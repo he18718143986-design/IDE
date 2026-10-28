@@ -106,13 +106,46 @@ describe("TM-G 批次级门禁：144 组组合（单人编写，待第三方独�
   ];
   const RELS: Record<string, number> = { behind: 4, same: 5, ahead: 6 };
 
+  /**
+   * 规格 §6.2 真值表（只断言规格确定的列：批次游标、修订号、闸门失败不出卡）。
+   * 「视判决」的出卡数不在此断言——需复核人阶段 A 表格给出。
+   */
+  const assertSpecRow = (
+    r: unknown,
+    st: { scheme_revision: number; suggestions: unknown[] },
+    row: { frozen: boolean; struct: string; rel: string; ops: string },
+  ) => {
+    const x = r as {
+      status: string;
+      batch_consumed: boolean;
+      revision?: number;
+      next?: { scheme_revision: number; suggestions: unknown[] };
+    };
+    const gated = row.frozen || row.struct !== "ok" || row.rel !== "same";
+    if (gated) {
+      // 真值表 1–5：批次游标不推进；无新状态（不修订、不出卡）
+      expect(x.batch_consumed, "闸门失败：批次游标不推进").toBe(false);
+      expect(x.next, "闸门失败：不产生新状态").toBeUndefined();
+      return;
+    }
+    if (row.ops === "applicable") {
+      // 真值表 7：APPLIED，修订号 +1，游标推进
+      expect(x).toMatchObject({ status: "applied", batch_consumed: true });
+      expect(x.revision).toBe(st.scheme_revision + 1);
+      expect(x.next?.scheme_revision).toBe(st.scheme_revision + 1);
+    } else {
+      // 真值表 6：NOOP，修订号不变，游标推进
+      expect(x).toMatchObject({ status: "noop", batch_consumed: true });
+      expect(x.next?.scheme_revision).toBe(st.scheme_revision);
+    }
+  };
+
   for (const frozen of [false, true])
     for (const struct of STRUCTS)
       for (const rel of Object.keys(RELS))
         for (const attempt of [0, 1] as const)
           for (const ops of ["applicable", "all_drop"] as const) {
             // ops 维度只影响 struct === ok 的分支
-            if (struct !== "ok" && ops === "all_drop") continue;
             const name = `frozen=${frozen} struct=${struct} rel=${rel} attempt=${attempt} ops=${ops}`;
             it(name, () => {
               const st = state({
@@ -123,6 +156,7 @@ describe("TM-G 批次级门禁：144 组组合（单人编写，待第三方独�
               const p = structPatch(struct, ops);
               (p as { base_revision: number }).base_revision = RELS[rel]!;
               const r = run(st, p, attempt);
+              assertSpecRow(r, st, { frozen, struct, rel, ops });
               // 期望：冻结 > 结构 > 新鲜度 > 逐 op
               if (frozen)
                 return expect(r).toMatchObject({
