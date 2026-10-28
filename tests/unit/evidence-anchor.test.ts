@@ -15,7 +15,7 @@ import type {
 
 /**
  * 实施口径 scheme-patch-engine.md §3（TM-Q / TM-P 的锚定部分）。
- * 注意：Q-16、Q-19 的规格期望与 §3.3 步骤 5 的「过滤后选取」不自洽，本文件按步骤 5 字面实现，见 PR 说明。
+ * Q-16、Q-19 按规格 §3.4 勘误口径编写：步骤 5 先过滤（整句边界）、步骤 6 再在候选中选取。
  */
 function turn(text: string): TranscriptTurn {
   return { turn_id: "T1", role: "user", seq: 1, text, text_sha256: sha(text) };
@@ -146,7 +146,7 @@ describe("anchorQuote 判例（§3.4 Q-01～Q-23）", () => {
       code: "E_QUOTE_OCCURRENCE_OUT_OF_RANGE",
     });
   });
-  it("Q-19 重叠出现的短引用：无整句边界的出现位置被过滤（与规格期望不同，见 PR）", () => {
+  it("Q-19 重叠出现的短引用：无整句边界的出现位置被过滤，候选为空（§3.4 勘误）", () => {
     expect(anchor("哈哈哈", "哈哈")).toEqual({
       ok: false,
       code: "E_QUOTE_TOO_SHORT_UNBOUNDED",

@@ -65,7 +65,7 @@ const run = (
     ctx: ctx ?? ctxCounter(attempt),
   });
 
-describe("TM-G 批次级门禁：144 组组合（独立夹具，见 PR 说明）", () => {
+describe("TM-G 批次级门禁：144 组组合（单人编写，待第三方独立复核，规格 §8 第 5 条）", () => {
   const STRUCT_CODE: Record<string, string> = {
     schema_bad: "E_PATCH_SCHEMA_INVALID",
     batch_bad: "E_PATCH_BATCH_INVALID",

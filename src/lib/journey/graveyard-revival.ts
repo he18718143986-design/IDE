@@ -450,7 +450,7 @@ export function buildTombstone(input: TombstoneInput): GraveyardEntry {
 
 /**
  * migrateGraveyardEntry：旧数据缺 K-4 字段时确定性补全。与 buildTombstone 对同一输入结果相等（TM-Y-29）。
- * 缺失的 rejected_after_turn_seq 默认 0（信息不足时的保守口径，见 PR 说明）。
+ * 缺失的 rejected_after_turn_seq 默认 0（规格 scheme-patch-engine.md §1.3 K-13 登记的行为性默认值）。
  */
 export function migrateGraveyardEntry(
   raw: Partial<GraveyardEntry> &

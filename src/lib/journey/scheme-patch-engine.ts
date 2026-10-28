@@ -410,8 +410,8 @@ export function auditLedgerState(
           ]
         : [mainTextOf(c, x as unknown as Record<string, unknown>)];
     for (const g of state.graveyard) {
-      // 豁免（待裁定，见 PR 说明）：被拒建议的 item_ref 指向仍保留的条目本身，
-      // 该条目是用户选择保留的版本，不视为「被复活」。后续补丁仍由 P3 的 (a) 拦截。
+      // 豁免（规格 scheme-patch-engine.md §5.5 A-04 豁免条款）：被拒建议的 item_ref 指向仍保留的条目本身，
+      // 该条目是用户选择保留的版本，不视为命中。后续补丁仍由 P3 的 (a) 拦截。
       if (g.item_ref && g.item_ref.id === x.id && g.status === "active")
         continue;
       if (
