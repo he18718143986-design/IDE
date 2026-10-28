@@ -117,7 +117,7 @@ describe("TM-G 批次级门禁：144 组组合（单人编写，待第三方独�
    */
   const assertSpecRow = (
     r: unknown,
-    st: { scheme_revision: number; suggestions: unknown[] },
+    st: { scheme_revision: number },
     row: { frozen: boolean; struct: string; rel: string; ops: string },
   ) => {
     const x = r as {
