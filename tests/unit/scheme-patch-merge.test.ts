@@ -66,6 +66,11 @@ const run = (
   });
 
 describe("TM-G 批次级门禁：144 组组合（单人编写，待第三方独立复核，规格 §8 第 5 条）", () => {
+  // 退化性说明（勿误读为隔离性证据）：structPatch 对 struct !== "ok" 忽略 ops，
+  // 因此 struct !== "ok" 且 ops === "all_drop" 的 60 组（5 结构 × frozen 2 × rel 3 × attempt 2）
+  // 与同格 ops === "applicable" 的输入完全相同，是同一输入的重复运行。
+  // ops 维度实际只对 struct === "ok" 生效。保留完整 144 组枚举以满足规格 §6.2 的形式计数；
+  // 这 60 组不构成“ops 不穿透失败闸门”的独立证据。
   const STRUCT_CODE: Record<string, string> = {
     schema_bad: "E_PATCH_SCHEMA_INVALID",
     batch_bad: "E_PATCH_BATCH_INVALID",
