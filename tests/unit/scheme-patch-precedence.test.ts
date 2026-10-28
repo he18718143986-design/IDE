@@ -184,17 +184,68 @@ describe("TM-Z 优先级：保护路径 > 安全门禁墓碑 > 用户墓碑 > �
     expect(r.next.suggestions[0]).toMatchObject({ kind: "S_OVERRIDE_PINNED" });
     expect(r.next.suggestions[0]?.reasons).toContain("S_GRAVEYARD_SOFT");
   });
-  it("Z-11 未钉选 × 门禁墓碑 → DROP（安全门禁不可经补丁复活）", () => {
-    const r = zRun(false, "G", "-");
-    expect(r.next.suggestions.length).toBe(0);
-    expect(r.journal.verdicts[0]).toMatchObject({
-      verdict: "DROP",
-      code: "E_REVIVAL_SECURITY_LOCKED",
+  for (const rev of ["-", "L", "I"] as const)
+    it(`Z-11 未钉选 × 门禁墓碑 × rev=${rev} → DROP E_REVIVAL_SECURITY_LOCKED（安全门禁不可经补丁复活）`, () => {
+      const r = zRun(false, "G", rev);
+      expect(r.next.suggestions.length).toBe(0);
+      expect(r.journal.verdicts[0]).toMatchObject({
+        verdict: "DROP",
+        code: "E_REVIVAL_SECURITY_LOCKED",
+      });
+    });
+  for (const rev of ["-", "L", "I"] as const)
+    it(`Z-12 钉选 × 门禁墓碑 × rev=${rev} → DROP E_REVIVAL_SECURITY_LOCKED`, () => {
+      const r = zRun(true, "G", rev);
+      expect(r.next.suggestions.length).toBe(0);
+      expect(r.journal.verdicts[0]).toMatchObject({
+        verdict: "DROP",
+        code: "E_REVIVAL_SECURITY_LOCKED",
+      });
+    });
+});
+
+describe("TM-Z 具名用例（§6.8）", () => {
+  it("TM-Z-13 Z-08：每个 op 只产生 1 张卡，kind 为 S_REVIVAL_AMBIGUOUS，reasons 含 S_OVERRIDE_PINNED", () => {
+    const r = zRun(true, "H", "A");
+    expect(r.next.suggestions).toHaveLength(1);
+    expect(r.next.suggestions[0]).toMatchObject({
+      kind: "S_REVIVAL_AMBIGUOUS",
+    });
+    expect(r.next.suggestions[0]?.reasons).toContain("S_OVERRIDE_PINNED");
+  });
+
+  it("TM-Z-14 Z-06 采纳：同一修订内条目被覆盖 + 墓碑 revived", () => {
+    const r = zRun(true, "H", "L");
+    const sug = r.next.suggestions[0];
+    const edit: UserEdit = {
+      edit_event_id: "UE1",
+      edited_at: 9,
+      collection: "modules",
+      id: "M1",
+      patch: {},
+    };
+    const acc = acceptSuggestion(
+      r.next,
+      sug!.suggestion_id,
+      edit,
+      ctxCounter(),
+      TZ.view,
+    );
+    expect(acc.ok).toBe(true);
+    if (!acc.ok) return;
+    const rev = acc.state.draft.scheme_revision;
+    expect(acc.state.graveyard[0]).toMatchObject({ status: "revived" });
+    expect(acc.state.graveyard[0]?.revived?.at_revision).toBe(rev);
+    expect(acc.state.draft.modules[0]).toMatchObject({
+      name: "Excel 导出功能",
+      user_pinned: true,
+      updated_in_revision: rev,
     });
   });
-  it("Z-12 钉选 × 门禁墓碑 → DROP", () => {
-    const r = zRun(true, "G", "-");
-    expect(r.next.suggestions.length).toBe(0);
+
+  it("TM-Z-15 Z-04：卡片数为 0（被否决的想法不得借覆盖卡重现）", () => {
+    const r = zRun(true, "H", "I");
+    expect(r.next.suggestions).toHaveLength(0);
     expect(r.journal.verdicts[0]).toMatchObject({ verdict: "DROP" });
   });
 });
