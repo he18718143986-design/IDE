@@ -22,6 +22,7 @@ import {
   state,
   turnEv,
   type Transcript,
+  userModule,
 } from "../helpers/scheme-patch-fixtures";
 
 /** 对话记录：T1 用户原话；T2 AI；T3/T5 用户「对」；T4 AI 问句；T6 否定；T7 问句；T8 「对比」；T9 AI；T10 用户 */
@@ -198,6 +199,171 @@ describe("TM-G 批次级门禁：144 组组合（单人编写，待第三方独�
               return expect(r).toMatchObject({ status: "noop" });
             });
           }
+});
+
+/**
+ * TM-G 具名用例（规格 §6.2 表，独立构造，不从笛卡尔积派生）。
+ * 只断言规格确定的列：status / code / retry / 修订号 / 闸门游标（batch_consumed）/ 不产生新状态（next）。
+ */
+describe("TM-G 具名用例（§6.2，独立构造）", () => {
+  const gate = (r: unknown) =>
+    r as { batch_consumed?: boolean; next?: unknown };
+
+  it("TM-G-01 frozen + schema_bad → frozen（冻结优先于结构）", () => {
+    const r = run(state({ frozen: true }), patch([{ op: "replace_all" }]));
+    expect(r).toMatchObject({ status: "frozen", code: "E_PATCH_FROZEN" });
+    expect(gate(r).batch_consumed).toBe(false);
+  });
+
+  it("TM-G-02 frozen + base 落后 → frozen，retry 字段不存在", () => {
+    const r = run(
+      state({ frozen: true, scheme_revision: 5 }),
+      patch([modOp("M9", "报表导出", "给管理者看", [ev("T1")])], 4),
+    );
+    expect(r).toMatchObject({ status: "frozen", code: "E_PATCH_FROZEN" });
+    expect(r).not.toHaveProperty("retry");
+  });
+
+  it("TM-G-03 schema_bad + base 落后 → rejected E_PATCH_SCHEMA_INVALID（结构优先于修订号）", () => {
+    const r = run(
+      state({ scheme_revision: 5 }),
+      patch([{ op: "replace_all" }], 4),
+    );
+    expect(r).toMatchObject({
+      status: "rejected",
+      code: "E_PATCH_SCHEMA_INVALID",
+    });
+    expect(r.status).not.toBe("stale");
+    expect(gate(r).batch_consumed).toBe(false);
+  });
+
+  it("TM-G-04 65 个 op → rejected E_PATCH_TOO_LARGE，无新状态", () => {
+    const ops = Array.from({ length: 65 }, (_, i) =>
+      modOp(`M${i + 1}`, `模块${i + 1}`, "用途", [ev("T1")]),
+    );
+    const r = run(
+      state({ modules: [aiModule("M0", "旧模块", "旧用途")] }),
+      patch(ops),
+    );
+    expect(r).toMatchObject({
+      status: "rejected",
+      code: "E_PATCH_TOO_LARGE",
+    });
+    expect(gate(r).next).toBeUndefined();
+    expect(gate(r).batch_consumed).toBe(false);
+  });
+
+  it("TM-G-05 某 op evidence: [] → rejected E_PATCH_EVIDENCE_EMPTY，其他合法 op 也不生效", () => {
+    const r = run(
+      state({ modules: [aiModule("M0", "旧模块", "旧用途")] }),
+      patch([
+        modOp("M9", "报表导出", "给管理者看", []),
+        modOp("M8", "导入", "导入数据", [ev("T1")]),
+      ]),
+    );
+    expect(r).toMatchObject({
+      status: "rejected",
+      code: "E_PATCH_EVIDENCE_EMPTY",
+    });
+    expect(gate(r).next).toBeUndefined();
+    expect(gate(r).batch_consumed).toBe(false);
+  });
+
+  it("TM-G-06 compiled_from_turns: [] → rejected E_PATCH_BATCH_INVALID", () => {
+    const r = run(
+      state(),
+      patch([modOp("M9", "报表导出", "给管理者看", [ev("T1")])], 5, []),
+    );
+    expect(r).toMatchObject({
+      status: "rejected",
+      code: "E_PATCH_BATCH_INVALID",
+    });
+    expect(gate(r).batch_consumed).toBe(false);
+  });
+
+  it("TM-G-07 compiled_from_turns 含 AI 消息 → rejected E_PATCH_BATCH_INVALID", () => {
+    const r = run(
+      state(),
+      patch([modOp("M9", "报表导出", "给管理者看", [ev("T1")])], 5, [
+        "T1",
+        "T2",
+      ]),
+    );
+    expect(r).toMatchObject({
+      status: "rejected",
+      code: "E_PATCH_BATCH_INVALID",
+    });
+    expect(gate(r).batch_consumed).toBe(false);
+  });
+
+  it("TM-G-08 compiled_from_turns 有重复 id → rejected E_PATCH_BATCH_INVALID", () => {
+    const r = run(
+      state(),
+      patch([modOp("M9", "报表导出", "给管理者看", [ev("T1")])], 5, [
+        "T1",
+        "T1",
+      ]),
+    );
+    expect(r).toMatchObject({
+      status: "rejected",
+      code: "E_PATCH_BATCH_INVALID",
+    });
+    expect(gate(r).batch_consumed).toBe(false);
+  });
+
+  it("TM-G-09 基线 user_said 条目锚点哈希被篡改 → rejected E_STATE_CORRUPT", () => {
+    const m = userModule(
+      TR,
+      "M0",
+      "旧模块",
+      "旧用途",
+      "T1",
+      "我要做一个报表工具",
+    );
+    const tampered = {
+      ...m,
+      evidence: m.evidence.map((e) =>
+        e.kind === "turn" && e.ref.anchor
+          ? {
+              ...e,
+              ref: {
+                ...e.ref,
+                anchor: { ...e.ref.anchor, turn_text_sha256: "0".repeat(64) },
+              },
+            }
+          : e,
+      ),
+    };
+    const r = run(
+      state({ modules: [tampered as never] }),
+      patch([modOp("M9", "报表导出", "给管理者看", [ev("T1")])]),
+    );
+    expect(r).toMatchObject({
+      status: "rejected",
+      code: "E_STATE_CORRUPT",
+    });
+    expect(gate(r).batch_consumed).toBe(false);
+  });
+
+  it("TM-G-10 未知 op 名 replace_all → rejected E_PATCH_SCHEMA_INVALID（永远不能整份替换）", () => {
+    const r = run(
+      state(),
+      patch([{ op: "replace_all", item: { id: "M9" }, evidence: [ev("T1")] }]),
+    );
+    expect(r).toMatchObject({
+      status: "rejected",
+      code: "E_PATCH_SCHEMA_INVALID",
+    });
+  });
+
+  it("TM-G-11 ops: []，批次合法 → noop，batch_consumed: true，修订号不变", () => {
+    const r = run(state({ scheme_revision: 5 }), patch([]));
+    expect(r).toMatchObject({ status: "noop", batch_consumed: true });
+    expect(
+      (r as { next: { draft: { scheme_revision: number } } }).next.draft
+        .scheme_revision,
+    ).toBe(5);
+  });
 });
 
 describe("§5 补丁级结构与证据（TM-P）", () => {
