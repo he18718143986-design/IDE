@@ -117,15 +117,16 @@ describe("TM-G 批次级门禁：144 组组合（单人编写，待第三方独�
    */
   const assertSpecRow = (
     r: unknown,
-    st: { scheme_revision: number },
+    st: LedgerState,
     row: { frozen: boolean; struct: string; rel: string; ops: string },
   ) => {
     const x = r as {
       status: string;
       batch_consumed: boolean;
       revision?: number;
-      next?: { scheme_revision: number; suggestions: unknown[] };
+      next?: LedgerState;
     };
+    const rev = st.draft.scheme_revision;
     const gated = row.frozen || row.struct !== "ok" || row.rel !== "same";
     if (gated) {
       // 真值表 1–5：批次游标不推进；无新状态（不修订、不出卡）
@@ -136,12 +137,12 @@ describe("TM-G 批次级门禁：144 组组合（单人编写，待第三方独�
     if (row.ops === "applicable") {
       // 真值表 7：APPLIED，修订号 +1，游标推进
       expect(x).toMatchObject({ status: "applied", batch_consumed: true });
-      expect(x.revision).toBe(st.scheme_revision + 1);
-      expect(x.next?.scheme_revision).toBe(st.scheme_revision + 1);
+      expect(x.revision).toBe(rev + 1);
+      expect(x.next?.draft.scheme_revision).toBe(rev + 1);
     } else {
       // 真值表 6：NOOP，修订号不变，游标推进
       expect(x).toMatchObject({ status: "noop", batch_consumed: true });
-      expect(x.next?.scheme_revision).toBe(st.scheme_revision);
+      expect(x.next?.draft.scheme_revision).toBe(rev);
     }
   };
 
