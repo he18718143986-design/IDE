@@ -1,6 +1,6 @@
 # 技术方案与系统知识库规格（S4 · DesignNote + `docs/system/`）
 
-> **地位**：实施口径，从属 [ADR-0016](../adr/0016-system-knowledge-base-in-repo.md) 与 [`delivery-lifecycle.md`](./delivery-lifecycle.md) §2 S4。
+> **地位**：实施口径，从属 [ADR-0016](../adr/0016-system-knowledge-base-in-repo.md)、[ADR-0018](../adr/0018-project-architecture-baseline.md) 与 [`delivery-lifecycle.md`](./delivery-lifecycle.md) §2 S4。DesignNote 必须遵守 [PAB](./project-architecture-baseline.md)，不得替代项目级架构决策。
 > **上游意图**：`q17`「技术方案」、`q19`「在复杂度超过个人脑容量之后，仍然能够掌握整个系统」、`q1`「其他部分能交给Agent的都交给它」（[`../scheme.md`](../scheme.md)）。
 > **施工卡**：TASK-L.11（DesignNote）、L.12（知识库 Schema、引导与漂移门禁）、L.13（追踪反查）。
 > **状态**：设计定稿 · 待施工。现有代码没有设计产物；`daemon/arch/parser.ts` 与 `daemon/arch/graph.ts` 只在 `GET /api/arch/graph` 上按需计算依赖图，不落盘。
