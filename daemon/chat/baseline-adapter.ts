@@ -34,9 +34,9 @@ export class BaselineChatAdapter implements ChatAdapter {
       apiKey,
       ...(baseURL === undefined ? {} : { baseURL }),
     });
+    // TASK-L.1 / ADR-0014 §1：右栏无系统提示；messages 仅历史与本条用户消息
     const result = streamText({
       model: provider(getRuntimeModel()),
-      system: "你是 Stagent 右栏助手，用简体中文简洁回答。",
       messages: [
         ...input.history.map((h) => ({ role: h.role, content: h.text })),
         { role: "user" as const, content: input.prompt },

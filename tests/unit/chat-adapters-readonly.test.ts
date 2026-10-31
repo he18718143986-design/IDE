@@ -105,8 +105,9 @@ describe("BaselineChatAdapter（自研 OpenAI 兼容适配器）没有工具通�
       expect(opts).not.toHaveProperty("maxSteps");
       expect(opts).not.toHaveProperty("maxToolRoundtrips");
       expect(Object.keys(opts).sort()).toEqual(
-        ["abortSignal", "messages", "model", "system"].sort(),
+        ["abortSignal", "messages", "model"].sort(),
       );
+      expect(opts).not.toHaveProperty("system");
       // 行为事实：只吐文本，不产生 tool_call / tool_result
       expect(events.every((e) => e.kind === "delta")).toBe(true);
     } finally {

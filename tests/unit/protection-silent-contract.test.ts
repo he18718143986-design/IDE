@@ -5,7 +5,6 @@ import os from "node:os";
 import path from "node:path";
 import {
   addProtectionEntry,
-  buildProtectionPromptNotice,
   closeRound,
   decideApproval,
   ensureRoundStarted,
@@ -217,14 +216,6 @@ describe("TASK-P.1 保护清单与本轮授权", () => {
     );
   });
 
-  it("Prompt 前置注入包含白话清单；无锁定时不注入", () => {
-    expect(buildProtectionPromptNotice(repo)).toBeNull();
-    addProtectionEntry(repo, "登录", ["src/auth/**"]);
-    const notice = buildProtectionPromptNotice(repo);
-    expect(notice).toContain("保护清单");
-    expect(notice).toContain("登录");
-    expect(notice).toContain("src/auth/**");
-  });
 });
 
 describe("TASK-P.1 Auto-Checkpoint 与整轮撤销", () => {

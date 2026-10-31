@@ -7,7 +7,6 @@ import type {
 } from "../../src/lib/chat-events";
 import type { AdapterEvent, ChatAdapter, HistoryTurn } from "./types";
 import { ChatSessionStore, type StoredSession } from "./session-store";
-import { buildProtectionPromptNotice } from "../protection/protection-list";
 import { pickPreferredAdapterId } from "../../src/lib/pick-chat-adapter";
 
 /**
@@ -229,15 +228,9 @@ export class ChatSessionManager {
     this.emit(session, turnId, { kind: "user", text });
     try {
       if (!adapter) throw new Error(`adapter missing: ${session.adapter_id}`);
-      // P.1：把已锁定的保护清单前置注入 Prompt，引导 AI 主动规避（§0.6.3）
-      const protectionNotice = buildProtectionPromptNotice(
-        this.opts.resolveCwd?.() ?? this.opts.repoRoot,
-      );
-      const prompt = protectionNotice
-        ? `${protectionNotice}\n\n---\n${text}`
-        : text;
+      // TASK-L.1 / ADR-0014 §1：prompt 与用户输入逐字节相同，不再注入保护清单前缀
       const iter = adapter.run({
-        prompt,
+        prompt: text,
         cwd: this.opts.resolveCwd?.() ?? this.opts.repoRoot,
         nativeSessionId: session.native_session_id,
         history,
