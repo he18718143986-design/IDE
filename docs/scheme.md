@@ -207,9 +207,9 @@
 | :--- | :--- | :--- | :--- |
 | gap-1 | 右栏只读 | 已实现：`ClaudeCodeAdapter` `role: "partner"`，工具白名单 `Read,Glob,Grep` | TASK-J.1 代码已合入（PR #29 / #30），**卡状态仍为 NEW_TASK**；真 Key 补验 OP-28 |
 | gap-2 | 右栏无系统提示 | Claude Code 适配器未传系统提示参数；`BaselineChatAdapter` 带 `system: "你是 Stagent 右栏助手…"`；P.1 把保护清单拼在用户消息前面发给右栏（`daemon/chat/session-manager.ts` 的 `buildProtectionPromptNotice`） | 无卡；见 conf-2、conf-4 |
-| gap-3 | 中栏 Supervisor 是 Claude Code | 规则 L0 + 可选 OpenAI 增强；方案靠 6 条 `MODULE_HINTS` 正则 | TASK-J.10（意图编译器）；conf-1 |
+| gap-3 | 中栏 Supervisor 是 Claude Code | 规则 L0 + 可选 OpenAI 增强；方案靠 6 条 `MODULE_HINTS` 正则 | TASK-J.10；conf-1；**由 [ADR-0018](./adr/0018-intent-to-executable-seal.md) 封印（编译结果须经密封进入签署）** |
 | gap-4 | Supervisor 只经画布交互 | 规格 §16 仍有右栏插话设计；前端无 `JourneyStage` 投影 | TASK-J.8；conf-3 |
-| gap-5 | 机器指令 = 合同 + 任务图 | 合同范围在确认时临时推断，未经 `ScopePlan` 展示 | TASK-J.2～J.6 |
+| gap-5 | 机器指令 = 合同 + 任务图 | 合同范围在确认时临时推断，未经 `ScopePlan` 展示 | TASK-J.2～J.6；**由 [ADR-0018](./adr/0018-intent-to-executable-seal.md) 封印（禁 `buildL0Plan(chat)`；确认冻 MachineFace）** |
 | gap-6 | 墓地拦截 Worker 复活被否决方案 | 未实现 | TASK-J.18 |
 | gap-7 | 试玩「这里不对」自查 | 旧 `dispute` 实现有 7 处缺陷 | TASK-J.16（预告）；[`specs/playtest-self-check.md`](./specs/playtest-self-check.md) |
 | gap-8 | `SchemePatch` 零模型合并 | 引擎文件不存在 | TASK-J.9 |

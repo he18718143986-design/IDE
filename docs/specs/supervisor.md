@@ -1359,6 +1359,7 @@ interface ScopePlan {
 1. 「确认方案」事务的 `VALIDATE_CONFIRMATION` 阶段同时校验 `scopePlan.scheme_revision === scheme_revision`，并**在 Daemon 上重跑一次预检**比对 `plan_digest`。不一致（例如用户在别处新建了 `package.json`，绿野判定变了）→ `E_SCOPE_PLAN_DRIFT`（409），事务在冻结前中止、右栏解锁，中栏显示「项目刚刚有变化，我重新核对了改动范围，请再看一眼」并展示新范围。
 2. `FREEZE_SNAPSHOT` 把 `ScopePlan` 完整写进 `.stagent/drafts/schemes/{confirmation_id}.json`，快照摘要包含 `plan_digest`。
 3. `SIGN_AND_PREPARE` 建合同时，`writable_paths` / `forbidden_paths` / `verification_spec` / `budget` **只能**从快照里的 `ScopePlan` 原样生成；传了 `confirmation_id` 的合同创建请求若与快照不一致 → `409 E_SCHEME_SNAPSHOT_MISMATCH`。Daemon 不再从意图文本重新推断范围。
+> **架构定型**：本条「不得从意图文本重推范围」升格为 [ADR-0018](../adr/0018-intent-to-executable-seal.md)（`INV-SEAL-01～05`）；下游 PAB 见 [ADR-0019](../adr/0019-project-architecture-baseline.md)。
 4. **不变量**：带 `confirmation_id` 的合同创建与批准，**不得**返回 `E_WRITABLE_SCOPE_POLICY`。若发生，按 D1 违约缺陷处理（以 Daemon 为准、记告警、补测试）。
 
 > 第一部分「L1 与 L2 使用同一组拒绝码」的纪律在此显式化：`E_SCOPE_PLAN_DRIFT`、`E_SCHEME_SNAPSHOT_MISMATCH` 与既有的 `E_DEMO_NOT_CONFIRMED`、`E_SCHEME_SNAPSHOT_NOT_FOUND` 一样，属于**只有 Daemon 才能检出**的情形（前端看不到磁盘与快照），登记在 `runtime-contract-and-safety.md` §2.3「Daemon 专属码」中；其余码两层必须一致。
