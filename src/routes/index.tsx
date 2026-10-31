@@ -262,8 +262,18 @@ function Console() {
   const [specsOpen, setSpecsOpen] = useState(true); // C.10f：审阅页内默认展开本轮依据
 
   /** TASK-C.2：Daemon 权威展示态（STATE_CHANGED），驱动 Studio 默认视口 */
+  /** TASK-J.8：附带 journey_*，只存不渲染（四幕 UI 另卡） */
   const [presentationByContract, setPresentationByContract] = useState<
-    Record<string, { state: PresentationState; message: string }>
+    Record<
+      string,
+      {
+        state: PresentationState;
+        message: string;
+        journey_stage?: string;
+        journey_substate?: string;
+        journey_archived?: boolean;
+      }
+    >
   >({});
   const [demoPreview, setDemoPreview] =
     useState<DemoPreviewStatusPayload | null>(null);
@@ -1701,6 +1711,16 @@ ${trimmed}`
         [p.contract_id]: {
           state: state as PresentationState,
           message: p.message?.trim() || "",
+          // TASK-J.8：只存 Daemon 投影字段，本卡不改 UI
+          ...(p.journey_stage !== undefined
+            ? { journey_stage: p.journey_stage }
+            : {}),
+          ...(p.journey_substate !== undefined
+            ? { journey_substate: p.journey_substate }
+            : {}),
+          ...(p.journey_archived !== undefined
+            ? { journey_archived: p.journey_archived }
+            : {}),
         },
       }));
     },

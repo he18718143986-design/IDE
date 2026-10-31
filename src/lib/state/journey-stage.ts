@@ -27,6 +27,7 @@ export const JOURNEY_SUBSTATES = [
   "plan_chatting",
   "plan_demo",
   "plan_handoff",
+  "plan_project_mapping",
   "build_running",
   "build_checking",
   "build_rework",
@@ -99,6 +100,13 @@ export const JOURNEY_ROWS: readonly JourneyRow[] = [
     presentation: ["GRAPH_MAPPING"],
   },
   {
+    // 方案 · 整理项目地图（supervisor §16.2 / J-01）：与交接中 GRAPH_MAPPING 互斥；右栏可聊
+    substate: "plan_project_mapping",
+    transient: [null],
+    lifecycle: [null, "PREPARING"],
+    presentation: ["PROJECT_MAPPING"],
+  },
+  {
     substate: "build_running",
     delivery: ["IMPLEMENTING"],
     lifecycle: ["EXECUTING"],
@@ -165,6 +173,7 @@ const STAGE_OF: Readonly<Record<JourneySubstate, JourneyStage>> = {
   plan_chatting: "scheme",
   plan_demo: "scheme",
   plan_handoff: "scheme",
+  plan_project_mapping: "scheme",
   build_running: "construction",
   build_checking: "construction",
   build_rework: "construction",

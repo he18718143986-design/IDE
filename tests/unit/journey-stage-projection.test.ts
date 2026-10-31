@@ -69,6 +69,24 @@ const CASES: ReadonlyArray<{
     expect: { stage: "scheme", substate: "plan_handoff" },
   },
   {
+    name: "方案 · 整理项目地图（PROJECT_MAPPING，无施工合同）",
+    input: base({
+      delivery_state: "PLAN_CONFIRMED",
+      presentation_state: "PROJECT_MAPPING",
+    }),
+    expect: { stage: "scheme", substate: "plan_project_mapping" },
+  },
+  {
+    name: "方案 · 整理项目地图（PROJECT_MAPPING，PREPARING 桩）",
+    input: base({
+      delivery_state: "PLAN_CONFIRMED",
+      lifecycle_state: "PREPARING",
+      presentation_state: "PROJECT_MAPPING",
+      has_contract: true,
+    }),
+    expect: { stage: "scheme", substate: "plan_project_mapping" },
+  },
+  {
     name: "施工 · 进行中",
     input: base({
       delivery_state: "IMPLEMENTING",
