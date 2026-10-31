@@ -2,20 +2,26 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import type { DemoGate, SchemeDraft } from "../../src/lib/journey/scheme-draft";
+import type { ScopePlan } from "../../src/lib/journey/scope-plan";
 import { writeJsonAtomic } from "../../src/lib/state-machine";
 
 /**
  * TASK-C.22 / SSOT v2.0.2 §5.2.1：确认方案不可变快照。
+ * TASK-J.4：schema 1.1 绑定 ScopePlan；digest 纳入 plan_digest。
  *
  * 只负责“冻结事实”，不负责签署。相同 confirmation_id + 相同内容幂等返回；
  * 同一 id 对应不同内容则拒绝，避免前端重试时悄悄替换用户已确认的方案。
  */
 
 export const SCHEME_SNAPSHOT_DIR = ".stagent/drafts/schemes" as const;
-export const SCHEME_SNAPSHOT_SCHEMA_VERSION = "1.0" as const;
+/** 现行写入版本；读侧仍接受 1.0（scope_plan 视为缺失）。 */
+export const SCHEME_SNAPSHOT_SCHEMA_VERSION = "1.1" as const;
+export const SCHEME_SNAPSHOT_SCHEMA_VERSION_LEGACY = "1.0" as const;
 
 export interface SchemeSnapshot {
-  schema_version: typeof SCHEME_SNAPSHOT_SCHEMA_VERSION;
+  schema_version:
+    | typeof SCHEME_SNAPSHOT_SCHEMA_VERSION
+    | typeof SCHEME_SNAPSHOT_SCHEMA_VERSION_LEGACY;
   snapshot_id: string;
   confirmation_id: string;
   status: "FROZEN";
@@ -29,6 +35,8 @@ export interface SchemeSnapshot {
     demo_mode: "none" | "interactive" | "degraded";
   };
   digest: string;
+  /** 1.1 必有；读 1.0 旧快照时为 undefined（视为缺失）。 */
+  scope_plan?: ScopePlan;
 }
 
 export class SchemeSnapshotConflictError extends Error {
@@ -84,11 +92,16 @@ export function schemeSnapshotDigest(input: {
   scheme_revision: number;
   scheme: SchemeDraft;
   demo: DemoGate;
+  /** 1.1：纳入 plan_digest；缺省（旧 1.0 口径）不参与。 */
+  scope_plan?: ScopePlan;
 }): string {
   const payload = stableStringify({
     scheme_revision: input.scheme_revision,
     scheme: decisionBearingScheme(input.scheme),
     demo: input.demo,
+    ...(input.scope_plan
+      ? { scope_plan_digest: input.scope_plan.plan_digest }
+      : {}),
   });
   return createHash("sha256").update(payload).digest("hex");
 }
@@ -99,6 +112,15 @@ export function schemeSnapshotPath(
 ): string {
   const id = assertConfirmationId(confirmationId);
   return path.join(path.resolve(repoRoot), SCHEME_SNAPSHOT_DIR, `${id}.json`);
+}
+
+function isSupportedSchemaVersion(value: unknown): value is
+  | typeof SCHEME_SNAPSHOT_SCHEMA_VERSION
+  | typeof SCHEME_SNAPSHOT_SCHEMA_VERSION_LEGACY {
+  return (
+    value === SCHEME_SNAPSHOT_SCHEMA_VERSION ||
+    value === SCHEME_SNAPSHOT_SCHEMA_VERSION_LEGACY
+  );
 }
 
 export function readSchemeSnapshot(
@@ -115,12 +137,17 @@ export function readSchemeSnapshot(
   try {
     const parsed = JSON.parse(fs.readFileSync(file, "utf8")) as SchemeSnapshot;
     if (
-      parsed.schema_version !== SCHEME_SNAPSHOT_SCHEMA_VERSION ||
+      !isSupportedSchemaVersion(parsed.schema_version) ||
       parsed.status !== "FROZEN" ||
       typeof parsed.digest !== "string" ||
       parsed.confirmation_id !== confirmationId
     ) {
       return null;
+    }
+    // 1.0：scope_plan 视为缺失（即使文件里被人塞了字段也不采信）
+    if (parsed.schema_version === SCHEME_SNAPSHOT_SCHEMA_VERSION_LEGACY) {
+      const { scope_plan: _drop, ...rest } = parsed;
+      return rest;
     }
     return parsed;
   } catch {
@@ -135,6 +162,7 @@ export function writeSchemeSnapshot(
     scheme: SchemeDraft;
     demo: DemoGate;
     decision: SchemeSnapshot["decision"];
+    scope_plan: ScopePlan;
     now?: () => Date;
   },
 ): { snapshot: SchemeSnapshot; idempotent: boolean } {
@@ -143,6 +171,7 @@ export function writeSchemeSnapshot(
     scheme_revision: input.scheme.scheme_revision,
     scheme: input.scheme,
     demo: input.demo,
+    scope_plan: input.scope_plan,
   });
   const existing = readSchemeSnapshot(repoRoot, confirmationId);
   if (existing) {
@@ -164,6 +193,7 @@ export function writeSchemeSnapshot(
     demo: input.demo,
     decision: input.decision,
     digest,
+    scope_plan: input.scope_plan,
   };
   writeJsonAtomic(schemeSnapshotPath(repoRoot, confirmationId), snapshot);
   return { snapshot, idempotent: false };

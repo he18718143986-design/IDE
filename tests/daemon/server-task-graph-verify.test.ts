@@ -148,8 +148,8 @@ describe("OP-32-A: daemon task-graph verify command execution", () => {
   async function startAndInitGraph() {
     daemon = createDaemon({
       repoRoot: tempDir,
-      startPort: 3930,
-      endPort: 3939,
+      startPort: 3960,
+      endPort: 3969,
     });
     const info = await daemon.start();
     const token = daemon.getSessionToken() ?? "";
