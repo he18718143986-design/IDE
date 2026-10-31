@@ -134,7 +134,7 @@ export function evaluatePhaseCheck(
 export interface SuspensionRecord {
   contract_id: string;
   reason: string;
-  phase: "t" | "i" | "two_phase";
+  phase: "t" | "i" | "two_phase" | "design";
   detail?: string;
   created_at: string;
   i_green_failures?: number;

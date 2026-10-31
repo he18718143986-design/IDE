@@ -95,6 +95,19 @@ import {
 } from "./two-phase-runner";
 import { shouldRunTwoPhase } from "./two-phase";
 import {
+  runDesignStep,
+  applyDesignDependencyAllow,
+  type DesignNoteGenerator,
+  type DesignSuspensionReason,
+} from "../supervisor/design/design-step";
+import type { DesignNote, DetectedEscalation } from "../../src/lib/design/design-note";
+import type {
+  ProjectPlan,
+  ProjectPlanScheme,
+  RepoFacts,
+} from "../../src/lib/project/project-plan";
+
+import {
   deriveObligations,
   detectRunner,
   obligationCommand,
@@ -132,6 +145,8 @@ export interface OrchestratorOptions {
     | undefined;
   /** TASK-W.4：Gateway 运行时违规广播出口 */
   onGatewayViolation?: ((violation: GatewayViolation) => void) | undefined;
+  /** TASK-L.11：可注入设计步骤生成器（测试桩 / 专用 Agent） */
+  designNoteGenerator?: DesignNoteGenerator | undefined;
 }
 
 export interface ExecutionOutcome {
@@ -187,6 +202,14 @@ export interface AdmissionResult {
   cardId?: string | undefined;
 }
 
+export interface DesignRunInfo {
+  status: "ok" | "suspended";
+  reason?: DesignSuspensionReason;
+  detail?: string;
+  note?: DesignNote | null;
+  escalation_missed?: DetectedEscalation[];
+}
+
 export class ContractOrchestrator {
   private readonly repoRoot: string;
   private readonly store: ContractStore;
@@ -196,6 +219,8 @@ export class ContractOrchestrator {
     | undefined;
   private readonly onGatewayViolation?:
     ((violation: GatewayViolation) => void) | undefined;
+  /** TASK-L.11 */
+  private readonly designNoteGenerator: DesignNoteGenerator | undefined;
   /** 在途执行（execute/runWorker）的中止控制器：abort 端点凭此强杀子进程树 */
   private readonly abortControllers = new Map<string, AbortController>();
   /** 已请求中止但执行尚未开始的合同：注册控制器时立即进入已中止态 */
@@ -217,6 +242,7 @@ export class ContractOrchestrator {
     this.acknowledgeDirty = options.acknowledgeDirty ?? false;
     this.onTerminalLine = options.onTerminalLine;
     this.onGatewayViolation = options.onGatewayViolation;
+    this.designNoteGenerator = options.designNoteGenerator;
   }
 
   /** 测试/诊断：当前合同是否持有有效 exec_token */
@@ -743,6 +769,58 @@ export class ContractOrchestrator {
     }
   }
 
+  /**
+   * TASK-L.11 DN-2：用户在意外卡选「可以」装新库。
+   * 快照合同文件字节 → 仅写计划插入 dependency 桩 → 再 abort。
+   * 不改已签合同的授权字段（dependency_changes_allowed 等）。
+   */
+  async resolveDesignDependencyAllow(
+    contractId: string,
+    input: {
+      plan: ProjectPlan;
+      scheme: ProjectPlanScheme;
+      repoFacts: RepoFacts;
+      originalStubId: string;
+      dependencies: Array<{ name: string; version: string; why: string }>;
+      reason?: string;
+    },
+  ): Promise<{
+    aborted: SoftwareContract;
+    plan: ProjectPlan;
+    dependencyStubId: string;
+    contractBytesBeforeAllow: string;
+    contractBytesAfterAllow: string;
+  }> {
+    const contractPath = this.store.filePath(contractId);
+    const contractBytesBeforeAllow = fs.readFileSync(contractPath, "utf8");
+    const applied = applyDesignDependencyAllow({
+      repoRoot: this.repoRoot,
+      contractFileBytes: contractBytesBeforeAllow,
+      plan: input.plan,
+      scheme: input.scheme,
+      repoFacts: input.repoFacts,
+      originalStubId: input.originalStubId,
+      dependencies: input.dependencies,
+    });
+    if (!applied.ok) {
+      throw new Error(`[${applied.code}] ${applied.message}`);
+    }
+    const contractBytesAfterAllow = fs.readFileSync(contractPath, "utf8");
+    const aborted = await this.abort(contractId, {
+      reviewer: "local-user",
+      reason:
+        input.reason ??
+        "DN-2: user allowed new dependency; aborting for re-sign after dependency stub",
+    });
+    return {
+      aborted,
+      plan: applied.plan,
+      dependencyStubId: applied.dependencyStubId,
+      contractBytesBeforeAllow,
+      contractBytesAfterAllow,
+    };
+  }
+
   /** 注册本次执行的中止控制器；若 abort 已先行到达则直接以中止态注册 */
   private beginAbortable(contractId: string): AbortSignal {
     const controller = new AbortController();
@@ -1083,8 +1161,14 @@ export class ContractOrchestrator {
        * 生产 HTTP 路径不传；未覆盖的 runT/runI 由本方法组装真实 AiWorker。
        */
       twoPhase?: Partial<TwoPhaseHooks>;
+      /** TASK-L.11：覆盖构造器上的设计生成器 */
+      designNoteGenerator?: DesignNoteGenerator;
+      /** TASK-L.11：测试可跳过设计步骤（仅旧卡回归）；生产不得跳过 */
+      skipDesignStep?: boolean;
     } = {},
-  ): Promise<WorkerRunResult & { two_phase?: TwoPhaseResult }> {
+  ): Promise<
+    WorkerRunResult & { two_phase?: TwoPhaseResult; design?: DesignRunInfo }
+  > {
     return withContractLock(contractLockPath(this.repoRoot, contractId), () =>
       this.runWorkerInternal(contractId, options),
     );
@@ -1225,8 +1309,12 @@ export class ContractOrchestrator {
     options: {
       modelClient?: WorkerModelClient;
       twoPhase?: Partial<TwoPhaseHooks>;
+      designNoteGenerator?: DesignNoteGenerator;
+      skipDesignStep?: boolean;
     } = {},
-  ): Promise<WorkerRunResult & { two_phase?: TwoPhaseResult }> {
+  ): Promise<
+    WorkerRunResult & { two_phase?: TwoPhaseResult; design?: DesignRunInfo }
+  > {
     const signal = this.beginAbortable(contractId);
     try {
       const current = this.store.get(contractId);
@@ -1237,6 +1325,50 @@ export class ContractOrchestrator {
           ["EXECUTING"],
           "run-worker",
         );
+      }
+
+      // TASK-L.11：EXECUTING 内、T 段之前先跑设计步骤
+      let activeDesignNote: DesignNote | undefined;
+      let designInfo: DesignRunInfo | undefined;
+      if (options.skipDesignStep !== true) {
+        const designResult = await runDesignStep({
+          repoRoot: this.repoRoot,
+          contract: current,
+          generator:
+            options.designNoteGenerator ?? this.designNoteGenerator,
+        });
+        if (designResult.status === "suspended") {
+          this.revokeExecTokenFor(contractId);
+          this.store.transition({
+            contractId,
+            lifecycleState: "PENDING_RESUME",
+          });
+          designInfo = {
+            status: "suspended",
+            reason: designResult.reason,
+            detail: designResult.detail,
+            note: designResult.note,
+            ...(designResult.escalation_missed
+              ? { escalation_missed: designResult.escalation_missed }
+              : {}),
+          };
+          return {
+            applied: false,
+            changes: [],
+            log: [`design:${designResult.reason}`],
+            usage: { inputTokens: 0, outputTokens: 0 },
+            blockers: [
+              { code: designResult.reason, message: designResult.detail },
+            ],
+            design: designInfo,
+          };
+        }
+        activeDesignNote = designResult.note;
+        designInfo = {
+          status: "ok",
+          note: designResult.note,
+          escalation_missed: designResult.escalation_missed,
+        };
       }
 
       const modelClient =
@@ -1260,6 +1392,9 @@ export class ContractOrchestrator {
           costMonitor,
           modelClient,
           repoRoot: this.repoRoot,
+          ...(activeDesignNote
+            ? { designNote: activeDesignNote }
+            : {}),
         });
 
         try {
@@ -1274,6 +1409,7 @@ export class ContractOrchestrator {
               obligations: [],
               reason_codes: [],
             },
+            ...(designInfo ? { design: designInfo } : {}),
           };
         } catch (err) {
           if (err instanceof WorkerScopeError) {
@@ -1376,6 +1512,9 @@ export class ContractOrchestrator {
           modelClient,
           repoRoot: this.repoRoot,
           checksExtras: extras,
+          ...(activeDesignNote
+            ? { designNote: activeDesignNote }
+            : {}),
         });
         const result = await worker.run(signal);
         bag.changes.push(...result.changes);
@@ -1434,6 +1573,7 @@ export class ContractOrchestrator {
         usage: bag.usage,
         blockers: [],
         two_phase: twoPhase,
+        ...(designInfo ? { design: designInfo } : {}),
       };
     } finally {
       this.endAbortable(contractId);
