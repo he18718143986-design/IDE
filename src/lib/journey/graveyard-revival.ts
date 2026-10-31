@@ -3,7 +3,6 @@
  * 纯函数：零 node:* 导入、零时钟、零随机数、零网络。
  */
 import {
-  GRAVEYARD_DICE_THRESHOLD,
   NEGATION_WINDOW_GRAPHEMES,
   type GraveyardEntry,
   type QuoteAnchor,
@@ -14,13 +13,13 @@ import {
 } from "./scheme-patch-types";
 import {
   anchorQuote,
-  dice,
   graphemeCount,
   lexemes,
   matchNormalize,
   normalizeForAnchor,
   sentenceAt,
 } from "./evidence-anchor";
+import { matchesTombstoneText } from "./graveyard-match";
 
 /** 词表（常量，冻结在代码里；改动须改测试）。匹配作用于 matchNormalize 之后的文本。 */
 export const NEGATION_CUES = [
@@ -176,7 +175,7 @@ export interface TombstoneMatch {
 }
 
 /**
- * matchesTombstone：(a) 目标 id 相同；(b) 指纹精确相等；(c) Dice ≥ 0.75；(d) 复活关键词（≥4 字素）子串命中。
+ * matchesTombstone：(a) 目标 id 相同；(b)(c)(d) 委托 matchesTombstoneText（G-MATCH 唯一实现）。
  * 只检查 status === "active"。
  */
 export function matchesTombstone(
@@ -192,13 +191,14 @@ export function matchesTombstone(
   )
     via.add("a");
   for (const t of probe.texts) {
-    const key = matchNormalize(t);
-    if (key.length > 0 && key === entry.fingerprint.key) via.add("b");
-    if (dice(lexemes(t), entry.fingerprint.lexemes) >= GRAVEYARD_DICE_THRESHOLD)
-      via.add("c");
-    for (const rk of entry.revival_keys) {
-      if (graphemeCount(rk) >= 4 && key.includes(rk)) via.add("d");
-    }
+    const m = matchesTombstoneText(
+      t,
+      entry,
+      probe.targetId !== undefined ? { targetId: probe.targetId } : undefined,
+    );
+    if (m.b) via.add("b");
+    if (m.c) via.add("c");
+    if (m.d) via.add("d");
   }
   const out = [...via];
   return { hit: out.length > 0, via: out };

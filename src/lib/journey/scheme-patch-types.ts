@@ -423,7 +423,7 @@ export type EditErrorCode =
 export const MAX_OPS_PER_PATCH = 64;
 export const MAX_QUOTE_GRAPHEMES = 500;
 export const SHORT_QUOTE_GRAPHEMES = 4;
-export const GRAVEYARD_DICE_THRESHOLD = 0.75;
+export { GRAVEYARD_DICE_THRESHOLD } from "./graveyard-match";
 export const NEGATION_WINDOW_GRAPHEMES = 8;
 export const PARTNER_HINT_MAX_CHARS = 200;
 
