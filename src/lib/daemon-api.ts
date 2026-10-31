@@ -944,6 +944,18 @@ export async function deleteVaultSecret(
   );
 }
 
+/** TASK-L.10：读取项目计划（含服务端权威下一份）。 */
+export async function getProjectPlan(
+  conn: DaemonConnection,
+): Promise<{
+  ok: boolean;
+  plan: import("./project/project-plan").ProjectPlan;
+  next_stub_id: string | null;
+  next_stub: import("./project/project-plan").ContractStub | null;
+}> {
+  return request(conn, "/api/project/plan", { method: "GET" });
+}
+
 /** TASK-L.8：用户侧计划补丁（仅 remove_stub / reorder）。 */
 export async function patchProjectPlan(
   conn: DaemonConnection,
@@ -1816,16 +1828,22 @@ export async function preflightScope(
   input: {
     scheme: SchemeDraft;
     decisions?: ScopePlanDecisions;
+    /** TASK-L.10 / L.9：按桩预检；缺省时 Daemon 用 nextStub */
+    stub_id?: string;
   },
-): Promise<{ scope_plan: ScopePlan }> {
-  return request<{ scope_plan: ScopePlan }>(
-    conn,
-    "/api/supervisor/scope/preflight",
-    {
-      method: "POST",
-      body: JSON.stringify(input),
-    },
-  );
+): Promise<{
+  scope_plan: ScopePlan;
+  stub_id?: string;
+  next_stub_id?: string;
+}> {
+  return request<{
+    scope_plan: ScopePlan;
+    stub_id?: string;
+    next_stub_id?: string;
+  }>(conn, "/api/supervisor/scope/preflight", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 export async function getSupervisorPrototypeStatus(

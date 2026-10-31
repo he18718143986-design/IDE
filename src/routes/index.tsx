@@ -63,6 +63,8 @@ import {
   confirmSupervisorPrototype,
   freezeSchemeSnapshot,
   preflightScope,
+  getProjectPlan,
+  patchProjectPlan,
   fetchPresentationSnapshot,
   listContracts,
   loadConnection,
@@ -144,6 +146,7 @@ import {
   applyScopeDecisions,
   type ScopePlan,
 } from "@/lib/journey/scope-plan";
+import type { ProjectPlan } from "@/lib/project/project-plan";
 import {
   authorizePendingSensitiveDecisions,
   declineSensitiveDecisions,
@@ -392,6 +395,15 @@ function Console() {
   /** J.6：确认点击时展开敏感项查看 */
   const [forceExpandSensitive, setForceExpandSensitive] = useState(false);
   const [scopeDecisionBusy, setScopeDecisionBusy] = useState(false);
+  /** TASK-L.10：项目计划（服务端权威 next_stub_id） */
+  const [projectPlan, setProjectPlan] = useState<ProjectPlan | null>(null);
+  const [projectNextStubId, setProjectNextStubId] = useState<string | null>(
+    null,
+  );
+  const [projectMapBusy, setProjectMapBusy] = useState(false);
+  const scopePlanRef = useRef<ScopePlan | null>(null);
+  scopePlanRef.current = scopePlan;
+
   /** TASK-C.11b：感官确认 + prototype id */
   const [demoConfirmed, setDemoConfirmed] = useState(false);
   const [activePrototypeId, setActivePrototypeId] = useState<string | null>(
@@ -418,6 +430,31 @@ function Console() {
         : null,
     [schemeDraft, schemeDemoGate, scopePlan],
   );
+
+
+  const refreshProjectPlan = useCallback(async () => {
+    if (!conn || !connected) {
+      setProjectPlan(null);
+      setProjectNextStubId(null);
+      return;
+    }
+    try {
+      const res = await getProjectPlan(conn);
+      setProjectPlan(res.plan);
+      setProjectNextStubId(res.next_stub_id);
+    } catch (err) {
+      if (err instanceof DaemonApiError && err.status === 404) {
+        setProjectPlan(null);
+        setProjectNextStubId(null);
+        return;
+      }
+      console.warn("[L.10] getProjectPlan failed", err);
+    }
+  }, [conn, connected]);
+
+  useEffect(() => {
+    void refreshProjectPlan();
+  }, [refreshProjectPlan, schemeDraft?.frozen, schemeDraft?.scheme_revision]);
 
   /** TASK-J.5：方案修订变化 → 300ms 防抖 preflightScope；修订号不匹配则丢弃。 */
   useEffect(() => {
@@ -1153,7 +1190,7 @@ ${trimmed}`
     }
   }, [conn, schemeDraft, scopePlan, scopeDecisionBusy]);
 
-  const handleConfirmScheme = useCallback(async () => {
+  const handleConfirmScheme = useCallback(async (overridePlan?: ScopePlan) => {
     if (!conn || !schemeDraft || schemeDraft.frozen || schemeConfirmBusy)
       return;
     setSchemeConfirmBusy(true);
@@ -1172,7 +1209,8 @@ ${trimmed}`
     const confirmationId = schemeConfirmIdRef.current.id;
 
     // J.5：范围须在点击前算好；不再走 formatSchemeAsIntent → submitJourneyMessage。
-    let planForConfirm = scopePlan;
+    // L.10：地图「确认开工」可传入刚预检的 overridePlan。
+    let planForConfirm = overridePlan ?? scopePlanRef.current ?? scopePlan;
     if (
       !planForConfirm ||
       planForConfirm.scheme_revision !== expectedRevision
@@ -1360,6 +1398,7 @@ ${trimmed}`
       }),
     );
     setSchemeChatLocked(false);
+    void refreshProjectPlan();
 
     const committed = staging.target;
     if (committed) {
@@ -1384,8 +1423,110 @@ ${trimmed}`
     schemeDemoGate,
     schemeConfirmBusy,
     chatSession,
+    refreshProjectPlan,
   ]);
 
+  const handleProjectMapDefer = useCallback(
+    async (stubId: string) => {
+      if (!conn || !projectPlan || projectMapBusy) return;
+      setProjectMapBusy(true);
+      try {
+        const res = await patchProjectPlan(conn, {
+          patch: {
+            base_revision: projectPlan.plan_revision,
+            reason: "user_request",
+            ops: [
+              {
+                op: "remove_stub",
+                stub_id: stubId,
+                reason: "用户选择先不做这个",
+              },
+            ],
+          },
+          removed_by: "user",
+        });
+        if (res.ok && res.plan) {
+          setProjectPlan(res.plan as ProjectPlan);
+        }
+        await refreshProjectPlan();
+      } catch (err) {
+        setConfirmPrototypeError(
+          err instanceof Error ? err.message : String(err),
+        );
+      } finally {
+        setProjectMapBusy(false);
+      }
+    },
+    [conn, projectPlan, projectMapBusy, refreshProjectPlan],
+  );
+
+  const handleProjectMapReorderForward = useCallback(
+    async (stubId: string) => {
+      if (!conn || !projectPlan || projectMapBusy) return;
+      const stub = projectPlan.contracts.find((s) => s.stub_id === stubId);
+      if (!stub) return;
+      const ms = projectPlan.milestones.find(
+        (m) => m.milestone_id === stub.milestone_id,
+      );
+      if (!ms) return;
+      const ids = [...ms.contract_ids];
+      const idx = ids.indexOf(stubId);
+      if (idx <= 0) return;
+      ids.splice(idx, 1);
+      ids.splice(idx - 1, 0, stubId);
+      setProjectMapBusy(true);
+      try {
+        const res = await patchProjectPlan(conn, {
+          patch: {
+            base_revision: projectPlan.plan_revision,
+            reason: "user_request",
+            ops: [
+              {
+                op: "reorder",
+                milestone_id: ms.milestone_id,
+                contract_ids: ids,
+              },
+            ],
+          },
+          removed_by: "user",
+        });
+        if (res.ok && res.plan) {
+          setProjectPlan(res.plan as ProjectPlan);
+        }
+        await refreshProjectPlan();
+      } catch (err) {
+        setConfirmPrototypeError(
+          err instanceof Error ? err.message : String(err),
+        );
+      } finally {
+        setProjectMapBusy(false);
+      }
+    },
+    [conn, projectPlan, projectMapBusy, refreshProjectPlan],
+  );
+
+  const handleProjectMapConfirmStart = useCallback(
+    async (stubId: string) => {
+      if (!conn || !schemeDraft || schemeConfirmBusy || projectMapBusy) return;
+      setProjectMapBusy(true);
+      try {
+        const { scope_plan } = await preflightScope(conn, {
+          scheme: schemeDraft,
+          stub_id: stubId,
+        });
+        setScopePlan(scope_plan);
+        scopePlanRef.current = scope_plan;
+        setProjectMapBusy(false);
+        await handleConfirmScheme(scope_plan);
+      } catch (err) {
+        setConfirmPrototypeError(
+          err instanceof Error ? err.message : String(err),
+        );
+        setProjectMapBusy(false);
+      }
+    },
+    [conn, schemeDraft, schemeConfirmBusy, projectMapBusy, handleConfirmScheme],
+  );
 
   // C.18：选择题流程废弃；保留空实现避免旧引用崩（若有）
   const handleClarificationSelect = useCallback(
@@ -3263,6 +3404,18 @@ ${trimmed}`
                       setSettingsDeepFocus(null);
                       setSettingsReturnArmed(true);
                       setSettingsNonce((n) => n + 1);
+                    }}
+                    projectPlan={projectPlan}
+                    projectNextStubId={projectNextStubId}
+                    projectMapBusy={projectMapBusy}
+                    onProjectMapConfirmStart={(stubId) => {
+                      void handleProjectMapConfirmStart(stubId);
+                    }}
+                    onProjectMapDefer={(stubId) => {
+                      void handleProjectMapDefer(stubId);
+                    }}
+                    onProjectMapReorderForward={(stubId) => {
+                      void handleProjectMapReorderForward(stubId);
                     }}
                   />
                 </div>

@@ -4045,6 +4045,34 @@ export class StagentDaemon {
       return;
     }
 
+    // TASK-L.10：读项目计划（含服务端权威下一份）
+    if (method === "GET" && pathname === "/api/project/plan") {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      try {
+        const plan = readPlan(this.repoRoot);
+        if (!plan) {
+          this.sendJson(res, 404, {
+            error: "project plan not found",
+            code: "E_PLAN_INVALID",
+          });
+          return;
+        }
+        const next = nextStub(plan);
+        this.sendJson(res, 200, {
+          ok: true,
+          plan,
+          next_stub_id: next?.stub_id ?? null,
+          next_stub: next,
+        });
+      } catch (err) {
+        this.sendJson(res, 500, { error: (err as Error).message });
+      }
+      return;
+    }
+
     // TASK-L.8：计划补丁合并与分解器
     if (method === "POST" && pathname === "/api/project/plan/patch") {
       if (!this.isAuthorized(req)) {
