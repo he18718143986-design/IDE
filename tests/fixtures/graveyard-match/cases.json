@@ -1,0 +1,167 @@
+{
+  "version": 1,
+  "alias_lexicon_version": 1,
+  "tombstones": {
+    "T-MONGO": {
+      "fingerprint": {
+        "key": "用mongodb存数据",
+        "lexemes": [
+          "mongodb",
+          "存数",
+          "数据",
+          "用"
+        ]
+      },
+      "revival_keys": [
+        "用mongodb存数据"
+      ],
+      "status": "active",
+      "disallow_revival": true,
+      "rejected_by": "user"
+    },
+    "T-EXCEL": {
+      "fingerprint": {
+        "key": "excel导出",
+        "lexemes": [
+          "excel",
+          "导出"
+        ]
+      },
+      "revival_keys": [
+        "excel导出",
+        "excel"
+      ],
+      "status": "active",
+      "disallow_revival": true,
+      "rejected_by": "user"
+    },
+    "T-DICE75": {
+      "fingerprint": {
+        "key": "excel导出报表数据文件",
+        "lexemes": [
+          "excel",
+          "导出",
+          "报表",
+          "数据",
+          "文件"
+        ]
+      },
+      "revival_keys": [
+        "excel导出报表数据文件"
+      ],
+      "status": "active",
+      "disallow_revival": true,
+      "rejected_by": "user"
+    },
+    "T-SHORTKEY": {
+      "fingerprint": {
+        "key": "存数据模块",
+        "lexemes": [
+          "存数",
+          "数据",
+          "模块"
+        ]
+      },
+      "revival_keys": [
+        "存数据"
+      ],
+      "status": "active",
+      "disallow_revival": true,
+      "rejected_by": "user"
+    }
+  },
+  "nl_cases": [
+    {
+      "id": "GM-NL-01",
+      "text": "用 MongoDB 存数据",
+      "tombstone": "T-MONGO",
+      "expect": {
+        "b": true,
+        "c": true,
+        "d": true
+      }
+    },
+    {
+      "id": "GM-NL-02",
+      "text": "MongoDB 存储",
+      "tombstone": "T-MONGO",
+      "expect": {
+        "b": false,
+        "c": false,
+        "d": false
+      }
+    },
+    {
+      "id": "GM-NL-03",
+      "text": "Excel 导出 报表",
+      "tombstone": "T-DICE75",
+      "expect": {
+        "b": false,
+        "c": true,
+        "d": false
+      }
+    },
+    {
+      "id": "GM-NL-04",
+      "text": "报表导出功能",
+      "tombstone": "T-DICE75",
+      "expect": {
+        "b": false,
+        "c": false,
+        "d": false
+      }
+    },
+    {
+      "id": "GM-NL-05",
+      "text": "我们需要存数据能力",
+      "tombstone": "T-SHORTKEY",
+      "expect": {
+        "b": false,
+        "c": false,
+        "d": false
+      }
+    }
+  ],
+  "code_cases": [
+    {
+      "id": "GM-CODE-01",
+      "unit": "U-DEP",
+      "text": "mongoose",
+      "tombstone": "T-MONGO",
+      "expect": {
+        "hit": true,
+        "via": "alias"
+      }
+    },
+    {
+      "id": "GM-CODE-02",
+      "unit": "U-DEP",
+      "text": "mongodb",
+      "tombstone": "T-MONGO",
+      "expect": {
+        "hit": true,
+        "via": "direct"
+      }
+    },
+    {
+      "id": "GM-CODE-03",
+      "unit": "U-DEP",
+      "text": "xlsx",
+      "tombstone": "T-EXCEL",
+      "expect": {
+        "hit": true,
+        "via": "alias"
+      }
+    },
+    {
+      "id": "GM-CODE-04",
+      "unit": "U-IDENT",
+      "text": "const url = 'mongodb://localhost'",
+      "tombstone": "T-MONGO",
+      "expect": {
+        "hit": true,
+        "via": "direct"
+      }
+    }
+  ]
+}
