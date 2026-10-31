@@ -18,7 +18,6 @@
 | `TASK-W.5b` | `NEW_TASK` | cursor-agent 适配器黑盒实测 (v1.3.3 新增) | [打开](./development-tasks-active.md#task-w.5b) |
 | `TASK-W.5c` | `NEW_TASK` | OpenHands 适配器（容器隔离，SANDBOX_ENFORCED）(v1.3.3 新增) | [打开](./development-tasks-active.md#task-w.5c) |
 | `TASK-J.18` | `SPLIT` | Worker 派工墓地门禁（INV-LEDGER-03 工地侧）· 拆分母卡 | [打开](./development-tasks-active.md#task-j.18) |
-| `TASK-L.11` | `NEW_TASK` | DesignNote 生成、校验与注入 | [打开](./development-tasks-active.md#task-l.11) |
 | `TASK-L.12` | `NEW_TASK` | 系统知识库：Schema、引导合同与漂移门禁 | [打开](./development-tasks-active.md#task-l.12) |
 | `TASK-L.13` | `NEW_TASK` | 追踪链：Trailer 扩展与「这段为什么存在」反查 | [打开](./development-tasks-active.md#task-l.13) |
 | `TASK-L.15` | `NEW_TASK` | 发布生命周期与两类部署目标 | [打开](./development-tasks-active.md#task-l.15) |
@@ -130,6 +129,7 @@
 | `TASK-L.8` | `COMPLETED` | 计划补丁合并与分解器 | [打开](./development-tasks-completed.md#task-l.8) |
 | `TASK-L.9` | `COMPLETED` | 合同序列、桩视图预检与「下一份」交接 | [打开](./development-tasks-completed.md#task-l.9) |
 | `TASK-L.10` | `COMPLETED` | 画布「项目地图」视图 | [打开](./development-tasks-completed.md#task-l.10) |
+| `TASK-L.11` | `COMPLETED` | DesignNote 生成、校验与注入 | [打开](./development-tasks-completed.md#task-l.11) |
 | `TASK-L.14` | `COMPLETED` | 凭据保险库 | [打开](./development-tasks-completed.md#task-l.14) |
 | `TASK-C.5` | `COMPLETED` | 双栏 Diff 审阅器与结构化终端日志回放 | [打开](./development-tasks-completed.md#task-c.5) |
 | `TASK-C.6` | `COMPLETED` | 右栏 Agent 流式会话与打断续接 (v1.3.3 新增) | [打开](./development-tasks-completed.md#task-c.6) |

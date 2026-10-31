@@ -75,6 +75,7 @@
 | DLV-3 | `AdapterRegistry` 未接线，Worker 只有 OpenAI `AiWorker`；Claude Code 作 Worker（W.5a 的 worker 角色）未接入派工 | NON_BLOCKER（M2 不依赖） | 卡 owner | 审计 §2 S5；需另立卡 |
 | DLV-4 | `.stagent/metadata/` 仍在代码写入路径列表中，与 ADR-0011 废止该路径冲突 | NON_BLOCKER | 卡 owner | 审计依据：代码 `.stagent/` 写入清单 |
 | DLV-5 | 系统地图 UI（项目视图第二页）与「改这里会影响什么」入口尚未立卡 | NON_BLOCKER | — | [`../specs/technical-design-and-knowledge.md`](../specs/technical-design-and-knowledge.md) §5 |
+| DLV-6 | L.11 DN-2「可以」：`resolveDesignDependencyAllow` 已合入且集成测覆盖，**无** HTTP / 画布意外卡入口（`POST .../resume` 不路由至此）。属后续接线卡职责（可挂 J.7 交接类或另立卡），**不**阻断 L.11 领域验收 | NON_BLOCKER | 卡 owner | PR [#43](https://github.com/he18718143986-design/IDE/pull/43) 审查确认；`daemon/pipeline/orchestrator.ts::resolveDesignDependencyAllow`；台账收口随 L.11 docs 回写 |
 
 
 ## DoR 全量审计挂账（2026-10-31 新增）

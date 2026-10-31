@@ -3005,6 +3005,34 @@
 * **相关文件**：`src/components/project/ProjectMapPane.tsx`（新；导出 `ProjectMapPane`）、`src/components/studio/SchemeReviewPane.tsx::SchemeReviewPane`（同页挂载点）、`src/lib/daemon-api.ts`（新建 GET 客户端；复用 `::patchProjectPlan`）、`daemon/server.ts`（挂 `GET /api/project/plan`）；只读复用 `src/lib/project/next-stub.ts::nextStub`；对照 `src/components/WorkspaceLayout.tsx::STUDIO_TAB_ID` / `src/components/layout/ActivityBar.tsx::ActivityBar`（**不**增项目入口）
 * **估算**：M
 
+<a id="task-l.11"></a>
+
+#### 【Task L.11】DesignNote 生成、校验与注入 `[COMPLETED]`
+
+* **任务编号**：`TASK-L.11`
+* **对应规格**：[`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) §2、§3、§6（TD-01～TD-05）；[`project-architecture-baseline.md`](./project-architecture-baseline.md) §6；ADR-0016、ADR-0018、ADR-0019
+* **前置依赖**：`TASK-L.4`、`TASK-L.9`（DN-2 插入依赖桩）
+* **优先级**：P2（M3）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#43](https://github.com/he18718143986-design/IDE/pull/43) / tip `78ec236`（`feat(L.11): DesignNote generate/validate/inject on EXECUTING path`）
+* **已知挂账（合入时）**：DN-2「可以」领域方法 `PipelineOrchestrator.resolveDesignDependencyAllow` 已交付并由集成测覆盖；**无** HTTP / 画布意外卡入口可达（`POST .../resume` 不路由至此）。入口接线属后续卡职责（与既有预算/熔断挂起卡片同类债；可挂 J.7 交接类或另立接线卡），本卡不宣称端到端 UI 闭环。见 ledger DLV-6。
+* **对照痛点（代码事实）**：Worker 直接从合同开工，没有设计产物；技术决策不被记录。
+* **一句话目标**：每份合同开工时先出一份通过校验的设计说明，Worker 按它施工，五类决策才打扰用户。
+* **范围**：
+  1. 新建 `src/lib/knowledge/modules-schema.ts`：`modules.yaml` 的 zod Schema 与 `ModuleEntry` 类型（L.12 复用）。
+  2. 新建 `src/lib/design/design-note.ts`：§2.2 类型；`validateDesignNote(note, contract, modules)`（DN-1～DN-5）；`detectEscalations(note, protectionList, paidSdkList)`（§3 二次判定）。
+  3. 新建 `daemon/supervisor/design/design-step.ts`：输入合同 + `docs/system/`（若存在），输出 DesignNote（形态开放；zod Schema 约束）；落盘 `.stagent/records/<id>/design-note.json`。
+  4. `orchestrator.ts`：进入 `EXECUTING` 后、T 段之前调用设计步骤；校验失败重试 1 次，仍失败 → `EXECUTING → PENDING_RESUME`；有升级项 → `PENDING_RESUME`。原因（`DESIGN_INVALID` / `DESIGN_ESCALATION` / `DESIGN_NEEDS_DEPENDENCY`）写入 `.stagent/records/<id>/suspension.json`（现行 `PENDING_RESUME` 迁移不带原因字段；这些不是证据原因码，不进 `reasonCodeSchema`）。
+  5. **DN-2（需要新依赖但合同不允许）**：设计步骤先重试一次「不引入依赖」；仍需要 → 意外卡「需要装新库 X」：选「可以」→ 本合同安全中止（`ABORTED`），经 L.8 补丁在原桩前插入 `kind: "dependency"` 桩，原桩随后重签；选「不用」→ 本合同按无依赖方案继续或中止，由用户在卡上二选一。**不修改已签合同**。
+  6. DesignNote 的 `test_plan` 覆盖 L.3 约定路径（必须落在签署前已进 `ScopePlan` 的 `tests/stagent/**` 内），写入 `.stagent/records/<id>/obligations.json`；`buildWorkerTaskInstruction` 注入「技术方案」段（§2.4）。
+  7. `src/lib/design/paid-sdk-list.ts`：付费 SDK 名单（初版：stripe、twilio、@google/maps、openai、@anthropic-ai/sdk、aws-sdk、@aws-sdk/*）。
+* **非目标**：不做知识库校验（L.12）。
+* **不变声明**：不新增生命周期状态或迁移边。
+* **验收（PASS）**：`tests/unit/design-note.test.ts`：TD-01～TD-05；`tests/integration/design-step.test.ts`：桩设计步骤返回合法 DesignNote → Worker 指令含「技术方案」段与 `touches` 路径；返回含 `costs_money` 的决策 → 合同 `PENDING_RESUME` 且 `suspension.json` 原因为 `DESIGN_ESCALATION`；DN-2 选「可以」→ 原合同 `ABORTED`、计划出现 `dependency` 桩、原合同 JSON 字节未变。
+* **FAIL**：未校验的 DesignNote 被注入 Worker；二次判定命中却未升级。
+* **关键文件**：`src/lib/knowledge/modules-schema.ts`（新）、`src/lib/design/design-note.ts`（新）、`src/lib/design/paid-sdk-list.ts`（新）、`daemon/supervisor/design/design-step.ts`（新）、`daemon/pipeline/orchestrator.ts`、`daemon/worker/session-task-injector.ts`
+* **估算**：M
+
 <a id="task-l.14"></a>
 
 #### 【Task L.14】凭据保险库 `[COMPLETED]`

@@ -83,6 +83,7 @@
 - **P-95（DoR R-4 补锚，2026-10-31）**：`TASK-L.10`「对照痛点」改为已核实 `file::symbol`；入口改为同页嵌方案工作台（Tina 裁决跟 supervisor/§7），废止 ActivityBar「项目」Tab 表述（见版本头第 95 条）。**卡状态仍 `[NEW_TASK]`**；**不实现** L.10 代码。**本条仅文档**。
 - **P-96（状态回写，2026-11-01）**：`TASK-L.10` → **`[COMPLETED]`**（[#38](https://github.com/he18718143986-design/IDE/pull/38)/`e4351b0`）。同步：版本头第 96 条、§1.1 矩阵、§3.4d 详细卡、Sprint「当前首要」→ **L.11**。并同 PR 轻量对齐 [`../scheme.md`](../scheme.md) gap-13、[`delivery-lifecycle.md`](./delivery-lifecycle.md) S2/S3。**本条仅文档**；不改生产代码；**不**开工 L.11；**不**修类型润色。
 - **P-97（文档治理第 0 波，2026-11-01）**：索引/ADR 状态对齐、reports 索引分组、DoR 基线快照横幅、DOC-3 基线单源、DOC-4 死引用、DOC-11 节号与 few-shot 例 6 机械修；ledger DOC-3/4/11 RESOLVED、DOR-2/3 `[NEEDS_RECHECK]`。**不**拆文件（DOC-1）、**不**大规模回写历史卡（DOC-2）、**不**动 DOC-5～10 / RFC 正文。**本条仅文档**。
+- **P-98（状态回写，2026-11-01）**：`TASK-L.11` → **`[COMPLETED]`**（[#43](https://github.com/he18718143986-design/IDE/pull/43)/`78ec236`）。同步：版本头第 98 条、§1.1 矩阵、§3.4d 详细卡迁 completed、索引、Sprint「当前首要」→ **L.12**。并同 PR 轻量对齐 [`../scheme.md`](../scheme.md) gap-16、[`delivery-lifecycle.md`](./delivery-lifecycle.md) S4；ledger 增 **DLV-6**（DN-2 入口缺口挂账）。**本条仅文档**；不改生产代码；**不**开工 L.12；**不**另立 DLV 代码卡。
 
 
 - **P-79（完工，2026-10-26）**：`TASK-H.5`–`TASK-H.8` → **[COMPLETED]**（Tina t881u「开工」）。实现：旅程 `contract_id` 落盘回传；脏区白话引导+ack 排除；主链路回归套件；records 脱敏 zip/清理 API。单测 `task-h5`…`task-h8` PASS。**不**触碰 v0.2 封印。
