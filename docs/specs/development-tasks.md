@@ -1,6 +1,6 @@
 > **读法（2026-10-29 文档治理加注，不改任何卡的条款与状态）**
 > - **本文件是 L3 任务卡层**：Supervisor 方案确认后交给施工 Worker 的机器指令。意图层见 [`../scheme.md`](../scheme.md)，地图见 [`../README.md`](../README.md)。
-> - **当前要做的卡在 §3.4c（J 系列，注意各卡「ADR-0014 修订」块）与 §3.4d（L 系列）**，按 [`delivery-lifecycle.md`](./delivery-lifecycle.md) §8 里程碑 M2 → M5 排期；每张卡开工前按 [`task-card-standard.md`](./task-card-standard.md) 核对就绪。§1.1 矩阵是状态总表；下方游离的 P-xx 修订行、版本头 90 条状态回写与 §6 修订记录都是历史流水，施工时可跳过。
+> - **当前要做的卡在 §3.4c（J 系列，注意各卡「ADR-0014 修订」块）与 §3.4d（L 系列）**，按 [`delivery-lifecycle.md`](./delivery-lifecycle.md) §8 里程碑 M2 → M5 排期；每张卡开工前按 [`task-card-standard.md`](./task-card-standard.md) 核对就绪。§1.1 矩阵是状态总表；下方游离的 P-xx 修订行、版本头 91 条状态回写与 §6 修订记录都是历史流水，施工时可跳过。
 > - **三 Agent 口径以 J 系列与 [`supervisor.md`](./supervisor.md) §13.2 为准**：右栏 = 只读 AI 搭档（`TASK-J.1`），中栏 = Supervisor 方案画布，Worker 只在 Worktree 施工。C.1「右栏（Coding Agent 对话）」、W.1「推入右侧 Worker 对话窗口」、W.5a「对接右栏会话」、C.6、P.1 / E.1 的 Vibe 直改主工作树、Sprint 1 门禁「右栏 Claude Code 改文件」均为早期叙述，已由 J.1 / C.18 改变；原文保留作溯源。
 > - **已知结构问题**（状态矛盾、三处「当前基线」不一致、失效的 `docs/archive/*` 引用）登记在 [`../ledger/README.md`](../ledger/README.md) DOC-1～DOC-4，未在本轮修改。
 
@@ -125,6 +125,7 @@
 > 88. **状态回写（2026-10-31 · 拆分 TASK-J.18 · DoR R-11）**：原 `TASK-J.18` 估算 **L**，按 [`task-card-standard.md`](./task-card-standard.md) R-11 **禁止开工、必须再拆**。拆为四张 S/M 子卡：**`TASK-J.18a`**（G-MATCH 纯函数与产出物投影）、**`TASK-J.18b`**（`scheme_binding` + 快照 1.2 墓地权威源）、**`TASK-J.18c`**（门禁裁决 / 优先级格 / 派工绑定 / 码表）、**`TASK-J.18d`**（写路径接线、CLI gate pack、全量扫描与集成）。母卡 `TASK-J.18` 标为 **`[SPLIT]`**，指向子卡；实施口径仍见 [`worker-graveyard-gate.md`](./worker-graveyard-gate.md)。**本条仅文档拆卡**；不改生产代码。
 > 89. **状态回写（2026-10-31 · J.18a / J.18b / L.6 / L.7 合入）**：下列已合入卡由 `[NEW_TASK]` → **`[COMPLETED]`**（证据均为本仓 GitHub squash merge）：`TASK-J.18b` [#22](https://github.com/he18718143986-design/IDE/pull/22)/`ca9ed8f`；`TASK-J.18a` [#24](https://github.com/he18718143986-design/IDE/pull/24)/`20c2d46`；`TASK-L.6` [#21](https://github.com/he18718143986-design/IDE/pull/21)/`93589bf`；`TASK-L.7` [#23](https://github.com/he18718143986-design/IDE/pull/23)/`607d742`。同步：§1.1 矩阵、§3.4c/§3.4d 详细卡、Sprint「当前首要」→ **J.18c（下一张）∥ L.8（L 系下一张）**；`J.18c`/`J.18d` 仍为 `[NEW_TASK]`（**未**标完成）。main tip `607d742`。**本条仅文档状态回写**；不改生产代码。
 > 90. **状态回写（2026-10-31 · J.18c / J.18d 合入）**：下列已合入卡由 `[NEW_TASK]` → **`[COMPLETED]`**（证据均为本仓 GitHub squash merge）：`TASK-J.18c` [#26](https://github.com/he18718143986-design/IDE/pull/26)/`b6922ac`；`TASK-J.18d` [#27](https://github.com/he18718143986-design/IDE/pull/27)/`a2fa7df`。同步：§1.1 矩阵、§3.4c 详细卡、Sprint「当前首要」→ **L.8（下一张）**；母卡 `TASK-J.18` 仍为 **`[SPLIT]`**（子卡 a～d 均 COMPLETED）。main tip `a2fa7df`。**本条仅文档状态回写**；不改生产代码。
+> 91. **状态回写（2026-10-31 · L.8 DoR R-4）**：补 `TASK-L.8`「对照痛点（代码事实）」为真实 `file::symbol` 锚点（`project-plan.ts::validateProjectPlan` / `plan-store.ts::readPlan`/`::writePlan` / `scheme-patch-engine.ts::mergeSchemePatch` / `scheme-snapshot-store.ts::writeSchemeSnapshot` 等），并写明今日缺 `plan-patch.ts`、`decomposer/`、`POST /api/project/plan/patch`。**不**改卡状态（仍 `[NEW_TASK]`）、**不**改范围目标到实现、**不**改生产代码。Sprint 仍指向 **L.8**。
 > 65. **状态回写（2026-10-26 · 实现完成 TASK-C.14f + TASK-C.15a–d）**：Tina t855u「继续项 2（WS）与项 4（EO 余面 Delta）的立卡实现」。已落地：`BASELINE_PROGRESS` WS（停 2s 轮询）；EO-01 完备+转移 DAG；EO-08 UUIDv5/返工计数；EO-05 签署白名单 GC + MERGED→DELIVERED 失败停 MERGED；P0 drafts 隔离 + EO-09 worktree seal。单测 `task-c14f-*` / `task-c15a–d-*` + C.12 回归绿。**不**扩 Spec Freeze 五正文；P1–P3 仍 backlog。
 > 64. **状态回写（2026-10-26 · 立卡 TASK-C.14f + TASK-C.15a–d · WS 深度进度 + EO 余面 Delta）**：Tina t855u「继续项 2（WS）与项 4（EO 余面 Delta）的立卡实现」。按此前安全闭环后暂缓的 backlog 升格为薄卡：**`TASK-C.14f`**（基线深度进度真 WS/流式：Daemon 推 `BASELINE_PROGRESS`，替换前端 2s 轮询；P0 仍秒级解锁右栏）；**`TASK-C.15a`**（EO-01 DeliveryState 完备：补齐 C.12b 简化缺口与合法转移）；**`TASK-C.15b`**（EO-08 断言身份与返工计数：UUIDv5 `assertion_id` + Daemon 权威计数 + 超限 `ESCALATED_HUMAN` + 返工期禁追加）；**`TASK-C.15c`**（EO-05 两阶段归档/GC：签署期白名单 GC；`MERGED`→`DELIVERED` 事务硬化，失败停 `MERGED`）；**`TASK-C.15d`**（P0 AC-ISOL 草稿隔离 + EO-09 Worktree seal 轻量；P1 sufficiency / P2 确认分级 / P3 视口防抖仍 backlog）。建议序 **C.14f → C.15a → C.15b → C.15c → C.15d**；**当前首要**→ **C.14f**。**本条仅文档立卡**；**不写**产品码直至同授权「立卡实现」开工；**不**扩 Spec Freeze 五正文；不抢 D.1e；不改 D.1 鉴权。权威：基线讨论稿 §5/§7 流式 OPEN；右栏 §14.11 EO-01/05/08/09 + §13 P0；C.12 Top5 已覆盖部分不重复。
 > 58. **状态回写（2026-10-26 · 立卡 TASK-C.12a–e · Spec Freeze → Top5 Delta 升级卡）**：Tina 授权（t817u「升格立卡」）。按封版记录 `docs/reports/spec-freeze-record.md`（tip `e4779ad`）与澄清 §6 / Checklist §3，将 API Top5 As-is→To-be 映射为五张 **Delta 升级卡**（**不推翻**现网 session / STATE / prototypes / PAUSED 弹窗骨架）：**`TASK-C.12a`**（双层 Token：`exec_token` + `resume_token`+`jti`；PAUSED 吊销；EO-07）、**`TASK-C.12b`**（`session_epoch`+`state_seq` + EO-01 `DeliveryState` 广播；含 `CONTRACT_SIGNING` 瞬态）、**`TASK-C.12c`**（越界原子拦截：SIGINT 3s→SIGKILL→吊销→清锁→PAUSED；EO-02/07）、**`TASK-C.12d`**（Demo 三态 + `can_sign` + records 轻量拷贝；EO-05/06）、**`TASK-C.12e`**（`.stagent/records/{contract_id}/audit-manifest.json`；EO-03/04/05）。建议序 **C.12a→C.12b→C.12c→C.12d→C.12e**；**当前首要**→ **C.12a**。**本条仅文档立卡**；**CLOSED ≠ 已实现**；**不写** daemon/src 产品码直至 Tina 点名开发；**不抢** D.1e；Impact/Mode/AST/云归档仍 **v0.2+**；不改 D.1 loopback+#token 通道原则。
@@ -3413,7 +3414,11 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 * **前置依赖**：`TASK-L.7`、`TASK-J.9`（方案结构）；先经 ADR-0018 密封方案，再生成并通过 PAB，再生成 ProjectPlan
 * **优先级**：P2（M3）
 * **状态**：`[NEW_TASK]`
-* **对照痛点（代码事实）**：无分解逻辑。
+* **对照痛点（代码事实）**：
+  - 计划类型与校验已在 `src/lib/project/project-plan.ts::validateProjectPlan` / `::ProjectPlan` / `::orderedStubs`（L.7）；落盘已在 `daemon/project/plan-store.ts::readPlan` / `::writePlan`。**今日无** `src/lib/project/plan-patch.ts`、**无** `applyPlanPatch` / `PlanPatch` / `PlanOp` 符号；**无** `daemon/supervisor/decomposer/` 目录（全库对计划侧 `PlanPatch`/`applyPlanPatch`/`decompose` 实现 **0 命中**）。
+  - 方案侧已有同构补丁引擎可作挂接参照：`src/lib/journey/scheme-patch-engine.ts::mergeSchemePatch` 与 `src/lib/journey/scheme-patch-types.ts::SchemeDraftV2`；L.8 应对齐该模式做计划补丁，而非再造方案合并。
+  - 密封快照入口已在 `daemon/pipeline/scheme-snapshot-store.ts::writeSchemeSnapshot` / `::readSchemeSnapshot` / `::schemeBindingFromSnapshot`（ADR-0018 路径）。分解器应吃密封后的 `SchemeDraftV2` + ready PAB，但 **今日无**「密封方案 → `PlanPatch`」调用链。
+  - HTTP：`daemon/server.ts` 已有大量 `/api/*` 路由登记，**今日无** `POST /api/project/plan/patch`（pathname **0 命中**）；用户侧 `remove_stub`/`reorder` 尚无处可挂。
 * **一句话目标**：方案冻结前，分解器产出计划补丁；Daemon 确定性合并，不合规整体拒绝。
 * **范围**：
   1. `src/lib/project/plan-patch.ts`：`PlanPatch` / `PlanOp` 类型；`applyPlanPatch(plan, patch, scheme, repoFacts)`（纯函数，规则见 §4；合并后调 `validateProjectPlan`）。
@@ -3425,7 +3430,7 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 * **不变声明**：计划不是授权凭据；不改签署链。
 * **验收（PASS）**：`tests/unit/plan-patch.test.ts`：PD-08、PD-09、PD-11；`standard` 方案零模型调用得到 1 里程碑 1 桩；桩模型返回违反 D-7 的补丁 → 重试 1 次 → 第二次合法则合并成功。
 * **FAIL**：对 `merged` 桩的修改被采纳；用户删除的桩被同义复活且未报 `E_PLAN_STUB_REVIVED`。
-* **关键文件**：`src/lib/project/plan-patch.ts`（新）、`daemon/supervisor/decomposer/decompose.ts`（新）、`daemon/server.ts`
+* **关键文件**：`src/lib/project/plan-patch.ts`（新；导出 `PlanPatch`/`PlanOp`/`applyPlanPatch`）、`daemon/supervisor/decomposer/decompose.ts`（新）、`daemon/server.ts`（挂 `POST /api/project/plan/patch`）；调用既有 `src/lib/project/project-plan.ts::validateProjectPlan`、`daemon/project/plan-store.ts::readPlan`/`::writePlan`、`daemon/pipeline/scheme-snapshot-store.ts::readSchemeSnapshot`
 * **估算**：M
 
 #### 【Task L.9】合同序列、桩视图预检与「下一份」交接 `[NEW_TASK]`
@@ -4058,6 +4063,7 @@ node scripts/verify-env.mjs && npx tsc --noEmit && npm run lint && npm test
 - **P-88（状态回写，2026-10-31）**：`TASK-J.10`、`TASK-L.4` → **`[COMPLETED]`**（[#17](https://github.com/he18718143986-design/IDE/pull/17)/`97bb0db`；[#18](https://github.com/he18718143986-design/IDE/pull/18)/`9263504`）。同步：版本头第 87 条、§1.1 矩阵、§3.4c/d 详细卡、Sprint「当前首要」→ **L.6（进行中）**；`L.6` 仍 `[NEW_TASK]`。并同 PR 对齐 [`../scheme.md`](../scheme.md) §11 与 [`delivery-lifecycle.md`](./delivery-lifecycle.md) 状态指针。**本条仅文档**；不改生产代码。
 - **P-89（状态回写，2026-10-31）**：`TASK-J.18b`、`TASK-J.18a`、`TASK-L.6`、`TASK-L.7` → **`[COMPLETED]`**（[#22](https://github.com/he18718143986-design/IDE/pull/22)/`ca9ed8f`；[#24](https://github.com/he18718143986-design/IDE/pull/24)/`20c2d46`；[#21](https://github.com/he18718143986-design/IDE/pull/21)/`93589bf`；[#23](https://github.com/he18718143986-design/IDE/pull/23)/`607d742`）。同步：版本头第 89 条、§1.1 矩阵、§3.4c/d 详细卡、Sprint「当前首要」→ **J.18c ∥ L.8**；`J.18c`/`J.18d` 仍 `[NEW_TASK]`。并同 PR 对齐 [`../scheme.md`](../scheme.md) §11（gap-6 部分收口 / gap-13 / gap-14）与 [`delivery-lifecycle.md`](./delivery-lifecycle.md) 状态指针。**本条仅文档**；不改生产代码。
 - **P-90（状态回写，2026-10-31）**：`TASK-J.18c`、`TASK-J.18d` → **`[COMPLETED]`**（[#26](https://github.com/he18718143986-design/IDE/pull/26)/`b6922ac`；[#27](https://github.com/he18718143986-design/IDE/pull/27)/`a2fa7df`）。同步：版本头第 90 条、§1.1 矩阵、§3.4c 详细卡、Sprint「当前首要」→ **L.8**；母卡 `TASK-J.18` 仍 `[SPLIT]`。并同 PR 对齐 [`../scheme.md`](../scheme.md) §11（gap-6 **已收口**）与 [`delivery-lifecycle.md`](./delivery-lifecycle.md) S5 状态指针。**本条仅文档**；不改生产代码。
+- **P-91（DoR R-4 补锚，2026-10-31）**：`TASK-L.8`「对照痛点」由虚化「无分解逻辑」改为已核实 `file::symbol`（见版本头第 91 条）；相关文件清单补调用既有 L.7/密封路径符号。**卡状态仍 `[NEW_TASK]`**；**不实现** L.8 代码。**本条仅文档**。
 
 
 - **P-79（完工，2026-10-26）**：`TASK-H.5`–`TASK-H.8` → **[COMPLETED]**（Tina t881u「开工」）。实现：旅程 `contract_id` 落盘回传；脏区白话引导+ack 排除；主链路回归套件；records 脱敏 zip/清理 API。单测 `task-h5`…`task-h8` PASS。**不**触碰 v0.2 封印。
