@@ -1,6 +1,6 @@
 > **读法（2026-10-29 文档治理加注，不改任何卡的条款与状态）**
 > - **本文件是 L3 任务卡层**：Supervisor 方案确认后交给施工 Worker 的机器指令。意图层见 [`../scheme.md`](../scheme.md)，地图见 [`../README.md`](../README.md)。
-> - **当前要做的卡在 §3.4c（J 系列，注意各卡「ADR-0014 修订」块）与 §3.4d（L 系列）**，按 [`delivery-lifecycle.md`](./delivery-lifecycle.md) §8 里程碑 M2 → M5 排期；每张卡开工前按 [`task-card-standard.md`](./task-card-standard.md) 核对就绪。§1.1 矩阵是状态总表；下方游离的 P-xx 修订行、版本头 84 条状态回写与 §6 修订记录都是历史流水，施工时可跳过。
+> - **当前要做的卡在 §3.4c（J 系列，注意各卡「ADR-0014 修订」块）与 §3.4d（L 系列）**，按 [`delivery-lifecycle.md`](./delivery-lifecycle.md) §8 里程碑 M2 → M5 排期；每张卡开工前按 [`task-card-standard.md`](./task-card-standard.md) 核对就绪。§1.1 矩阵是状态总表；下方游离的 P-xx 修订行、版本头 85 条状态回写与 §6 修订记录都是历史流水，施工时可跳过。
 > - **三 Agent 口径以 J 系列与 [`supervisor.md`](./supervisor.md) §13.2 为准**：右栏 = 只读 AI 搭档（`TASK-J.1`），中栏 = Supervisor 方案画布，Worker 只在 Worktree 施工。C.1「右栏（Coding Agent 对话）」、W.1「推入右侧 Worker 对话窗口」、W.5a「对接右栏会话」、C.6、P.1 / E.1 的 Vibe 直改主工作树、Sprint 1 门禁「右栏 Claude Code 改文件」均为早期叙述，已由 J.1 / C.18 改变；原文保留作溯源。
 > - **已知结构问题**（状态矛盾、三处「当前基线」不一致、失效的 `docs/archive/*` 引用）登记在 [`../ledger/README.md`](../ledger/README.md) DOC-1～DOC-4，未在本轮修改。
 
@@ -119,6 +119,7 @@
 > 81. **状态回写（2026-10-28 · 规格增补落地 · 沉默损耗三项）**：`supervisor.md` 增补 ①§14.11 第 3 条墓地跨旅程继承（冻结快照 + 墓地子账本随迁，`disallow_revival` 与证据整体保留）；②§14.11 子账本四 `attributions` 质疑归因账本与收紧项 **K-14**（K-13 已由 `reject_item` 占用，故顺延；只写台账，不改 `requirements-store.ts` 的 `source` 枚举）；③§13.3 第一反应速记前置说明（不新增决定类型）。`intent-compiler-prompt.md` §2.2 补归因字段的生成端不可写边界（非码类，不改 51 码）。全部为 ⏳ 规格态，未实现；验收归 J.11 / 实施期。任务状态未改。
 > 82. **状态回写（2026-10-28 · 立卡 TASK-J.18 · Worker 派工墓地门禁）**：依 SSOT §14.11 INV-LEDGER-03 第 1 款立 **`TASK-J.18`**。实施口径见新文件 [`worker-graveyard-gate.md`](./worker-graveyard-gate.md)：判定单元分强弱两类（依赖 / 安装命令 / 导入为强，路径 / 标识符 / 文字为弱），新增内容用行多重集差；派工检查点复核快照绑定；执行期优先级格（保护路径 > 安全墓碑 > 用户墓碑 > 越界）；SSOT §14.11 新增第 5 小节 G-MATCH 作为墓地匹配单一语义源，引擎与门禁共用夹具。登记缺口 GAP-W1～W6 与待拍板项 DEC-1（K-9 对 `ERROR_CODES` 的解释）。**本条仅文档立卡**。
 > 84. **状态回写（2026-10-28 · 规格一致性审计收尾）**：`docs/specs/consistency-audit.md` 立档（2026-10-29 文档治理移至 `docs/ledger/consistency-audit.md`）（审计台账，非权威源；待裁决、机械修复、挂账项与权威分层）。K-16 `attributions.linked_reason_code` 类型名由 `reasonCodeSchema`（运行时常量）修正为 `ReasonCode`（推断类型）。审计机械修复 PR #9 已合入 main（`e430193`）。README 补 `playtest-self-check.md` 与 `consistency-audit.md` 索引。**无任务状态变化**，各任务卡状态未改。
+> 85. **状态回写（2026-10-31 · J.1 合入）**：`TASK-J.1` 由 `[NEW_TASK]` → **`[COMPLETED]`**（证据 PR [#29](https://github.com/he18718143986-design/IDE/pull/29) / tip `4144a20`，`feat(daemon): TASK-J.1 右栏 partner 只读化`；partner 只读；相关测本机 51 passed）。同步：§1.1 矩阵、§3.4c 详细卡、Sprint「当前首要」→ **J.2**（主链起点；J.1 已收口）。**本条仅文档状态回写**；不改生产代码。
 > 65. **状态回写（2026-10-26 · 实现完成 TASK-C.14f + TASK-C.15a–d）**：Tina t855u「继续项 2（WS）与项 4（EO 余面 Delta）的立卡实现」。已落地：`BASELINE_PROGRESS` WS（停 2s 轮询）；EO-01 完备+转移 DAG；EO-08 UUIDv5/返工计数；EO-05 签署白名单 GC + MERGED→DELIVERED 失败停 MERGED；P0 drafts 隔离 + EO-09 worktree seal。单测 `task-c14f-*` / `task-c15a–d-*` + C.12 回归绿。**不**扩 Spec Freeze 五正文；P1–P3 仍 backlog。
 > 64. **状态回写（2026-10-26 · 立卡 TASK-C.14f + TASK-C.15a–d · WS 深度进度 + EO 余面 Delta）**：Tina t855u「继续项 2（WS）与项 4（EO 余面 Delta）的立卡实现」。按此前安全闭环后暂缓的 backlog 升格为薄卡：**`TASK-C.14f`**（基线深度进度真 WS/流式：Daemon 推 `BASELINE_PROGRESS`，替换前端 2s 轮询；P0 仍秒级解锁右栏）；**`TASK-C.15a`**（EO-01 DeliveryState 完备：补齐 C.12b 简化缺口与合法转移）；**`TASK-C.15b`**（EO-08 断言身份与返工计数：UUIDv5 `assertion_id` + Daemon 权威计数 + 超限 `ESCALATED_HUMAN` + 返工期禁追加）；**`TASK-C.15c`**（EO-05 两阶段归档/GC：签署期白名单 GC；`MERGED`→`DELIVERED` 事务硬化，失败停 `MERGED`）；**`TASK-C.15d`**（P0 AC-ISOL 草稿隔离 + EO-09 Worktree seal 轻量；P1 sufficiency / P2 确认分级 / P3 视口防抖仍 backlog）。建议序 **C.14f → C.15a → C.15b → C.15c → C.15d**；**当前首要**→ **C.14f**。**本条仅文档立卡**；**不写**产品码直至同授权「立卡实现」开工；**不**扩 Spec Freeze 五正文；不抢 D.1e；不改 D.1 鉴权。权威：基线讨论稿 §5/§7 流式 OPEN；右栏 §14.11 EO-01/05/08/09 + §13 P0；C.12 Top5 已覆盖部分不重复。
 > 58. **状态回写（2026-10-26 · 立卡 TASK-C.12a–e · Spec Freeze → Top5 Delta 升级卡）**：Tina 授权（t817u「升格立卡」）。按封版记录 `docs/reports/spec-freeze-record.md`（tip `e4779ad`）与澄清 §6 / Checklist §3，将 API Top5 As-is→To-be 映射为五张 **Delta 升级卡**（**不推翻**现网 session / STATE / prototypes / PAUSED 弹窗骨架）：**`TASK-C.12a`**（双层 Token：`exec_token` + `resume_token`+`jti`；PAUSED 吊销；EO-07）、**`TASK-C.12b`**（`session_epoch`+`state_seq` + EO-01 `DeliveryState` 广播；含 `CONTRACT_SIGNING` 瞬态）、**`TASK-C.12c`**（越界原子拦截：SIGINT 3s→SIGKILL→吊销→清锁→PAUSED；EO-02/07）、**`TASK-C.12d`**（Demo 三态 + `can_sign` + records 轻量拷贝；EO-05/06）、**`TASK-C.12e`**（`.stagent/records/{contract_id}/audit-manifest.json`；EO-03/04/05）。建议序 **C.12a→C.12b→C.12c→C.12d→C.12e**；**当前首要**→ **C.12a**。**本条仅文档立卡**；**CLOSED ≠ 已实现**；**不写** daemon/src 产品码直至 Tina 点名开发；**不抢** D.1e；Impact/Mode/AST/云归档仍 **v0.2+**；不改 D.1 loopback+#token 通道原则。
@@ -215,7 +216,7 @@
 | **TASK-C.19** | Supervisor SSOT 合流（DOC-SSOT-Supervisor） | 文档治理 | **[COMPLETED]**（2026-10-26 Tina t906u；本提交合入） | P4 规范合流 | • 前置 `C.18` COMPLETED<br>• 新建 `docs/specs/supervisor.md` 五大章<br>• 旧右栏/工作流/澄清/接口/运转机制加 SSOT 指针<br>• 不改产品代码；不抢 D.1e；不扩 v0.2 |
 | **TASK-C.20** | Supervisor 合流前碎片归档（DOC-ARCHIVE-Supervisor-pre-SSOT） | 文档治理 | **[COMPLETED]**（2026-10-26 Tina t908u「归档」；本提交合入） | P4 规范归档 | • 前置 `C.19` COMPLETED<br>• `docs/archive/supervisor-pre-ssot/` + 5 份 git mv<br>• reports 留 stub；Freeze 总册保留并强化指针<br>• 不改产品代码；不抢 D.1e；不扩 v0.2 |
 | **TASK-C.21** | Supervisor SSOT 审查补丁（DOC-SSOT-Supervisor-Patch） | 文档治理 | **[COMPLETED]**（2026-10-26 Tina t910u「补丁」；本提交合入） | P4 规范补丁 | • 前置 `C.20` COMPLETED<br>• SSOT v2.0.1：Demo 门禁 / 通配分级 / 确认原子时序 / pin / 降级 / demoReady<br>• 不改产品代码；不抢 D.1e；不扩 v0.2 |
-| **TASK-J.1** | 右栏 AI 搭档只读工具集 | 安全 / 工作台 | **[NEW_TASK]** | **P0** 闭环 v2.1 第一批 | • SSOT §13.2 / P-01 / L-02<br>• Claude Code 右栏改 `role: partner`：仅 Read/Glob/Grep，禁写与 Bash，不用 acceptEdits<br>• 右栏拒选 read_write 适配器 |
+| **TASK-J.1** | 右栏 AI 搭档只读工具集 | 安全 / 工作台 | **[COMPLETED]**（tip `4144a20` / merge [#29](https://github.com/he18718143986-design/IDE/pull/29)；partner 只读；相关测本机 51 passed） | **P0** 闭环 v2.1 第一批 | • SSOT §13.2 / P-01 / L-02<br>• Claude Code 右栏改 `role: partner`：仅 Read/Glob/Grep，禁写与 Bash，不用 acceptEdits<br>• 右栏拒选 read_write 适配器 |
 | **TASK-J.2** | `ScopePlan` 纯函数与范围预检构建器 | 门禁 / 范围 | **[NEW_TASK]** | P1 闭环 v2.1 第一批 | • SSOT §15.3 / S2-02 / S2-04 / L-03<br>• 单一来源 + 稳定 digest；确定性收敛，不编造路径<br>• 无验证脚本 → manual_only |
 | **TASK-J.3** | 唯一确认谓词纳入 `ScopePlan` | 门禁 | **[NEW_TASK]** | P1 闭环 v2.1 第一批 | • 前置 `J.2`<br>• 新增 `E_SCOPE_NOT_READY` / `E_SCOPE_POLICY` / `E_SCOPE_APPROVAL_REQUIRED`<br>• 与 J.5 同 PR 或开关保护 |
 | **TASK-J.4** | Daemon 范围预检接口与快照绑定 | 门禁 / 控制面 | **[NEW_TASK]** | P1 闭环 v2.1 第一批 | • 前置 `J.2`<br>• `POST /api/supervisor/scope/preflight`；快照 1.1 含 `scope_plan`<br>• `E_SCOPE_PLAN_DRIFT` / `E_SCHEME_SNAPSHOT_MISMATCH`；签署链不得 403 |
@@ -2713,14 +2714,15 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 
 建议开工顺序：**J.1（并行，P0 安全）→ J.2 → J.3 ∥ J.4 → J.5 → J.6 ∥ J.7**；**J.8** 任意时刻可并行。
 
-#### 【Task J.1】右栏 AI 搭档只读工具集（P0 安全） `[NEW_TASK]`
+#### 【Task J.1】右栏 AI 搭档只读工具集（P0 安全） `[COMPLETED]`
 
 * **任务编号**：`TASK-J.1`
 * **任务名称**：方案工作台右栏搭档以只读工具集运行
 * **对应规格**：SSOT 第三部分 §13.2「AI 搭档只读是硬约束」；§18 `P-01`；§19 `L-02`
 * **前置依赖**：无（可立即开工；`TASK-J.7` 硬依赖本卡）
 * **优先级**：**P0**（现网安全缺口）
-* **状态**：`[NEW_TASK]`
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#29](https://github.com/he18718143986-design/IDE/pull/29) / tip `4144a20`（`feat(daemon): TASK-J.1 右栏 partner 只读化`）；partner 只读；相关测本机 51 passed
 * **对照痛点（代码事实）**：右栏默认首选适配器是 `ClaudeCodeAdapter`（`daemon/server.ts::defaultChatAdapters`），其 `BASE_TOOLS` 含 `Edit` / `Write` / `MultiEdit`，以 `--permission-mode acceptEdits` 启动，`cwd` 为用户仓库根（`daemon/chat/session-manager.ts` 的 `resolveCwd ?? repoRoot`）。也就是说，右栏聊天今天可以**不经合同、不经 Worktree** 直接改用户主干——违反签署分水岭「签署前主干改动为 0 字节」。
 * **一句话目标**：在方案工作台里，无论接哪个适配器，右栏只能读、搜、列目录，不能写文件、不能跑 shell、不能联网。
 * **范围**：
@@ -3773,7 +3775,7 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 
 > **Sprint 0 / 2 / 3 / 4 实施基线核验**：
 > - **当前工程物理起点**：本地代码仓库 `main`@`f14c8cb`（去掉资源管理器「文件」标题热修）；测试基线 **1292 passed / 6 skipped**；已交付至 C.9a–d、**C.10a–h**。
-> - **当前首要编码任务**：**`TASK-J.1`**（右栏搭档只读，P0，可并行）与 **`TASK-J.2`**（`ScopePlan` 单一来源，主链起点）。闭环旅程 v2.1 第一批 J.1–J.8 见 §3.4c。前序 `TASK-C.21` 及之前均 COMPLETED。
+> - **当前首要编码任务**：**`TASK-J.2`**（`ScopePlan` 单一来源，主链起点）。`TASK-J.1` 已 **COMPLETED**（tip `4144a20` / [#29](https://github.com/he18718143986-design/IDE/pull/29)）。闭环旅程 v2.1 第一批其余 J.2–J.8 见 §3.4c。前序 `TASK-C.21` 及之前均 COMPLETED。
 > - **前序（历史）**：`TASK-C.21` → **`[COMPLETED]`**（Tina t910u Supervisor SSOT v2.0.1 审查补丁）。C.20/C.19/C.18/C.17/C.16/H.1–H.8 均 COMPLETED。**不**改产品代码；不抢 D.1e；不扩 v0.2。
 > - **Sprint 2 已达成**：`TASK-P.1`、`TASK-C.5`、`TASK-W.3`、`TASK-W.4` 四张卡均已落地并通过各自专用用例；保护路径在任意模式被门卫拦截、撤销一键恢复、4 类绕过负例失败关闭均已成立。
 > - **Sprint 3 已达成**：`TASK-D.2` 主体已落地，无交集合同自动批准，交互收敛为 1 次合并按钮。
