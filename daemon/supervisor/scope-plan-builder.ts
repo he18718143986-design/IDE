@@ -29,6 +29,13 @@ import type {
   VerificationCommand,
 } from "../../src/lib/contract.schema";
 import {
+  detectRunner,
+  obligationCommand,
+  repoFactsFromPackageJson,
+  type DetectedRunner,
+  type RepoFacts,
+} from "../../src/lib/verification/obligations";
+import {
   DEFAULT_DRAFT_BUDGET,
   DEFAULT_FORBIDDEN_PATHS,
   buildL0Plan,
@@ -38,6 +45,12 @@ import {
 import type { SupervisorMessage } from "./types";
 
 /** 构建器接受的方案输入：兼容现行 SchemeDraft 与未来 SchemeDraftV2 子集 */
+export type SchemeAcceptanceItem = {
+  id: string;
+  text: string;
+  check: "auto" | "playtest" | "both";
+};
+
 export type ScopePlanSchemeInput = Pick<
   SchemeDraft,
   "scheme_revision" | "title" | "summary" | "modules" | "notes"
@@ -51,6 +64,8 @@ export type ScopePlanSchemeInput = Pick<
     project_anchor?: string;
   }>;
   out_of_scope?: ReadonlyArray<{ text: string }>;
+  /** V2：白话验收条目（TASK-L.3 withSystemScope / 合同元数据） */
+  acceptance?: ReadonlyArray<SchemeAcceptanceItem>;
 };
 
 export interface BuildScopePlanInput {
@@ -544,7 +559,7 @@ export function buildScopePlan(
     ...(contribution.budget_limits ?? {}),
   };
 
-  const plan: ScopePlan = {
+  let plan: ScopePlan = {
     scheme_revision: scheme.scheme_revision,
     plan_digest: "",
     areas,
@@ -568,10 +583,217 @@ export function buildScopePlan(
     },
   };
 
+  // TASK-L.3：签署前并入系统范围（义务测试路径 + stagent check 命令）
+  const withSystem = withSystemScope(plan, {
+    repoRoot,
+    scheme,
+  });
+  plan = withSystem;
+
   plan.plan_digest = scopePlanDigest(plan);
 
   if (input.decisions) {
     return applyScopeDecisions(plan, input.decisions);
   }
   return plan;
+}
+
+/** 系统范围上下文（L.3 / L.12 共用形状） */
+export interface SystemScopeContext {
+  repoRoot: string;
+  scheme: ScopePlanSchemeInput;
+  /** 可注入；缺省时从 package.json / go.mod / pytest 线索探测 */
+  repoFacts?: RepoFacts;
+  runner?: DetectedRunner;
+}
+
+const SYSTEM_TESTS_PATH = "tests/stagent/**";
+const SYSTEM_AREA_ID = "system-tests-stagent";
+
+function readRepoFacts(repoRoot: string): RepoFacts {
+  const facts: RepoFacts = {};
+  const pkgPath = path.join(repoRoot, "package.json");
+  try {
+    if (fs.existsSync(pkgPath)) {
+      const raw = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as {
+        scripts?: Record<string, string>;
+        dependencies?: Record<string, string>;
+        devDependencies?: Record<string, string>;
+      };
+      Object.assign(facts, repoFactsFromPackageJson(raw));
+    }
+  } catch {
+    // ignore malformed package.json
+  }
+  try {
+    if (fs.existsSync(path.join(repoRoot, "go.mod"))) {
+      facts.has_go_mod = true;
+    }
+  } catch {
+    // ignore
+  }
+  const pytestHints = [
+    "pytest.ini",
+    "pyproject.toml",
+    "setup.cfg",
+    "tox.ini",
+  ];
+  for (const hint of pytestHints) {
+    try {
+      if (fs.existsSync(path.join(repoRoot, hint))) {
+        facts.has_pytest = true;
+        break;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return facts;
+}
+
+function hasAutoAcceptance(
+  scheme: ScopePlanSchemeInput,
+): boolean {
+  return (scheme.acceptance ?? []).some(
+    (a) => a.check === "auto" || a.check === "both",
+  );
+}
+
+/**
+ * TASK-L.3：签署前系统贡献。
+ *
+ * - 方案含 check: auto/both 且 detectRunner 非空 → 写范围 tests/stagent/**
+ * - 追加义务命令 + `stagent check obligations` + `stagent check test-integrity`
+ * - 无 auto 条目或无运行器时原样返回（digest 不变）
+ */
+export function withSystemScope(
+  plan: ScopePlan,
+  ctx: SystemScopeContext,
+): ScopePlan {
+  if (!hasAutoAcceptance(ctx.scheme)) {
+    return plan;
+  }
+
+  const facts = ctx.repoFacts ?? readRepoFacts(ctx.repoRoot);
+  const runner = ctx.runner ?? detectRunner(facts);
+  if (runner.kind === null) {
+    return plan;
+  }
+
+  const next: ScopePlan = {
+    ...plan,
+    areas: plan.areas.map((a) => ({
+      ...a,
+      paths: [...a.paths],
+      module_ids: [...a.module_ids],
+    })),
+    never_touch: plan.never_touch.map((g) => ({
+      ...g,
+      paths: [...g.paths],
+    })),
+    needs_approval: plan.needs_approval.map((item) => ({
+      ...item,
+      paths: [...item.paths],
+    })),
+    verification: {
+      commands: plan.verification.commands.map((c) => ({
+        ...c,
+        args: [...c.args],
+      })),
+      plain: [...plan.verification.plain],
+      manual_only: plan.verification.manual_only,
+    },
+    budget: {
+      limits: { ...plan.budget.limits },
+      plain: plan.budget.plain,
+    },
+    grade: {
+      ok: plan.grade.ok,
+      rejected: plan.grade.rejected.map((r) => ({ ...r })),
+    },
+    plan_digest: "",
+  };
+
+  const alreadyHasTestsPath = next.areas.some((a) =>
+    a.paths.includes(SYSTEM_TESTS_PATH),
+  );
+  if (!alreadyHasTestsPath) {
+    next.areas.push({
+      id: SYSTEM_AREA_ID,
+      label: plainAreaLabel(SYSTEM_TESTS_PATH),
+      why: "本合同验收条目需要自动测试义务",
+      module_ids: [],
+      kind: "create_new",
+      paths: [SYSTEM_TESTS_PATH],
+      excluded_by_user: false,
+    });
+  }
+
+  const obligationPaths = (ctx.scheme.acceptance ?? [])
+    .filter((a) => a.check === "auto" || a.check === "both")
+    .map((a) => `tests/stagent/${a.id}.test.${runner.kind === "pytest" ? "py" : runner.kind === "go" ? "go" : "ts"}`);
+
+  const cmd = obligationCommand(runner, obligationPaths);
+  const extraCommands: VerificationCommand[] = [];
+  if (cmd) {
+    extraCommands.push({
+      alias: "obligation-tests",
+      executable: cmd.executable,
+      args: cmd.args,
+      expected_exit_code: 0,
+      timeout_seconds: 300,
+    });
+  }
+  extraCommands.push(
+    {
+      alias: "check-obligations",
+      executable: "stagent",
+      args: [
+        "check",
+        "obligations",
+        "--report",
+        ".stagent/records/obligation-report.json",
+      ],
+      expected_exit_code: 0,
+      timeout_seconds: 60,
+    },
+    {
+      alias: "check-test-integrity",
+      executable: "stagent",
+      args: [
+        "check",
+        "test-integrity",
+        "--base",
+        ".stagent/records/test-baseline",
+        "--candidate",
+        ".stagent/records/test-candidate",
+        "--lang",
+        runner.kind === "pytest" ? "py" : runner.kind === "go" ? "go" : "ts",
+      ],
+      expected_exit_code: 0,
+      timeout_seconds: 60,
+    },
+  );
+
+  const existingAliases = new Set(
+    next.verification.commands.map((c) => c.alias),
+  );
+  for (const c of extraCommands) {
+    if (existingAliases.has(c.alias)) continue;
+    next.verification.commands.push(c);
+    existingAliases.add(c.alias);
+  }
+  if (next.verification.commands.length > 0) {
+    next.verification.manual_only = false;
+    if (
+      !next.verification.plain.includes("义务测试先红后绿，且既有测试不被削弱")
+    ) {
+      next.verification.plain.push(
+        "义务测试先红后绿，且既有测试不被削弱",
+      );
+    }
+  }
+
+  next.plan_digest = scopePlanDigest(next);
+  return next;
 }

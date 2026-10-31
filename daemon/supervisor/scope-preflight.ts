@@ -59,10 +59,17 @@ function asSchemeInput(
     modules: scheme.modules,
     notes: scheme.notes,
   };
+  let next: ScopePlanSchemeInput = base;
   if ("out_of_scope" in scheme && scheme.out_of_scope !== undefined) {
-    return { ...base, out_of_scope: scheme.out_of_scope };
+    next = { ...next, out_of_scope: scheme.out_of_scope };
   }
-  return base;
+  if ("acceptance" in scheme && scheme.acceptance !== undefined) {
+    next = { ...next, acceptance: scheme.acceptance };
+  }
+  if ("modules_v2" in scheme && scheme.modules_v2 !== undefined) {
+    next = { ...next, modules_v2: scheme.modules_v2 };
+  }
+  return next;
 }
 
 /** 只读预检：零模型、零落盘。 */

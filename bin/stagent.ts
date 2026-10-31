@@ -6,6 +6,8 @@
  *   stagent open  [路径] [--port <n>] [--ui-url <url>] [--no-browser]
  *   stagent start [--repo <path>] [--port <n>] [--ui-url <url>] [--no-browser]
  *   stagent status [--repo <path>]
+ *   stagent check obligations --report <path>
+ *   stagent check test-integrity --base <path> --candidate <path> [--lang <lang>]
  *
  * 安全约定（A §6.1 / B TASK-D.1 / D.1b）：
  * - Daemon 仅绑定 127.0.0.1，动态端口 3001~3010；
@@ -20,6 +22,16 @@
  */
 import path from "node:path";
 import { formatVersion, readCliVersion } from "./version";
+import fs from "node:fs";
+import {
+  classifyRun,
+  type ObligationRunClass,
+} from "../src/lib/verification/obligations";
+import {
+  detectTestWeakening,
+  type TestIntegrityLang,
+} from "../daemon/guard/test-integrity";
+
 import process from "node:process";
 import { execFile } from "node:child_process";
 import { pathToFileURL } from "node:url";
@@ -48,7 +60,7 @@ export {
   tryReuseRunningDaemon,
 };
 
-export type CliCommand = "open" | "start" | "status" | "help" | "version";
+export type CliCommand = "open" | "start" | "status" | "help" | "version" | "check";
 
 export interface CliOptions {
   command: CliCommand;
@@ -58,6 +70,8 @@ export interface CliOptions {
   uiUrl: string;
   /** 启动后不唤起浏览器（或 STAGENT_NO_BROWSER=1） */
   noBrowser: boolean;
+  /** `stagent check ...` 时，"check" 之后的剩余 argv */
+  checkArgv?: string[];
 }
 
 export const DEFAULT_UI_URL = "http://localhost:5173";
@@ -71,7 +85,8 @@ export function parseArgs(argv: string[]): CliOptions {
     rawCommand === "start" ||
     rawCommand === "status" ||
     rawCommand === "help" ||
-    rawCommand === "version"
+    rawCommand === "version" ||
+    rawCommand === "check"
   ) {
     command = rawCommand;
     cursor = 1;
@@ -85,6 +100,16 @@ export function parseArgs(argv: string[]): CliOptions {
   } else {
     command = "help";
     cursor = 0;
+  }
+
+  if (command === "check") {
+    const base: Omit<CliOptions, "command"> = {
+      repo: process.cwd(),
+      uiUrl: process.env["STAGENT_UI_URL"] ?? DEFAULT_UI_URL,
+      noBrowser: process.env["STAGENT_NO_BROWSER"] === "1",
+      checkArgv: argv.slice(1),
+    };
+    return { command, ...base };
   }
 
   let repo = process.cwd();
@@ -159,6 +184,10 @@ function printHelp(): void {
   stagent start [--repo <path>] [--port <n>] [--ui-url <url>] [--no-browser]
                                    启动本地 Daemon（仅绑定 127.0.0.1，端口 3001~3010）
   stagent status [--repo <path>]   查看当前仓库 Daemon 状态
+  stagent check obligations --report <path>
+                                   读运行报告，按 classifyRun 给出 red/green/red_invalid（退出码 0=green）
+  stagent check test-integrity --base <path> --candidate <path> [--lang ts|js|py|go|rs]
+                                   比对基线与候选测试，检测削弱（退出码 0=未削弱）
   stagent version                  显示版本号
   stagent help                     显示帮助
 
@@ -361,11 +390,134 @@ async function runOpenOrStart(
   process.once("SIGTERM", shutdown);
 }
 
+const CHECK_LANGS = new Set([
+  "ts",
+  "js",
+  "tsx",
+  "jsx",
+  "py",
+  "go",
+  "rs",
+]);
+
+function readJsonFile(filePath: string): unknown {
+  const raw = fs.readFileSync(filePath, "utf8");
+  return JSON.parse(raw) as unknown;
+}
+
+function parseCheckFlag(
+  argv: readonly string[],
+  name: string,
+): string | undefined {
+  const idx = argv.indexOf(name);
+  if (idx < 0) return undefined;
+  const value = argv[idx + 1];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+/**
+ * TASK-L.3：`stagent check` 子命令（纯本地，不启 Daemon）。
+ * 返回进程退出码；JSON 结果写入 stdout（测试可捕获）。
+ */
+export function runCheckCommand(checkArgv: readonly string[]): {
+  exitCode: number;
+  stdout: string;
+} {
+  const sub = checkArgv[0];
+  if (sub === "obligations") {
+    const reportPath = parseCheckFlag(checkArgv, "--report");
+    if (!reportPath) {
+      const stdout = JSON.stringify({
+        ok: false,
+        error: "missing --report <path>",
+      });
+      return { exitCode: 1, stdout };
+    }
+    try {
+      const report = readJsonFile(path.resolve(reportPath));
+      const classification: ObligationRunClass = classifyRun(report);
+      const ok = classification === "green";
+      const stdout = JSON.stringify({
+        ok,
+        classification,
+        report: path.resolve(reportPath),
+      });
+      return { exitCode: ok ? 0 : 1, stdout };
+    } catch (err) {
+      const stdout = JSON.stringify({
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return { exitCode: 1, stdout };
+    }
+  }
+
+  if (sub === "test-integrity") {
+    const basePath = parseCheckFlag(checkArgv, "--base");
+    const candidatePath = parseCheckFlag(checkArgv, "--candidate");
+    const langRaw = parseCheckFlag(checkArgv, "--lang") ?? "ts";
+    if (!basePath || !candidatePath) {
+      const stdout = JSON.stringify({
+        ok: false,
+        error: "missing --base <path> and/or --candidate <path>",
+      });
+      return { exitCode: 1, stdout };
+    }
+    if (!CHECK_LANGS.has(langRaw)) {
+      const stdout = JSON.stringify({
+        ok: false,
+        error: `unsupported --lang ${langRaw}`,
+      });
+      return { exitCode: 1, stdout };
+    }
+    try {
+      const baseText = fs.readFileSync(path.resolve(basePath), "utf8");
+      const candidateText = fs.readFileSync(
+        path.resolve(candidatePath),
+        "utf8",
+      );
+      const result = detectTestWeakening(
+        baseText,
+        candidateText,
+        langRaw as TestIntegrityLang,
+      );
+      const stdout = JSON.stringify({
+        ok: !result.weakened,
+        weakened: result.weakened,
+        reasons: result.reasons,
+        base_assertion_count: result.base_assertion_count,
+        candidate_assertion_count: result.candidate_assertion_count,
+      });
+      return { exitCode: result.weakened ? 1 : 0, stdout };
+    } catch (err) {
+      const stdout = JSON.stringify({
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return { exitCode: 1, stdout };
+    }
+  }
+
+  const stdout = JSON.stringify({
+    ok: false,
+    error:
+      'unknown check subcommand; use "obligations" or "test-integrity"',
+  });
+  return { exitCode: 1, stdout };
+}
+
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
 
   if (options.command === "help") {
     printHelp();
+    return;
+  }
+
+  if (options.command === "check") {
+    const result = runCheckCommand(options.checkArgv ?? []);
+    console.log(result.stdout);
+    process.exitCode = result.exitCode;
     return;
   }
 

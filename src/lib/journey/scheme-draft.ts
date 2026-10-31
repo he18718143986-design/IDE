@@ -70,6 +70,15 @@ export interface SchemeDraft {
   pinned_fields: SchemePinnedField[];
   /** 有效业务属性输入轮次（非寒暄） */
   business_input_rounds: number;
+  /**
+   * V2 白话验收条目（可选；TASK-L.3 投影进合同 supervisor_metadata.acceptance_refs）。
+   * 未接线前可缺省；有 auto/both 时 withSystemScope 会并入 tests/stagent/**。
+   */
+  acceptance?: Array<{
+    id: string;
+    text: string;
+    check: "auto" | "playtest" | "both";
+  }>;
 }
 
 /**
