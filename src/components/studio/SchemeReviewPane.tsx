@@ -5,8 +5,16 @@
  * - 冲突抉择 / AI 推荐决策确认
  * - 方案够完整才出现「生成 Demo」
  * - 最底只有「确认方案」（冻结 Spec → 开工）；无「继续澄清」按钮
+ * - J.7：确认中三步人话进度；COMMIT 后中栏交接卡（不进右栏）
  */
 
+import {
+  HANDOFF_COMPENSATION_FAILED_MESSAGE,
+  HANDOFF_LOCK_HINT,
+  HANDOFF_UI_STEPS,
+  handoffStepIndex,
+  type HandoffUiStepId,
+} from "@/lib/journey/handoff-progress";
 import type {
   DemoGate,
   SchemeConfirmationDecision,
@@ -45,6 +53,20 @@ export interface SchemeReviewPaneProps {
   onRetryDemo?: (() => void) | undefined;
   onAcceptDegradedDemo?: (() => void) | undefined;
   onConfirmScheme?: (() => void) | undefined;
+  /**
+   * J.7：交接进行中的当前人话步骤；有值时按钮区改为三步进度。
+   */
+  handoffStep?: HandoffUiStepId | null | undefined;
+  /**
+   * J.7：COMMIT 成功后的中栏交接卡文案（含节点数）；不进右栏。
+   */
+  handoffCardText?: string | null | undefined;
+  /**
+   * J.7：补偿失败时中栏诊断卡；右栏保持锁定。
+   */
+  handoffCompensationFailed?: boolean | undefined;
+  /** 打开运行诊断（补偿失败入口） */
+  onOpenHandoffDiagnose?: (() => void) | undefined;
 }
 
 function MermaidCard(props: { title: string; source: string; testId: string }) {
@@ -416,9 +438,35 @@ export function SchemeReviewPane(props: SchemeReviewPaneProps) {
         </div>
       ) : null}
 
+      {/* J.7：交接成功卡 / 补偿失败诊断 — 中栏画布，不进右栏 */}
+      {props.handoffCardText ? (
+        <section
+          data-testid="handoff-started-card"
+          className="mt-3 rounded border border-emerald-700/40 bg-emerald-500/10 p-3 text-xs leading-relaxed text-emerald-950"
+        >
+          {props.handoffCardText}
+        </section>
+      ) : null}
+      {props.handoffCompensationFailed ? (
+        <section
+          data-testid="handoff-compensation-failed"
+          className="mt-3 rounded border border-destructive/40 bg-destructive/10 p-3 text-xs leading-relaxed"
+        >
+          <p>{HANDOFF_COMPENSATION_FAILED_MESSAGE}</p>
+          <button
+            type="button"
+            data-testid="handoff-compensation-diagnose"
+            onClick={() => props.onOpenHandoffDiagnose?.()}
+            className="mt-2 rounded border border-border bg-background px-2 py-1 text-[11px] hover:bg-accent"
+          >
+            打开运行诊断
+          </button>
+        </section>
+      ) : null}
+
       {/* 最底只有确认方案；无「继续澄清」 */}
       <div className="mt-auto border-t border-border pt-3">
-        {!confirmation.ok && !frozen ? (
+        {!confirmation.ok && !frozen && !props.handoffStep ? (
           <p
             data-testid="scheme-confirm-blocked"
             className="mb-2 text-[11px] text-amber-800"
@@ -426,25 +474,77 @@ export function SchemeReviewPane(props: SchemeReviewPaneProps) {
             {confirmation.message}
           </p>
         ) : null}
-        <button
-          type="button"
-          data-testid="scheme-confirm"
-          disabled={!canConfirm}
-          onClick={() => props.onConfirmScheme?.()}
-          className="w-full rounded border border-emerald-800 bg-emerald-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-40"
-        >
-          {props.confirmBusy
-            ? "冻结并开工中…"
-            : frozen
-              ? "方案已确认"
-              : pendingSensitiveCount > 0
-                ? `确认方案（含 ${pendingSensitiveCount} 处敏感改动）`
-                : "确认方案"}
-        </button>
-        <p className="mt-1.5 text-[10px] text-muted-foreground">
-          确认后冻结 Spec 并直接开工写代码。Demo
-          是可选增强项；已生成则须先确认或显式接受降级。
-        </p>
+{props.handoffStep ? (
+          <div
+            data-testid="handoff-progress"
+            className="rounded border border-border bg-card p-3"
+          >
+            <p className="mb-2 text-xs font-semibold text-foreground">
+              正在准备开工
+            </p>
+            <ol className="space-y-1.5 text-[11px] leading-relaxed">
+              {HANDOFF_UI_STEPS.map((step) => {
+                const current = handoffStepIndex(props.handoffStep!);
+                const idx = handoffStepIndex(step.id);
+                const mark =
+                  idx < current ? "✓" : idx === current ? "●" : "○";
+                return (
+                  <li
+                    key={step.id}
+                    data-testid={`handoff-step-${step.id}`}
+                    data-handoff-state={
+                      idx < current
+                        ? "done"
+                        : idx === current
+                          ? "active"
+                          : "pending"
+                    }
+                    className={
+                      idx === current
+                        ? "font-medium text-foreground"
+                        : idx < current
+                          ? "text-emerald-800"
+                          : "text-muted-foreground"
+                    }
+                  >
+                    <span className="mr-1.5 inline-block w-3 text-center">
+                      {mark}
+                    </span>
+                    {step.label}
+                  </li>
+                );
+              })}
+            </ol>
+            <p
+              data-testid="handoff-progress-hint"
+              className="mt-2 text-[10px] text-muted-foreground"
+            >
+              {HANDOFF_LOCK_HINT}
+            </p>
+          </div>
+        ) : (
+          <button
+            type="button"
+            data-testid="scheme-confirm"
+            disabled={!canConfirm}
+            onClick={() => props.onConfirmScheme?.()}
+            className="w-full rounded border border-emerald-800 bg-emerald-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-40"
+          >
+            {props.confirmBusy
+              ? "冻结并开工中…"
+              : frozen
+                ? "方案已确认"
+                : pendingSensitiveCount > 0
+                  ? `确认方案（含 ${pendingSensitiveCount} 处敏感改动）`
+                  : "确认方案"}
+          </button>
+        )}
+        {!props.handoffStep ? (
+          <p className="mt-1.5 text-[10px] text-muted-foreground">
+            确认后冻结 Spec 并直接开工写代码。Demo
+            是可选增强项；已生成则须先确认或显式接受降级。
+          </p>
+        ) : null}
       </div>
     </div>
   );

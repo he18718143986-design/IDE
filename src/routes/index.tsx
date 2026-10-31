@@ -153,6 +153,13 @@ import {
   runConfirmSchemeAtomic,
 } from "@/lib/journey/confirm-scheme-atomic";
 import {
+  HANDOFF_LOCK_HINT,
+  confirmStepToHandoffUi,
+  formatHandoffStartedCard,
+  partnerMessageMayRebuildScheme,
+  type HandoffUiStepId,
+} from "@/lib/journey/handoff-progress";
+import {
   grayOutTaskGraphNodes,
   shouldGrayAfterDispute,
 } from "@/lib/graph/dispute-gray";
@@ -361,6 +368,13 @@ function Console() {
     useState<DemoGate>(EMPTY_DEMO_GATE);
   const [schemeConfirmBusy, setSchemeConfirmBusy] = useState(false);
   const [schemeChatLocked, setSchemeChatLocked] = useState(false);
+  /** J.7：交接三步人话进度；null = 未在交接 */
+  const [handoffStep, setHandoffStep] = useState<HandoffUiStepId | null>(null);
+  /** J.7：中栏交接成功卡（DEC-005，不进右栏） */
+  const [handoffCardText, setHandoffCardText] = useState<string | null>(null);
+  /** J.7：补偿失败诊断卡 */
+  const [handoffCompensationFailed, setHandoffCompensationFailed] =
+    useState(false);
   /**
    * TASK-C.22：确认方案的幂等键。
    * 同一修订重试必须复用同一 id——否则网络抖动会签出两份合同；
@@ -500,6 +514,9 @@ function Console() {
     setSchemeCorpus("");
     setSchemeDemoGate(EMPTY_DEMO_GATE);
     setSchemeChatLocked(false);
+    setHandoffStep(null);
+    setHandoffCardText(null);
+    setHandoffCompensationFailed(false);
     setDemoConfirmed(false);
     setActivePrototypeId(null);
     schemeConfirmIdRef.current = null;
@@ -903,6 +920,11 @@ function Console() {
       const trimmed = text.trim();
       if (!trimmed) return "passthrough";
 
+      // J.7 / D9：方案已冻结后，右栏消息只作施工对话，绝不回写方案。
+      if (!partnerMessageMayRebuildScheme(schemeDraft)) {
+        return "passthrough";
+      }
+
       // 随对话刷新方案（不锁用户进选择题）
       const nextCorpus = schemeCorpus
         ? `${schemeCorpus}
@@ -964,7 +986,7 @@ ${trimmed}`
         setJourneyBusy(false);
       }
     },
-    [conn, connected, selectedId, toDisputeView, schemeCorpus],
+    [conn, connected, selectedId, toDisputeView, schemeCorpus, schemeDraft],
   );
 
   const handleSchemeConfirmDecision = useCallback((decisionId: string) => {
@@ -1136,6 +1158,9 @@ ${trimmed}`
       return;
     setSchemeConfirmBusy(true);
     setConfirmPrototypeError(null);
+    setHandoffCardText(null);
+    setHandoffCompensationFailed(false);
+    setHandoffStep("save_scheme");
 
     const expectedRevision = schemeDraft.scheme_revision;
     if (schemeConfirmIdRef.current?.revision !== expectedRevision) {
@@ -1153,6 +1178,7 @@ ${trimmed}`
       planForConfirm.scheme_revision !== expectedRevision
     ) {
       setConfirmPrototypeError("正在核对要改哪些地方…");
+      setHandoffStep(null);
       setSchemeConfirmBusy(false);
       return;
     }
@@ -1178,7 +1204,8 @@ ${trimmed}`
     const staging: {
       contractId: string | null;
       target: SoftwareContract | null;
-    } = { contractId: null, target: null };
+      nodeCount: number;
+    } = { contractId: null, target: null, nodeCount: 0 };
 
     const result = await runConfirmSchemeAtomic({
       confirmationId,
@@ -1187,10 +1214,15 @@ ${trimmed}`
       expectedRevision,
       scopePlan: planForConfirm,
 
-      // 1. 先停流式，再禁右栏；右栏一旦锁定就不再接受 Supervisor Patch。
+      // 1. 先停流式，再禁右栏；交接瞬态锁定（J.7 / D9）。
       quiesceRightChat: async () => {
         await chatSession.stop();
         setSchemeChatLocked(true);
+      },
+
+      // J.7：五阶段 → 三步人话进度
+      onStage: (stage) => {
+        setHandoffStep(confirmStepToHandoffUi(stage));
       },
 
       // 2. 不可变快照（幂等：同 id + 同内容返回原快照）；绑定当前 ScopePlan。
@@ -1262,20 +1294,16 @@ ${trimmed}`
           list.find((c) => c.contract_id === saved.contract_id) ?? saved;
         staging.target = approved;
 
+        // 人话第三步：安排施工步骤（建任务图）
+        setHandoffStep("arrange_steps");
         const graph = await createTaskGraph(
           conn,
           buildProposalFromContract(approved),
         );
         setTaskGraph(graph);
         setStudioNonce((n) => n + 1);
-        setJourneyCards((prev) => [
-          ...prev.slice(-19),
-          {
-            id: `scheme-confirmed-${Date.now()}`,
-            kind: "SYSTEM",
-            text: `方案已确认并冻结。「${approved.intent.title}」任务图已建（${graph.nodes.length} 节点），开始写代码。`,
-          },
-        ]);
+        // J.7 / DEC-005：交接卡进中栏，严禁向右栏注入系统消息。
+        staging.nodeCount = graph.nodes.length;
         return { contract_id: saved.contract_id };
       },
 
@@ -1285,19 +1313,15 @@ ${trimmed}`
         if (!target) return;
         await abortContract(conn, target, "local-user");
         setContracts((prev) => prev.filter((c) => c.contract_id !== target));
-        setJourneyCards((prev) => [
-          ...prev.slice(-19),
-          {
-            id: `scheme-compensated-${Date.now()}`,
-            kind: "SYSTEM",
-            text: `确认失败已回滚：${cause}`,
-          },
-        ]);
+        // J.7：失败说明走中栏，不向右栏塞系统消息。
+        void cause;
       },
 
-      // 5. 只有成功提交才恢复右栏；失败保持锁定（已签署态不允许再聊改本轮）。
-      //    例外：漂移等冻结前失败由事务内 restoreRightChat 解锁。
-      restoreRightChat: () => setSchemeChatLocked(false),
+      // J.7：补偿成功 / 冻结前失败 → 解锁；补偿失败保持锁定。
+      restoreRightChat: () => {
+        setSchemeChatLocked(false);
+        setHandoffStep(null);
+      },
     });
 
     if (!result.ok) {
@@ -1306,41 +1330,36 @@ ${trimmed}`
       if (drifted && result.scope_plan) {
         setScopePlan(result.scope_plan);
       }
-      setConfirmPrototypeError(
-        drifted
-          ? "项目刚刚有变化，我重新核对了改动范围，请再看一眼"
-          : (result.reason ?? "确认方案失败，请检查方案与 Demo 状态后重试。"),
-      );
-      setJourneyCards((prev) => [
-        ...prev.slice(-19),
-        {
-          id: `scheme-confirm-failed-${Date.now()}`,
-          kind: "SYSTEM",
-          text: compensationFailed
-            ? `确认在「${result.failedAt}」阶段失败且补偿未完成，右栏保持锁定，需人工处理：${result.reason ?? ""}`
-            : drifted
-              ? "项目刚刚有变化，我重新核对了改动范围，请再看一眼"
-              : `确认未生效（${result.failedAt}）：${result.reason ?? "未知原因"}`,
-        },
-      ]);
+      setHandoffStep(null);
+      if (compensationFailed) {
+        setHandoffCompensationFailed(true);
+        setConfirmPrototypeError(null);
+      } else {
+        setHandoffCompensationFailed(false);
+        setConfirmPrototypeError(
+          drifted
+            ? "项目刚刚有变化，我重新核对了改动范围，请再看一眼"
+            : (result.reason ?? "确认方案失败，请检查方案与 Demo 状态后重试。"),
+        );
+      }
+      // J.7：失败不向右栏注入系统消息；补偿失败保持锁定，其余已由 restoreRightChat 解锁。
       setSchemeConfirmBusy(false);
       return;
     }
 
-    // COMMIT：方案冻结，右栏保持锁定——冻结后右栏的修改只会被静默丢弃。
+    // J.7 / D9：COMMIT 成功 → 右栏解锁；中栏画布交接卡；右栏零系统消息。
     setSchemeDraft(result.frozen ?? freezeScheme(schemeDraft));
     setDemoConfirmed(true);
     setPlainContractVisible(false);
-    if (result.idempotent) {
-      setJourneyCards((prev) => [
-        ...prev.slice(-19),
-        {
-          id: `scheme-confirm-replay-${Date.now()}`,
-          kind: "SYSTEM",
-          text: "这次确认与上一笔相同，已按幂等处理，未重复签署。",
-        },
-      ]);
-    }
+    setHandoffStep(null);
+    setHandoffCompensationFailed(false);
+    setHandoffCardText(
+      formatHandoffStartedCard({
+        nodeCount: staging.nodeCount,
+        budgetPlain: planForConfirm.budget.plain,
+      }),
+    );
+    setSchemeChatLocked(false);
 
     const committed = staging.target;
     if (committed) {
@@ -1349,17 +1368,12 @@ ${trimmed}`
         const worker = await runWorker(conn, committed.contract_id);
         setWorkerResult(worker);
       } catch (err) {
-        setJourneyCards((prev) => [
-          ...prev.slice(-19),
-          {
-            id: `scheme-worker-${Date.now()}`,
-            kind: "SYSTEM",
-            text:
-              err instanceof Error
-                ? `已确认方案；Worker 稍后可在状态就绪后重试：${err.message}`
-                : "已确认方案；Worker 稍后可重试。",
-          },
-        ]);
+        // Worker 重试提示进中栏错误条，不进右栏系统消息。
+        setConfirmPrototypeError(
+          err instanceof Error
+            ? `已确认方案；Worker 稍后可在状态就绪后重试：${err.message}`
+            : "已确认方案；Worker 稍后可重试。",
+        );
       }
     }
     setSchemeConfirmBusy(false);
@@ -2740,9 +2754,7 @@ ${trimmed}`
                 onAssistantModeChange={setAssistantMode}
                 locked={schemeChatLocked}
                 lockedReason={
-                  schemeDraft?.frozen
-                    ? "方案已签署并冻结，右栏本轮已锁定。要改需求请点「新建需求」重新开始。"
-                    : "正在确认方案，本轮右栏已暂停接收新输入；确认完成后自动解除。"
+                  schemeChatLocked ? HANDOFF_LOCK_HINT : undefined
                 }
               />
             </div>
@@ -3243,6 +3255,14 @@ ${trimmed}`
                     }}
                     onConfirmScheme={() => {
                       void handleConfirmScheme();
+                    }}
+                    handoffStep={handoffStep}
+                    handoffCardText={handoffCardText}
+                    handoffCompensationFailed={handoffCompensationFailed}
+                    onOpenHandoffDiagnose={() => {
+                      setSettingsDeepFocus(null);
+                      setSettingsReturnArmed(true);
+                      setSettingsNonce((n) => n + 1);
                     }}
                   />
                 </div>

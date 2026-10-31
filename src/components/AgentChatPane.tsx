@@ -63,7 +63,7 @@ export interface AgentChatPaneProps {
   commandPhase?: "no_key" | "idle" | "in_progress" | undefined;
   /** 与指挥面一致的主 CTA test id */
   primaryCtaTestId?: string | undefined;
-  /** 确认方案事务期间锁定右侧输入；已签署后保持锁定。 */
+  /** J.7：交接瞬态锁定右侧输入；COMMIT 成功后由调用方解锁（D9）。 */
   locked?: boolean | undefined;
   /** 锁定原因（白话） */
   lockedReason?: string | undefined;
@@ -432,7 +432,7 @@ export function AgentChatPane({
           }}
           placeholder={
             locked === true
-              ? "方案已确认/正在确认，本轮右栏已锁定"
+              ? (lockedReason ?? "正在交接，几秒后可以继续聊")
               : assistant.mode === "wizard"
                 ? "先配置模型钥匙，再回来说话（不会假装发送）"
                 : assistant.mode === "practice"
