@@ -306,6 +306,37 @@ export class ScopedWorktreeGateway {
   }
 
   /**
+   * TASK-L.4：公开写评估（含 phaseOverlay 收窄），供 AiWorker 预校验。
+   * 与真实 write/delete 使用同一套 effectiveWriteScope + testAllowlist。
+   */
+  public assessWriteAccess(relPath: string): {
+    allowed: boolean;
+    code?: string;
+    message?: string;
+  } {
+    const deny = this.testAllowlistDenial(relPath);
+    if (deny) {
+      return {
+        allowed: false,
+        code: "E_TEST_NOT_IN_ALLOWLIST",
+        message: deny,
+      };
+    }
+    const access = checkWriteAccess(relPath, this.effectiveWriteScope());
+    if (!access.allowed) {
+      return {
+        allowed: false,
+        code: this.scopeBlockCode(access.reason, relPath),
+        message:
+          access.reason === "FORBIDDEN_PATH"
+            ? `Path '${relPath}' is strictly forbidden (or phase extraForbidden)`
+            : `Path '${relPath}' is outside authorized writable scope`,
+      };
+    }
+    return { allowed: true };
+  }
+
+  /**
    * 合并 extraForbidden 后的写 Scope（禁止优先，复用 checkWriteAccess 顺序）。
    * 不修改合同对象。
    */

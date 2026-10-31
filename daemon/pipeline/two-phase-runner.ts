@@ -63,6 +63,14 @@ export interface TwoPhaseHooks {
     can_merge: boolean;
     evidence?: Record<string, unknown>;
   }>;
+  /**
+   * 网关建好后、Worker 跑前的钩子（集成测可在此证明 I 段拒改测试）。
+   * 生产路径不传。
+   */
+  afterGatewayBuilt?: (
+    phase: "t" | "i" | "single",
+    gateway: ScopedWorktreeGateway,
+  ) => void | Promise<void>;
 }
 
 export interface TwoPhaseResult {
@@ -165,6 +173,7 @@ export async function runTwoPhaseConstruction(
 
   if (!shouldRunTwoPhase(derived.obligations)) {
     const gateway = host.buildGateway(undefined);
+    await hooks.afterGatewayBuilt?.("single", gateway);
     await hooks.runI(gateway, []);
     const verify = hooks.afterIVerify
       ? await hooks.afterIVerify(gateway)
@@ -207,6 +216,7 @@ export async function runTwoPhaseConstruction(
       tAttempts += 1;
       const tOverlay = buildTPhaseOverlay(obligationPaths, writable);
       const gateway = host.buildGateway(tOverlay);
+      await hooks.afterGatewayBuilt?.("t", gateway);
       const extras = obligationChecksExtras("t", derived.obligations);
       await hooks.runT(gateway, extras);
       tWritten = tPhaseLockedPaths([...gateway.getModifiedFiles()]);
@@ -280,6 +290,7 @@ export async function runTwoPhaseConstruction(
       if (typeof gateway.setPhaseOverlay === "function") {
         gateway.setPhaseOverlay(iOverlay);
       }
+      await hooks.afterGatewayBuilt?.("i", gateway);
       const extras = obligationChecksExtras("i", derived.obligations);
       await hooks.runI(gateway, extras);
 

@@ -1,5 +1,4 @@
 import type { SoftwareContract } from "../../src/lib/contract.schema";
-import { checkWriteAccess } from "../../src/lib/scope";
 import type { ScopedWorktreeGateway } from "../mcp/gateway";
 import type { CostMonitor } from "../guard/cost-monitor";
 import {
@@ -145,6 +144,8 @@ export class AiWorker {
   private readonly declaration: AdapterCapabilityDeclaration;
   private readonly repoRoot: string | undefined;
   private readonly exposedTools: readonly string[] | undefined;
+  /** TASK-L.4：本段义务清单等，注入「你会被这样检查」 */
+  private readonly checksExtras: readonly string[] | undefined;
   private readonly toolset: WorkerToolset;
 
   constructor(options: {
@@ -157,6 +158,8 @@ export class AiWorker {
     repoRoot?: string | undefined;
     /** 期望暴露的工具子集；缺省按合同授权推导 */
     exposedTools?: readonly string[] | undefined;
+    /** TASK-L.4：追加到检查段的本段义务清单 */
+    checksExtras?: readonly string[] | undefined;
   }) {
     this.gateway = options.gateway;
     this.costMonitor = options.costMonitor;
@@ -164,6 +167,7 @@ export class AiWorker {
     this.declaration = options.declaration ?? MANAGED_AI_CAPABILITY;
     this.repoRoot = options.repoRoot;
     this.exposedTools = options.exposedTools;
+    this.checksExtras = options.checksExtras;
 
     // 工具在构造期按合同授权一次性挂载：未授权命令执行时 exec 工具根本不实例化
     this.toolset = mountWorkerTools({
@@ -199,6 +203,9 @@ export class AiWorker {
       ...(this.exposedTools === undefined
         ? {}
         : { exposedTools: this.exposedTools }),
+      ...(this.checksExtras === undefined
+        ? {}
+        : { checksExtras: this.checksExtras }),
     });
   }
 
@@ -318,13 +325,12 @@ export class AiWorker {
     return files;
   }
 
-  /** 整批预校验：任一越权 → 全部拒绝，绝不写半成品 */
+  /** 整批预校验：任一越权（含 phaseOverlay 收窄）→ 全部拒绝，绝不写半成品 */
   private validateChanges(
     contract: SoftwareContract,
     changes: WorkerChange[],
   ): Array<{ code: string; message: string }> {
     const blockers: Array<{ code: string; message: string }> = [];
-    const scope = contract.authorization.file_system_scope;
     const budget = contract.authorization.budget_limits.max_file_modifications;
 
     if (changes.length > budget) {
@@ -344,11 +350,14 @@ export class AiWorker {
         continue;
       }
       seen.add(change.path);
-      const access = checkWriteAccess(change.path, scope);
+      // TASK-L.4：经网关评估，使 phaseOverlay 收窄在预校验阶段即生效
+      const access = this.gateway.assessWriteAccess(change.path);
       if (!access.allowed) {
         blockers.push({
-          code: access.reason ?? "E_OUT_OF_SCOPE",
-          message: `Path '${change.path}' is outside authorized writable scope`,
+          code: access.code ?? "E_OUT_OF_SCOPE",
+          message:
+            access.message ??
+            `Path '${change.path}' is outside authorized writable scope`,
         });
       }
     }

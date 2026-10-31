@@ -29,6 +29,10 @@ import {
 } from "../../src/lib/contract.schema";
 import type { TestObligation } from "../../src/lib/verification/obligations";
 import { renderChecksSection } from "../../daemon/worker/session-task-injector";
+import { ContractOrchestrator } from "../../daemon/pipeline/orchestrator";
+import { ContractStore } from "../../daemon/pipeline/contract-store";
+import { git } from "../helpers/git";
+import type { WorkerModelClient } from "../../daemon/worker/ai-worker";
 
 function makeContract(opts: {
   writablePaths?: string[];
@@ -475,5 +479,214 @@ describe("TASK-L.4 两段式施工", () => {
       phase: "i",
     });
     expect(fs.existsSync(sus)).toBe(true);
+  });
+});
+
+
+describe("TASK-L.4 生产调度接线（orchestrator.runWorker）", () => {
+  let repo: string;
+
+  beforeEach(() => {
+    repo = fs.mkdtempSync(path.join(os.tmpdir(), "stagent-l4-prod-"));
+    git(repo, ["init", "-q", "-b", "main"]);
+    git(repo, ["config", "user.email", "t@example.com"]);
+    git(repo, ["config", "user.name", "T"]);
+    fs.mkdirSync(path.join(repo, "src"), { recursive: true });
+    fs.mkdirSync(path.join(repo, "tests", "stagent"), { recursive: true });
+    fs.writeFileSync(path.join(repo, "src", "a.ts"), "export const a = 1;\n");
+    // 让 deriveObligations 能探测到 vitest（生产路径不用注入 obligations 也能两段）
+    fs.writeFileSync(
+      path.join(repo, "package.json"),
+      JSON.stringify({
+        name: "l4-prod",
+        private: true,
+        devDependencies: { vitest: "^3.0.0" },
+        scripts: { test: "vitest run" },
+      }),
+      "utf8",
+    );
+    git(repo, ["add", "."]);
+    git(repo, ["commit", "-q", "-m", "init"]);
+  });
+
+  afterEach(() => {
+    safeRmSync(repo);
+  });
+
+  function seedExecuting() {
+    const draft = createContractDraft({
+      title: "L.4 prod",
+      description: "two-phase via runWorker",
+      acceptanceCriteria: ["登录成功"],
+      writablePaths: ["src/**", "tests/**"],
+      maxVerificationRetries: 5,
+      supervisorMetadata: {
+        suggestion_id: "scheme:l4-prod",
+        acceptance_refs: [
+          { id: "ac-login", text: "登录成功", check: "auto" },
+        ],
+        scheme_item_ids: ["ac-login"],
+        stub_id: null,
+      },
+      commands: [
+        {
+          alias: "verify",
+          executable: "node",
+          args: ["-e", "process.exit(0)"],
+          expected_exit_code: 0,
+          timeout_seconds: 30,
+        },
+      ],
+    });
+    const contract = softwareContractSchema.parse({
+      ...draft,
+      lifecycle_state: "PENDING_APPROVAL",
+      approval: { status: "PENDING_REVIEW" },
+    });
+    new ContractStore(repo).save(contract);
+    return contract.contract_id;
+  }
+
+  const oblPath = "tests/stagent/ac-login.test.ts";
+
+  it("有未豁免义务：runWorker 走 T→I，I 段不能改测试", async () => {
+    const contractId = seedExecuting();
+    const orchestrator = new ContractOrchestrator({ repoRoot: repo });
+    await orchestrator.approve(contractId, "tina");
+
+    const iDenied: boolean[] = [];
+    let calls = 0;
+    const modelClient: WorkerModelClient = {
+      generateChanges: async (input) => {
+        calls += 1;
+        const prompt = input.task.system_prompt;
+        if (prompt.includes("本段（T · 先写测试）义务")) {
+          expect(prompt).toContain("ac-login");
+          return {
+            changes: [
+              {
+                path: oblPath,
+                content:
+                  "import { expect, it } from 'vitest';\nit('red', () => expect(1).toBe(2));\n",
+              },
+            ],
+            log: ["T"],
+            usage: { inputTokens: 10, outputTokens: 10 },
+          };
+        }
+        // I 段：只写实现
+        expect(prompt).toContain("本段（I · 再实现）义务");
+        return {
+          changes: [
+            {
+              path: "src/login.ts",
+              content: "export const login = () => true;\n",
+            },
+          ],
+          log: ["I"],
+          usage: { inputTokens: 10, outputTokens: 10 },
+        };
+      },
+    };
+
+    const result = await orchestrator.runWorker(contractId, {
+      modelClient,
+      twoPhase: {
+        // 桩报告：避免真跑 vitest
+        readObligationReport: (phase) =>
+          phase === "t"
+            ? {
+                schema: "stagent-obligation-report-v1",
+                test_count: 1,
+                assertion_failures: 1,
+                collection_or_compile_errors: 0,
+              }
+            : {
+                schema: "stagent-obligation-report-v1",
+                test_count: 1,
+                assertion_failures: 0,
+                collection_or_compile_errors: 0,
+              },
+        afterGatewayBuilt: async (phase, gateway) => {
+          if (phase !== "i") return;
+          // 用 assessWriteAccess 证明 I 段收窄（不触发 onScopeBlocked 吊销 exec_token）
+          const obl = gateway.assessWriteAccess(oblPath);
+          iDenied.push(!obl.allowed);
+          const legacy = gateway.assessWriteAccess("tests/legacy.test.ts");
+          iDenied.push(!legacy.allowed);
+          // 实现路径仍应可写
+          expect(gateway.assessWriteAccess("src/login.ts").allowed).toBe(true);
+        },
+      },
+    });
+
+    expect(result.two_phase?.phase).toBe("two_phase");
+    expect(result.two_phase?.can_merge).toBe(true);
+    expect(result.two_phase?.t_attempts).toBeGreaterThanOrEqual(1);
+    expect(result.two_phase?.i_attempts).toBeGreaterThanOrEqual(1);
+    expect(calls).toBeGreaterThanOrEqual(2);
+    expect(iDenied.length).toBeGreaterThanOrEqual(2);
+    expect(iDenied.every(Boolean)).toBe(true);
+
+    const wt = path.join(repo, ".stagent", "worktrees", `task-${contractId}`);
+    expect(fs.existsSync(path.join(wt, oblPath))).toBe(true);
+    expect(fs.existsSync(path.join(wt, "src", "login.ts"))).toBe(true);
+    // red_sha 应由 commitRedSha 记下
+    expect(result.two_phase?.red_sha).toBeTruthy();
+    expect(result.two_phase?.red_sha).not.toBe("unknown");
+  });
+
+  it("全部豁免：runWorker 保持单段，不强制 T", async () => {
+    const draft = createContractDraft({
+      title: "L.4 waived",
+      description: "no auto",
+      acceptanceCriteria: ["手测"],
+      writablePaths: ["src/**"],
+      supervisorMetadata: {
+        suggestion_id: "scheme:l4-waive",
+        acceptance_refs: [
+          { id: "ac-play", text: "手测", check: "playtest" },
+        ],
+        scheme_item_ids: ["ac-play"],
+        stub_id: null,
+      },
+      commands: [
+        {
+          alias: "verify",
+          executable: "node",
+          args: ["-e", "process.exit(0)"],
+          expected_exit_code: 0,
+          timeout_seconds: 30,
+        },
+      ],
+    });
+    const contract = softwareContractSchema.parse({
+      ...draft,
+      lifecycle_state: "PENDING_APPROVAL",
+      approval: { status: "PENDING_REVIEW" },
+    });
+    new ContractStore(repo).save(contract);
+    const orchestrator = new ContractOrchestrator({ repoRoot: repo });
+    await orchestrator.approve(contract.contract_id, "tina");
+
+    let calls = 0;
+    const result = await orchestrator.runWorker(contract.contract_id, {
+      modelClient: {
+        generateChanges: async () => {
+          calls += 1;
+          return {
+            changes: [
+              { path: "src/b.ts", content: "export const b = 2;\n" },
+            ],
+            log: ["single"],
+            usage: { inputTokens: 1, outputTokens: 1 },
+          };
+        },
+      },
+    });
+
+    expect(result.two_phase?.phase).toBe("single");
+    expect(calls).toBe(1);
+    expect(result.applied).toBe(true);
   });
 });
