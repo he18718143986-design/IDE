@@ -3230,8 +3230,8 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 #### 【Task L.7】`ProjectPlan` 类型、校验与存储 `[NEW_TASK]`
 
 * **任务编号**：`TASK-L.7`
-* **对应规格**：[`project-decomposition.md`](./project-decomposition.md) §2、§3、§6、§8；ADR-0015
-* **前置依赖**：`TASK-L.6`（M2 收口后才开 M3）
+* **对应规格**：[`project-decomposition.md`](./project-decomposition.md) §2、§3、§6、§8；[`project-architecture-baseline.md`](./project-architecture-baseline.md) §3～§5；ADR-0015、ADR-0018、ADR-0019
+* **前置依赖**：`TASK-L.6`（M2 收口后才开 M3）；ADR-0018 意图密封路径可用；需实现 PAB Schema/校验并要求 `architecture_baseline_ref`
 * **优先级**：P2（M3）
 * **状态**：`[NEW_TASK]`
 * **对照痛点（代码事实）**：全库无项目级计划；任务图一份合同一张（`src/lib/journey/proposal-from-contract.ts`）。
@@ -3250,15 +3250,15 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 #### 【Task L.8】计划补丁合并与分解器 `[NEW_TASK]`
 
 * **任务编号**：`TASK-L.8`
-* **对应规格**：[`project-decomposition.md`](./project-decomposition.md) §1、§4、§8（PD-08、PD-09、PD-11）
-* **前置依赖**：`TASK-L.7`、`TASK-J.9`（方案结构）
+* **对应规格**：[`project-decomposition.md`](./project-decomposition.md) §1、§4、§8（PD-08、PD-09、PD-11）；[`project-architecture-baseline.md`](./project-architecture-baseline.md) §2～§5；ADR-0018、ADR-0019
+* **前置依赖**：`TASK-L.7`、`TASK-J.9`（方案结构）；先经 ADR-0018 密封方案，再生成并通过 PAB，再生成 ProjectPlan
 * **优先级**：P2（M3）
 * **状态**：`[NEW_TASK]`
 * **对照痛点（代码事实）**：无分解逻辑。
 * **一句话目标**：方案冻结前，分解器产出计划补丁；Daemon 确定性合并，不合规整体拒绝。
 * **范围**：
   1. `src/lib/project/plan-patch.ts`：`PlanPatch` / `PlanOp` 类型；`applyPlanPatch(plan, patch, scheme, repoFacts)`（纯函数，规则见 §4；合并后调 `validateProjectPlan`）。
-  2. `daemon/supervisor/decomposer/decompose.ts`：输入方案（`SchemeDraftV2`）+ `repoFacts`，输出 `PlanPatch`（`reason: "initial"`）。实现形态开放（同 ADR-0014 §1）：单次结构化模型调用，输出用 zod Schema 约束；`size_hint === "standard"` 时不调模型，确定性生成单里程碑单桩。
+  2. `daemon/supervisor/decomposer/decompose.ts`：输入已密封方案（`SchemeDraftV2`）+ `repoFacts` + ready PAB，输出引用 PAB revision/digest 的 `PlanPatch`（`reason: "initial"`）；PAB 缺失、过期或有阻断决策时不得生成可签署合同桩。实现形态开放（同 ADR-0014 §1）：单次结构化模型调用，输出用 zod Schema 约束；`size_hint === "standard"` 时不调模型，确定性生成单里程碑单桩。
   3. 合并失败时把 `violations` 回喂分解器重试一次；仍失败 → 画布白话「这个需求我还没拆好」，不生成合同。
   4. HTTP `POST /api/project/plan/patch`（带 session token）：只接受用户发起的 `remove_stub`（`removed_by: "user"`）与 `reorder`，其余 op 返回 422；供 L.10 调用。
   5. 方案在两份合同之间变化时：§16.5 C 类（新需求）→ `add_stub`；B 类（本轮范围内补充）不产生计划补丁，仍并入当前合同（project-decomposition §5）。
@@ -3315,7 +3315,7 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 #### 【Task L.11】DesignNote 生成、校验与注入 `[NEW_TASK]`
 
 * **任务编号**：`TASK-L.11`
-* **对应规格**：[`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) §2、§3、§6（TD-01～TD-05）；ADR-0016
+* **对应规格**：[`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) §2、§3、§6（TD-01～TD-05）；[`project-architecture-baseline.md`](./project-architecture-baseline.md) §6；ADR-0016、ADR-0018、ADR-0019
 * **前置依赖**：`TASK-L.4`、`TASK-L.9`（DN-2 插入依赖桩）
 * **优先级**：P2（M3）
 * **状态**：`[NEW_TASK]`

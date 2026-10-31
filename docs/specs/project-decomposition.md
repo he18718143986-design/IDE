@@ -1,6 +1,6 @@
 # 项目分解规格（S3 · ProjectPlan）
 
-> **地位**：实施口径，从属 [ADR-0015](../adr/0015-contract-as-unit-of-delivery.md) 与 [`delivery-lifecycle.md`](./delivery-lifecycle.md) §1～§2。冲突时以 ADR 为准。
+> **地位**：实施口径，从属 [ADR-0015](../adr/0015-contract-as-unit-of-delivery.md)、[ADR-0018](../adr/0018-intent-to-executable-seal.md)、[ADR-0019](../adr/0019-project-architecture-baseline.md) 与 [`delivery-lifecycle.md`](./delivery-lifecycle.md) §1～§2。Standard/large 计划必须引用通过校验的 [PAB](./project-architecture-baseline.md)。冲突时以 ADR 为准。
 > **上游意图**：`q18`「把一个无法掌握的大型 AI 软件项目，变成一组你能够理解、能够验收、能够追踪、能够维护的可控任务」（[`../scheme.md`](../scheme.md) goal-8）。
 > **施工卡**：TASK-L.7（类型与存储）、L.8（分解器与计划补丁）、L.9（合同序列与交接）、L.10（项目地图画布）。
 > **状态**：设计定稿 · 待施工。全库无 `ProjectPlan` 相关代码。
@@ -17,9 +17,9 @@
 
 | 方案 `size_hint` | 处理 |
 | :--- | :--- |
-| `tiny` | 不建计划；直接走 Fast Path「直接改」（supervisor §16.11） |
-| `standard` | 计划只有 1 个里程碑、1 份合同桩，结构照常落盘（让追踪链完整） |
-| `large` | 必须分解；分解结果不满足 §3 尺寸规则时，不得生成任何合同 |
+| `tiny` | 不建计划；直接走 Fast Path「直接改」（supervisor §16.11），仍须遵守 ADR-0018 意图密封；跨模块/数据/安全改动须升为 standard 并建立 PAB |
+| `standard` | 须先经 ADR-0018 密封，再有 PAB；通常计划只有 1 个里程碑、1 份合同桩，结构照常落盘 |
+| `large` | 须先经 ADR-0018 密封，再有 PAB 并分解；分解结果不满足 §3 尺寸规则时，不得生成任何合同 |
 
 `size_hint` 由方案编译器给出（supervisor §14.2）。分解器可以把 `standard` 升为 `large`，但不能降级。
 
@@ -34,6 +34,7 @@ export interface ProjectPlan {
   schema_version: "1.0.0";
   project_id: string;               // 稳定 ID，首次建计划时生成
   plan_revision: number;            // 每合并一次补丁 +1
+  architecture_baseline_ref: { baseline_id: string; baseline_revision: number; baseline_digest: string }; // standard/large 必填
   scheme_id: string;                // 来源方案
   scheme_revision: number;          // 分解时的方案修订号
   milestones: Milestone[];

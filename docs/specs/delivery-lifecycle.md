@@ -3,7 +3,7 @@
 > **地位**：现行规范的**总装图**。它不重写任何已有条款，只把七个环节串成一条链：每一环写清输入、输出、负责方、门禁和用户触点，并指向权威正文。条款冲突时以所指正文为准；本文与正文都没写的，以本文为准。
 > **上游意图**：[`../scheme.md`](../scheme.md) goal-7～goal-10（`q17`～`q21`）。
 > **审计依据**：[`../reports/delivery-path-audit.md`](../reports/delivery-path-audit.md)。
-> **新增决策**：[ADR-0015](../adr/0015-contract-as-unit-of-delivery.md)（四级分解）、[ADR-0016](../adr/0016-system-knowledge-base-in-repo.md)（知识库入库）、[ADR-0017](../adr/0017-release-lifecycle-after-merge.md)（发布独立生命周期）。
+> **新增决策**：[ADR-0018](../adr/0018-intent-to-executable-seal.md)（意图→可签执行物唯一真相缝，绝对榜首）、[ADR-0019](../adr/0019-project-architecture-baseline.md)（项目架构基线先于分解）、[ADR-0015](../adr/0015-contract-as-unit-of-delivery.md)（四级分解）、[ADR-0016](../adr/0016-system-knowledge-base-in-repo.md)（知识库入库）、[ADR-0017](../adr/0017-release-lifecycle-after-merge.md)（发布独立生命周期）。
 
 ---
 
@@ -39,9 +39,11 @@ Release ── 引用一个已合并提交，可覆盖多份合同（.stagent/re
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **S1 需求摄取** | 用户消息、参考资料 | 会话记录（`.stagent/sessions/`）；用户消息带 `U<seq>` 别名 | 右栏 Agent（只读、无系统提示） | 右栏工具白名单 `Read,Glob,Grep`；无任何前缀注入 | 自由聊 | ADR-0014 §1；supervisor §13.2、§14.5 | 只读已实现；纯净化 → **L.1** |
 | **S2 方案编译** | 用户消息 | `SchemeDraftV2` + 证据台账（冻结后 `.stagent/drafts/schemes/{confirmation_id}.json`） | 中栏意图编译组件 | `SchemePatch` 引擎零模型合并；INV-LEDGER-01～04 | 拍板分歧（冲突卡） | supervisor §14；[`scheme-patch-engine.md`](./scheme-patch-engine.md)；[`intent-compiler-prompt.md`](./intent-compiler-prompt.md) | 规格完备、实现 0% → **J.9、J.10′** |
-| **S3 项目分解** | 冻结前的方案 | `ProjectPlan`：里程碑、合同桩、依赖 DAG | Supervisor（分解器） | 计划补丁校验（§4 不变式） | 无（画布只读展示「项目地图」） | [`project-decomposition.md`](./project-decomposition.md) | 空白 → **L.7～L.10** |
-| **S3→合同** | 计划中的下一份合同桩 + 方案 | `ScopePlan` → 合同（`.stagent/contracts/<id>.json`） | Daemon | 唯一确认谓词 `evaluateSchemeConfirmation`；§3 可编译判定 | **「确认开工」**（第 1 次点击） | supervisor §15、§17 D7；runtime §2 | 未施工 → **J.2～J.6′** |
-| **S4 技术方案** | 已签合同 + 系统知识库 | `DesignNote`（`.stagent/records/<id>/design-note.json`）+ 知识库增量计划 | 设计步骤（中栏组件或专用 Agent，形态开放） | DesignNote Schema 校验；五类决策升级规则 | 仅在五类决策时弹意外卡 | [`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) | 空白 → **L.11** |
+| **S2→Seal 意图密封** | 可编译方案 | 冻结快照 UserFace+MachineFace | Daemon | INV-SEAL-01～05；禁 buildL0Plan(chat) | 确认方案/开工 | ADR-0018 | → J.2～J.5′ |
+| **S3 项目架构基线** | 已密封方案 + 仓库/知识库事实 | PAB（版本化项目级架构约束） | Supervisor 提案、Daemon 确定性校验 | 覆盖、边界、来源、验证映射与 freshness | 仅升级裁决时触点；非授权 | [`project-architecture-baseline.md`](./project-architecture-baseline.md)；ADR-0019 | 待施工；先于 L.7/L.8 |
+| **S3 项目分解** | 已密封方案 + ready PAB（standard/large） | `ProjectPlan`：里程碑、合同桩、依赖 DAG（引用 PAB digest） | Supervisor（分解器） | 计划补丁校验 + PAB 引用一致性 | 无（画布只读展示「项目地图」） | [`project-decomposition.md`](./project-decomposition.md) | 空白 → **L.7～L.10** |
+| **S3→合同** | 计划中的下一份合同桩 + 已密封 MachineFace | `ScopePlan` → 合同（`.stagent/contracts/<id>.json`） | Daemon | 唯一确认谓词 `evaluateSchemeConfirmation`；§3 可编译判定；ADR-0018 密封门禁 | **「确认开工」**（第 1 次点击） | supervisor §15、§17 D7；runtime §2；ADR-0018 | 未施工 → **J.2～J.6′** |
+| **S4 技术方案** | 已签合同 + ready PAB + 系统知识库 | `DesignNote`（`.stagent/records/<id>/design-note.json`）+ 知识库增量计划 | 设计步骤（中栏组件或专用 Agent，形态开放） | DesignNote Schema 与 PAB 一致性校验；五类决策升级规则 | 仅在五类决策时弹意外卡 | [`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) | 空白 → **L.11** |
 | **S5 施工** | 合同 + DesignNote + 测试义务 | Worktree 内的改动（`.stagent/worktrees/task-<id>`，分支 `task/<id>`） | Worker | 网关写范围；预算三维熔断；墓地门禁 | 无（看步骤点亮） | runtime §1～§5；ADR-0003、0013；[`worker-graveyard-gate.md`](./worker-graveyard-gate.md) | 单合同已实现；验证命令进指令 → **L.2**；墓地 → **J.18** |
 | **S6 验证与验收** | 候选提交 | `EvidenceBundle`（`.stagent/evidence/<contractId>-<evidenceId>.json`）；试玩记录；合并提交 + Trailer | Daemon（判卷）+ 用户（试玩） | `can_merge` 只由退出码派生；测试义务红→绿；知识库漂移检查 | 试玩；**「合入」**（第 2 次点击） | ADR-0005；[`verification-strategy.md`](./verification-strategy.md)；[`playtest-self-check.md`](./playtest-self-check.md) | 测试义务 → **L.3、L.4**；真实预览 → **L.5**；知识库检查 → **L.12** |
 | **S7 发布与运维** | 已合并提交 | `ReleaseRecord`（`.stagent/releases/<id>.json`）；健康检查证据 | Daemon | 构建与健康检查退出码；失败自动回滚 | **「发布」**（独立点击）；回滚 | [`release-and-operations.md`](./release-and-operations.md) | 空白 → **L.14～L.16** |
@@ -107,7 +109,7 @@ q<n>（原话） → scheme item id（goal-* / mod-* / acc-*） → milestone_id
 | 链接 | 记录在哪里 | 现状 |
 | :--- | :--- | :--- |
 | 原话 → 方案条目 | 方案条目 `evidence[]`（supervisor §14.2） | 规格已定，引擎未实现 |
-| 方案条目 → 合同 | 合同 `supervisor_metadata.scheme_item_ids` / `acceptance_refs` / `stub_id`（新增可选字段，TASK-L.3 定义并在按快照建合同时填写；`stub_id` 由 L.9 写入） | 断开：今天范围从聊天文本推断 |
+| 方案条目 → 合同 | 合同 `supervisor_metadata.scheme_item_ids` / `acceptance_refs` / `stub_id`（新增可选字段，TASK-L.3 定义并在按快照建合同时填写；`stub_id` 由 L.9 写入） | 断开：今天范围从聊天文本推断（由 ADR-0018 封印禁旁路） |
 | 合同 → 提交 | Trailer `Stagent-Contract-ID`（`daemon/pipeline/merger.ts`） | 已实现 |
 | 提交 → 方案条目 | Trailer `Stagent-Scheme-Items`（新增，L.13；受 512B 单行上限约束，超出时写 `changelog.md` 并只留合同号） | 未实现 |
 | 合同 → 证据 | Trailer `Stagent-Evidence-ID` | 已实现 |
@@ -130,6 +132,7 @@ q<n>（原话） → scheme item id（goal-* / mod-* / acc-*） → milestone_id
 | 证据 | `.stagent/evidence/<contractId>-<evidenceId>.json` | 否 | 现有 |
 | 方案快照 | `.stagent/drafts/schemes/{confirmation_id}.json` | 否 | 现有 |
 | 审计包 | `.stagent/records/<contract_id>/` | 否 | 现有（ADR-0011） |
+| 架构基线 | `.stagent/project/architecture-baseline.json` + `revisions/` | 否 | 新增（ADR-0019，L.7 前置） |
 | 项目计划 | `.stagent/project/plan.json` + `plan.revisions/` | 否 | 新增（L.7） |
 | 设计说明 | `.stagent/records/<contract_id>/design-note.json` | 否 | 新增（L.11） |
 | 系统知识库 | 目标仓库 `docs/system/` | **是** | 新增（ADR-0016，L.12） |

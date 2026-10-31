@@ -57,13 +57,13 @@
 
 | 层级 | 管什么 | 文件 | 冲突时 |
 | :--- | :--- | :--- | :--- |
-| **现行规范（四份）** | 产品与契约 | [`system-architecture.md`](./specs/system-architecture.md)（架构宪法，v1.6.1；§0.2、§7.1 已由 supervisor 取代）· [`supervisor.md`](./specs/supervisor.md)（Supervisor SSOT，第三部分 v2.1 现行）· [`runtime-contract-and-safety.md`](./specs/runtime-contract-and-safety.md)（运行时硬契约）· [`development-tasks.md`](./specs/development-tasks.md)（任务卡与 DAG，v1.6.2） | 上位优先；supervisor §17 与 §7 同级 |
-| **交付全链路（2026-10-30）** | 方案之后的环节 | [`delivery-lifecycle.md`](./specs/delivery-lifecycle.md)（总装图）· [`project-decomposition.md`](./specs/project-decomposition.md)（S3，ADR-0015）· [`technical-design-and-knowledge.md`](./specs/technical-design-and-knowledge.md)（S4，ADR-0016）· [`verification-strategy.md`](./specs/verification-strategy.md)（S6）· [`release-and-operations.md`](./specs/release-and-operations.md)（S7，ADR-0017）· [`task-card-standard.md`](./specs/task-card-standard.md)（卡就绪） | 与四份现行规范同级；冲突时以对应 ADR 为准 |
+| **核心规范（四份）** | 产品与契约 | [`system-architecture.md`](./specs/system-architecture.md)（架构宪法，v1.6.1；§0.2、§7.1 已由 supervisor 取代）· [`supervisor.md`](./specs/supervisor.md)（Supervisor SSOT，第三部分 v2.1 现行）· [`runtime-contract-and-safety.md`](./specs/runtime-contract-and-safety.md)（运行时硬契约）· [`development-tasks.md`](./specs/development-tasks.md)（任务卡与 DAG，v1.6.2） | 上位优先；supervisor §17 与 §7 同级 |
+| **交付全链路（2026-10-30）** | 方案之后的环节 | [`delivery-lifecycle.md`](./specs/delivery-lifecycle.md)（总装图）· [`ADR-0018 真相缝`](./adr/0018-intent-to-executable-seal.md) · [`project-architecture-baseline.md`](./specs/project-architecture-baseline.md)（密封后 S3 前置，ADR-0019）· [`project-decomposition.md`](./specs/project-decomposition.md)（S3，ADR-0015；依赖 PAB）· [`technical-design-and-knowledge.md`](./specs/technical-design-and-knowledge.md)（S4，ADR-0016）· [`verification-strategy.md`](./specs/verification-strategy.md)（S6）· [`release-and-operations.md`](./specs/release-and-operations.md)（S7，ADR-0017）· [`task-card-standard.md`](./specs/task-card-standard.md)（卡就绪） | 与四份现行规范同级；冲突时以对应 ADR 为准 |
 | **实施口径（附属）** | 某条现行规范的实施细节 | [`scheme-patch-engine.md`](./specs/scheme-patch-engine.md)（supervisor §14.2/14.3/14.11，`TASK-J.9`）· [`intent-compiler-prompt.md`](./specs/intent-compiler-prompt.md)（§14.4～14.9，`TASK-J.10`/J.11）· [`worker-graveyard-gate.md`](./specs/worker-graveyard-gate.md)（§14.11 INV-LEDGER-03，`TASK-J.18`）· [`playtest-self-check.md`](./specs/playtest-self-check.md)（§16.7，`TASK-J.16`） | 以所指上位规格为准 |
 | **代码即权威** | 运行时事实 | `src/lib/state/delivery-state.ts`、`src/lib/journey/confirm-scheme-atomic.ts`、`daemon/supervisor/demo/signing-gate.ts`、`daemon/guard/audit-manifest.ts`、`daemon/supervisor/rules-l0.ts`、`src/lib/error-codes.ts` | 代码现状 ≠ 目标规格；差距登记在 supervisor §19 与 [`scheme.md`](./scheme.md) §11 |
 | **草案（非依据）** | 待核验 | [`constants-and-paths.md`](./specs/constants-and-paths.md)、[`state-machine-contract.md`](./specs/state-machine-contract.md)、[`evidence-and-acceptance-criteria.md`](./specs/evidence-and-acceptance-criteria.md) | 不得当现行规范引用 |
 
-> 四份实施口径的状态均为「设计定稿 · 待施工」：对应引擎文件目前都不存在。
+> 交付全链路实施口径处于「设计定稿 · 待施工」；能力状态以任务卡和验证证据为准。
 
 ### 3.2 三个 Agent 在规格里的位置
 
@@ -78,10 +78,10 @@
 
 ---
 
-## 4. L1 决策（`adr/`）· 17 篇
+## 4. L1 决策（`adr/`）· 19 篇
 
-索引见 [`adr/README.md`](./adr/README.md)。0001～0009 抽自架构规范 §8；0010～0013 为 2026-10-27 补录；0014 为三 Agent 拓扑（用户裁决）；0015～0017 为交付全链路（随 2026-10-30 PR 合入生效）。
-方案里 `status: pending` 的决定（[`scheme.md`](./scheme.md) §6）经用户拍板后，在此新增 ADR（下一个编号 0018）。
+索引见 [`adr/README.md`](./adr/README.md)。0001～0009 抽自架构规范 §8；0010～0013 为 2026-10-27 补录；0014 为三 Agent 拓扑（用户裁决）；0015～0017 为交付全链路（随 2026-10-30 PR 合入生效）；0018 为意图→可签执行物唯一真相缝（绝对榜首，PROPOSED，随本 PR 合入生效）；0019 为项目架构基线（密封之后，PROPOSED，随本 PR 合入生效）。
+方案里 `status: pending` 的决定（[`scheme.md`](./scheme.md) §6）经用户拍板后，在此新增 ADR（下一个未使用编号）。
 
 ---
 
