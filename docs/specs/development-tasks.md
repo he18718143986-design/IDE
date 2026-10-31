@@ -1,6 +1,6 @@
 > **读法（2026-10-29 文档治理加注，不改任何卡的条款与状态）**
 > - **本文件是 L3 任务卡层**：Supervisor 方案确认后交给施工 Worker 的机器指令。意图层见 [`../scheme.md`](../scheme.md)，地图见 [`../README.md`](../README.md)。
-> - **当前要做的卡在 §3.4c（J 系列，注意各卡「ADR-0014 修订」块）与 §3.4d（L 系列）**，按 [`delivery-lifecycle.md`](./delivery-lifecycle.md) §8 里程碑 M2 → M5 排期；每张卡开工前按 [`task-card-standard.md`](./task-card-standard.md) 核对就绪。§1.1 矩阵是状态总表；下方游离的 P-xx 修订行、版本头 95 条状态回写与 §6 修订记录都是历史流水，施工时可跳过。
+> - **当前要做的卡在 §3.4c（J 系列，注意各卡「ADR-0014 修订」块）与 §3.4d（L 系列）**，按 [`delivery-lifecycle.md`](./delivery-lifecycle.md) §8 里程碑 M2 → M5 排期；每张卡开工前按 [`task-card-standard.md`](./task-card-standard.md) 核对就绪。§1.1 矩阵是状态总表；下方游离的 P-xx 修订行、版本头 96 条状态回写与 §6 修订记录都是历史流水，施工时可跳过。
 > - **三 Agent 口径以 J 系列与 [`supervisor.md`](./supervisor.md) §13.2 为准**：右栏 = 只读 AI 搭档（`TASK-J.1`），中栏 = Supervisor 方案画布，Worker 只在 Worktree 施工。C.1「右栏（Coding Agent 对话）」、W.1「推入右侧 Worker 对话窗口」、W.5a「对接右栏会话」、C.6、P.1 / E.1 的 Vibe 直改主工作树、Sprint 1 门禁「右栏 Claude Code 改文件」均为早期叙述，已由 J.1 / C.18 改变；原文保留作溯源。
 > - **已知结构问题**（状态矛盾、三处「当前基线」不一致、失效的 `docs/archive/*` 引用）登记在 [`../ledger/README.md`](../ledger/README.md) DOC-1～DOC-4，未在本轮修改。
 
@@ -130,6 +130,7 @@
 > 93. **状态回写（2026-10-31 · L.8 合入）**：`TASK-L.8` 由 `[NEW_TASK]` → **`[COMPLETED]`**（证据为本仓 GitHub squash merge）：[#33](https://github.com/he18718143986-design/IDE/pull/33)/`fb27504`（`feat(L.8): PlanPatch 合并、分解器与 /api/project/plan 接线`）。同步：§1.1 矩阵、§3.4d 详细卡、Sprint「当前首要」→ **L.9（下一张实现卡）**。main tip `fb27504`。**本条仅文档状态回写**；不改生产代码；**不**开工 L.9。
 > 94. **状态回写（2026-10-31 · L.9 合入）**：`TASK-L.9` 由 `[NEW_TASK]` → **`[COMPLETED]`**（证据为本仓 GitHub squash merge）：[#35](https://github.com/he18718143986-design/IDE/pull/35)/`e1cf1bb`（`feat(L.9): 合同序列、桩视图预检与下一份交接`）。同步：§1.1 矩阵、§3.4d 详细卡、Sprint「当前首要」→ **L.10（下一张实现卡）**。main tip `e1cf1bb`。**本条仅文档状态回写**；不改生产代码；**不**开工 L.10。
 > 95. **状态回写（2026-10-31 · L.10 DoR R-4）**：补 `TASK-L.10`「对照痛点（代码事实）」为真实 `file::symbol` 锚点（`SchemeReviewPane.tsx::SchemeReviewPane` / `WorkspaceLayout.tsx::STUDIO_TAB_ID` / `ActivityBar.tsx::ActivityBar` / `daemon-api.ts::patchProjectPlan` / `next-stub.ts::nextStub`），并写明今日缺 `GET /api/project/plan`、`ProjectMapPane`、`tests/ui/project-map-pane.test.tsx`。**入口形态**按 Tina 2026-10-31 裁决改为跟 supervisor / [`project-decomposition.md`](./project-decomposition.md) §7：**同页嵌**于方案工作台，**禁止**另开 ActivityBar「项目」Tab / 独立视口。**不**改卡状态（仍 `[NEW_TASK]`）、**不**改生产代码、**不**开工 L.10 实现。Sprint 指针本条不动。
+> 96. **状态回写（2026-11-01 · L.10 合入）**：`TASK-L.10` 由 `[NEW_TASK]` → **`[COMPLETED]`**（证据为本仓 GitHub squash merge）：[#38](https://github.com/he18718143986-design/IDE/pull/38)/`e4351b0`（`feat(L.10): 画布同页嵌项目地图与 GET /api/project/plan`）。同步：§1.1 矩阵、§3.4d 详细卡、Sprint「当前首要」→ **L.11（下一张实现卡）**（前置 `L.4`/`L.9` 已 COMPLETED；同属 M3。另有就绪并行卡 `L.15`（M4，前置 `L.14`），本条不抢 Sprint）。main tip `e4351b0`。**本条仅文档状态回写**；不改生产代码；**不**开工 L.11；**不**修类型润色。
 > 65. **状态回写（2026-10-26 · 实现完成 TASK-C.14f + TASK-C.15a–d）**：Tina t855u「继续项 2（WS）与项 4（EO 余面 Delta）的立卡实现」。已落地：`BASELINE_PROGRESS` WS（停 2s 轮询）；EO-01 完备+转移 DAG；EO-08 UUIDv5/返工计数；EO-05 签署白名单 GC + MERGED→DELIVERED 失败停 MERGED；P0 drafts 隔离 + EO-09 worktree seal。单测 `task-c14f-*` / `task-c15a–d-*` + C.12 回归绿。**不**扩 Spec Freeze 五正文；P1–P3 仍 backlog。
 > 64. **状态回写（2026-10-26 · 立卡 TASK-C.14f + TASK-C.15a–d · WS 深度进度 + EO 余面 Delta）**：Tina t855u「继续项 2（WS）与项 4（EO 余面 Delta）的立卡实现」。按此前安全闭环后暂缓的 backlog 升格为薄卡：**`TASK-C.14f`**（基线深度进度真 WS/流式：Daemon 推 `BASELINE_PROGRESS`，替换前端 2s 轮询；P0 仍秒级解锁右栏）；**`TASK-C.15a`**（EO-01 DeliveryState 完备：补齐 C.12b 简化缺口与合法转移）；**`TASK-C.15b`**（EO-08 断言身份与返工计数：UUIDv5 `assertion_id` + Daemon 权威计数 + 超限 `ESCALATED_HUMAN` + 返工期禁追加）；**`TASK-C.15c`**（EO-05 两阶段归档/GC：签署期白名单 GC；`MERGED`→`DELIVERED` 事务硬化，失败停 `MERGED`）；**`TASK-C.15d`**（P0 AC-ISOL 草稿隔离 + EO-09 Worktree seal 轻量；P1 sufficiency / P2 确认分级 / P3 视口防抖仍 backlog）。建议序 **C.14f → C.15a → C.15b → C.15c → C.15d**；**当前首要**→ **C.14f**。**本条仅文档立卡**；**不写**产品码直至同授权「立卡实现」开工；**不**扩 Spec Freeze 五正文；不抢 D.1e；不改 D.1 鉴权。权威：基线讨论稿 §5/§7 流式 OPEN；右栏 §14.11 EO-01/05/08/09 + §13 P0；C.12 Top5 已覆盖部分不重复。
 > 58. **状态回写（2026-10-26 · 立卡 TASK-C.12a–e · Spec Freeze → Top5 Delta 升级卡）**：Tina 授权（t817u「升格立卡」）。按封版记录 `docs/reports/spec-freeze-record.md`（tip `e4779ad`）与澄清 §6 / Checklist §3，将 API Top5 As-is→To-be 映射为五张 **Delta 升级卡**（**不推翻**现网 session / STATE / prototypes / PAUSED 弹窗骨架）：**`TASK-C.12a`**（双层 Token：`exec_token` + `resume_token`+`jti`；PAUSED 吊销；EO-07）、**`TASK-C.12b`**（`session_epoch`+`state_seq` + EO-01 `DeliveryState` 广播；含 `CONTRACT_SIGNING` 瞬态）、**`TASK-C.12c`**（越界原子拦截：SIGINT 3s→SIGKILL→吊销→清锁→PAUSED；EO-02/07）、**`TASK-C.12d`**（Demo 三态 + `can_sign` + records 轻量拷贝；EO-05/06）、**`TASK-C.12e`**（`.stagent/records/{contract_id}/audit-manifest.json`；EO-03/04/05）。建议序 **C.12a→C.12b→C.12c→C.12d→C.12e**；**当前首要**→ **C.12a**。**本条仅文档立卡**；**CLOSED ≠ 已实现**；**不写** daemon/src 产品码直至 Tina 点名开发；**不抢** D.1e；Impact/Mode/AST/云归档仍 **v0.2+**；不改 D.1 loopback+#token 通道原则。
@@ -250,7 +251,7 @@
 | **TASK-L.7** | `ProjectPlan` 类型、校验与存储 | 项目分解 | **[COMPLETED]**（tip `607d742` / merge [#23](https://github.com/he18718143986-design/IDE/pull/23)） | 交付全链路 M3 | • 前置 `L.6`<br>• 详见 §3.4d；总装图 [`delivery-lifecycle.md`](./delivery-lifecycle.md) |
 | **TASK-L.8** | 计划补丁合并与分解器 | 项目分解 | **[COMPLETED]**（tip `fb27504` / merge [#33](https://github.com/he18718143986-design/IDE/pull/33)） | 交付全链路 M3 | • 前置 `L.7`、`J.9`<br>• 详见 §3.4d；总装图 [`delivery-lifecycle.md`](./delivery-lifecycle.md) |
 | **TASK-L.9** | 合同序列与「下一份」交接 | 项目分解 | **[COMPLETED]**（tip `e1cf1bb` / merge [#35](https://github.com/he18718143986-design/IDE/pull/35)） | 交付全链路 M3 | • 前置 `L.8`、`J.4`、`J.5`<br>• 详见 §3.4d；总装图 [`delivery-lifecycle.md`](./delivery-lifecycle.md) |
-| **TASK-L.10** | 画布「项目地图」 | 工作台 UX | **[NEW_TASK]** | 交付全链路 M3 | • 前置 `L.9`、`L.8`<br>• 详见 §3.4d；总装图 [`delivery-lifecycle.md`](./delivery-lifecycle.md) |
+| **TASK-L.10** | 画布「项目地图」 | 工作台 UX | **[COMPLETED]**（tip `e4351b0` / merge [#38](https://github.com/he18718143986-design/IDE/pull/38)） | 交付全链路 M3 | • 前置 `L.9`、`L.8`<br>• 详见 §3.4d；总装图 [`delivery-lifecycle.md`](./delivery-lifecycle.md) |
 | **TASK-L.11** | DesignNote 生成、校验与注入 | 技术方案 | **[NEW_TASK]** | 交付全链路 M3 | • 前置 `L.4`、`L.9`<br>• 详见 §3.4d；总装图 [`delivery-lifecycle.md`](./delivery-lifecycle.md) |
 | **TASK-L.12** | 系统知识库与漂移门禁 | 知识库 | **[NEW_TASK]** | 交付全链路 M3 | • 前置 `L.11`<br>• 详见 §3.4d；总装图 [`delivery-lifecycle.md`](./delivery-lifecycle.md) |
 | **TASK-L.13** | 追踪链与「这段为什么存在」 | 追踪 | **[NEW_TASK]** | 交付全链路 M3 | • 前置 `L.9`、`L.12`<br>• 详见 §3.4d；总装图 [`delivery-lifecycle.md`](./delivery-lifecycle.md) |
@@ -3201,7 +3202,7 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 > 1. **签署后不改合同**。系统需要的写范围（`tests/stagent/**`、`docs/system/**`）、检查命令、依赖安装权限，一律在签署**前**并入 `ScopePlan`（进入 `plan_digest`）。施工期只允许**收窄**网关输入，不允许扩大或改写合同（supervisor §15.5 D7）。
 > 2. **新检查也必须是真实进程退出码**（ADR-0005 决策 1）。测试义务、测试完整性、知识库漂移都以 Daemon 自带的 `stagent check <kind>` 子命令运行，作为验证命令写进 `verification_spec.commands`，由退出码派生结论。
 >
-> **本节状态（2026-10-31 · L.9 合入回写）**：以 §1.1 矩阵为准。**已 COMPLETED**：`L.1`～`L.9`、`L.14`（合入证据见各卡与版本头第 86～94 条）。**仍为 `[NEW_TASK]`**：`L.10`～`L.13`、`L.15`～`L.17`。J 系墓地：`J.18a`～`J.18d` **COMPLETED**（母卡 `J.18` 仍 `[SPLIT]`）。下文详细卡标题与「状态」字段须与矩阵一致；不得再把整节写成「全部 NEW_TASK」。
+> **本节状态（2026-11-01 · L.10 合入回写）**：以 §1.1 矩阵为准。**已 COMPLETED**：`L.1`～`L.10`、`L.14`（合入证据见各卡与版本头第 86～96 条）。**仍为 `[NEW_TASK]`**：`L.11`～`L.13`、`L.15`～`L.17`。J 系墓地：`J.18a`～`J.18d` **COMPLETED**（母卡 `J.18` 仍 `[SPLIT]`）。下文详细卡标题与「状态」字段须与矩阵一致；不得再把整节写成「全部 NEW_TASK」。
 
 #### 【Task L.1】右栏纯净化：去掉系统提示与消息前缀（DEC-004） `[COMPLETED]`
 
@@ -3462,13 +3463,14 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 * **关键文件**：`src/lib/project/next-stub.ts`（新）、`src/lib/project/stub-view.ts`（新）、`daemon/server.ts`（合入回调处）
 * **估算**：M
 
-#### 【Task L.10】画布「项目地图」视图 `[NEW_TASK]`
+#### 【Task L.10】画布「项目地图」视图 `[COMPLETED]`
 
 * **任务编号**：`TASK-L.10`
 * **对应规格**：[`project-decomposition.md`](./project-decomposition.md) §7；[`supervisor.md`](./supervisor.md) §16（同页四幕 / `PROJECT_MAPPING`）
 * **前置依赖**：`TASK-L.9`、`TASK-L.8`
 * **优先级**：P2（M3）
-* **状态**：`[NEW_TASK]`
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#38](https://github.com/he18718143986-design/IDE/pull/38) / tip `e4351b0`（`feat(L.10): 画布同页嵌项目地图与 GET /api/project/plan`）
 * **对照痛点（代码事实）**：
   - 中栏方案工作台已在 `src/components/studio/SchemeReviewPane.tsx::SchemeReviewPane`；Studio 可关 Tab 常量在 `src/components/WorkspaceLayout.tsx::STUDIO_TAB_ID`；ActivityBar 壳在 `src/components/layout/ActivityBar.tsx::ActivityBar`（**今日无**「项目」入口）。**Tina 2026-10-31 裁决：跟 supervisor / §7**——地图必须**同页嵌**于方案工作台，**禁止**另开 ActivityBar「项目」Tab / 独立视口 / 第二套导航（不得再造类似 `STUDIO_TAB_ID` 的「项目」Tab）。
   - 计划「下一份」纯函数已在 `src/lib/project/next-stub.ts::nextStub`（L.9）；前端补丁客户端已在 `src/lib/daemon-api.ts::patchProjectPlan`（挂 L.8 `POST /api/project/plan/patch`）。**今日无** `GET /api/project/plan`（`daemon/server.ts` 仅有 POST `.../patch` 与 `.../decompose`，GET pathname **0 命中**）；**今日无** `src/components/project/ProjectMapPane.tsx` / `ProjectMapPane` 符号；**今日无** `tests/ui/project-map-pane.test.tsx`（卡要求的 UI 测尚未落盘）。
@@ -3947,7 +3949,7 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 
 > **Sprint 0 / 2 / 3 / 4 实施基线核验**：
 > - **当前工程物理起点**：本地代码仓库 `main`@`f14c8cb`（去掉资源管理器「文件」标题热修）；测试基线 **1292 passed / 6 skipped**；已交付至 C.9a–d、**C.10a–h**。
-> - **当前首要编码任务**：**`TASK-L.10`**（画布「项目地图」 · **下一张实现卡**）。`TASK-J.1`～`J.10`、`J.18a`～`J.18d`、`L.1`～`L.9`、`L.14` 已 **COMPLETED**（见版本头第 85～94 条；main tip `e1cf1bb`，含 `#34`/`#35`）。未合实现卡：`L.10`～`L.13`、`L.15`～。母卡 `TASK-J.18` 仍 **`[SPLIT]`**。前序 `TASK-C.21` 及之前均 COMPLETED。
+> - **当前首要编码任务**：**`TASK-L.11`**（DesignNote 生成、校验与注入 · **下一张实现卡**）。`TASK-J.1`～`J.10`、`J.18a`～`J.18d`、`L.1`～`L.10`、`L.14` 已 **COMPLETED**（见版本头第 85～96 条；main tip `e4351b0`，含 `#36`/`#37`/`#38`）。未合实现卡：`L.11`～`L.13`、`L.15`～。另有就绪并行卡 `L.15`（M4，前置 `L.14`），本 Sprint 不抢。母卡 `TASK-J.18` 仍 **`[SPLIT]`**。前序 `TASK-C.21` 及之前均 COMPLETED。
 > - **前序（历史）**：`TASK-C.21` → **`[COMPLETED]`**（Tina t910u Supervisor SSOT v2.0.1 审查补丁）。C.20/C.19/C.18/C.17/C.16/H.1–H.8 均 COMPLETED。**不**改产品代码；不抢 D.1e；不扩 v0.2。
 > - **Sprint 2 已达成**：`TASK-P.1`、`TASK-C.5`、`TASK-W.3`、`TASK-W.4` 四张卡均已落地并通过各自专用用例；保护路径在任意模式被门卫拦截、撤销一键恢复、4 类绕过负例失败关闭均已成立。
 > - **Sprint 3 已达成**：`TASK-D.2` 主体已落地，无交集合同自动批准，交互收敛为 1 次合并按钮。
@@ -4078,6 +4080,7 @@ node scripts/verify-env.mjs && npx tsc --noEmit && npm run lint && npm test
 - **P-93（状态回写，2026-10-31）**：`TASK-L.8` → **`[COMPLETED]`**（[#33](https://github.com/he18718143986-design/IDE/pull/33)/`fb27504`）。同步：版本头第 93 条、§1.1 矩阵、§3.4d 详细卡、Sprint「当前首要」→ **L.9**。并同 PR 轻量对齐 [`../scheme.md`](../scheme.md) gap-13、[`delivery-lifecycle.md`](./delivery-lifecycle.md) S3。**本条仅文档**；不改生产代码；**不**开工 L.9。
 - **P-94（状态回写，2026-10-31）**：`TASK-L.9` → **`[COMPLETED]`**（[#35](https://github.com/he18718143986-design/IDE/pull/35)/`e1cf1bb`）。同步：版本头第 94 条、§1.1 矩阵、§3.4d 详细卡、Sprint「当前首要」→ **L.10**。并同 PR 轻量对齐 [`../scheme.md`](../scheme.md) gap-13、[`delivery-lifecycle.md`](./delivery-lifecycle.md) S3。**本条仅文档**；不改生产代码；**不**开工 L.10。
 - **P-95（DoR R-4 补锚，2026-10-31）**：`TASK-L.10`「对照痛点」改为已核实 `file::symbol`；入口改为同页嵌方案工作台（Tina 裁决跟 supervisor/§7），废止 ActivityBar「项目」Tab 表述（见版本头第 95 条）。**卡状态仍 `[NEW_TASK]`**；**不实现** L.10 代码。**本条仅文档**。
+- **P-96（状态回写，2026-11-01）**：`TASK-L.10` → **`[COMPLETED]`**（[#38](https://github.com/he18718143986-design/IDE/pull/38)/`e4351b0`）。同步：版本头第 96 条、§1.1 矩阵、§3.4d 详细卡、Sprint「当前首要」→ **L.11**。并同 PR 轻量对齐 [`../scheme.md`](../scheme.md) gap-13、[`delivery-lifecycle.md`](./delivery-lifecycle.md) S2/S3。**本条仅文档**；不改生产代码；**不**开工 L.11；**不**修类型润色。
 
 
 - **P-79（完工，2026-10-26）**：`TASK-H.5`–`TASK-H.8` → **[COMPLETED]**（Tina t881u「开工」）。实现：旅程 `contract_id` 落盘回传；脏区白话引导+ack 排除；主链路回归套件；records 脱敏 zip/清理 API。单测 `task-h5`…`task-h8` PASS。**不**触碰 v0.2 封印。
