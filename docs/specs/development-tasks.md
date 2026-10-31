@@ -1,6 +1,6 @@
 > **读法（2026-10-29 文档治理加注，不改任何卡的条款与状态）**
 > - **本文件是 L3 任务卡层**：Supervisor 方案确认后交给施工 Worker 的机器指令。意图层见 [`../scheme.md`](../scheme.md)，地图见 [`../README.md`](../README.md)。
-> - **当前要做的卡在 §3.4c（J 系列，注意各卡「ADR-0014 修订」块）与 §3.4d（L 系列）**，按 [`delivery-lifecycle.md`](./delivery-lifecycle.md) §8 里程碑 M2 → M5 排期；每张卡开工前按 [`task-card-standard.md`](./task-card-standard.md) 核对就绪。§1.1 矩阵是状态总表；下方游离的 P-xx 修订行、版本头 89 条状态回写与 §6 修订记录都是历史流水，施工时可跳过。
+> - **当前要做的卡在 §3.4c（J 系列，注意各卡「ADR-0014 修订」块）与 §3.4d（L 系列）**，按 [`delivery-lifecycle.md`](./delivery-lifecycle.md) §8 里程碑 M2 → M5 排期；每张卡开工前按 [`task-card-standard.md`](./task-card-standard.md) 核对就绪。§1.1 矩阵是状态总表；下方游离的 P-xx 修订行、版本头 90 条状态回写与 §6 修订记录都是历史流水，施工时可跳过。
 > - **三 Agent 口径以 J 系列与 [`supervisor.md`](./supervisor.md) §13.2 为准**：右栏 = 只读 AI 搭档（`TASK-J.1`），中栏 = Supervisor 方案画布，Worker 只在 Worktree 施工。C.1「右栏（Coding Agent 对话）」、W.1「推入右侧 Worker 对话窗口」、W.5a「对接右栏会话」、C.6、P.1 / E.1 的 Vibe 直改主工作树、Sprint 1 门禁「右栏 Claude Code 改文件」均为早期叙述，已由 J.1 / C.18 改变；原文保留作溯源。
 > - **已知结构问题**（状态矛盾、三处「当前基线」不一致、失效的 `docs/archive/*` 引用）登记在 [`../ledger/README.md`](../ledger/README.md) DOC-1～DOC-4，未在本轮修改。
 
@@ -124,6 +124,7 @@
 > 87. **状态回写（2026-10-31 · J.10 / L.4 合入）**：`TASK-J.10`、`TASK-L.4` 由 `[NEW_TASK]` → **`[COMPLETED]`**（证据均为本仓 GitHub squash merge）：`J.10` [#17](https://github.com/he18718143986-design/IDE/pull/17)/`97bb0db`；`L.4` [#18](https://github.com/he18718143986-design/IDE/pull/18)/`9263504`。同步：§1.1 矩阵、§3.4c/§3.4d 详细卡、Sprint「当前首要」→ **L.6（进行中）**；`L.6` 仍为 `[NEW_TASK]`（本机推进，未合入）。**本条仅文档状态回写**；不改生产代码。
 > 88. **状态回写（2026-10-31 · 拆分 TASK-J.18 · DoR R-11）**：原 `TASK-J.18` 估算 **L**，按 [`task-card-standard.md`](./task-card-standard.md) R-11 **禁止开工、必须再拆**。拆为四张 S/M 子卡：**`TASK-J.18a`**（G-MATCH 纯函数与产出物投影）、**`TASK-J.18b`**（`scheme_binding` + 快照 1.2 墓地权威源）、**`TASK-J.18c`**（门禁裁决 / 优先级格 / 派工绑定 / 码表）、**`TASK-J.18d`**（写路径接线、CLI gate pack、全量扫描与集成）。母卡 `TASK-J.18` 标为 **`[SPLIT]`**，指向子卡；实施口径仍见 [`worker-graveyard-gate.md`](./worker-graveyard-gate.md)。**本条仅文档拆卡**；不改生产代码。
 > 89. **状态回写（2026-10-31 · J.18a / J.18b / L.6 / L.7 合入）**：下列已合入卡由 `[NEW_TASK]` → **`[COMPLETED]`**（证据均为本仓 GitHub squash merge）：`TASK-J.18b` [#22](https://github.com/he18718143986-design/IDE/pull/22)/`ca9ed8f`；`TASK-J.18a` [#24](https://github.com/he18718143986-design/IDE/pull/24)/`20c2d46`；`TASK-L.6` [#21](https://github.com/he18718143986-design/IDE/pull/21)/`93589bf`；`TASK-L.7` [#23](https://github.com/he18718143986-design/IDE/pull/23)/`607d742`。同步：§1.1 矩阵、§3.4c/§3.4d 详细卡、Sprint「当前首要」→ **J.18c（下一张）∥ L.8（L 系下一张）**；`J.18c`/`J.18d` 仍为 `[NEW_TASK]`（**未**标完成）。main tip `607d742`。**本条仅文档状态回写**；不改生产代码。
+> 90. **状态回写（2026-10-31 · J.18c / J.18d 合入）**：下列已合入卡由 `[NEW_TASK]` → **`[COMPLETED]`**（证据均为本仓 GitHub squash merge）：`TASK-J.18c` [#26](https://github.com/he18718143986-design/IDE/pull/26)/`b6922ac`；`TASK-J.18d` [#27](https://github.com/he18718143986-design/IDE/pull/27)/`a2fa7df`。同步：§1.1 矩阵、§3.4c 详细卡、Sprint「当前首要」→ **L.8（下一张）**；母卡 `TASK-J.18` 仍为 **`[SPLIT]`**（子卡 a～d 均 COMPLETED）。main tip `a2fa7df`。**本条仅文档状态回写**；不改生产代码。
 > 65. **状态回写（2026-10-26 · 实现完成 TASK-C.14f + TASK-C.15a–d）**：Tina t855u「继续项 2（WS）与项 4（EO 余面 Delta）的立卡实现」。已落地：`BASELINE_PROGRESS` WS（停 2s 轮询）；EO-01 完备+转移 DAG；EO-08 UUIDv5/返工计数；EO-05 签署白名单 GC + MERGED→DELIVERED 失败停 MERGED；P0 drafts 隔离 + EO-09 worktree seal。单测 `task-c14f-*` / `task-c15a–d-*` + C.12 回归绿。**不**扩 Spec Freeze 五正文；P1–P3 仍 backlog。
 > 64. **状态回写（2026-10-26 · 立卡 TASK-C.14f + TASK-C.15a–d · WS 深度进度 + EO 余面 Delta）**：Tina t855u「继续项 2（WS）与项 4（EO 余面 Delta）的立卡实现」。按此前安全闭环后暂缓的 backlog 升格为薄卡：**`TASK-C.14f`**（基线深度进度真 WS/流式：Daemon 推 `BASELINE_PROGRESS`，替换前端 2s 轮询；P0 仍秒级解锁右栏）；**`TASK-C.15a`**（EO-01 DeliveryState 完备：补齐 C.12b 简化缺口与合法转移）；**`TASK-C.15b`**（EO-08 断言身份与返工计数：UUIDv5 `assertion_id` + Daemon 权威计数 + 超限 `ESCALATED_HUMAN` + 返工期禁追加）；**`TASK-C.15c`**（EO-05 两阶段归档/GC：签署期白名单 GC；`MERGED`→`DELIVERED` 事务硬化，失败停 `MERGED`）；**`TASK-C.15d`**（P0 AC-ISOL 草稿隔离 + EO-09 Worktree seal 轻量；P1 sufficiency / P2 确认分级 / P3 视口防抖仍 backlog）。建议序 **C.14f → C.15a → C.15b → C.15c → C.15d**；**当前首要**→ **C.14f**。**本条仅文档立卡**；**不写**产品码直至同授权「立卡实现」开工；**不**扩 Spec Freeze 五正文；不抢 D.1e；不改 D.1 鉴权。权威：基线讨论稿 §5/§7 流式 OPEN；右栏 §14.11 EO-01/05/08/09 + §13 P0；C.12 Top5 已覆盖部分不重复。
 > 58. **状态回写（2026-10-26 · 立卡 TASK-C.12a–e · Spec Freeze → Top5 Delta 升级卡）**：Tina 授权（t817u「升格立卡」）。按封版记录 `docs/reports/spec-freeze-record.md`（tip `e4779ad`）与澄清 §6 / Checklist §3，将 API Top5 As-is→To-be 映射为五张 **Delta 升级卡**（**不推翻**现网 session / STATE / prototypes / PAUSED 弹窗骨架）：**`TASK-C.12a`**（双层 Token：`exec_token` + `resume_token`+`jti`；PAUSED 吊销；EO-07）、**`TASK-C.12b`**（`session_epoch`+`state_seq` + EO-01 `DeliveryState` 广播；含 `CONTRACT_SIGNING` 瞬态）、**`TASK-C.12c`**（越界原子拦截：SIGINT 3s→SIGKILL→吊销→清锁→PAUSED；EO-02/07）、**`TASK-C.12d`**（Demo 三态 + `can_sign` + records 轻量拷贝；EO-05/06）、**`TASK-C.12e`**（`.stagent/records/{contract_id}/audit-manifest.json`；EO-03/04/05）。建议序 **C.12a→C.12b→C.12c→C.12d→C.12e**；**当前首要**→ **C.12a**。**本条仅文档立卡**；**CLOSED ≠ 已实现**；**不写** daemon/src 产品码直至 Tina 点名开发；**不抢** D.1e；Impact/Mode/AST/云归档仍 **v0.2+**；不改 D.1 loopback+#token 通道原则。
@@ -233,8 +234,8 @@
 | **TASK-J.18** | Worker 派工墓地门禁（母卡 · 已拆） | 门禁 / 证据台账 | **[SPLIT]** → `J.18a`～`J.18d` | P1 闭环 v2.1 第二批 / M3 | • 原估算 L，R-11 禁开工<br>• 实施口径仍 [`worker-graveyard-gate.md`](./worker-graveyard-gate.md)<br>• **禁止**直接派工本母卡 |
 | **TASK-J.18a** | G-MATCH 纯函数与产出物投影 | 门禁 / 纯函数 | **[COMPLETED]**（tip `20c2d46` / merge [#24](https://github.com/he18718143986-design/IDE/pull/24)） | P1 / M3 墓地 | • 前置 `J.9`<br>• `graveyard-match` / `artifact-projection` / `alias-lexicon`；TM-GM、TM-GU<br>• 估算 M |
 | **TASK-J.18b** | 合同 `scheme_binding` 与快照墓地权威源 | 门禁 / Schema | **[COMPLETED]**（tip `ca9ed8f` / merge [#22](https://github.com/he18718143986-design/IDE/pull/22)） | P1 / M3 墓地 | • 前置 `J.4`（硬）、`J.9`<br>• GAP-W1 / GAP-W2；快照 1.2 含 `graveyard`<br>• 估算 M；可与 `J.18a` 并行 |
-| **TASK-J.18c** | 墓地门禁裁决、优先级格与派工绑定 | 门禁 / Daemon | **[NEW_TASK]** | P1 / M3 墓地 | • 前置 `J.18a`、`J.18b`<br>• `evaluateGraveyardGate` / `pickPrimaryVerdict` / `verifyDispatchBinding` / 码表<br>• TM-GS、TM-GA、TM-GP、TM-GB、TM-GE；估算 M |
-| **TASK-J.18d** | 写路径接线、CLI pack、全量扫描与集成 | 门禁 / 接线 | **[NEW_TASK]** | P1 / M3 墓地 | • 前置 `J.18c`<br>• Worker/Gateway/编排/合并/hook；GAP-W3/W4/W6；TM-GH、TM-GI（3950–3959）<br>• 估算 M |
+| **TASK-J.18c** | 墓地门禁裁决、优先级格与派工绑定 | 门禁 / Daemon | **[COMPLETED]**（tip `b6922ac` / merge [#26](https://github.com/he18718143986-design/IDE/pull/26)） | P1 / M3 墓地 | • 前置 `J.18a`、`J.18b`<br>• `evaluateGraveyardGate` / `pickPrimaryVerdict` / `verifyDispatchBinding` / 码表<br>• TM-GS、TM-GA、TM-GP、TM-GB、TM-GE；估算 M |
+| **TASK-J.18d** | 写路径接线、CLI pack、全量扫描与集成 | 门禁 / 接线 | **[COMPLETED]**（tip `a2fa7df` / merge [#27](https://github.com/he18718143986-design/IDE/pull/27)） | P1 / M3 墓地 | • 前置 `J.18c`<br>• Worker/Gateway/编排/合并/hook；GAP-W3/W4/W6；TM-GH、TM-GI（3950–3959）<br>• 估算 M |
 | **TASK-L.1** | 右栏纯净化（DEC-004） | 右栏 / Agent | **[COMPLETED]**（tip `8eb6896` / merge [#9](https://github.com/he18718143986-design/IDE/pull/9)） | 交付全链路 M2 | • 前置 无<br>• 详见 §3.4d；总装图 [`delivery-lifecycle.md`](./delivery-lifecycle.md) |
 | **TASK-L.2** | Worker 指令补全「你会被这样检查」 | Worker | **[COMPLETED]**（tip `16c5176` / merge [#8](https://github.com/he18718143986-design/IDE/pull/8)） | 交付全链路 M2 | • 前置 无<br>• 详见 §3.4d；总装图 [`delivery-lifecycle.md`](./delivery-lifecycle.md) |
 | **TASK-L.3** | 测试义务：合同元数据、`ScopePlan` 系统范围、`stagent check` | 验证 | **[COMPLETED]**（tip `b4e0091` / merge [#15](https://github.com/he18718143986-design/IDE/pull/15)） | 交付全链路 M2 | • 前置 `J.2`、`J.4`<br>• 详见 §3.4d；总装图 [`delivery-lifecycle.md`](./delivery-lifecycle.md) |
@@ -3104,14 +3105,15 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 * **关键文件**：`src/lib/contract.schema.ts`、`daemon/supervisor/scheme-snapshot-store.ts`（及 J.4 建合同接线文件）、相关单测
 * **估算**：M
 
-#### 【Task J.18c】墓地门禁裁决、优先级格与派工绑定 `[NEW_TASK]`
+#### 【Task J.18c】墓地门禁裁决、优先级格与派工绑定 `[COMPLETED]`
 
 * **任务编号**：`TASK-J.18c`
 * **任务名称**：`evaluateGraveyardGate` / 优先级格 / `verifyDispatchBinding` / 码表与 L3 闭集
 * **对应规格**：[`worker-graveyard-gate.md`](./worker-graveyard-gate.md) §2.5、§3、§5.3、§6.2～§6.3、§7.4～§7.7、§7.9；runtime §8 / §8.1 提案；DEC-1（K-15）
 * **前置依赖**：`TASK-J.18a`、`TASK-J.18b`（均须 `COMPLETED`）
 * **优先级**：P1（M3 墓地）
-* **状态**：`[NEW_TASK]`
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#26](https://github.com/he18718143986-design/IDE/pull/26) / tip `b6922ac`（`feat(J.18c): 墓地门禁裁决、优先级格与派工绑定`）
 * **对照痛点（代码事实）**：无 `evaluateGraveyardGate` / `pickPrimaryVerdict` / `verifyDispatchBinding`；L3 无闭集表；`E_PROPOSAL_PREVIOUSLY_REJECTED` 未入 `ERROR_CODES`（DEC-1 待代码登记）。
 * **一句话目标**：给定快照墓地与一批产出物，门禁确定性给出是否拦截、主码与全部命中证据；派工前绑定失败则不签发 `exec_token`。
 * **范围**：
@@ -3131,14 +3133,15 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 * **关键文件**：`daemon/guard/worker-graveyard-gate.ts`（新）、`daemon/guard/dispatch-binding.ts`（新）、`src/lib/error-codes.ts`（或对应码表）、`docs/specs/runtime-contract-and-safety.md`、上述单测
 * **估算**：M
 
-#### 【Task J.18d】写路径接线、CLI pack、全量扫描与集成 `[NEW_TASK]`
+#### 【Task J.18d】写路径接线、CLI pack、全量扫描与集成 `[COMPLETED]`
 
 * **任务编号**：`TASK-J.18d`
 * **任务名称**：把墓地门禁挂到派工 / 写入 / 合并检查点，并交付 CLI gate pack 与集成证明
 * **对应规格**：[`worker-graveyard-gate.md`](./worker-graveyard-gate.md) §4.4、§5.1～§5.2、§6.4、§7.8、§7.10、§8 GAP-W3/W4/W6；SSOT §15.6、§16.6；runtime §5.2
 * **前置依赖**：`TASK-J.18c`（硬）
 * **优先级**：P1（M3 墓地）
-* **状态**：`[NEW_TASK]`
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#27](https://github.com/he18718143986-design/IDE/pull/27) / tip `a2fa7df`（`feat(J.18d): 墓地门禁生产写路径接线（dispatch/Worker/Gateway/CLI/扫描）`）
 * **对照痛点（代码事实）**：
   - `buildWorkerTaskInstruction` 不注入墓地（F-10 / GAP-W3）。
   - CLI PreToolUse hook 只看路径不看内容（F-3 / GAP-W4）。
@@ -3193,7 +3196,7 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 > 1. **签署后不改合同**。系统需要的写范围（`tests/stagent/**`、`docs/system/**`）、检查命令、依赖安装权限，一律在签署**前**并入 `ScopePlan`（进入 `plan_digest`）。施工期只允许**收窄**网关输入，不允许扩大或改写合同（supervisor §15.5 D7）。
 > 2. **新检查也必须是真实进程退出码**（ADR-0005 决策 1）。测试义务、测试完整性、知识库漂移都以 Daemon 自带的 `stagent check <kind>` 子命令运行，作为验证命令写进 `verification_spec.commands`，由退出码派生结论。
 >
-> **本节状态（2026-10-31 · J.18a/b / L.6 / L.7 合入回写）**：以 §1.1 矩阵为准。**已 COMPLETED**：`L.1`～`L.7`（合入证据见各卡与版本头第 86～89 条）。**仍为 `[NEW_TASK]`**：`L.8`～`L.17`。J 系墓地：`J.18a`/`J.18b` **COMPLETED**；`J.18c`/`J.18d` 仍 `[NEW_TASK]`。下文详细卡标题与「状态」字段须与矩阵一致；不得再把整节写成「全部 NEW_TASK」。
+> **本节状态（2026-10-31 · J.18c/d 合入回写）**：以 §1.1 矩阵为准。**已 COMPLETED**：`L.1`～`L.7`（合入证据见各卡与版本头第 86～90 条）。**仍为 `[NEW_TASK]`**：`L.8`～`L.17`。J 系墓地：`J.18a`～`J.18d` **COMPLETED**（母卡 `J.18` 仍 `[SPLIT]`）。下文详细卡标题与「状态」字段须与矩阵一致；不得再把整节写成「全部 NEW_TASK」。
 
 #### 【Task L.1】右栏纯净化：去掉系统提示与消息前缀（DEC-004） `[COMPLETED]`
 
@@ -3929,7 +3932,7 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 
 > **Sprint 0 / 2 / 3 / 4 实施基线核验**：
 > - **当前工程物理起点**：本地代码仓库 `main`@`f14c8cb`（去掉资源管理器「文件」标题热修）；测试基线 **1292 passed / 6 skipped**；已交付至 C.9a–d、**C.10a–h**。
-> - **当前首要编码任务**：**`TASK-J.18c`**（墓地门禁裁决 · **下一张**）∥ **`TASK-L.8`**（计划补丁/分解器 · L 系下一张）。`TASK-J.1`～`J.10`、`J.18a`/`J.18b`、`L.1`～`L.7` 已 **COMPLETED**（见版本头第 85～89 条；main tip `607d742`，含 `#21`/`#22`/`#23`/`#24`）。未合：`J.18c`/`J.18d`、`L.8`～。**禁止**把 `J.18c`/`J.18d` 标为完成。前序 `TASK-C.21` 及之前均 COMPLETED。
+> - **当前首要编码任务**：**`TASK-L.8`**（计划补丁/分解器 · **下一张**）。`TASK-J.1`～`J.10`、`J.18a`～`J.18d`、`L.1`～`L.7` 已 **COMPLETED**（见版本头第 85～90 条；main tip `a2fa7df`，含 `#26`/`#27`）。未合：`L.8`～。母卡 `TASK-J.18` 仍 **`[SPLIT]`**。前序 `TASK-C.21` 及之前均 COMPLETED。
 > - **前序（历史）**：`TASK-C.21` → **`[COMPLETED]`**（Tina t910u Supervisor SSOT v2.0.1 审查补丁）。C.20/C.19/C.18/C.17/C.16/H.1–H.8 均 COMPLETED。**不**改产品代码；不抢 D.1e；不扩 v0.2。
 > - **Sprint 2 已达成**：`TASK-P.1`、`TASK-C.5`、`TASK-W.3`、`TASK-W.4` 四张卡均已落地并通过各自专用用例；保护路径在任意模式被门卫拦截、撤销一键恢复、4 类绕过负例失败关闭均已成立。
 > - **Sprint 3 已达成**：`TASK-D.2` 主体已落地，无交集合同自动批准，交互收敛为 1 次合并按钮。
@@ -4054,6 +4057,7 @@ node scripts/verify-env.mjs && npx tsc --noEmit && npm run lint && npm test
 - **P-87（状态回写 + 真相缝，2026-10-31）**：`TASK-J.2`～`J.9`、`L.1`～`L.3`、`L.5` → **`[COMPLETED]`**（对齐 GitHub [#4](https://github.com/he18718143986-design/IDE/pull/4)～[#15](https://github.com/he18718143986-design/IDE/pull/15) 已合入；不含未合的 `J.10`/`L.4`/`L.6`）。同步：版本头第 86 条、§1.1 矩阵、§3.4c/d 详细卡、J 系补 R-12 不变声明、Sprint「当前首要」→ **J.10 ∥ L.4**；并同 PR 对齐 [`../scheme.md`](../scheme.md) §11 落差、升格 [`evidence-and-acceptance-criteria.md`](./evidence-and-acceptance-criteria.md) 为现行规格。**本条仅文档**；不改生产代码。
 - **P-88（状态回写，2026-10-31）**：`TASK-J.10`、`TASK-L.4` → **`[COMPLETED]`**（[#17](https://github.com/he18718143986-design/IDE/pull/17)/`97bb0db`；[#18](https://github.com/he18718143986-design/IDE/pull/18)/`9263504`）。同步：版本头第 87 条、§1.1 矩阵、§3.4c/d 详细卡、Sprint「当前首要」→ **L.6（进行中）**；`L.6` 仍 `[NEW_TASK]`。并同 PR 对齐 [`../scheme.md`](../scheme.md) §11 与 [`delivery-lifecycle.md`](./delivery-lifecycle.md) 状态指针。**本条仅文档**；不改生产代码。
 - **P-89（状态回写，2026-10-31）**：`TASK-J.18b`、`TASK-J.18a`、`TASK-L.6`、`TASK-L.7` → **`[COMPLETED]`**（[#22](https://github.com/he18718143986-design/IDE/pull/22)/`ca9ed8f`；[#24](https://github.com/he18718143986-design/IDE/pull/24)/`20c2d46`；[#21](https://github.com/he18718143986-design/IDE/pull/21)/`93589bf`；[#23](https://github.com/he18718143986-design/IDE/pull/23)/`607d742`）。同步：版本头第 89 条、§1.1 矩阵、§3.4c/d 详细卡、Sprint「当前首要」→ **J.18c ∥ L.8**；`J.18c`/`J.18d` 仍 `[NEW_TASK]`。并同 PR 对齐 [`../scheme.md`](../scheme.md) §11（gap-6 部分收口 / gap-13 / gap-14）与 [`delivery-lifecycle.md`](./delivery-lifecycle.md) 状态指针。**本条仅文档**；不改生产代码。
+- **P-90（状态回写，2026-10-31）**：`TASK-J.18c`、`TASK-J.18d` → **`[COMPLETED]`**（[#26](https://github.com/he18718143986-design/IDE/pull/26)/`b6922ac`；[#27](https://github.com/he18718143986-design/IDE/pull/27)/`a2fa7df`）。同步：版本头第 90 条、§1.1 矩阵、§3.4c 详细卡、Sprint「当前首要」→ **L.8**；母卡 `TASK-J.18` 仍 `[SPLIT]`。并同 PR 对齐 [`../scheme.md`](../scheme.md) §11（gap-6 **已收口**）与 [`delivery-lifecycle.md`](./delivery-lifecycle.md) S5 状态指针。**本条仅文档**；不改生产代码。
 
 
 - **P-79（完工，2026-10-26）**：`TASK-H.5`–`TASK-H.8` → **[COMPLETED]**（Tina t881u「开工」）。实现：旅程 `contract_id` 落盘回传；脏区白话引导+ack 排除；主链路回归套件；records 脱敏 zip/清理 API。单测 `task-h5`…`task-h8` PASS。**不**触碰 v0.2 封印。
