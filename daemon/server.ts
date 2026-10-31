@@ -79,6 +79,16 @@ import {
   type RealPreviewServer,
 } from "./supervisor/preview/real-preview-server";
 import {
+  findStaticPreviewRoot,
+  NO_PREVIEW_PLAIN_MESSAGE,
+  pickPreviewCommand,
+  startAppPreview,
+  stopAppPreview,
+  waitReady,
+  type AppPreviewHandle,
+} from "./supervisor/preview/app-runner";
+import { REAL_PREVIEW_PORT_RANGE } from "./supervisor/preview/types";
+import {
   createSessionToken,
   clearSessionToken,
   verifySessionToken,
@@ -339,6 +349,8 @@ export class StagentDaemon {
   private readonly targetAdvancedContracts: Set<string> = new Set();
   /** TASK-S.6b：合同 → 真机预览服务（自建或外链挂载） */
   private readonly realPreviews = new Map<string, RealPreviewServer>();
+  /** TASK-L.5：合同 → Worktree 应用预览进程（与 realPreviews 配对回收） */
+  private readonly appPreviews = new Map<string, AppPreviewHandle>();
   /** TASK-C.11b：当前隔离 Demo 预览（prototypes） */
   private demoPreviewServer: DemoPreviewServer | null = null;
   private activePrototypeId: string | null = null;
@@ -601,7 +613,15 @@ export class StagentDaemon {
     this.stopSweepFn?.();
     this.stopSweepFn = null;
 
-    // TASK-S.6b：回收真机预览进程
+    // TASK-L.5 / S.6b：回收应用预览进程组 + 真机预览服务
+    for (const [id, app] of [...this.appPreviews.entries()]) {
+      try {
+        await stopAppPreview(app);
+      } catch {
+        // 停机路径尽最大努力
+      }
+      this.appPreviews.delete(id);
+    }
     for (const [id, srv] of [...this.realPreviews.entries()]) {
       try {
         await srv.stop();
@@ -847,12 +867,15 @@ export class StagentDaemon {
   }
 
   /**
-   * TASK-S.6b：启动或挂载真机预览，并在合同为 AUDITED+APPROVED 时投影 REAL_PLAYTEST。
+   * TASK-S.6b / L.5：启动或挂载真机预览。
+   * 优先在 Worktree 里跑用户应用（dev→start→preview）；否则静态目录；
+   * 再没有则返回白话失败，不再默写占位桩（显式 stub:true 除外）。
    */
   async startRealPlaytest(input: {
     contractId: string;
     attachUrl?: string | undefined;
     rootDir?: string | undefined;
+    worktreeDir?: string | undefined;
     /** 无业务产物时写一页白话桩（产品壳走通） */
     stub?: boolean | undefined;
     title?: string | undefined;
@@ -861,27 +884,142 @@ export class StagentDaemon {
     if (!contractId) {
       throw new Error("[E_REAL_PREVIEW_NO_CONTRACT] contract_id 不能为空");
     }
-    const existing = this.realPreviews.get(contractId);
-    if (existing) {
-      await existing.stop();
-      this.realPreviews.delete(contractId);
+    await this.stopRealPlaytest(contractId);
+
+    // 1) 显式外链挂载
+    if (input.attachUrl) {
+      return this.mountRealPreviewServer(contractId, {
+        attachUrl: input.attachUrl,
+      });
     }
 
-    let rootDir = input.rootDir;
-    if (input.stub === true || (!input.attachUrl && !rootDir)) {
-      rootDir = path.join(
+    // 2) 显式静态根
+    if (input.rootDir) {
+      return this.mountRealPreviewServer(contractId, {
+        rootDir: input.rootDir,
+      });
+    }
+
+    // 3) 显式桩页
+    if (input.stub === true) {
+      const rootDir = path.join(
         this.repoRoot,
         ".stagent",
         "real-preview",
         contractId,
       );
       writeRealPlaytestStub(rootDir, input.title ?? "真机试玩");
+      return this.mountRealPreviewServer(contractId, { rootDir });
     }
 
+    // 4) TASK-L.5：Worktree 真实应用 / 静态回退
+    const worktreeDir =
+      input.worktreeDir ??
+      (() => {
+        try {
+          return getWorktreePath(this.repoRoot, contractId);
+        } catch {
+          return null;
+        }
+      })();
+
+    if (worktreeDir && fs.existsSync(worktreeDir)) {
+      const picked = pickPreviewCommand(worktreeDir);
+      if (picked) {
+        let port: number;
+        try {
+          port = await findAvailablePort({
+            host: "127.0.0.1",
+            startPort: REAL_PREVIEW_PORT_RANGE.start,
+            endPort: REAL_PREVIEW_PORT_RANGE.end,
+          });
+        } catch (err) {
+          const message = `[E_REAL_PREVIEW_UNAVAILABLE] ${
+            err instanceof Error ? err.message : "no port"
+          }`;
+          const payload: RealPlaytestStatusPayload = {
+            contract_id: contractId,
+            url: "",
+            port: 0,
+            status: "ERROR",
+            owned: false,
+            message,
+            updated_at: new Date().toISOString(),
+          };
+          this.emitRealPlaytestStatus(payload);
+          return payload;
+        }
+
+        const app = await startAppPreview({ worktreeDir, port });
+        const ready = await waitReady(port, {
+          getStderr: () => app.stderr(),
+        });
+        if (!ready.ready) {
+          await stopAppPreview(app);
+          const stderrTail = ready.stderrTail.trim();
+          const message = stderrTail
+            ? `预览没能在时限内就绪。\n${stderrTail}`
+            : "预览没能在时限内就绪。";
+          const payload: RealPlaytestStatusPayload = {
+            contract_id: contractId,
+            url: "",
+            port,
+            status: "ERROR",
+            owned: false,
+            message,
+            updated_at: new Date().toISOString(),
+          };
+          this.emitRealPlaytestStatus(payload);
+          return payload;
+        }
+
+        this.appPreviews.set(contractId, app);
+        return this.mountRealPreviewServer(contractId, {
+          attachUrl: app.url,
+        });
+      }
+
+      const staticRoot = findStaticPreviewRoot(worktreeDir);
+      if (staticRoot) {
+        return this.mountRealPreviewServer(contractId, {
+          rootDir: staticRoot,
+        });
+      }
+
+      const payload: RealPlaytestStatusPayload = {
+        contract_id: contractId,
+        url: "",
+        port: 0,
+        status: "ERROR",
+        owned: false,
+        message: NO_PREVIEW_PLAIN_MESSAGE,
+        updated_at: new Date().toISOString(),
+      };
+      this.emitRealPlaytestStatus(payload);
+      return payload;
+    }
+
+    // 5) 无 Worktree：保留产品壳桩页（兼容 S.6b 无业务仓库走通）
+    const rootDir = path.join(
+      this.repoRoot,
+      ".stagent",
+      "real-preview",
+      contractId,
+    );
+    writeRealPlaytestStub(rootDir, input.title ?? "真机试玩");
+    return this.mountRealPreviewServer(contractId, { rootDir });
+  }
+
+  private async mountRealPreviewServer(
+    contractId: string,
+    options: { rootDir?: string; attachUrl?: string },
+  ): Promise<RealPlaytestStatusPayload> {
     const server = createRealPreviewServer({
       contractId,
-      ...(rootDir === undefined ? {} : { rootDir }),
-      ...(input.attachUrl === undefined ? {} : { attachUrl: input.attachUrl }),
+      ...(options.rootDir === undefined ? {} : { rootDir: options.rootDir }),
+      ...(options.attachUrl === undefined
+        ? {}
+        : { attachUrl: options.attachUrl }),
       onStatusChange: (payload) => {
         this.emitRealPlaytestStatus(payload);
       },
@@ -917,6 +1055,15 @@ export class StagentDaemon {
     contractId: string,
   ): Promise<RealPlaytestStatusPayload> {
     const id = contractId.trim();
+    const app = this.appPreviews.get(id);
+    if (app) {
+      try {
+        await stopAppPreview(app);
+      } catch {
+        // 回收尽最大努力
+      }
+      this.appPreviews.delete(id);
+    }
     const server = this.realPreviews.get(id);
     const prev = server?.handle;
     if (server) {
@@ -2523,22 +2670,49 @@ export class StagentDaemon {
           : undefined;
       const rootDir =
         typeof body.root_dir === "string" ? body.root_dir.trim() : undefined;
-      const stub =
-        body.stub === true ||
-        (attachUrl === undefined && (rootDir === undefined || rootDir === ""));
+      const worktreeDir =
+        typeof (body as { worktree_dir?: unknown }).worktree_dir === "string"
+          ? String((body as { worktree_dir?: unknown }).worktree_dir).trim()
+          : undefined;
+      // TASK-L.5：有 Worktree 时走应用/静态探测，不再默写占位桩；
+      // 仅显式 stub:true 或无 Worktree 时才落桩页。
+      let worktreeExists = false;
+      if (worktreeDir) {
+        worktreeExists = fs.existsSync(worktreeDir);
+      } else {
+        try {
+          worktreeExists = fs.existsSync(
+            getWorktreePath(this.repoRoot, contractId),
+          );
+        } catch {
+          worktreeExists = false;
+        }
+      }
+      const stubExplicit = body.stub === true;
+      const stubFallback =
+        !stubExplicit &&
+        attachUrl === undefined &&
+        (rootDir === undefined || rootDir === "") &&
+        !worktreeExists;
+      const stub = stubExplicit || stubFallback;
 
       const payload = await this.startRealPlaytest({
         contractId,
         stub,
         ...(attachUrl ? { attachUrl } : {}),
         ...(rootDir ? { rootDir } : {}),
+        ...(worktreeDir ? { worktreeDir } : {}),
         ...(title ? { title } : {}),
       });
-      this.sendJson(res, 200, {
+      const plain =
+        payload.status === "ERROR"
+          ? (payload.message ?? NO_PREVIEW_PLAIN_MESSAGE)
+          : stub
+            ? "真机预览已启动（试玩桩）。可在中栏试玩，或点「在浏览器打开」。"
+            : "真机预览已挂载。可在中栏试玩，或点「在浏览器打开」。";
+      this.sendJson(res, payload.status === "ERROR" ? 200 : 200, {
         ...payload,
-        plain_summary: stub
-          ? "真机预览已启动（试玩桩）。可在中栏试玩，或点「在浏览器打开」。"
-          : "真机预览已挂载。可在中栏试玩，或点「在浏览器打开」。",
+        plain_summary: plain,
         suggest_viewport: "playtest",
       });
     } catch (err) {
@@ -4380,6 +4554,8 @@ export class StagentDaemon {
             // P.1：真正产生提交才关轮（授权作废、快照不再可撤）；
             // AI 改动全部被用户版本覆盖时没有提交，保留本轮与 Worktree 供 AI 重做。
             if (!result.nothingToMerge) {
+              // TASK-L.5：合入后回收预览进程组，释放 4200～4210 端口
+              await this.stopRealPlaytest(contractId);
               closeRound(this.repoRoot, "MERGED");
               clearCheckpoint(this.repoRoot);
               this.targetAdvancedContracts.delete(contractId);
@@ -4431,6 +4607,8 @@ export class StagentDaemon {
                 reviewer: body.reviewer ?? "local-user",
                 reason: "TARGET_BRANCH_ADVANCED_ABANDON",
               });
+              // TASK-L.5：放弃候选时回收预览
+              await this.stopRealPlaytest(contractId);
               this.targetAdvancedContracts.delete(contractId);
               this.emitContractUpdate(contract);
               this.sendJson(res, 200, { decision, contract });
@@ -4553,6 +4731,8 @@ export class StagentDaemon {
                 : { reviewer: body.reviewer }),
               ...(body.reason === undefined ? {} : { reason: body.reason }),
             });
+            // TASK-L.5：ABORTED 时回收预览进程组
+            await this.stopRealPlaytest(contractId);
             // 中止的合同若正被证据监听武装，立即解除（其 Worktree 已清理）
             if (this.armedContractId === contractId) {
               await this.stopEvidenceWatcher();
