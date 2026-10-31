@@ -49,6 +49,8 @@ export interface DaemonRuntimeSignals {
   readonly dispute_open?: boolean | undefined;
   /** 真实环境预览是否在跑（AUDITED → REAL_PLAYTEST） */
   readonly real_preview_running?: boolean | undefined;
+  /** supervisor §16.2：规划密封后整理项目地图（PREPARING → PROJECT_MAPPING） */
+  readonly project_mapping?: boolean | undefined;
 }
 
 /** §6.3.1 的白话文案：前端不做任何状态到文案的映射 */
@@ -58,6 +60,7 @@ export const PRESENTATION_MESSAGES: Readonly<
   EXPLORING: "正在和你确认需求",
   DEMO_PREVIEW: "原型已经可以试玩",
   GRAPH_MAPPING: "正在把需求拆成可执行的任务",
+  PROJECT_MAPPING: "正在整理项目地图",
   NEEDS_APPROVAL: "需要你确认授权后才能继续",
   EXECUTING: "正在按计划施工",
   STOPPING: "正在停止并回收资源",
@@ -113,6 +116,9 @@ function toRuntimeContext(
     ...(signals.target_branch_ahead === undefined
       ? {}
       : { target_branch_ahead: signals.target_branch_ahead }),
+    ...(signals.project_mapping === undefined
+      ? {}
+      : { project_mapping: signals.project_mapping }),
   };
 }
 

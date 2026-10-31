@@ -6,9 +6,9 @@ import { validateStatePair } from "../state-machine";
  * —— 《Stagent 系统架构设计规范 v1.6.1》§6.3.1 / §9.6，TASK-D.3。
  *
  * 设计红线（三条，缺一不可）：
- * 1. **词汇表唯一**：只有本文件导出的 15 个取值。禁止旧版
- *    `CONTRACT_REVIEW` / `GRAPH_ORCHESTRATING` / `PREPARING` 之类的额外展示态，
- *    底层中间转换不得伪装成第 16 个 UI 状态（§6.3.1 卡片明确禁止）。
+ * 1. **词汇表唯一**：只有本文件导出的取值（§6.3.1 原 15 态 + supervisor §16.2
+ *    增补的 `PROJECT_MAPPING`）。禁止旧版 `CONTRACT_REVIEW` /
+ *    `GRAPH_ORCHESTRATING` / `PREPARING` 之类别名混入展示态。
  * 2. **投影必须确定性**：相同输入恒得相同输出，不依赖判据的书写顺序、
  *    对象键序、时间或随机数。`(AUDITED, APPROVED)` 的四分支按规范给定的
  *    优先级短路，消除"多个判据同时为真"时的实现自由裁量。
@@ -20,11 +20,12 @@ import { validateStatePair } from "../state-machine";
  * 唯一事实源，本模块不重复定义矩阵，避免两份清单漂移。
  */
 
-/** §9.6 唯一 15 态词汇表（顺序与规范表格一致，便于逐行比对） */
+/** §9.6 + supervisor §16.2：唯一展示态词汇表（顺序便于逐行比对） */
 export const PRESENTATION_STATES = [
   "EXPLORING",
   "DEMO_PREVIEW",
   "GRAPH_MAPPING",
+  "PROJECT_MAPPING",
   "NEEDS_APPROVAL",
   "EXECUTING",
   "STOPPING",
@@ -50,6 +51,8 @@ export interface PresentationRuntimeContext {
   demo_service?: { status?: string | undefined } | undefined;
   /** Task Graph 拓扑生成是否进行中（PREPARING 的补充说明，不改变映射结果） */
   dag_generation?: { in_progress?: boolean | undefined } | undefined;
+  /** supervisor §16.2：规划密封后整理项目地图（与 GRAPH_MAPPING 交接瞬态区分） */
+  project_mapping?: boolean | undefined;
   /** 用户已发起停止；EXECUTING 下为 true 时展示 STOPPING */
   stopping_requested?: boolean | undefined;
   /** 挂起原因（§6.3.2），PAUSED 时用于提示文案，不改变映射结果 */
@@ -98,7 +101,7 @@ export class PresentationStateProjectionError extends Error {
   }
 }
 
-/** §6.3.1 表格的机器可读登记（15 行，供 CI 不变式与测试逐行比对） */
+/** 展示态矩阵的机器可读登记（供 CI 不变式与测试逐行比对） */
 export interface PresentationStateRow {
   readonly presentation_state: PresentationState;
   readonly lifecycle_state: LifecycleState;
@@ -124,7 +127,13 @@ export const PRESENTATION_STATE_MATRIX: readonly PresentationStateRow[] = [
     presentation_state: "GRAPH_MAPPING",
     lifecycle_state: "PREPARING",
     approval_status: ["APPROVED"],
-    runtime_criteria: "DAG 拓扑计算中",
+    runtime_criteria: "合同级确认开工交接瞬态（非 project_mapping）",
+  },
+  {
+    presentation_state: "PROJECT_MAPPING",
+    lifecycle_state: "PREPARING",
+    approval_status: ["APPROVED"],
+    runtime_criteria: "规划密封后整理项目地图（project_mapping === true）",
   },
   {
     presentation_state: "NEEDS_APPROVAL",
@@ -267,7 +276,8 @@ export function getPresentationState(
       return "NEEDS_APPROVAL";
 
     case "PREPARING":
-      return "GRAPH_MAPPING";
+      // supervisor §16.2：PROJECT_MAPPING（整理项目地图）与 GRAPH_MAPPING（交接中）互斥
+      return runtime.project_mapping === true ? "PROJECT_MAPPING" : "GRAPH_MAPPING";
 
     case "EXECUTING":
       return runtime.stopping_requested === true ? "STOPPING" : "EXECUTING";

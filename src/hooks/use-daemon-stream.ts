@@ -75,7 +75,7 @@ export interface UseDaemonStreamOptions {
    * Daemon 是唯一权威，前端只按帧覆盖本地视图，不自行推导节点状态。
    */
   onTaskGraphUpdate?: (payload: TaskGraphUpdatedPayload) => void;
-  /** TASK-D.3 / C.2：15 态展示状态权威帧 */
+  /** TASK-D.3 / C.2 / J.8：展示状态权威帧（含可选 journey_*） */
   onStateChanged?: (payload: StateChangedPayload) => void;
   /** TASK-S.4 / C.2：Demo 预览生命周期 */
   onDemoPreviewStatus?: (payload: DemoPreviewStatusPayload) => void;

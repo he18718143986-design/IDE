@@ -123,7 +123,7 @@ export interface ContractUpdatePayload {
  */
 export interface StateChangedPayload {
   contract_id: string;
-  /** 15 态展示状态，必填：本帧的核心载荷 */
+  /** 展示状态，必填：本帧的核心载荷（§6.3.1 + §16.2 PROJECT_MAPPING） */
   presentation_state: PresentationState;
   /** 面向非技术用户的白话提示文本（§6.3.1） */
   message?: string;

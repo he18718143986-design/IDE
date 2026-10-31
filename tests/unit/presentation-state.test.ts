@@ -24,7 +24,7 @@ import {
  *
  * 判据分三层：
  * 1. 词汇表唯一（不多不少，且禁止旧版别名混入）；
- * 2. 15 个状态逐个可达，且映射由 (lifecycle_state, approval_status) + 运行时判据唯一决定；
+ * 2. 全部展示态逐个可达，且映射由 (lifecycle_state, approval_status) + 运行时判据唯一决定；
  * 3. 四分支短路顺序、ABORTED 边界、非法输入失败行为。
  */
 
@@ -38,10 +38,10 @@ function project(
   return getPresentationState({ lifecycle_state, approval_status, runtime });
 }
 
-describe("词汇表：唯一 15 态，无重复无别名", () => {
-  it("恰好 15 个取值且无重复", () => {
-    expect(SS).toHaveLength(15);
-    expect(new Set(SS).size).toBe(15);
+describe("词汇表：唯一展示态，无重复无别名", () => {
+  it("恰好 16 个取值且无重复（§6.3.1 原 15 + §16.2 PROJECT_MAPPING）", () => {
+    expect(SS).toHaveLength(16);
+    expect(new Set(SS).size).toBe(16);
   });
 
   it("与 §9.6 定义的集合完全一致", () => {
@@ -58,6 +58,7 @@ describe("词汇表：唯一 15 态，无重复无别名", () => {
         "MERGED",
         "NEEDS_APPROVAL",
         "PAUSED",
+        "PROJECT_MAPPING",
         "READY_TO_MERGE",
         "REAL_PLAYTEST",
         "STOPPING",
@@ -66,7 +67,7 @@ describe("词汇表：唯一 15 态，无重复无别名", () => {
     );
   });
 
-  it("禁止旧版/自造展示态混入（卡片明令禁止第 16 个 UI 状态）", () => {
+  it("禁止旧版/自造展示态别名混入词汇表", () => {
     const forbidden = [
       "INITIAL_EMPTY",
       "CONTRACT_REVIEW",
@@ -83,8 +84,8 @@ describe("词汇表：唯一 15 态，无重复无别名", () => {
 });
 
 describe("§6.3.1 CI 不变式：矩阵中所有 lifecycle 必须存在于状态机枚举", () => {
-  it("15 行矩阵逐行可对照，且 lifecycle 全部合法", () => {
-    expect(PRESENTATION_STATE_MATRIX).toHaveLength(15);
+  it("矩阵逐行可对照，且 lifecycle 全部合法", () => {
+    expect(PRESENTATION_STATE_MATRIX).toHaveLength(16);
     for (const row of PRESENTATION_STATE_MATRIX) {
       expect(
         ALL_LIFECYCLE_STATES as readonly string[],
@@ -93,13 +94,13 @@ describe("§6.3.1 CI 不变式：矩阵中所有 lifecycle 必须存在于状态
     }
   });
 
-  it("矩阵覆盖全部 15 个展示态，无遗漏无重复", () => {
+  it("矩阵覆盖全部展示态，无遗漏无重复", () => {
     const covered = PRESENTATION_STATE_MATRIX.map((r) => r.presentation_state);
     expect([...covered].sort()).toEqual([...SS].sort());
   });
 });
 
-describe("15 个展示状态逐个可达", () => {
+describe("全部展示状态逐个可达", () => {
   it("EXPLORING：草案且 Demo 未运行", () => {
     expect(project("DRAFT", "DRAFT")).toBe("EXPLORING");
     expect(
@@ -116,6 +117,13 @@ describe("15 个展示状态逐个可达", () => {
   it("GRAPH_MAPPING：已批准的 PREPARING（任务拆解中）", () => {
     expect(project("PREPARING", "APPROVED")).toBe("GRAPH_MAPPING");
   });
+
+  it("PROJECT_MAPPING：PREPARING 且 project_mapping（§16.2 整理项目地图）", () => {
+    expect(
+      project("PREPARING", "APPROVED", { project_mapping: true }),
+    ).toBe("PROJECT_MAPPING");
+  });
+
 
   it("NEEDS_APPROVAL：待审等待授权", () => {
     expect(project("PENDING_APPROVAL", "PENDING_REVIEW")).toBe(
