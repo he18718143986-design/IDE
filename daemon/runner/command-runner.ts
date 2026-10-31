@@ -3,6 +3,7 @@ import { StringDecoder } from "node:string_decoder";
 import { resolveEnvironment } from "../worker/policy-guard";
 import { type EnvSanitizerOptions } from "./env-filter";
 import { killProcessTree, type ProcessTreeKillResult } from "./process-tree";
+import { getActiveVault } from "../vault";
 
 export const E_COMMAND_REJECTED = "E_COMMAND_REJECTED";
 export const E_COMMAND_TIMEOUT = "E_COMMAND_TIMEOUT";
@@ -103,7 +104,11 @@ export function redactSecrets(
   let redacted = false;
   let out = text;
 
-  for (const secret of secretValues) {
+  // TASK-L.14：保险库当前值并入精确遮蔽清单
+  const fromVault = getActiveVault()?.currentValues() ?? [];
+  const allSecrets = [...secretValues, ...fromVault];
+
+  for (const secret of allSecrets) {
     if (secret && secret.length >= 6 && out.includes(secret)) {
       out = out.split(secret).join("[REDACTED]");
       redacted = true;

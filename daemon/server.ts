@@ -209,6 +209,13 @@ import { buildDependencyGraph } from "./arch/graph";
 import { readDiffFiles } from "./diff/diff-files";
 import { launchEditor } from "./editor/launcher";
 import { getModelSettings, setRuntimeKey } from "./worker/key-store";
+import {
+  createVault,
+  getActiveVault,
+  setActiveVault,
+  VaultError,
+  type Vault,
+} from "./vault";
 import { ChatSessionManager } from "./chat/session-manager";
 import {
   decideWrite,
@@ -312,6 +319,8 @@ export interface DaemonStatusResponse {
 
 export class StagentDaemon {
   readonly repoRoot: string;
+  /** TASK-L.14：进程级保险库（启动时 hydrate） */
+  private vault: Vault | null = null;
   readonly host: string;
   readonly version: string;
   readonly startPort: number;
@@ -564,6 +573,26 @@ export class StagentDaemon {
 
     // 规范 TASK-D.1 PASS-2：单次随机会话 Token，独立于 PID 文件
     this.sessionToken = createSessionToken(this.repoRoot);
+
+    // TASK-L.14：启动时挂载凭据保险库（钥匙串优先，否则加密文件；测可设 STAGENT_VAULT_BACKEND）
+    try {
+      this.vault = await createVault({ repoRoot: this.repoRoot });
+      setActiveVault(this.vault);
+    } catch (err) {
+      // 保险库失败不挡 Daemon 启动；HTTP 写接口会报错
+      this.vault = null;
+      setActiveVault(null);
+      try {
+        appendDaemonLog(this.repoRoot, {
+          level: "warn",
+          kind: "vault_init_failed",
+          detail: { message: (err as Error).message },
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+
     // 规范 TASK-D.1 G-12：单连接帧大小硬上限 2MB（ws 超限自动以 1009 关闭）
     this.wss = new WebSocketServer({
       noServer: true,
@@ -637,6 +666,9 @@ export class StagentDaemon {
    * 3. Cleans up OS signal handlers
    */
   async stop(): Promise<void> {
+    // TASK-L.14：卸下进程级保险库
+    this.vault = null;
+    setActiveVault(null);
     if (!this.running || this.stopping) {
       return;
     }
@@ -3972,6 +4004,80 @@ export class StagentDaemon {
         this.sendJson(res, 200, { settings: getModelSettings() });
       } catch (err) {
         this.sendJson(res, 400, { error: (err as Error).message });
+      }
+      return;
+    }
+
+    // TASK-L.14：凭据保险库 HTTP（永不返回明文值）
+    if (method === "GET" && pathname === "/api/vault") {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      try {
+        const vault = this.vault ?? getActiveVault();
+        const names = vault ? await vault.listNames() : [];
+        this.sendJson(res, 200, {
+          names,
+          backend: vault?.backendKind ?? null,
+        });
+      } catch (err) {
+        this.sendJson(res, 500, { error: (err as Error).message });
+      }
+      return;
+    }
+
+    if (method === "PUT" && pathname.startsWith("/api/vault/")) {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      const name = decodeURIComponent(pathname.slice("/api/vault/".length));
+      try {
+        const body = (await this.readJsonBody(req)) as { value?: string };
+        if (typeof body.value !== "string") {
+          this.sendJson(res, 400, { error: "value is required", code: "E_VAULT_NAME_INVALID" });
+          return;
+        }
+        let vault = this.vault ?? getActiveVault();
+        if (!vault) {
+          vault = await createVault({ repoRoot: this.repoRoot });
+          this.vault = vault;
+          setActiveVault(vault);
+        }
+        await vault.setSecret(name, body.value);
+        this.sendJson(res, 200, { ok: true, name });
+      } catch (err) {
+        if (err instanceof VaultError) {
+          const status =
+            err.code === "E_VAULT_VALUE_TOO_SHORT" ||
+            err.code === "E_VAULT_NAME_INVALID"
+              ? 400
+              : 404;
+          this.sendJson(res, status, { error: err.message, code: err.code });
+          return;
+        }
+        this.sendJson(res, 500, { error: (err as Error).message });
+      }
+      return;
+    }
+
+    if (method === "DELETE" && pathname.startsWith("/api/vault/")) {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      const name = decodeURIComponent(pathname.slice("/api/vault/".length));
+      try {
+        const vault = this.vault ?? getActiveVault();
+        if (vault) await vault.deleteSecret(name);
+        this.sendJson(res, 200, { ok: true, name });
+      } catch (err) {
+        if (err instanceof VaultError) {
+          this.sendJson(res, 400, { error: err.message, code: err.code });
+          return;
+        }
+        this.sendJson(res, 500, { error: (err as Error).message });
       }
       return;
     }

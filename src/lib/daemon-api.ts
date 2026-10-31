@@ -906,6 +906,44 @@ export async function saveOpenAiKey(
   return body.settings;
 }
 
+/** TASK-L.14：保险库名字列表（永不含明文值） */
+export interface VaultListResponse {
+  names: string[];
+  backend: "keychain" | "file" | "memory" | null;
+}
+
+export async function fetchVaultNames(
+  conn: DaemonConnection,
+): Promise<VaultListResponse> {
+  return request<VaultListResponse>(conn, "/api/vault");
+}
+
+export async function putVaultSecret(
+  conn: DaemonConnection,
+  name: string,
+  value: string,
+): Promise<{ ok: boolean; name: string }> {
+  return request<{ ok: boolean; name: string }>(
+    conn,
+    `/api/vault/${encodeURIComponent(name)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ value }),
+    },
+  );
+}
+
+export async function deleteVaultSecret(
+  conn: DaemonConnection,
+  name: string,
+): Promise<{ ok: boolean; name: string }> {
+  return request<{ ok: boolean; name: string }>(
+    conn,
+    `/api/vault/${encodeURIComponent(name)}`,
+    { method: "DELETE" },
+  );
+}
+
 export interface MergeResult {
   commitSha: string;
   commitMessage: string;

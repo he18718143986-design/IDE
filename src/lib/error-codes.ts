@@ -42,6 +42,9 @@ export const ERROR_CODES = [
   "E_PLAN_STUB_REVIVED",
   "E_PROPOSAL_PREVIOUSLY_REJECTED",
   "E_GATE_SCAN_FAILED",
+  "E_VAULT_VALUE_TOO_SHORT",
+  "E_VAULT_NAME_INVALID",
+  "E_VAULT_NOT_FOUND",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -312,6 +315,34 @@ export const ERROR_CODE_CATALOG: Readonly<Record<ErrorCode, ErrorCodeSpec>> = {
     plain_message: "自动检查没跑完，这一轮还不能合入。",
     http_status: 409,
   },
+  E_VAULT_VALUE_TOO_SHORT: {
+    code: "E_VAULT_VALUE_TOO_SHORT",
+    reason_code: "PREPARATION_INTERRUPTED",
+    component: "Vault",
+    task: "TASK-L.14",
+    condition: "setSecret 拒绝短于 8 个字符的值（精确脱敏下限）",
+    plain_message: "这个密钥太短了，至少要 8 个字符，否则没法可靠地从日志里抹掉。",
+    http_status: 400,
+  },
+  E_VAULT_NAME_INVALID: {
+    code: "E_VAULT_NAME_INVALID",
+    reason_code: "PREPARATION_INTERRUPTED",
+    component: "Vault",
+    task: "TASK-L.14",
+    condition: "密钥名不符合环境变量命名（字母/下划线开头）",
+    plain_message: "密钥名字不合法：请用字母或下划线开头，后面只能是字母、数字、下划线。",
+    http_status: 400,
+  },
+  E_VAULT_NOT_FOUND: {
+    code: "E_VAULT_NOT_FOUND",
+    reason_code: "PREPARATION_INTERRUPTED",
+    component: "Vault",
+    task: "TASK-L.14",
+    condition: "resolveEnv / 发布前置找不到已登记的密钥名",
+    plain_message: "保险库里还没有这个名字的密钥，请先到设置 → 密钥里保存。",
+    http_status: 404,
+  },
+
 };
 
 // --- 4. 映射函数 ---

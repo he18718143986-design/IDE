@@ -3,6 +3,7 @@ import {
   Activity,
   ChevronDown,
   KeyRound,
+  Lock,
   MessagesSquare,
   Plug,
   Radio,
@@ -11,7 +12,12 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import type { DaemonConnection } from "@/lib/daemon-api";
-import { normalizeSessionToken } from "@/lib/daemon-api";
+import {
+  normalizeSessionToken,
+  fetchVaultNames,
+  putVaultSecret,
+  deleteVaultSecret,
+} from "@/lib/daemon-api";
 import type { RunMode, WorkerControl } from "@/components/workspace-types";
 import {
   SETTINGS_MODEL_KEY_TEST_ID,
@@ -99,6 +105,142 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
     <div className="grid grid-cols-[8rem_1fr] items-center gap-2">
       <span className="opacity-60">{label}</span>
       <span className="min-w-0 break-all">{children}</span>
+    </div>
+  );
+}
+
+
+/** TASK-L.14：设置 → 密钥（掩码输入、列表名、删除；永不回显值） */
+function VaultSecretsPanel({ conn, connected }: { conn: DaemonConnection; connected: boolean }) {
+  const [names, setNames] = useState<string[]>([]);
+  const [backend, setBackend] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const refresh = async () => {
+    if (!connected) {
+      setNames([]);
+      setBackend(null);
+      return;
+    }
+    try {
+      const res = await fetchVaultNames(conn);
+      setNames(res.names);
+      setBackend(res.backend);
+      setErr(null);
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  };
+
+  useEffect(() => {
+    void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conn.baseUrl, conn.token, connected]);
+
+  const save = async () => {
+    setBusy(true);
+    setMessage(null);
+    setErr(null);
+    try {
+      await putVaultSecret(conn, name.trim(), value);
+      setValue("");
+      setMessage(`已保存「${name.trim()}」（值不会显示）`);
+      await refresh();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (n: string) => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await deleteVaultSecret(conn, n);
+      setMessage(`已删除「${n}」`);
+      await refresh();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div data-testid="settings-vault-panel" className="space-y-2">
+      <p className="opacity-70">
+        发布与外网摄取用的密钥只存在本机保险库。聊天里不要贴密钥；这里保存后也不会回显。
+        {backend ? `（后端：${backend}）` : ""}
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          data-testid="vault-secret-name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="变量名，如 DEPLOY_TOKEN"
+          className="w-40 rounded border border-border bg-background px-2 py-1 outline-none"
+        />
+        <input
+          data-testid="vault-secret-value"
+          type="password"
+          autoComplete="off"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="密钥值（至少 8 个字符）"
+          className="w-56 rounded border border-border bg-background px-2 py-1 outline-none"
+        />
+        <button
+          type="button"
+          data-testid="vault-secret-save"
+          disabled={
+            busy || !connected || name.trim().length === 0 || value.length < 8
+          }
+          onClick={() => void save()}
+          className="rounded bg-primary px-2 py-1 text-primary-foreground disabled:opacity-40"
+        >
+          {busy ? "保存中…" : "保存"}
+        </button>
+      </div>
+      {names.length === 0 ? (
+        <p className="opacity-60" data-testid="vault-secret-empty">
+          还没有保存任何密钥。
+        </p>
+      ) : (
+        <ul data-testid="vault-secret-list" className="space-y-1">
+          {names.map((n) => (
+            <li
+              key={n}
+              className="flex items-center justify-between gap-2 rounded border border-border px-2 py-1"
+            >
+              <span className="font-mono">{n}</span>
+              <button
+                type="button"
+                data-testid={`vault-secret-delete-${n}`}
+                disabled={busy || !connected}
+                onClick={() => void remove(n)}
+                className="rounded border border-border px-2 py-0.5 hover:bg-accent disabled:opacity-40"
+              >
+                删除
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {message ? (
+        <p className="text-emerald-700" data-testid="vault-secret-message">
+          {message}
+        </p>
+      ) : null}
+      {err ? (
+        <p className="text-destructive" data-testid="vault-secret-error" role="alert">
+          {err}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -206,6 +348,14 @@ export function SettingsTab({
         {modelKeySlot ?? (
           <p className="opacity-60">当前页面没有注入模型钥匙面板。</p>
         )}
+      </Section>
+
+      <Section
+        title="密钥"
+        icon={<Lock className="h-4 w-4" />}
+        testId="settings-vault"
+      >
+        <VaultSecretsPanel conn={conn} connected={connected} />
       </Section>
 
       {/* C.10b：工程师项默认折叠 */}
