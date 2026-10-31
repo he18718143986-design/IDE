@@ -4,7 +4,9 @@
 
 > **性质**：审计收尾记录，只登记、不改任务状态。任务卡（`development-tasks.md`）状态未改动。
 > **2026-10-28 裁决落笔**：C-3、C-4、C-5 已拍板并移入「一之二」；OP-11 已销项（见「五」第 10 项）；新增 OP-19（C-4 按钮文案统一）。本次修改不改任务状态。
-> **2026-11-01 裁决落笔（Tina）**：OP-1 → 洗白；OP-13 → 第一印象窗口不阻塞。见「一之二」增补与「三」划线销项；落点 `scheme.md` dec-10/dec-11、supervisor §13.3 / §14.11 K-12、playtest-self-check §5.1。
+> **2026-11-01 裁决落笔（Tina）**：OP-1 → 洗白；OP-13 → 第一印象窗口不阻塞。
+> **2026-11-01 立卡（Tina）**：台账债六项 → `TASK-A.7` / `H.9` / `W.6` / `L.18` / `J.19` / `J.20`（OP-1 实施）。裁决 OP-1/OP-13 仍销项；Sprint 首要仍 L.12。
+见「一之二」增补与「三」划线销项；落点 `scheme.md` dec-10/dec-11、supervisor §13.3 / §14.11 K-12、playtest-self-check §5.1。
 > **基线**：`main` @ `e610016`。**PR #9 仍为 open、未合入**。本记录的机械修复与 PR #9 不重叠：PR #9 改动 supervisor §12 与 §20、dev-tasks 的 S.5 / J.10 / J.16 与状态回写 39→83、runtime §8 L3 行、README 附属段；本记录不触及这些位置。两者合并顺序互不影响。**本记录完成后更新**：PR #9（`e430193`）与本记录所在 PR #10（`99cfe51`）已先后合入 main；上文「open、未合入」为撰写时的历史状态。
 > **行号**：本文「行号」指 `e610016` 快照中的物理行，仅供审计定位；规格正文不引用行号。
 > **编号**：`C-` 待裁决矛盾；`M-` 本 PR 机械修复；`OP-` 挂账项。`C-1` 本轮无前次记录，留空位。
@@ -28,7 +30,7 @@
 | J9-2 | 锚定判例 Q-16、Q-19 与 §3.3 步骤 5「先过滤后选取」冲突 | 以步骤 5 为准，判例改写：Q-16 取过滤后第 1 处，Q-19 判 `E_QUOTE_TOO_SHORT_UNBOUNDED`。规格勘误：判例与算法冲突时以算法为准，但判例必须同步修改，不得保留旧期望 | 步骤 5 是规范算法，`anchorQuote` 实现与之一致 | `scheme-patch-engine.md` §3.3 步骤 5 澄清、§3.4 勘误说明与 Q-16/Q-19 行；测试已按新口径 |
 | J9-3 | TM-Z-11 门禁墓碑的期望码（包装码 `E_PROPOSAL_PREVIOUSLY_REJECTED` 或 op 级码） | op 级码 `E_REVIVAL_SECURITY_LOCKED`。门禁墓碑永不复活，与用户否决墓碑的可复活路径是两类语义，包装码会模糊区分 | K-5 | `scheme-patch-engine.md` §5.3 码表注释；Z-11/Z-12 测试断言 |
 | J9-4 | 旧墓碑缺 `rejected_after_turn_seq` 时的迁移默认值 | 默认 0，登记为行为性默认值（偏宽放，不偏紧收）；复活仍须过 R1–R9 闸门 | 旧数据无法确知否决水位 | `scheme-patch-engine.md` §1.3 K-13 |
-| OP-1 | 确认路径 `occurrence` 洗白（`mark_user_confirmed`） | **洗白**：确认路径 `occurrence` 机制生效——用户在「确认开工」时点名的敏感项进入授权清单，后续合同同一敏感项再次出现自动放行（对齐 K-12「显式风险」与 SA-1）。落地细节（白名单存储位置、scope 粒度）由实施卡确定；本条只销裁决。 | **用户拍板 2026-11-01**；原话：「确认路径上 occurrence 机制生效——用户在「确认开工」时点名的敏感项进入授权清单，后续合同中同一敏感项再次出现自动放行」 | `scheme.md` dec-10；supervisor §14.11 K-12；SA-1 / delivery-lifecycle §5 |
+| OP-1 | 确认路径 `occurrence` 洗白（`mark_user_confirmed`） | **洗白**：确认路径 `occurrence` 机制生效——用户在「确认开工」时点名的敏感项进入授权清单，后续合同同一敏感项再次出现自动放行（对齐 K-12「显式风险」与 SA-1）。落地细节（白名单存储位置、scope 粒度、失效条件）由实施卡 **`TASK-J.20`** 确定（**不**回写已 COMPLETED 的 J.9）；本条只销裁决。 | **用户拍板 2026-11-01**；原话：「确认路径上 occurrence 机制生效——用户在「确认开工」时点名的敏感项进入授权清单，后续合同中同一敏感项再次出现自动放行」 | `scheme.md` dec-10；supervisor §14.11 K-12；SA-1 / delivery-lifecycle §5 |
 | OP-13 | 第一印象窗口长度 | **不阻塞**：不设等待时长；可选速记提示；可跳过；跳过直接进入验收决定；异议随时经右栏 `user_dispute`。 | **用户拍板 2026-11-01**；原话：「第一印象速记窗口不设等待时长、非阻塞、可跳过；用户跳过则直接进入验收决定；用户异议随时经右栏走 user_dispute trigger」 | supervisor §13.3；playtest-self-check §5.1；`scheme.md` dec-11 |
 
 
@@ -51,7 +53,7 @@
 
 | 编号 | 挂账项 | owner | 触发条件 | 依据 |
 | :--- | :--- | :--- | :--- | :--- |
-| ~~OP-1~~ | ~~确认路径 `occurrence` 洗白（`mark_user_confirmed`）~~ | — | **已销项（2026-11-01）**：裁决「洗白」——确认路径 `occurrence` 生效，点名敏感项进授权清单、后续合同同项自动放行（K-12 / SA-1）。见「一之二」OP-1；落地细节另由实施卡确定 | supervisor §14.11 K-12；`scheme.md` dec-10 |
+| ~~OP-1~~ | ~~确认路径 `occurrence` 洗白（`mark_user_confirmed`）~~ | — | **已销项（2026-11-01）**：裁决「洗白」——确认路径 `occurrence` 生效，点名敏感项进授权清单、后续合同同项自动放行（K-12 / SA-1）。见「一之二」OP-1；实施卡 **`TASK-J.20`**（2026-11-01 立卡） | supervisor §14.11 K-12；`scheme.md` dec-10 |
 | OP-2 | `remove_item` 去留（可绕过入墓） | J.10 实施 | J.10 实施期；若保留，先做组装期否定词检查 | PR #5 审核挂账 |
 | OP-3 | `surface_log`（GAP-P8）呈现日志 | J.16 实施 | J.16 实施时写入 §15.4 投影 | playtest-self-check 行 61、305。非错误码，是数据字段；代码 0 命中。 |
 | OP-4 | 门禁码无成表闭集 | J.18 实施 PR | 建立 runtime §8.1 闭集并同步 ERROR_CODES 映射时 | runtime §8 L3 行脚注；K-15 |
@@ -121,7 +123,7 @@
 
 - **项**：DN-2「可以」HTTP / 画布意外卡入口缺口。
 - **事实**：`PipelineOrchestrator.resolveDesignDependencyAllow` + `applyDesignDependencyAllow` 已合入；集成测直接调用；生产路径无 HTTP action / 卡片路由可达。
-- **处理**：挂 [`README.md`](./README.md) **DLV-6**（NON_BLOCKER）；入口接线归后续卡（如 J.7 交接类或另立），本波 docs 回写不补端点。
+- **处理**：挂 [`README.md`](./README.md) **DLV-6**（NON_BLOCKER）。**2026-11-01 已立卡 `TASK-J.19`**（参照 J.7 UX；不抢 L.12）；本波 docs 回写时未补端点。
 - **依据**：Tina 合前确认「若本是后续卡职责则挂账即可」；PR #43 正文审查确认。
 
 **未覆盖**：本轮未逐字核对的范围见 OP-18；`src/` 与 `daemon/` 的检查基于 `e610016` 快照的文本检索，未运行测试。

@@ -37,7 +37,7 @@
 
 | 项 | 说明 |
 | :--- | :--- |
-| Worktree seal 路径前缀 | `daemon/guard/worktree-seal.ts` 使用 `.stagent/worktrees/{id}/`，与 `worktree-manager` 的 `task-{id}` 不一致；docs 已注明（runtime §10），**改代码另立卡** |
+| Worktree seal 路径前缀 | `daemon/guard/worktree-seal.ts` 使用 `.stagent/worktrees/{id}/`，与 `worktree-manager` 的 `task-{id}` 不一致；docs 已注明（runtime §10）。**已立卡 `TASK-A.7`**（NEW_TASK · NON_BLOCKER · 不抢 L.12） |
 | 草案升格（DOC-7） | **CLOSED（2026-11-01）**：已并入 runtime §10 / §11；原文件 `[HISTORICAL]` 指针 |
 | RFC 正文（DOC-8/9） | **CLOSED（2026-11-01）**：冲突正文已改写为 DEFERRED/PROPOSED 一致表述；ADR-0006 对齐 |
 | DOC-1 | **RESOLVED**（第 2 波 · #42） |
@@ -72,11 +72,13 @@
 | SA-1 | ADR-0014 敏感项授权已选定开工一并授权机制（dec-8） | **RESOLVED** | 用户（q22） | [`../specs/delivery-lifecycle.md`](../specs/delivery-lifecycle.md) §5 |
 | DLV-1 | ADR-0015～0017 均已由用户原话 q22 明确授权生效（DEC-006～008） | **RESOLVED** | 用户（q22） | [`../scheme.md`](../scheme.md) §6 |
 | DLV-2 | PR #3 已由用户批准并执行物理关闭 | **RESOLVED** | 用户 | PR #3 已关闭 |
-| DLV-3 | `AdapterRegistry` 未接线，Worker 只有 OpenAI `AiWorker`；Claude Code 作 Worker（W.5a 的 worker 角色）未接入派工 | NON_BLOCKER（M2 不依赖） | 卡 owner | 审计 §2 S5；需另立卡 |
-| DLV-4 | `.stagent/metadata/` 仍在代码写入路径列表中，与 ADR-0011 废止该路径冲突 | NON_BLOCKER | 卡 owner | 审计依据：代码 `.stagent/` 写入清单 |
-| DLV-5 | 系统地图 UI（项目视图第二页）与「改这里会影响什么」入口尚未立卡 | NON_BLOCKER | — | [`../specs/technical-design-and-knowledge.md`](../specs/technical-design-and-knowledge.md) §5 |
-| DLV-6 | L.11 DN-2「可以」：`resolveDesignDependencyAllow` 已合入且集成测覆盖，**无** HTTP / 画布意外卡入口（`POST .../resume` 不路由至此）。属后续接线卡职责（可挂 J.7 交接类或另立卡），**不**阻断 L.11 领域验收 | NON_BLOCKER | 卡 owner | PR [#43](https://github.com/he18718143986-design/IDE/pull/43) 审查确认；`daemon/pipeline/orchestrator.ts::resolveDesignDependencyAllow`；台账收口随 L.11 docs 回写 |
+| DLV-3 | `AdapterRegistry` 未接线，Worker 只有 OpenAI `AiWorker`；Claude Code 作 Worker（W.5a 的 worker 角色）未接入派工 | NON_BLOCKER（M2 不依赖） | 卡 owner | **已立卡 `TASK-W.6`**（不抢 L.12） |
+| DLV-4 | `.stagent/metadata/` 仍在代码写入路径列表中，与 ADR-0011 废止该路径冲突 | NON_BLOCKER | 卡 owner | **已立卡 `TASK-H.9`**（不抢 L.12） |
+| DLV-5 | 系统地图 UI（项目视图第二页）与「改这里会影响什么」入口 | NON_BLOCKER | — | **已立卡 `TASK-L.18`**（前置 L.12；不抢 L.12 开工）；规格 [`../specs/technical-design-and-knowledge.md`](../specs/technical-design-and-knowledge.md) §5 |
+| DLV-6 | L.11 DN-2「可以」：`resolveDesignDependencyAllow` 已合入且集成测覆盖，**无** HTTP / 画布意外卡入口（`POST .../resume` 不路由至此）。**不**阻断 L.11 领域验收 | NON_BLOCKER | 卡 owner | **已立卡 `TASK-J.19`**（可参照 J.7 UX；不抢 L.12）；代码 `orchestrator.ts::resolveDesignDependencyAllow` |
 
+
+> **OP-1 实施（2026-11-01）**：裁决仍销项（consistency-audit / scheme dec-10）；白名单存储/scope/失效落地归 **`TASK-J.20`**（**不**回写已 COMPLETED 的 `TASK-J.9`）。Sprint 首要仍 L.12。
 
 ## DoR 全量审计挂账（2026-10-31 新增）
 

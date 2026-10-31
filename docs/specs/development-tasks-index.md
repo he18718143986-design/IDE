@@ -12,17 +12,23 @@
 | `TASK-A.4` | `COMPLETED` | 受限进程执行器与跨平台进程树全回收 | [矩阵行](./development-tasks.md)（无独立详细卡；正文时代已收口进矩阵） |
 | `TASK-A.5` | `COMPLETED` | 循环重试熔断与费用/Token 硬上限监控 | [矩阵行](./development-tasks.md)（无独立详细卡；正文时代已收口进矩阵） |
 | `TASK-A.6` | `COMPLETED` | Daemon 崩溃自愈、Git 锁清理与 TOCTOU 校验 | [矩阵行](./development-tasks.md)（无独立详细卡；正文时代已收口进矩阵） |
+| `TASK-A.7` | `NEW_TASK` | Worktree seal 路径前缀对齐 · NON_BLOCKER | [打开](./development-tasks-active.md#task-a.7) |
 | `TASK-S.6b` | `COMPLETED` | 真机试玩收口（S.6 降级项；无独立详细卡，见矩阵 S.6 行与 changelog P-22） | [矩阵/流水](./development-tasks.md)（无独立详细卡） |
 | `TASK-D.1e` | `DEFERRED` | 桌面壳 / 本机助手：真·选文件夹（Import 与工作台同壳） | [打开](./development-tasks-active.md#task-d.1e) |
 | `TASK-S.3` | `DEFERRED` | Supervisor HUD 建议流与 WebSocket 广播 | [打开](./development-tasks-active.md#task-s.3) |
 | `TASK-W.5b` | `NEW_TASK` | cursor-agent 适配器黑盒实测 (v1.3.3 新增) | [打开](./development-tasks-active.md#task-w.5b) |
 | `TASK-W.5c` | `NEW_TASK` | OpenHands 适配器（容器隔离，SANDBOX_ENFORCED）(v1.3.3 新增) | [打开](./development-tasks-active.md#task-w.5c) |
+| `TASK-W.6` | `NEW_TASK` | AdapterRegistry 接线与 Claude Worker 派工（DLV-3）· NON_BLOCKER | [打开](./development-tasks-active.md#task-w.6) |
 | `TASK-J.18` | `SPLIT` | Worker 派工墓地门禁（INV-LEDGER-03 工地侧）· 拆分母卡 | [打开](./development-tasks-active.md#task-j.18) |
+| `TASK-J.19` | `NEW_TASK` | DN-2「可以」HTTP/画布入口（DLV-6）· NON_BLOCKER | [打开](./development-tasks-active.md#task-j.19) |
+| `TASK-J.20` | `NEW_TASK` | OP-1 授权清单落地（dec-10 实施；不回写 J.9）· NON_BLOCKER | [打开](./development-tasks-active.md#task-j.20) |
 | `TASK-L.12` | `NEW_TASK` | 系统知识库：Schema、引导合同与漂移门禁 | [打开](./development-tasks-active.md#task-l.12) |
 | `TASK-L.13` | `NEW_TASK` | 追踪链：Trailer 扩展与「这段为什么存在」反查 | [打开](./development-tasks-active.md#task-l.13) |
 | `TASK-L.15` | `NEW_TASK` | 发布生命周期与两类部署目标 | [打开](./development-tasks-active.md#task-l.15) |
 | `TASK-L.16` | `NEW_TASK` | 线上问题回流 | [打开](./development-tasks-active.md#task-l.16) |
 | `TASK-L.17` | `NEW_TASK` | 受控只读外网摄取（北极星前置） | [打开](./development-tasks-active.md#task-l.17) |
+| `TASK-L.18` | `NEW_TASK` | 系统地图 UI +「改这里会影响什么」（DLV-5）· NON_BLOCKER | [打开](./development-tasks-active.md#task-l.18) |
+| `TASK-H.9` | `NEW_TASK` | 废止 `.stagent/metadata/` 写入（DLV-4 · ADR-0011）· NON_BLOCKER | [打开](./development-tasks-active.md#task-h.9) |
 | `TASK-B.1` | `DEFERRED` | 本地 AST 增量依赖图分析引擎 | [打开](./development-tasks-active.md#task-b.1) |
 | `TASK-B.2` | `DEFERRED` | 多活跃 Worktree 监听与 Evidence 状态联动 | [打开](./development-tasks-active.md#task-b.2) |
 | `TASK-C.4` | `DEFERRED` | 架构雷达视图与 Scope 圈选抽屉 | [打开](./development-tasks-active.md#task-c.4) |
