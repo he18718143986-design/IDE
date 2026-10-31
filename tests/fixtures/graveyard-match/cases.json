@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "alias_lexicon_version": 1,
+  "alias_lexicon_version": 2,
   "tombstones": {
     "T-MONGO": {
       "fingerprint": {
