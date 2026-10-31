@@ -792,23 +792,3 @@ export function recommendProtections(
   }
   return recs;
 }
-
-/** 给 Worker Prompt 前置注入的白话清单文本（无锁定时返回 null） */
-export function buildProtectionPromptNotice(repoRoot: string): string | null {
-  let list: ProtectionList;
-  try {
-    list = loadProtectionList(repoRoot);
-  } catch {
-    // 清单损坏时门卫已按全拦截处理；Prompt 注入失败不阻断会话
-    return null;
-  }
-  if (list.entries.length === 0) return null;
-  const lines = list.entries.map(
-    (e) => `- 「${e.name}」：${e.patterns.join("、")}`,
-  );
-  return (
-    "【Stagent 保护清单】以下部分已被用户锁定，未经用户当面同意不得修改、删除、改名，" +
-    "也不要用命令行或符号链接间接改动它们；确需修改时先说明理由并等待用户确认：\n" +
-    lines.join("\n")
-  );
-}
