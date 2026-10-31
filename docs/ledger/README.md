@@ -10,7 +10,7 @@
 
 | 文件 | 内容 | 状态 |
 | :--- | :--- | :--- |
-| [`consistency-audit.md`](./consistency-audit.md) | 规格一致性审计台账：`C-` 待裁决矛盾、`M-` 机械修复、`OP-` 挂账项（OP-1～OP-35）、权威分层表 | 持续追加；OP-1、OP-13 待用户裁决 |
+| [`consistency-audit.md`](./consistency-audit.md) | 规格一致性审计台账：`C-` 待裁决矛盾、`M-` 机械修复、`OP-` 挂账项（OP-1～OP-35）、权威分层表 | 持续追加；**OP-1 / OP-13 已于 2026-11-01 销项**（见 consistency-audit「一之二」） |
 | [`w3-known-gaps.md`](./w3-known-gaps.md) | W.3 环境 / 秘密 / 网络守卫的已知缺口 | 7 项中 2 项未修（`tmpRoot` GC、`splitShellSegments` 引号边界） |
 
 ## 文档治理挂账（2026-10-29 新增）
@@ -25,21 +25,21 @@
 | DOC-4 | 约 24 处引用已删除的 `docs/archive/*`，约 98 处引用已删除的「走查报告 §6.x」 | 同上 | 统一改为「见 Git 历史」或删除 → **已做**（docs 内活引用改指针；历史叙述保留路径字面作溯源） | **RESOLVED**（docs 冗余治理第 0 波 · #40） |
 | DOC-5 | 路径三方不一致：Worktree 目录（`task-{id}` vs `{id}`）、Demo 目录（`.stagent/demo/` vs `.stagent/prototypes/`）、Git Trailer 键名与长度上限 | `system-architecture.md` §5、`constants-and-paths.md` §2/§3、`runtime-contract-and-safety.md` §5.3、代码 | 以代码为准回写规格，或立卡改代码 → **已做**：constants §0 代码事实表 + runtime §2/§5.3 注记；**`worktree-seal` 无 `task-` 前缀与创建路径不一致 → 需立卡改代码（本波未改代码）** | **RESOLVED**（docs 冗余治理第 1 波 · #41；代码对齐另立卡） |
 | DOC-6 | `delivery-state.ts` 仍有 `DELIVERED`，与 ADR-0012、`state-machine-contract.md` 冲突；两套状态机（生命周期 9 态 / 交付轨 A）关系未交代 | `state-machine-contract.md`、runtime §7、§9 | 在 state-machine-contract 补一节两轨关系 → **已做**：§0 两轨关系 + ADR-0012/H.2 指针；`DELIVERED` 仅交付投影内部标记 | **RESOLVED**（docs 冗余治理第 1 波 · #41） |
-| DOC-7 | `state-machine-contract.md` 标「目标、待测试固化」，但 `src/lib/state-machine.ts` 已实现其迁移表；`constants-and-paths.md` 同为草案 | `specs/` 两份草案 | 核对后升格或合并入 runtime 契约 → **已做**：两文件头加 `[DRAFT / HISTORICAL]` + 权威指针；**未升格合并**（避免本波改条款过大） | **RESOLVED**（docs 冗余治理第 1 波 · #41；升格另议） |
-| DOC-8 | RFC v0.2 阶段 0「右栏可写主干」、§3.1「删除旁听」与现行 SSOT 冲突；附录 A/B/C 是 UI 候选清单，不是 RFC | `rfc/v0.2-multi-agent-pipeline.md` | 已加取代横幅；正文改写待 v0.2 立项 → **已做**：顶部 `[DEFERRED / 非现行]` 横幅加固 + 附录非规范短注；正文大改仍待立项 | **RESOLVED**（docs 冗余治理第 1 波 · #41；正文改写另议） |
-| DOC-9 | RFC-003 内两份 `SchemeSnapshot` 定义并存；Ed25519「防篡改」措辞与 ADR-0006 冲突 | `rfc/scheme-snapshot-and-attestation-model.md` | v0.2 立项时一并修 → **已做**：`[PROPOSED / 非现行]` 横幅 + 双定义/防篡改短注；正文大改仍待立项 | **RESOLVED**（docs 冗余治理第 1 波 · #41；正文改写另议） |
+| DOC-7 | `state-machine-contract.md` 标「目标、待测试固化」，但 `src/lib/state-machine.ts` 已实现其迁移表；`constants-and-paths.md` 同为草案 | `specs/` 两份草案 | 核对后升格或合并入 runtime 契约 → 第 1 波仅加指针；**2026-11-01 用户拍板提前做**：内容并入 `runtime-contract-and-safety.md` §10 / §11（以代码为准回写）；原文件降为 `[HISTORICAL]` 指针 | **CLOSED**（升格完成 · 2026-11-01；遗留「另议」关闭） |
+| DOC-8 | RFC v0.2 阶段 0「右栏可写主干」、§3.1「删除旁听」与现行 SSOT 冲突；附录 A/B/C 是 UI 候选清单，不是 RFC | `rfc/v0.2-multi-agent-pipeline.md` | 第 1 波仅横幅；**2026-11-01 用户拍板提前做**：§3.1 与附录 A/B/C 改写为与 DEFERRED 一致——保留设想并标注被 REJ-001 / supervisor §14.4 等否决或取代 | **CLOSED**（正文清理完成 · 2026-11-01；遗留「另议」关闭） |
+| DOC-9 | RFC-003 内两份 `SchemeSnapshot` 定义并存；Ed25519「防篡改」措辞与 ADR-0006 冲突 | `rfc/scheme-snapshot-and-attestation-model.md` | 第 1 波仅横幅；**2026-11-01 用户拍板提前做**：合并为一份权威 `SchemeSnapshot` 提案定义；彻底去掉「防篡改/不可篡改」措辞，对齐 ADR-0006 本地优先不防篡改 | **CLOSED**（正文清理完成 · 2026-11-01；遗留「另议」关闭） |
 | DOC-10 | 三份实施口径（引擎 / 墓地门禁 / 试玩自查）把 K-1～K-13、G-MATCH、墓地交叉逻辑各写一遍，已出现 K-9 漂移 | `specs/scheme-patch-engine.md` 等 | 只在 supervisor §14.11 保留一份，其余改指针 → **已做**：三份删重复公式/K 表，改 SSOT 指针；K-9/K-13/K-15 以 supervisor 为准；supervisor §14.11 标明唯一权威 | **RESOLVED**（docs 冗余治理第 1 波 · #41） |
 | DOC-11 | `supervisor.md` 内部旧节号（§9.5 写「§3.1–§3.5」、L694「§5.4」）与计数（§18 写 35 条、实为 39 条）；intent-compiler few-shot 例 6 用 `remove_item` 处理否决，与 §4.5 冲突 | `specs/supervisor.md`、`specs/intent-compiler-prompt.md` | 机械修复 → **已做**：§9.1–§9.5、§11.3、changelog 对齐 39 条；例 6 改 `reject_item` | **RESOLVED**（docs 冗余治理第 0 波 · #40） |
 
 ---
 
-## 第 1 波遗留（需另立卡 / 不改代码）
+## 第 1 波遗留
 
 | 项 | 说明 |
 | :--- | :--- |
-| Worktree seal 路径前缀 | `daemon/guard/worktree-seal.ts` 使用 `.stagent/worktrees/{id}/`，与 `worktree-manager` 的 `task-{id}` 不一致；docs 已注明，**改代码另立卡** |
-| 草案升格 | `constants-and-paths.md` / `state-machine-contract.md` 仍 `[DRAFT / HISTORICAL]`，并入 runtime 另议 |
-| RFC 正文 | DOC-8/9 正文冲突大改待 v0.2 立项 |
+| Worktree seal 路径前缀 | `daemon/guard/worktree-seal.ts` 使用 `.stagent/worktrees/{id}/`，与 `worktree-manager` 的 `task-{id}` 不一致；docs 已注明（runtime §10），**改代码另立卡** |
+| 草案升格（DOC-7） | **CLOSED（2026-11-01）**：已并入 runtime §10 / §11；原文件 `[HISTORICAL]` 指针 |
+| RFC 正文（DOC-8/9） | **CLOSED（2026-11-01）**：冲突正文已改写为 DEFERRED/PROPOSED 一致表述；ADR-0006 对齐 |
 | DOC-1 | **RESOLVED**（第 2 波 · #42） |
 
 ## 纪律

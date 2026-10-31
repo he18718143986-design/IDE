@@ -2,6 +2,7 @@
 
 > **状态**：**现行生效 · 运行时工程硬契约的唯一权威**
 > **建立日期**：2026-10-27（Asia/Hong_Kong，文档治理重组）
+> **DOC-7 升格**：2026-11-01 — §10 路径/常量、§11 状态机合同并入（用户拍板提前做；原两草案降为历史指针）。
 > **为什么新增本文件**：本文件涵盖的内容原先**散落在 6 处**——架构规范 §4/§5/§9、Supervisor SSOT §4、Top7、核心资产治理、合同设计说明 §5、Claude Code 隔离设计——并且**本轮审查发现的 10 条冲突中有 4 条（C-1/C-2/C-3/C-8）全部落在这层**。把它们收口为一份并宣布唯一权威，是消灭冲突成本最低的手段。
 > **与三份规范的关系**：[`system-architecture.md`](./system-architecture.md) 管「怎么造 Stagent」；[`supervisor.md`](./supervisor.md) 管「Supervisor 产品与监理灵魂」；[`development-tasks.md`](./development-tasks.md) 管「哪张卡做了什么」；**本文件管「用户每一轮需求被哪些硬约束兜住」**。
 > **版本流转**：由 Git Tag 与 commit 历史承载，文件名不含版本号。
@@ -49,7 +50,7 @@
 | **确认方案前** | 只读分析；草案写入 `.stagent/drafts/`；Demo 写入 `.stagent/prototypes/` | 写用户项目主干；下发写权限 `exec_token`；跳过用户确认开工 |
 | **确认方案 / 签署后** | Worker 仅在 `.stagent/worktrees/` 下该合同目录与合同 `writable_paths` 内施工 | 改合同本身；挂载/改写 `prototypes/` 或 `records/`；`../` 穿出 worktree；静默扩 Scope |
 
-> **路径字面（DOC-5）**：活跃 Worktree 代码路径为 `.stagent/worktrees/task-{contract_id}/`（`worktree-manager` / `server` / `launcher`）。表格里的 `{contract_id}` 是合同键简写，**不等于**目录名一定无前缀。`worktree-seal` 当前写无前缀目录，与创建路径不一致 → 需立卡，本波不改代码。详见 [`constants-and-paths.md`](./constants-and-paths.md) §0。
+> **路径字面（DOC-5 / DOC-7）**：活跃 Worktree 代码路径为 `.stagent/worktrees/task-{contract_id}/`（`worktree-manager` / `server` / `launcher`）。表格里的 `{contract_id}` 是合同键简写，**不等于**目录名一定无前缀。`worktree-seal` 当前写无前缀目录，与创建路径不一致 → 需立卡，本波不改代码。权威摘要见本文 **§10**（原 `constants-and-paths.md` §0 已升格）。
 
 **不变量**：签署事件落盘前，主干工作区的改动必须为 **0 字节**（drafts / prototypes 除外，且二者不得进主干）。
 
@@ -287,3 +288,122 @@
 | 确认事务（代码即权威） | `src/lib/journey/confirm-scheme-atomic.ts` |
 | 签署门禁（代码即权威） | `daemon/supervisor/demo/signing-gate.ts` |
 | 保护清单与审计（代码即权威） | `daemon/guard/audit-manifest.ts`、`daemon/supervisor/rules-l0.ts` |
+| 路径与常量（DOC-7 升格） | 本文 **§10**；代码：`daemon/git/worktree-manager.ts`、`daemon/guard/worktree-seal.ts`、`daemon/pipeline/merger.ts` |
+| 状态机合同（DOC-7 升格） | 本文 **§11**；代码：`src/lib/state-machine.ts`、`src/lib/state/delivery-state.ts` |
+| 历史指针 | [`constants-and-paths.md`](./constants-and-paths.md)、[`state-machine-contract.md`](./state-machine-contract.md)（仅指针，非权威） |
+
+---
+
+## 10. 路径与常量（DOC-7 升格 · 代码权威）
+
+> **升格（2026-11-01 · 用户拍板提前做 DOC-7）**：自 `constants-and-paths.md` 的「代码事实」并入。冲突时以代码为准。原文件降为 `[HISTORICAL]` 指针。
+> **权威代码**：`daemon/git/worktree-manager.ts`、`daemon/guard/worktree-seal.ts`、`daemon/pipeline/merger.ts`、`daemon/supervisor/demo/demo-generator.ts`、`src/lib/journey/scheme-draft.ts`。
+
+### 10.1 运行时路径（代码事实）
+
+| 资产 | 代码事实 | 权威落点 |
+| :--- | :--- | :--- |
+| 活跃 Worktree 目录 | `.stagent/worktrees/task-{contractId}/` | `getWorktreePath`（`worktree-manager.ts`）；`server` / `launcher` |
+| Worktree seal 目录 | `.stagent/worktrees/{contractId}/`（**无** `task-` 前缀） | `worktree-seal.ts` → **与创建路径不一致**；改代码另立卡（本升格不改代码） |
+| Demo（遗留入口） | `.stagent/demo/`（`DEMO_ROOT`） | `demo-generator.ts` |
+| Demo（隔离预览） | `.stagent/prototypes/{prototype_id}/`（`PROTOTYPES_ROOT`，C.11b） | 现行隔离 Demo；见本文 §2 |
+| 合并 Git Trailer | `Stagent-Contract-ID` / `Stagent-Evidence-ID` / `Stagent-Evidence-Hash` / `Stagent-Verdict` / `Stagent-Approval-Status`；可选 `Stagent-Tests-Modified`、人工确认 trailer | `merger.ts` |
+| 方案确认唯一守卫 | `evaluateSchemeConfirmation(draft, demo)` | `src/lib/journey/scheme-draft.ts`（Daemon 签署结论须与之同码） |
+
+### 10.2 目标路径 vs 代码（不得误标为已实现）
+
+下列曾出现在草案「目标规范」表中；**升格后明确：非现行代码事实**，仅作远期设计备忘，施工仍以 §10.1 与代码为准：
+
+| 资产 | 草案目标路径 | 现行处理 |
+| :--- | :--- | :--- |
+| 合同快照 | `.stagent/contracts/{contract_id}.json` | 以 Daemon 实际导出为准；未在本升格宣布为 SSOT |
+| Evidence 快照 | `.stagent/evidence/{contract_id}-{evidence_id}.json` | 同上 |
+| 任务 Worktree（目标简写无前缀） | `.stagent/worktrees/{contract_id}/` | **否**：活跃创建路径有 `task-` 前缀（§10.1） |
+| 审计侧车 | `.stagent/records/{contract_id}/audit-manifest.json` | 见 ADR-0011 / runtime 既有条款；非「防篡改」 |
+
+**废止声明校正**：草案曾写「废止 `.stagent/prototypes/`、`.stagent/metadata/` 以及 `task-{id}` 规范路径」。**以代码为准**：`prototypes/` 仍是现行隔离 Demo 根；`task-{id}` 是活跃 Worktree 目录名；`.stagent/metadata/` 与 ADR-0011 冲突见 DLV-4（另卡）。不得再把「废止 task- 前缀」写成现行规范。
+
+### 10.3 跨端字段与 Trailer（代码 vs 草案）
+
+- **合同关联键（跨端 JSON/IPC）**：小写下划线 `contract_id`（草案目标，与代码字段一致处保留）。
+- **Git Trailer 键名（合并提交）**：以 `merger.ts` 的 `Stagent-*` PascalCase 为准（§10.1）。草案曾禁止 `Stagent-Contract-ID` 并要求裸小写 `contract_id:` trailer 块——**与代码冲突，升格时废弃该禁令**；字节上限（单行 512 / 块 4096）仍可作为目标测试约定，未在本文件升格为硬门禁除非代码已实现。
+
+### 10.4 ReasonCode（证据/执行失败闭集 · 与 runtime L3 表分工）
+
+草案闭集（目标）：`SCOPE_VIOLATION` · `BUDGET_EXHAUSTED` · `WORKSPACE_LOCKED` · `UNAUTHORIZED_COMMAND` · `VERIFICATION_RETRY_LIMIT` · `UNSAFE_EXECUTION` · `EVIDENCE_STALE` · `PREPARATION_INTERRUPTED` · `WORKTREE_LOST`。
+
+执行期用户面主码仍以本文 §8 / L3 表与 `ERROR_CODES` 为准；本闭集描述证据与失败归因语义，**不是**另立第二套 HTTP 路由码表。
+
+### 10.5 升格差异清单（供 PR 审查）
+
+| # | 草案曾写 | 代码事实 | 本文件处理 |
+| --- | --- | --- | --- |
+| D1 | Worktree 规范路径无 `task-` 前缀 / 「废止 task- 表达」 | 创建路径为 `task-{id}` | §10.1 / §10.2 按代码；废止声明作废 |
+| D2 | seal 与创建同目录（未区分） | seal 无前缀、创建有前缀 | §10.1 明示；改代码另卡 |
+| D3 | 禁止 `Stagent-Contract-ID` 等，改裸小写 trailer | `merger` 写入 `Stagent-*` | §10.3 按代码 |
+| D4 | 「废止 `.stagent/prototypes/`」 | prototypes 仍为隔离 Demo 根 | §10.2 校正 |
+| D5 | 目标 contracts/evidence/records 路径作规范 | 未全部在代码落地为 SSOT | §10.2 降为备忘 |
+
+---
+
+## 11. 状态机合同（DOC-7 升格 · 代码权威）
+
+> **升格（2026-11-01 · 用户拍板提前做 DOC-7）**：自 `state-machine-contract.md` 并入；迁移表与终态以 `src/lib/state-machine.ts` 的 `LIFECYCLE_TRANSITIONS` / `TERMINAL_STATES` 为准。交付投影见 `src/lib/state/delivery-state.ts` + `terminal-delivery-closure.ts`（H.2）与 [ADR-0012](../adr/0012-merged-as-terminal-state.md)。
+
+### 11.1 两轨关系
+
+| 轨 | 类型 / 模块 | 是否含 `DELIVERED` | 对外终态 |
+| :--- | :--- | :--- | :--- |
+| **生命周期轨** | `LifecycleState` + `ApprovalStatus`；`state-machine.ts` | **否**（止于 `MERGED` / `ABORTED`） | 成功公开终态 = **`MERGED`** |
+| **交付投影轨** | `DeliveryState`；`delivery-state.ts` | **是**：`DELIVERED` = MERGED 后归档事务成功的内部/投影标记 | 对外文案收敛为 `MERGED`；禁止独立 `DELIVERED` 运行时 lifecycle 名 |
+
+lifecycle 进入 `MERGED` 后，归档流水线可尝试投影到 `DELIVERED`；**任一步失败则停在 `MERGED`，绝不回退 lifecycle**。
+
+### 11.2 LifecycleState × ApprovalStatus（代码枚举）
+
+```ts
+// 与 src/lib/contract.schema / state-machine.ts 一致
+LifecycleState =
+  DRAFT | PENDING_APPROVAL | PREPARING | EXECUTING | VERIFYING |
+  PENDING_RESUME | AUDITED | MERGED | ABORTED;
+
+TERMINAL_STATES = MERGED | ABORTED;
+```
+
+| LifecycleState | 唯一合法 ApprovalStatus | 语义 |
+| --- | --- | --- |
+| `DRAFT` | `DRAFT` | 方案草案，尚未获得施工审批 |
+| `PENDING_APPROVAL` | `PENDING_REVIEW` | 等待用户审批 |
+| `PREPARING` | `APPROVED` | 创建/恢复 Worktree 与受控环境 |
+| `EXECUTING` | `APPROVED` | Worker 持有效 exec token 施工 |
+| `VERIFYING` | `APPROVED` | Daemon 验证 / Scope / 指纹 |
+| `PENDING_RESUME` | `APPROVED` | 安全挂起 |
+| `AUDITED` | `APPROVED` | Evidence 已核验，待合并 |
+| `MERGED` | `APPROVED` | 唯一成功运行时终态 |
+| `ABORTED` | `REJECTED` 或 `APPROVED` | 拒绝或获批后安全终止 |
+
+### 11.3 允许迁移（与 `LIFECYCLE_TRANSITIONS` 逐字一致）
+
+| From | To |
+| --- | --- |
+| `DRAFT` | `PENDING_APPROVAL`, `PREPARING`, `ABORTED` |
+| `PENDING_APPROVAL` | `PREPARING`, `ABORTED` |
+| `PREPARING` | `EXECUTING`, `PENDING_APPROVAL`, `ABORTED` |
+| `EXECUTING` | `VERIFYING`, `PENDING_RESUME`, `ABORTED` |
+| `VERIFYING` | `AUDITED`, `EXECUTING`, `PENDING_RESUME`, `ABORTED` |
+| `PENDING_RESUME` | `EXECUTING`, `PREPARING`, `ABORTED` |
+| `AUDITED` | `MERGED`, `EXECUTING`, `VERIFYING`, `ABORTED` |
+| `MERGED` | （无） |
+| `ABORTED` | （无） |
+
+未列出的边一律禁止（`canTransition` / 附加 Guard 见代码）。`DRAFT → PREPARING` 仅 Fast Path（带 Guard）；**不存在** `DRAFT → EXECUTING`。
+
+### 11.4 升格差异
+
+| # | 草案曾写 | 代码事实 | 本文件处理 |
+| --- | --- | --- | --- |
+| S1 | 全文标「目标、待测试固化」易被误当未实现 | `LIFECYCLE_TRANSITIONS` 已实现核心边 | §11 升格为代码权威摘要 |
+| S2 | 叙事上易把 `DELIVERED` 混入 lifecycle | 仅交付投影 | §11.1 两轨 |
+| S3 | 负例/回滚表偏目标测试清单 | 与代码边兼容处保留为实施口径，权威仍是 §11.3 + 代码 | 细节仍可读 Git 历史中的原草案 §4/§5 |
+
+---

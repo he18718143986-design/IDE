@@ -2,7 +2,8 @@
 
 > ## `[PROPOSED / 未批准 / 非现行]` · 不得当施工依据（DOC-9）
 >
-> 本文**不进入**现行 Supervisor / ADR / runtime。与 SSOT 冲突时以 SSOT 为准。正文内两份 `SchemeSnapshot` 定义并存、以及 Ed25519「防篡改」措辞与 [ADR-0006](../adr/0006-local-first-no-tamper-proof.md) 的冲突，**本波不改正文**，仅横幅提示；大改待 v0.2 立项（ledger DOC-9）。
+> 本文**不进入**现行 Supervisor / ADR / runtime。与 SSOT 冲突时以 SSOT 为准。
+> **DOC-9 · 2026-11-01（用户拍板提前做）**：① 两份 `SchemeSnapshot` 已合并为下文 **唯一权威提案定义**（原瘦身第二份降为历史注记）；② 全文去掉「防篡改 / 不可篡改」升格措辞，完整性校验对齐 [ADR-0006](../adr/0006-local-first-no-tamper-proof.md)（**本地优先 · 不防篡改**——持有宿主写权限者无法被本地 JSON/签名承诺击败）。
 
 > **状态**：**PROPOSED · 未批准 · 不进入现行规范**
 > **提案编号**：RFC-2026-003（文档治理重组时分配）
@@ -48,11 +49,14 @@
 
 ### 4.7 核心数据模型、类型约束与跨阶段不变量（v2.0.3 修订）
 
-本节是产品契约层的规范性数据模型。字段标为必填时对象必须携带；可选字段只允许在所列生命周期阶段缺省。Daemon 必须在持久化边界再次校验，TypeScript 类型不能代替运行时校验、路径拦截或签名验证。实现字段名可适配现有代码，但不得削弱语义。
+本节是产品契约层的规范性数据模型。字段标为必填时对象必须携带；可选字段只允许在所列生命周期阶段缺省。Daemon 必须在持久化边界再次校验，TypeScript 类型不能代替运行时校验、路径拦截或完整性校验（对齐 ADR-0006：非防篡改）。实现字段名可适配现有代码，但不得削弱语义。
 
 #### 4.7.1 Scheme 快照规范化 AST、Demo 绑定与 Markdown 工件映射
 
-##### A. 完整 `SchemeSnapshot` 数据模型与规范化摘要算法
+##### A. `SchemeSnapshot` 唯一权威提案定义与规范化摘要算法
+
+> **DOC-9**：本节为本 RFC 内**唯一** `SchemeSnapshot` 提案定义。现行代码若尚未接线，仍以 SSOT「未接线即未完成」为准（见 §0）；不得把本接口当作已实现 SSOT。
+
 ```ts
 export type SchemeStatus = 
   | 'DRAFTING'        // 需求收集中
@@ -61,12 +65,11 @@ export type SchemeStatus =
   | 'FROZEN'          // 用户点击「确认方案」，只读锁定，准备编译 Contract
   | 'ABANDONED';      // 方案废弃
 
-// DOC-9：本 RFC 内另有一份 SchemeSnapshot 定义并存；以现行代码/SSOT 为准，此处仅提案稿。
 export interface SchemeSnapshot {
   schema_version: '2.0.0';
   scheme_id: string;                    // 方案唯一实例 ID
   revision: number;                     // 单调递增正整数 (1, 2, 3...)
-  digest: string;                       // 本版本内容的规范化 SHA-256 签名 (hex, 64 字符)
+  digest: string;                       // 本版本内容的规范化 SHA-256 摘要 (hex, 64 字符；完整性校验，非防篡改)
   created_at: string;                   // ISO 8601
   updated_at: string;                   // ISO 8601 (计算 digest 时排除)
   status: SchemeStatus;
@@ -156,28 +159,9 @@ AST 转换为工程工件时必须保持无副作用纯函数渲染，并在 Fro
 - `03-验收矩阵模板.md`：映射 `verification.assertions`（Given-When-Then）、自动化验证命令与验收未决项；
 - `04-追溯矩阵模板.md`：自动以 `REQ-###` 聚合推导 `AC`、`ARCH/API`、`ADR`、`TEST` 交叉矩阵。
 
-##### C. 原型绑定状态枚举
+##### C. 原型绑定状态枚举（隶属权威 `SchemeSnapshot.demo_binding`）
 
 ```ts
-export interface SchemeModule {
-  module_id: string;
-  name: string;
-  responsibilities: string[];
-  dependencies: string[];
-}
-export interface SchemeDecision {
-  key: string;
-  choice: string;
-  source: 'USER_EXPLICIT' | 'AI_RECOMMENDED';
-  user_pinned: boolean;
-}
-export interface SchemeConflict {
-  conflict_id: string;
-  description: string;
-  status: 'OPEN' | 'RESOLVED';
-  resolution_note?: string; // RESOLVED 时建议提供；迁移旧记录期间可缺省
-}
-
 export type SchemeDemoBinding =
   | { status: 'none' }
   | { status: 'building'; bound_scheme_revision: number; bound_scheme_digest: string }
@@ -192,28 +176,13 @@ export type SchemeDemoBinding =
       /** 内部遥测标记：记录因版本递增或内容摘要变化引起的失效原因 */
       stale_trigger: 'REVISION_MISMATCH' | 'DIGEST_MISMATCH'; 
     };
-
-// DOC-9：本 RFC 内另有一份 SchemeSnapshot 定义并存；以现行代码/SSOT 为准，此处仅提案稿。
-export interface SchemeSnapshot {
-  scheme_id: string;
-  revision: number;                 // 每次语义内容变化单调递增
-  created_at: string;
-  product_intent: {
-    title: string;
-    summary: string;
-    target_audience: string;
-    modules: SchemeModule[];
-  };
-  decisions: SchemeDecision[];
-  open_conflicts: SchemeConflict[];
-  demo: SchemeDemoBinding;
-  content_digest: string;            // 规范化语义内容的 SHA-256，不含时间戳等非语义元数据
-}
 ```
+
+> **DOC-9 合并说明（2026-11-01）**：曾并存的第二份瘦身 `SchemeSnapshot`（`product_intent` / `content_digest` / 顶层 `demo`）**已废除**，不再作为本 RFC 定义。其字段语义分别覆盖于权威定义的 `product` / `architecture` / `governance` / `digest` / `demo_binding`。若 Git 历史需对照，见升格前版本。
 
 **字段与谓词规则（兼容 v2.0.2 D1）**：
 1. **字段互斥**：Demo 为 `none` 时不得存在任何绑定字段；从 `building` 起必须固定生成时的 `bound_scheme_revision` 与 `bound_scheme_digest`；`ready` 必须包含可解析的 `preview_ref`；`confirmed` 必须包含 `confirmed_at`；降级卡必须记录显式接受时间与风险标记。
-2. **陈旧判定收敛（D1 闭集保持）**：当且仅当 `(demo.bound_scheme_revision !== scheme.revision || demo.bound_scheme_digest !== scheme.digest)` 时，系统判定 Demo 失效（`status = 'stale'`）。此时，方案确认谓词 `evaluateSchemeConfirmation` 必须且只能返回 v2.0.2 §1 D1 规定的标准拒绝码 **`E_DEMO_STALE`**。严禁向上层暴露自定义错误码；内部遥测字段 `stale_trigger` 仅供审计，不参与 UI 分支判定。
+2. **陈旧判定收敛（D1 闭集保持）**：当且仅当 `(demo_binding.bound_scheme_revision !== scheme.revision || demo_binding.bound_scheme_digest !== scheme.digest)` 时，系统判定 Demo 失效（`status = 'stale'`）。此时，方案确认谓词 `evaluateSchemeConfirmation` 必须且只能返回 v2.0.2 §1 D1 规定的标准拒绝码 **`E_DEMO_STALE`**。严禁向上层暴露自定义错误码；内部遥测字段 `stale_trigger` 仅供审计，不参与 UI 分支判定。
 
 #### 4.7.2 Contract 生命周期与不可变签署材料
 
@@ -278,7 +247,7 @@ export type ExecutionContract =
     });
 ```
 
-`PENDING_APPROVAL` 不是已签署合同，不得伪造签署时间或签名。签署后 `scheme_ref`、`base_commit_hash`、Scope、验证命令与预算不可变；如需改变必须新建合同/新修订，不得覆写原合同。`contract_signature` 必须由可信 Daemon 对规范化合同载荷做密码学完整性校验；不可把普通摘要或前端生成值称为授权凭证。
+`PENDING_APPROVAL` 不是已签署合同，不得伪造签署时间或签名。签署后 `scheme_ref`、`base_commit_hash`、Scope、验证命令与预算不可变；如需改变必须新建合同/新修订，不得覆写原合同。`contract_signature` 若存在，表示可信 Daemon 对规范化合同载荷的**本地完整性证明**（可选密码学附属）；**不构成**对持有宿主写权限攻击者的防篡改（ADR-0006）。不可把前端生成值称为授权凭证。
 
 #### 4.7.3 Task 状态、执行证据与清理阶段
 
@@ -363,19 +332,19 @@ export type ExecutionTask =
 
 #### 4.7.5 AST、Markdown 工件与 ExecutionContract 三元哈希绑定与差异追溯
 
-为实现「所见即所签，所签即所建」，系统建立严密的三元哈希完整性链条（**DOC-9**：措辞「防篡改」易与 [ADR-0006](../adr/0006-local-first-no-tamper-proof.md) 完整性/证据链口径混淆；本 RFC 提案语义不得覆盖 ADR-0006）：
+为实现「所见即所签，所签即所建」，系统建立**三元哈希完整性链条**（一致性 / 漂移检测，**不是**防篡改）。对齐 [ADR-0006](../adr/0006-local-first-no-tamper-proof.md)：本地优先，持有宿主写权限者可改任何本地文件与密钥材料——本机制只帮助诚实主体发现漂移，不宣称密码学不可伪造。
 
 1. **确定性规范化渲染**：
    - `SchemeSnapshot` 基于 RFC 8785 键名排序计算规范化 SHA-256 摘要 $H_{ast}$；
    - 纯函数模板将 AST 序列化为五份 Markdown（00-04），在 Frontmatter 显式注入 `source_digest: H_ast`；
    - 提取五份工件文本组合计算工件集哈希 $H_{md}$。
-2. **Contract 不可篡改签名**：
+2. **Contract 本地完整性附属（可选）**：
    - `ExecutionContract` 冻结记录 `scheme_ref: { revision, digest: H_ast }` 与 `artifacts_ref: { digest: H_md }`；
    - 签署时刻捕获底层 Git 树基线 `git_baseline_commit`；
-   - Daemon 使用私钥对包含上述哈希与安全 Scope（可写/只读/严禁路径、验证命令、预算）的载荷进行 Ed25519 签名。
-3. **差异检测与篡改告警**：
+   - Daemon **可**对包含上述哈希与安全 Scope（可写/只读/严禁路径、验证命令、预算）的载荷做 Ed25519 **本地附属签名**（证明「曾被该 Daemon 实例签署」）；**禁止**对外称作「防篡改签名」或「不可篡改」。
+3. **差异检测与漂移告警**（非「篡改告警」升格）：
    - 磁盘文件的 `source_digest !== snapshot.digest` 时，判定文件过期，自动触发重新渲染；
-   - 磁盘文件实际哈希与登记的 $H_{md}$ 不符时，说明工作区被外部工具手动修改，触发 `E_DIRTY_CONFLICT` 告警。
+   - 磁盘文件实际哈希与登记的 $H_{md}$ 不符时，说明工作区相对登记摘要已漂移，触发 `E_DIRTY_CONFLICT` 告警（诚实主体提示，非攻击证明）。
 
 #### 4.7.6 错误码分层架构与不变量矩阵
 

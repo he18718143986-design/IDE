@@ -46,9 +46,12 @@
 | q20 | U3 | 让一个人也能驾驭 AI 构建的复杂软件。 |
 | q21 | U3 | Agent 现在是否能直接照任务无脑开发？ |
 | q22 | U4 | 直接对这两个 PR 执行变更，认同三篇 ADR 和两个推荐项 |
+| q23 | U5 | 确认路径上 occurrence 机制生效——用户在「确认开工」时点名的敏感项进入授权清单，后续合同中同一敏感项再次出现自动放行 |
+| q24 | U5 | 第一印象速记窗口不设等待时长、非阻塞、可跳过；用户跳过则直接进入验收决定；用户异议随时经右栏走 user_dispute trigger |
 
 > `U3` = 2026-10-30 用户提出的目标能力与审计要求（任务 TINA16-3 第三轮）。审计结论见 [`reports/delivery-path-audit.md`](./reports/delivery-path-audit.md)。
 > `U4` = 2026-10-30 用户对三篇 ADR（ADR-0015～0017）及两项推荐（SA-1 与凭据钥匙串 OQ-REL-1）的正式授权拍板（原话见 q22）。
+> `U5` = 2026-11-01 用户拍板 OP-1「洗白」、OP-13「第一印象窗口不阻塞」、DOC-7 草案升格与 DOC-8/9 RFC 正文清理（原话见 q23、q24）。
 
 **已落盘的用户裁决**（不是本轮原话，但属于 `user_confirmed`，可作证据）：
 
@@ -57,6 +60,8 @@
 | R-OP28 | 右栏只读白名单 + 自由脑暴定位 | [`ledger/consistency-audit.md`](./ledger/consistency-audit.md) OP-28；[`specs/supervisor.md`](./specs/supervisor.md) §14.5 |
 | R-D1…D10 | Supervisor 十项钉死决策 | [`specs/supervisor.md`](./specs/supervisor.md) §7、§17 |
 | R-ADR | ADR-0001～0013（均 ACCEPTED） | [`adr/README.md`](./adr/README.md) |
+| R-OP1 | 确认路径 occurrence → 洗白 / 授权清单（SA-1 语义） | 本文 §6 dec-10；[`ledger/consistency-audit.md`](./ledger/consistency-audit.md) OP-1；supervisor §14.11 K-12 |
+| R-OP13 | 第一印象速记：不设等待、非阻塞、可跳过 | 本文 §6 dec-11；[`ledger/consistency-audit.md`](./ledger/consistency-audit.md) OP-13；supervisor §13.3 |
 
 ---
 
@@ -142,6 +147,8 @@
 | dec-8 | ADR-0014「只保留两次点击」下，涉及保护清单的改动怎么授权？（SA-1） | 敏感项默认排除出范围；只有用户原话点名时才进审批，开工按钮一次点击一并授权并带入 plan_digest。 | 保留逐项「可以/不行」 | 守住两次点击，也不放宽保护清单：物理门禁绝不放行未获授权的敏感写入。 | high | `user_confirmed` | q13、q22；[`specs/delivery-lifecycle.md`](./specs/delivery-lifecycle.md) §5 |
 | dec-9 | 凭据保险库（Vault）选择哪种存储后端？（OQ-REL-1） | 系统钥匙串（OS Keychain）：本地开发最安全、防明文泄露能力最强，Worker 运行时只受控注入环境变量。 | 加密 JSON 文件；第三方托管服务 | 系统钥匙串避免明文或对称秘钥落盘在目标仓库或 .stagent/，符合零凭据落盘原则。 | low | `user_confirmed` | q14、q22；[`specs/release-and-operations.md`](./specs/release-and-operations.md) §4.1 |
 | dec-4 | `development-tasks.md`（约 460KB）要不要拆？ | 拆成「卡号索引 + 活跃卡 + 已完成卡 + 修订流水」，卡号不变。 | 维持单文件 | 约 65% 是已完成卡的历史，仍要执行的 J 系列只占约 15%；但拆分会与正在进行的 PR 冲突，需择时。 | low | `user_confirmed` | q9；[`ledger/README.md`](./ledger/README.md) DOC-1 |
+| dec-10 | 确认路径上 `occurrence` 是否保留（OP-1「洗白面」）？ | **洗白**：确认路径 `occurrence` 机制生效——用户在「确认开工」时点名的敏感项进入授权清单，后续合同中同一敏感项再次出现自动放行（对齐 supervisor §14.11 K-12「显式风险」与 SA-1 授权清单语义）。落地细节（白名单存储位置、scope 粒度）由实施卡确定；本裁决只定方向。 | 取消确认路径 `occurrence`；或另建独立白名单字段、与 quote 锚点脱钩 | 与 dec-8 / SA-1「原话点名 → 开工一并授权」同向；复活路径仍按 K-12 忽略 `occurrence`（取最后一处）。 | high | `user_confirmed` | **用户拍板 2026-11-01**；原话 q23：「确认路径上 occurrence 机制生效——用户在「确认开工」时点名的敏感项进入授权清单，后续合同中同一敏感项再次出现自动放行」 |
+| dec-11 | 第一印象速记窗口要不要计时阻塞（OP-13）？ | **不阻塞**：不设等待时长；可选速记提示；可跳过；跳过则直接进入验收决定；异议随时经右栏走 `user_dispute` trigger。 | 设固定计时窗口后再入账 | 不新增决定类型、不挡「合入 / 这里不对」；与 §13.3「五种决定」纪律一致。 | low | `user_confirmed` | **用户拍板 2026-11-01**；原话 q24：「第一印象速记窗口不设等待时长、非阻塞、可跳过；用户跳过则直接进入验收决定；用户异议随时经右栏走 user_dispute trigger」 |
 
 ## 7. 分歧（`conflicts[]`）——原话与现行规格打架的地方
 
