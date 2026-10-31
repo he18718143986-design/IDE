@@ -44,7 +44,7 @@ Release ── 引用一个已合并提交，可覆盖多份合同（.stagent/re
 | **S3 项目分解** | 已密封方案 + ready PAB（standard/large） | `ProjectPlan`：里程碑、合同桩、依赖 DAG（引用 PAB digest） | Supervisor（分解器） | 计划补丁校验 + PAB 引用一致性 | 同页嵌「项目地图」（非第二套导航）；下一份旁 **「确认开工」** | [`project-decomposition.md`](./project-decomposition.md) | 空白 → **L.7～L.10** |
 | **S3→合同** | 计划中的下一份合同桩 + 已密封 MachineFace | `ScopePlan` → 合同（`.stagent/contracts/<id>.json`） | Daemon | 唯一确认谓词 `evaluateSchemeConfirmation`；§3 可编译判定；ADR-0018 密封门禁 | **「确认开工」**（**该份合同**施工授权；含 SA-1） | supervisor §15、§16.3、§17 D7；runtime §2；ADR-0018 | **J.2～J.6 COMPLETED**（#4～#7、#11）；**J.10 COMPLETED**（#17）；多合同桩/下一份交接余量 → **L.7～L.9** |
 | **S4 技术方案** | 已签合同 + ready PAB + 系统知识库 | `DesignNote`（`.stagent/records/<id>/design-note.json`）+ 知识库增量计划 | 设计步骤（中栏组件或专用 Agent，形态开放） | DesignNote Schema 与 PAB 一致性校验；五类决策升级规则 | 仅在五类决策时弹意外卡 | [`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) | 空白 → **L.11** |
-| **S5 施工** | 合同 + DesignNote + 测试义务 | Worktree 内的改动（`.stagent/worktrees/task-<id>`，分支 `task/<id>`） | Worker | 网关写范围；预算三维熔断；墓地门禁 | 无（看步骤点亮） | runtime §1～§5；ADR-0003、0013；[`worker-graveyard-gate.md`](./worker-graveyard-gate.md) | 单合同已实现；验证命令进指令 → **L.2**；墓地 → **J.18** |
+| **S5 施工** | 合同 + DesignNote + 测试义务 | Worktree 内的改动（`.stagent/worktrees/task-<id>`，分支 `task/<id>`） | Worker | 网关写范围；预算三维熔断；墓地门禁 | 无（看步骤点亮） | runtime §1～§5；ADR-0003、0013；[`worker-graveyard-gate.md`](./worker-graveyard-gate.md) | 单合同已实现；验证命令进指令 → **L.2**；墓地 → **J.18a～J.18d**（母卡 J.18 `[SPLIT]`） |
 | **S6 验证与验收** | 候选提交 | `EvidenceBundle`（`.stagent/evidence/<contractId>-<evidenceId>.json`）；试玩记录；合并提交 + Trailer | Daemon（判卷）+ 用户（试玩） | `can_merge` 只由退出码派生；测试义务红→绿；知识库漂移检查 | 试玩；**「合入」**（第 2 次点击） | ADR-0005；[`verification-strategy.md`](./verification-strategy.md)；[`evidence-and-acceptance-criteria.md`](./evidence-and-acceptance-criteria.md)；[`playtest-self-check.md`](./playtest-self-check.md) | 测试义务 **L.3 COMPLETED**（#15）；两段式 **L.4 COMPLETED**（#18）；真实预览 **L.5 COMPLETED**（#14）；M2 黄金切片 → **L.6（进行中）**；知识库检查 → **L.12** |
 | **S7 发布与运维** | 已合并提交 | `ReleaseRecord`（`.stagent/releases/<id>.json`）；健康检查证据 | Daemon | 构建与健康检查退出码；失败自动回滚 | **「发布」**（独立点击）；回滚 | [`release-and-operations.md`](./release-and-operations.md) | 空白 → **L.14～L.16** |
 
@@ -158,7 +158,7 @@ q<n>（原话） → scheme item id（goal-* / mod-* / acc-*） → milestone_id
 | :--- | :--- | :--- | :--- |
 | **M1 · v0.1** | 单合同受控施工可签收 | 已完成（Tag `v0.1.0`） | 见 [`../reports/v0.1-hardening-closure.md`](../reports/v0.1-hardening-closure.md) |
 | **M2 · 黄金切片** | 一句话需求 → 一次开工 → 真实预览 → 一次合入，全程无技术决策 | L.1、J.2、J.3′、J.4、J.5′、J.6′、J.7′、J.8、J.9、J.10′、L.2、L.3、L.4、L.5、L.6 | L.6 端到端测试通过：替身模型下，从右栏一条消息到 `MERGED`；用户只点 2 次；候选含至少 1 条红→绿测试；预览加载的是 Worktree 里运行的真实应用 |
-| **M3 · 大项目可控** | 一个需求被拆成多份合同，逐份交付，系统始终可理解 | L.7、L.8、L.9、L.10、L.11、L.12、L.13、J.18 | 夹具项目：一段多模块需求被分解为 ≥3 份合同、≥2 个里程碑；逐份合入后 `docs/system/modules.yaml` 覆盖全部改动文件；任意一行新代码能反查到原话 |
+| **M3 · 大项目可控** | 一个需求被拆成多份合同，逐份交付，系统始终可理解 | L.7、L.8、L.9、L.10、L.11、L.12、L.13、J.18a～J.18d | 夹具项目：一段多模块需求被分解为 ≥3 份合同、≥2 个里程碑；逐份合入后 `docs/system/modules.yaml` 覆盖全部改动文件；任意一行新代码能反查到原话 |
 | **M4 · 可发布** | 合并的提交能一键上线并能回滚 | L.14、L.15、L.16 | `local_process` 与 `user_command` 两类目标各有 1 条端到端测试：发布 → 健康检查 → LIVE；人为让健康检查失败 → 自动回到上一个 LIVE；日志与证据中搜不到任何保险库明文 |
 | **M5 · 北极星** | 给网址 + 登录信息，复刻网站 | L.17 + oq-2 裁决 | 待 oq-2（「一模一样」的判据）裁决后写入 |
 

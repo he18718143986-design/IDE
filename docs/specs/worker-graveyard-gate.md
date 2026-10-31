@@ -1,6 +1,6 @@
 # Worker 派工门禁 · 墓地确定性拦截规范（INV-LEDGER-03 工地侧 · TASK-J.18）
 
-> **状态**：**设计定稿 · 待施工**（立卡见 [`development-tasks.md`](./development-tasks.md) §3.4c `TASK-J.18`）
+> **状态**：**设计定稿 · 待施工（已拆卡）**（母卡 [`TASK-J.18`](./development-tasks.md) 为 `[SPLIT]`；可开工子卡 **`TASK-J.18a`～`J.18d`**，见 `development-tasks.md` §3.4c。原单卡估算 L，按 DoR R-11 禁止直接开工。）
 > **建立日期**：2026-10-28（Asia/Hong_Kong）
 > **上位规格**：[`supervisor.md`](./supervisor.md) §14.11（`INV-LEDGER-03` 第 1 款「机器侧拦截」）、§14.11 第 5 小节 G-MATCH（本卡新增的单一语义源）、§15.6、§16.6；[`runtime-contract-and-safety.md`](./runtime-contract-and-safety.md) §2.1、§2.3、§5.2、§8；[`scheme-patch-engine.md`](./scheme-patch-engine.md) §4.2～§4.3（墓碑指纹、`matchesTombstone`、`revival_keys`）。
 > **与上位规格的关系**：本文是工地侧的实施口径。墓地匹配的**语义**只在 SSOT G-MATCH 定义一次；引擎与本门禁是它的两处投影。冲突时以 SSOT 为准。
@@ -318,7 +318,7 @@ stateDiagram-v2
 | W5-b | `E_CHECKPOINT_FAILED` 实际是「开一轮前打检查点失败」（`server.ts:1767`、`:1844`，`POST /api/protection/round/start`），不是执行期码；且不在 `ERROR_CODES` | `daemon/server.ts:1767` |
 | W5-c | `E_TEST_FILE_WRITE_BLOCKED` 是 Gateway 执行期码（`gateway.ts:137`），不在 L3 行也不在 `ERROR_CODES` | `daemon/mcp/gateway.ts:137` |
 
-**补登方案（提案；随本卡 PR 只在 runtime §8 加指针，闭集表由 J.18 实施 PR 合入 runtime §8.1）**：
+**补登方案（提案；随本卡 PR 只在 runtime §8 加指针，闭集表由 **TASK-J.18c** 实施 PR 合入 runtime §8.1）**：
 
 runtime §8 新增 §8.1「L3 执行期码闭集」，列：码 / 触发点 / 停止语义 / 用户面（§16.6 卡片情形）/ `ERROR_CODES` 是否登记 / `reason_code`。
 
@@ -338,9 +338,20 @@ runtime §8 新增 §8.1「L3 执行期码闭集」，列：码 / 触发点 / �
 | `E_GATE_SCAN_FAILED` | **本卡新增**：全量扫描无法读取 diff | 失败关闭：不进入合并 | 「自动检查没跑完」 | **待登记** | `PREPARATION_INTERRUPTED`（提案） |
 | `E_CHECKPOINT_FAILED` | 开一轮前打检查点 | 不开工 | — | 否 | **移出 L3**，改登记为开工前码（提案） |
 
-**K-9 解释冲突（已拍板：按建议登记，见 K-15）**：K-9 规定引擎码「不登记入 `src/lib/error-codes.ts` 的 `ERROR_CODES`」，并把 `E_PROPOSAL_PREVIOUSLY_REJECTED` 列为例外，但例外条文只说明它出现在 `journal.verdicts` 且归属门禁层，**没有说明它是否进 `ERROR_CODES`**。工地侧拦截要写证据包 `verdict.reason_code`，而 `error-codes.ts` 规定每个运行时 `error_code` 都映射到一个 `reason_code`。**决定**：作为 L3 运行时码登记进 `ERROR_CODES`，映射 `SCOPE_VIOLATION`（不新增原因码）；由 K-15 明确「引擎编译期产出的同名码仍是编译日志码，工地侧产出的才是运行时码」。登记的代码动作随 J.18 实施 PR 完成；在该 PR 合入前，门禁只写日志与 `forbiddenViolations`，不写 `reason_code` 新映射。
+**K-9 解释冲突（已拍板：按建议登记，见 K-15）**：K-9 规定引擎码「不登记入 `src/lib/error-codes.ts` 的 `ERROR_CODES`」，并把 `E_PROPOSAL_PREVIOUSLY_REJECTED` 列为例外，但例外条文只说明它出现在 `journal.verdicts` 且归属门禁层，**没有说明它是否进 `ERROR_CODES`**。工地侧拦截要写证据包 `verdict.reason_code`，而 `error-codes.ts` 规定每个运行时 `error_code` 都映射到一个 `reason_code`。**决定**：作为 L3 运行时码登记进 `ERROR_CODES`，映射 `SCOPE_VIOLATION`（不新增原因码）；由 K-15 明确「引擎编译期产出的同名码仍是编译日志码，工地侧产出的才是运行时码」。登记的代码动作随 **TASK-J.18c** 实施 PR 完成；在该 PR 合入前，门禁只写日志与 `forbiddenViolations`，不写 `reason_code` 新映射。
 
 ---
+
+## 5.9 拆卡映射（2026-10-31 · DoR R-11）
+
+| 子卡 | 交付层 | 主要章节 / 缺口 / 测试 |
+| :--- | :--- | :--- |
+| `TASK-J.18a` | 纯函数 | §2、§4.1～§4.3；TM-GM、TM-GU |
+| `TASK-J.18b` | Schema / 快照 | §3.4；GAP-W1、GAP-W2 |
+| `TASK-J.18c` | 门禁裁决 + 派工绑定 + 码表 | §3、§5.3、§6.2～§6.3；TM-GS、TM-GA、TM-GP、TM-GB、TM-GE |
+| `TASK-J.18d` | 生产接线 + CLI + 集成 | §4.4、§5.1～§5.2、§6.4；GAP-W3/W4/W6；TM-GH、TM-GI |
+
+母卡 `TASK-J.18` 保留一句话目标与非目标，**不得**被 Agent 直接认领开工。
 
 ## 6. 交付蓝图
 
@@ -612,7 +623,7 @@ export function verifyDispatchBinding(repoRoot: string, contract: SoftwareContra
 | GAP-W6 | `ai-worker.ts:350` 与 `gateway.ts:859` 向 blockers 推送原始 `access.reason`（`FORBIDDEN_PATH` / `NOT_WRITABLE`），而非映射后的 `E_*` 码 | 改为 `scopeErrorCode` 映射；否则 `pickPrimaryVerdict` 无法比较 | 本卡（顺带修） |
 | OBS-1 | `runBoundaryStop` 由 Gateway 回调时传入 `workerPid: null`，SIGINT 软停一步被跳过 | 观察项，不在本卡修；建议另开卡核实 | — |
 | DEP-1 | `E_SCOPE_PLAN_DRIFT` / `E_SCHEME_SNAPSHOT_MISMATCH` 代码 0 命中（F-9） | `TASK-J.4` 先行 | J.4 |
-| DEC-1 | K-9 对 `ERROR_CODES` 登记的解释冲突（§5.3） | 已拍板：按建议登记，见 K-15；代码登记随 J.18 实施 | 规格评审（已决） |
+| DEC-1 | K-9 对 `ERROR_CODES` 登记的解释冲突（§5.3） | 已拍板：按建议登记，见 K-15；代码登记随 **J.18c** 实施 | 规格评审（已决） |
 
 ## 9. 已知局限
 
