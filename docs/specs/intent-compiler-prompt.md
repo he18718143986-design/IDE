@@ -647,7 +647,7 @@ U9（batch）：对
 ```text
 U10：导出先不要，等报表稳定了再导出
 ✗ "text":"导出"        ← 这条消息里「导出」出现两次，不知道你指哪一个
-✓ 否决导出：q1 = "导出先不要" → { "op":"remove_item", "id":"M6", "reason":"用户说先不要导出", "evidence":[{"qid":"q1"}] }
+✓ 否决导出：q1 = "导出先不要" → { "op":"reject_item", "id":"M6", "evidence":[{"qid":"q1"}] }  ← 聊天否决用 reject_item 入墓（§4.5）；不要用 remove_item 代替
 ```
 
 **例 7 · ✗ 语义改写复活墓碑 → ✓ 不写**

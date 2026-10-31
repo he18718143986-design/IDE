@@ -32,7 +32,7 @@
 | **v2.1 编译器生成端口径** | 2026-10-27 | 新增实施口径 [`intent-compiler-prompt.md`](./intent-compiler-prompt.md)（`TASK-J.10`）：生成端 × 引擎 47 码责任表（注：47 为 2026-10-27 当时口径，现行引擎码表 51 码，见 `intent-compiler-prompt.md` §2.2，本条不回改）、零转述摘录协议、墓碑注入取舍、搭档与编译器双调用、对抗性金标种子（J.11）。 |
 | **v2.1 合并引擎口径** | 2026-10-27 | 新增实施口径 [`scheme-patch-engine.md`](./scheme-patch-engine.md)（`TASK-J.9`）：§14.3 合并规则的判定树与优先级、§14.11 引用锚定算法与墓地复活判定；§14.11 第 4 小节登记收紧项 K-1、K-2、K-3（指向 §14.3 实施口径）、K-4、K-5/K-6、K-7、K-8（§14.2、§14.11 字段）、K-9；`runtime-contract-and-safety.md` §8 L3 行补登 `E_PROPOSAL_PREVIOUSLY_REJECTED` 并修正 `E_BUDGET_EXCEEDED` 码名；§18 增 V-10～V-13。 |
 | **v2.1 证据台账契约** | 2026-10-28 | §14 增补 §14.11 证据台账（Evidence Ledger）契约与不可变式（INV-LEDGER-01～04）：条目级 Schema、EditRef 手改证据、原话子串确定性校验、代选择阻断、墓地不可复活与逃生口、Delta 回写与快照继承权威方向、与 docs/templates/ REQ/ADR/EVID 主键映射表。 |
-| **v2.1 增补** | 2026-10-27 | 交互温度层增补：点击溯源双向联动、白话合同三层折叠与单向投影不变式、质询台三栏并排规格与双白话按钮、重试非警报呈现与交付仪式卡、低置信度分流保守默认（不变式 C-1）；§18 验收矩阵增补 6 条（V-10, S2-09, J-12～J-15，全部 `⏳`），总计 35 条（`✅ 0 / ⏳ 35`）。 |
+| **v2.1 增补** | 2026-10-27 | 交互温度层增补：点击溯源双向联动、白话合同三层折叠与单向投影不变式、质询台三栏并排规格与双白话按钮、重试非警报呈现与交付仪式卡、低置信度分流保守默认（不变式 C-1）；§18 验收矩阵增补 6 条（V-10, S2-09, J-12～J-15，全部 `⏳`），当时记 35 条；**现行 §18 统计为 39 条（`✅ 0 / ⏳ 39`）**，以本节正文「统计」行为准。 |
 | **v2.1** | 2026-10-27 | 新增第三部分（§13～§20）：意图编译器（增量补丁、模型出结构代码出图、只认用户原话）；中栏《改动范围与验收方式》与 `ScopePlan` 单一事实源，确认谓词纳入范围，杜绝确认后 403；确认后单页四幕旅程（`JourneyStage` 映射表、交接、施工对话四类分流、三段式意外卡、对话式验收、单页 Fast Path）；决策 D6–D10；验收矩阵增补 29 条（全部 `⏳`）；实现落差登记 L-01～L-10。 |
 | **v2.0.3（草案）** | 2026-10-27 | **未并入本文。** 判别联合数据模型 / 三元哈希绑定 / 终态清理协议等条款代码 0 命中，已抽为独立 RFC：[`../rfc/scheme-snapshot-and-attestation-model.md`](../rfc/scheme-snapshot-and-attestation-model.md)。 |
 | **v2.0.2 补丁 2** | 2026-10-27 | 测试基建去抖：34 段 daemon 端口区间迁到两两互斥并加 `tests/unit/test-port-map.test.ts` 守卫；WS 延迟断言改相对测量；`authTimeoutMs` 拆成「成功路径宽预算 / 超时用例短预算」。详见 §11.3 / §11.4。 |
@@ -49,7 +49,7 @@
 **本文是 Stagent Supervisor 的单一事实源（Single Source of Truth）。**
 
 - 凡「右栏怎么聊、中栏怎么显、何时出 Demo、如何确认开工、施工门禁与异常怎么处置」——**只认本文**。
-- 下列合流前碎片若与本文冲突，**一律以本文为准**。Tina t908u「归档」（`TASK-C.20`）后正文曾置于 `docs/archive/supervisor-pre-ssot/`；该目录已于 2026-10-27 文档治理整体移除，原文查 Git 历史（`git log --diff-filter=D -- docs/archive/`）：
+- 下列合流前碎片若与本文冲突，**一律以本文为准**。Tina t908u「归档」（`TASK-C.20`）后正文曾置于 见 Git 历史（原 `docs/archive/supervisor-pre-ssot/`）；该目录已于 2026-10-27 文档治理整体移除，原文查 Git 历史（`git log --diff-filter=D -- docs/archive/`）：
   - `right-panel-conversation-design.md`
   - `supervisor-end-to-end-workflow.md`
   - `clarification-and-authorization.md`
@@ -632,7 +632,7 @@ Stagent 的灵魂不是「另一个能写码的聊天框」，而是：**自由�
 | S-08 | 收敛：glob 无命中 | 保留原种子 | ✅ T-SCOPE-009 |
 | S-09 | 收敛去重 | 同一文件不重复 | ✅ T-SCOPE-010 |
 
-**统计**：§3.1–§3.5 共 **45** 条，其中 `✅ 45` / `⏳ 0`。
+**统计**：§9.1–§9.5 共 **45** 条，其中 `✅ 45` / `⏳ 0`。
 
 > R-10 与 F-07 原先只能靠单测桩验证，现已补 `tests/integration/scheme-confirm-http-injection.test.ts`：起真 Daemon，故障由真实 HTTP 请求注入，断言落在落盘后的权威状态（合同 `lifecycle_state`、快照可回读性、图谱 404）而非内存桩的调用次数。
 
@@ -712,7 +712,7 @@ Stagent 的灵魂不是「另一个能写码的聊天框」，而是：**自由�
 | 3 | `deps-reuse` 「零拷贝挂载 < 500ms」 | 1 | 同类绝对延迟断言（实测 1553ms）。 |
 | 4 | `task-c17-debug-log` 「daemon.jsonl 轮转」 | 1 | 30s 用例超时，同样是极端负载；上一轮它的 4 条同族用例是撞上沙箱删除阈值（`SAFE_DELETE_BULK_CONFIRM_REQUIRED`，count 50/50），本轮只剩这条超时。 |
 
-对照：同一环境下**全部** WS / IPC / 端口相关用例（`ws-auth-handshake`、`ipc-stream`、`presentation-state-wiring`、`ws-auth`、`ws-security`、`test-port-map`、以及 `chaos-concurrency` / `merge-decision-d4` / `task-c15b`）均通过——这正说明 §5.4 的处置有效：原先必红的 3 条 WS 用例已在满并发下稳定通过。
+对照：同一环境下**全部** WS / IPC / 端口相关用例（`ws-auth-handshake`、`ipc-stream`、`presentation-state-wiring`、`ws-auth`、`ws-security`、`test-port-map`、以及 `chaos-concurrency` / `merge-decision-d4` / `task-c15b`）均通过——这正说明 §11.3（端口段互斥）的处置有效：原先必红的 3 条 WS 用例已在满并发下稳定通过。
 
 > 读数口径仍然诚实：上一版「0 失败」是权限窗口与负载都正常的时段取得的。**要复现 0 失败，需要在启用沙箱、且机器无其他重负载的时段跑。**
 

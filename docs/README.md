@@ -81,12 +81,15 @@
 
 ## 4. L1 决策（`adr/`）· 19 篇
 
-索引见 [`adr/README.md`](./adr/README.md)。0001～0009 抽自架构规范 §8；0010～0013 为 2026-10-27 补录；0014 为三 Agent 拓扑（用户裁决）；0015～0017 为交付全链路（随 2026-10-30 PR 合入生效）；0018 为意图→可签执行物唯一真相缝（绝对榜首，PROPOSED，随本 PR 合入生效）；0019 为项目架构基线（密封之后，PROPOSED，随本 PR 合入生效）。
+索引见 [`adr/README.md`](./adr/README.md)。0001～0009 抽自架构规范 §8；0010～0013 为 2026-10-27 补录；0014 为三 Agent 拓扑（用户裁决）；0015～0019 **均已 ACCEPTED**（0015～0017：用户原话 q22；0018：合入 `main` @ `931b188` 并经完整诊断加固；0019：随 PR #1 合入并经完整诊断增等待态 UX）。状态以各 ADR 文件头 `> **状态**:` 为准，本段与 [`adr/README.md`](./adr/README.md) 须同步。
 方案里 `status: pending` 的决定（[`scheme.md`](./scheme.md) §6）经用户拍板后，在此新增 ADR（下一个未使用编号）。
 
 ---
 
 ## 5. L4 证据与历史签收（`reports/`）
+
+> **`reports/` 不作现行施工依据**——只保留签收凭据与时点审计快照；施工认 `specs/` + `adr/`。完整分组索引见 [`reports/README.md`](./reports/README.md)。
+
 
 - [`reports/spec-freeze-record.md`](./reports/spec-freeze-record.md) — Spec Freeze 封版索引
 - [`reports/v0.1-mainline-milestone.md`](./reports/v0.1-mainline-milestone.md) — v0.1 主路径 Sign-off
@@ -94,6 +97,7 @@
 - [`reports/J1-partner-cli-verification-2026-10-28.md`](./reports/J1-partner-cli-verification-2026-10-28.md) — `TASK-J.1` 右栏只读的真实 CLI 验证（替身模型端点）
 - [`reports/delivery-path-audit.md`](./reports/delivery-path-audit.md) — 交付全链路审计（2026-10-30）：七环逐环核查、「Agent 能否无脑开发」结论与补全清单
 - [`reports/完整诊断修订纪要-2026-10-31.md`](./reports/完整诊断修订纪要-2026-10-31.md) — 完整诊断十四定型（确认开工/D9/Canvas/JourneyStage/等待态；仅文档）
+- [`reports/dor-readiness-audit-2026-10-31.md`](./reports/dor-readiness-audit-2026-10-31.md) — DoR 全量审计（**时点快照**，基线 `a2fa7df`；不代表当前排期）
 
 ---
 

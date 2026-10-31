@@ -609,7 +609,7 @@ $$\text{FixIsFree} \iff (\text{TargetFiles} \subseteq \text{ApprovedScope}) \lan
 
 ### 4.4 Demo 预览视口安全隔离规范 (P-16) `[v1.5.1 强制安全规范]`
 
-> **与控制台托管的边界（2026-10-24 显式化）**：本节约束的是 **Demo 原型预览**，不是验收控制台本身。控制台可由 Daemon 同源托管（打开项目 DX，见 §11 注记 8 / 任务 `TASK-D.1b`–`D.1d`）；**Demo 仍必须独立 Origin**，不得与控制台或 Daemon API 同源。详细愿景/现状见 `docs/specs/development-tasks.md` 的 `TASK-D.1b`–`D.1d` 卡（原过程稿 `docs/archive/open-project-vision-and-status.md` 已随 archive 移除）。
+> **与控制台托管的边界（2026-10-24 显式化）**：本节约束的是 **Demo 原型预览**，不是验收控制台本身。控制台可由 Daemon 同源托管（打开项目 DX，见 §11 注记 8 / 任务 `TASK-D.1b`–`D.1d`）；**Demo 仍必须独立 Origin**，不得与控制台或 Daemon API 同源。详细愿景/现状见 `docs/specs/development-tasks.md` 的 `TASK-D.1b`–`D.1d` 卡（原过程稿见 Git 历史（原 `docs/archive/open-project-vision-and-status.md`）；已随 archive 移除）。
 
 为彻底消除模型生成的前端代码在 IDE 中同源执行直连本地 Daemon 控制面的严重攻击面，系统确立以下隔离规范：
 
