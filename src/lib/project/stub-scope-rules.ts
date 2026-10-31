@@ -120,17 +120,28 @@ export function applyStubKindScopeRules(
     const commands = [
       ...plan.verification.commands,
       {
-        command_id: "stagent-check-knowledge",
-        command: "stagent",
-        args: ["check", "knowledge", "--all"],
-        cwd: ".",
+        alias: "check-knowledge",
+        executable: "stagent",
+        args: [
+          "check",
+          "knowledge",
+          "--all",
+          "--base",
+          "__STAGENT_BASE_SHA__",
+          "--candidate",
+          "__STAGENT_CANDIDATE_SHA__",
+          "--contract-id",
+          "__STAGENT_CONTRACT_ID__",
+        ],
+        expected_exit_code: 0,
+        timeout_seconds: 120,
       },
     ];
-    // 去重 command_id
+    // 去重 alias（VerificationCommand）
     const seen = new Set<string>();
     const deduped = commands.filter((c) => {
-      if (seen.has(c.command_id)) return false;
-      seen.add(c.command_id);
+      if (seen.has(c.alias)) return false;
+      seen.add(c.alias);
       return true;
     });
     const next: ScopePlan = {

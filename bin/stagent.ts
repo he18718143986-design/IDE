@@ -8,6 +8,7 @@
  *   stagent status [--repo <path>]
  *   stagent check obligations --report <path> [--phase t|i]
  *   stagent check test-integrity --base <path> --candidate <path> [--lang <lang>]
+ *   stagent check knowledge --base <sha> --candidate <sha> --contract-id <id> [--all]
  *
  * 安全约定（A §6.1 / B TASK-D.1 / D.1b）：
  * - Daemon 仅绑定 127.0.0.1，动态端口 3001~3010；
@@ -31,6 +32,8 @@ import {
   detectTestWeakening,
   type TestIntegrityLang,
 } from "../daemon/guard/test-integrity";
+import { checkKnowledge } from "../daemon/knowledge/check-knowledge";
+import type { DesignNote } from "../src/lib/design/design-note";
 
 import process from "node:process";
 import { execFile } from "node:child_process";
@@ -188,6 +191,8 @@ function printHelp(): void {
                                    读运行报告分类；无 --phase 时 0=green；
                                    --phase t 期望 red；--phase i 期望 green
   stagent check test-integrity --base <path> --candidate <path> [--lang ts|js|py|go|rs]
+  stagent check knowledge --base <sha> --candidate <sha> --contract-id <id>
+                          [--worktree <path>] [--design-note <path>] [--all]
                                    比对基线与候选测试，检测削弱（退出码 0=未削弱）
   stagent version                  显示版本号
   stagent help                     显示帮助
@@ -545,10 +550,74 @@ export function runCheckCommand(checkArgv: readonly string[]): {
     }
   }
 
+  if (sub === "knowledge") {
+    const baseSha = parseCheckFlag(checkArgv, "--base");
+    const candidateSha = parseCheckFlag(checkArgv, "--candidate");
+    const contractId = parseCheckFlag(checkArgv, "--contract-id");
+    const worktreeFlag = parseCheckFlag(checkArgv, "--worktree");
+    const designNoteFlag = parseCheckFlag(checkArgv, "--design-note");
+    const allSourceFiles = checkArgv.includes("--all");
+    if (!baseSha || !candidateSha || !contractId) {
+      const stdout = JSON.stringify({
+        ok: false,
+        error:
+          "missing --base <sha> and/or --candidate <sha> and/or --contract-id <id>",
+      });
+      return { exitCode: 1, stdout };
+    }
+    const worktreeDir = path.resolve(worktreeFlag ?? process.cwd());
+    let designNote: DesignNote | null = null;
+    const designNotePath =
+      designNoteFlag !== undefined
+        ? path.resolve(designNoteFlag)
+        : path.join(
+            worktreeDir,
+            ".stagent",
+            "records",
+            contractId,
+            "design-note.json",
+          );
+    try {
+      if (fs.existsSync(designNotePath)) {
+        designNote = JSON.parse(
+          fs.readFileSync(designNotePath, "utf8"),
+        ) as DesignNote;
+      }
+    } catch {
+      designNote = null;
+    }
+    try {
+      const result = checkKnowledge({
+        worktreeDir,
+        baseSha,
+        candidateSha,
+        contractId,
+        designNote,
+        allSourceFiles,
+      });
+      const stdout = JSON.stringify({
+        ok: result.ok,
+        ...(result.ok
+          ? {}
+          : { reason_code: "KNOWLEDGE_DRIFT" as const }),
+        failures: result.failures,
+      });
+      return { exitCode: result.ok ? 0 : 1, stdout };
+    } catch (err) {
+      const stdout = JSON.stringify({
+        ok: false,
+        reason_code: "KNOWLEDGE_DRIFT",
+        error: err instanceof Error ? err.message : String(err),
+        failures: [],
+      });
+      return { exitCode: 1, stdout };
+    }
+  }
+
   const stdout = JSON.stringify({
     ok: false,
     error:
-      'unknown check subcommand; use "obligations" or "test-integrity"',
+      'unknown check subcommand; use "obligations", "test-integrity", or "knowledge"',
   });
   return { exitCode: 1, stdout };
 }

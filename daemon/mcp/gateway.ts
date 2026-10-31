@@ -459,6 +459,25 @@ export class ScopedWorktreeGateway {
     return Array.from(this.modifiedFiles);
   }
 
+  /** TASK-L.12：docs/system/** 不计入 max_file_modifications */
+  private static readonly FILE_BUDGET_EXCLUSIONS = ["docs/system/**"] as const;
+
+  private countsTowardFileBudget(relPath: string): boolean {
+    return !matchesAnyPattern(relPath, [
+      ...ScopedWorktreeGateway.FILE_BUDGET_EXCLUSIONS,
+    ]).matches;
+  }
+
+  /** 计入文件修改预算的路径数（排除知识库目录） */
+  private fileBudgetUsed(): number {
+    let n = 0;
+    for (const f of this.modifiedFiles) {
+      if (this.countsTowardFileBudget(f)) n += 1;
+    }
+    return n;
+  }
+
+
   public getModifiedTestFiles(): readonly string[] {
     return Array.from(this.modifiedTestFiles);
   }
@@ -988,13 +1007,14 @@ export class ScopedWorktreeGateway {
       }
     }
 
-    // 2. 文件数预算
+    // 2. 文件数预算（TASK-L.12：docs/system/** 不计）
     const maxFiles =
       this.contract.authorization.budget_limits.max_file_modifications;
-    if (this.modifiedFiles.size > maxFiles) {
+    const budgetUsed = this.fileBudgetUsed();
+    if (budgetUsed > maxFiles) {
       blockers.push({
         code: "E_BUDGET_EXCEEDED",
-        message: `Modified ${this.modifiedFiles.size} files, exceeding budget of ${maxFiles}`,
+        message: `Modified ${budgetUsed} files, exceeding budget of ${maxFiles}`,
       });
     }
 
@@ -1329,11 +1349,13 @@ export class ScopedWorktreeGateway {
       }
     }
 
-    // 4. Budget limits verification (Max file modifications)
+    // 4. Budget limits verification (Max file modifications；L.12 排除 docs/system/**)
     const maxFiles =
       this.contract.authorization.budget_limits.max_file_modifications;
-    const isNewFileMod = !this.modifiedFiles.has(safe.relativePath);
-    if (isNewFileMod && this.modifiedFiles.size >= maxFiles) {
+    const countsTowardBudget = this.countsTowardFileBudget(safe.relativePath);
+    const isNewFileMod =
+      countsTowardBudget && !this.modifiedFiles.has(safe.relativePath);
+    if (isNewFileMod && this.fileBudgetUsed() >= maxFiles) {
       const msg = `Budget exceeded: modification limit of ${maxFiles} files reached`;
       this.logAudit({
         tool: "stagent_write_file",
@@ -1999,11 +2021,13 @@ export class ScopedWorktreeGateway {
       }
     }
 
-    // 4. 文件数预算：删除一个未登记文件同样占用一次修改配额
+    // 4. 文件数预算：删除一个未登记文件同样占用一次修改配额（L.12 排除 docs/system/**）
     const maxFiles =
       this.contract.authorization.budget_limits.max_file_modifications;
-    const isNewFileMod = !this.modifiedFiles.has(safe.relativePath);
-    if (isNewFileMod && this.modifiedFiles.size >= maxFiles) {
+    const countsTowardBudget = this.countsTowardFileBudget(safe.relativePath);
+    const isNewFileMod =
+      countsTowardBudget && !this.modifiedFiles.has(safe.relativePath);
+    if (isNewFileMod && this.fileBudgetUsed() >= maxFiles) {
       const msg = `Budget exceeded: modification limit of ${maxFiles} files reached`;
       this.logAudit({
         tool: "stagent_delete_file",
