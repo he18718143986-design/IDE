@@ -1,4 +1,5 @@
 import type { SoftwareContract } from "../../src/lib/contract.schema";
+import type { DesignNote } from "../../src/lib/design/design-note";
 import type { ScopedWorktreeGateway } from "../mcp/gateway";
 import type { CostMonitor } from "../guard/cost-monitor";
 import {
@@ -156,6 +157,8 @@ export class AiWorker {
   private readonly exposedTools: readonly string[] | undefined;
   /** TASK-L.4：本段义务清单等，注入「你会被这样检查」 */
   private readonly checksExtras: readonly string[] | undefined;
+  /** TASK-L.11：已校验 DesignNote，注入「技术方案」 */
+  private readonly designNote: DesignNote | undefined;
   private readonly toolset: WorkerToolset;
 
   constructor(options: {
@@ -170,6 +173,8 @@ export class AiWorker {
     exposedTools?: readonly string[] | undefined;
     /** TASK-L.4：追加到检查段的本段义务清单 */
     checksExtras?: readonly string[] | undefined;
+    /** TASK-L.11：设计说明 */
+    designNote?: DesignNote | undefined;
   }) {
     this.gateway = options.gateway;
     this.costMonitor = options.costMonitor;
@@ -178,6 +183,7 @@ export class AiWorker {
     this.repoRoot = options.repoRoot;
     this.exposedTools = options.exposedTools;
     this.checksExtras = options.checksExtras;
+    this.designNote = options.designNote;
 
     // 工具在构造期按合同授权一次性挂载：未授权命令执行时 exec 工具根本不实例化
     this.toolset = mountWorkerTools({
@@ -217,6 +223,9 @@ export class AiWorker {
       ...(this.checksExtras === undefined
         ? {}
         : { checksExtras: this.checksExtras }),
+      ...(this.designNote === undefined
+        ? {}
+        : { designNote: this.designNote }),
       ...(gate && gate.availability === "snapshot"
         ? { graveyard: gate.graveyard }
         : {}),

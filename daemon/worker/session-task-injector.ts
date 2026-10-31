@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { SoftwareContract } from "../../src/lib/contract.schema";
+import type { DesignNote } from "../../src/lib/design/design-note";
 import type { GraveyardEntry } from "../../src/lib/journey/scheme-patch-types";
 import { renderRejectedProposalsSection } from "../guard/graveyard-wiring";
 import type { AdapterCapabilityDeclaration } from "./worker-adapter.interface";
@@ -153,6 +154,11 @@ export interface BuildWorkerInstructionInput {
    * 只列 proposal / rejection_reason，不列 artifact_keys。
    */
   graveyard?: readonly GraveyardEntry[] | undefined;
+  /**
+   * TASK-L.11：已通过校验的 DesignNote；注入「技术方案」段（§2.4）。
+   * 未提供时不注入该段（兼容 L.11 前路径）。
+   */
+  designNote?: DesignNote | undefined;
 }
 
 /**
@@ -316,6 +322,60 @@ export function renderChecksSection(
  * 说明：`objective` 取合同的 `intent.title` / `intent.description`；
  * 规范中的「目标意图」在 `SoftwareContractV12` 里即由 `intent` 承载。
  */
+
+/**
+ * TASK-L.11 / technical-design §2.4：渲染「技术方案」段。
+ * 顺序：approach → touches → interfaces → test_plan → knowledge_delta。
+ */
+export function renderDesignNoteSection(
+  note: DesignNote,
+): WorkerInstructionSection {
+  const lines: string[] = [];
+  lines.push("### approach");
+  lines.push(note.approach);
+  lines.push("");
+  lines.push("### touches");
+  if (note.touches.length === 0) {
+    lines.push("（无）");
+  } else {
+    for (const t of note.touches) {
+      lines.push(`- ${t.change} ${t.path} — ${t.why}`);
+    }
+  }
+  lines.push("");
+  lines.push("### interfaces");
+  if (note.interfaces.length === 0) {
+    lines.push("（无）");
+  } else {
+    for (const i of note.interfaces) {
+      lines.push(
+        `- ${i.kind} ${i.name}: ${i.signature}（consumers: ${i.consumers.join(", ") || "—"}）`,
+      );
+    }
+  }
+  lines.push("");
+  lines.push("### test_plan");
+  if (note.test_plan.length === 0) {
+    lines.push("（无）");
+  } else {
+    for (const t of note.test_plan) {
+      lines.push(`- ${t.acceptance_id} → ${t.test_path}（${t.level}）`);
+    }
+  }
+  lines.push("");
+  lines.push("### knowledge_delta");
+  lines.push(
+    `- modules_upsert: ${note.knowledge_delta.modules_upsert.map((m) => m.id).join(", ") || "（无）"}`,
+  );
+  lines.push(
+    `- decisions_add: ${note.knowledge_delta.decisions_add.join(", ") || "（无）"}`,
+  );
+  lines.push(
+    `- overview_changed: ${note.knowledge_delta.overview_changed ? "yes" : "no"}`,
+  );
+  return { title: "技术方案", body: lines.join("\n") };
+}
+
 export function buildWorkerTaskInstruction(
   input: BuildWorkerInstructionInput,
 ): WorkerTaskInstruction {
@@ -384,6 +444,9 @@ export function buildWorkerTaskInstruction(
         `- 风险等级：${objective.risk_level}`,
       ].join("\n"),
     },
+    ...(input.designNote
+      ? [renderDesignNoteSection(input.designNote)]
+      : []),
     {
       title: "可写范围（allowed_files / directories）",
       body: bulletList(scope.writable_paths, "（未授权任何可写路径）"),
