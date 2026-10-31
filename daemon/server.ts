@@ -116,6 +116,13 @@ import { SupervisorSessionManager } from "./supervisor/session-manager";
 import { SUPERVISOR_SESSION_SCHEMA_VERSION } from "./supervisor/types";
 
 import {
+  createIntentCompilerHost,
+  IntentCompilerHost,
+  type IntentCompilerModelClient,
+  type CompilerLoopStats,
+} from "./supervisor/intent-compiler/host";
+
+import {
   recoverDaemonState,
   type RecoveryReport,
 } from "./recovery/crash-recovery";
@@ -279,6 +286,14 @@ export interface DaemonServerOptions extends PortFinderOptions {
    * 传 `null` 显式关闭同源托管（测试用）。
    */
   consolePublicDir?: string | null;
+  /**
+   * TASK-J.10：意图编译器模型客户端（可替换）。
+   * 缺省 / null → 离线兜底（V-06），不调用模型、不回流右栏。
+   */
+  intentCompilerModelClient?: IntentCompilerModelClient | null;
+  /** TASK-J.10 测试注入：覆盖编译循环 setTimeout（跳过 1.2s 防抖） */
+  intentCompilerSetTimeout?: (fn: () => void, ms: number) => unknown;
+  intentCompilerClearTimeout?: (handle: unknown) => void;
 }
 
 export interface DaemonStatusResponse {
@@ -357,6 +372,15 @@ export class StagentDaemon {
   private stopSweepFn: (() => void) | null = null;
   /** TASK-C.14：打开即扫的渐进基线（进行中 Promise，防重复扫） */
   private baselineScanInFlight: Promise<BaselineArchive> | null = null;
+  /** TASK-J.10：意图编译器宿主（用户消息 → 方案补丁 CAS） */
+  private intentCompilerHost: IntentCompilerHost | null = null;
+  private readonly intentCompilerModelClient: IntentCompilerModelClient | null;
+  private readonly intentCompilerSetTimeout:
+    | ((fn: () => void, ms: number) => unknown)
+    | undefined;
+  private readonly intentCompilerClearTimeout:
+    | ((handle: unknown) => void)
+    | undefined;
 
   constructor(options: DaemonServerOptions) {
     this.repoRoot = path.resolve(options.repoRoot);
@@ -414,6 +438,12 @@ export class StagentDaemon {
       },
     });
     this.supervisorEnrich = options.supervisorEnrich;
+    this.intentCompilerModelClient =
+      options.intentCompilerModelClient === undefined
+        ? null
+        : options.intentCompilerModelClient;
+    this.intentCompilerSetTimeout = options.intentCompilerSetTimeout;
+    this.intentCompilerClearTimeout = options.intentCompilerClearTimeout;
 
     // TASK-D.3：看门狗只做"判定 + 调用钩子"，真实动作仍由编排层执行。
     // 这样五类死锁的处置路径与既有控制面保持同一条事实源，不产生第二套状态机。
@@ -642,6 +672,10 @@ export class StagentDaemon {
     }
 
     await this.stopEvidenceWatcher();
+    if (this.intentCompilerHost) {
+      this.intentCompilerHost.dispose();
+      this.intentCompilerHost = null;
+    }
     await this.chat.shutdown();
 
     for (const client of this.clients) {
@@ -677,6 +711,47 @@ export class StagentDaemon {
   /** 供 CLI / 测试读取本次会话 Token（服务端内存值） */
   getSessionToken(): string | null {
     return this.sessionToken;
+  }
+
+  /**
+   * TASK-J.10：懒创建意图编译宿主。
+   * 生产路径由 {@link handleSupervisorJourney} 在用户消息落盘后调用
+   * {@link IntentCompilerHost.commitUserTurn}。
+   */
+  private ensureIntentCompilerHost(): IntentCompilerHost {
+    if (this.intentCompilerHost) return this.intentCompilerHost;
+    this.intentCompilerHost = createIntentCompilerHost({
+      repoRoot: this.repoRoot,
+      modelClient: this.intentCompilerModelClient,
+      ...(this.intentCompilerSetTimeout === undefined
+        ? {}
+        : { setTimeoutFn: this.intentCompilerSetTimeout }),
+      ...(this.intentCompilerClearTimeout === undefined
+        ? {}
+        : { clearTimeoutFn: this.intentCompilerClearTimeout }),
+      onLog: (entry) => {
+        try {
+          appendDaemonLog(this.repoRoot, {
+            kind: "intent_compiler",
+            detail: entry,
+          });
+        } catch {
+          /* 日志失败不影响编译 */
+        }
+      },
+    });
+    return this.intentCompilerHost;
+  }
+
+  /** @internal 测试：冲洗防抖并等待编译循环空闲 */
+  async flushIntentCompilerForTest(): Promise<void> {
+    if (!this.intentCompilerHost) return;
+    await this.intentCompilerHost.flushForTest();
+  }
+
+  /** @internal 测试：读取编译循环统计 */
+  getIntentCompilerStatsForTest(): CompilerLoopStats | null {
+    return this.intentCompilerHost?.getStats() ?? null;
   }
 
   getClientCount(): number {
@@ -3225,6 +3300,14 @@ export class StagentDaemon {
           ...(sessionId === undefined ? {} : { sessionId }),
           ...(requestId === undefined ? {} : { requestId }),
         });
+        // TASK-J.10：USER_TURN_COMMITTED → 意图编译循环（防抖后组装/merge/CAS）
+        // 失败不挡旅程主路径；编译器输出严禁回流右栏（ADR-0014）。
+        try {
+          const host = this.ensureIntentCompilerHost();
+          host.commitUserTurn({ text: message });
+        } catch {
+          /* 编译宿主异常不挡主路径 */
+        }
         appendJourneyTurn(this.repoRoot, {
           role: "assistant",
           text: result.plain_summary,
@@ -3236,6 +3319,11 @@ export class StagentDaemon {
           ...(result.code === undefined ? {} : { code: result.code }),
           ...(requestId === undefined ? {} : { requestId }),
         });
+        try {
+          this.intentCompilerHost?.recordAssistantTurn(result.plain_summary);
+        } catch {
+          /* ignore */
+        }
         if (
           sessionId !== undefined &&
           /^[A-Za-z0-9][A-Za-z0-9_-]{7,127}$/.test(sessionId)
