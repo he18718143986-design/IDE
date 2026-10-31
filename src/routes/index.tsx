@@ -372,7 +372,9 @@ function Console() {
   const schemeConfirmation = useMemo(
     () =>
       schemeDraft
-        ? evaluateSchemeConfirmation(schemeDraft, schemeDemoGate)
+        ? // TASK-J.3：第三参暂传 null；真实 ScopePlan 接线在 J.5。
+          // SCOPE_GATE_ENABLED 默认 false，故此时确认按钮仍可用。
+          evaluateSchemeConfirmation(schemeDraft, schemeDemoGate, null)
         : null,
     [schemeDraft, schemeDemoGate],
   );

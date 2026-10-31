@@ -1,5 +1,5 @@
 /**
- * TASK-C.18 / C.22：方案草案（中间「方案审阅」单页的数据模型）。
+ * TASK-C.18 / C.22 / J.3：方案草案（中间「方案审阅」单页的数据模型）。
  *
  * C.18：规则/启发式从对话与意图拼出模块图与决策。
  * C.22（SSOT v2.0.1）：
@@ -8,7 +8,14 @@
  * - user_pinned 字段级脏检查：随聊合并不覆盖已 pin
  * - canConfirmScheme 是向后兼容别名；真实门禁统一走
  *   evaluateSchemeConfirmation（含 Demo 与 revision 绑定）
+ * J.3（SSOT §15.5 / D7）：第三参 scopePlan；三条范围拒绝码。
+ *   临时开关 SCOPE_GATE_ENABLED 默认 false，避免 J.5 接线前确认按钮不可用。
  */
+
+import {
+  plainAreaLabel,
+  type ScopePlan,
+} from "./scope-plan";
 
 export interface SchemeDecision {
   id: string;
@@ -100,7 +107,20 @@ export type SchemeConfirmationCode =
   | "E_DEMO_BUILDING"
   | "E_DEMO_FAILED"
   | "E_DEMO_CONFIRMATION_REQUIRED"
-  | "E_DEMO_STALE";
+  | "E_DEMO_STALE"
+  /** J.3 / SSOT §15.5：尚无与当前修订绑定的 ScopePlan */
+  | "E_SCOPE_NOT_READY"
+  /** J.3：自动收敛后范围仍不合规 */
+  | "E_SCOPE_POLICY"
+  /** J.3 / ADR-0014：提交的 ScopePlan 仍有未授权敏感项 */
+  | "E_SCOPE_APPROVAL_REQUIRED";
+
+/**
+ * 临时开关（TASK-J.3）：默认 false，包住三条范围判定，使本卡可单独合入而
+ * 「确认方案」按钮仍可用。TASK-J.5 接线真实 ScopePlan 后移除本开关并恒开启。
+ * 单测改 `SCOPE_GATE_ENABLED.value`；生产路径勿改。
+ */
+export const SCOPE_GATE_ENABLED = { value: false };
 
 export interface SchemeConfirmationDecision {
   ok: boolean;
@@ -324,22 +344,90 @@ function isReviewableScheme(draft: SchemeDraft): boolean {
   );
 }
 
+/** 被拒路径 → 白话区域名（优先 areas.label，否则 plainAreaLabel；绝不回传通配符）。 */
+function plainRejectedScopeLabels(plan: ScopePlan): string[] {
+  const labels: string[] = [];
+  const seen = new Set<string>();
+  for (const rejected of plan.grade.rejected) {
+    const area = plan.areas.find((a) => a.paths.includes(rejected.path));
+    const label = area?.label?.trim()
+      ? area.label.trim()
+      : plainAreaLabel(rejected.path);
+    if (seen.has(label)) continue;
+    seen.add(label);
+    labels.push(label);
+  }
+  return labels;
+}
+
+function scopePolicyMessage(plan: ScopePlan): string {
+  const labels = plainRejectedScopeLabels(plan);
+  const shown = labels.length > 0 ? labels[0]! : "这部分";
+  // SSOT §15.5 表格原文结构；多区域时只点名首个，避免堆砌路径。
+  return `『${shown}』范围太大，我没法替你担保不误伤。请告诉我具体要改哪块，或把这部分拆成单独一轮。`;
+}
+
+function evaluateScopeGate(
+  draft: SchemeDraft,
+  scopePlan: ScopePlan | null,
+  demoMode: SchemeConfirmationDecision["demo_mode"],
+): SchemeConfirmationDecision | null {
+  if (scopePlan == null || scopePlan.scheme_revision !== draft.scheme_revision) {
+    return {
+      ok: false,
+      code: "E_SCOPE_NOT_READY",
+      message: "正在核对要改哪些地方…",
+      reasons: ["改动范围尚未与当前方案对齐"],
+      demo_mode: demoMode,
+    };
+  }
+  if (!scopePlan.grade.ok) {
+    const message = scopePolicyMessage(scopePlan);
+    return {
+      ok: false,
+      code: "E_SCOPE_POLICY",
+      message,
+      reasons: [message],
+      demo_mode: demoMode,
+    };
+  }
+  const pending = scopePlan.needs_approval.filter(
+    (item) => item.approved !== true,
+  );
+  if (pending.length > 0) {
+    const message = `还有 ${pending.length} 处敏感改动会写在确认开工上`;
+    return {
+      ok: false,
+      code: "E_SCOPE_APPROVAL_REQUIRED",
+      message,
+      reasons: [message],
+      demo_mode: demoMode,
+    };
+  }
+  return null;
+}
+
 /**
- * 唯一确认门禁（SSOT v2.0.2 §3.5）。
+ * 唯一确认门禁（SSOT v2.0.2 §3.5 + v2.1 §15.5）。
  *
  * 允许：
  * - 从未生成 Demo（demo.status=none）；
  * - Demo 对当前 revision 生成且用户对同一 revision 显式确认；
- * - Demo 已失败/不可用，用户对当前 revision 显式接受流程图降级。
+ * - Demo 已失败/不可用，用户对当前 revision 显式接受流程图降级；
+ * - （SCOPE_GATE_ENABLED 时）与当前修订绑定、grade.ok、敏感项均已授权的 ScopePlan。
  *
  * 拒绝：
  * - 生成/确认后方案又改过（revision 不一致）；
  * - 已生成但未确认；
- * - building / failed 尚未处置。
+ * - building / failed 尚未处置；
+ * - （SCOPE_GATE_ENABLED 时）E_SCOPE_NOT_READY / E_SCOPE_POLICY / E_SCOPE_APPROVAL_REQUIRED。
+ *
+ * 判定顺序：冻结 → 冲突 → 可审 → Demo 四码 →（开关开启时）三条范围码。
  */
 export function evaluateSchemeConfirmation(
   draft: SchemeDraft,
   demo: DemoGate = EMPTY_DEMO_GATE,
+  scopePlan: ScopePlan | null = null,
 ): SchemeConfirmationDecision {
   const reasons: string[] = [];
 
@@ -394,58 +482,60 @@ export function evaluateSchemeConfirmation(
     };
   }
 
-  if (demo.status === "none") {
-    return {
-      ok: true,
-      code: "OK",
-      message: "未生成 Demo，按静态方案签署",
-      reasons: [],
-      demo_mode: "none",
-    };
+  let demoMode: SchemeConfirmationDecision["demo_mode"] = "none";
+  let okMessage = "未生成 Demo，按静态方案签署";
+
+  if (demo.status !== "none") {
+    demoMode =
+      demo.status === "degraded_flowcard" ? "degraded" : "interactive";
+    if (demo.scheme_revision !== draft.scheme_revision) {
+      return {
+        ok: false,
+        code: "E_DEMO_STALE",
+        message: "方案已修改，Demo 与当前方案不再对应；请重新生成/确认",
+        reasons: ["Demo 基于旧版方案"],
+        demo_mode: demoMode,
+      };
+    }
+    if (demo.decision_revision !== draft.scheme_revision) {
+      return {
+        ok: false,
+        code: "E_DEMO_CONFIRMATION_REQUIRED",
+        message:
+          demo.status === "degraded_flowcard"
+            ? "请先显式接受流程图降级"
+            : "Demo 已生成，请先确认 Demo",
+        reasons: ["Demo 未对当前方案确认"],
+        demo_mode: demoMode,
+      };
+    }
+    okMessage =
+      demo.status === "degraded_flowcard"
+        ? "已接受流程图降级，按标风险方案签署"
+        : "Demo 已对当前方案确认";
   }
 
-  const demoMode =
-    demo.status === "degraded_flowcard" ? "degraded" : "interactive";
-  if (demo.scheme_revision !== draft.scheme_revision) {
-    return {
-      ok: false,
-      code: "E_DEMO_STALE",
-      message: "方案已修改，Demo 与当前方案不再对应；请重新生成/确认",
-      reasons: ["Demo 基于旧版方案"],
-      demo_mode: demoMode,
-    };
-  }
-  if (demo.decision_revision !== draft.scheme_revision) {
-    return {
-      ok: false,
-      code: "E_DEMO_CONFIRMATION_REQUIRED",
-      message:
-        demo.status === "degraded_flowcard"
-          ? "请先显式接受流程图降级"
-          : "Demo 已生成，请先确认 Demo",
-      reasons: ["Demo 未对当前方案确认"],
-      demo_mode: demoMode,
-    };
+  if (SCOPE_GATE_ENABLED.value) {
+    const scopeDecision = evaluateScopeGate(draft, scopePlan, demoMode);
+    if (scopeDecision) return scopeDecision;
   }
 
   return {
     ok: true,
     code: "OK",
-    message:
-      demo.status === "degraded_flowcard"
-        ? "已接受流程图降级，按标风险方案签署"
-        : "Demo 已对当前方案确认",
+    message: okMessage,
     reasons: [],
     demo_mode: demoMode,
   };
 }
 
 /**
- * 向后兼容别名。只表达“静态方案本身是否可确认”，不代替完整门禁。
- * 新代码必须使用 `evaluateSchemeConfirmation`。
+ * 向后兼容别名。**新代码禁止使用**——固定传 `scopePlan=null`；
+ * 在 `SCOPE_GATE_ENABLED.value===true` 时结果恒为不可确认（`E_SCOPE_NOT_READY`），
+ * 用以暴露遗留调用点。请改用 `evaluateSchemeConfirmation(draft, demo, scopePlan)`。
  */
 export function canConfirmScheme(draft: SchemeDraft): boolean {
-  return evaluateSchemeConfirmation(draft, EMPTY_DEMO_GATE).ok;
+  return evaluateSchemeConfirmation(draft, EMPTY_DEMO_GATE, null).ok;
 }
 
 export function isEffectiveBusinessInput(text: string): boolean {
