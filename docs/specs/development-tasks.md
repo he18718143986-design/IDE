@@ -3009,6 +3009,7 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
   - `tests/ui/intent-compiler-offline.test.tsx`（`V-06`）。
 * **FAIL**：生成 Schema 允许 `occurrence`、`anchor`、`user_confirmed`、`edit` 证据任一出现；模型输出 `base_revision` 或 `compiled_from_turns` 并被采信；op 级丢弃触发重试；提示词出现引擎词表或阈值。
 * **关键文件**：见范围 1～4（范围 5 已废止）
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证 / 网关写范围。本卡只做意图编译生成端与 Daemon 编译循环（产出 `SchemePatch` → 引擎）；编译结果须经 [ADR-0018](../adr/0018-intent-to-executable-seal.md) 密封进入签署，**禁止**确认路径用聊天直推 `ScopePlan`/`buildL0Plan(chat)`；输出不得回流右栏（DEC-004）。不放宽 Gateway `writable_paths`。
 * **估算**：M
 
 #### 【Task J.18】Worker 派工墓地门禁（INV-LEDGER-03 工地侧） `[NEW_TASK]`
@@ -3033,6 +3034,7 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 * **已拍板**：DEC-1 按建议登记（`supervisor.md` §14.11 K-15）：工地侧 `E_PROPOSAL_PREVIOUSLY_REJECTED` 作为 L3 运行时码登记入 `ERROR_CODES`，映射 `SCOPE_VIOLATION`。代码登记随本卡实施 PR 完成；在该 PR 合入前，门禁只写日志与 `forbiddenViolations`，不写 `reason_code`。
 * **验收（PASS）**：实施口径 §7 全部用例通过：TM-GM（共享夹具一致性）、TM-GU、TM-GS、TM-GA（含 ⚠ 残余风险的现行口径断言）、TM-GP（120 组笛卡尔积对拍）、TM-GB、TM-GH、TM-GE、TM-GI（端口段 3950–3959）；`npm run typecheck` 相对基线无新增；`npm run lint` 0 error。
 * **FAIL**：弱证据导致停工；软墓碑（`disallow_revival: false`）导致停工；执行期出现 `E_SCOPE_PLAN_DRIFT`；越界与墓地同时命中时主码为越界；引擎与门禁对同一自然语言文本的匹配结果不同；`graveyard-match.ts` 之外出现墓地匹配逻辑。
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证；**不改变** Gateway 物理路径写范围（`writable_paths` / 既有路径门禁）与 `E_SCOPE_PLAN_DRIFT` 签署期语义（卡内非目标）。**会改变（收紧，不放宽）**：在派工 / `gateway.handleWriteFile` / 执行期校验 / `PRE_MERGE` 等检查点按墓地（INV-LEDGER-03）做**内容级**拦截——命中已否决方案的写入在写盘前或合并前被拦；弱证据只进审阅不停工；新运行时码 `E_PROPOSAL_PREVIOUSLY_REJECTED`（映射 `SCOPE_VIOLATION`）随实施 PR 登记，合入前门禁可先只写日志与 `forbiddenViolations`（见卡内「已拍板」）。
 * **估算**：L
 
 #### 第二批预告（本批合入后再细化立卡，**本条不立卡**）
@@ -3064,7 +3066,7 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 > 1. **签署后不改合同**。系统需要的写范围（`tests/stagent/**`、`docs/system/**`）、检查命令、依赖安装权限，一律在签署**前**并入 `ScopePlan`（进入 `plan_digest`）。施工期只允许**收窄**网关输入，不允许扩大或改写合同（supervisor §15.5 D7）。
 > 2. **新检查也必须是真实进程退出码**（ADR-0005 决策 1）。测试义务、测试完整性、知识库漂移都以 Daemon 自带的 `stagent check <kind>` 子命令运行，作为验证命令写进 `verification_spec.commands`，由退出码派生结论。
 >
-> **本节全部为文档立卡，无代码改动，状态均为 `[NEW_TASK]`。**
+> **本节状态（2026-10-31 真相缝）**：以 §1.1 矩阵为准。**已 COMPLETED**：`L.1`、`L.2`、`L.3`、`L.5`（合入证据见各卡与版本头第 86 条）。**仍为 `[NEW_TASK]`**：`L.4`、`L.6`～`L.17`（及未在矩阵标完成的其余 L 卡）。下文详细卡标题与「状态」字段须与矩阵一致；不得再把整节写成「全部 NEW_TASK」。
 
 #### 【Task L.1】右栏纯净化：去掉系统提示与消息前缀（DEC-004） `[COMPLETED]`
 
