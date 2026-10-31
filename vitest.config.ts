@@ -50,6 +50,7 @@ export default defineConfig({
             "tests/integration/**/*.{test,spec}.{ts,tsx}",
             "tests/e2e/**/*.{test,spec}.{ts,tsx}",
             "tests/unit/**/*.{test,spec}.{ts,tsx}",
+            "tests/eval/**/*.{test,spec}.{ts,tsx}",
             "src/lib/**/*.{test,spec}.ts",
             "src/**/*.{test,spec}.ts",
           ],
