@@ -23,6 +23,7 @@ import {
   type ScopePlanNeedsApproval,
   type ScopePlanNeverTouch,
 } from "../../src/lib/journey/scope-plan";
+import { applyStubKindScopeRules } from "../../src/lib/project/stub-scope-rules";
 import type { SchemeDraft } from "../../src/lib/journey/scheme-draft";
 import type {
   BudgetLimits,
@@ -72,6 +73,8 @@ export interface BuildScopePlanInput {
   repoRoot: string;
   scheme: ScopePlanSchemeInput;
   decisions?: ScopePlanDecisions;
+  /** TASK-L.9：合同桩 → 应用 §5.1 种类规则 */
+  stub?: import("../../src/lib/project/project-plan").ContractStub | null;
 }
 
 /** 可追加来源的贡献（L.3 withSystemScope 等往这里挂） */
@@ -591,6 +594,11 @@ export function buildScopePlan(
   plan = withSystem;
 
   plan.plan_digest = scopePlanDigest(plan);
+
+  // TASK-L.9：按桩种类叠加签署前范围规则（进入 plan_digest）
+  if (input.stub) {
+    plan = applyStubKindScopeRules(plan, input.stub);
+  }
 
   if (input.decisions) {
     return applyScopeDecisions(plan, input.decisions);

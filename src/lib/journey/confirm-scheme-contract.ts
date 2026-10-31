@@ -1,5 +1,7 @@
 /**
  * TASK-J.5：按 ScopePlan 投影组装待签合同（确认链唯一范围来源）。
+ * TASK-L.9：可选合同桩 → 写入 supervisor_metadata.stub_id / scheme_item_ids，
+ *           并投影 §5.1 执行权限。
  *
  * 禁止从意图文本 / submitJourneyMessage 推断 writable_paths。
  */
@@ -9,8 +11,14 @@ import {
   softwareContractSchema,
   type SoftwareContract,
 } from "../contract.schema";
+import type { ContractStub } from "../project/project-plan";
 import type { SchemeDraft } from "./scheme-draft";
 import { scopePlanToContractScope, type ScopePlan } from "./scope-plan";
+
+export interface BuildConfirmContractOptions {
+  /** 项目计划中的合同桩；写入元数据并优先用桩的 scheme_item_ids */
+  stub?: ContractStub | null;
+}
 
 /**
  * 用方案标题/摘要 + `scopePlanToContractScope` 投影生成合同。
@@ -19,6 +27,7 @@ import { scopePlanToContractScope, type ScopePlan } from "./scope-plan";
 export function buildConfirmContractFromScopePlan(
   scheme: SchemeDraft,
   plan: ScopePlan,
+  options?: BuildConfirmContractOptions,
 ): SoftwareContract {
   const projected = scopePlanToContractScope(plan);
   if (projected.writable_paths.length === 0) {
@@ -60,19 +69,45 @@ export function buildConfirmContractFromScopePlan(
     text: a.text,
     check: a.check,
   }));
-  const scheme_item_ids = acceptance_refs.map((a) => a.id);
+  const stub = options?.stub ?? null;
+  const scheme_item_ids =
+    stub && stub.scheme_item_ids.length > 0
+      ? [...stub.scheme_item_ids]
+      : acceptance_refs.map((a) => a.id);
+
+  const exec = projected.execution_permissions;
+  const nextAuth = {
+    ...draft.authorization,
+    budget_limits: { ...projected.budget },
+    file_system_scope: {
+      ...draft.authorization.file_system_scope,
+      writable_paths: projected.writable_paths,
+      strictly_forbidden_paths: projected.forbidden_paths,
+    },
+    execution_permissions: {
+      ...draft.authorization.execution_permissions,
+      ...(exec?.allowed_commands
+        ? {
+            allowed_commands: [
+              ...new Set([
+                ...draft.authorization.execution_permissions.allowed_commands,
+                ...exec.allowed_commands,
+              ]),
+            ],
+          }
+        : {}),
+      ...(exec?.network_policy
+        ? { network_policy: exec.network_policy }
+        : {}),
+      ...(typeof exec?.dependency_changes_allowed === "boolean"
+        ? { dependency_changes_allowed: exec.dependency_changes_allowed }
+        : {}),
+    },
+  };
 
   return softwareContractSchema.parse({
     ...draft,
-    authorization: {
-      ...draft.authorization,
-      budget_limits: { ...projected.budget },
-      file_system_scope: {
-        ...draft.authorization.file_system_scope,
-        writable_paths: projected.writable_paths,
-        strictly_forbidden_paths: projected.forbidden_paths,
-      },
-    },
+    authorization: nextAuth,
     verification_spec: {
       commands: projected.verification_spec.commands,
       ...(projected.verification_spec.manual_confirmation
@@ -89,13 +124,14 @@ export function buildConfirmContractFromScopePlan(
             }
           : {}),
     },
-    // TASK-L.3 / delivery-lifecycle §6：按快照方案填充追踪元数据（签署后不改）
+    // TASK-L.3 / L.9：追踪元数据（签署后不改合同正文）
     supervisor_metadata: {
-      suggestion_id: `scheme:${scheme.scheme_id}`,
-      ...(acceptance_refs.length > 0
-        ? { acceptance_refs, scheme_item_ids }
-        : {}),
-      stub_id: null,
+      suggestion_id: stub
+        ? `stub:${stub.stub_id}`
+        : `scheme:${scheme.scheme_id}`,
+      ...(acceptance_refs.length > 0 ? { acceptance_refs } : {}),
+      ...(scheme_item_ids.length > 0 ? { scheme_item_ids } : {}),
+      stub_id: stub ? stub.stub_id : null,
     },
   });
 }

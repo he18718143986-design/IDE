@@ -45,6 +45,7 @@ export const ERROR_CODES = [
   "E_VAULT_VALUE_TOO_SHORT",
   "E_VAULT_NAME_INVALID",
   "E_VAULT_NOT_FOUND",
+  "E_CONTRACT_IN_FLIGHT",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -341,6 +342,16 @@ export const ERROR_CODE_CATALOG: Readonly<Record<ErrorCode, ErrorCodeSpec>> = {
     condition: "resolveEnv / 发布前置找不到已登记的密钥名",
     plain_message: "保险库里还没有这个名字的密钥，请先到设置 → 密钥里保存。",
     http_status: 404,
+  },
+  E_CONTRACT_IN_FLIGHT: {
+    code: "E_CONTRACT_IN_FLIGHT",
+    reason_code: "WORKSPACE_LOCKED",
+    component: "Contract Sequence",
+    task: "TASK-L.9",
+    condition:
+      "已有合同处于 PREPARING～AUDITED 时签署下一份（ADR-0002 合同级互斥）",
+    plain_message: "上一份还没做完，做完我再开下一份。",
+    http_status: 409,
   },
 
 };

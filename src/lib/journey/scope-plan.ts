@@ -62,6 +62,16 @@ export interface ScopePlan {
   verification: ScopePlanVerification;
   budget: ScopePlanBudget;
   grade: ScopePlanGrade;
+  /**
+   * TASK-L.9 / §5.1：按桩种类写入的执行权限（进入 plan_digest）。
+   * 缺省表示沿用合同默认 DENY / 不允许改依赖。
+   */
+  dependency_changes_allowed?: boolean;
+  network_policy?: "DENY" | "EXPLICIT_TARGETS" | "USER_APPROVED";
+  /** EXPLICIT_TARGETS 时的允许域名（包注册表等） */
+  network_targets?: string[];
+  /** 精确安装/工具命令，签署后投影到 execution_permissions.allowed_commands */
+  allowed_commands?: string[];
 }
 
 /** 用户对范围预检的表态（排除区域 / 敏感项授权） */
@@ -83,6 +93,12 @@ export interface ContractScopeFromPlan {
     };
   };
   budget: BudgetLimits;
+  /** L.9：从 ScopePlan 投影的执行权限片段 */
+  execution_permissions?: {
+    allowed_commands?: string[];
+    network_policy?: "DENY" | "EXPLICIT_TARGETS" | "USER_APPROVED";
+    dependency_changes_allowed?: boolean;
+  };
 }
 
 /**
@@ -387,11 +403,28 @@ export function scopePlanToContractScope(
     };
   }
 
+  const execution_permissions: NonNullable<
+    ContractScopeFromPlan["execution_permissions"]
+  > = {};
+  if (plan.allowed_commands && plan.allowed_commands.length > 0) {
+    execution_permissions.allowed_commands = [...plan.allowed_commands];
+  }
+  if (plan.network_policy) {
+    execution_permissions.network_policy = plan.network_policy;
+  }
+  if (typeof plan.dependency_changes_allowed === "boolean") {
+    execution_permissions.dependency_changes_allowed =
+      plan.dependency_changes_allowed;
+  }
+
   return {
     writable_paths: writable,
     forbidden_paths: forbidden,
     verification_spec,
     budget: { ...plan.budget.limits },
+    ...(Object.keys(execution_permissions).length > 0
+      ? { execution_permissions }
+      : {}),
   };
 }
 
