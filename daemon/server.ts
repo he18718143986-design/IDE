@@ -218,6 +218,14 @@ import {
 } from "./vault";
 import { readPlan, writePlan } from "./project/plan-store";
 import {
+  applyContractStubTerminal,
+  findInFlightContract,
+  stubIdFromContract,
+  triggerRedecomposeIfNeeded,
+} from "./project/contract-sequence";
+import { nextStub } from "../src/lib/project/next-stub";
+
+import {
   applyPlanPatch,
   type PlanPatch,
 } from "../src/lib/project/plan-patch";
@@ -1724,7 +1732,7 @@ export class StagentDaemon {
       this.sendJson(res, 405, { error: "Method not allowed" });
       return;
     }
-    let body: { scheme?: unknown; decisions?: unknown };
+    let body: { scheme?: unknown; decisions?: unknown; stub_id?: unknown };
     try {
       body = (await this.readJsonBody(req)) as typeof body;
     } catch (err) {
@@ -1748,6 +1756,15 @@ export class StagentDaemon {
       return;
     }
     try {
+      // TASK-L.9：可选 stub_id → 桩视图预检；缺省时若有计划则用 nextStub
+      let stub: import("../src/lib/project/project-plan").ContractStub | null =
+        null;
+      const plan = readPlan(this.repoRoot);
+      if (typeof body.stub_id === "string" && body.stub_id && plan) {
+        stub = plan.contracts.find((c) => c.stub_id === body.stub_id) ?? null;
+      } else if (plan) {
+        stub = nextStub(plan);
+      }
       const scope_plan = preflightScopePlan({
         repoRoot: this.repoRoot,
         scheme:
@@ -1758,8 +1775,17 @@ export class StagentDaemon {
                 body.decisions as import("../src/lib/journey/scope-plan").ScopePlanDecisions,
             }
           : {}),
+        ...(stub ? { stub } : {}),
       });
-      this.sendJson(res, 200, { scope_plan });
+      this.sendJson(res, 200, {
+        scope_plan,
+        ...(stub
+          ? {
+              stub_id: stub.stub_id,
+              next_stub_id: stub.stub_id,
+            }
+          : {}),
+      });
     } catch (err) {
       this.sendActionError(res, err);
     }
@@ -4396,6 +4422,18 @@ export class StagentDaemon {
             return;
           }
           let contract = softwareContractSchema.parse(body.contract);
+          // TASK-L.9：合同级互斥——已有 PREPARING～AUDITED 则拒绝签署下一份
+          const inFlight = findInFlightContract(store.list());
+          if (inFlight) {
+            this.sendJson(res, 409, {
+              error: "contract_in_flight",
+              code: "E_CONTRACT_IN_FLIGHT",
+              message: "上一份还没做完，做完我再开下一份。",
+              in_flight_contract_id: inFlight.contract_id,
+              in_flight_lifecycle_state: inFlight.lifecycle_state,
+            });
+            return;
+          }
           let snapshotDemoGate: DemoSignGateDecision | undefined;
           if (body.confirmation_id) {
             const snapshot = readSchemeSnapshot(
@@ -4484,8 +4522,22 @@ export class StagentDaemon {
               this.emitContractUpdate(admission.contract);
             }
           }
+          const created = admission?.contract ?? saved;
+          // TASK-L.9：合同生成回填桩 status=signed + contract_id
+          const createdStubId = stubIdFromContract(created);
+          if (createdStubId) {
+            applyContractStubTerminal(
+              this.repoRoot,
+              createdStubId,
+              "signed",
+              created.contract_id,
+            );
+            if (!this.activeContracts.includes(created.contract_id)) {
+              this.activeContracts.push(created.contract_id);
+            }
+          }
           this.sendJson(res, 201, {
-            contract: admission?.contract ?? saved,
+            contract: created,
             admission,
           });
         } catch (err) {
@@ -4913,8 +4965,28 @@ export class StagentDaemon {
               clearCheckpoint(this.repoRoot);
               this.targetAdvancedContracts.delete(contractId);
               this.emitContractUpdate(result.contract);
+              // TASK-L.9：合入回填桩 merged；从 activeContracts 移除
+              const mergedStubId = stubIdFromContract(result.contract);
+              if (mergedStubId) {
+                applyContractStubTerminal(
+                  this.repoRoot,
+                  mergedStubId,
+                  "merged",
+                  result.contract.contract_id,
+                );
+              }
+              this.activeContracts = this.activeContracts.filter(
+                (id) => id !== contractId,
+              );
             }
-            this.sendJson(res, 200, { result });
+            const planAfterMerge = readPlan(this.repoRoot);
+            const next = planAfterMerge ? nextStub(planAfterMerge) : null;
+            this.sendJson(res, 200, {
+              result,
+              ...(next
+                ? { next_stub_id: next.stub_id, next_stub: next }
+                : { next_stub_id: null }),
+            });
           } catch (err) {
             // D-4：目标分支已前进 → 409 + 二选一，绝不静默 rebase 或强行合并
             if (err instanceof TargetBranchAdvancedError) {
@@ -5092,7 +5164,33 @@ export class StagentDaemon {
             }
             this.targetAdvancedContracts.delete(contractId);
             this.emitContractUpdate(contract);
-            this.sendJson(res, 200, { contract });
+            // TASK-L.9：ABORTED → 桩 aborted；必要时触发重新分解
+            let redecompose_requested = false;
+            const abortedStubId = stubIdFromContract(contract);
+            if (abortedStubId) {
+              const sync = applyContractStubTerminal(
+                this.repoRoot,
+                abortedStubId,
+                "aborted",
+                contract.contract_id,
+              );
+              if (sync?.redecompose && sync.plan) {
+                const req = triggerRedecomposeIfNeeded(
+                  this.repoRoot,
+                  sync.plan,
+                  abortedStubId,
+                  contract.contract_id,
+                );
+                redecompose_requested = Boolean(req);
+              }
+            }
+            this.activeContracts = this.activeContracts.filter(
+              (id) => id !== contractId,
+            );
+            this.sendJson(res, 200, {
+              contract,
+              redecompose_requested,
+            });
           } catch (err) {
             this.sendActionError(res, err);
           } finally {

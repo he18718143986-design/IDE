@@ -18,6 +18,8 @@ import {
   type ScopePlanSchemeInput,
 } from "./scope-plan-builder";
 import { isGreenfieldRepo } from "./rules-l0";
+import type { ContractStub } from "../../src/lib/project/project-plan";
+import { schemeViewForStub } from "../../src/lib/project/stub-view";
 
 export class ScopePlanDriftError extends Error {
   readonly code = "E_SCOPE_PLAN_DRIFT" as const;
@@ -72,16 +74,23 @@ function asSchemeInput(
   return next;
 }
 
-/** 只读预检：零模型、零落盘。 */
+/** 只读预检：零模型、零落盘。可选 stub → 桩视图 + §5.1 种类规则。 */
 export function preflightScopePlan(input: {
   repoRoot: string;
   scheme: SchemeDraft | ScopePlanSchemeInput;
   decisions?: ScopePlanDecisions;
+  /** TASK-L.9：合同桩；若给出则先裁成桩视图再构建 ScopePlan */
+  stub?: ContractStub | null;
 }): ScopePlan {
+  const schemeInput = asSchemeInput(input.scheme);
+  const schemeForBuild = input.stub
+    ? schemeViewForStub(schemeInput, input.stub)
+    : schemeInput;
   return buildScopePlan({
     repoRoot: input.repoRoot,
-    scheme: asSchemeInput(input.scheme),
+    scheme: schemeForBuild,
     ...(input.decisions ? { decisions: input.decisions } : {}),
+    ...(input.stub ? { stub: input.stub } : {}),
   });
 }
 
