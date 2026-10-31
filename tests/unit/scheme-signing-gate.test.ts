@@ -98,6 +98,7 @@ function writeSnapshot(
       demo_mode: demo.status === "degraded_flowcard" ? "degraded" : "none",
     },
     scope_plan,
+    graveyard: [],
   });
 }
 

@@ -19,6 +19,33 @@ import {
   type MigrationResultV13,
 } from "../../src/lib/migration";
 
+export const E_SCHEME_BINDING_IMMUTABLE = "E_SCHEME_BINDING_IMMUTABLE";
+
+/**
+ * TASK-J.18b：`scheme_binding` 写一次锁定——已落盘合同不得增删改此字段。
+ * 旧直签合同（无 binding）也不得事后发明 binding。
+ */
+export class SchemeBindingImmutableError extends Error {
+  readonly code: typeof E_SCHEME_BINDING_IMMUTABLE = E_SCHEME_BINDING_IMMUTABLE;
+  constructor(message = "scheme_binding 签署后不可改，且旧直签合同不得事后写入") {
+    super(`[${E_SCHEME_BINDING_IMMUTABLE}] ${message}`);
+    this.name = "SchemeBindingImmutableError";
+  }
+}
+
+function schemeBindingEqual(
+  a: SoftwareContract["scheme_binding"],
+  b: SoftwareContract["scheme_binding"],
+): boolean {
+  if (a === undefined && b === undefined) return true;
+  if (a === undefined || b === undefined) return false;
+  return (
+    a.confirmation_id === b.confirmation_id &&
+    a.snapshot_digest === b.snapshot_digest &&
+    a.plan_digest === b.plan_digest
+  );
+}
+
 /**
  * 一次合同加载的结果。
  *
@@ -62,8 +89,58 @@ export class ContractStore {
 
   save(contract: SoftwareContract): SoftwareContract {
     const validated = softwareContractSchema.parse(contract);
+    // TASK-J.18b：scheme_binding 写一次锁定（runtime §2「改合同本身」禁止）
+    const priorBinding = this.peekSchemeBinding(validated.contract_id);
+    if (priorBinding.fileExists) {
+      if (!schemeBindingEqual(priorBinding.binding, validated.scheme_binding)) {
+        throw new SchemeBindingImmutableError(
+          priorBinding.binding === undefined
+            ? "旧直签合同不得事后写入 scheme_binding"
+            : "已落盘的 scheme_binding 不可改写或删除",
+        );
+      }
+    }
     writeJsonAtomic(this.filePath(validated.contract_id), validated);
     return validated;
+  }
+
+  /**
+   * 探测已落盘合同的 scheme_binding（不做完整 Schema 强制）。
+   * 文件不存在 → fileExists=false；存在但无该字段 → binding=undefined。
+   */
+  private peekSchemeBinding(contractId: string): {
+    fileExists: boolean;
+    binding: SoftwareContract["scheme_binding"];
+  } {
+    const file = this.filePath(contractId);
+    if (!fs.existsSync(file)) return { fileExists: false, binding: undefined };
+    try {
+      const raw = JSON.parse(fs.readFileSync(file, "utf-8")) as {
+        scheme_binding?: unknown;
+      };
+      const b = raw?.scheme_binding;
+      if (
+        b &&
+        typeof b === "object" &&
+        typeof (b as { confirmation_id?: unknown }).confirmation_id ===
+          "string" &&
+        typeof (b as { snapshot_digest?: unknown }).snapshot_digest ===
+          "string" &&
+        typeof (b as { plan_digest?: unknown }).plan_digest === "string"
+      ) {
+        return {
+          fileExists: true,
+          binding: {
+            confirmation_id: (b as { confirmation_id: string }).confirmation_id,
+            snapshot_digest: (b as { snapshot_digest: string }).snapshot_digest,
+            plan_digest: (b as { plan_digest: string }).plan_digest,
+          },
+        };
+      }
+      return { fileExists: true, binding: undefined };
+    } catch {
+      return { fileExists: true, binding: undefined };
+    }
   }
 
   /**

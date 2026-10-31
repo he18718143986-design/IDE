@@ -58,8 +58,10 @@ import {
 import {
   readSchemeSnapshot,
   writeSchemeSnapshot,
+  schemeBindingFromSnapshot,
   SchemeSnapshotConflictError,
 } from "./pipeline/scheme-snapshot-store";
+import { loadOrInitLedgerState } from "./supervisor/intent-compiler/scheme-ledger-store";
 import {
   assertContractScopeAllowed,
   WritableScopePolicyError,
@@ -1625,6 +1627,8 @@ export class StagentDaemon {
         scheme: schemeDraft,
         submitted: submittedPlan,
       });
+      // TASK-J.18b / GAP-W2：冻结时从账本拷贝完整墓地（含 revived）进快照 1.2
+      const ledgerGraveyard = loadOrInitLedgerState(this.repoRoot).graveyard;
       const written = writeSchemeSnapshot(this.repoRoot, {
         confirmation_id: confirmationId,
         scheme: schemeDraft,
@@ -1636,6 +1640,7 @@ export class StagentDaemon {
             "none" | "interactive" | "degraded",
         },
         scope_plan: freshPlan,
+        graveyard: ledgerGraveyard,
       });
       this.sendJson(res, written.idempotent ? 200 : 201, {
         snapshot_id: written.snapshot.snapshot_id,
@@ -4138,7 +4143,7 @@ export class StagentDaemon {
             this.sendJson(res, 400, { error: "contract is required" });
             return;
           }
-          const contract = softwareContractSchema.parse(body.contract);
+          let contract = softwareContractSchema.parse(body.contract);
           let snapshotDemoGate: DemoSignGateDecision | undefined;
           if (body.confirmation_id) {
             const snapshot = readSchemeSnapshot(
@@ -4199,6 +4204,14 @@ export class StagentDaemon {
               });
               return;
             }
+            // TASK-J.18b / GAP-W1：校验通过后永久写入 scheme_binding（旧直签不走此支）
+            contract = softwareContractSchema.parse({
+              ...contract,
+              scheme_binding: schemeBindingFromSnapshot(
+                body.confirmation_id,
+                snapshot,
+              ),
+            });
           } else {
             assertContractScopeAllowed(
               this.repoRoot,
