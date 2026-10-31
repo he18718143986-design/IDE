@@ -24,7 +24,7 @@
 | **L1 决策** | 已拍板、难逆转的技术选择 | `decisions[]`（已确认） | [`adr/`](./adr/README.md) | 只能 SUPERSEDE，不能删改原文 |
 | **L2 规格** | 系统必须怎样表现（契约） | 冻结快照 + `ScopePlan` | `specs/`（见 §3） | 走规格修订任务卡 |
 | **L3 任务卡** | 交给 Worker 的机器指令 | 合同 + 任务图节点 | [`specs/development-tasks.md`](./specs/development-tasks.md)（就绪标准 [`specs/task-card-standard.md`](./specs/task-card-standard.md)） | 按卡施工；开工前过就绪标准；按 supervisor §10 判定口径回写状态 |
-| **L4 证据** | 做到了没有，凭什么说做到了 | `EvidenceBundle` | [`reports/`](./reports/README.md)、[`specs/evidence-and-acceptance-criteria.md`](./specs/evidence-and-acceptance-criteria.md)（草案） | 只追加；证据绑定 head SHA |
+| **L4 证据** | 做到了没有，凭什么说做到了 | `EvidenceBundle` | [`reports/`](./reports/README.md)、[`specs/evidence-and-acceptance-criteria.md`](./specs/evidence-and-acceptance-criteria.md)（现行规格） | 只追加；证据绑定 head SHA |
 | **L5 台账** | 还欠什么、谁来定 | `conflicts` / `open_questions` / 挂账 | [`ledger/`](./ledger/README.md) | 只追加；销项要注明 PR |
 | 旁支 | 未批准的远期提案 | — | `rfc/`（见 §6） | 立项后才进 L1 / L2 |
 | 旁支 | 空白格式 | — | `templates/`（见 §7） | — |
@@ -61,7 +61,8 @@
 | **交付全链路（2026-10-30）** | 方案之后的环节 | [`delivery-lifecycle.md`](./specs/delivery-lifecycle.md)（总装图）· [`ADR-0018 真相缝`](./adr/0018-intent-to-executable-seal.md) · [`project-architecture-baseline.md`](./specs/project-architecture-baseline.md)（密封后 S3 前置，ADR-0019）· [`project-decomposition.md`](./specs/project-decomposition.md)（S3，ADR-0015；依赖 PAB）· [`technical-design-and-knowledge.md`](./specs/technical-design-and-knowledge.md)（S4，ADR-0016）· [`verification-strategy.md`](./specs/verification-strategy.md)（S6）· [`release-and-operations.md`](./specs/release-and-operations.md)（S7，ADR-0017）· [`task-card-standard.md`](./specs/task-card-standard.md)（卡就绪） | 与四份现行规范同级；冲突时以对应 ADR 为准 |
 | **实施口径（附属）** | 某条现行规范的实施细节 | [`scheme-patch-engine.md`](./specs/scheme-patch-engine.md)（supervisor §14.2/14.3/14.11，`TASK-J.9`）· [`intent-compiler-prompt.md`](./specs/intent-compiler-prompt.md)（§14.4～14.9，`TASK-J.10`/J.11）· [`worker-graveyard-gate.md`](./specs/worker-graveyard-gate.md)（§14.11 INV-LEDGER-03，`TASK-J.18`）· [`playtest-self-check.md`](./specs/playtest-self-check.md)（§16.7，`TASK-J.16`） | 以所指上位规格为准 |
 | **代码即权威** | 运行时事实 | `src/lib/state/delivery-state.ts`、`src/lib/journey/confirm-scheme-atomic.ts`、`daemon/supervisor/demo/signing-gate.ts`、`daemon/guard/audit-manifest.ts`、`daemon/supervisor/rules-l0.ts`、`src/lib/error-codes.ts` | 代码现状 ≠ 目标规格；差距登记在 supervisor §19 与 [`scheme.md`](./scheme.md) §11 |
-| **草案（非依据）** | 待核验 | [`constants-and-paths.md`](./specs/constants-and-paths.md)、[`state-machine-contract.md`](./specs/state-machine-contract.md)、[`evidence-and-acceptance-criteria.md`](./specs/evidence-and-acceptance-criteria.md) | 不得当现行规范引用 |
+| **实施口径（附属）· 证据判定** | 验收材料三态与必填字段 | [`evidence-and-acceptance-criteria.md`](./specs/evidence-and-acceptance-criteria.md) | 从属 ADR-0005 / verification-strategy；〔待补〕项不得假完成 |
+| **草案（非依据）** | 待核验 | [`constants-and-paths.md`](./specs/constants-and-paths.md)、[`state-machine-contract.md`](./specs/state-machine-contract.md) | 不得当现行规范引用 |
 
 > 交付全链路实施口径处于「设计定稿 · 待施工」；能力状态以任务卡和验证证据为准。
 
@@ -120,7 +121,7 @@
 | 用户拍板了一个决定 | 新增 `adr/00NN-*.md`；`scheme.md` 把对应条目改为 `accepted` 并指向 ADR | 被取代的 ADR 标 `SUPERSEDED by`，不删 |
 | 用户否决了一个方案 | `scheme.md` §10 墓地加一行 | 写清谁否决、为什么 |
 | 规格条款要变 | 先立规格修订任务卡，再改 `specs/` | 实施口径不得反向改上位规格 |
-| 卡做完了 | 任务卡状态回写 + `reports/` 或 PR 附证据 | 按 supervisor §10 与 evidence 草案判定，不得假 COMPLETED |
+| 卡做完了 | 任务卡状态回写 + `reports/` 或 PR 附证据 | 按 supervisor §10 与 [`evidence-and-acceptance-criteria.md`](./specs/evidence-and-acceptance-criteria.md) 判定，不得假 COMPLETED |
 | 发现解决不了的问题 | `ledger/` 加一行 | 必须写清谁来定、判据是什么 |
 
 ---
