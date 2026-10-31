@@ -140,7 +140,14 @@ import {
   type SchemeDraft,
 } from "@/lib/journey/scheme-draft";
 import { buildConfirmContractFromScopePlan } from "@/lib/journey/confirm-scheme-contract";
-import type { ScopePlan } from "@/lib/journey/scope-plan";
+import {
+  applyScopeDecisions,
+  type ScopePlan,
+} from "@/lib/journey/scope-plan";
+import {
+  authorizePendingSensitiveDecisions,
+  declineSensitiveDecisions,
+} from "@/components/studio/ScopeAcceptanceBlock";
 import {
   newSchemeConfirmationId,
   runConfirmSchemeAtomic,
@@ -368,6 +375,9 @@ function Console() {
    */
   const [scopePlan, setScopePlan] = useState<ScopePlan | null>(null);
   const scopePreflightSeqRef = useRef(0);
+  /** J.6：确认点击时展开敏感项查看 */
+  const [forceExpandSensitive, setForceExpandSensitive] = useState(false);
+  const [scopeDecisionBusy, setScopeDecisionBusy] = useState(false);
   /** TASK-C.11b：感官确认 + prototype id */
   const [demoConfirmed, setDemoConfirmed] = useState(false);
   const [activePrototypeId, setActivePrototypeId] = useState<string | null>(
@@ -399,12 +409,14 @@ function Console() {
   useEffect(() => {
     if (!conn || !schemeDraft || schemeDraft.frozen) {
       setScopePlan(null);
+      setForceExpandSensitive(false);
       return;
     }
     const revision = schemeDraft.scheme_revision;
     const seq = ++scopePreflightSeqRef.current;
     let cancelled = false;
     setScopePlan(null);
+    setForceExpandSensitive(false);
     const timer = window.setTimeout(() => {
       void (async () => {
         try {
@@ -1093,6 +1105,32 @@ ${trimmed}`
    * - 快照后的任何失败都必须 `compensate`，不允许半签半开；
    * - 补偿失败保持右栏锁定并明确告知需人工处理，不假装成功。
    */
+  /** TASK-J.6：不碰这些 → excluded_area_ids + 拒绝敏感项，重新预检 */
+  const handleDeclineSensitive = useCallback(async () => {
+    if (!conn || !schemeDraft || !scopePlan || scopeDecisionBusy) return;
+    setScopeDecisionBusy(true);
+    setConfirmPrototypeError(null);
+    try {
+      const decisions = declineSensitiveDecisions(scopePlan);
+      const { scope_plan } = await preflightScope(conn, {
+        scheme: schemeDraft,
+        decisions,
+      });
+      if (scope_plan.scheme_revision === schemeDraft.scheme_revision) {
+        setScopePlan(scope_plan);
+        setForceExpandSensitive(false);
+      }
+    } catch (err) {
+      setConfirmPrototypeError(
+        err instanceof Error
+          ? err.message
+          : "重新核对改动范围失败，请稍后重试",
+      );
+    } finally {
+      setScopeDecisionBusy(false);
+    }
+  }, [conn, schemeDraft, scopePlan, scopeDecisionBusy]);
+
   const handleConfirmScheme = useCallback(async () => {
     if (!conn || !schemeDraft || schemeDraft.frozen || schemeConfirmBusy)
       return;
@@ -1109,7 +1147,7 @@ ${trimmed}`
     const confirmationId = schemeConfirmIdRef.current.id;
 
     // J.5：范围须在点击前算好；不再走 formatSchemeAsIntent → submitJourneyMessage。
-    const planForConfirm = scopePlan;
+    let planForConfirm = scopePlan;
     if (
       !planForConfirm ||
       planForConfirm.scheme_revision !== expectedRevision
@@ -1117,6 +1155,19 @@ ${trimmed}`
       setConfirmPrototypeError("正在核对要改哪些地方…");
       setSchemeConfirmBusy(false);
       return;
+    }
+
+    // J.6 / SA-1：有未表态敏感项时展开查看，并一键授权后带着新 digest 提交。
+    const pendingSensitive = planForConfirm.needs_approval.filter(
+      (item) => item.approved === null,
+    );
+    if (pendingSensitive.length > 0) {
+      setForceExpandSensitive(true);
+      planForConfirm = applyScopeDecisions(
+        planForConfirm,
+        authorizePendingSensitiveDecisions(planForConfirm),
+      );
+      setScopePlan(planForConfirm);
     }
 
     /**
@@ -3167,9 +3218,14 @@ ${trimmed}`
                     demoStatus={demoPreview?.status ?? null}
                     demoGate={schemeDemoGate}
                     demoBusy={schemeDemoBusy}
-                    confirmBusy={schemeConfirmBusy || authorizeBusy}
+                    confirmBusy={schemeConfirmBusy || authorizeBusy || scopeDecisionBusy}
                     errorMessage={confirmPrototypeError}
                     confirmation={schemeConfirmation ?? undefined}
+                    scopePlan={scopePlan}
+                    forceExpandSensitive={forceExpandSensitive}
+                    onDeclineSensitive={() => {
+                      void handleDeclineSensitive();
+                    }}
                     onConfirmDecision={handleSchemeConfirmDecision}
                     onResolveConflict={handleSchemeResolveConflict}
                     onNotesChange={handleSchemeNotesChange}
