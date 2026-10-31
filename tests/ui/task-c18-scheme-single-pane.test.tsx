@@ -5,11 +5,61 @@ import { SchemeReviewPane } from "../../src/components/studio/SchemeReviewPane";
 import { StudioViewportShell } from "../../src/components/studio/StudioViewportShell";
 import { WorkspaceLayout } from "../../src/components/WorkspaceLayout";
 import {
+  EMPTY_DEMO_GATE,
+  evaluateSchemeConfirmation,
   rebuildSchemeFromCorpus,
   resolveSchemeConflict,
   confirmSchemeDecision,
 } from "../../src/lib/journey/scheme-draft";
+import {
+  formatBudgetPlain,
+  scopePlanDigest,
+  type ScopePlan,
+} from "../../src/lib/journey/scope-plan";
 import { resolveDefaultViewport } from "../../src/components/studio/viewport-routing";
+
+function compliantScopePlan(revision: number): ScopePlan {
+  const plan: ScopePlan = {
+    scheme_revision: revision,
+    plan_digest: "",
+    areas: [
+      {
+        id: "area-0",
+        label: "工程进度管控",
+        why: "因为要做进度汇总",
+        module_ids: ["mod-0"],
+        kind: "change_existing",
+        paths: ["src/pages/**"],
+        excluded_by_user: false,
+      },
+    ],
+    never_touch: [{ label: "密码与钥匙文件", paths: [".env*"] }],
+    needs_approval: [],
+    verification: {
+      commands: [],
+      plain: ["页面能打开"],
+      manual_only: true,
+    },
+    budget: {
+      limits: {
+        max_file_modifications: 10,
+        max_total_diff_lines: 2000,
+        max_duration_seconds: 1800,
+        max_verification_retries: 3,
+        max_command_executions: 40,
+        max_tool_calls: 200,
+      },
+      plain: formatBudgetPlain({
+        max_file_modifications: 10,
+        max_duration_seconds: 1800,
+      }),
+    },
+    grade: { ok: true, rejected: [] },
+  };
+  const withDigest: ScopePlan = { ...plan, plan_digest: "" };
+  withDigest.plan_digest = scopePlanDigest(withDigest);
+  return withDigest;
+}
 
 describe("TASK-C.18 单页方案审阅", () => {
   it("Studio 外壳无五视口 Tab，只有方案审阅", () => {
@@ -64,9 +114,15 @@ describe("TASK-C.18 单页方案审阅", () => {
     }
     const onGenerate = vi.fn();
     const onConfirm = vi.fn();
+    const plan = compliantScopePlan(scheme.scheme_revision);
     render(
       <SchemeReviewPane
         scheme={scheme}
+        confirmation={evaluateSchemeConfirmation(
+          scheme,
+          EMPTY_DEMO_GATE,
+          plan,
+        )}
         onGenerateDemo={onGenerate}
         onConfirmScheme={onConfirm}
       />,

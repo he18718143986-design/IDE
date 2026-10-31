@@ -8,8 +8,7 @@
  * - user_pinned 字段级脏检查：随聊合并不覆盖已 pin
  * - canConfirmScheme 是向后兼容别名；真实门禁统一走
  *   evaluateSchemeConfirmation（含 Demo 与 revision 绑定）
- * J.3（SSOT §15.5 / D7）：第三参 scopePlan；三条范围拒绝码。
- *   临时开关 SCOPE_GATE_ENABLED 默认 false，避免 J.5 接线前确认按钮不可用。
+ * J.3 / J.5（SSOT §15.5 / D7）：第三参 scopePlan；三条范围拒绝码恒开启。
  */
 
 import {
@@ -114,13 +113,6 @@ export type SchemeConfirmationCode =
   | "E_SCOPE_POLICY"
   /** J.3 / ADR-0014：提交的 ScopePlan 仍有未授权敏感项 */
   | "E_SCOPE_APPROVAL_REQUIRED";
-
-/**
- * 临时开关（TASK-J.3）：默认 false，包住三条范围判定，使本卡可单独合入而
- * 「确认方案」按钮仍可用。TASK-J.5 接线真实 ScopePlan 后移除本开关并恒开启。
- * 单测改 `SCOPE_GATE_ENABLED.value`；生产路径勿改。
- */
-export const SCOPE_GATE_ENABLED = { value: false };
 
 export interface SchemeConfirmationDecision {
   ok: boolean;
@@ -414,15 +406,15 @@ function evaluateScopeGate(
  * - 从未生成 Demo（demo.status=none）；
  * - Demo 对当前 revision 生成且用户对同一 revision 显式确认；
  * - Demo 已失败/不可用，用户对当前 revision 显式接受流程图降级；
- * - （SCOPE_GATE_ENABLED 时）与当前修订绑定、grade.ok、敏感项均已授权的 ScopePlan。
+ * - 与当前修订绑定、grade.ok、敏感项均已授权的 ScopePlan（J.5 恒校验）。
  *
  * 拒绝：
  * - 生成/确认后方案又改过（revision 不一致）；
  * - 已生成但未确认；
  * - building / failed 尚未处置；
- * - （SCOPE_GATE_ENABLED 时）E_SCOPE_NOT_READY / E_SCOPE_POLICY / E_SCOPE_APPROVAL_REQUIRED。
+ * - E_SCOPE_NOT_READY / E_SCOPE_POLICY / E_SCOPE_APPROVAL_REQUIRED。
  *
- * 判定顺序：冻结 → 冲突 → 可审 → Demo 四码 →（开关开启时）三条范围码。
+ * 判定顺序：冻结 → 冲突 → 可审 → Demo 四码 → 三条范围码。
  */
 export function evaluateSchemeConfirmation(
   draft: SchemeDraft,
@@ -515,10 +507,8 @@ export function evaluateSchemeConfirmation(
         : "Demo 已对当前方案确认";
   }
 
-  if (SCOPE_GATE_ENABLED.value) {
-    const scopeDecision = evaluateScopeGate(draft, scopePlan, demoMode);
-    if (scopeDecision) return scopeDecision;
-  }
+  const scopeDecision = evaluateScopeGate(draft, scopePlan, demoMode);
+  if (scopeDecision) return scopeDecision;
 
   return {
     ok: true,
@@ -530,9 +520,9 @@ export function evaluateSchemeConfirmation(
 }
 
 /**
- * 向后兼容别名。**新代码禁止使用**——固定传 `scopePlan=null`；
- * 在 `SCOPE_GATE_ENABLED.value===true` 时结果恒为不可确认（`E_SCOPE_NOT_READY`），
- * 用以暴露遗留调用点。请改用 `evaluateSchemeConfirmation(draft, demo, scopePlan)`。
+ * 向后兼容别名。**新代码禁止使用**——固定传 `scopePlan=null`，
+ * 结果恒为不可确认（`E_SCOPE_NOT_READY`），用以暴露遗留调用点。
+ * 请改用 `evaluateSchemeConfirmation(draft, demo, scopePlan)`。
  */
 export function canConfirmScheme(draft: SchemeDraft): boolean {
   return evaluateSchemeConfirmation(draft, EMPTY_DEMO_GATE, null).ok;

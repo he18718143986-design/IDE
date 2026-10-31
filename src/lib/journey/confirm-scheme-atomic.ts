@@ -14,6 +14,7 @@ import type {
   SchemeDraft,
 } from "./scheme-draft";
 import { evaluateSchemeConfirmation, freezeScheme } from "./scheme-draft";
+import type { ScopePlan } from "./scope-plan";
 
 export type ConfirmSchemeStepId =
   | "CLAIM_AND_QUIESCE"
@@ -48,6 +49,8 @@ export interface ConfirmSchemeAtomicInput {
   demo: DemoGate;
   /** 调用方看到的修订号；与 scheme.scheme_revision 不一致即拒绝。 */
   expectedRevision: number;
+  /** J.5：与当前修订绑定的 ScopePlan；VALIDATE 与 Daemon 共用。 */
+  scopePlan: ScopePlan | null;
   /** 先停流式，再禁用右栏输入；两者都完成才允许继续。 */
   quiesceRightChat: () => void | Promise<void>;
   /** 写入不可变快照；同 id + 同内容必须幂等返回原快照。 */
@@ -95,6 +98,8 @@ export interface ConfirmSchemeAtomicResult {
   failedAt?: ConfirmSchemeStepId;
   code?: string;
   reason?: string;
+  /** FREEZE 漂移时附带 Daemon 重算的新 plan，供调用方刷新。 */
+  scope_plan?: ScopePlan;
 }
 
 interface CompletedConfirmation {
@@ -147,6 +152,22 @@ export function newSchemeConfirmationId(): string {
  * 按五阶段执行。任何失败都返回结构化失败点，调用方只负责展示，
  * 不得再自行补签署步骤——否则会绕开幂等与补偿。
  */
+
+function readErrorCode(err: unknown): string | undefined {
+  if (typeof err !== "object" || err === null) return undefined;
+  const code = (err as { code?: unknown }).code;
+  return typeof code === "string" ? code : undefined;
+}
+
+function readDriftScopePlan(err: unknown): ScopePlan | undefined {
+  if (typeof err !== "object" || err === null) return undefined;
+  const plan = (err as { scope_plan?: unknown }).scope_plan;
+  if (plan && typeof plan === "object" && "plan_digest" in (plan as object)) {
+    return plan as ScopePlan;
+  }
+  return undefined;
+}
+
 export async function runConfirmSchemeAtomic(
   input: ConfirmSchemeAtomicInput,
 ): Promise<ConfirmSchemeAtomicResult> {
@@ -212,7 +233,11 @@ export async function runConfirmSchemeAtomic(
     );
   }
 
-  const decision = evaluateSchemeConfirmation(input.scheme, input.demo);
+  const decision = evaluateSchemeConfirmation(
+    input.scheme,
+    input.demo,
+    input.scopePlan,
+  );
   if (!decision.ok) {
     input.restoreRightChat?.();
     steps.push({
@@ -245,14 +270,18 @@ export async function runConfirmSchemeAtomic(
   } catch (err) {
     input.restoreRightChat?.();
     const reason = err instanceof Error ? err.message : "快照落盘失败";
+    const drift = readErrorCode(err) === "E_SCOPE_PLAN_DRIFT";
+    const code = drift ? "E_SCOPE_PLAN_DRIFT" : "E_SCHEME_SNAPSHOT_FAILED";
+    const freshPlan = drift ? readDriftScopePlan(err) : undefined;
     steps.push({ step: "FREEZE_SNAPSHOT", ok: false, reason });
     return failed(
       input.confirmationId,
       "FREEZE_SNAPSHOT",
-      "E_SCHEME_SNAPSHOT_FAILED",
+      code,
       reason,
       steps,
       frozen,
+      freshPlan ? { scope_plan: freshPlan } : undefined,
     );
   }
 

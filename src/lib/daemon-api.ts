@@ -32,10 +32,20 @@ export interface DaemonHealth {
 
 export class DaemonApiError extends Error {
   readonly status: number;
-  constructor(status: number, message: string) {
+  /** Daemon JSON `code`（如 E_SCOPE_PLAN_DRIFT）；无则 undefined。 */
+  readonly code?: string;
+  /** 原始错误体，漂移时含 `scope_plan`。 */
+  readonly body?: unknown;
+  constructor(
+    status: number,
+    message: string,
+    options?: { code?: string; body?: unknown },
+  ) {
     super(message);
     this.name = "DaemonApiError";
     this.status = status;
+    if (options?.code !== undefined) this.code = options.code;
+    if (options?.body !== undefined) this.body = options.body;
   }
 }
 
@@ -259,15 +269,22 @@ async function request<T>(
   const body = text ? (JSON.parse(text) as unknown) : {};
   if (!res.ok) {
     let message = `HTTP ${res.status}`;
+    let code: string | undefined;
     if (typeof body === "object" && body) {
-      const rec = body as { message?: unknown; error?: unknown };
+      const rec = body as { message?: unknown; error?: unknown; code?: unknown };
       if (typeof rec.message === "string" && rec.message.trim()) {
         message = rec.message;
       } else if ("error" in rec) {
         message = String(rec.error);
       }
+      if (typeof rec.code === "string" && rec.code.trim()) {
+        code = rec.code;
+      }
     }
-    throw new DaemonApiError(res.status, message);
+    throw new DaemonApiError(res.status, message, {
+      ...(code ? { code } : {}),
+      body,
+    });
   }
   return body as T;
 }

@@ -1,7 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   EMPTY_DEMO_GATE,
-  SCOPE_GATE_ENABLED,
   canConfirmScheme,
   computeDemoReady,
   emptySchemeDraft,
@@ -20,7 +19,7 @@ import { canTransitionDelivery } from "../../src/lib/state/delivery-state";
 
 /**
  * SSOT v2.0.2 §3.5 / §2.2 验收：单一确认谓词与直接签署状态边。
- * TASK-J.3 / SSOT §15.5：范围纳入唯一确认谓词（T-GATE-012～016）。
+ * TASK-J.3 / J.5 / SSOT §15.5：范围纳入唯一确认谓词（T-GATE-012～018；门禁恒开启）。
  *
  * 本文件是「允许/拒绝矩阵」的唯一实现证据。规范里每条决策都指向
  * 这里的测试 ID（T-GATE-xxx / T-STATE-xxx），改谓词必须先改这里。
@@ -104,7 +103,7 @@ function compliantScopePlan(partial: Partial<ScopePlan> = {}): ScopePlan {
 
 describe("T-GATE 单一确认谓词 evaluateSchemeConfirmation", () => {
   it("T-GATE-001 从未生成 Demo：允许按静态方案签署，demo_mode=none", () => {
-    // SCOPE_GATE 默认关闭；传入合规 plan 预演 J.5 形态（门关闭时忽略）
+    // J.5：门禁恒开启，须传与修订对齐的合规 plan
     const decision = evaluateSchemeConfirmation(
       makeDraft(),
       EMPTY_DEMO_GATE,
@@ -288,22 +287,18 @@ describe("T-GATE 单一确认谓词 evaluateSchemeConfirmation", () => {
     );
   });
 
-  it("T-GATE-011c canConfirmScheme 兼容别名：SCOPE_GATE 关闭时与主谓词（null plan）等价", () => {
-    expect(SCOPE_GATE_ENABLED.value).toBe(false);
-    expect(canConfirmScheme(makeDraft())).toBe(
+  it("T-GATE-011c canConfirmScheme 兼容别名：固定 null plan → 恒不可确认", () => {
+    expect(canConfirmScheme(makeDraft())).toBe(false);
+    expect(
       evaluateSchemeConfirmation(makeDraft(), EMPTY_DEMO_GATE, null).ok,
-    );
+    ).toBe(false);
+    expect(
+      evaluateSchemeConfirmation(makeDraft(), EMPTY_DEMO_GATE, null).code,
+    ).toBe("E_SCOPE_NOT_READY");
   });
 });
 
-describe("T-GATE J.3 范围纳入唯一确认谓词（SCOPE_GATE_ENABLED）", () => {
-  beforeEach(() => {
-    SCOPE_GATE_ENABLED.value = true;
-  });
-  afterEach(() => {
-    SCOPE_GATE_ENABLED.value = false;
-  });
-
+describe("T-GATE J.3/J.5 范围纳入唯一确认谓词（恒开启）", () => {
   it("T-GATE-012 修订号不一致 → E_SCOPE_NOT_READY", () => {
     const draft = makeDraft({ scheme_revision: 3 });
     const plan = compliantScopePlan({ scheme_revision: 2 });
@@ -408,14 +403,14 @@ describe("T-GATE J.3 范围纳入唯一确认谓词（SCOPE_GATE_ENABLED）", ()
     expect(decision.code).toBe("E_SCHEME_CONFLICTS_OPEN");
   });
 
-  it("T-GATE-018 canConfirmScheme 在 SCOPE_GATE 开启时恒不可确认（逼出遗留调用）", () => {
+  it("T-GATE-018 canConfirmScheme 恒不可确认（逼出遗留调用）", () => {
     expect(canConfirmScheme(makeDraft())).toBe(false);
     expect(
       evaluateSchemeConfirmation(makeDraft(), EMPTY_DEMO_GATE, null).code,
     ).toBe("E_SCOPE_NOT_READY");
   });
 
-  it("旧用例在合规 scopePlan + 门开启下不回归（无 Demo 可签）", () => {
+  it("旧用例在合规 scopePlan 下不回归（无 Demo 可签）", () => {
     const decision = evaluateSchemeConfirmation(
       makeDraft(),
       EMPTY_DEMO_GATE,

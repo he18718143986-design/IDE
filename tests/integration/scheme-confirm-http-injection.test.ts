@@ -397,11 +397,13 @@ describe("T-HTTP R-10 / F-07 确认快照与建图补偿（真 Daemon）", () =>
     const compensated: string[] = [];
     let restored = 0;
 
+    const scopePlan = buildScopePlan({ repoRoot: repo, scheme });
     const result = await runConfirmSchemeAtomic({
       confirmationId,
       scheme,
       demo: EMPTY_DEMO_GATE,
       expectedRevision: scheme.scheme_revision,
+      scopePlan,
 
       quiesceRightChat: async () => {
         /* 真 UI 里是停流式 + 禁右栏；HTTP 测试无需模拟 */
@@ -539,11 +541,13 @@ describe("T-HTTP R-10 / F-07 确认快照与建图补偿（真 Daemon）", () =>
     const aborts: number[] = [];
     let restored = 0;
 
+    const scopePlan = buildScopePlan({ repoRoot: repo, scheme });
     const result = await runConfirmSchemeAtomic({
       confirmationId,
       scheme,
       demo: EMPTY_DEMO_GATE,
       expectedRevision: scheme.scheme_revision,
+      scopePlan,
       quiesceRightChat: async () => {},
 
       persistSnapshot: async ({
