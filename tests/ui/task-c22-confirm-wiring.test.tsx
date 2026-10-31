@@ -14,12 +14,21 @@ import {
   type DemoGate,
   type SchemeDraft,
 } from "../../src/lib/journey/scheme-draft";
+import {
+  formatBudgetPlain,
+  scopePlanDigest,
+  scopePlanToContractScope,
+  type ScopePlan,
+} from "../../src/lib/journey/scope-plan";
+import { buildConfirmContractFromScopePlan } from "../../src/lib/journey/confirm-scheme-contract";
+import { softwareContractSchema } from "../../src/lib/contract.schema";
 
 /**
  * SSOT v2.0.2 §3 验收：前端接线。
  *
  * 这里只断言「组件确实按谓词渲染、按钮确实连到回调」——
  * 谓词本身的正确性由 tests/unit/scheme-confirmation-gate.test.ts 负责。
+ * J.5：夹具补合规 ScopePlan；T-UI-011～013 覆盖预检与签署投影。
  */
 
 function makeScheme(partial: Partial<SchemeDraft> = {}): SchemeDraft {
@@ -38,22 +47,74 @@ function makeDemo(partial: Partial<DemoGate> = {}): DemoGate {
   return { ...EMPTY_DEMO_GATE, ...partial };
 }
 
+/** J.5：夹具须补合规 plan，否则门禁恒拦确认按钮。 */
+function compliantScopePlan(partial: Partial<ScopePlan> = {}): ScopePlan {
+  const plan: ScopePlan = {
+    scheme_revision: 2,
+    plan_digest: "",
+    areas: [
+      {
+        id: "area-0",
+        label: "工程进度管控",
+        why: "因为要做进度汇总",
+        module_ids: ["mod-0"],
+        kind: "change_existing",
+        paths: ["src/pages/**"],
+        excluded_by_user: false,
+      },
+    ],
+    never_touch: [{ label: "密码与钥匙文件", paths: [".env*"] }],
+    needs_approval: [],
+    verification: {
+      commands: [],
+      plain: ["页面能打开并看到进度数字"],
+      manual_only: true,
+    },
+    budget: {
+      limits: {
+        max_file_modifications: 10,
+        max_total_diff_lines: 2000,
+        max_duration_seconds: 1800,
+        max_verification_retries: 3,
+        max_command_executions: 40,
+        max_tool_calls: 200,
+      },
+      plain: formatBudgetPlain({
+        max_file_modifications: 10,
+        max_duration_seconds: 1800,
+      }),
+    },
+    grade: { ok: true, rejected: [] },
+    ...partial,
+  };
+  const withDigest: ScopePlan = { ...plan, plan_digest: "" };
+  withDigest.plan_digest = scopePlanDigest(withDigest);
+  return withDigest;
+}
+
 function renderPane(
   scheme: SchemeDraft,
   demo: DemoGate,
   handlers: {
-    onConfirmScheme?: () => void;
+    onConfirmScheme?: (() => void) | (() => Promise<void>);
     onConfirmDemo?: () => void;
     onRetryDemo?: () => void;
     onAcceptDegradedDemo?: () => void;
   } = {},
+  /**
+   * 默认补合规 plan（T-UI-001～010 不回归）。
+   * 传 `null` 表示预检未返回（T-UI-011）。
+   */
+  scopePlan: ScopePlan | null = compliantScopePlan({
+    scheme_revision: scheme.scheme_revision,
+  }),
 ) {
   return render(
     <SchemeReviewPane
       scheme={scheme}
       demoUrl="http://127.0.0.1:4100/"
       demoGate={demo}
-      confirmation={evaluateSchemeConfirmation(scheme, demo)}
+      confirmation={evaluateSchemeConfirmation(scheme, demo, scopePlan)}
       onConfirmScheme={handlers.onConfirmScheme}
       onConfirmDemo={handlers.onConfirmDemo}
       onRetryDemo={handlers.onRetryDemo}
@@ -174,6 +235,8 @@ describe("T-UI-2 Demo 三态的动作必须连到真实回调", () => {
         decision_revision: 4,
         prototype_id: "proto-4",
       }),
+      {},
+      compliantScopePlan({ scheme_revision: 5 }),
     );
     expect(screen.getByTestId("scheme-demo-confirm")).toBeDisabled();
     expect(screen.getByTestId("scheme-confirm")).toBeDisabled();
@@ -247,5 +310,71 @@ describe("T-UI-3 右栏锁定可见可验", () => {
       <AgentChatPane transport={stubTransport()} session={stubSession()} />,
     );
     expect(screen.queryByTestId("agent-chat-locked")).toBeNull();
+  });
+});
+
+describe("T-UI-4 J.5 范围预检与确认接线", () => {
+  it("T-UI-011 预检未返回：按钮不可点且显示「正在核对要改哪些地方…」", () => {
+    renderPane(makeScheme(), EMPTY_DEMO_GATE, {}, null);
+    expect(screen.getByTestId("scheme-confirm")).toBeDisabled();
+    expect(
+      screen.getByTestId("scheme-confirm-blocked").textContent ?? "",
+    ).toContain("正在核对要改哪些地方");
+  });
+
+  it("T-UI-012 预检返回合规 plan 后可点", () => {
+    const scheme = makeScheme();
+    renderPane(
+      scheme,
+      EMPTY_DEMO_GATE,
+      {},
+      compliantScopePlan({ scheme_revision: scheme.scheme_revision }),
+    );
+    expect(screen.getByTestId("scheme-confirm")).not.toBeDisabled();
+    expect(screen.queryByTestId("scheme-confirm-blocked")).toBeNull();
+  });
+
+  it("T-UI-013 点击确认：createContractWithAdmission 的 writable_paths 与 plan 一致，且未走 submitJourneyMessage", async () => {
+    const scheme = makeScheme();
+    const plan = compliantScopePlan({ scheme_revision: scheme.scheme_revision });
+    const expectedWritable = scopePlanToContractScope(plan).writable_paths;
+    const createContractWithAdmission = vi.fn(
+      async (_conn: unknown, contract: unknown) => ({
+        contract,
+        admission: null,
+      }),
+    );
+    const submitJourneyMessage = vi.fn();
+
+    const onConfirmScheme = vi.fn(async () => {
+      // 与 index.tsx::handleConfirmScheme 的 signAndPrepare 同源：按 plan 投影建合同。
+      const fromPlan = buildConfirmContractFromScopePlan(scheme, plan);
+      await createContractWithAdmission(
+        { baseUrl: "http://test" },
+        softwareContractSchema.parse({
+          ...fromPlan,
+          lifecycle_state: "PENDING_APPROVAL",
+          approval: { status: "PENDING_REVIEW" },
+        }),
+        { confirmationId: "scheme-confirm-ui-013" },
+      );
+      // 确认链不得再走意图文本推断
+      expect(submitJourneyMessage).not.toHaveBeenCalled();
+    });
+
+    renderPane(scheme, EMPTY_DEMO_GATE, { onConfirmScheme }, plan);
+    fireEvent.click(screen.getByTestId("scheme-confirm"));
+    expect(onConfirmScheme).toHaveBeenCalledTimes(1);
+    await onConfirmScheme.mock.results[0]!.value;
+
+    expect(createContractWithAdmission).toHaveBeenCalledTimes(1);
+    expect(submitJourneyMessage).not.toHaveBeenCalled();
+    const passed = createContractWithAdmission.mock.calls[0]![1] as {
+      authorization: { file_system_scope: { writable_paths: string[] } };
+    };
+    expect(passed.authorization.file_system_scope.writable_paths).toEqual(
+      expectedWritable,
+    );
+    expect(expectedWritable).toContain("src/pages/**");
   });
 });

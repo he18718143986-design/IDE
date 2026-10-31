@@ -12,6 +12,11 @@ import {
   runConfirmSchemeAtomic,
   type ConfirmSchemeAtomicInput,
 } from "../../src/lib/journey/confirm-scheme-atomic";
+import {
+  formatBudgetPlain,
+  scopePlanDigest,
+  type ScopePlan,
+} from "../../src/lib/journey/scope-plan";
 
 /**
  * SSOT v2.0.2 §5.2.1 验收：确认方案事务、幂等与补偿。
@@ -40,6 +45,51 @@ function makeDemo(partial: Partial<DemoGate> = {}): DemoGate {
   return { ...EMPTY_DEMO_GATE, ...partial };
 }
 
+/** 与 makeScheme 默认 revision=2 对齐的合规 ScopePlan（敏感项已清空）。 */
+function compliantScopePlan(partial: Partial<ScopePlan> = {}): ScopePlan {
+  const plan: ScopePlan = {
+    scheme_revision: 2,
+    plan_digest: "",
+    areas: [
+      {
+        id: "area-0",
+        label: "工程进度管控",
+        why: "因为要做进度汇总",
+        module_ids: ["mod-0"],
+        kind: "change_existing",
+        paths: ["src/pages/**"],
+        excluded_by_user: false,
+      },
+    ],
+    never_touch: [{ label: "密码与钥匙文件", paths: [".env*"] }],
+    needs_approval: [],
+    verification: {
+      commands: [],
+      plain: ["页面能打开并看到进度数字"],
+      manual_only: true,
+    },
+    budget: {
+      limits: {
+        max_file_modifications: 10,
+        max_total_diff_lines: 2000,
+        max_duration_seconds: 1800,
+        max_verification_retries: 3,
+        max_command_executions: 40,
+        max_tool_calls: 200,
+      },
+      plain: formatBudgetPlain({
+        max_file_modifications: 10,
+        max_duration_seconds: 1800,
+      }),
+    },
+    grade: { ok: true, rejected: [] },
+    ...partial,
+  };
+  const withDigest: ScopePlan = { ...plan, plan_digest: "" };
+  withDigest.plan_digest = scopePlanDigest(withDigest);
+  return withDigest;
+}
+
 interface Harness {
   input: ConfirmSchemeAtomicInput;
   calls: string[];
@@ -54,14 +104,21 @@ function makeHarness(
     scheme?: Partial<SchemeDraft>;
     demo?: DemoGate;
     expectedRevision?: number;
+    scopePlan?: ScopePlan | null;
     failQuiesce?: boolean;
     failSnapshot?: boolean;
+    /** J.5：persistSnapshot 抛 E_SCOPE_PLAN_DRIFT（附带新 plan） */
+    failSnapshotDrift?: boolean;
     failSign?: boolean;
     failCompensate?: boolean;
     confirmationId?: string;
   } = {},
 ): Harness {
   const scheme = makeScheme(overrides.scheme);
+  const scopePlan =
+    overrides.scopePlan === undefined
+      ? compliantScopePlan({ scheme_revision: scheme.scheme_revision })
+      : overrides.scopePlan;
   const calls: string[] = [];
   const harness: Harness = {
     calls,
@@ -74,12 +131,33 @@ function makeHarness(
       scheme,
       demo: overrides.demo ?? EMPTY_DEMO_GATE,
       expectedRevision: overrides.expectedRevision ?? scheme.scheme_revision,
+      scopePlan,
       quiesceRightChat: async () => {
         calls.push("quiesce");
         if (overrides.failQuiesce) throw new Error("流式中断超时");
       },
       persistSnapshot: async ({ confirmation_id }) => {
         calls.push("snapshot");
+        if (overrides.failSnapshotDrift) {
+          const fresh = compliantScopePlan({
+            scheme_revision: scheme.scheme_revision,
+            areas: [
+              {
+                id: "area-drift",
+                label: "漂移后的区域",
+                why: "项目刚变",
+                module_ids: ["mod-0"],
+                kind: "change_existing",
+                paths: ["src/features/progress/**"],
+                excluded_by_user: false,
+              },
+            ],
+          });
+          throw Object.assign(new Error("范围计划已漂移"), {
+            code: "E_SCOPE_PLAN_DRIFT",
+            scope_plan: fresh,
+          });
+        }
         if (overrides.failSnapshot) throw new Error("磁盘只读");
         harness.snapshotWrites += 1;
         return {
@@ -260,15 +338,34 @@ describe("T-ATOM 故障注入与补偿", () => {
   });
 });
 
+describe("T-ATOM J.5 范围漂移", () => {
+  it("T-ATOM-012 persistSnapshot 抛 E_SCOPE_PLAN_DRIFT → 同码、不签署、解锁并附带新 plan", async () => {
+    const h = makeHarness({ failSnapshotDrift: true });
+    const result = await runConfirmSchemeAtomic(h.input);
+
+    expect(result.ok).toBe(false);
+    expect(result.failedAt).toBe("FREEZE_SNAPSHOT");
+    expect(result.code).toBe("E_SCOPE_PLAN_DRIFT");
+    expect(h.signs).toBe(0);
+    expect(h.compensations).toHaveLength(0);
+    expect(h.restores).toBe(1);
+    expect(result.scope_plan?.areas[0]?.paths).toEqual([
+      "src/features/progress/**",
+    ]);
+    // 未进入 SIGN_AND_PREPARE
+    expect(h.calls).toEqual(["quiesce", "snapshot", "restore"]);
+  });
+});
+
 describe("T-ATOM confirmation_id 生成", () => {
-  it("T-ATOM-012 生成器产物满足 8–96 位字符集且两次不重复", () => {
+  it("T-ATOM-013 生成器产物满足 8–96 位字符集且两次不重复", () => {
     const a = newSchemeConfirmationId();
     const b = newSchemeConfirmationId();
     expect(a).not.toBe(b);
     expect(a).toMatch(/^[A-Za-z0-9._-]{8,96}$/);
   });
 
-  it("T-ATOM-013 生成的 id 可被事务接受（端到端一小步）", async () => {
+  it("T-ATOM-014 生成的 id 可被事务接受（端到端一小步）", async () => {
     const spy = vi.fn(async () => ({ contract_id: "contract-x" }));
     const h = makeHarness({ confirmationId: newSchemeConfirmationId() });
     h.input.signAndPrepare = spy;

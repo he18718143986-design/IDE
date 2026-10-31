@@ -134,12 +134,13 @@ import {
   resolveSchemeConflict,
   updateSchemeNotes,
   evaluateSchemeConfirmation,
-  formatSchemeAsIntent,
   freezeScheme,
   EMPTY_DEMO_GATE,
   type DemoGate,
   type SchemeDraft,
 } from "@/lib/journey/scheme-draft";
+import { buildConfirmContractFromScopePlan } from "@/lib/journey/confirm-scheme-contract";
+import type { ScopePlan } from "@/lib/journey/scope-plan";
 import {
   newSchemeConfirmationId,
   runConfirmSchemeAtomic,
@@ -351,6 +352,12 @@ function Console() {
   const schemeConfirmIdRef = useRef<{ revision: number; id: string } | null>(
     null,
   );
+  /**
+   * TASK-J.5：与当前 scheme_revision 绑定的范围预检结果。
+   * 修订变化后先清空，300ms 防抖再拉；在途请求被新修订作废。
+   */
+  const [scopePlan, setScopePlan] = useState<ScopePlan | null>(null);
+  const scopePreflightSeqRef = useRef(0);
   /** TASK-C.11b：感官确认 + prototype id */
   const [demoConfirmed, setDemoConfirmed] = useState(false);
   const [activePrototypeId, setActivePrototypeId] = useState<string | null>(
@@ -373,12 +380,41 @@ function Console() {
   const schemeConfirmation = useMemo(
     () =>
       schemeDraft
-        ? // TASK-J.3：第三参暂传 null；真实 ScopePlan 接线在 J.5。
-          // SCOPE_GATE_ENABLED 默认 false，故此时确认按钮仍可用。
-          evaluateSchemeConfirmation(schemeDraft, schemeDemoGate, null)
+        ? evaluateSchemeConfirmation(schemeDraft, schemeDemoGate, scopePlan)
         : null,
-    [schemeDraft, schemeDemoGate],
+    [schemeDraft, schemeDemoGate, scopePlan],
   );
+
+  /** TASK-J.5：方案修订变化 → 300ms 防抖 preflightScope；修订号不匹配则丢弃。 */
+  useEffect(() => {
+    if (!conn || !schemeDraft || schemeDraft.frozen) {
+      setScopePlan(null);
+      return;
+    }
+    const revision = schemeDraft.scheme_revision;
+    const seq = ++scopePreflightSeqRef.current;
+    let cancelled = false;
+    setScopePlan(null);
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const { scope_plan } = await preflightScope(conn, {
+            scheme: schemeDraft,
+          });
+          if (cancelled || scopePreflightSeqRef.current !== seq) return;
+          if (scope_plan.scheme_revision !== revision) return;
+          setScopePlan(scope_plan);
+        } catch {
+          if (cancelled || scopePreflightSeqRef.current !== seq) return;
+          setScopePlan(null);
+        }
+      })();
+    }, 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [conn, schemeDraft]);
 
   /** C.10o：图谱开工/核销忙态与失败黄条（与建图错误共用顶栏） */
   const [graphActionBusy, setGraphActionBusy] = useState(false);
@@ -1062,53 +1098,16 @@ ${trimmed}`
     }
     const confirmationId = schemeConfirmIdRef.current.id;
 
-    // 事务外前置：把方案解析成一份可签署的合同骨架。
-    // 故意放在 quiesce 之前——失败时右栏尚未锁定，用户可继续改需求后重试。
-    let sourceContract: SoftwareContract | null = null;
-    try {
-      const intentText = formatSchemeAsIntent(schemeDraft);
-      let workingDraft = draft;
-      if (!workingDraft?.contract) {
-        const result = await submitJourneyMessage(conn, {
-          message: intentText,
-          ...(selectedId ? { contract_id: selectedId } : {}),
-        });
-        if (result.draft) {
-          workingDraft = result.draft;
-          setDraft(result.draft);
-        }
-        setJourneyCards((prev) => [
-          ...prev.slice(-19),
-          {
-            id: `scheme-draft-${Date.now()}`,
-            kind: result.route,
-            text: result.plain_summary,
-          },
-        ]);
-      }
-      const reusable =
-        selected != null &&
-        selected.lifecycle_state !== "DRAFT" &&
-        selected.approval?.status !== "DRAFT"
-          ? selected
-          : null;
-      sourceContract = reusable ?? workingDraft?.contract ?? selected;
-    } catch (error) {
-      setConfirmPrototypeError(
-        error instanceof Error ? error.message : "方案转合同失败",
-      );
+    // J.5：范围须在点击前算好；不再走 formatSchemeAsIntent → submitJourneyMessage。
+    const planForConfirm = scopePlan;
+    if (
+      !planForConfirm ||
+      planForConfirm.scheme_revision !== expectedRevision
+    ) {
+      setConfirmPrototypeError("正在核对要改哪些地方…");
       setSchemeConfirmBusy(false);
       return;
     }
-
-    if (!sourceContract) {
-      setConfirmPrototypeError(
-        "没有可确认的方案合同，请再在右侧补充一点需求后重试。",
-      );
-      setSchemeConfirmBusy(false);
-      return;
-    }
-    const contractSource: SoftwareContract = sourceContract;
 
     /**
      * signAndPrepare 内部暂存，供 compensate 精确回收本次已建的合同。
@@ -1125,6 +1124,7 @@ ${trimmed}`
       scheme: schemeDraft,
       demo: schemeDemoGate,
       expectedRevision,
+      scopePlan: planForConfirm,
 
       // 1. 先停流式，再禁右栏；右栏一旦锁定就不再接受 Supervisor Patch。
       quiesceRightChat: async () => {
@@ -1132,34 +1132,51 @@ ${trimmed}`
         setSchemeChatLocked(true);
       },
 
-      // 2. 不可变快照（幂等：同 id + 同内容返回原快照）。
+      // 2. 不可变快照（幂等：同 id + 同内容返回原快照）；绑定当前 ScopePlan。
       persistSnapshot: async ({ confirmation_id, scheme, demo, decision }) => {
-        // TASK-J.4：冻结须绑定 ScopePlan；完整中栏状态与防抖预检见 J.5
-        const { scope_plan } = await preflightScope(conn, { scheme });
-        const view = await freezeSchemeSnapshot(conn, {
-          confirmation_id,
-          scheme,
-          demo,
-          decision: {
-            code: decision.code,
-            message: decision.message,
-            demo_mode: decision.demo_mode,
-          },
-          scope_plan,
-        });
-        return {
-          snapshot_id: view.snapshot_id,
-          digest: view.digest,
-          idempotent: view.idempotent,
-        };
+        try {
+          const view = await freezeSchemeSnapshot(conn, {
+            confirmation_id,
+            scheme,
+            demo,
+            decision: {
+              code: decision.code,
+              message: decision.message,
+              demo_mode: decision.demo_mode,
+            },
+            scope_plan: planForConfirm,
+          });
+          return {
+            snapshot_id: view.snapshot_id,
+            digest: view.digest,
+            idempotent: view.idempotent,
+          };
+        } catch (err) {
+          if (
+            err instanceof DaemonApiError &&
+            err.code === "E_SCOPE_PLAN_DRIFT"
+          ) {
+            const body = err.body as { scope_plan?: ScopePlan } | undefined;
+            const drift = Object.assign(new Error(err.message), {
+              code: "E_SCOPE_PLAN_DRIFT" as const,
+              ...(body?.scope_plan ? { scope_plan: body.scope_plan } : {}),
+            });
+            throw drift;
+          }
+          throw err;
+        }
       },
 
-      // 3. 签署 + 施工准备：建合同（带 confirmation_id）→ 批准 → 建任务图。
+      // 3. 签署 + 施工准备：按 ScopePlan 投影建合同 → 批准 → 建任务图。
       signAndPrepare: async ({ confirmation_id, onContractCreated }) => {
+        const fromPlan = buildConfirmContractFromScopePlan(
+          schemeDraft,
+          planForConfirm,
+        );
         const created = await createContractWithAdmission(
           conn,
           softwareContractSchema.parse({
-            ...contractSource,
+            ...fromPlan,
             lifecycle_state: "PENDING_APPROVAL",
             approval: { status: "PENDING_REVIEW" },
           }),
@@ -1218,13 +1235,20 @@ ${trimmed}`
       },
 
       // 5. 只有成功提交才恢复右栏；失败保持锁定（已签署态不允许再聊改本轮）。
+      //    例外：漂移等冻结前失败由事务内 restoreRightChat 解锁。
       restoreRightChat: () => setSchemeChatLocked(false),
     });
 
     if (!result.ok) {
       const compensationFailed = result.code === "E_COMPENSATION_FAILED";
+      const drifted = result.code === "E_SCOPE_PLAN_DRIFT";
+      if (drifted && result.scope_plan) {
+        setScopePlan(result.scope_plan);
+      }
       setConfirmPrototypeError(
-        result.reason ?? "确认方案失败，请检查方案与 Demo 状态后重试。",
+        drifted
+          ? "项目刚刚有变化，我重新核对了改动范围，请再看一眼"
+          : (result.reason ?? "确认方案失败，请检查方案与 Demo 状态后重试。"),
       );
       setJourneyCards((prev) => [
         ...prev.slice(-19),
@@ -1233,7 +1257,9 @@ ${trimmed}`
           kind: "SYSTEM",
           text: compensationFailed
             ? `确认在「${result.failedAt}」阶段失败且补偿未完成，右栏保持锁定，需人工处理：${result.reason ?? ""}`
-            : `确认未生效（${result.failedAt}）：${result.reason ?? "未知原因"}`,
+            : drifted
+              ? "项目刚刚有变化，我重新核对了改动范围，请再看一眼"
+              : `确认未生效（${result.failedAt}）：${result.reason ?? "未知原因"}`,
         },
       ]);
       setSchemeConfirmBusy(false);
@@ -1279,13 +1305,12 @@ ${trimmed}`
   }, [
     conn,
     schemeDraft,
-    draft,
-    selected,
-    selectedId,
+    scopePlan,
     schemeDemoGate,
     schemeConfirmBusy,
     chatSession,
   ]);
+
 
   // C.18：选择题流程废弃；保留空实现避免旧引用崩（若有）
   const handleClarificationSelect = useCallback(
