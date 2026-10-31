@@ -3,8 +3,10 @@
 > **状态**：**设计定稿 · 待施工**（立卡见 [`development-tasks.md`](./development-tasks.md) §3.4c `TASK-J.9`）
 > **建立日期**：2026-10-27（Asia/Hong_Kong）
 > **上位规格**：[`supervisor.md`](./supervisor.md) 第三部分 §14.2（`SchemeDraftV2`）、§14.3（`SchemePatch` 与合并规则）、§14.11（证据台账与 `INV-LEDGER-01～04`）；相关 §3.3（pin 与覆盖建议）、§14.7（溯源高亮与撤销）、§16.5（冻结后分流）。
-> **与上位规格的关系**：本文是上述条款的**实施口径**，不新增产品行为。凡本文对上位规格做了「收紧」或「补全」，均在 §1.3 登记，并在 `supervisor.md` §14.11 末尾加了指针。与上位规格冲突时以 `supervisor.md` 为准，并回头修本文。
+> **与上位规格的关系**：本文是上述条款的**实施口径**，不新增产品行为。**K-1～K-16、G-MATCH、墓地不可变式的权威正文只在 [`supervisor.md`](./supervisor.md) §14.11**；冲突以 supervisor 为准，并回头修本文。
 > **读者**：实现 `src/lib/journey/scheme-patch-engine.ts` 的本地工程团队；评审 J.9 PR 的人。
+>
+> > **DOC-10（2026-11-01）**：本文曾自带 K-1～K-13 全表与 G-MATCH 公式副本，已与 SSOT 出现 K-9 / K-13 编号漂移。重复条款已删除，改为下方指针与实现索引。
 
 ---
 
@@ -41,21 +43,29 @@
 
 ### 1.3 对上位规格的收紧与补全（登记表）
 
-| # | 上位条文 | 本文口径 | 理由 |
-| :--- | :--- | :--- | :--- |
-| K-1 | §14.2 条目 `evidence: TurnRef[]` 与 §14.11 `EvidenceItem[]` 并存 | **存储**用 `EvidenceItem[]`（§14.11 较新）。**编译器 op** 只能携带 `TurnRef[]`；op 里出现 `kind: "edit"` 即判伪造。`EditRef` 只能由 `applyUserEdit` 产生。 | 编译器看不到 UI 编辑事件，它给出的编辑证据只能是编造。 |
-| K-2 | §14.11 `TurnRef.quote` 可选 | 三种场景 **`quote` 必填**：`mark_user_confirmed`；复活；新条目声明 `source: "user_said"`（缺 `quote` 时降级为 `ai_inferred`，不丢弃）。 | 没有原话切片，零模型代码无从断言「用户真的这么说」。这是 `INV-LEDGER-02`「携带用户明确肯定原话」的可执行形式。 |
-| K-3 | §14.3「`evidence` 指向 AI 回复 → 该 op 丢弃」与「Schema 错 → 整个补丁丢弃」 | 明确两级原子性：**结构类错误整补丁丢弃；溯源类错误单 op 丢弃**；幸存 op 作为**一个修订**整体提交或整体回滚（§2.4）。 | 两条原文分别规定了补丁级与 op 级，需要说清边界，避免「部分应用」被误读。 |
-| K-4 | §14.11 `RejectedAlternative` | 追加**可选**字段：`item_ref`、`fingerprint`、`revival_keys`、`rejected_after_turn_seq`、`status`、`revived`（§5.1）。旧数据缺字段时由 `migrateGraveyardEntry` 确定性补全。 | 不加这些字段，「原话精准匹配」与「必须晚于否决」都无从判定。 |
-| K-5 | §14.11 `rejected_by: "security_gate"` | 门禁否决的墓碑**不能**经补丁复活（`E_REVIVAL_SECURITY_LOCKED`），只能走门禁自己的审批流。 | 聊天里的一句话不得绕过安全门禁。 |
-| K-6 | §14.11 `disallow_revival: false` | 命中此类墓碑的 AI op 不拦截，**转成待决推荐卡**（`S_GRAVEYARD_SOFT`），不直接写入。 | 「允许 Agent 提请复活」的字面含义是「提请」，不是「直接复活」。 |
-| K-7 | §14.7「撤销这次整理，方案回到上一修订」 | 撤销产生**新修订**（`scheme_revision + 1`），内容等于上一修订。修订号永不回退。 | 修订号回退会产生 ABA：基于旧修订编译的补丁会被误判为新鲜。 |
-| K-8 | §14.2 `SchemeItemMeta` | 追加引擎自有的可选字段 `introduced_after_turn_seq`（条目首次出现时的水位）。编译器提交的同名字段一律忽略。 | 用于识别「拿用户很久以前的一句『对』确认新条目」的假冒确认。 |
-| K-9 | 引擎码 | 引擎码表中的 `E_* / W_* / S_*` 码是**编译日志码**，面向开发者与审计，不进入 [`runtime-contract-and-safety.md`](./runtime-contract-and-safety.md) §2.3 签署闭集，也不登记入 `src/lib/error-codes.ts` 的 `ERROR_CODES`。例外：`E_PROPOSAL_PREVIOUSLY_REJECTED` 由引擎在编译期以 DROP 裁决输出（含 Z-04 静默 DROP），故同时出现在码表与 `journal.verdicts` 中；其拒绝码归属为门禁层（§8 L3，定义见 INV-LEDGER-03），同样不进入 §2.3 签署闭集。 | 拒绝码闭集是「用户可做什么」的表；编译日志码只给开发者与审计看。 |
-| K-10 | §14.11 墓地命中判定（INV-LEDGER-03） | `matchesTombstone` 增第 (d) 条：`revival_keys` 中字素数 ≥ 4 的元素被 `matchNormalize(op 主文本)` 包含即命中；命中只进入复活判定，不直接 DROP（§4.2）。 | 复活判定认用户自己的说法，拦截原先只认指纹与 Dice，两者方向不一致，拦截比复活宽松。 |
-| K-11 | §14.3 `SchemeOp` 联合 | 新增 `reject_item` 操作（§2.3.2、§5.4）：聊天里的否决入墓；证据须为本批用户消息，锚定句含否定词且非问句（引擎词表判定）。 | 原先只有 UI 与卡片拒绝能入墓，聊天中「不要了」没有路径。 |
-| K-12 | §14.11 `TurnRef.occurrence`（编译器提示） | 复活判定路径忽略编译器 `occurrence`，锚点取最后一处，记 `W_REVIVAL_OCCURRENCE_IGNORED`（§4.4）。**显式风险**：确认判定路径（`mark_user_confirmed`，§3.4）同样接受 `occurrence`，存在同型洗白面（「我同意。算了不同意」+ `occurrence: 0`），修法待定。 | 允许编译器挑出现处，即可把 ILLEGAL 洗成 LEGAL（R-18）。 |
-| K-13 | §14.11 `RejectedAlternative.rejected_after_turn_seq`（旧数据迁移） | `migrateGraveyardEntry` 对缺失该字段的旧墓碑默认 0。含义：任何 seq > 0 的用户消息都满足 R2 的时间条件，复活判定的时间下界被放宽到几乎无约束；风险由 R1–R9 其余闸门（用户来源、批次内、关键词、否定、问句、肯定词、指纹）兜底。| 旧数据无法确知否决水位；取 0 偏宽放（可能让更早的用户话成为复活证据），而非偏紧收（不会误拦）。如实登记，实施期若需收紧须改本条。 |
+> **SSOT**：K-1～K-16 的权威正文**只**在 [`supervisor.md`](./supervisor.md) §14.11 第 4 小节。**冲突以 supervisor 为准**（含 **K-9 / K-15**：`E_PROPOSAL_PREVIOUSLY_REJECTED` 编译日志码 vs 工地 L3 运行时码 / `ERROR_CODES` 关系）。本文**不再复述** K 表全文。
+
+**本文实现索引**（仅落点指针，不重复条款）：
+
+| # | 本文落点（算法 / 类型 / 码） |
+| :--- | :--- |
+| K-1 | §5.2 类型；P1 伪造 `EditRef` |
+| K-2 | §3 锚定；`mark_user_confirmed` / 复活 / `user_said` 的 `quote` |
+| K-3 | §2.4 两级原子性 |
+| K-4 | §5.1 / §5.2 墓地扩展字段与 `migrateGraveyardEntry` |
+| K-5 / K-6 | §2.3 P3；`E_REVIVAL_SECURITY_LOCKED` / `S_GRAVEYARD_SOFT` |
+| K-7 | §5.4 `EditResult`；撤销 → 新修订 |
+| K-8 | §5.2 `introduced_after_turn_seq` |
+| K-9 | **以 supervisor K-9 + K-15 为准**（本文码表 §5.3 只列编译日志码） |
+| K-10 | §4.2 命中 (d)；语义见 SSOT G-MATCH-NL-4 |
+| K-11 | §2.3.2 / §5.4 `reject_item` |
+| K-12 | §4.4 `ignoreOccurrence` |
+| K-13 | **以 supervisor 为准**（生成端 `reject_item`）；见下方「仅属本文件」迁移注 |
+| K-14～K-16 | 试玩 / 归因侧，见 [`playtest-self-check.md`](./playtest-self-check.md)；权威仍在 supervisor |
+
+**仅属本文件的非重复补充**（原引擎表曾误把下列口径标成「K-13」，与 supervisor 的 K-13 编号冲突；编号以 SSOT 为准，内容保留为 K-4 迁移实现注）：
+
+- `migrateGraveyardEntry` 对缺失 `rejected_after_turn_seq` 的旧墓碑**默认 0**。含义：任何 `seq > 0` 的用户消息都满足复活判定 R2 的时间条件，时间下界被放宽到几乎无约束；风险由 R1–R9 其余闸门兜底。旧数据无法确知否决水位；取 0 偏宽放而非偏紧收。实施期若需收紧须改 supervisor 登记并回写本注。
 
 ---
 
@@ -353,12 +363,9 @@ function anchorQuote(turn: TranscriptTurn, ref: TurnRef, opts?: { requireQuote?:
 ### 4.2 墓碑指纹（入墓时一次性计算并存储）
 
 ```ts
-// matchNormalize：normalizeForAnchor 之后再做 ASCII 小写、删除全部空白与 \p{P}\p{S}
-// 只用于「指纹 / 关键词」比较，不用于 quote 锚定
+// matchNormalize / lexemes：签名与语义见 SSOT G-MATCH-NL-1/NL-2；实现见 graveyard-match.ts
 function matchNormalize(s: string): string;
-
-// 汉字连续段取相邻二元组；长度为 1 的汉字段取单字；ASCII 字母数字词（长度 ≥ 2）整体作为一个元素
-function lexemes(s: string): string[];   // 排序去重后返回
+function lexemes(s: string): string[];
 
 interface GraveyardFingerprint {
   key: string;          // matchNormalize(主文本)
@@ -368,20 +375,11 @@ interface GraveyardFingerprint {
 
 「主文本」按条目类别取：`modules → name + " " + purpose`；`goals / out_of_scope / acceptance / open_questions → text`；`flows / entities → name`；`decisions → question + " " + (chosen ?? recommended)`；`conflicts → question`；`set_title / set_summary / set_audience → value`。
 
-> **语义源**：本小节的 `matchNormalize`、`lexemes`、Dice 与 (a)～(d) 以 [`supervisor.md`](./supervisor.md) §14.11 第 5 小节 G-MATCH-NL 为准；Worker 派工门禁按同一语义投影（[`worker-graveyard-gate.md`](./worker-graveyard-gate.md) §4）。下文公式保留为历史记录。
+> **语义源（DOC-10）**：`matchNormalize`、`lexemes`、Dice、阈值与命中 (a)～(d) **只**以 [`supervisor.md`](./supervisor.md) §14.11 第 5 小节 **G-MATCH-NL** 为准；本文与 [`worker-graveyard-gate.md`](./worker-graveyard-gate.md) 只做投影，**禁止复述公式或常量值**。代码唯一实现：`src/lib/journey/graveyard-match.ts`。
 
-**命中判定** `matchesTombstone(opContent, entry)`（与条目类别无关，防止「换个 op 类型偷渡」）：
+**命中判定** `matchesTombstone(opContent, entry)`：按 **G-MATCH-NL-4** 求值（与条目类别无关，防止「换个 op 类型偷渡」）。多个墓碑同时命中时，按 `rejected_id` 字典序取第一个作为主墓碑，其余写入 `reasons[]`。
 
-```text
-命中 ⇔ entry.status === "active" 且 满足其一：
-  (a) entry.item_ref 存在 且 op 目标 id === entry.item_ref.id
-  (b) matchNormalize(op 主文本) === entry.fingerprint.key
-  (c) Dice(lexemes(op 主文本), entry.fingerprint.lexemes) ≥ GRAVEYARD_DICE_THRESHOLD（= 0.75）
-  (d) ∃ k ∈ entry.revival_keys：字素数(k) ≥ 4 且 matchNormalize(op 主文本) 包含 k（子串，口径同 R6）
-多个墓碑同时命中时，按 rejected_id 字典序取第一个作为主墓碑，其余写入 reasons[]
-```
-
-(d) 命中**不直接 DROP**，与 (a)(b)(c) 同一汇合点，进入 §4.4 `judgeRevival`（P3 → RV）。它让拦截与复活使用同一套关键词，消除「复活认得、拦截不认得」的不对称。字素数下限 4 防止两字短词造成大面积过拦截。
+**(d) 的引擎侧处置（非重复语义）**：(d) 命中**不直接 DROP**，与 (a)(b)(c) 同一汇合点，进入 §4.4 `judgeRevival`（P3 → RV）。它让拦截与复活使用同一套关键词，消除「复活认得、拦截不认得」的不对称。
 
 **能力边界（必须写进 PR 描述）**：(b)(c)(d) 都是字面匹配，**抓不住纯语义改写**（「用 MongoDB」与「换成文档数据库」Dice 为 0）。零模型方案在此处的残余风险由三层兜底：① 编译器与 Worker 的提示词注入活跃墓碑（§14.11 已规定）；② 金标对话集加入「语义改写偷渡」样本并要求 0 漏网（J.11）；③ Worker 产出物门禁（不在 J.9）。阈值 0.75 是保守取值：宁可误拦一个相似的新想法（用户仍可亲口说出来走合法复活），不可漏放一个已否决的想法。(d) 只抓复用了用户原话关键词的重提。「MongoDB 存储」与墓碑「用 MongoDB 存数据」之间只有模块名重叠，既不超过 Dice 阈值，也不含用户原话的完整关键词，(d) 不命中，仍放行。这是已登记的残余风险，由 J.11 金标覆盖。
 
@@ -727,7 +725,7 @@ export const WARNING_CODES = [
 export const MAX_OPS_PER_PATCH = 64;
 export const MAX_QUOTE_GRAPHEMES = 500;
 export const SHORT_QUOTE_GRAPHEMES = 4;
-export const GRAVEYARD_DICE_THRESHOLD = 0.75;
+export const GRAVEYARD_DICE_THRESHOLD = 0.75; // 数值 SSOT：supervisor §14.11 G-MATCH-NL-3；此处仅实现导出清单
 export const NEGATION_WINDOW_GRAPHEMES = 8;
 ```
 

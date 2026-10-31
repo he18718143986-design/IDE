@@ -3,8 +3,10 @@
 > **状态**：**设计定稿 · 待施工**（归属第二批预告 `J.16`「试玩幕、对话式验收」；本文只覆盖其中的自查与点亮，建议实施时拆卡）
 > **建立日期**：2026-10-28（Asia/Hong_Kong）
 > **上位规格**：[`supervisor.md`](./supervisor.md) §14.11（台账、子账本四 `attributions`、K-14、K-15、K-16）、§16.5（B/C 分流与不变式 C-1）、§16.7（试玩幕与质询台）、§17 D10；[`runtime-contract-and-safety.md`](./runtime-contract-and-safety.md) §5.4；[`worker-graveyard-gate.md`](./worker-graveyard-gate.md)（返工派工同样过门禁）；架构 [`system-architecture.md`](./system-architecture.md) 步骤六（已被 §16.7 与 D10 修订的部分以 SSOT 为准）。
-> **与上位规格的关系**：本文是实施口径，不新增场景、不新增用户决定类型、不新增错误码与原因码。冲突时以 SSOT 为准。
+> **与上位规格的关系**：本文是实施口径，不新增场景、不新增用户决定类型、不新增错误码与原因码。**K-14 / K-15 / K-16、G-MATCH、INV-LEDGER-03 以 [`supervisor.md`](./supervisor.md) §14.11 为准**；冲突时以 SSOT 为准。
 > **逐字核对基线**：`main` @ `0613a00`。本文引用的类型、常量与函数名均已对照原文：`src/lib/evidence.schema.ts`（`reasonCodeSchema` 9 码、`evidenceBundleSchema`、`deriveCanMerge`、`tests_modified`）；`daemon/supervisor/dispute/*`（`DISPUTE_CONFIDENCE_THRESHOLD = 0.7`、`DisputeClassification`、`DisputeUserChoice`、`DisputeReport`、`classifyDispute`、`buildReworkProposal`、`assertReworkScopeSubset`、`extractKeywords`、`CodeFactSourceImpl`）。
+>
+> > **DOC-10（2026-11-01）**：墓地交叉与 K-16 闭集不再复述 SSOT；§4.6 / §5 仅保留试玩引擎特有的裁决算法与兼容处理。
 
 ---
 
@@ -245,6 +247,8 @@ stateDiagram-v2
 
 ### 4.6 与墓地、§16.5、dispute 阈值的交叉决议
 
+> **SSOT**：墓地不可复活与逃生口见 supervisor §14.11 **INV-LEDGER-03**；匹配语义见 **G-MATCH**。下表是试玩引擎特有的交叉裁决（不重复定义匹配公式）。
+
 | # | 交叉情形 | 裁决 | 依据 |
 | :-: | :--- | :--- | :--- |
 | X-1 | 质疑原话命中活跃墓碑（用户在试玩时想要回被否决的东西） | 走 Revival：等价 §16.5 C 类「暂停，现在改方案」入口，回方案幕后由引擎 R0～R9 判定；**永不**作为 Bug 返工 | 被否决的东西按定义不在冻结方案里；§16.7「方案里没有」分支 |
@@ -271,15 +275,9 @@ stateDiagram-v2
 
 ### 5.2 trigger 收紧为闭集（K-16）
 
-K-16 前 SSOT 口径（已由 `supervisor.md` §14.11 K-16 收紧为闭集，见下方兼容处理）：`trigger: "first_impression" | "user_dispute" | "acceptance_fail" | string`。
+> **SSOT**：闭集定义与字段语义见 [`supervisor.md`](./supervisor.md) §14.11 **K-16**（及 K-14 归因账本）。本文不复述。
 
-**建议去掉 `| string`**，理由：
-
-1. `| string` 让类型退化为 `string`，TypeScript 无法做穷尽检查，回填机的 `switch` 漏掉分支也不会报错。
-2. 归因账本是度量出口（K-14 原文「归因是读数」）。开放字符串会让统计口径漂移（`"dispute"`、`"user-dispute"`、`"userDispute"` 被当作三种来源）。
-3. 新增来源是规格变更，应走 SSOT 增补，而不是运行时随手写。
-
-**兼容处理**：读取旧台账时，未知 trigger 映射为 `"user_dispute"` 并在 `resolution_note` 前缀 `[legacy-trigger:<原值>]`，写入时拒绝未知值。已登记为 K-16（`supervisor.md` §14.11），实施期生效；回填机代码随 `TASK-J.16` 落地。
+**仅属本文件的实现补充（兼容处理）**：读取旧台账时，未知 trigger 映射为 `"user_dispute"` 并在 `resolution_note` 前缀 `[legacy-trigger:<原值>]`，写入时拒绝未知值。回填机代码随 `TASK-J.16` 落地。
 
 ### 5.3 三分类裁决算法
 

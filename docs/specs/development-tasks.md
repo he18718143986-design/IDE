@@ -2347,10 +2347,10 @@ TASK-0.1 ──► TASK-0.2b ──► TASK-0.2c (Schema v1.3.0 & 自愈边) ─
 * **FAIL**：仍仅逻辑约定无 OS 证明；或负例可写/可出网；或改鉴权/扩 Freeze。
 
 
-#### 【Task C.14f】基线深度进度真 WS/流式 `[NEW_TASK]`
+#### 【Task C.14f】基线深度进度真 WS/流式 `[COMPLETED]`
 * **任务编号**：`TASK-C.14f`
 * **前置依赖**：`TASK-C.14b` (COMPLETED)
-* **任务状态**：**[NEW_TASK]**（2026-10-26 Tina t855u「立卡实现」；本条先立卡）
+* **任务状态**：**[COMPLETED]**（Tina t855u 实现；合入 tip `5f6ca93` `feat: C.14f BASELINE_PROGRESS WS + C.15a–d EO 余面 Delta`；矩阵与卡内双写已于 DOC-2 / 2026-11-01 对齐）
 * **对照痛点 / Spec 锚点**：基线讨论稿 §5 渐进扫 + §7 流式协议仍 OPEN；C.14b 验收注「深度进度为轮询——已知缝」。项 2（P1 体验）升格。
 * **v0.1 范围（施工合同 · Delta）**：
   1. Daemon 在渐进扫 `onP0` / 深度进展 / `onDone` 时经已有 WebSocket 广播 **`BASELINE_PROGRESS`**（载荷含 `scan_id`、`phase`、`progress_copy`、节点增量或全量摘要、`grants_construction:false`）。
@@ -2370,10 +2370,10 @@ TASK-0.1 ──► TASK-0.2b ──► TASK-0.2c (Schema v1.3.0 & 自愈边) ─
   4. 相关单测绿；不改 D.1；不扩 Freeze 五正文。
 * **FAIL**：仍仅靠 2s 轮询更新全景；或阻塞右栏；或改鉴权。
 
-#### 【Task C.15a】EO-01 DeliveryState 完备 `[NEW_TASK]`
+#### 【Task C.15a】EO-01 DeliveryState 完备 `[COMPLETED]`
 * **任务编号**：`TASK-C.15a`
 * **前置依赖**：`TASK-C.12b` (COMPLETED)
-* **任务状态**：**[NEW_TASK]**（Tina t855u；EO 余面项 4）
+* **任务状态**：**[COMPLETED]**（Tina t855u 实现；合入 tip `5f6ca93`；`src/lib/delivery-state.ts` + 转移 DAG；DOC-2 / 2026-11-01 对齐）
 * **对照痛点 / Spec 锚点**：右栏 §14.11 EO-01；C.12b 已落地 epoch/seq + 简化枚举投影，缺完整态与合法转移表。
 * **v0.1 范围**：
   1. 扩展 `DeliveryState` 至 EO-01 完备集（至少补 `PLAN_READY`、`VERIFYING`、`REWORK_REQUIRED`、`ESCALATED_HUMAN`；Demo 三态可用主干 `DEMO_READY`+`demo_mode` 或分立 `DEMO_*_READY`，须可测且与 C.12d 不打架）。
@@ -2408,10 +2408,10 @@ TASK-0.1 ──► TASK-0.2b ──► TASK-0.2c (Schema v1.3.0 & 自愈边) ─
   5. **活路径（t866u）**：签署 seed → execute 断言失败计返工 → 第 3 次升格 `PENDING_RESUME`；HTTP rework 读写权威。
 * **FAIL**：模型可自造 ID 清零；或返工期默许加断言；或库绿但 Daemon 不计数。
 
-#### 【Task C.15c】EO-05 两阶段归档/GC 细项 `[NEW_TASK]`
+#### 【Task C.15c】EO-05 两阶段归档/GC 细项 `[COMPLETED]`
 * **任务编号**：`TASK-C.15c`
 * **前置依赖**：`TASK-C.12d` (COMPLETED)、`TASK-C.12e` (COMPLETED)、`TASK-C.15a`
-* **任务状态**：**[NEW_TASK]**（Tina t855u）
+* **任务状态**：**[COMPLETED]**（Tina t855u 实现；合入 tip `5f6ca93`；签署期白名单 GC + MERGED→DELIVERED 事务边界；DOC-2 / 2026-11-01 对齐）
 * **对照痛点 / Spec 锚点**：§14.11 EO-05 / DEC-01；C.12d/e 已有轻量 records+manifest，缺签署期白名单 GC 与完整 `MERGED`→`DELIVERED` 事务边界。
 * **v0.1 范围**：
   1. **签署期 GC**：仅白名单临时缓存（未采纳 Diff 碎片、Demo `.cache/` 等）；**禁止**清 drafts / 活跃 Demo / 刚冻结 snapshot。
@@ -2426,10 +2426,10 @@ TASK-0.1 ──► TASK-0.2b ──► TASK-0.2c (Schema v1.3.0 & 自愈边) ─
   4. C.12d/e 回归绿。
 * **FAIL**：签署 GC 误删 drafts；或失败仍 DELIVERED。
 
-#### 【Task C.15d】P0 AC-ISOL 草稿隔离 + EO-09 Worktree seal `[NEW_TASK]`
+#### 【Task C.15d】P0 AC-ISOL 草稿隔离 + EO-09 Worktree seal `[COMPLETED]`
 * **任务编号**：`TASK-C.15d`
 * **前置依赖**：`TASK-C.15c`
-* **任务状态**：**[NEW_TASK]**（Tina t855u）
+* **任务状态**：**[COMPLETED]**（Tina t855u 实现；合入 tip `5f6ca93`；`.stagent/` gitignore + drafts 路由 + worktree seal manifest；DOC-2 / 2026-11-01 对齐）
 * **对照痛点 / Spec 锚点**：§13 P0 / AC-ISOL（§8.5.2）；§14.11 EO-09。P1 sufficiency / P2 确认分级 / P3 视口防抖 **本卡不实现，仍 backlog**。
 * **v0.1 范围**：
   1. 项目初始化/打开时确保根 `.gitignore` 含 **`.stagent/`**（可幂等追加；不当 ACL）。

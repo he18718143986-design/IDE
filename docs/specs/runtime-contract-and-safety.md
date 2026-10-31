@@ -47,7 +47,9 @@
 | 阶段 | 允许 | 禁止 |
 | :--- | :--- | :--- |
 | **确认方案前** | 只读分析；草案写入 `.stagent/drafts/`；Demo 写入 `.stagent/prototypes/` | 写用户项目主干；下发写权限 `exec_token`；跳过用户确认开工 |
-| **确认方案 / 签署后** | Worker 仅在 `.stagent/worktrees/{contract_id}/` 与合同 `writable_paths` 内施工 | 改合同本身；挂载/改写 `prototypes/` 或 `records/`；`../` 穿出 worktree；静默扩 Scope |
+| **确认方案 / 签署后** | Worker 仅在 `.stagent/worktrees/` 下该合同目录与合同 `writable_paths` 内施工 | 改合同本身；挂载/改写 `prototypes/` 或 `records/`；`../` 穿出 worktree；静默扩 Scope |
+
+> **路径字面（DOC-5）**：活跃 Worktree 代码路径为 `.stagent/worktrees/task-{contract_id}/`（`worktree-manager` / `server` / `launcher`）。表格里的 `{contract_id}` 是合同键简写，**不等于**目录名一定无前缀。`worktree-seal` 当前写无前缀目录，与创建路径不一致 → 需立卡，本波不改代码。详见 [`constants-and-paths.md`](./constants-and-paths.md) §0。
 
 **不变量**：签署事件落盘前，主干工作区的改动必须为 **0 字节**（drafts / prototypes 除外，且二者不得进主干）。
 
@@ -183,8 +185,9 @@
 
 ### 5.3 物理隔离边界
 
-- Worker **只挂载** `.stagent/worktrees/{contract_id}/`；禁符号链接穿出、禁 `../`。
-- Demo 落在 `.stagent/prototypes/{id}/`（gitignore，不进主干）；归档落在 `.stagent/records/{contract_id}/`。**`prototypes ≠ worktrees ≠ records`。**
+- Worker **只挂载** `.stagent/worktrees/task-{contract_id}/`（代码事实；禁符号链接穿出、禁 `../`）。
+- Demo：**隔离预览**落在 `.stagent/prototypes/{id}/`（gitignore，不进主干）；遗留生成器仍可能写 `.stagent/demo/`（见 constants §0）。归档落在 `.stagent/records/{contract_id}/`。**`prototypes ≠ worktrees ≠ records`。**
+- 合并 commit trailer 键名以 `daemon/pipeline/merger.ts` 为准（`Stagent-Contract-ID` 等）；长度/集合以代码为 SSOT。
 - Worktree **不是 OS 级沙盒**（ADR-0003）；只读/断网证明由 `daemon/baseline/os-sandbox.ts` 独立给出，未证明不得升级硬承诺。
 - CLI Worker 适配器隔离见 **ADR-0013**：弃用 `--bare`，改用 `--setting-sources ""` + 工具白名单 + 严格 MCP + 环境白名单。
 
