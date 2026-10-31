@@ -22,6 +22,10 @@ import { FAST_PATH_APPROVER, validateStatePair } from "./state-machine";
  *  - `approval` 补齐审批凭证字段：签名摘要、准入决策、决策说明、驳回者
  *  - 新增不变式：`ADMITTED_AUTOMATIC` 只能由 `system:fast-path` 签发
  *
+ * v1.3.2 增量（TASK-J.18b / GAP-W1）：
+ *  - 新增可选 `scheme_binding?`：带 confirmation_id 建出的合同永久绑定快照 digest / plan_digest；
+ *    旧直签合同不得发明此字段；签署后不可改（由 ContractStore 写一次锁定）。
+ *
  * 未在本卡落地的 §9.1 目标字段（已记录于交付说明，避免误读为"已实现"）：
  *  - 顶层 `scope` / `change_request_id` / `presentation_state`（分别牵动 daemon 全链路
  *    与 TASK-D.3 的 15 态投影，另行推进）
@@ -393,6 +397,24 @@ export const gitAuthorizationSchema = z.object({
 });
 export type GitAuthorization = z.infer<typeof gitAuthorizationSchema>;
 
+// --- 7b. 方案快照绑定（TASK-J.18b / GAP-W1） ---
+
+/**
+ * 带 confirmation_id 建出的合同永久携带此字段；派工只信任它，不信任请求体。
+ * 旧直签路径不得写入。
+ */
+export const schemeBindingSchema = z.object({
+  confirmation_id: z
+    .string()
+    .regex(
+      /^[A-Za-z0-9._-]{8,96}$/,
+      "confirmation_id must be 8–96 chars of [A-Za-z0-9._-]",
+    ),
+  snapshot_digest: z.string().min(1),
+  plan_digest: z.string().min(1),
+});
+export type SchemeBinding = z.infer<typeof schemeBindingSchema>;
+
 // --- 8. 软件合同模式 (§9.1 SoftwareContractV13) ---
 
 /**
@@ -495,6 +517,8 @@ export const softwareContractSchema = z
       manual_confirmation: manualConfirmationSpecSchema.optional(),
     }),
     approval: approvalSchema,
+    /** TASK-J.18b / GAP-W1：可选；仅带 confirmation_id 的新路径写入，签署后不可改 */
+    scheme_binding: schemeBindingSchema.optional(),
   })
   .superRefine((contract, ctx) => {
     // §9.1.1 双状态机联动规则：拒绝非法的 lifecycle × approval 组合
