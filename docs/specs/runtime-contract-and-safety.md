@@ -104,8 +104,9 @@
 | `E_SCHEME_SNAPSHOT_NOT_FOUND` | 传了 `confirmation_id` 但快照缺失或损坏（HTTP 409） |
 | `E_SCOPE_PLAN_DRIFT`（v2.1） | Daemon 重跑预检得到的 `plan_digest` 与前端提交的不一致（HTTP 409） |
 | `E_SCHEME_SNAPSHOT_MISMATCH`（v2.1） | 带 `confirmation_id` 的合同范围、验证命令或预算与快照里的 `ScopePlan` 不一致（HTTP 409） |
+| `E_SCOPE_INVARIANT_BROKEN`（v2.1） | 带 `confirmation_id` 且合同与快照一致，但 `gradeWritableScope` 仍失败（D1 违约；HTTP **500**，不得返回 403） |
 
-**新增码必须同时更新本表、Supervisor SSOT §7 D1 与测试。** 带 `confirmation_id` 的签署链**不得**返回 `E_WRITABLE_SCOPE_POLICY`；若发生，按 D1 违约缺陷处理。
+**新增码必须同时更新本表、Supervisor SSOT §15.5 与测试。** 带 `confirmation_id` 的签署链**不得**返回 `E_WRITABLE_SCOPE_POLICY`；若发生，按 D1 违约缺陷处理（对外应映射为 `E_SCOPE_INVARIANT_BROKEN`）。
 
 ### 2.4 允许与禁止的状态边
 

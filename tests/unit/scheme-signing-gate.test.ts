@@ -17,6 +17,7 @@ import {
   schemeSnapshotPath,
   writeSchemeSnapshot,
 } from "../../daemon/pipeline/scheme-snapshot-store";
+import { buildScopePlan } from "../../daemon/supervisor/scope-plan-builder";
 import {
   evaluateLatestDemoGate,
   evaluateSnapshotDemoGate,
@@ -86,6 +87,7 @@ function writeSnapshot(
   scheme: SchemeDraft = makeScheme(),
   confirmationId = "scheme-confirm-gate-0001",
 ) {
+  const scope_plan = buildScopePlan({ repoRoot, scheme });
   return writeSchemeSnapshot(repoRoot, {
     confirmation_id: confirmationId,
     scheme,
@@ -95,6 +97,7 @@ function writeSnapshot(
       message: "ok",
       demo_mode: demo.status === "degraded_flowcard" ? "degraded" : "none",
     },
+    scope_plan,
   });
 }
 

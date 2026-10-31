@@ -65,6 +65,15 @@ import {
   WritableScopePolicyError,
 } from "./supervisor/scope-gate";
 import {
+  assertScopePlanFreshForFreeze,
+  assertSignedContractMatchesSnapshot,
+  preflightScopePlan,
+  SchemeSnapshotMismatchError,
+  ScopeInvariantBrokenError,
+  ScopePlanDriftError,
+} from "./supervisor/scope-preflight";
+import type { ScopePlan } from "../src/lib/journey/scope-plan";
+import {
   createRealPreviewServer,
   writeRealPlaytestStub,
   type RealPreviewServer,
@@ -1321,6 +1330,7 @@ export class StagentDaemon {
       scheme?: unknown;
       demo?: unknown;
       decision?: unknown;
+      scope_plan?: unknown;
     };
     try {
       body = (await this.readJsonBody(req)) as typeof body;
@@ -1368,18 +1378,42 @@ export class StagentDaemon {
       return;
     }
 
+    const scopePlanRaw = body.scope_plan;
+    if (
+      !scopePlanRaw ||
+      typeof scopePlanRaw !== "object" ||
+      typeof (scopePlanRaw as { plan_digest?: unknown }).plan_digest !==
+        "string" ||
+      !(scopePlanRaw as { plan_digest: string }).plan_digest
+    ) {
+      this.sendJson(res, 400, {
+        error: "invalid_scheme_snapshot",
+        code: "E_SCHEME_SNAPSHOT_INVALID",
+        message: "scope_plan 必填（含 plan_digest）",
+      });
+      return;
+    }
+    const submittedPlan = scopePlanRaw as ScopePlan;
+
     try {
+      const schemeDraft =
+        scheme as unknown as import("../src/lib/journey/scheme-draft").SchemeDraft;
+      const freshPlan = assertScopePlanFreshForFreeze({
+        repoRoot: this.repoRoot,
+        scheme: schemeDraft,
+        submitted: submittedPlan,
+      });
       const written = writeSchemeSnapshot(this.repoRoot, {
         confirmation_id: confirmationId,
-        scheme:
-          scheme as unknown as import("../src/lib/journey/scheme-draft").SchemeDraft,
+        scheme: schemeDraft,
         demo: demo as unknown as import("../src/lib/journey/scheme-draft").DemoGate,
         decision: {
-          code: decision["code"],
-          message: decision["message"],
+          code: decision["code"] as string,
+          message: decision["message"] as string,
           demo_mode: decision["demo_mode"] as
             "none" | "interactive" | "degraded",
         },
+        scope_plan: freshPlan,
       });
       this.sendJson(res, written.idempotent ? 200 : 201, {
         snapshot_id: written.snapshot.snapshot_id,
@@ -1387,6 +1421,15 @@ export class StagentDaemon {
         idempotent: written.idempotent,
       });
     } catch (err) {
+      if (err instanceof ScopePlanDriftError) {
+        this.sendJson(res, 409, {
+          error: "scope_plan_drift",
+          code: err.code,
+          message: err.message,
+          scope_plan: err.scope_plan,
+        });
+        return;
+      }
       if (err instanceof SchemeSnapshotConflictError) {
         this.sendJson(res, 409, {
           error: "scheme_confirmation_conflict",
@@ -1395,6 +1438,59 @@ export class StagentDaemon {
         });
         return;
       }
+      this.sendActionError(res, err);
+    }
+  }
+
+  /**
+   * TASK-J.4：范围预检。只读、零模型、零落盘；鉴权同 /api/supervisor/draft。
+   */
+  private async handleScopePreflight(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    method: string,
+  ): Promise<void> {
+    if (method !== "POST") {
+      this.sendJson(res, 405, { error: "Method not allowed" });
+      return;
+    }
+    let body: { scheme?: unknown; decisions?: unknown };
+    try {
+      body = (await this.readJsonBody(req)) as typeof body;
+    } catch (err) {
+      this.sendJson(res, 400, {
+        error: "invalid_json",
+        message: (err as Error).message,
+      });
+      return;
+    }
+    const scheme = body.scheme as Record<string, unknown> | undefined;
+    if (
+      !scheme ||
+      typeof scheme["scheme_revision"] !== "number" ||
+      !Number.isInteger(scheme["scheme_revision"]) ||
+      scheme["scheme_revision"] < 1
+    ) {
+      this.sendJson(res, 400, {
+        error: "invalid_scheme",
+        message: "scheme.scheme_revision 必填且为正整数",
+      });
+      return;
+    }
+    try {
+      const scope_plan = preflightScopePlan({
+        repoRoot: this.repoRoot,
+        scheme:
+          scheme as unknown as import("../src/lib/journey/scheme-draft").SchemeDraft,
+        ...(body.decisions && typeof body.decisions === "object"
+          ? {
+              decisions:
+                body.decisions as import("../src/lib/journey/scope-plan").ScopePlanDecisions,
+            }
+          : {}),
+      });
+      this.sendJson(res, 200, { scope_plan });
+    } catch (err) {
       this.sendActionError(res, err);
     }
   }
@@ -3709,6 +3805,15 @@ export class StagentDaemon {
       return;
     }
 
+    if (pathname === "/api/supervisor/scope/preflight") {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      await this.handleScopePreflight(req, res, method);
+      return;
+    }
+
     if (pathname === "/api/supervisor/draft") {
       if (!this.isAuthorized(req)) {
         this.sendJson(res, 401, { error: "Unauthorized" });
@@ -3772,10 +3877,6 @@ export class StagentDaemon {
             return;
           }
           const contract = softwareContractSchema.parse(body.contract);
-          assertContractScopeAllowed(
-            this.repoRoot,
-            contract.authorization.file_system_scope.writable_paths,
-          );
           let snapshotDemoGate: DemoSignGateDecision | undefined;
           if (body.confirmation_id) {
             const snapshot = readSchemeSnapshot(
@@ -3790,6 +3891,41 @@ export class StagentDaemon {
               });
               return;
             }
+            try {
+              assertSignedContractMatchesSnapshot({
+                repoRoot: this.repoRoot,
+                contract,
+                snapshot,
+              });
+            } catch (scopeErr) {
+              const code = (scopeErr as { code?: string }).code;
+              if (code === "E_SCHEME_SNAPSHOT_NOT_FOUND") {
+                this.sendJson(res, 409, {
+                  error: "scheme_snapshot_not_found",
+                  code: "E_SCHEME_SNAPSHOT_NOT_FOUND",
+                  message: (scopeErr as Error).message,
+                });
+                return;
+              }
+              if (scopeErr instanceof SchemeSnapshotMismatchError) {
+                this.sendJson(res, 409, {
+                  error: "scheme_snapshot_mismatch",
+                  code: scopeErr.code,
+                  message: scopeErr.message,
+                });
+                return;
+              }
+              if (scopeErr instanceof ScopeInvariantBrokenError) {
+                this.sendJson(res, 500, {
+                  error: "scope_invariant_broken",
+                  code: scopeErr.code,
+                  message: scopeErr.message,
+                });
+                return;
+              }
+              throw scopeErr;
+            }
+            // 与快照一致：跳过 assertContractScopeAllowed（预检已保证合规）
             snapshotDemoGate = evaluateSnapshotDemoGate(
               snapshot,
               (prototypeId) => readDemoConfirm(this.repoRoot, prototypeId),
@@ -3801,6 +3937,11 @@ export class StagentDaemon {
               });
               return;
             }
+          } else {
+            assertContractScopeAllowed(
+              this.repoRoot,
+              contract.authorization.file_system_scope.writable_paths,
+            );
           }
           const saved = store.save(contract);
           this.emitContractUpdate(saved);
@@ -4066,11 +4207,6 @@ export class StagentDaemon {
               this.sendJson(res, 404, { error: "Contract not found" });
               return;
             }
-            assertContractScopeAllowed(
-              this.repoRoot,
-              current.authorization.file_system_scope.writable_paths,
-            );
-
             let demoGate: DemoSignGateDecision;
             if (body.confirmation_id) {
               const snapshot = readSchemeSnapshot(
@@ -4085,10 +4221,49 @@ export class StagentDaemon {
                 });
                 return;
               }
+              try {
+                assertSignedContractMatchesSnapshot({
+                  repoRoot: this.repoRoot,
+                  contract: current,
+                  snapshot,
+                });
+              } catch (scopeErr) {
+                const code = (scopeErr as { code?: string }).code;
+                if (code === "E_SCHEME_SNAPSHOT_NOT_FOUND") {
+                  this.sendJson(res, 409, {
+                    error: "scheme_snapshot_not_found",
+                    code: "E_SCHEME_SNAPSHOT_NOT_FOUND",
+                    message: (scopeErr as Error).message,
+                  });
+                  return;
+                }
+                if (scopeErr instanceof SchemeSnapshotMismatchError) {
+                  this.sendJson(res, 409, {
+                    error: "scheme_snapshot_mismatch",
+                    code: scopeErr.code,
+                    message: scopeErr.message,
+                  });
+                  return;
+                }
+                if (scopeErr instanceof ScopeInvariantBrokenError) {
+                  this.sendJson(res, 500, {
+                    error: "scope_invariant_broken",
+                    code: scopeErr.code,
+                    message: scopeErr.message,
+                  });
+                  return;
+                }
+                throw scopeErr;
+              }
+              // 与快照一致：跳过 assertContractScopeAllowed
               demoGate = evaluateSnapshotDemoGate(snapshot, (prototypeId) =>
                 readDemoConfirm(this.repoRoot, prototypeId),
               );
             } else {
+              assertContractScopeAllowed(
+                this.repoRoot,
+                current.authorization.file_system_scope.writable_paths,
+              );
               // 旧路径没有快照：保守回退最新 Demo 记录；从未生成才允许。
               demoGate = evaluateLatestDemoGate(this.repoRoot);
             }

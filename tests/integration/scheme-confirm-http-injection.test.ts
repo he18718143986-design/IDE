@@ -19,6 +19,11 @@ import {
   resetConfirmSchemeTransactionsForTest,
   runConfirmSchemeAtomic,
 } from "../../src/lib/journey/confirm-scheme-atomic";
+import { buildScopePlan } from "../../daemon/supervisor/scope-plan-builder";
+import {
+  scopePlanToContractScope,
+  type ScopePlan,
+} from "../../src/lib/journey/scope-plan";
 import { git } from "../helpers/git";
 
 /**
@@ -125,14 +130,80 @@ describe("T-HTTP R-10 / F-07 确认快照与建图补偿（真 Daemon）", () =>
   }
 
   function makeContract(
-    lifecycle: "DRAFT" | "PENDING_APPROVAL",
-    writablePaths: string[] = ["src/**"],
+    lifecycle: "DRAFT" | "PENDING_APPROVAL" = "PENDING_APPROVAL",
+    plan?: ScopePlan,
   ): SoftwareContract {
+    if (plan) {
+      const projected = scopePlanToContractScope(plan);
+      const writable =
+        projected.writable_paths.length > 0
+          ? projected.writable_paths
+          : ["src/**"];
+      const useManual =
+        projected.verification_spec.commands.length === 0 ||
+        Boolean(projected.verification_spec.manual_confirmation);
+      const draft = createContractDraft({
+        title: "确认后签署",
+        description: "R-10 / F-07 HTTP 级注入",
+        acceptanceCriteria: ["verify passes"],
+        writablePaths: writable,
+        ...(useManual
+          ? {
+              commands: projected.verification_spec.commands,
+              manualConfirmation: projected.verification_spec
+                .manual_confirmation ?? {
+                reason_required: true as const,
+                capture_evidence: [
+                  "actor",
+                  "confirmed_at",
+                  "reason",
+                ] as Array<"actor" | "confirmed_at" | "reason">,
+              },
+            }
+          : { commands: projected.verification_spec.commands }),
+        strictlyForbiddenPaths: projected.forbidden_paths,
+        maxFileModifications: projected.budget.max_file_modifications,
+        maxDurationSeconds: projected.budget.max_duration_seconds,
+        maxVerificationRetries: projected.budget.max_verification_retries,
+      });
+      return softwareContractSchema.parse({
+        ...draft,
+        authorization: {
+          ...draft.authorization,
+          budget_limits: { ...projected.budget },
+          file_system_scope: {
+            ...draft.authorization.file_system_scope,
+            writable_paths: writable,
+            strictly_forbidden_paths: projected.forbidden_paths,
+          },
+        },
+        verification_spec: {
+          commands: projected.verification_spec.commands,
+          ...(projected.verification_spec.manual_confirmation
+            ? {
+                manual_confirmation:
+                  projected.verification_spec.manual_confirmation,
+              }
+            : useManual
+              ? {
+                  manual_confirmation: {
+                    reason_required: true,
+                    capture_evidence: ["actor", "confirmed_at", "reason"],
+                  },
+                }
+              : {}),
+        },
+        lifecycle_state: lifecycle,
+        ...(lifecycle === "PENDING_APPROVAL"
+          ? { approval: { status: "PENDING_REVIEW" } }
+          : {}),
+      });
+    }
     const draft = createContractDraft({
       title: "确认后签署",
       description: "R-10 / F-07 HTTP 级注入",
       acceptanceCriteria: ["verify passes"],
-      writablePaths,
+      writablePaths: ["src/**"],
       commands: [
         {
           alias: "verify",
@@ -156,7 +227,10 @@ describe("T-HTTP R-10 / F-07 确认快照与建图补偿（真 Daemon）", () =>
     confirmationId: string,
     scheme: SchemeDraft,
     demo: DemoGate = EMPTY_DEMO_GATE,
+    scope_plan?: ScopePlan,
   ) {
+    const plan =
+      scope_plan ?? buildScopePlan({ repoRoot: repo, scheme });
     return {
       confirmation_id: confirmationId,
       scheme,
@@ -164,8 +238,9 @@ describe("T-HTTP R-10 / F-07 确认快照与建图补偿（真 Daemon）", () =>
       decision: {
         code: "OK",
         message: "未生成 Demo，按静态方案签署",
-        demo_mode: "none",
+        demo_mode: "none" as const,
       },
+      scope_plan: plan,
     };
   }
 
@@ -222,17 +297,23 @@ describe("T-HTTP R-10 / F-07 确认快照与建图补偿（真 Daemon）", () =>
   it("T-HTTP-R10-003 快照存在但 Demo 仍在生成：409 E_DEMO_BUILDING", async () => {
     const confirmationId = "scheme-confirm-building-0001";
     const scheme = makeScheme();
+    const plan = buildScopePlan({ repoRoot: repo, scheme });
     const frozen = await call("POST", "/api/supervisor/scheme/freeze", {
-      ...freezePayload(confirmationId, scheme, {
-        ...EMPTY_DEMO_GATE,
-        status: "building",
-        scheme_revision: scheme.scheme_revision,
-      }),
+      ...freezePayload(
+        confirmationId,
+        scheme,
+        {
+          ...EMPTY_DEMO_GATE,
+          status: "building",
+          scheme_revision: scheme.scheme_revision,
+        },
+        plan,
+      ),
     });
     expect(frozen.status).toBe(201);
 
     const res = await call("POST", "/api/contracts", {
-      contract: makeContract("PENDING_APPROVAL"),
+      contract: makeContract("PENDING_APPROVAL", plan),
       confirmation_id: confirmationId,
     });
     expect(res.status).toBe(409);
@@ -242,11 +323,12 @@ describe("T-HTTP R-10 / F-07 确认快照与建图补偿（真 Daemon）", () =>
   it("T-HTTP-R10-004 先冻结快照再创建合同：201，且快照可原样回读", async () => {
     const confirmationId = "scheme-confirm-ok-0001";
     const scheme = makeScheme();
+    const plan = buildScopePlan({ repoRoot: repo, scheme });
 
     const frozen = await call<{ snapshot_id: string; digest: string }>(
       "POST",
       "/api/supervisor/scheme/freeze",
-      freezePayload(confirmationId, scheme),
+      freezePayload(confirmationId, scheme, EMPTY_DEMO_GATE, plan),
     );
     expect(frozen.status).toBe(201);
     expect(frozen.body.snapshot_id).toBe(confirmationId);
@@ -256,7 +338,7 @@ describe("T-HTTP R-10 / F-07 确认快照与建图补偿（真 Daemon）", () =>
       "POST",
       "/api/contracts",
       {
-        contract: makeContract("PENDING_APPROVAL"),
+        contract: makeContract("PENDING_APPROVAL", plan),
         confirmation_id: confirmationId,
       },
     );
@@ -343,6 +425,7 @@ describe("T-HTTP R-10 / F-07 确认快照与建图补偿（真 Daemon）", () =>
             message: decision.message,
             demo_mode: decision.demo_mode,
           },
+          scope_plan: buildScopePlan({ repoRoot: repo, scheme: frozen }),
         });
         if (res.status >= 300) {
           throw new Error(`快照落盘失败 ${res.status} ${res.body.code ?? ""}`);
@@ -359,7 +442,10 @@ describe("T-HTTP R-10 / F-07 确认快照与建图补偿（真 Daemon）", () =>
           "POST",
           "/api/contracts",
           {
-            contract: makeContract("PENDING_APPROVAL"),
+            contract: makeContract(
+              "PENDING_APPROVAL",
+              buildScopePlan({ repoRoot: repo, scheme }),
+            ),
             confirmation_id,
           },
         );
@@ -478,6 +564,7 @@ describe("T-HTTP R-10 / F-07 确认快照与建图补偿（真 Daemon）", () =>
               message: decision.message,
               demo_mode: decision.demo_mode,
             },
+            scope_plan: buildScopePlan({ repoRoot: repo, scheme: frozen }),
           },
         );
         if (res.status >= 300) {
@@ -491,7 +578,10 @@ describe("T-HTTP R-10 / F-07 确认快照与建图补偿（真 Daemon）", () =>
           "POST",
           "/api/contracts",
           {
-            contract: makeContract("PENDING_APPROVAL"),
+            contract: makeContract(
+              "PENDING_APPROVAL",
+              buildScopePlan({ repoRoot: repo, scheme }),
+            ),
             confirmation_id,
           },
         );

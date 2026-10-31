@@ -419,3 +419,61 @@ export function plainAreaLabel(pathPattern: string, moduleName?: string): string
   const trimmed = cleaned.replace(/\/+$/, "") || pathPattern;
   return `${trimmed} 这一块`;
 }
+
+/**
+ * 从已有 ScopePlan 还原用户表态，供 Daemon 冻结时重跑 `buildScopePlan`。
+ * - excluded_area_ids：excluded_by_user === true 的区域；
+ * - approvals：仅纳入已表态（true/false）的敏感项，null 不写入。
+ */
+export function decisionsFromScopePlan(plan: ScopePlan): ScopePlanDecisions {
+  const excluded_area_ids = plan.areas
+    .filter((a) => a.excluded_by_user)
+    .map((a) => a.id);
+  const approvals: Record<string, boolean> = {};
+  for (const item of plan.needs_approval) {
+    if (item.approved === true || item.approved === false) {
+      approvals[item.id] = item.approved;
+    }
+  }
+  return { excluded_area_ids, approvals };
+}
+
+/** 合同侧与 ScopePlan 投影比对用的最小切片（J.4 签署链）。 */
+export interface ContractScopeFields {
+  writable_paths: readonly string[];
+  strictly_forbidden_paths: readonly string[];
+  verification_spec: {
+    commands: unknown;
+    manual_confirmation?: unknown;
+  };
+  budget_limits: unknown;
+}
+
+/**
+ * 合同范围字段是否与 `scopePlanToContractScope(plan)` 一字不差。
+ * 用稳定序列化比对，避免引用相等误判；路径数组顺序敏感（与投影保序一致）。
+ */
+export function contractMatchesScopePlan(
+  contract: ContractScopeFields,
+  plan: ScopePlan,
+): boolean {
+  const expected = scopePlanToContractScope(plan);
+  const actualShape = {
+    writable_paths: contract.writable_paths,
+    forbidden_paths: contract.strictly_forbidden_paths,
+    verification_spec: {
+      commands: contract.verification_spec.commands,
+      ...(contract.verification_spec.manual_confirmation !== undefined
+        ? { manual_confirmation: contract.verification_spec.manual_confirmation }
+        : {}),
+    },
+    budget: contract.budget_limits,
+  };
+  const expectedShape = {
+    writable_paths: expected.writable_paths,
+    forbidden_paths: expected.forbidden_paths,
+    verification_spec: expected.verification_spec,
+    budget: expected.budget,
+  };
+  return stableStringify(actualShape) === stableStringify(expectedShape);
+}

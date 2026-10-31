@@ -62,6 +62,7 @@ import {
   createSupervisorPrototype,
   confirmSupervisorPrototype,
   freezeSchemeSnapshot,
+  preflightScope,
   fetchPresentationSnapshot,
   listContracts,
   loadConnection,
@@ -1133,6 +1134,8 @@ ${trimmed}`
 
       // 2. 不可变快照（幂等：同 id + 同内容返回原快照）。
       persistSnapshot: async ({ confirmation_id, scheme, demo, decision }) => {
+        // TASK-J.4：冻结须绑定 ScopePlan；完整中栏状态与防抖预检见 J.5
+        const { scope_plan } = await preflightScope(conn, { scheme });
         const view = await freezeSchemeSnapshot(conn, {
           confirmation_id,
           scheme,
@@ -1142,6 +1145,7 @@ ${trimmed}`
             message: decision.message,
             demo_mode: decision.demo_mode,
           },
+          scope_plan,
         });
         return {
           snapshot_id: view.snapshot_id,
