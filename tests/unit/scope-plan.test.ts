@@ -164,6 +164,53 @@ describe("TASK-J.2 ScopePlan 纯函数", () => {
     expect(scopePlanToContractScope(excluded).writable_paths).toEqual([]);
   });
 
+  it("未获批敏感路径即使重叠 areas 也不得进入 writable_paths", () => {
+    const plan = samplePlan();
+    // 模拟真实构建器：保护路径同时出现在 areas 与 needs_approval
+    plan.areas[0]!.paths = ["src/pages/**", "package.json"];
+    plan.needs_approval[0]!.approved = null;
+    plan.plan_digest = scopePlanDigest(plan);
+
+    const blocked = scopePlanToContractScope(plan);
+    expect(blocked.writable_paths).toEqual(["src/pages/**"]);
+    expect(blocked.writable_paths).not.toContain("package.json");
+
+    const denied = applyScopeDecisions(plan, {
+      approvals: { "prot-0": false },
+    });
+    expect(scopePlanToContractScope(denied).writable_paths).not.toContain(
+      "package.json",
+    );
+    // 明确未授权 → 追加 never_touch → 进入 forbidden
+    expect(
+      denied.never_touch.some((g) => g.paths.includes("package.json")),
+    ).toBe(true);
+    expect(scopePlanToContractScope(denied).forbidden_paths).toContain(
+      "package.json",
+    );
+
+    const approved = applyScopeDecisions(plan, {
+      approvals: { "prot-0": true },
+    });
+    expect(scopePlanToContractScope(approved).writable_paths).toContain(
+      "package.json",
+    );
+  });
+
+  it("排除区域路径追加进 never_touch", () => {
+    const plan = samplePlan();
+    const excluded = applyScopeDecisions(plan, {
+      excluded_area_ids: ["area-0"],
+    });
+    expect(excluded.areas[0]!.excluded_by_user).toBe(true);
+    expect(
+      excluded.never_touch.some((g) => g.paths.includes("src/pages/**")),
+    ).toBe(true);
+    expect(scopePlanToContractScope(excluded).forbidden_paths).toContain(
+      "src/pages/**",
+    );
+  });
+
   it("budget.plain 与 plainAreaLabel 不含技术黑词", () => {
     const plain = formatBudgetPlain({
       max_file_modifications: 10,

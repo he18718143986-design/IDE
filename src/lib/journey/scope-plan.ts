@@ -276,15 +276,35 @@ export function applyScopeDecisions(
     rejected: rejected.map((r) => ({ ...r })),
   };
 
+  // delivery-lifecycle §5：排除区域 / 明确未授权的敏感项 → 追加进 never_touch
+  const never_touch = plan.never_touch.map((g) => ({
+    ...g,
+    paths: [...g.paths],
+  }));
+  const neverSeen = new Set(never_touch.flatMap((g) => g.paths));
+  const appendNever = (label: string, paths: readonly string[]): void => {
+    const fresh = paths.filter((p) => !neverSeen.has(p));
+    if (fresh.length === 0) return;
+    for (const p of fresh) neverSeen.add(p);
+    never_touch.push({ label, paths: [...fresh] });
+  };
+  for (const area of areas) {
+    if (!area.excluded_by_user) continue;
+    if (!excluded.has(area.id)) continue; // 仅本次决策新排除的区域
+    appendNever(`已排除：${area.label}`, area.paths);
+  }
+  for (const item of needs_approval) {
+    if (item.approved !== false) continue;
+    if (!Object.prototype.hasOwnProperty.call(approvals, item.id)) continue;
+    appendNever(`未授权：${item.label}`, item.paths);
+  }
+
   const next: ScopePlan = {
     ...plan,
     areas,
     needs_approval,
     grade,
-    never_touch: plan.never_touch.map((g) => ({
-      ...g,
-      paths: [...g.paths],
-    })),
+    never_touch,
     verification: {
       ...plan.verification,
       commands: plan.verification.commands.map((c) => ({
@@ -306,24 +326,35 @@ export function applyScopeDecisions(
 /**
  * 从 ScopePlan 投影合同范围字段（签署链唯一来源，ADR-0018）。
  * - 已排除区域不进入 writable_paths；
+ * - 未获批（approved !== true）的 needs_approval 路径绝不能进入 writable_paths，
+ *   即使它们也出现在 areas.paths（敏感项穿透门禁）；
+ * - 仅 approved === true 的敏感项并入可写；
  * - never_touch 全部并入 forbidden_paths；
  * - manual_only 时带 manual_confirmation。
  */
 export function scopePlanToContractScope(
   plan: ScopePlan,
 ): ContractScopeFromPlan {
+  // 尚未明确获批的敏感路径：areas 循环中必须拦截
+  const unapprovedProtectedPaths = new Set(
+    plan.needs_approval
+      .filter((item) => item.approved !== true)
+      .flatMap((item) => item.paths),
+  );
+
   const writable: string[] = [];
   const seen = new Set<string>();
   for (const area of plan.areas) {
     if (area.excluded_by_user) continue;
     for (const p of area.paths) {
+      if (unapprovedProtectedPaths.has(p)) continue;
       if (seen.has(p)) continue;
       seen.add(p);
       writable.push(p);
     }
   }
 
-  // 已表态同意的敏感项路径若尚未在 areas 中，并入可写
+  // 仅明确同意的敏感项并入可写
   for (const item of plan.needs_approval) {
     if (item.approved !== true) continue;
     for (const p of item.paths) {
