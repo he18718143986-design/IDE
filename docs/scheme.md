@@ -203,7 +203,7 @@
 
 > 这是给 Worker 的「还差什么」。卡号以 [`specs/development-tasks.md`](./specs/development-tasks.md) 为准；supervisor §19 的 L-01～L-10 不在此重复。
 >
-> **2026-10-31 回写**：下表已按 main tip `fb27504`（含 J.2～J.10、J.18a～d、L.1～L.8、**L.14** 合入；另含 #28～#33 文档/实现）回写「当前代码事实」；管道口径对齐 [ADR-0018](./adr/0018-intent-to-executable-seal.md)（确认 → Seal MachineFace → PAB → ProjectPlan → Worker；禁确认路径 `buildL0Plan(chat)`）。未合实现卡（如 L.9～）不得标关闭；Sprint 指向 **L.9**。
+> **2026-10-31 回写**：下表已按 main tip `e1cf1bb`（含 J.2～J.10、J.18a～d、L.1～L.9、**L.14** 合入；另含 #28～#35 文档/实现）回写「当前代码事实」；管道口径对齐 [ADR-0018](./adr/0018-intent-to-executable-seal.md)（确认 → Seal MachineFace → PAB → ProjectPlan → Worker；禁确认路径 `buildL0Plan(chat)`）。未合实现卡（如 L.10～）不得标关闭；Sprint 指向 **L.10**。
 
 | id | 方案要求 | 当前代码事实 | 对应卡 / 台账 |
 | :--- | :--- | :--- | :--- |
@@ -219,7 +219,7 @@
 | gap-10 | 用户不做技术决策 | 现行有 `needs_approval` 逐项表态等审批点 | conf-5 |
 | gap-11 | 复刻网站需读参考站 | 全部 Agent 禁 `WebFetch` / `WebSearch` | conf-6；无卡 |
 | gap-12 | 登录凭据受控使用 | **代码已收口（L.14）**：`daemon/vault/` + `/api/vault` + Settings「密钥」区；日志/命令输出精确脱敏；HTTP 不回明文。发布/摄取注入仍待 L.15/L.17 | oq-3；`TASK-L.14` **COMPLETED**（[#31](https://github.com/he18718143986-design/IDE/pull/31)/`ae57543`） |
-| gap-13 | 大需求拆成合同序列 | **部分收口（L.7+L.8）**：`ProjectPlan` 类型/校验/落盘（L.7）与 `PlanPatch` 合并、`decomposer`、`POST /api/project/plan/patch`/`decompose`（L.8，tip `fb27504` / #33）已合入；合同序列交接与项目地图仍缺（L.9～L.10）。任务图一份合同一张的旧路径仍在。 | `TASK-L.7` **COMPLETED**（[#23](https://github.com/he18718143986-design/IDE/pull/23)/`607d742`）；`TASK-L.8` **COMPLETED**（[#33](https://github.com/he18718143986-design/IDE/pull/33)/`fb27504`）；余量 `TASK-L.9`～`L.10` |
+| gap-13 | 大需求拆成合同序列 | **部分收口（L.7+L.8+L.9）**：`ProjectPlan` 类型/校验/落盘（L.7）；`PlanPatch`/分解器/API（L.8）；合同序列/`nextStub`/桩视图预检/互斥/`E_CONTRACT_IN_FLIGHT`/桩状态回填（L.9，tip `e1cf1bb` / #35）已合入；画布「项目地图」仍缺（L.10）。任务图一份合同一张的旧路径仍在。 | `TASK-L.7` **COMPLETED**（[#23](https://github.com/he18718143986-design/IDE/pull/23)/`607d742`）；`TASK-L.8` **COMPLETED**（[#33](https://github.com/he18718143986-design/IDE/pull/33)/`fb27504`）；`TASK-L.9` **COMPLETED**（[#35](https://github.com/he18718143986-design/IDE/pull/35)/`e1cf1bb`）；余量 `TASK-L.10` |
 | gap-14 | 新功能带测试 | Worker 指令已补「你会被这样检查」（L.2）；合同元数据 / `withSystemScope` / `stagent check` 义务与削弱检测已合入（L.3）；**两段式先红后绿编排已合入（L.4）**（`runWorker`→`runTwoPhase`）；**M2 黄金切片 E2E 已合入（L.6）** | `L.2`/`L.3`/`L.4`/`L.6` **COMPLETED**（[#8](https://github.com/he18718143986-design/IDE/pull/8)/[#15](https://github.com/he18718143986-design/IDE/pull/15)/[#18](https://github.com/he18718143986-design/IDE/pull/18)/[#21](https://github.com/he18718143986-design/IDE/pull/21) / `93589bf`） |
 | gap-15 | 试玩看到真实应用 | Worktree 真实应用预览已合入（`daemon/supervisor/preview/app-runner.ts`；端口段 4200～4210，与 Demo 段隔离） | `TASK-L.5` **COMPLETED**（[#14](https://github.com/he18718143986-design/IDE/pull/14) / `0b6bc7f`） |
 | gap-16 | 技术方案与系统知识 | 无设计产物；`daemon/arch/*` 只做按需展示 | TASK-L.11～L.13 |
