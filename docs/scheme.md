@@ -202,24 +202,26 @@
 ## 11. 落差登记——方案 vs 当前代码
 
 > 这是给 Worker 的「还差什么」。卡号以 [`specs/development-tasks.md`](./specs/development-tasks.md) 为准；supervisor §19 的 L-01～L-10 不在此重复。
+>
+> **2026-10-31 真相缝**：下表已按 main tip `b4e0091`（含 J.2～J.9、L.1～L.3、L.5 合入）回写「当前代码事实」；管道口径对齐 [ADR-0018](./adr/0018-intent-to-executable-seal.md)（确认 → Seal MachineFace → PAB → ProjectPlan → Worker；禁确认路径 `buildL0Plan(chat)`）。未合卡（如 J.10、L.4、L.6）不得标关闭。
 
 | id | 方案要求 | 当前代码事实 | 对应卡 / 台账 |
 | :--- | :--- | :--- | :--- |
-| gap-1 | 右栏只读 | 已实现：`ClaudeCodeAdapter` `role: "partner"`，工具白名单 `Read,Glob,Grep` | TASK-J.1 代码已合入（PR #29 / #30），**卡状态仍为 NEW_TASK**；真 Key 补验 OP-28 |
-| gap-2 | 右栏无系统提示 | Claude Code 适配器未传系统提示参数；`BaselineChatAdapter` 带 `system: "你是 Stagent 右栏助手…"`；P.1 把保护清单拼在用户消息前面发给右栏（`daemon/chat/session-manager.ts` 的 `buildProtectionPromptNotice`） | 无卡；见 conf-2、conf-4 |
+| gap-1 | 右栏只读 | 已实现：`ClaudeCodeAdapter` `role: "partner"`，工具白名单 `Read,Glob,Grep` | **已关闭代码落差**：`TASK-J.1` **COMPLETED**（[#29](https://github.com/he18718143986-design/IDE/pull/29) / `4144a20`）；真 Key 补验仍挂账 OP-28 |
+| gap-2 | 右栏无系统提示 | **代码已收口（L.1）**：去掉保护清单消息前缀与右栏系统提示注入；`buildProtectionPromptNotice` 已不在热路径。acc-2 自动化断言仍待补 | `TASK-L.1` **COMPLETED**（[#9](https://github.com/he18718143986-design/IDE/pull/9) / `8eb6896`）；见 conf-2、conf-4 |
 | gap-3 | 中栏 Supervisor 是 Claude Code | 规则 L0 + 可选 OpenAI 增强；方案靠 6 条 `MODULE_HINTS` 正则 | TASK-J.10；conf-1；**由 [ADR-0018](./adr/0018-intent-to-executable-seal.md) 封印（编译结果须经密封进入签署）** |
-| gap-4 | Supervisor 只经画布交互 | 规格 §16 仍有右栏插话设计；前端无 `JourneyStage` 投影 | TASK-J.8；conf-3 |
-| gap-5 | 机器指令 = 合同 + 任务图 | 合同范围在确认时临时推断，未经 `ScopePlan` 展示 | TASK-J.2～J.6；**由 [ADR-0018](./adr/0018-intent-to-executable-seal.md) 封印（禁 `buildL0Plan(chat)`；确认冻 MachineFace）** |
+| gap-4 | Supervisor 只经画布交互 | `JourneyStage` 已由 Daemon 投影并随 `STATE_CHANGED` 下发（J.8）；J.7 交接改为中栏画布卡片、右栏 0 系统消息。规格 §16 旧「右栏插话」叙述仍待正文扫尾 | `TASK-J.8`/`J.7` **COMPLETED**（[#10](https://github.com/he18718143986-design/IDE/pull/10)/[#13](https://github.com/he18718143986-design/IDE/pull/13)）；conf-3 |
+| gap-5 | 机器指令 = 合同 + 任务图；确认冻 MachineFace | **主链已落地**：`ScopePlan` 纯函数→预检→确认谓词→快照绑定→确认接线→中栏白话区块（J.2～J.6）。签署路径禁止聊天直推写范围（[ADR-0018](./adr/0018-intent-to-executable-seal.md) INV-SEAL-01～03：禁 `buildL0Plan(chat)`；用户确认方案 → Seal 冻 UserFace+MachineFace → 其后 PAB / ProjectPlan / Worker）。意图编译器生成端仍缺（J.10） | `TASK-J.2`～`J.6` **COMPLETED**（[#4](https://github.com/he18718143986-design/IDE/pull/4)～[#7](https://github.com/he18718143986-design/IDE/pull/7)、[#11](https://github.com/he18718143986-design/IDE/pull/11)）；余量 `TASK-J.10` |
 | gap-6 | 墓地拦截 Worker 复活被否决方案 | 未实现 | TASK-J.18 |
 | gap-7 | 试玩「这里不对」自查 | 旧 `dispute` 实现有 7 处缺陷 | TASK-J.16（预告）；[`specs/playtest-self-check.md`](./specs/playtest-self-check.md) |
-| gap-8 | `SchemePatch` 零模型合并 | 引擎文件不存在 | TASK-J.9 |
+| gap-8 | `SchemePatch` 零模型合并 | 引擎已合入：`src/lib/journey/scheme-patch-engine.ts`（§6 矩阵） | `TASK-J.9` **COMPLETED**（[#12](https://github.com/he18718143986-design/IDE/pull/12) / `1ad6eab`）；生成端循环仍见 `TASK-J.10` |
 | gap-9 | 早期卡把右栏写成「编码 Worker 对话窗口」 | C.1、W.1、W.5a、C.6、P.1、E.1、Sprint 1 门禁的旧叙述 | 已在任务卡文件头加取代说明；原文不改 |
 | gap-10 | 用户不做技术决策 | 现行有 `needs_approval` 逐项表态等审批点 | conf-5 |
 | gap-11 | 复刻网站需读参考站 | 全部 Agent 禁 `WebFetch` / `WebSearch` | conf-6；无卡 |
 | gap-12 | 登录凭据受控使用 | 无凭据托管通道；README 声明无法防止用户把秘密写进合同 | oq-3；TASK-L.14 |
 | gap-13 | 大需求拆成合同序列 | 无项目级计划；任务图一份合同一张（`src/lib/journey/proposal-from-contract.ts`） | TASK-L.7～L.10 |
-| gap-14 | 新功能带测试 | 网关默认拦截测试文件写入（`daemon/mcp/gateway.ts` `E_TEST_FILE_WRITE_BLOCKED`）；Worker 指令不含验证命令 | TASK-L.2、L.3、L.4 |
-| gap-15 | 试玩看到真实应用 | 真机预览只服务静态目录或已有 URL，不在 Worktree 启动用户应用 | TASK-L.5 |
+| gap-14 | 新功能带测试 | Worker 指令已补「你会被这样检查」（L.2）；合同元数据 / `withSystemScope` / `stagent check` 义务与削弱检测已合入（L.3）。**两段式先红后绿编排仍缺（L.4）** | `L.2`/`L.3` **COMPLETED**（[#8](https://github.com/he18718143986-design/IDE/pull/8)/[#15](https://github.com/he18718143986-design/IDE/pull/15)）；余量 `TASK-L.4` |
+| gap-15 | 试玩看到真实应用 | Worktree 真实应用预览已合入（`daemon/supervisor/preview/app-runner.ts`；端口段 4200～4210，与 Demo 段隔离） | `TASK-L.5` **COMPLETED**（[#14](https://github.com/he18718143986-design/IDE/pull/14) / `0b6bc7f`） |
 | gap-16 | 技术方案与系统知识 | 无设计产物；`daemon/arch/*` 只做按需展示 | TASK-L.11～L.13 |
 | gap-17 | 合并后可发布 | deploy / release / health_check 全库 0 命中 | TASK-L.15、L.16 |
 

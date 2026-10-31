@@ -1,6 +1,6 @@
 # 验证策略规格（S6 · 测试义务、红绿检查、真实预览）
 
-> **地位**：实施口径，从属 [ADR-0005](../adr/0005-deterministic-verification-gate.md)（确定性验证门禁）与 [`delivery-lifecycle.md`](./delivery-lifecycle.md) §2 S6。验收材料的人工判定规则见 [`evidence-and-acceptance-criteria.md`](./evidence-and-acceptance-criteria.md)（草案）；试玩归因见 [`playtest-self-check.md`](./playtest-self-check.md)。
+> **地位**：实施口径，从属 [ADR-0005](../adr/0005-deterministic-verification-gate.md)（确定性验证门禁）与 [`delivery-lifecycle.md`](./delivery-lifecycle.md) §2 S6。验收材料的人工判定规则见 [`evidence-and-acceptance-criteria.md`](./evidence-and-acceptance-criteria.md)（现行规格）；试玩归因见 [`playtest-self-check.md`](./playtest-self-check.md)。
 > **上游意图**：`q17`「测试」、`q18`「能够验收」（[`../scheme.md`](../scheme.md) acc-7）。
 > **施工卡**：TASK-L.2（验证命令进 Worker 指令）、L.3（测试义务契约与判定）、L.4（两段式施工编排）、L.5（真实预览）。
 > **状态**：设计定稿 · 待施工。

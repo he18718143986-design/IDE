@@ -1,6 +1,6 @@
 > **读法（2026-10-29 文档治理加注，不改任何卡的条款与状态）**
 > - **本文件是 L3 任务卡层**：Supervisor 方案确认后交给施工 Worker 的机器指令。意图层见 [`../scheme.md`](../scheme.md)，地图见 [`../README.md`](../README.md)。
-> - **当前要做的卡在 §3.4c（J 系列，注意各卡「ADR-0014 修订」块）与 §3.4d（L 系列）**，按 [`delivery-lifecycle.md`](./delivery-lifecycle.md) §8 里程碑 M2 → M5 排期；每张卡开工前按 [`task-card-standard.md`](./task-card-standard.md) 核对就绪。§1.1 矩阵是状态总表；下方游离的 P-xx 修订行、版本头 85 条状态回写与 §6 修订记录都是历史流水，施工时可跳过。
+> - **当前要做的卡在 §3.4c（J 系列，注意各卡「ADR-0014 修订」块）与 §3.4d（L 系列）**，按 [`delivery-lifecycle.md`](./delivery-lifecycle.md) §8 里程碑 M2 → M5 排期；每张卡开工前按 [`task-card-standard.md`](./task-card-standard.md) 核对就绪。§1.1 矩阵是状态总表；下方游离的 P-xx 修订行、版本头 86 条状态回写与 §6 修订记录都是历史流水，施工时可跳过。
 > - **三 Agent 口径以 J 系列与 [`supervisor.md`](./supervisor.md) §13.2 为准**：右栏 = 只读 AI 搭档（`TASK-J.1`），中栏 = Supervisor 方案画布，Worker 只在 Worktree 施工。C.1「右栏（Coding Agent 对话）」、W.1「推入右侧 Worker 对话窗口」、W.5a「对接右栏会话」、C.6、P.1 / E.1 的 Vibe 直改主工作树、Sprint 1 门禁「右栏 Claude Code 改文件」均为早期叙述，已由 J.1 / C.18 改变；原文保留作溯源。
 > - **已知结构问题**（状态矛盾、三处「当前基线」不一致、失效的 `docs/archive/*` 引用）登记在 [`../ledger/README.md`](../ledger/README.md) DOC-1～DOC-4，未在本轮修改。
 
@@ -120,6 +120,7 @@
 > 82. **状态回写（2026-10-28 · 立卡 TASK-J.18 · Worker 派工墓地门禁）**：依 SSOT §14.11 INV-LEDGER-03 第 1 款立 **`TASK-J.18`**。实施口径见新文件 [`worker-graveyard-gate.md`](./worker-graveyard-gate.md)：判定单元分强弱两类（依赖 / 安装命令 / 导入为强，路径 / 标识符 / 文字为弱），新增内容用行多重集差；派工检查点复核快照绑定；执行期优先级格（保护路径 > 安全墓碑 > 用户墓碑 > 越界）；SSOT §14.11 新增第 5 小节 G-MATCH 作为墓地匹配单一语义源，引擎与门禁共用夹具。登记缺口 GAP-W1～W6 与待拍板项 DEC-1（K-9 对 `ERROR_CODES` 的解释）。**本条仅文档立卡**。
 > 84. **状态回写（2026-10-28 · 规格一致性审计收尾）**：`docs/specs/consistency-audit.md` 立档（2026-10-29 文档治理移至 `docs/ledger/consistency-audit.md`）（审计台账，非权威源；待裁决、机械修复、挂账项与权威分层）。K-16 `attributions.linked_reason_code` 类型名由 `reasonCodeSchema`（运行时常量）修正为 `ReasonCode`（推断类型）。审计机械修复 PR #9 已合入 main（`e430193`）。README 补 `playtest-self-check.md` 与 `consistency-audit.md` 索引。**无任务状态变化**，各任务卡状态未改。
 > 85. **状态回写（2026-10-31 · J.1 合入）**：`TASK-J.1` 由 `[NEW_TASK]` → **`[COMPLETED]`**（证据 PR [#29](https://github.com/he18718143986-design/IDE/pull/29) / tip `4144a20`，`feat(daemon): TASK-J.1 右栏 partner 只读化`；partner 只读；相关测本机 51 passed）。同步：§1.1 矩阵、§3.4c 详细卡、Sprint「当前首要」→ **J.2**（主链起点；J.1 已收口）。**本条仅文档状态回写**；不改生产代码。
+> 86. **状态回写（2026-10-31 · M2 真相缝 · J.2～J.9 / L.1～L.3 / L.5 合入）**：下列已合入卡由 `[NEW_TASK]` → **`[COMPLETED]`**（证据均为本仓 GitHub squash merge）：`TASK-J.2` [#4](https://github.com/he18718143986-design/IDE/pull/4)/`e6e1730`；`J.3` [#5](https://github.com/he18718143986-design/IDE/pull/5)/`f4656a9`；`J.4` [#6](https://github.com/he18718143986-design/IDE/pull/6)/`4832506`；`J.5` [#7](https://github.com/he18718143986-design/IDE/pull/7)/`c877d1c`；`J.6` [#11](https://github.com/he18718143986-design/IDE/pull/11)/`a9d7cb2`；`J.7` [#13](https://github.com/he18718143986-design/IDE/pull/13)/`67d7605`；`J.8` [#10](https://github.com/he18718143986-design/IDE/pull/10)/`b90241e`；`J.9` [#12](https://github.com/he18718143986-design/IDE/pull/12)/`1ad6eab`；`L.1` [#9](https://github.com/he18718143986-design/IDE/pull/9)/`8eb6896`；`L.2` [#8](https://github.com/he18718143986-design/IDE/pull/8)/`16c5176`；`L.3` [#15](https://github.com/he18718143986-design/IDE/pull/15)/`b4e0091`；`L.5` [#14](https://github.com/he18718143986-design/IDE/pull/14)/`0b6bc7f`。同步：§1.1 矩阵、§3.4c/§3.4d 详细卡（含 J 系 R-12 不变声明）、Sprint「当前首要」→ **J.10 ∥ L.4**；`J.10` / `L.4` / `L.6` 等未合入卡保持 `[NEW_TASK]`。**本条仅文档状态回写与真相缝**；不改生产代码。
 > 65. **状态回写（2026-10-26 · 实现完成 TASK-C.14f + TASK-C.15a–d）**：Tina t855u「继续项 2（WS）与项 4（EO 余面 Delta）的立卡实现」。已落地：`BASELINE_PROGRESS` WS（停 2s 轮询）；EO-01 完备+转移 DAG；EO-08 UUIDv5/返工计数；EO-05 签署白名单 GC + MERGED→DELIVERED 失败停 MERGED；P0 drafts 隔离 + EO-09 worktree seal。单测 `task-c14f-*` / `task-c15a–d-*` + C.12 回归绿。**不**扩 Spec Freeze 五正文；P1–P3 仍 backlog。
 > 64. **状态回写（2026-10-26 · 立卡 TASK-C.14f + TASK-C.15a–d · WS 深度进度 + EO 余面 Delta）**：Tina t855u「继续项 2（WS）与项 4（EO 余面 Delta）的立卡实现」。按此前安全闭环后暂缓的 backlog 升格为薄卡：**`TASK-C.14f`**（基线深度进度真 WS/流式：Daemon 推 `BASELINE_PROGRESS`，替换前端 2s 轮询；P0 仍秒级解锁右栏）；**`TASK-C.15a`**（EO-01 DeliveryState 完备：补齐 C.12b 简化缺口与合法转移）；**`TASK-C.15b`**（EO-08 断言身份与返工计数：UUIDv5 `assertion_id` + Daemon 权威计数 + 超限 `ESCALATED_HUMAN` + 返工期禁追加）；**`TASK-C.15c`**（EO-05 两阶段归档/GC：签署期白名单 GC；`MERGED`→`DELIVERED` 事务硬化，失败停 `MERGED`）；**`TASK-C.15d`**（P0 AC-ISOL 草稿隔离 + EO-09 Worktree seal 轻量；P1 sufficiency / P2 确认分级 / P3 视口防抖仍 backlog）。建议序 **C.14f → C.15a → C.15b → C.15c → C.15d**；**当前首要**→ **C.14f**。**本条仅文档立卡**；**不写**产品码直至同授权「立卡实现」开工；**不**扩 Spec Freeze 五正文；不抢 D.1e；不改 D.1 鉴权。权威：基线讨论稿 §5/§7 流式 OPEN；右栏 §14.11 EO-01/05/08/09 + §13 P0；C.12 Top5 已覆盖部分不重复。
 > 58. **状态回写（2026-10-26 · 立卡 TASK-C.12a–e · Spec Freeze → Top5 Delta 升级卡）**：Tina 授权（t817u「升格立卡」）。按封版记录 `docs/reports/spec-freeze-record.md`（tip `e4779ad`）与澄清 §6 / Checklist §3，将 API Top5 As-is→To-be 映射为五张 **Delta 升级卡**（**不推翻**现网 session / STATE / prototypes / PAUSED 弹窗骨架）：**`TASK-C.12a`**（双层 Token：`exec_token` + `resume_token`+`jti`；PAUSED 吊销；EO-07）、**`TASK-C.12b`**（`session_epoch`+`state_seq` + EO-01 `DeliveryState` 广播；含 `CONTRACT_SIGNING` 瞬态）、**`TASK-C.12c`**（越界原子拦截：SIGINT 3s→SIGKILL→吊销→清锁→PAUSED；EO-02/07）、**`TASK-C.12d`**（Demo 三态 + `can_sign` + records 轻量拷贝；EO-05/06）、**`TASK-C.12e`**（`.stagent/records/{contract_id}/audit-manifest.json`；EO-03/04/05）。建议序 **C.12a→C.12b→C.12c→C.12d→C.12e**；**当前首要**→ **C.12a**。**本条仅文档立卡**；**CLOSED ≠ 已实现**；**不写** daemon/src 产品码直至 Tina 点名开发；**不抢** D.1e；Impact/Mode/AST/云归档仍 **v0.2+**；不改 D.1 loopback+#token 通道原则。
@@ -217,21 +218,21 @@
 | **TASK-C.20** | Supervisor 合流前碎片归档（DOC-ARCHIVE-Supervisor-pre-SSOT） | 文档治理 | **[COMPLETED]**（2026-10-26 Tina t908u「归档」；本提交合入） | P4 规范归档 | • 前置 `C.19` COMPLETED<br>• `docs/archive/supervisor-pre-ssot/` + 5 份 git mv<br>• reports 留 stub；Freeze 总册保留并强化指针<br>• 不改产品代码；不抢 D.1e；不扩 v0.2 |
 | **TASK-C.21** | Supervisor SSOT 审查补丁（DOC-SSOT-Supervisor-Patch） | 文档治理 | **[COMPLETED]**（2026-10-26 Tina t910u「补丁」；本提交合入） | P4 规范补丁 | • 前置 `C.20` COMPLETED<br>• SSOT v2.0.1：Demo 门禁 / 通配分级 / 确认原子时序 / pin / 降级 / demoReady<br>• 不改产品代码；不抢 D.1e；不扩 v0.2 |
 | **TASK-J.1** | 右栏 AI 搭档只读工具集 | 安全 / 工作台 | **[COMPLETED]**（tip `4144a20` / merge [#29](https://github.com/he18718143986-design/IDE/pull/29)；partner 只读；相关测本机 51 passed） | **P0** 闭环 v2.1 第一批 | • SSOT §13.2 / P-01 / L-02<br>• Claude Code 右栏改 `role: partner`：仅 Read/Glob/Grep，禁写与 Bash，不用 acceptEdits<br>• 右栏拒选 read_write 适配器 |
-| **TASK-J.2** | `ScopePlan` 纯函数与范围预检构建器 | 门禁 / 范围 | **[NEW_TASK]** | P1 闭环 v2.1 第一批 | • SSOT §15.3 / S2-02 / S2-04 / L-03<br>• 单一来源 + 稳定 digest；确定性收敛，不编造路径<br>• 无验证脚本 → manual_only |
-| **TASK-J.3** | 唯一确认谓词纳入 `ScopePlan` | 门禁 | **[NEW_TASK]** | P1 闭环 v2.1 第一批 | • 前置 `J.2`<br>• 新增 `E_SCOPE_NOT_READY` / `E_SCOPE_POLICY` / `E_SCOPE_APPROVAL_REQUIRED`<br>• 与 J.5 同 PR 或开关保护 |
-| **TASK-J.4** | Daemon 范围预检接口与快照绑定 | 门禁 / 控制面 | **[NEW_TASK]** | P1 闭环 v2.1 第一批 | • 前置 `J.2`<br>• `POST /api/supervisor/scope/preflight`；快照 1.1 含 `scope_plan`<br>• `E_SCOPE_PLAN_DRIFT` / `E_SCHEME_SNAPSHOT_MISMATCH`；签署链不得 403 |
-| **TASK-J.5** | 「确认方案」接线改造 | 工作台 / 门禁 | **[NEW_TASK]** | P1 闭环 v2.1 第一批 | • 前置 `J.3`、`J.4`<br>• 防抖预检；删除事务前意图推断；按快照建合同<br>• drift 解锁并刷新范围 |
-| **TASK-J.6** | 中栏《改动范围与验收方式》区块 | 工作台 UX | **[NEW_TASK]** | P1 闭环 v2.1 第一批 | • 前置 `J.5`<br>• 五块白话呈现；排除区域 / 敏感项表态触发预检<br>• 无技术单位、无手写 glob |
-| **TASK-J.7** | 交接三步进度与右栏解锁 | 工作台 UX | **[NEW_TASK]** | P1 闭环 v2.1 第一批 | • 前置 `J.1`（硬）、`J.5`<br>• COMMIT 后解锁；冻结后消息只作只读问答<br>• 仅补偿失败保持锁定 |
-| **TASK-J.8** | `JourneyStage` 投影与广播 | 状态权威 | **[NEW_TASK]** | P1 闭环 v2.1 第一批 | • SSOT §16.2 / J-01 / L-10<br>• Daemon 投影随 `STATE_CHANGED` 下发；表外组合告警<br>• `DELIVERED` 呈现为已合入（不删枚举） |
-| **TASK-J.9** | SchemePatch 零模型确定性合并引擎 | 意图编译器 / 证据台账 | **[NEW_TASK]** | P1 闭环 v2.1 第二批 | • SSOT §14.2 / §14.3 / §14.11；V-01～V-04、V-10～V-13<br>• 实施口径 [`scheme-patch-engine.md`](./scheme-patch-engine.md)<br>• 纯函数零模型；可用桩编译器 |
+| **TASK-J.2** | `ScopePlan` 纯函数与范围预检构建器 | 门禁 / 范围 | **[COMPLETED]**（tip `e6e1730` / merge [#4](https://github.com/he18718143986-design/IDE/pull/4)） | P1 闭环 v2.1 第一批 | • SSOT §15.3 / S2-02 / S2-04 / L-03<br>• 单一来源 + 稳定 digest；确定性收敛，不编造路径<br>• 无验证脚本 → manual_only |
+| **TASK-J.3** | 唯一确认谓词纳入 `ScopePlan` | 门禁 | **[COMPLETED]**（tip `f4656a9` / merge [#5](https://github.com/he18718143986-design/IDE/pull/5)） | P1 闭环 v2.1 第一批 | • 前置 `J.2`<br>• 新增 `E_SCOPE_NOT_READY` / `E_SCOPE_POLICY` / `E_SCOPE_APPROVAL_REQUIRED`<br>• 与 J.5 同 PR 或开关保护 |
+| **TASK-J.4** | Daemon 范围预检接口与快照绑定 | 门禁 / 控制面 | **[COMPLETED]**（tip `4832506` / merge [#6](https://github.com/he18718143986-design/IDE/pull/6)） | P1 闭环 v2.1 第一批 | • 前置 `J.2`<br>• `POST /api/supervisor/scope/preflight`；快照 1.1 含 `scope_plan`<br>• `E_SCOPE_PLAN_DRIFT` / `E_SCHEME_SNAPSHOT_MISMATCH`；签署链不得 403 |
+| **TASK-J.5** | 「确认方案」接线改造 | 工作台 / 门禁 | **[COMPLETED]**（tip `c877d1c` / merge [#7](https://github.com/he18718143986-design/IDE/pull/7)） | P1 闭环 v2.1 第一批 | • 前置 `J.3`、`J.4`<br>• 防抖预检；删除事务前意图推断；按快照建合同<br>• drift 解锁并刷新范围 |
+| **TASK-J.6** | 中栏《改动范围与验收方式》区块 | 工作台 UX | **[COMPLETED]**（tip `a9d7cb2` / merge [#11](https://github.com/he18718143986-design/IDE/pull/11)） | P1 闭环 v2.1 第一批 | • 前置 `J.5`<br>• 五块白话呈现；排除区域 / 敏感项表态触发预检<br>• 无技术单位、无手写 glob |
+| **TASK-J.7** | 交接三步进度与右栏解锁 | 工作台 UX | **[COMPLETED]**（tip `67d7605` / merge [#13](https://github.com/he18718143986-design/IDE/pull/13)） | P1 闭环 v2.1 第一批 | • 前置 `J.1`（硬）、`J.5`<br>• COMMIT 后解锁；冻结后消息只作只读问答<br>• 仅补偿失败保持锁定 |
+| **TASK-J.8** | `JourneyStage` 投影与广播 | 状态权威 | **[COMPLETED]**（tip `b90241e` / merge [#10](https://github.com/he18718143986-design/IDE/pull/10)） | P1 闭环 v2.1 第一批 | • SSOT §16.2 / J-01 / L-10<br>• Daemon 投影随 `STATE_CHANGED` 下发；表外组合告警<br>• `DELIVERED` 呈现为已合入（不删枚举） |
+| **TASK-J.9** | SchemePatch 零模型确定性合并引擎 | 意图编译器 / 证据台账 | **[COMPLETED]**（tip `1ad6eab` / merge [#12](https://github.com/he18718143986-design/IDE/pull/12)） | P1 闭环 v2.1 第二批 | • SSOT §14.2 / §14.3 / §14.11；V-01～V-04、V-10～V-13<br>• 实施口径 [`scheme-patch-engine.md`](./scheme-patch-engine.md)<br>• 纯函数零模型；可用桩编译器 |
 | **TASK-J.10** | 意图编译器生成端与 Daemon 编译循环 | 意图编译器 | **[NEW_TASK]** | P1 闭环 v2.1 第二批 | • 前置 `J.9`；合并后触发预检依赖 `J.2`<br>• 实施口径 [`intent-compiler-prompt.md`](./intent-compiler-prompt.md)<br>• V-05、V-06、V-09；GAP-1/GAP-2 已关闭，见 `supervisor.md` §14.11 K-10/K-11 |
 | **TASK-J.18** | Worker 派工墓地门禁（INV-LEDGER-03 工地侧） | 门禁 / 证据台账 | **[NEW_TASK]** | P1 闭环 v2.1 第二批 | • 前置 `J.4`（硬）、`J.9`<br>• 实施口径 [`worker-graveyard-gate.md`](./worker-graveyard-gate.md)；SSOT §14.11 第 5 小节 G-MATCH<br>• 端口段 3950–3959 |
-| **TASK-L.1** | 右栏纯净化（DEC-004） | 右栏 / Agent | **[NEW_TASK]** | 交付全链路 M2 | • 前置 无<br>• 详见 §3.4d；总装图 [`delivery-lifecycle.md`](./delivery-lifecycle.md) |
-| **TASK-L.2** | Worker 指令补全「你会被这样检查」 | Worker | **[NEW_TASK]** | 交付全链路 M2 | • 前置 无<br>• 详见 §3.4d；总装图 [`delivery-lifecycle.md`](./delivery-lifecycle.md) |
-| **TASK-L.3** | 测试义务：合同元数据、`ScopePlan` 系统范围、`stagent check` | 验证 | **[NEW_TASK]** | 交付全链路 M2 | • 前置 `J.2`、`J.4`<br>• 详见 §3.4d；总装图 [`delivery-lifecycle.md`](./delivery-lifecycle.md) |
+| **TASK-L.1** | 右栏纯净化（DEC-004） | 右栏 / Agent | **[COMPLETED]**（tip `8eb6896` / merge [#9](https://github.com/he18718143986-design/IDE/pull/9)） | 交付全链路 M2 | • 前置 无<br>• 详见 §3.4d；总装图 [`delivery-lifecycle.md`](./delivery-lifecycle.md) |
+| **TASK-L.2** | Worker 指令补全「你会被这样检查」 | Worker | **[COMPLETED]**（tip `16c5176` / merge [#8](https://github.com/he18718143986-design/IDE/pull/8)） | 交付全链路 M2 | • 前置 无<br>• 详见 §3.4d；总装图 [`delivery-lifecycle.md`](./delivery-lifecycle.md) |
+| **TASK-L.3** | 测试义务：合同元数据、`ScopePlan` 系统范围、`stagent check` | 验证 | **[COMPLETED]**（tip `b4e0091` / merge [#15](https://github.com/he18718143986-design/IDE/pull/15)） | 交付全链路 M2 | • 前置 `J.2`、`J.4`<br>• 详见 §3.4d；总装图 [`delivery-lifecycle.md`](./delivery-lifecycle.md) |
 | **TASK-L.4** | 两段式施工编排：先红后绿 | 验证 / 编排 | **[NEW_TASK]** | 交付全链路 M2 | • 前置 `L.3`、`L.2`<br>• 详见 §3.4d；总装图 [`delivery-lifecycle.md`](./delivery-lifecycle.md) |
-| **TASK-L.5** | 真实预览：Worktree 启动用户应用 | 试玩 | **[NEW_TASK]** | 交付全链路 M2 | • 前置 无<br>• 详见 §3.4d；总装图 [`delivery-lifecycle.md`](./delivery-lifecycle.md) |
+| **TASK-L.5** | 真实预览：Worktree 启动用户应用 | 试玩 | **[COMPLETED]**（tip `0b6bc7f` / merge [#14](https://github.com/he18718143986-design/IDE/pull/14)） | 交付全链路 M2 | • 前置 无<br>• 详见 §3.4d；总装图 [`delivery-lifecycle.md`](./delivery-lifecycle.md) |
 | **TASK-L.6** | 黄金切片端到端测试（M2 退出） | E2E | **[NEW_TASK]** | 交付全链路 M2 | • 前置 `L.1`～`L.5`、`J.2`～`J.10`<br>• 详见 §3.4d；总装图 [`delivery-lifecycle.md`](./delivery-lifecycle.md) |
 | **TASK-L.7** | `ProjectPlan` 类型、校验与存储 | 项目分解 | **[NEW_TASK]** | 交付全链路 M3 | • 前置 `L.6`<br>• 详见 §3.4d；总装图 [`delivery-lifecycle.md`](./delivery-lifecycle.md) |
 | **TASK-L.8** | 计划补丁合并与分解器 | 项目分解 | **[NEW_TASK]** | 交付全链路 M3 | • 前置 `L.7`、`J.9`<br>• 详见 §3.4d；总装图 [`delivery-lifecycle.md`](./delivery-lifecycle.md) |
@@ -2739,9 +2740,10 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
   - `worker` 角色既有用例全部不回归。
 * **FAIL**：右栏任一适配器在方案工作台中可产生写文件或 shell 调用；或仅靠 hook、无 CLI 参数层拦截。
 * **关键文件**：`daemon/worker/cli-host/claude-code-adapter.ts`、`daemon/worker/cli-host/pretool-hook.mjs`、`daemon/server.ts`、`daemon/chat/types.ts`、`src/lib/chat-events.ts`、`src/lib/pick-chat-adapter.ts`（以实际路径为准）
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证 / 网关写范围（本卡只收紧右栏 partner 工具白名单与 permission-mode；不放宽 Gateway `writable_paths`）。合入证据见卡内「合入证据」；真 Key 补验仍挂账 OP-28。
 * **估算**：S
 
-#### 【Task J.2】`ScopePlan` 纯函数与 Daemon 范围预检构建器 `[NEW_TASK]`
+#### 【Task J.2】`ScopePlan` 纯函数与 Daemon 范围预检构建器 `[COMPLETED]`
 
 > **交付全链路备注（2026-10-30）**：本卡不变。后续 `TASK-L.3`、`L.9`、`L.12` 会在 `scope-plan-builder.ts` 中追加签署前的系统范围（`withSystemScope`：`tests/stagent/**`、`docs/system/**`、`stagent check` 命令、按桩种类的安装权限）。实现本卡时请把「组合各来源 → 计算 digest」写成可追加来源的形式。
 
@@ -2750,7 +2752,8 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 * **对应规格**：SSOT 第三部分 §15.3、§15.4（数据部分）；§18 `S2-02`、`S2-04`；§19 `L-03`（前半）
 * **前置依赖**：无
 * **优先级**：P1（本批主链起点）
-* **状态**：`[NEW_TASK]`
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#4](https://github.com/he18718143986-design/IDE/pull/4) / tip `e6e1730`（`feat(J.2): ScopePlan 纯函数与范围预检构建器`）
 * **对照痛点（代码事实）**：合同范围今天在「确认方案」那一刻由 `buildL0Plan` 从意图文本临时推出；推不出路径时兜底为 `["src/**"]`（`daemon/supervisor/rules-l0.ts::buildL0Plan`），而老项目（有 `package.json`）的 `src/**` 正是通配符分级必拒的 `bare_top_glob`——这就是「确认后 403」的根因。
 * **一句话目标**：把「这一轮会改哪里、不会碰哪里、要谁点头、怎么验收、多大规模」算成一个与方案修订号绑定、可摘要、确定性的 `ScopePlan`，并让它成为后续预检与合同创建**共用**的唯一来源。
 * **范围**：
@@ -2769,9 +2772,10 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
   - `budget.plain` 与 `areas[].label` 不含 `token`、`tool`、`glob`、`**` 字样。
 * **FAIL**：任何收敛结果指向仓库中不存在的目录；或同输入 digest 不稳定。
 * **关键文件**：`src/lib/journey/scope-plan.ts`（新）、`daemon/supervisor/scope-plan-builder.ts`（新）、`daemon/supervisor/rules-l0.ts`（只读复用，必要时导出内部函数）、`src/lib/writable-scope-grade.ts`、`daemon/pipeline/scheme-snapshot-store.ts`（复用 `stableStringify`，可抽到共享模块）
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证。网关写范围：本卡把 `ScopePlan` 定为唯一来源（对齐 [ADR-0018](../adr/0018-intent-to-executable-seal.md) INV-SEAL-01/02），**不**放宽 Gateway 物理门禁；签署路径禁止 `buildL0Plan(chat)` 旁路（旁路删除在 J.5）。
 * **估算**：M
 
-#### 【Task J.3】唯一确认谓词纳入 `ScopePlan` `[NEW_TASK]`
+#### 【Task J.3】唯一确认谓词纳入 `ScopePlan` `[COMPLETED]`
 
 > **ADR-0014 修订（2026-10-30，[`delivery-lifecycle.md`](./delivery-lifecycle.md) §5 SA-1，推荐默认，待用户确认）**：`E_SCOPE_APPROVAL_REQUIRED` 保留，但「表态」不再是逐项点击。`needs_approval` 只收用户原话点名的敏感项与系统必需的敏感项（如锁文件），其余默认移入 `never_touch`。授权仍存在 `ScopePlan.needs_approval[].approved` 中：前端在「确认开工」时用 `applyScopeDecisions` 一次性把全部项置为 `true`，带着新 `plan_digest` 提交。T-GATE 用例中「有未表态敏感项」改为「提交的 `ScopePlan` 中仍有 `approved !== true` 的敏感项」。其余判定顺序不变。
 
@@ -2780,7 +2784,8 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 * **对应规格**：SSOT 第三部分 §15.5、§17 D7；§7 D1 拒绝码表（v2.1 三行）；`runtime-contract-and-safety.md` §2.3；§18 `S2-01`、`S2-03`（及 `S2-02` 谓词侧）；§19 `L-04`
 * **前置依赖**：`TASK-J.2`（类型）
 * **优先级**：P1
-* **状态**：`[NEW_TASK]`
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#5](https://github.com/he18718143986-design/IDE/pull/5) / tip `f4656a9`（`feat(J.3): 确认谓词纳入 ScopePlan（SCOPE_GATE 默认关）`）
 * **一句话目标**：「能不能点确认方案」的唯一谓词把范围也算进去，前端在确认**之前**就能把所有范围问题用白话说清。
 * **范围**：
   1. `src/lib/journey/scheme-draft.ts::evaluateSchemeConfirmation` 增加第三参数 `scopePlan: ScopePlan | null`。判定顺序（先命中先返回）：既有 `E_SCHEME_ALREADY_FROZEN` → `E_SCHEME_CONFLICTS_OPEN` → `E_SCHEME_NOT_REVIEWABLE` → Demo 四码 → **`E_SCOPE_NOT_READY`**（`scopePlan == null` 或 `scopePlan.scheme_revision !== draft.scheme_revision`）→ **`E_SCOPE_POLICY`**（`!scopePlan.grade.ok`）→ **`E_SCOPE_APPROVAL_REQUIRED`**（提交的 `ScopePlan` 中存在 `needs_approval[i].approved !== true` 的敏感项；依 ADR-0014 / SA-1，不再支持逐项表态，开工时一并授权）。
@@ -2794,16 +2799,18 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
   - 既有 `T-GATE-001`～`011` 在传入合规 `scopePlan` 夹具后全部不回归。
 * **FAIL**：存在第二套范围判断（UI 自行推导 `disabled`）；或谓词读取 `completeness`。
 * **关键文件**：`src/lib/journey/scheme-draft.ts`、`src/routes/index.tsx`、`tests/unit/scheme-confirmation-gate.test.ts`
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证 / 网关写范围物理门禁。本卡只把确认谓词纳入已算好的 `ScopePlan`（含 `E_SCOPE_*`），不另开写路径。
 * **估算**：S
 
-#### 【Task J.4】Daemon 范围预检接口与快照绑定 `[NEW_TASK]`
+#### 【Task J.4】Daemon 范围预检接口与快照绑定 `[COMPLETED]`
 
 * **任务编号**：`TASK-J.4`
 * **任务名称**：`POST /api/supervisor/scope/preflight` + 快照写入 `ScopePlan` + 签署链按快照校验
 * **对应规格**：SSOT 第三部分 §15.5「签署链对齐」1～4；`runtime-contract-and-safety.md` §1「护照的来源」、§2.1 v2.1 补充、§2.3「Daemon 专属码」；§18 `S2-05`、`S2-06`、`S2-07`；§19 `L-03`（后半）
 * **前置依赖**：`TASK-J.2`
 * **优先级**：P1
-* **状态**：`[NEW_TASK]`
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#6](https://github.com/he18718143986-design/IDE/pull/6) / tip `4832506`（`feat(J.4): ScopePlan 预检接口与快照签署绑定`）
 * **一句话目标**：Daemon 能随时为当前方案算出 `ScopePlan`；冻结时把它锁进快照；带 `confirmation_id` 的合同只能与快照里的范围一字不差，从此签署链上不可能再出现范围 403。
 * **范围**：
   1. **预检接口**：`POST /api/supervisor/scope/preflight`，入参 `{ scheme, decisions }`，返回 `ScopePlan`。只读、零模型、零落盘、不建 Worktree；鉴权同 `/api/supervisor/draft`；前端客户端 `src/lib/daemon-api.ts` 增加 `preflightScope()`。
@@ -2821,9 +2828,10 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
   - 既有 `tests/integration/scheme-confirm-http-injection.test.ts`（7 条）与 `contract-api` / `resume-abort` 不回归；`tests/unit/test-port-map.test.ts` 通过。
 * **FAIL**：preflight 写盘或调用模型；签署链在带 `confirmation_id` 时任何路径返回 403。
 * **关键文件**：`daemon/server.ts`、`daemon/pipeline/scheme-snapshot-store.ts`、`daemon/supervisor/scope-plan-builder.ts`、`src/lib/journey/scope-plan.ts`、`src/lib/daemon-api.ts`
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证。网关写范围：经 `scope/preflight` 与快照 `scope_plan`/`plan_digest` 绑定后进入签署（INV-SEAL-03）；漂移拒绝，不放宽 Gateway。
 * **估算**：M
 
-#### 【Task J.5】「确认方案」接线改造：范围先算好、按快照签 `[NEW_TASK]`
+#### 【Task J.5】「确认方案」接线改造：范围先算好、按快照签 `[COMPLETED]`
 
 > **ADR-0014 修订（2026-10-30）**：按 SA-1，确认请求提交的是已用 `applyScopeDecisions` 置好授权的 `ScopePlan`（见 J.3 修订），Daemon 用快照 + 同一组表态重算，摘要一致；不再有逐项表态往返。防抖预检保留（范围仍须在点击前算好，只是不强迫用户审阅）。
 
@@ -2832,7 +2840,8 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 * **对应规格**：SSOT 第三部分 §15.5、§16.3（失败分支）；§19 `L-03`、`L-04`
 * **前置依赖**：`TASK-J.3`、`TASK-J.4`
 * **优先级**：P1
-* **状态**：`[NEW_TASK]`
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#7](https://github.com/he18718143986-design/IDE/pull/7) / tip `c877d1c`（`feat(J.5): 确认链接线 ScopePlan 并移除 SCOPE_GATE`）
 * **对照痛点（代码事实）**：`src/routes/index.tsx::handleConfirmScheme` 在事务开始前用 `formatSchemeAsIntent` → `submitJourneyMessage` 生成合同骨架，再在 `signAndPrepare` 里 `createContractWithAdmission`——范围从未展示给用户，且失败发生在右栏已锁之后。
 * **一句话目标**：方案每变一次就预检一次；确认时只冻结、只按快照建合同；任何范围问题都在点击前暴露。
 * **范围**：
@@ -2848,9 +2857,10 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
   - J.4 的集成测试继续通过；`T-UI-001`～`010` 不回归（夹具补合规 plan）。
 * **FAIL**：确认链任何一步仍从意图文本推断范围；或 drift 后右栏保持锁定。
 * **关键文件**：`src/routes/index.tsx`、`src/lib/journey/confirm-scheme-atomic.ts`、`src/lib/daemon-api.ts`、`tests/ui/task-c22-confirm-wiring.test.tsx`、`tests/unit/confirm-scheme-atomic.test.ts`
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证。网关写范围：确认链改用冻结 `ScopePlan` 建合同，删除事务前聊天推断；对齐 INV-SEAL-01（禁 `buildL0Plan(chat)` 签署用法）。
 * **估算**：M
 
-#### 【Task J.6】中栏《改动范围与验收方式》区块 `[NEW_TASK]`
+#### 【Task J.6】中栏《改动范围与验收方式》区块 `[COMPLETED]`
 
 > **ADR-0014 修订（2026-10-30，审阅后置）**：开工前**不展示**路径与区域调整控件。区块在开工前只显示三行白话：「这次大概改 N 处、不碰 M 处」「怎么算做完」「预计多大」；如有敏感项，再显示「含 N 处敏感改动」与「不碰这些，其余照做」按钮。范围 `2` 中「会改动的地方 / 这次不会碰」的完整清单，后置到试玩验收幕**只读**展示，与证据并列。范围 `3` 的「不要改这里」按钮删除：签署后范围已冻结，用户对范围的异议走 supervisor §16.7「这里不对」，或在右栏说出来，按 §16.5 C 类进入下一份合同。验收用例同步调整：开工前页面不含区域级按钮；验收幕清单只读。
 
@@ -2859,7 +2869,8 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 * **对应规格**：SSOT 第三部分 §15.2、§15.4；§18 `S2-08`
 * **前置依赖**：`TASK-J.5`
 * **优先级**：P1
-* **状态**：`[NEW_TASK]`
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#11](https://github.com/he18718143986-design/IDE/pull/11) / tip `a9d7cb2`（`feat(J.6): 中栏改动范围与验收白话区块`）
 * **一句话目标**：用户在点「确认开工」之前，用三行白话看清改动概览（大概改 N 处、不碰 M 处、怎么算做完、预计规模）；如有敏感项，显示白话敏感项与「不碰这些」按钮；具体路径树与命令明细后置到试玩验收幕只读展示。
 * **范围**：
   1. 新建 `src/components/studio/ScopeAcceptanceBlock.tsx`，插入 `SchemeReviewPane` 的决议区之后、「生成 Demo」之前（SSOT §15.2 顺序）。
@@ -2877,9 +2888,10 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
   - `tests/ui/task-c18-scheme-single-pane.test.tsx` 与 `task-c22` 不回归。
 * **FAIL**：区块显示技术单位或原始合同 JSON；或用户表态未进入预检。
 * **关键文件**：`src/components/studio/ScopeAcceptanceBlock.tsx`（新）、`src/components/studio/SchemeReviewPane.tsx`、`src/routes/index.tsx`
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证 / 网关写范围（纯中栏呈现与敏感项旁路 UI；写范围仍以预检 `ScopePlan` 为准）。
 * **估算**：M
 
-#### 【Task J.7】交接三步进度与右栏解锁（施工对话过渡态） `[NEW_TASK]`
+#### 【Task J.7】交接三步进度与右栏解锁（施工对话过渡态） `[COMPLETED]`
 
 > **ADR-0014 / DEC-005 修订（2026-10-30）**：范围 `3` 的「插入系统消息」改为**中栏画布**卡片，右栏不出现任何 Supervisor 消息；范围 `4` 输入框上方的提示同样移到画布。验收用例「系统消息含节点数」改为「画布卡片含节点数，右栏消息列表无新增系统消息」。
 
@@ -2888,7 +2900,8 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 * **对应规格**：SSOT 第三部分 §16.3、§17 D9；§18 `J-02`；§19 `L-05`
 * **前置依赖**：`TASK-J.1`（**硬依赖**：右栏未只读前不得在施工期解锁）、`TASK-J.5`
 * **优先级**：P1
-* **状态**：`[NEW_TASK]`
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#13](https://github.com/he18718143986-design/IDE/pull/13) / tip `67d7605`（`feat(J.7): 交接三步进度与右栏解锁`）
 * **对照痛点（代码事实）**：交接成功后 `setSchemeChatLocked(true)` 一直保持，只有「新建需求」解锁（`src/routes/index.tsx`）；冻结后的输入会被 `rebuildSchemeFromCorpus` 静默丢弃。
 * **一句话目标**：点击确认后用三步人话进度替代「假死」；成功后右栏立即恢复可用，且冻结后的消息绝不写进方案。
 * **范围**：
@@ -2906,16 +2919,18 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
   - `tests/ui/supervisor-studio-approval.test.tsx`、`task-c22` 不回归。
 * **FAIL**：成功后右栏仍锁定；或冻结后的消息改变了方案、合同或任务图。
 * **关键文件**：`src/routes/index.tsx`、`src/lib/journey/confirm-scheme-atomic.ts`、`src/components/studio/SchemeReviewPane.tsx`、`src/components/AgentChatPane.tsx`
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证 / 网关写范围（交接 UX + 右栏解锁；解锁不改变 partner 工具权限，仍受 J.1 只读约束）。
 * **估算**：M
 
-#### 【Task J.8】`JourneyStage` 投影与广播 `[NEW_TASK]`
+#### 【Task J.8】`JourneyStage` 投影与广播 `[COMPLETED]`
 
 * **任务编号**：`TASK-J.8`
 * **任务名称**：四幕状态由 Daemon 投影并随 `STATE_CHANGED` 下发
 * **对应规格**：SSOT 第三部分 §16.2 映射表、§17 D8；§18 `J-01`；§19 `L-08`（呈现层）、`L-10`
 * **前置依赖**：无（可与主链并行）
 * **优先级**：P1
-* **状态**：`[NEW_TASK]`
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#10](https://github.com/he18718143986-design/IDE/pull/10) / tip `b90241e`（`feat(J.8): JourneyStage 投影与 STATE_CHANGED 广播`）
 * **对照痛点（代码事实）**：前端在 `index.tsx` 中自行组合合同、图谱与预览状态决定显示什么；`DELIVERY_STATES` 仍含 ADR-0012 已废止的 `DELIVERED`。
 * **一句话目标**：用户可见的「当前在哪一幕、幕内什么子态」只有一个来源——Daemon 按规格映射表算出并广播；前端只消费，不推导。
 * **范围**：
@@ -2931,16 +2946,18 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
   - `tests/integration/presentation-state-wiring.test.ts` 补断言：`STATE_CHANGED` 帧携带 `journey_stage`；既有断言不回归。
 * **FAIL**：前端新增任何基于底层状态组合推导幕次的代码；或映射表有行缺测试。
 * **关键文件**：`src/lib/state/journey-stage.ts`（新）、`src/lib/ipc/frames.ts`、`daemon/state/presentation-projector.ts`、`src/lib/state/delivery-state.ts`（只读复用 `projectDeliveryState`）
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证 / 网关写范围（本卡只做 `JourneyStage` 投影与广播，不改门禁）。
 * **估算**：S
 
-#### 【Task J.9】SchemePatch 零模型确定性合并引擎 `[NEW_TASK]`
+#### 【Task J.9】SchemePatch 零模型确定性合并引擎 `[COMPLETED]`
 
 * **任务编号**：`TASK-J.9`
 * **任务名称**：编译器补丁的确定性合并、证据锚定与墓地复活判定（纯函数）
 * **对应规格**：SSOT 第三部分 §14.2、§14.3、§14.11（`INV-LEDGER-01～03`）；§18 `V-01`～`V-04`、`V-10`～`V-13`。**实施口径**：[`scheme-patch-engine.md`](./scheme-patch-engine.md)（与 SSOT 冲突时以 SSOT 为准）
 * **前置依赖**：无硬依赖（纯函数，可立即开工）。合并成功后触发范围预检的接线在 `TASK-J.10`，届时依赖 `TASK-J.2`
 * **优先级**：P1（闭环 v2.1 第二批首卡；`J.10` 硬依赖本卡）
-* **状态**：`[NEW_TASK]`
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#12](https://github.com/he18718143986-design/IDE/pull/12) / tip `1ad6eab`（`feat(J.9): SchemePatch 零模型确定性合并引擎`）
 * **对照痛点（代码事实）**：方案今天由 `src/lib/journey/scheme-draft.ts` 的 `MODULE_HINTS` 正则启发式整份生成，没有补丁、没有证据、没有 pin 合并规则，也没有墓地；SSOT §14.3 的合并表与 §14.11 的不变式在代码里 0 命中。
 * **一句话目标**：给定当前台账状态、编译器补丁与只读对话记录，引擎零模型地算出「整补丁冻结 / 拒绝 / 过期」或「逐 op 写入 / 出卡 / 丢弃」，同样输入永远得到逐字节相同的输出。
 * **范围**：
@@ -2958,6 +2975,7 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
   - `npm run typecheck` 相对基线无新增；`npm run lint` 0 error。
 * **FAIL**：任一 op 在证据不合格时被部分应用；墓地命中的内容以覆盖建议卡形式出现在用户面前（Z-04）；一次成功合并使修订号增加超过 1；同一输入两次调用结果不同；引擎源码出现 `node:` 导入、`Date.now`、`Math.random` 或网络调用。
 * **关键文件**：`src/lib/journey/scheme-patch-types.ts`（新）、`src/lib/journey/evidence-anchor.ts`（新）、`src/lib/journey/graveyard-revival.ts`（新）、`src/lib/journey/scheme-patch-engine.ts`（新）、`tests/helpers/scheme-patch-fixtures.ts`（新）
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证 / 网关写范围（纯函数 `SchemePatch` 合并引擎；不触签署/Gateway）。
 * **估算**：M
 * **备注**：`runtime-contract-and-safety.md` §8 L3 行的门禁层拒绝码无 §2.3 式闭集。`E_CHECKPOINT_FAILED`（`daemon/server.ts` 两处 catch，Daemon HTTP 层以 409 直接返回）与 `E_WRITABLE_SCOPE_POLICY`（类 `WritableScopePolicyError` 定义于 `daemon/supervisor/scope-gate.ts`）均未登记入 `ERROR_CODES`；待派工门禁产出证据归因时统一补登，不在本卡范围。注意 `E_SCOPE_POLICY`（§2.3 表内，v2.1）与 `E_WRITABLE_SCOPE_POLICY` 是两个不同的码，仅名字相近。
 * **待定风险（K-12）**：确认路径（`mark_user_confirmed`，§3.4 / §5.3）同样接受编译器 `occurrence`，存在同型洗白面（「我同意。算了不同意」+ `occurrence: 0`）。复活路径已由 K-12 修复；确认路径修法待定，落地前不得把「待定」读成「无问题」。J.11 金标须含此类对抗样本。
@@ -3048,13 +3066,14 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 >
 > **本节全部为文档立卡，无代码改动，状态均为 `[NEW_TASK]`。**
 
-#### 【Task L.1】右栏纯净化：去掉系统提示与消息前缀（DEC-004） `[NEW_TASK]`
+#### 【Task L.1】右栏纯净化：去掉系统提示与消息前缀（DEC-004） `[COMPLETED]`
 
 * **任务编号**：`TASK-L.1`
 * **对应规格**：ADR-0014 §1；`scheme.md` conf-2、conf-4、acc-2；`ledger/README.md` DEC-004
 * **前置依赖**：无
 * **优先级**：P1（M2）
-* **状态**：`[NEW_TASK]`
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#9](https://github.com/he18718143986-design/IDE/pull/9) / tip `8eb6896`（`feat(L.1): 右栏纯净化去掉系统提示与前缀`）
 * **对照痛点（代码事实）**：`daemon/chat/baseline-adapter.ts` 调 `streamText` 时带 `system: "你是 Stagent 右栏助手，用简体中文简洁回答。"`；`daemon/chat/session-manager.ts` 在发给右栏前用 `buildProtectionPromptNotice` 把保护清单拼在用户消息前面。
 * **一句话目标**：右栏收到的内容与用户输入逐字节相同，没有任何系统提示或前缀。
 * **范围**：
@@ -3072,13 +3091,14 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 * **关键文件**：`daemon/chat/baseline-adapter.ts`、`daemon/chat/session-manager.ts`、`daemon/protection/protection-list.ts`（只读核对调用方）
 * **估算**：S
 
-#### 【Task L.2】Worker 指令补全「你会被这样检查」 `[NEW_TASK]`
+#### 【Task L.2】Worker 指令补全「你会被这样检查」 `[COMPLETED]`
 
 * **任务编号**：`TASK-L.2`
 * **对应规格**：[`verification-strategy.md`](./verification-strategy.md) §8 第 1 项
 * **前置依赖**：无
 * **优先级**：P1（M2）
-* **状态**：`[NEW_TASK]`
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#8](https://github.com/he18718143986-design/IDE/pull/8) / tip `16c5176`（`feat(L.2): Worker 指令「你会被这样检查」`）
 * **对照痛点（代码事实）**：`daemon/worker/session-task-injector.ts::buildWorkerTaskInstruction` 只用 `verification_spec.commands` 决定是否暴露执行工具（约 L227），不把命令写进指令。
 * **一句话目标**：Worker 指令里原样列出验证命令与期望退出码。
 * **范围**：
@@ -3096,13 +3116,14 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 * **关键文件**：`daemon/worker/session-task-injector.ts`
 * **估算**：S
 
-#### 【Task L.3】测试义务：合同元数据、`ScopePlan` 系统范围、证据字段与 `stagent check` `[NEW_TASK]`
+#### 【Task L.3】测试义务：合同元数据、`ScopePlan` 系统范围、证据字段与 `stagent check` `[COMPLETED]`
 
 * **任务编号**：`TASK-L.3`
 * **对应规格**：[`verification-strategy.md`](./verification-strategy.md) §2、§3.1、§3.4、§3.5、§5；[`delivery-lifecycle.md`](./delivery-lifecycle.md) §6；`scheme.md` acc-7
 * **前置依赖**：`TASK-J.2`（`buildScopePlan`）、`TASK-J.4`（按快照建合同）
 * **优先级**：P1（M2）
-* **状态**：`[NEW_TASK]`
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#15](https://github.com/he18718143986-design/IDE/pull/15) / tip `b4e0091`（`feat(L.3): 测试义务、系统范围与 stagent check`）
 * **对照痛点（代码事实）**：
   - 合同 `intent.acceptance_criteria` 是无 id、无 `check` 的 `string[]`（`src/lib/contract.schema.ts` 约 L443），无法派生测试义务。
   - `supervisorMetadataSchema`（约 L278）是非 strict 的 zod 对象，未知键在解析时被剥掉。
@@ -3180,13 +3201,14 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 * **关键文件**：`daemon/pipeline/orchestrator.ts`、`daemon/mcp/gateway.ts`、`src/lib/scope.ts`（只读复用）、`daemon/worker/session-task-injector.ts`
 * **估算**：M
 
-#### 【Task L.5】真实预览：在 Worktree 里启动用户应用 `[NEW_TASK]`
+#### 【Task L.5】真实预览：在 Worktree 里启动用户应用 `[COMPLETED]`
 
 * **任务编号**：`TASK-L.5`
 * **对应规格**：[`verification-strategy.md`](./verification-strategy.md) §7；`scheme.md` gap-15
 * **前置依赖**：无
 * **优先级**：P1（M2）
-* **状态**：`[NEW_TASK]`
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#14](https://github.com/he18718143986-design/IDE/pull/14) / tip `0b6bc7f`（`feat(L.5): Worktree 真实应用预览`）
 * **对照痛点（代码事实）**：`daemon/supervisor/preview/real-preview-server.ts` 只服务静态目录或登记已有 URL；都没有时 `daemon/server.ts`（约 L861）写占位页。没有任何代码在 Worktree 里执行 `dev` / `start`。
 * **一句话目标**：施工完成后，中栏试玩加载的是 Worktree 里正在运行的真实应用。
 * **范围**：
@@ -3775,7 +3797,7 @@ TASK-J.2 ScopePlan 纯函数 + 预检构建器      TASK-J.1 右栏搭档只读 
 
 > **Sprint 0 / 2 / 3 / 4 实施基线核验**：
 > - **当前工程物理起点**：本地代码仓库 `main`@`f14c8cb`（去掉资源管理器「文件」标题热修）；测试基线 **1292 passed / 6 skipped**；已交付至 C.9a–d、**C.10a–h**。
-> - **当前首要编码任务**：**`TASK-J.2`**（`ScopePlan` 单一来源，主链起点）。`TASK-J.1` 已 **COMPLETED**（tip `4144a20` / [#29](https://github.com/he18718143986-design/IDE/pull/29)）。闭环旅程 v2.1 第一批其余 J.2–J.8 见 §3.4c。前序 `TASK-C.21` 及之前均 COMPLETED。
+> - **当前首要编码任务**：**`TASK-J.10`**（意图编译器）∥ **`TASK-L.4`**（先红后绿编排）。`TASK-J.1`～`J.9`、`L.1`～`L.3`、`L.5` 已 **COMPLETED**（见版本头第 85～86 条；main tip `b4e0091`）。未合：`J.10`、`L.4`、`L.6`～。前序 `TASK-C.21` 及之前均 COMPLETED。
 > - **前序（历史）**：`TASK-C.21` → **`[COMPLETED]`**（Tina t910u Supervisor SSOT v2.0.1 审查补丁）。C.20/C.19/C.18/C.17/C.16/H.1–H.8 均 COMPLETED。**不**改产品代码；不抢 D.1e；不扩 v0.2。
 > - **Sprint 2 已达成**：`TASK-P.1`、`TASK-C.5`、`TASK-W.3`、`TASK-W.4` 四张卡均已落地并通过各自专用用例；保护路径在任意模式被门卫拦截、撤销一键恢复、4 类绕过负例失败关闭均已成立。
 > - **Sprint 3 已达成**：`TASK-D.2` 主体已落地，无交集合同自动批准，交互收敛为 1 次合并按钮。
@@ -3897,5 +3919,7 @@ node scripts/verify-env.mjs && npx tsc --noEmit && npm run lint && npm test
 - **P-84（立卡+归档，2026-10-26）**：新增 **`TASK-C.20`** / `DOC-ARCHIVE-Supervisor-pre-SSOT`（Tina t908u「归档」）。5 份 Supervisor 碎片 → `docs/archive/supervisor-pre-ssot/`；reports 留 stub；Freeze 总册保留。同步：版本头第 74 条、§1.1 矩阵、§2.1 JSON（`C.19→C.20`）、§3.4 详细卡、Sprint「当前首要」→ **C.20**。**不**改产品代码；不抢 D.1e；不扩 v0.2。
 - **P-85（立卡+文档补丁，2026-10-26）**：新增 **`TASK-C.21`** / `DOC-SSOT-Supervisor-Patch`（Tina t910u「补丁」）。SSOT → **v2.0.1**：Demo 可选门禁、通配分级、确认方案原子时序、`user_pinned`、Demo 失败双按钮降级、`demoReady` 硬性布尔底线。同步：版本头第 75 条、§1.1 矩阵、§2.1 JSON（`C.20→C.21`）、§3.4 详细卡、Sprint「当前首要」→ **C.21**。**不**改产品代码；不抢 D.1e；不扩 v0.2。
 - **P-86（立卡，2026-10-27）**：新增 **`TASK-J.1`–`TASK-J.8`**（闭环旅程 v2.1 第一批；规格 `supervisor.md` 第三部分）。同步：版本头第 76 条、§1.1 矩阵 8 行、§2.1 JSON 7 条边（`J.2→J.3/J.4`、`J.3/J.4→J.5`、`J.5→J.6/J.7`、`J.1→J.7`）、新增 §3.4c 详细卡与第二批预告、Sprint「当前首要」→ **J.1 ∥ J.2**。新集成测试端口段登记 3930–3939 / 3940–3949。**不**改产品代码；**不**改 SSOT 条款；`TASK-C.22` 号码因代码注释已引用而不复用。
+- **P-87（状态回写 + 真相缝，2026-10-31）**：`TASK-J.2`～`J.9`、`L.1`～`L.3`、`L.5` → **`[COMPLETED]`**（对齐 GitHub [#4](https://github.com/he18718143986-design/IDE/pull/4)～[#15](https://github.com/he18718143986-design/IDE/pull/15) 已合入；不含未合的 `J.10`/`L.4`/`L.6`）。同步：版本头第 86 条、§1.1 矩阵、§3.4c/d 详细卡、J 系补 R-12 不变声明、Sprint「当前首要」→ **J.10 ∥ L.4**；并同 PR 对齐 [`../scheme.md`](../scheme.md) §11 落差、升格 [`evidence-and-acceptance-criteria.md`](./evidence-and-acceptance-criteria.md) 为现行规格。**本条仅文档**；不改生产代码。
+
 
 - **P-79（完工，2026-10-26）**：`TASK-H.5`–`TASK-H.8` → **[COMPLETED]**（Tina t881u「开工」）。实现：旅程 `contract_id` 落盘回传；脏区白话引导+ack 排除；主链路回归套件；records 脱敏 zip/清理 API。单测 `task-h5`…`task-h8` PASS。**不**触碰 v0.2 封印。

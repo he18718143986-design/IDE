@@ -1,5 +1,7 @@
-《证据与验收标准》草案
-> 草案，经规格 owner 裁决后走 PR 才生效，本文不是规范本身。
+《证据与验收标准》
+> **地位**：现行规格（验收材料人工判定规则）。从属 [ADR-0005](../adr/0005-deterministic-verification-gate.md) 与 [`verification-strategy.md`](./verification-strategy.md)（S6 实施口径）；总装位置见 [`delivery-lifecycle.md`](./delivery-lifecycle.md) §2 S6。
+> **怎么用**：卡回写 / PR 审阅按本文三态（PASS / FAIL / INCONCLUSIVE）与必填字段判据；机器侧 `can_merge` 仍只由退出码派生（ADR-0005），本文不替代 Daemon 判卷。
+> **仍开放的〔待补〕**：正文内标注〔待补〕的定义与事件描述保持缺口，**不得**当作已裁决事实；补齐另走文档 PR。
 来源标记
 - 〔任务书〕：本任务书对该条款的表述，不是判例。
 - 〔材料 N〕：随任务书回填的先例与规则材料。
