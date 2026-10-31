@@ -216,6 +216,17 @@ import {
   VaultError,
   type Vault,
 } from "./vault";
+import { readPlan, writePlan } from "./project/plan-store";
+import {
+  applyPlanPatch,
+  type PlanPatch,
+} from "../src/lib/project/plan-patch";
+import type { RepoFacts } from "../src/lib/project/project-plan";
+import {
+  decompose,
+  type ReadyPabView,
+} from "./supervisor/decomposer";
+import { httpStatusForErrorCode } from "../src/lib/error-codes";
 import { ChatSessionManager } from "./chat/session-manager";
 import {
   decideWrite,
@@ -4004,6 +4015,141 @@ export class StagentDaemon {
         this.sendJson(res, 200, { settings: getModelSettings() });
       } catch (err) {
         this.sendJson(res, 400, { error: (err as Error).message });
+      }
+      return;
+    }
+
+    // TASK-L.8：计划补丁合并与分解器
+    if (method === "POST" && pathname === "/api/project/plan/patch") {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      try {
+        const body = (await this.readJsonBody(req)) as {
+          patch?: PlanPatch;
+          removed_by?: "user" | "replan";
+          scheme?: unknown;
+          repo_facts?: RepoFacts;
+        };
+        const patch = body.patch;
+        if (!patch || !Array.isArray(patch.ops)) {
+          this.sendJson(res, 400, { error: "patch.ops required" });
+          return;
+        }
+        // 用户 HTTP 路径只接受 remove_stub / reorder（供 L.10）
+        for (const op of patch.ops) {
+          if (op.op !== "remove_stub" && op.op !== "reorder") {
+            this.sendJson(res, 422, {
+              error: "only remove_stub and reorder are allowed",
+              code: "E_PLAN_INVALID",
+              rejected_op: op.op,
+            });
+            return;
+          }
+        }
+        const plan = readPlan(this.repoRoot);
+        if (!plan) {
+          this.sendJson(res, 404, {
+            error: "project plan not found",
+            code: "E_PLAN_INVALID",
+          });
+          return;
+        }
+        // scheme / repo_facts：调用方传入；缺省用计划上的 scheme_id 占位最小视图
+        const scheme = (body.scheme ?? {
+          scheme_id: plan.scheme_id,
+          scheme_revision: plan.scheme_revision,
+          size_hint: "standard",
+          goals: [],
+          out_of_scope: [],
+          modules: [],
+          entities: [],
+          acceptance: [],
+        }) as Parameters<typeof applyPlanPatch>[2];
+        const repoFacts: RepoFacts = body.repo_facts ?? {
+          has_test_script: true,
+          has_modules_yaml: true,
+          existing_dirs: ["src"],
+        };
+        const removedBy =
+          body.removed_by ??
+          (patch.ops.some((o) => o.op === "remove_stub") ? "user" : "replan");
+        const result = applyPlanPatch(plan, patch, scheme, repoFacts, {
+          removed_by: removedBy,
+        });
+        if (!result.ok) {
+          const status = httpStatusForErrorCode(result.code) ?? 409;
+          this.sendJson(res, status, {
+            ok: false,
+            code: result.code,
+            error: result.plain_message ?? result.code,
+            violations: result.violations,
+            discarded: result.discarded,
+          });
+          return;
+        }
+        // 仅锁定丢弃、其余成功：仍写入（PD-08）
+        writePlan(this.repoRoot, result.plan);
+        this.sendJson(res, 200, {
+          ok: true,
+          plan: result.plan,
+          discarded: result.discarded,
+        });
+      } catch (err) {
+        this.sendJson(res, 500, { error: (err as Error).message });
+      }
+      return;
+    }
+
+    if (method === "POST" && pathname === "/api/project/plan/decompose") {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      try {
+        const body = (await this.readJsonBody(req)) as {
+          scheme?: Parameters<typeof decompose>[0]["scheme"];
+          repo_facts?: RepoFacts;
+          pab?: ReadyPabView | null;
+          project_id?: string;
+        };
+        if (!body.scheme || typeof body.scheme !== "object") {
+          this.sendJson(res, 400, { error: "scheme required" });
+          return;
+        }
+        const repoFacts: RepoFacts = body.repo_facts ?? {
+          has_test_script: true,
+          has_modules_yaml: true,
+          existing_dirs: ["src"],
+        };
+        const existing = readPlan(this.repoRoot);
+        const result = await decompose({
+          scheme: body.scheme,
+          repoFacts,
+          pab: body.pab ?? null,
+          existingPlan: existing,
+          project_id: body.project_id,
+        });
+        if (!result.ok) {
+          this.sendJson(res, 422, {
+            ok: false,
+            code: result.code,
+            error: result.plain_message,
+            violations: result.violations ?? [],
+            model_calls: result.model_calls,
+          });
+          return;
+        }
+        writePlan(this.repoRoot, result.plan);
+        this.sendJson(res, 200, {
+          ok: true,
+          plan: result.plan,
+          patch: result.patch,
+          model_calls: result.model_calls,
+        });
+      } catch (err) {
+        this.sendJson(res, 500, { error: (err as Error).message });
       }
       return;
     }

@@ -944,6 +944,57 @@ export async function deleteVaultSecret(
   );
 }
 
+/** TASK-L.8：用户侧计划补丁（仅 remove_stub / reorder）。 */
+export async function patchProjectPlan(
+  conn: DaemonConnection,
+  input: {
+    patch: {
+      base_revision: number;
+      reason: string;
+      ops: Array<Record<string, unknown>>;
+    };
+    removed_by?: "user" | "replan";
+    scheme?: unknown;
+    repo_facts?: {
+      has_test_script: boolean;
+      has_modules_yaml: boolean;
+      existing_dirs: string[];
+    };
+  },
+): Promise<{ ok: boolean; plan?: unknown; code?: string; discarded?: unknown }> {
+  return request(conn, "/api/project/plan/patch", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/** TASK-L.8：密封方案 → 计划（分解器生产入口）。 */
+export async function decomposeProjectPlan(
+  conn: DaemonConnection,
+  input: {
+    scheme: unknown;
+    pab: unknown;
+    repo_facts?: {
+      has_test_script: boolean;
+      has_modules_yaml: boolean;
+      existing_dirs: string[];
+    };
+    project_id?: string;
+  },
+): Promise<{
+  ok: boolean;
+  plan?: unknown;
+  patch?: unknown;
+  model_calls?: number;
+  code?: string;
+  error?: string;
+}> {
+  return request(conn, "/api/project/plan/decompose", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export interface MergeResult {
   commitSha: string;
   commitMessage: string;
