@@ -11,10 +11,12 @@ import {
 } from "./types";
 
 /**
- * TASK-S.6b：真机预览服务（静态根目录或外链挂载）。
+ * TASK-S.6b / L.5：真机预览服务（静态根目录或外链挂载）。
  *
  * - 自建模式：在 127.0.0.1:4200–4210 起只读静态服务（常用于桩页面 / dist）；
- * - 外链模式：不启进程，只登记已有回环 URL（如业务 Vite 已在跑）。
+ * - 外链模式：不启进程，只登记已有回环 URL。TASK-L.5 的 `app-runner` 在
+ *   Worktree 里拉起 `dev`/`start`/`preview` 并探活成功后，即以本模式登记 URL，
+ *   `RealPlaytestPane` 协议不变。
  *
  * 与 Demo 的差异：CSP 允许 connect-src 'self'（真机页面常需打自己的 API）；
  * 仍只绑回环、禁路径逃逸、禁非 GET/HEAD。
