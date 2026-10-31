@@ -3,7 +3,7 @@
  *
  * C.18：规则/启发式从对话与意图拼出模块图与决策。
  * C.22（SSOT v2.0.1）：
- * - demoReady = 四条硬性布尔底线（≥2 模块、≥1 主流程、无 OPEN 冲突、
+ * - demoReady = 四条硬性布尔底线（§14.10：≥1 个有界面模块、≥1 主流程、无 OPEN 冲突、
  *   ≥1 轮有效业务输入）；completeness 仅展示，不参与门禁
  * - user_pinned 字段级脏检查：随聊合并不覆盖已 pin
  * - canConfirmScheme 是向后兼容别名；真实门禁统一走
@@ -323,18 +323,36 @@ export function hasMainFlow(
 }
 
 /**
- * SSOT v2.0.2 §2.2：`demoReady` 恰由四条布尔底线决定。
  * completeness 只在 UI 展示，绝不参与本函数——否则“辅助分”会变成隐藏硬门禁。
+ *
+ * SSOT §14.10 / D6：`demoReady = ≥1 个有界面模块 && ≥1 条主流程 && 无未选冲突 && ≥1 轮业务输入`。
+ * V1 `modules: string[]` 把每个字符串模块视为有界面（启发式离线路径）；
+ * 纯逻辑任务应使用 V2 的 `user_visible: false`（见 {@link computeDemoReadyFromModules}）。
  */
 export function computeDemoReady(draft: SchemeDraft): boolean {
   const openConflicts = draft.conflicts.filter(
     (c) => c.chosenId === null,
   ).length;
   return (
-    draft.modules.length >= 2 &&
+    draft.modules.length >= 1 &&
     hasMainFlow(draft) &&
     openConflicts === 0 &&
     draft.business_input_rounds >= 1
+  );
+}
+
+/** §14.10 显式 user_visible 判定（引擎态 / V2）。 */
+export function computeDemoReadyFromModules(input: {
+  modules: readonly { user_visible: boolean }[];
+  has_main_flow: boolean;
+  open_conflicts: number;
+  business_input_rounds: number;
+}): boolean {
+  return (
+    input.modules.some((m) => m.user_visible) &&
+    input.has_main_flow &&
+    input.open_conflicts === 0 &&
+    input.business_input_rounds >= 1
   );
 }
 
