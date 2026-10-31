@@ -40,6 +40,8 @@ export const ERROR_CODES = [
   "E_PLAN_STUB_LOCKED",
   "E_PLAN_STUB_TOO_LARGE",
   "E_PLAN_STUB_REVIVED",
+  "E_PROPOSAL_PREVIOUSLY_REJECTED",
+  "E_GATE_SCAN_FAILED",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -288,6 +290,26 @@ export const ERROR_CODE_CATALOG: Readonly<Record<ErrorCode, ErrorCodeSpec>> = {
     condition:
       "graveyard 中 removed_by=user 的桩标题经 G-MATCH-NL 与新桩标题命中（D-11）",
     plain_message: "这个你之前删过，要重新加回来吗？",
+    http_status: 409,
+  },
+  E_PROPOSAL_PREVIOUSLY_REJECTED: {
+    code: "E_PROPOSAL_PREVIOUSLY_REJECTED",
+    reason_code: "SCOPE_VIOLATION",
+    component: "Worker Graveyard Gate",
+    task: "TASK-J.18c",
+    condition:
+      "施工产出物强证据命中 disallow_revival=true 的用户/安全墓碑（INV-LEDGER-03 / DEC-1）",
+    plain_message: "这个做法你之前否决过，我换个思路。",
+    http_status: 409,
+  },
+  E_GATE_SCAN_FAILED: {
+    code: "E_GATE_SCAN_FAILED",
+    reason_code: "PREPARATION_INTERRUPTED",
+    component: "Worker Graveyard Gate / Full Scan",
+    task: "TASK-J.18c",
+    condition:
+      "全量扫描读不到完整 diff（readDiffFiles 抛错、truncatedList 非空、依赖清单截断）",
+    plain_message: "自动检查没跑完，这一轮还不能合入。",
     http_status: 409,
   },
 };

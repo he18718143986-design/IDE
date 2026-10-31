@@ -5,7 +5,7 @@
  */
 
 /** 别名表版本；改表必须 +1 */
-export const ALIAS_LEXICON_VERSION = 1;
+export const ALIAS_LEXICON_VERSION = 2;
 
 /**
  * 键 → 别名列表（含自身常见拼写）。
@@ -32,6 +32,7 @@ export const ALIAS_LEXICON: Readonly<Record<string, readonly string[]>> = {
   ],
   excel: [
     "xlsx",
+    "xls",
     "exceljs",
     "sheetjs",
     "xlsx-populate",
@@ -41,6 +42,7 @@ export const ALIAS_LEXICON: Readonly<Record<string, readonly string[]>> = {
   ],
   xlsx: [
     "xlsx",
+    "xls",
     "exceljs",
     "sheetjs",
     "xlsx-populate",

@@ -20,7 +20,8 @@ import {
  * + W.2b 增补 E_OUT_OF_SCOPE_UNTRACKED
  * + S.4 增补 E_DEMO_PAYLOAD_TOO_LARGE
  * + S.5 增补 E_DISPUTE_TIMEOUT
- * + L.7 增补 E_PLAN_* ×5 = 22 个 → 9 个 reason_code，正反向均可闭环。
+ * + L.7 增补 E_PLAN_* ×5
+ * + J.18c 增补 E_PROPOSAL_PREVIOUSLY_REJECTED / E_GATE_SCAN_FAILED = 24 个 → 9 个 reason_code，正反向均可闭环。
  */
 
 /** A §9.3 表格的逐行期望值（手工登记，不以实现反推） */
@@ -50,20 +51,30 @@ const EXPECTED_MAPPING: Record<ErrorCode, string> = {
   E_PLAN_STUB_LOCKED: "WORKSPACE_LOCKED",
   E_PLAN_STUB_TOO_LARGE: "BUDGET_EXHAUSTED",
   E_PLAN_STUB_REVIVED: "PREPARATION_INTERRUPTED",
+  // TASK-J.18c：墓地门禁 / 全量扫描失败
+  E_PROPOSAL_PREVIOUSLY_REJECTED: "SCOPE_VIOLATION",
+  E_GATE_SCAN_FAILED: "PREPARATION_INTERRUPTED",
 };
 
-describe("目录基数：22 个 error_code → 9 个 reason_code", () => {
-  it("恰好 22 个错误码且无重复", () => {
-    expect(ERROR_CODES).toHaveLength(22);
-    expect(new Set(ERROR_CODES).size).toBe(22);
+describe("目录基数：24 个 error_code → 9 个 reason_code", () => {
+  it("恰好 24 个错误码且无重复", () => {
+    expect(ERROR_CODES).toHaveLength(24);
+    expect(new Set(ERROR_CODES).size).toBe(24);
   });
 
-  it("恰好 9 个原因码，且与 evidence.schema 的 reasonCodeSchema 同集合", () => {
+  it("恰好 9 个运行时原因码；均为 evidence.schema reasonCodeSchema 子集（L.3 义务码仅用于证据载荷）", () => {
     expect(REASON_CODES).toHaveLength(9);
     expect(new Set(REASON_CODES).size).toBe(9);
-    expect([...REASON_CODES].sort()).toEqual(
-      [...reasonCodeSchema.options].sort(),
-    );
+    const evidenceReasons = new Set(reasonCodeSchema.options);
+    for (const r of REASON_CODES) {
+      expect(evidenceReasons.has(r), `missing in evidence.schema: ${r}`).toBe(
+        true,
+      );
+    }
+    // 目录表不得引用 REASON_CODES 之外的原因码
+    for (const spec of Object.values(ERROR_CODE_CATALOG)) {
+      expect(REASON_CODES).toContain(spec.reason_code);
+    }
   });
 
   it("目录表逐项登记，且 code / reason_code 与 A §9.3 完全一致", () => {
@@ -87,11 +98,12 @@ describe("正向映射：error_code → reason_code", () => {
     expect(mapErrorToReasonCode(code)).toBe(EXPECTED_MAPPING[code]);
   });
 
-  it("多对一归并正确：SCOPE_VIOLATION 由 4 个错误码共同产出", () => {
+  it("多对一归并正确：SCOPE_VIOLATION 由 5 个错误码共同产出", () => {
     expect(errorCodesForReasonCode("SCOPE_VIOLATION").sort()).toEqual([
       "E_FORBIDDEN_PATH",
       "E_OUT_OF_SCOPE",
       "E_OUT_OF_SCOPE_UNTRACKED",
+      "E_PROPOSAL_PREVIOUSLY_REJECTED",
       "PATH_TRAVERSAL_DETECTED",
     ]);
   });
@@ -127,11 +139,11 @@ describe("反向映射：reason_code → error_code[]（一对多）", () => {
     }
   });
 
-  it("反向映射覆盖全部 22 个错误码，无遗漏", () => {
+  it("反向映射覆盖全部 24 个错误码，无遗漏", () => {
     const covered = new Set(
       REASON_CODES.flatMap((reason) => errorCodesForReasonCode(reason)),
     );
-    expect(covered.size).toBe(22);
+    expect(covered.size).toBe(24);
     for (const code of ERROR_CODES) {
       expect(covered.has(code), `uncovered error_code: ${code}`).toBe(true);
     }
@@ -166,10 +178,20 @@ describe("反向映射：reason_code → error_code[]（一对多）", () => {
       "E_PLAN_STALE",
     ]);
     expect(errorCodesForReasonCode("PREPARATION_INTERRUPTED").sort()).toEqual([
+      "E_GATE_SCAN_FAILED",
       "E_PLAN_INVALID",
       "E_PLAN_STUB_REVIVED",
       "E_PREPARATION_FAILED",
     ]);
+  });
+
+  it("TASK-J.18c 墓地门禁码并入 SCOPE_VIOLATION / PREPARATION_INTERRUPTED", () => {
+    expect(errorCodesForReasonCode("SCOPE_VIOLATION")).toContain(
+      "E_PROPOSAL_PREVIOUSLY_REJECTED",
+    );
+    expect(errorCodesForReasonCode("PREPARATION_INTERRUPTED")).toContain(
+      "E_GATE_SCAN_FAILED",
+    );
   });
 });
 

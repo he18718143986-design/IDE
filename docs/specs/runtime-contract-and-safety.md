@@ -240,11 +240,34 @@
 | **L2 Daemon 签署拦截** | `signing-gate.ts` | 真正放行判定；快照缺失即拒 | §2.3 主表 + 「Daemon 专属码」表 |
 | **L3 执行期运行时** | Gateway / Orchestrator / Daemon HTTP 层 / 派工门禁 | 越界、预算、锁、越权、墓地命中 | `E_OUT_OF_SCOPE` / `E_OUT_OF_SCOPE_UNTRACKED` / `E_BUDGET_EXCEEDED` / `E_WORKSPACE_LOCKED` / `E_PROPOSAL_PREVIOUSLY_REJECTED`（v2.1，INV-LEDGER-03）/ `E_DISPUTE_TIMEOUT`（质询超时，见 playtest-self-check.md） |
 
-> `E_CHECKPOINT_FAILED`（Daemon HTTP 层 409）为开一轮前的检查点码，不列入 L3 代表码，待门禁码闭集建立时统一登记。
->
-> **L3 闭集待补登（提案）**：L3 行目前只列代表码，没有闭集表；`E_FORBIDDEN_PATH`、`E_TEST_FILE_WRITE_BLOCKED` 是执行期码却未列入，`E_CHECKPOINT_FAILED` 实为开一轮前的检查点码。补登方案与候选闭集表见 [`worker-graveyard-gate.md`](./worker-graveyard-gate.md) §5.3，由 `TASK-J.18` 实施 PR 合入本节 §8.1。
+> `E_CHECKPOINT_FAILED`（Daemon HTTP 层 409）为开一轮前的检查点码，**不列入 L3 闭集**（改登记为开工前码；见 §8.1）。
 
-**纪律**：凡前端能检出的情形，L1 与 L2 必须使用**同一组拒绝码**；L2 只可额外使用 §2.3「Daemon 专属码」表中登记的码，不得自造未登记的码。两者结论不一致时以 L2 为准并记一条告警。
+### 8.1 L3 执行期码闭集（TASK-J.18c / GAP-W5）
+
+执行期（派工后写入 / 全量扫描 / CLI hook / Gateway）只允许下表码作为停工主码或失败关闭码。求值不短路（P0 除外），用户面只显示一个主码，优先级见 [`worker-graveyard-gate.md`](./worker-graveyard-gate.md) §3.3。
+
+| 码 | 触发点 | 停止语义 | 用户面 | `ERROR_CODES` | `reason_code` |
+| :--- | :--- | :--- | :--- | :-: | :--- |
+| `E_UNSAFE_EXECUTION` | runtime-interceptor | 短路、降级 | 「Worker 失联 / 不受控」 | ✓ | `UNSAFE_EXECUTION` |
+| `PATH_TRAVERSAL_DETECTED` | Gateway 路径解析 | 短路 | 同上 | ✓ | `SCOPE_VIOLATION` |
+| `E_FORBIDDEN_PATH` | Gateway `checkWriteAccess` | §5.2 | 超出范围（保护） | ✓ | `SCOPE_VIOLATION` |
+| `E_OUT_OF_SCOPE` | Gateway / AiWorker / 检查点 | §5.2 | §15.6 扩权卡 | ✓ | `SCOPE_VIOLATION` |
+| `E_OUT_OF_SCOPE_UNTRACKED` | 未跟踪文件检查点 | §5.2 | §15.6 扩权卡 | ✓ | `SCOPE_VIOLATION` |
+| `E_TEST_FILE_WRITE_BLOCKED` | Gateway 测试文件守卫 | 拒绝当次写 | 检查反复失败类 | 待登记 | `SCOPE_VIOLATION`（提案） |
+| `E_BUDGET_EXCEEDED` | 成本监视 | 熔断 | 接近 / 超出预算 | ✓ | `BUDGET_EXHAUSTED` |
+| `E_COMMAND_TIMEOUT` / `E_TASK_TIMEOUT` | 命令执行 | 熔断 | 同上 | ✓ | `BUDGET_EXHAUSTED` |
+| `E_UNAUTHORIZED_COMMAND` | 命令白名单 | 拒绝 | 超出范围 | ✓ | `UNAUTHORIZED_COMMAND` |
+| `E_WORKSPACE_LOCKED` | 工作区互斥 | 拒绝 | 「等一下」 | ✓ | `WORKSPACE_LOCKED` |
+| `E_PROPOSAL_PREVIOUSLY_REJECTED` | 派工门禁 / 全量扫描 / CLI hook | §5.2 | 墓地卡（§5.1） | ✓（DEC-1） | `SCOPE_VIOLATION` |
+| `E_GATE_SCAN_FAILED` | 全量扫描无法读取完整 diff | 失败关闭：不进合并 | 「自动检查没跑完」 | ✓ | `PREPARATION_INTERRUPTED` |
+| `E_SCHEME_SNAPSHOT_NOT_FOUND` / `E_SCHEME_SNAPSHOT_MISMATCH` | 派工绑定（复用 L2 Daemon 专属码） | 不签发 `exec_token` | 「方案快照对不上，需要重新确认」 | L2 表 | （签署/派工归因，不写入执行期 evidence 主码） |
+| `E_DISPUTE_TIMEOUT` | 质询看门狗 | 熔断 | 见 playtest-self-check | ✓ | `BUDGET_EXHAUSTED` |
+
+**移出 L3**：`E_CHECKPOINT_FAILED`（开一轮前打检查点失败）——不是执行期码。
+
+**门禁日志码（不进本表、不进 `ERROR_CODES`）**：`W_GRAVEYARD_WEAK_MATCH` / `W_GRAVEYARD_CHECK_UNAVAILABLE` / `W_GATE_PACK_MISSING` / `W_GATE_DIFF_TRUNCATED`（口径同 K-9 / worker-graveyard-gate.md §6.3）。
+
+**纪律**：凡前端能检出的情形，L1 与 L2 必须使用**同一组拒绝码**；L2 只可额外使用 §2.3「Daemon 专属码」表中登记的码，不得自造未登记的码。两者结论不一致时以 L2 为准并记一条告警。执行期主码**永不为**签署期 `E_SCOPE_PLAN_DRIFT`。
 
 ---
 
