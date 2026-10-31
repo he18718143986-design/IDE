@@ -215,6 +215,19 @@ export interface ScopedGatewayOptions {
    * 并仍触发 onScopeBlocked → C.12c 软停链。
    */
   dirtyExclusions?: readonly string[] | undefined;
+  /**
+   * TASK-L.4：运行期收窄（verification-strategy §3.2 / §3.3）。
+   * 只比合同更窄，不持久化、不改合同。可通过 setPhaseOverlay 在 T/I 段切换。
+   */
+  phaseOverlay?: PhaseOverlay | undefined;
+}
+
+/** TASK-L.4：运行期写范围收窄（只收窄不放宽） */
+export interface PhaseOverlay {
+  /** 存在时：测试文件只有列表内路径可写 */
+  testWriteAllowlist?: string[] | undefined;
+  /** 并入 strictly_forbidden（禁止优先于可写） */
+  extraForbidden?: string[] | undefined;
 }
 
 /** G-09 分列记账快照（工具调用 / 命令执行互不折算） */
@@ -246,6 +259,8 @@ export class ScopedWorktreeGateway {
   private readonly execToken?: ScopedGatewayOptions["execToken"];
   private readonly onScopeBlocked?: ScopedGatewayOptions["onScopeBlocked"];
   private readonly dirtyExclusions: readonly string[];
+  /** TASK-L.4：可变运行期收窄；不写回合同 */
+  private phaseOverlay: PhaseOverlay | undefined;
 
   private auditLog: AuditLogEntry[] = [];
   private modifiedFiles: Set<string> = new Set();
@@ -278,6 +293,85 @@ export class ScopedWorktreeGateway {
     this.execToken = options.execToken;
     this.onScopeBlocked = options.onScopeBlocked;
     this.dirtyExclusions = options.dirtyExclusions ?? [];
+    this.phaseOverlay = options.phaseOverlay;
+  }
+
+  /** TASK-L.4：切换运行期收窄（T/I 段）；传 undefined 清除 */
+  setPhaseOverlay(overlay: PhaseOverlay | undefined): void {
+    this.phaseOverlay = overlay;
+  }
+
+  getPhaseOverlay(): PhaseOverlay | undefined {
+    return this.phaseOverlay;
+  }
+
+  /**
+   * TASK-L.4：公开写评估（含 phaseOverlay 收窄），供 AiWorker 预校验。
+   * 与真实 write/delete 使用同一套 effectiveWriteScope + testAllowlist。
+   */
+  public assessWriteAccess(relPath: string): {
+    allowed: boolean;
+    code?: string;
+    message?: string;
+  } {
+    const deny = this.testAllowlistDenial(relPath);
+    if (deny) {
+      return {
+        allowed: false,
+        code: "E_TEST_NOT_IN_ALLOWLIST",
+        message: deny,
+      };
+    }
+    const access = checkWriteAccess(relPath, this.effectiveWriteScope());
+    if (!access.allowed) {
+      return {
+        allowed: false,
+        code: this.scopeBlockCode(access.reason, relPath),
+        message:
+          access.reason === "FORBIDDEN_PATH"
+            ? `Path '${relPath}' is strictly forbidden (or phase extraForbidden)`
+            : `Path '${relPath}' is outside authorized writable scope`,
+      };
+    }
+    return { allowed: true };
+  }
+
+  /**
+   * 合并 extraForbidden 后的写 Scope（禁止优先，复用 checkWriteAccess 顺序）。
+   * 不修改合同对象。
+   */
+  private effectiveWriteScope(): {
+    writable_paths: string[];
+    readonly_paths?: string[];
+    strictly_forbidden_paths?: string[];
+  } {
+    const base = this.contract.authorization.file_system_scope;
+    const extra = this.phaseOverlay?.extraForbidden ?? [];
+    if (extra.length === 0) return base;
+    return {
+      writable_paths: base.writable_paths,
+      readonly_paths: base.readonly_paths,
+      strictly_forbidden_paths: [
+        ...(base.strictly_forbidden_paths ?? []),
+        ...extra,
+      ],
+    };
+  }
+
+  /**
+   * testWriteAllowlist 存在时：测试文件必须命中清单，否则阻断。
+   * 返回拒绝文案；null 表示放行（或非测试 / 未启用 allowlist）。
+   */
+  private testAllowlistDenial(relPath: string): string | null {
+    const allow = this.phaseOverlay?.testWriteAllowlist;
+    if (allow === undefined) return null;
+    if (!isTestPath(relPath)) return null;
+    const hit = matchesAnyPattern(relPath, allow);
+    if (hit.matches) return null;
+    return (
+      `Write rejected: '${relPath}' is a test file outside ` +
+      `phaseOverlay.testWriteAllowlist (TASK-L.4 runtime narrowing)`
+    );
   }
 
   /** TASK-C.14d：是否命中脏区排除（施工禁止覆盖） */
@@ -848,7 +942,7 @@ export class ScopedWorktreeGateway {
     }
 
     const blockers: DeclareCompleteBlocker[] = [];
-    const scope = this.contract.authorization.file_system_scope;
+    const scope = this.effectiveWriteScope();
     const touched = parsed.data.touched_paths ?? [];
 
     // 1. Scope 校验：实际修改文件 + 声明的 touched_paths 均须在 writable 内
@@ -1045,7 +1139,7 @@ export class ScopedWorktreeGateway {
     // 3. Scope verification (Write access)
     const access = checkWriteAccess(
       safe.relativePath,
-      this.contract.authorization.file_system_scope,
+      this.effectiveWriteScope(),
     );
     if (!access.allowed) {
       const code = this.scopeBlockCode(access.reason, safe.relativePath);
@@ -1108,6 +1202,33 @@ export class ScopedWorktreeGateway {
             { type: "text", text: `[${E_TEST_FILE_WRITE_BLOCKED}] ${msg}` },
           ],
           error: { code: E_TEST_FILE_WRITE_BLOCKED, message: msg },
+        };
+      }
+    }
+
+    // TASK-L.4：phaseOverlay.testWriteAllowlist 运行期收窄
+    {
+      const deny = this.testAllowlistDenial(safe.relativePath);
+      if (deny !== null) {
+        this.logAudit({
+          tool: "stagent_write_file",
+          input: { path: rawPath },
+          outcome: "BLOCKED",
+          violationCode: E_TEST_FILE_WRITE_BLOCKED,
+          details: deny,
+        });
+        this.onScopeBlocked?.({
+          tool: "stagent_write_file",
+          path: rawPath,
+          code: E_TEST_FILE_WRITE_BLOCKED,
+          message: deny,
+        });
+        return {
+          isError: true,
+          content: [
+            { type: "text", text: `[${E_TEST_FILE_WRITE_BLOCKED}] ${deny}` },
+          ],
+          error: { code: E_TEST_FILE_WRITE_BLOCKED, message: deny },
         };
       }
     }
@@ -1687,10 +1808,10 @@ export class ScopedWorktreeGateway {
       };
     }
 
-    // 2. 可写 Scope（删除等同写入）
+    // 2. 可写 Scope（删除等同写入；含 TASK-L.4 extraForbidden）
     const access = checkWriteAccess(
       safe.relativePath,
-      this.contract.authorization.file_system_scope,
+      this.effectiveWriteScope(),
     );
     if (!access.allowed) {
       const code = this.scopeBlockCode(access.reason, safe.relativePath);
@@ -1743,6 +1864,34 @@ export class ScopedWorktreeGateway {
           outcome: "BLOCKED",
           violationCode: E_TEST_FILE_WRITE_BLOCKED,
           details: msg,
+        });
+        return {
+          isError: true,
+          content: [
+            { type: "text", text: `[${E_TEST_FILE_WRITE_BLOCKED}] ${msg}` },
+          ],
+          error: { code: E_TEST_FILE_WRITE_BLOCKED, message: msg },
+        };
+      }
+    }
+
+    // TASK-L.4：phaseOverlay.testWriteAllowlist 运行期收窄（删除同写）
+    {
+      const deny = this.testAllowlistDenial(safe.relativePath);
+      if (deny !== null) {
+        const msg = deny.replace(/^Write /, "Delete ");
+        this.logAudit({
+          tool: "stagent_delete_file",
+          input: { path: rawPath },
+          outcome: "BLOCKED",
+          violationCode: E_TEST_FILE_WRITE_BLOCKED,
+          details: msg,
+        });
+        this.onScopeBlocked?.({
+          tool: "stagent_delete_file",
+          path: rawPath,
+          code: E_TEST_FILE_WRITE_BLOCKED,
+          message: msg,
         });
         return {
           isError: true,

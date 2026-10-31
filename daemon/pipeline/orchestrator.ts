@@ -59,6 +59,7 @@ import {
 } from "../guard/gateway-violation-store";
 import {
   AiWorker,
+  type WorkerChange,
   type WorkerModelClient,
   type WorkerRunResult,
 } from "../worker/ai-worker";
@@ -78,6 +79,20 @@ import {
   removeTaskWorktree,
   type WorktreeInfo,
 } from "../git/worktree-manager";
+import type { PhaseOverlay } from "../mcp/gateway";
+import {
+  runTwoPhaseConstruction,
+  type TwoPhaseHooks,
+  type TwoPhaseResult,
+} from "./two-phase-runner";
+import { shouldRunTwoPhase } from "./two-phase";
+import {
+  deriveObligations,
+  detectRunner,
+  obligationCommand,
+  repoFactsFromPackageJson,
+  type TestObligation,
+} from "../../src/lib/verification/obligations";
 import {
   E_OUT_OF_SCOPE_UNTRACKED,
   UntrackedScopeViolationError,
@@ -1012,21 +1027,162 @@ export class ContractOrchestrator {
 
   /**
    * 运行受控 AI Worker：生成代码改动并经网关写入 Worktree。
+   * TASK-L.4：存在未豁免义务时走两段式（先红后绿）；全部豁免则保持单段。
    * 失败（越权/预算）时整批拒绝；预算耗尽进入 PENDING_RESUME。
    */
   async runWorker(
     contractId: string,
-    options: { modelClient?: WorkerModelClient } = {},
-  ): Promise<WorkerRunResult> {
+    options: {
+      modelClient?: WorkerModelClient;
+      /**
+       * TASK-L.4：测试可注入两段式 hooks 片段（如 readObligationReport）。
+       * 生产 HTTP 路径不传；未覆盖的 runT/runI 由本方法组装真实 AiWorker。
+       */
+      twoPhase?: Partial<TwoPhaseHooks>;
+    } = {},
+  ): Promise<WorkerRunResult & { two_phase?: TwoPhaseResult }> {
     return withContractLock(contractLockPath(this.repoRoot, contractId), () =>
       this.runWorkerInternal(contractId, options),
     );
   }
 
+  private deriveContractObligations(contract: SoftwareContract): {
+    obligations: TestObligation[];
+    waived: Array<{ acceptance_id: string; reason: "no_runner" }>;
+  } {
+    let facts: ReturnType<typeof repoFactsFromPackageJson> = {};
+    try {
+      const pkgPath = path.join(this.repoRoot, "package.json");
+      if (fs.existsSync(pkgPath)) {
+        const raw = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as {
+          scripts?: Record<string, string>;
+          dependencies?: Record<string, string>;
+          devDependencies?: Record<string, string>;
+        };
+        facts = repoFactsFromPackageJson(raw);
+      }
+    } catch {
+      facts = {};
+    }
+    return deriveObligations(contract, detectRunner(facts));
+  }
+
+  /**
+   * 跑完一阶段 Worker 后，执行义务命令并写入
+   * `.stagent/records/<id>/obligation-report-{t|i}.json`。
+   * 集成测若注入了 readObligationReport 则跳过本方法。
+   */
+  private async materializeObligationReport(
+    contract: SoftwareContract,
+    gateway: ScopedWorktreeGateway,
+    phase: "t" | "i",
+    obligations: readonly TestObligation[],
+  ): Promise<void> {
+    const dir = path.join(
+      this.repoRoot,
+      ".stagent",
+      "records",
+      contract.contract_id,
+    );
+    fs.mkdirSync(dir, { recursive: true });
+    const outPath = path.join(dir, `obligation-report-${phase}.json`);
+
+    let facts: ReturnType<typeof repoFactsFromPackageJson> = {};
+    try {
+      const wtPkg = path.join(gateway.getWorktreeRoot(), "package.json");
+      const rootPkg = path.join(this.repoRoot, "package.json");
+      const pkgPath = fs.existsSync(wtPkg) ? wtPkg : rootPkg;
+      if (fs.existsSync(pkgPath)) {
+        const raw = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as {
+          scripts?: Record<string, string>;
+          dependencies?: Record<string, string>;
+          devDependencies?: Record<string, string>;
+        };
+        facts = repoFactsFromPackageJson(raw);
+      }
+    } catch {
+      facts = {};
+    }
+    const runner = detectRunner(facts);
+    const cmd = obligationCommand(
+      runner,
+      obligations.map((o) => o.test_path),
+    );
+
+    let report: unknown = {
+      schema: "stagent-obligation-report-v1",
+      test_count: 0,
+      assertion_failures: 0,
+      collection_or_compile_errors: 1,
+    };
+
+    if (cmd) {
+      try {
+        const res = await gateway.callTool(
+          "stagent_exec_command",
+          {
+            executable: cmd.executable,
+            args: cmd.args,
+          },
+          { internal: true },
+        );
+        const data = (res.data ?? {}) as {
+          exitCode?: number;
+          stdout?: string;
+          stderr?: string;
+        };
+        const stdout = (data.stdout ?? "").trim();
+        // vitest/jest JSON 可能夹在其它日志里：取最后一个 {...} 块
+        let parsed: unknown = null;
+        if (stdout.startsWith("{")) {
+          try {
+            parsed = JSON.parse(stdout);
+          } catch {
+            parsed = null;
+          }
+        }
+        if (parsed === null) {
+          const start = stdout.lastIndexOf("{");
+          const end = stdout.lastIndexOf("}");
+          if (start >= 0 && end > start) {
+            try {
+              parsed = JSON.parse(stdout.slice(start, end + 1));
+            } catch {
+              parsed = null;
+            }
+          }
+        }
+        if (parsed !== null) {
+          report = parsed;
+        } else {
+          const exit = data.exitCode ?? (res.isError ? 1 : 0);
+          report = {
+            schema: "stagent-obligation-report-v1",
+            test_count: 1,
+            assertion_failures: exit === 0 ? 0 : 1,
+            collection_or_compile_errors: 0,
+          };
+        }
+      } catch {
+        report = {
+          schema: "stagent-obligation-report-v1",
+          test_count: 0,
+          assertion_failures: 0,
+          collection_or_compile_errors: 1,
+        };
+      }
+    }
+
+    fs.writeFileSync(outPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  }
+
   private async runWorkerInternal(
     contractId: string,
-    options: { modelClient?: WorkerModelClient } = {},
-  ): Promise<WorkerRunResult> {
+    options: {
+      modelClient?: WorkerModelClient;
+      twoPhase?: Partial<TwoPhaseHooks>;
+    } = {},
+  ): Promise<WorkerRunResult & { two_phase?: TwoPhaseResult }> {
     const signal = this.beginAbortable(contractId);
     try {
       const current = this.store.get(contractId);
@@ -1039,39 +1195,157 @@ export class ContractOrchestrator {
         );
       }
 
-      const { gateway, costMonitor } = this.buildRuntime(current, signal);
       const modelClient =
         options.modelClient ??
         new OpenAiWorkerClient({ repoRoot: this.repoRoot });
-      const worker = new AiWorker({ gateway, costMonitor, modelClient });
+      const userHooks = options.twoPhase ?? {};
 
-      try {
-        return await worker.run();
-      } catch (err) {
-        if (costMonitor.isTripped()) {
-          this.revokeExecTokenFor(contractId);
-          this.store.transition({
-            contractId,
-            lifecycleState: "PENDING_RESUME",
-          });
-          await this.writeEvidence(
-            current,
-            {
-              status: "BLOCKED",
-              reasonCode: "BUDGET_EXHAUSTED",
-              summary: `Worker aborted: ${(err as Error).message}`,
-              verificationResults: [],
-              scopePassed: false,
-              forbiddenViolations: [],
-              modifiedFiles: [...gateway.getModifiedFiles()],
-              testsModified: gateway.wasTestsModified(),
+      const derived =
+        userHooks.obligations !== undefined
+          ? {
+              obligations: userHooks.obligations,
+              waived: userHooks.waived ?? [],
+            }
+          : this.deriveContractObligations(current);
+
+      // ----- 全部豁免 / 无义务：保持旧单段路径 -----
+      if (!shouldRunTwoPhase(derived.obligations)) {
+        const { gateway, costMonitor } = this.buildRuntime(current, signal);
+        const worker = new AiWorker({
+          gateway,
+          costMonitor,
+          modelClient,
+          repoRoot: this.repoRoot,
+        });
+
+        try {
+          const result = await worker.run(signal);
+          return {
+            ...result,
+            two_phase: {
+              phase: "single",
+              can_merge: true,
+              t_attempts: 0,
+              i_attempts: 1,
+              obligations: [],
+              reason_codes: [],
             },
-            costMonitor,
-            gateway.getWorktreeRoot(),
+          };
+        } catch (err) {
+          if (costMonitor.isTripped()) {
+            this.revokeExecTokenFor(contractId);
+            this.store.transition({
+              contractId,
+              lifecycleState: "PENDING_RESUME",
+            });
+            await this.writeEvidence(
+              current,
+              {
+                status: "BLOCKED",
+                reasonCode: "BUDGET_EXHAUSTED",
+                summary: `Worker aborted: ${(err as Error).message}`,
+                verificationResults: [],
+                scopePassed: false,
+                forbiddenViolations: [],
+                modifiedFiles: [...gateway.getModifiedFiles()],
+                testsModified: gateway.wasTestsModified(),
+              },
+              costMonitor,
+              gateway.getWorktreeRoot(),
+            );
+          }
+          throw err;
+        }
+      }
+
+      // ----- 有未豁免义务：组装真实 runT/runI，走两段式 -----
+      const bag: {
+        changes: WorkerChange[];
+        log: string[];
+        usage: { inputTokens: number; outputTokens: number };
+        applied: boolean;
+      } = {
+        changes: [],
+        log: [],
+        usage: { inputTokens: 0, outputTokens: 0 },
+        applied: false,
+      };
+
+      const runPhaseWorker = async (
+        gateway: ScopedWorktreeGateway,
+        extras: string[],
+      ): Promise<void> => {
+        const costMonitor = gateway.getCostMonitor();
+        if (!costMonitor) {
+          throw new Error(
+            "ScopedWorktreeGateway missing costMonitor in two-phase run",
           );
         }
-        throw err;
-      }
+        const worker = new AiWorker({
+          gateway,
+          costMonitor,
+          modelClient,
+          repoRoot: this.repoRoot,
+          checksExtras: extras,
+        });
+        const result = await worker.run(signal);
+        bag.changes.push(...result.changes);
+        bag.log.push(...result.log);
+        bag.usage.inputTokens += result.usage.inputTokens;
+        bag.usage.outputTokens += result.usage.outputTokens;
+        bag.applied = bag.applied || result.applied;
+      };
+
+      const hooks: TwoPhaseHooks = {
+        obligations: derived.obligations,
+        waived: derived.waived,
+        runT:
+          userHooks.runT ??
+          (async (gateway, extras) => {
+            await runPhaseWorker(gateway, extras);
+            if (userHooks.readObligationReport === undefined) {
+              await this.materializeObligationReport(
+                current,
+                gateway,
+                "t",
+                derived.obligations,
+              );
+            }
+          }),
+        runI:
+          userHooks.runI ??
+          (async (gateway, extras) => {
+            await runPhaseWorker(gateway, extras);
+            if (userHooks.readObligationReport === undefined) {
+              await this.materializeObligationReport(
+                current,
+                gateway,
+                "i",
+                derived.obligations,
+              );
+            }
+          }),
+        ...(userHooks.readObligationReport === undefined
+          ? {}
+          : { readObligationReport: userHooks.readObligationReport }),
+        ...(userHooks.afterIVerify === undefined
+          ? {}
+          : { afterIVerify: userHooks.afterIVerify }),
+        ...(userHooks.afterGatewayBuilt === undefined
+          ? {}
+          : { afterGatewayBuilt: userHooks.afterGatewayBuilt }),
+      };
+
+      const twoPhase = await this.runTwoPhase(contractId, hooks, signal);
+
+      return {
+        applied: bag.applied,
+        changes: bag.changes,
+        log: bag.log,
+        usage: bag.usage,
+        blockers: [],
+        two_phase: twoPhase,
+      };
     } finally {
       this.endAbortable(contractId);
     }
@@ -1153,6 +1427,7 @@ export class ContractOrchestrator {
   private buildRuntime(
     contract: SoftwareContract,
     signal?: AbortSignal,
+    phaseOverlay?: PhaseOverlay,
   ): {
     gateway: ScopedWorktreeGateway;
     costMonitor: CostMonitor;
@@ -1207,6 +1482,7 @@ export class ContractOrchestrator {
       runtimeInterceptor: interceptor,
       requireRepoTrust: true,
       dirtyExclusions,
+      ...(phaseOverlay === undefined ? {} : { phaseOverlay }),
       ...(this.deadlock === null ? {} : { deadlock: this.deadlock }),
       ...(signal === undefined ? {} : { signal }),
       ...(this.onTerminalLine === undefined
@@ -1571,6 +1847,64 @@ export class ContractOrchestrator {
       return null;
     }
   }
+  /** TASK-L.4：带运行期收窄的网关（供两段式 / 集成测） */
+  buildRuntimeWithOverlay(
+    contract: SoftwareContract,
+    phaseOverlay?: PhaseOverlay,
+    signal?: AbortSignal,
+  ): {
+    gateway: ScopedWorktreeGateway;
+    costMonitor: CostMonitor;
+    loopGuard: LoopGuard;
+    worktreePath: string;
+    interceptor: RuntimeInterceptor;
+  } {
+    return this.buildRuntime(contract, signal, phaseOverlay);
+  }
+
+  /**
+   * TASK-L.4：两段式施工（先红后绿）。无未豁免义务时退化为单段。
+   * 编排细节见 daemon/pipeline/two-phase-runner.ts。
+   * 生产入口：`runWorker` 在存在未豁免义务时调用本方法并组装真实 AiWorker hooks。
+   */
+  async runTwoPhase(
+    contractId: string,
+    hooks: TwoPhaseHooks,
+    signal?: AbortSignal,
+  ): Promise<TwoPhaseResult> {
+    const current = this.store.get(contractId);
+    if (!current) throw new Error(`Contract not found: ${contractId}`);
+    return runTwoPhaseConstruction(
+      {
+        contract: current,
+        repoRoot: this.repoRoot,
+        buildGateway: (overlay) => {
+          const { gateway } = this.buildRuntime(current, signal, overlay);
+          return gateway;
+        },
+        commitRedSha: async (gateway) => {
+          const wt = gateway.getWorktreeRoot();
+          await this.commitWorktree(wt, contractId);
+          return this.syncGit(wt, ["rev-parse", "HEAD"]) ?? "unknown";
+        },
+        transitionPendingResume: (reason, detail) => {
+          try {
+            this.store.transition({
+              contractId,
+              lifecycleState: "PENDING_RESUME",
+            });
+          } catch (err) {
+            // 状态机若拒绝直接跳转，仍写入 suspension.json（runner 已写）
+            void err;
+            void reason;
+            void detail;
+          }
+        },
+      },
+      hooks,
+    );
+  }
+
 }
 
 /** 单条验证命令在 Evidence 中保留的日志尾巴字符数 */
