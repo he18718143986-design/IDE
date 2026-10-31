@@ -203,7 +203,7 @@
 
 > 这是给 Worker 的「还差什么」。卡号以 [`specs/development-tasks.md`](./specs/development-tasks.md) 为准；supervisor §19 的 L-01～L-10 不在此重复。
 >
-> **2026-10-31 回写**：下表已按 main tip `a2fa7df`（含 J.2～J.10、J.18a～d、L.1～L.7 合入；#17/#18/#21/#22/#23/#24/#26/#27）回写「当前代码事实」；管道口径对齐 [ADR-0018](./adr/0018-intent-to-executable-seal.md)（确认 → Seal MachineFace → PAB → ProjectPlan → Worker；禁确认路径 `buildL0Plan(chat)`）。未合卡（如 L.8～）不得标关闭；Sprint 指向 **L.8**。
+> **2026-10-31 回写**：下表已按 main tip `ae57543`（含 J.2～J.10、J.18a～d、L.1～L.7、**L.14** 合入；另含 #28～#31 文档/实现）回写「当前代码事实」；管道口径对齐 [ADR-0018](./adr/0018-intent-to-executable-seal.md)（确认 → Seal MachineFace → PAB → ProjectPlan → Worker；禁确认路径 `buildL0Plan(chat)`）。未合实现卡（如 L.8～）不得标关闭；Sprint 指向 **L.8**。
 
 | id | 方案要求 | 当前代码事实 | 对应卡 / 台账 |
 | :--- | :--- | :--- | :--- |
@@ -218,7 +218,7 @@
 | gap-9 | 早期卡把右栏写成「编码 Worker 对话窗口」 | C.1、W.1、W.5a、C.6、P.1、E.1、Sprint 1 门禁的旧叙述 | 已在任务卡文件头加取代说明；原文不改 |
 | gap-10 | 用户不做技术决策 | 现行有 `needs_approval` 逐项表态等审批点 | conf-5 |
 | gap-11 | 复刻网站需读参考站 | 全部 Agent 禁 `WebFetch` / `WebSearch` | conf-6；无卡 |
-| gap-12 | 登录凭据受控使用 | 无凭据托管通道；README 声明无法防止用户把秘密写进合同 | oq-3；TASK-L.14 |
+| gap-12 | 登录凭据受控使用 | **代码已收口（L.14）**：`daemon/vault/` + `/api/vault` + Settings「密钥」区；日志/命令输出精确脱敏；HTTP 不回明文。发布/摄取注入仍待 L.15/L.17 | oq-3；`TASK-L.14` **COMPLETED**（[#31](https://github.com/he18718143986-design/IDE/pull/31)/`ae57543`） |
 | gap-13 | 大需求拆成合同序列 | **部分收口（L.7）**：`ProjectPlan` 类型、`validateProjectPlan`（D-1～D-11）与 `.stagent/project/plan.json` 落盘已合入；补丁合并/分解器、合同序列交接与项目地图仍缺（L.8～L.10）。任务图一份合同一张的旧路径仍在。 | `TASK-L.7` **COMPLETED**（[#23](https://github.com/he18718143986-design/IDE/pull/23)/`607d742`）；余量 `TASK-L.8`～`L.10` |
 | gap-14 | 新功能带测试 | Worker 指令已补「你会被这样检查」（L.2）；合同元数据 / `withSystemScope` / `stagent check` 义务与削弱检测已合入（L.3）；**两段式先红后绿编排已合入（L.4）**（`runWorker`→`runTwoPhase`）；**M2 黄金切片 E2E 已合入（L.6）** | `L.2`/`L.3`/`L.4`/`L.6` **COMPLETED**（[#8](https://github.com/he18718143986-design/IDE/pull/8)/[#15](https://github.com/he18718143986-design/IDE/pull/15)/[#18](https://github.com/he18718143986-design/IDE/pull/18)/[#21](https://github.com/he18718143986-design/IDE/pull/21) / `93589bf`） |
 | gap-15 | 试玩看到真实应用 | Worktree 真实应用预览已合入（`daemon/supervisor/preview/app-runner.ts`；端口段 4200～4210，与 Demo 段隔离） | `TASK-L.5` **COMPLETED**（[#14](https://github.com/he18718143986-design/IDE/pull/14) / `0b6bc7f`） |
@@ -241,7 +241,7 @@
 
 - **会改动的地方**：新增审计报告 1 份、规格 6 份（总装图、项目分解、技术方案与知识库、验证策略、发布与运维、卡就绪标准）、ADR 3 篇（0015～0017）、任务卡模板 1 份；任务卡文件新增 §3.4d（L.1～L.17）、矩阵行、DAG 边，并给 J.3 / J.5 / J.6 / J.7 / J.10 加「ADR-0014 修订」块；supervisor 与 intent-compiler 加修订指针；本文追加 q17～q21 与相关条目。
 - **这次不会碰**：任何产品代码；任何既有任务卡的状态；ADR-0001～0014 正文。
-- **需要你点头**：ADR-0015～0017（合入即生效）；dec-8（SA-1 敏感项授权方式）；OQ-REL-1（保险库后端，L.14 开工前）。
+- **需要你点头**：ADR-0015～0017（合入即生效）；dec-8（SA-1 敏感项授权方式）；OQ-REL-1（保险库后端；**L.14 已按推荐值 A/B 落地**，改判只换后端）。
 - **怎么算做完**：链接检查 0 断链；原话逐字核对；DAG 无环；新文档引用的现有代码路径全部存在；`npm run lint` / `npm run typecheck` 不变红。
 - **预计规模**：新增 11 份文件，修改约 8 份文件。
 

@@ -74,6 +74,6 @@
 
 | 编号 | 问题 | 阻断级别 | 决策人 | 落点 |
 | :--- | :--- | :--- | :--- | :--- |
-| DOR-1 | `TASK-J.18c` / `J.18d`：§1.1 矩阵与卡内状态仍为 `NEW_TASK`，但 `main` @ `a2fa7df`（PR #27）已含 `daemon/guard/worker-graveyard-gate.ts`、`dispatch-binding.ts` 及派工/写路径接线；卡内「代码事实」声称文件不存在 → DoR 无法诚实判 READY，亦不能在未回写时当历史 N/A | NON_BLOCKER（文档真相） | 卡 owner | 回写矩阵与卡状态（或另立「残余工作」差分卡）；参见待合 docs PR（若有） |
+| DOR-1 | ~~`TASK-J.18c` / `J.18d`：矩阵与卡内仍 `NEW_TASK`，但代码已合入 `a2fa7df`（#27）~~ → **已关闭（2026-10-31）**：随 [#28](https://github.com/he18718143986-design/IDE/pull/28)/`e7ac058` 回写为 `[COMPLETED]`；main tip 含 J.18c/d 文档闭环 | NON_BLOCKER（文档真相） | 卡 owner | **RESOLVED**：#28 合入；本行保留作审计溯源 |
 | DOR-2 | §1.1 矩阵有 `TASK-0.1`、`TASK-A.1`～`A.6`，但 `development-tasks.md` §3.4 无对应 `#### 【Task …】` 详细正文 → 无法按 R-1～R-12 举证 | NON_BLOCKER | 卡 owner / 文档治理 | 补历史正文指针，或矩阵改注「正文见 Git 历史 / 已归档」 |
 | DOR-3 | `TASK-W.5b` / `W.5c` 正文远低于现行 DoR（缺范围路径与签名、独立 PASS 清单、估算、代码事实锚点等），却仍挂在矩阵 `NEW_TASK` | NON_BLOCKER（未排入 M2～M4 关键路径） | 卡 owner | 按 `task-card-standard.md` 重写后再进入可开工队列 |
