@@ -260,6 +260,45 @@ function bulletList(items: readonly string[], emptyText: string): string {
 }
 
 /**
+ * 渲染「你会被这样检查」段（TASK-L.2 / verification-strategy §8 第 1 项）。
+ *
+ * 原样列出合同 `verification_spec.commands` 的 alias、argv 与期望退出码；
+ * 命令为空且声明了 `manual_confirmation` 时，改为人工确认句。
+ * `extras` 供 L.4（分段义务）与 L.12（知识库规则）追加条目；本卡只保证
+ * 空 extras 行为正确，非空时原样追加在段末。
+ */
+export function renderChecksSection(
+  contract: SoftwareContract,
+  extras: readonly string[] = [],
+): WorkerInstructionSection {
+  const commands = contract.verification_spec.commands;
+  const lines: string[] = [];
+
+  if (commands.length === 0) {
+    if (contract.verification_spec.manual_confirmation !== undefined) {
+      lines.push("本合同没有自动检查，完成后由用户人工确认");
+    }
+  } else {
+    for (let i = 0; i < commands.length; i += 1) {
+      const cmd = commands[i]!;
+      const argv = [cmd.executable, ...cmd.args].join(" ");
+      lines.push(
+        `${i + 1}. 别名 ${cmd.alias}：${argv}（期望退出码 ${cmd.expected_exit_code}）`,
+      );
+    }
+  }
+
+  for (const extra of extras) {
+    lines.push(extra);
+  }
+
+  return {
+    title: "你会被这样检查",
+    body: lines.length === 0 ? "（无检查项）" : lines.join("\n"),
+  };
+}
+
+/**
  * 装配 Worker 任务指令。
  *
  * 说明：`objective` 取合同的 `intent.title` / `intent.description`；
@@ -392,6 +431,7 @@ export function buildWorkerTaskInstruction(
         "（适配器未声明已知限制；该状态不允许受控执行）",
       ),
     },
+    renderChecksSection(contract),
     {
       title: "输出契约",
       body: [
