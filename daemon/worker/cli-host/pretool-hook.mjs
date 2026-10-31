@@ -17,6 +17,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const WRITE_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 const READ_TOOLS = new Set(["Read", "Glob", "Grep", "TodoWrite", "Task"]);
@@ -150,6 +151,167 @@ function matchPattern(rel, pattern) {
 
 function readJson(file) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
+}
+
+
+/** TASK-J.18d / GAP-W4：gate pack 相对主仓路径 */
+const GATE_PACK_REL = path.join(".stagent", "claude-config", "graveyard-pack.json");
+
+/**
+ * 加载 gate pack 的小写 key 集合。
+ * @returns {{ ok: true, keys: Set<string>, byKey: Map<string, string> } | { ok: false, warning: "W_GATE_PACK_MISSING" }}
+ */
+export function loadGatePackKeys(mainRoot) {
+  const file = path.join(mainRoot, GATE_PACK_REL);
+  if (!fs.existsSync(file)) {
+    return { ok: false, warning: "W_GATE_PACK_MISSING" };
+  }
+  let pack;
+  try {
+    pack = readJson(file);
+  } catch {
+    return { ok: false, warning: "W_GATE_PACK_MISSING" };
+  }
+  if (
+    !pack ||
+    pack.pack_version !== 1 ||
+    !Array.isArray(pack.tombstones)
+  ) {
+    return { ok: false, warning: "W_GATE_PACK_MISSING" };
+  }
+  const keys = new Set();
+  /** @type {Map<string, string>} */
+  const byKey = new Map();
+  for (const t of pack.tombstones) {
+    if (!t || !Array.isArray(t.keys)) continue;
+    const id = String(t.rejected_id ?? "");
+    for (const k of t.keys) {
+      const low = String(k).toLowerCase();
+      keys.add(low);
+      if (id && !byKey.has(low)) byKey.set(low, id);
+    }
+  }
+  return { ok: true, keys, byKey };
+}
+
+/** 从 Bash 安装命令抽包名（U-CMD 写前近似） */
+export function extractInstallPackages(command) {
+  const text = String(command);
+  const out = [];
+  const patterns = [
+    /\b(?:npm|pnpm)\s+(?:i|install|add)\s+([^\n;&|]+)/i,
+    /\byarn\s+add\s+([^\n;&|]+)/i,
+    /\bpip(?:3)?\s+install\s+([^\n;&|]+)/i,
+    /\bggo\s+get\s+([^\n;&|]+)/i,
+    /\bgo\s+get\s+([^\n;&|]+)/i,
+  ];
+  for (const re of patterns) {
+    const m = re.exec(text);
+    if (!m) continue;
+    for (const tok of m[1].split(/\s+/)) {
+      if (!tok || tok.startsWith("-")) continue;
+      // npm alias: mongoose@npm:foo → take left; strip version
+      let name = tok.split("@")[0];
+      if (tok.includes("@npm:")) {
+        const right = tok.split("@npm:")[1] ?? "";
+        name = right.split("@")[0] || name;
+      }
+      // scoped keep @scope/name when tok starts with @
+      if (tok.startsWith("@")) {
+        const parts = tok.split("@").filter(Boolean);
+        // @scope/name@version → parts[0]=scope/name, parts[1]=version?
+        // Actually "@scope/pkg@1".split("@") => ["", "scope/pkg", "1"]
+        const scoped = tok.match(/^(@[^/]+\/[^@\s]+)/);
+        name = scoped ? scoped[1] : name;
+      }
+      if (name) out.push(name.toLowerCase());
+    }
+  }
+  return out;
+}
+
+const IMPORT_RES = [
+  /\bfrom\s+["']([^"']+)["']/,
+  /\bimport\s+["']([^"']+)["']/,
+  /\brequire\s*\(\s*["']([^"']+)["']\s*\)/,
+  /^import\s+(\S+)/m,
+  /^from\s+(\S+)\s+import\b/m,
+];
+
+function moduleName(spec) {
+  const s = String(spec);
+  if (s.startsWith(".") || s.startsWith("/")) return s.toLowerCase();
+  if (s.startsWith("@")) {
+    const parts = s.split("/");
+    return (parts.length >= 2 ? `${parts[0]}/${parts[1]}` : s).toLowerCase();
+  }
+  return s.split("/")[0].toLowerCase();
+}
+
+/** 从 Write/Edit 正文抽 U-DEP / U-IMPORT 候选（集合查找） */
+export function extractContentKeys(filePath, content) {
+  const text = String(content ?? "");
+  const base = String(filePath).replace(/\\/g, "/").split("/").pop() ?? "";
+  const keys = [];
+  if (base === "package.json") {
+    try {
+      const obj = JSON.parse(text);
+      for (const field of [
+        "dependencies",
+        "devDependencies",
+        "optionalDependencies",
+        "peerDependencies",
+      ]) {
+        const block = obj?.[field];
+        if (!block || typeof block !== "object") continue;
+        for (const [name, spec] of Object.entries(block)) {
+          let real = String(name).toLowerCase();
+          const s = String(spec ?? "");
+          if (s.startsWith("npm:")) {
+            real = s.slice(4).split("@")[0].toLowerCase() || real;
+          }
+          keys.push(real);
+        }
+      }
+    } catch {
+      // JSON 坏了：退回全文词扫描不在此做，避免误伤
+    }
+    return keys;
+  }
+  if (/^requirements.*\.txt$/i.test(base)) {
+    for (const line of text.split(/\r?\n/)) {
+      const t = line.trim();
+      if (!t || t.startsWith("#")) continue;
+      const m = /^([A-Za-z0-9_.-]+)\s*(?:[=<>!~].*)?$/.exec(t);
+      if (m) keys.push(m[1].toLowerCase());
+    }
+    return keys;
+  }
+  for (const line of text.split(/\r?\n/)) {
+    for (const re of IMPORT_RES) {
+      const m = re.exec(line);
+      if (m?.[1]) keys.push(moduleName(m[1]));
+    }
+  }
+  return keys;
+}
+
+/**
+ * @returns {{ hit: false } | { hit: true, rejected_id: string, key: string }}
+ */
+export function evaluateGatePackHit(packKeys, candidates) {
+  if (!packKeys || !packKeys.ok) return { hit: false };
+  for (const c of candidates) {
+    const low = String(c).toLowerCase();
+    if (packKeys.keys.has(low)) {
+      return {
+        hit: true,
+        rejected_id: packKeys.byKey.get(low) ?? "unknown",
+        key: low,
+      };
+    }
+  }
+  return { hit: false };
 }
 
 /** 返回 {hit, name, selfLock}；任何读取异常都抛错，由调用方按拒绝处理 */
@@ -288,6 +450,18 @@ function inside(root, p) {
   return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
 }
 
+
+/** 仅作为 CLI 入口执行主流程；被 import 时不跑 stdin 判定（TM-GH-06）。 */
+function isInvokedAsCli() {
+  try {
+    const entry = process.argv[1] ? path.resolve(process.argv[1]) : "";
+    return entry === path.resolve(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (isInvokedAsCli()) {
 try {
   const raw = fs.readFileSync(0, "utf8");
   input = JSON.parse(raw || "{}");
@@ -323,6 +497,27 @@ try {
     // 既有：保护清单命中且未获本轮授权 → 投递确认卡并拒绝
     const bashVerdict = shellProtectionVerdict(mainRoot, command);
     if (bashVerdict) deny(bashVerdict);
+    // TASK-J.18d / GAP-W4：gate pack 集合查找（U-CMD）
+    {
+      const pack = loadGatePackKeys(mainRoot);
+      if (!pack.ok) {
+        log({ decision: "allow", warning: pack.warning });
+      } else {
+        const pkgs = extractInstallPackages(command);
+        const hit = evaluateGatePackHit(pack, pkgs);
+        if (hit.hit) {
+          log({
+            decision: "deny",
+            code: "E_PROPOSAL_PREVIOUSLY_REJECTED",
+            rejected_id: hit.rejected_id,
+            key: hit.key,
+          });
+          deny(
+            `命令安装了用户否决过的依赖「${hit.key}」（E_PROPOSAL_PREVIOUSLY_REJECTED）`,
+          );
+        }
+      }
+    }
     log({ decision: "allow" });
     process.exit(0);
   }
@@ -360,6 +555,31 @@ try {
         // P.1 保护清单：命中且未获本轮授权 → 投递卡片请求并拒绝（先拦后写）
         const verdict = protectionVerdict(mainRoot, rel.join("/"));
         if (verdict) deny(verdict);
+        // TASK-J.18d / GAP-W4：gate pack 集合查找（U-DEP / U-IMPORT）
+        {
+          const pack = loadGatePackKeys(mainRoot);
+          if (!pack.ok) {
+            log({ decision: "allow", warning: pack.warning });
+          } else {
+            const body =
+              tool === "Edit" || tool === "MultiEdit"
+                ? String(ti.new_string ?? ti.content ?? "")
+                : String(ti.content ?? "");
+            const keys = extractContentKeys(rel.join("/"), body);
+            const hit = evaluateGatePackHit(pack, keys);
+            if (hit.hit) {
+              log({
+                decision: "deny",
+                code: "E_PROPOSAL_PREVIOUSLY_REJECTED",
+                rejected_id: hit.rejected_id,
+                key: hit.key,
+              });
+              deny(
+                `写入内容触及用户否决过的方案（依赖/导入「${hit.key}」，E_PROPOSAL_PREVIOUSLY_REJECTED）`,
+              );
+            }
+          }
+        }
       }
     }
     log({ decision: "allow" });
@@ -373,4 +593,5 @@ try {
   deny(`未在白名单内的工具：${tool}`);
 } catch (err) {
   deny(`hook 内部错误，按拒绝处理：${err && err.message}`);
+}
 }

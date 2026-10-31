@@ -109,6 +109,11 @@ export const scopeAuditSchema = z.object({
   ),
   forbidden_violations: z.array(z.string()),
   budget_exhausted: z.boolean(),
+  /**
+   * TASK-J.18d：墓地检查可用性。
+   * snapshot = 合同绑定快照墓地；unavailable = 旧直签（W_GRAVEYARD_CHECK_UNAVAILABLE）。
+   */
+  graveyard_check: z.enum(["snapshot", "unavailable"]).optional(),
 });
 export type ScopeAudit = z.infer<typeof scopeAuditSchema>;
 

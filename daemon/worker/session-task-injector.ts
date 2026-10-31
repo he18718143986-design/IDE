@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { SoftwareContract } from "../../src/lib/contract.schema";
+import type { GraveyardEntry } from "../../src/lib/journey/scheme-patch-types";
+import { renderRejectedProposalsSection } from "../guard/graveyard-wiring";
 import type { AdapterCapabilityDeclaration } from "./worker-adapter.interface";
 
 /**
@@ -146,6 +148,11 @@ export interface BuildWorkerInstructionInput {
    * 缺省空数组，行为与 L.2 一致。
    */
   checksExtras?: readonly string[] | undefined;
+  /**
+   * TASK-J.18d / GAP-W3：派工时注入「用户否决过的方案」白话段。
+   * 只列 proposal / rejection_reason，不列 artifact_keys。
+   */
+  graveyard?: readonly GraveyardEntry[] | undefined;
 }
 
 /**
@@ -437,6 +444,10 @@ export function buildWorkerTaskInstruction(
       ),
     },
     renderChecksSection(contract, input.checksExtras ?? []),
+    ...((): WorkerInstructionSection[] => {
+      const rejected = renderRejectedProposalsSection(input.graveyard ?? []);
+      return rejected ? [rejected] : [];
+    })(),
     {
       title: "输出契约",
       body: [
