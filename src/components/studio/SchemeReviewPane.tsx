@@ -29,6 +29,8 @@ import {
   ScopeAcceptanceBlock,
   type ScopeAcceptanceMode,
 } from "@/components/studio/ScopeAcceptanceBlock";
+import { ProjectMapPane } from "@/components/project/ProjectMapPane";
+import type { ProjectPlan } from "@/lib/project/project-plan";
 
 export interface SchemeReviewPaneProps {
   scheme: SchemeDraft | null;
@@ -67,6 +69,14 @@ export interface SchemeReviewPaneProps {
   handoffCompensationFailed?: boolean | undefined;
   /** 打开运行诊断（补偿失败入口） */
   onOpenHandoffDiagnose?: (() => void) | undefined;
+  /** TASK-L.10：同页嵌项目地图（有计划才渲染） */
+  projectPlan?: ProjectPlan | null | undefined;
+  /** 服务端权威下一份；前端不得本地重算 */
+  projectNextStubId?: string | null | undefined;
+  projectMapBusy?: boolean | undefined;
+  onProjectMapConfirmStart?: ((stubId: string) => void) | undefined;
+  onProjectMapDefer?: ((stubId: string) => void) | undefined;
+  onProjectMapReorderForward?: ((stubId: string) => void) | undefined;
 }
 
 function MermaidCard(props: { title: string; source: string; testId: string }) {
@@ -172,6 +182,18 @@ export function SchemeReviewPane(props: SchemeReviewPaneProps) {
           </span>
         ) : null}
       </header>
+
+      {props.projectPlan ? (
+        <ProjectMapPane
+          plan={props.projectPlan}
+          nextStubId={props.projectNextStubId ?? null}
+          busy={props.projectMapBusy === true || props.confirmBusy === true}
+          onConfirmStart={props.onProjectMapConfirmStart}
+          onDefer={props.onProjectMapDefer}
+          onReorderForward={props.onProjectMapReorderForward}
+        />
+      ) : null}
+
 
       <section className="mb-3 rounded border border-border p-3">
         <h3
