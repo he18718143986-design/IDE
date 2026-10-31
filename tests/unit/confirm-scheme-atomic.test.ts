@@ -206,6 +206,18 @@ describe("T-ATOM 五阶段事务", () => {
     expect(result.frozen?.frozen).toBe(true);
   });
 
+  it("T-ATOM-J7 onStage 在每阶段开始前按序回调", async () => {
+    const h = makeHarness();
+    const stages: string[] = [];
+    h.input.onStage = (stage) => {
+      stages.push(stage);
+    };
+    const result = await runConfirmSchemeAtomic(h.input);
+    expect(result.ok).toBe(true);
+    expect(stages).toEqual([...CONFIRM_SCHEME_STEPS]);
+  });
+
+
   it("T-ATOM-002 同 confirmation_id + 同修订重放：幂等返回，不重复签署", async () => {
     const h = makeHarness();
     const first = await runConfirmSchemeAtomic(h.input);

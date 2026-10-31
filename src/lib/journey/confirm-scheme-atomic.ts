@@ -85,6 +85,11 @@ export interface ConfirmSchemeAtomicInput {
   }) => Promise<void>;
   /** 补偿成功后恢复右栏；补偿失败必须保持锁定。 */
   restoreRightChat?: () => void;
+  /**
+   * J.7：每阶段开始前回调，驱动中栏三步人话进度。
+   * 失败路径也会在已进入的阶段上报；调用方不得据此旁路事务。
+   */
+  onStage?: (stage: ConfirmSchemeStepId) => void;
 }
 
 export interface ConfirmSchemeAtomicResult {
@@ -202,6 +207,7 @@ export async function runConfirmSchemeAtomic(
 
   // 1. 先冻结输入：停流式 + 禁右栏，之后不再接受 Supervisor Patch。
   try {
+    input.onStage?.("CLAIM_AND_QUIESCE");
     await input.quiesceRightChat();
     steps.push({ step: "CLAIM_AND_QUIESCE", ok: true });
   } catch (err) {
@@ -217,6 +223,7 @@ export async function runConfirmSchemeAtomic(
   }
 
   // 2. 在冻结后的同一修订上做最终求值（单谓词，UI 与 Daemon 共用）。
+  input.onStage?.("VALIDATE_CONFIRMATION");
   if (input.expectedRevision !== input.scheme.scheme_revision) {
     input.restoreRightChat?.();
     steps.push({
@@ -260,6 +267,7 @@ export async function runConfirmSchemeAtomic(
   // 3. 不可变快照。失败未签署，直接恢复右栏。
   let snapshot: PersistedSchemeSnapshot;
   try {
+    input.onStage?.("FREEZE_SNAPSHOT");
     snapshot = await input.persistSnapshot({
       confirmation_id: input.confirmationId,
       scheme: frozen,
@@ -296,6 +304,7 @@ export async function runConfirmSchemeAtomic(
    */
   const staging: { contractId: string | undefined } = { contractId: undefined };
   try {
+    input.onStage?.("SIGN_AND_PREPARE");
     const signed = await input.signAndPrepare({
       confirmation_id: input.confirmationId,
       frozen,
@@ -339,7 +348,9 @@ export async function runConfirmSchemeAtomic(
     );
   }
 
-  // 5. 提交事务并记住幂等结果。右栏保持锁定：已签署，不允许再聊改本轮。
+  // 5. 提交事务并记住幂等结果。
+  // J.7 / D9：右栏解锁由调用方在 COMMIT 成功后执行；本函数不再假定永久锁定。
+  input.onStage?.("COMMIT");
   steps.push({ step: "COMMIT", ok: true });
   const result: ConfirmSchemeAtomicResult = {
     ok: true,
