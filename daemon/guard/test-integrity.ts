@@ -51,3 +51,112 @@ export function scopeExplicitlyIncludesTests(writablePaths: string[]): boolean {
     return /(^|\/)(tests?|__tests__)(\/|$)/.test(pattern);
   });
 }
+
+/** 语言标签：决定断言与 skip/only 识别规则 */
+export type TestIntegrityLang = "ts" | "js" | "tsx" | "jsx" | "py" | "go" | "rs";
+
+export interface TestWeakeningResult {
+  weakened: boolean;
+  reasons: string[];
+  base_assertion_count: number;
+  candidate_assertion_count: number;
+}
+
+const ASSERTION_PATTERNS: Record<string, RegExp[]> = {
+  ts: [/\bexpect\s*\(/g, /\bassert\s*\(/g, /\bassert\.\w+\s*\(/g],
+  js: [/\bexpect\s*\(/g, /\bassert\s*\(/g, /\bassert\.\w+\s*\(/g],
+  tsx: [/\bexpect\s*\(/g, /\bassert\s*\(/g],
+  jsx: [/\bexpect\s*\(/g, /\bassert\s*\(/g],
+  py: [
+    /\bassert\b/g,
+    /\bself\.assert\w+\s*\(/g,
+    /\bpytest\.raises\s*\(/g,
+  ],
+  go: [/\b(?:assert|require|assertEq)\w*\s*\(/g, /\bt\.(?:Fatal|Error|Fail)/g],
+  rs: [/\bassert(?:_eq|_ne|_lt|_gt)?!\s*\(/g],
+};
+
+const WEAKEN_INSERT_PATTERNS: RegExp[] = [
+  /\bit\.only\s*\(/g,
+  /\btest\.only\s*\(/g,
+  /\bdescribe\.only\s*\(/g,
+  /\bfit\s*\(/g,
+  /\bfdescribe\s*\(/g,
+  /\bit\.skip\s*\(/g,
+  /\btest\.skip\s*\(/g,
+  /\bdescribe\.skip\s*\(/g,
+  /\bxit\s*\(/g,
+  /\bxdescribe\s*\(/g,
+  /\bxtest\s*\(/g,
+  /@pytest\.mark\.skip(?:if)?\b/g,
+  /\bpytest\.skip\s*\(/g,
+  /\bt\.Skip\s*\(/g,
+];
+
+function countMatches(text: string, patterns: RegExp[]): number {
+  let total = 0;
+  for (const pattern of patterns) {
+    const flags = pattern.flags.includes("g")
+      ? pattern.flags
+      : `${pattern.flags}g`;
+    const re = new RegExp(pattern.source, flags);
+    const hits = text.match(re);
+    total += hits?.length ?? 0;
+  }
+  return total;
+}
+
+function collectInsertHits(text: string): string[] {
+  const hits: string[] = [];
+  for (const pattern of WEAKEN_INSERT_PATTERNS) {
+    const flags = pattern.flags.includes("g")
+      ? pattern.flags
+      : `${pattern.flags}g`;
+    const re = new RegExp(pattern.source, flags);
+    const found = text.match(re);
+    if (found && found.length > 0) {
+      hits.push(...found);
+    }
+  }
+  return hits;
+}
+
+/**
+ * 比对基线与候选测试源码，判定是否削弱门禁（verification-strategy §5）。
+ *
+ * - 断言调用数下降 → weakened
+ * - 新增 .skip / .only / xit / @pytest.mark.skip 等 → weakened
+ * - 只增断言 → 不 weakened
+ */
+export function detectTestWeakening(
+  baseText: string,
+  candidateText: string,
+  lang: TestIntegrityLang,
+): TestWeakeningResult {
+  const key = lang in ASSERTION_PATTERNS ? lang : "ts";
+  const patterns = ASSERTION_PATTERNS[key] ?? ASSERTION_PATTERNS["ts"]!;
+  const baseCount = countMatches(baseText, patterns);
+  const candidateCount = countMatches(candidateText, patterns);
+  const reasons: string[] = [];
+
+  if (candidateCount < baseCount) {
+    reasons.push(
+      `assertion_count_dropped:${baseCount}->${candidateCount}`,
+    );
+  }
+
+  const baseInserts = collectInsertHits(baseText);
+  const candidateInserts = collectInsertHits(candidateText);
+  if (candidateInserts.length > baseInserts.length) {
+    reasons.push(
+      `inserted_skip_or_only:${baseInserts.length}->${candidateInserts.length}`,
+    );
+  }
+
+  return {
+    weakened: reasons.length > 0,
+    reasons,
+    base_assertion_count: baseCount,
+    candidate_assertion_count: candidateCount,
+  };
+}

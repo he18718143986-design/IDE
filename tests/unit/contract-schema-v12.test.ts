@@ -59,8 +59,8 @@ describe("Schema 版本与字段集合", () => {
     // TASK-0.2c 期望变更 1/2：签发版本由 1.2.0 升至 1.3.0（架构 §9.1）。
     // 断言从"锁定单值"改为"签发值 + 兼容白名单"，否则无法同时表达
     // 「新合同一律 1.3.0」与「存量 1.2.0 继续可读」两个要求。
-    expect(SOFTWARE_CONTRACT_SCHEMA_VERSION).toBe("1.3.1");
-    expect(draft().schema_version).toBe("1.3.1");
+    expect(SOFTWARE_CONTRACT_SCHEMA_VERSION).toBe("1.3.2");
+    expect(draft().schema_version).toBe("1.3.2");
 
     expect(
       softwareContractSchema.safeParse({

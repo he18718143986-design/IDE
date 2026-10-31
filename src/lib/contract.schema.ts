@@ -2,7 +2,7 @@ import { z } from "zod";
 import { FAST_PATH_APPROVER, validateStatePair } from "./state-machine";
 
 /**
- * 软件合同 Schema (v1.3.0)
+ * 软件合同 Schema (v1.3.2)
  * 严格对齐《Stagent 系统架构设计规范 v1.6.1》§9.1 与 §9.1.1。
  * 本文件是全工程唯一合同契约（红线一：Schema 即宪法）。
  *
@@ -29,17 +29,39 @@ import { FAST_PATH_APPROVER, validateStatePair } from "./state-machine";
  *  - `EvidenceBundleV12`（架构 §9.2，单独演进）
  */
 
-/** 当前签发版本：新建合同一律使用此版本 */
-export const SOFTWARE_CONTRACT_SCHEMA_VERSION = "1.3.1" as const;
+/** 当前签发版本：新建合同一律使用此版本（TASK-L.3 → 1.3.2） */
+export const SOFTWARE_CONTRACT_SCHEMA_VERSION = "1.3.2" as const;
+/** 存量兼容版本：v1.3.1 合同继续可解析（含 manual_confirmation） */
+export const LEGACY_CONTRACT_SCHEMA_VERSION_V131 = "1.3.1" as const;
 /** 存量兼容版本：v1.3.0 合同继续可解析 */
 export const LEGACY_CONTRACT_SCHEMA_VERSION_V130 = "1.3.0" as const;
 /** 存量兼容版本：v1.2.0 合同继续可解析、可迁移 */
 export const LEGACY_CONTRACT_SCHEMA_VERSION_V12 = "1.2.0" as const;
 
+/**
+ * 允许 `verification_spec.manual_confirmation` 的版本集合。
+ * 1.3.0 及更早不得携带该字段；1.3.1 / 1.3.2 行为保持一致。
+ */
+export const MANUAL_CONFIRMATION_SCHEMA_VERSIONS = [
+  LEGACY_CONTRACT_SCHEMA_VERSION_V131,
+  SOFTWARE_CONTRACT_SCHEMA_VERSION,
+] as const;
+
+/**
+ * 要求 `authorization.git` 显式凭证（allowed_operations / forbidden_flags /
+ * enforce_clean_base）的版本集合。1.2.0 存量不做追溯。
+ */
+export const GIT_EXPLICIT_AUTH_SCHEMA_VERSIONS = [
+  LEGACY_CONTRACT_SCHEMA_VERSION_V130,
+  LEGACY_CONTRACT_SCHEMA_VERSION_V131,
+  SOFTWARE_CONTRACT_SCHEMA_VERSION,
+] as const;
+
 /** 允许解析的合同 Schema 版本（白名单，未列出的版本一律拒绝） */
 export const SUPPORTED_CONTRACT_SCHEMA_VERSIONS = [
   LEGACY_CONTRACT_SCHEMA_VERSION_V12,
   LEGACY_CONTRACT_SCHEMA_VERSION_V130,
+  LEGACY_CONTRACT_SCHEMA_VERSION_V131,
   SOFTWARE_CONTRACT_SCHEMA_VERSION,
 ] as const;
 
@@ -275,10 +297,24 @@ export const suggestedScopeSchema = z.object({
 });
 export type SuggestedScope = z.infer<typeof suggestedScopeSchema>;
 
+/** 方案验收条目引用（TASK-L.3 / delivery-lifecycle §6） */
+export const acceptanceRefSchema = z.object({
+  id: z.string().min(1),
+  text: z.string().min(1),
+  check: z.enum(["auto", "playtest", "both"]),
+});
+export type AcceptanceRef = z.infer<typeof acceptanceRefSchema>;
+
 export const supervisorMetadataSchema = z.object({
   suggestion_id: z.string().min(1),
   maturity_assessment: maturityAssessmentSchema.optional(),
   suggested_scope: suggestedScopeSchema.optional(),
+  /** 方案 acceptance[] 投影；签署后不改合同正文 */
+  acceptance_refs: z.array(acceptanceRefSchema).optional(),
+  /** 方案条目 id 追踪链（goals/modules/acceptance 等） */
+  scheme_item_ids: z.array(z.string().min(1)).optional(),
+  /** 合同桩 id；由 L.9 写入，L.3 预留可为 null */
+  stub_id: z.string().min(1).nullable().optional(),
 });
 export type SupervisorMetadata = z.infer<typeof supervisorMetadataSchema>;
 
@@ -517,22 +553,26 @@ export const softwareContractSchema = z
       });
     }
 
-    // §1.3：manual_confirmation 只允许出现在 1.3.1 合同上。1.3.0 合同带有该字段时拒绝
+    // §1.3：manual_confirmation 只允许出现在 1.3.1 / 1.3.2 合同上（版本集合判断）。
+    // 1.3.0 合同带有该字段时拒绝；升版后既有 1.3.1 行为保持不变。
     if (
       contract.verification_spec.manual_confirmation !== undefined &&
-      contract.schema_version !== SOFTWARE_CONTRACT_SCHEMA_VERSION
+      !(MANUAL_CONFIRMATION_SCHEMA_VERSIONS as readonly string[]).includes(
+        contract.schema_version,
+      )
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: `manual_confirmation is only allowed on schema_version ${SOFTWARE_CONTRACT_SCHEMA_VERSION}, got ${contract.schema_version}`,
+        message: `manual_confirmation is only allowed on schema_version 1.3.1 or 1.3.2, got ${contract.schema_version}`,
       });
     }
 
-    // v1.3.0 / v1.3.1 必填字段：新合同必须显式声明 Git 授权凭证，
+    // v1.3.0 / v1.3.1 / v1.3.2 必填字段：新合同必须显式声明 Git 授权凭证，
     // 不允许靠缺省值"看起来合规"。存量 1.2.0 合同不做追溯要求。
     if (
-      contract.schema_version === SOFTWARE_CONTRACT_SCHEMA_VERSION ||
-      contract.schema_version === LEGACY_CONTRACT_SCHEMA_VERSION_V130
+      (GIT_EXPLICIT_AUTH_SCHEMA_VERSIONS as readonly string[]).includes(
+        contract.schema_version,
+      )
     ) {
       const git = contract.authorization.git;
       const requiredGitFields: Array<[string, unknown]> = [

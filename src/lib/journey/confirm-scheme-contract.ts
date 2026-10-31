@@ -54,6 +54,14 @@ export function buildConfirmContractFromScopePlan(
     maxVerificationRetries: projected.budget.max_verification_retries,
   });
 
+  const acceptance = scheme.acceptance ?? [];
+  const acceptance_refs = acceptance.map((a) => ({
+    id: a.id,
+    text: a.text,
+    check: a.check,
+  }));
+  const scheme_item_ids = acceptance_refs.map((a) => a.id);
+
   return softwareContractSchema.parse({
     ...draft,
     authorization: {
@@ -80,6 +88,14 @@ export function buildConfirmContractFromScopePlan(
               },
             }
           : {}),
+    },
+    // TASK-L.3 / delivery-lifecycle §6：按快照方案填充追踪元数据（签署后不改）
+    supervisor_metadata: {
+      suggestion_id: `scheme:${scheme.scheme_id}`,
+      ...(acceptance_refs.length > 0
+        ? { acceptance_refs, scheme_item_ids }
+        : {}),
+      stub_id: null,
     },
   });
 }

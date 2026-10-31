@@ -33,6 +33,11 @@ export const reasonCodeSchema = z.enum([
   "EVIDENCE_STALE",
   "PREPARATION_INTERRUPTED",
   "WORKTREE_LOST",
+  // TASK-L.3 / verification-strategy §3.2 / §5
+  "OBLIGATION_NOT_RED",
+  "OBLIGATION_RED_INVALID",
+  "OBLIGATION_NOT_GREEN",
+  "TEST_WEAKENED",
 ]);
 export type ReasonCode = z.infer<typeof reasonCodeSchema>;
 
@@ -186,6 +191,26 @@ export const evidenceBundleSchema = z
      * 零命令合同在完成人工确认记录（actor / confirmed_at / reason 齐全）后方可放行。
      */
     manual_confirmation: manualConfirmationRecordSchema.optional(),
+    /**
+     * TASK-L.3 / verification-strategy §3.4：测试义务红绿证据（可选，向后兼容）。
+     * 每条对应一份 acceptance_id；red.exit_code 必须 ≠ 0，green.exit_code 必须 = 0。
+     */
+    obligations: z
+      .array(
+        z.object({
+          acceptance_id: z.string().min(1),
+          test_path: z.string().min(1),
+          red: z.object({
+            sha: z.string().min(1),
+            exit_code: z.number().int(),
+          }),
+          green: z.object({
+            sha: z.string().min(1),
+            exit_code: z.number().int(),
+          }),
+        }),
+      )
+      .optional(),
   })
   .superRefine((bundle, ctx) => {
     // §9.2 Schema 不变式一：status !== "PASSED" 时 can_merge 必须为 false

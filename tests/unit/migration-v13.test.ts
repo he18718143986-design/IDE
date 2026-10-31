@@ -200,9 +200,9 @@ describe("版本与失败路径", () => {
     const result = migrateContractToV13(v12Raw("DRAFT", { status: "DRAFT" }));
     expect(result.from).toBe("1.2.0");
     expect(result.to).toBe(SOFTWARE_CONTRACT_SCHEMA_VERSION);
-    expect(result.contract.schema_version).toBe("1.3.1");
+    expect(result.contract.schema_version).toBe("1.3.2");
     expect(softwareContractSchema.parse(result.contract).schema_version).toBe(
-      "1.3.1",
+      "1.3.2",
     );
   });
 

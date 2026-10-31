@@ -346,7 +346,7 @@ describe("can_merge 派生不变式（§9.2）", () => {
 });
 
 describe("reason_code 与崩溃恢复两码", () => {
-  it("9 个原因码完整", () => {
+  it("13 个原因码完整（含 L.3 义务/削弱四码）", () => {
     expect(reasonCodeSchema.options).toEqual([
       "SCOPE_VIOLATION",
       "BUDGET_EXHAUSTED",
@@ -357,6 +357,10 @@ describe("reason_code 与崩溃恢复两码", () => {
       "EVIDENCE_STALE",
       "PREPARATION_INTERRUPTED",
       "WORKTREE_LOST",
+      "OBLIGATION_NOT_RED",
+      "OBLIGATION_RED_INVALID",
+      "OBLIGATION_NOT_GREEN",
+      "TEST_WEAKENED",
     ]);
   });
 

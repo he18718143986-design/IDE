@@ -76,14 +76,15 @@ function rawAtState(
 
 describe("版本白名单与签发值", () => {
   it("签发 1.3.0，兼容白名单为 1.2.0 + 1.3.0", () => {
-    expect(SOFTWARE_CONTRACT_SCHEMA_VERSION).toBe("1.3.1");
+    expect(SOFTWARE_CONTRACT_SCHEMA_VERSION).toBe("1.3.2");
     expect(LEGACY_CONTRACT_SCHEMA_VERSION_V12).toBe("1.2.0");
     expect([...SUPPORTED_CONTRACT_SCHEMA_VERSIONS]).toEqual([
       "1.2.0",
       "1.3.0",
       "1.3.1",
+      "1.3.2",
     ]);
-    expect(draft().schema_version).toBe("1.3.1");
+    expect(draft().schema_version).toBe("1.3.2");
   });
 
   it("未列入白名单的版本一律拒绝（含 v1.2.1 / v1.1.3）", () => {
@@ -342,7 +343,7 @@ describe("v1.3.1 manual_confirmation 兜底人工确认不变式", () => {
     expect(parsed.success).toBe(false);
     if (!parsed.success) {
       expect(parsed.error.issues[0]?.message).toContain(
-        "manual_confirmation is only allowed on schema_version 1.3.1",
+        "manual_confirmation is only allowed on schema_version 1.3.1 or 1.3.2",
       );
     }
   });
