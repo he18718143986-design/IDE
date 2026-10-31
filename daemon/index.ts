@@ -29,3 +29,4 @@ export * from "./watcher/invalidation-engine";
 
 export * from "./core/recent-projects";
 export * from "./core/open-workspace";
+export * from "./project/plan-store";

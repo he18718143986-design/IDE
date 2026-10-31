@@ -19,7 +19,8 @@ import {
  * 判据：A §9.3 的 13 个基础 error_code + W.3 增补 E_PORT_CONFLICT
  * + W.2b 增补 E_OUT_OF_SCOPE_UNTRACKED
  * + S.4 增补 E_DEMO_PAYLOAD_TOO_LARGE
- * + S.5 增补 E_DISPUTE_TIMEOUT = 17 个 → 9 个 reason_code，正反向均可闭环。
+ * + S.5 增补 E_DISPUTE_TIMEOUT
+ * + L.7 增补 E_PLAN_* ×5 = 22 个 → 9 个 reason_code，正反向均可闭环。
  */
 
 /** A §9.3 表格的逐行期望值（手工登记，不以实现反推） */
@@ -43,12 +44,18 @@ const EXPECTED_MAPPING: Record<ErrorCode, string> = {
   E_DEMO_PAYLOAD_TOO_LARGE: "BUDGET_EXHAUSTED",
   // TASK-S.5：60s 质疑自查看门狗超时，归入时间预算耗尽
   E_DISPUTE_TIMEOUT: "BUDGET_EXHAUSTED",
+  // TASK-L.7：项目计划校验 / 落盘错误码
+  E_PLAN_INVALID: "PREPARATION_INTERRUPTED",
+  E_PLAN_STALE: "EVIDENCE_STALE",
+  E_PLAN_STUB_LOCKED: "WORKSPACE_LOCKED",
+  E_PLAN_STUB_TOO_LARGE: "BUDGET_EXHAUSTED",
+  E_PLAN_STUB_REVIVED: "PREPARATION_INTERRUPTED",
 };
 
-describe("目录基数：17 个 error_code → 9 个 reason_code", () => {
-  it("恰好 17 个错误码且无重复", () => {
-    expect(ERROR_CODES).toHaveLength(17);
-    expect(new Set(ERROR_CODES).size).toBe(17);
+describe("目录基数：22 个 error_code → 9 个 reason_code", () => {
+  it("恰好 22 个错误码且无重复", () => {
+    expect(ERROR_CODES).toHaveLength(22);
+    expect(new Set(ERROR_CODES).size).toBe(22);
   });
 
   it("恰好 9 个原因码，且与 evidence.schema 的 reasonCodeSchema 同集合", () => {
@@ -89,7 +96,7 @@ describe("正向映射：error_code → reason_code", () => {
     ]);
   });
 
-  it("多对一归并正确：BUDGET_EXHAUSTED 由 5 个错误码共同产出", () => {
+  it("多对一归并正确：BUDGET_EXHAUSTED 由 6 个错误码共同产出", () => {
     // TASK-S.4 增补 E_DEMO_PAYLOAD_TOO_LARGE：单文件 2MB 上限同属"资源上限"家族
     // TASK-S.5 增补 E_DISPUTE_TIMEOUT：60s 看门狗同属"时间预算耗尽"
     expect(errorCodesForReasonCode("BUDGET_EXHAUSTED").sort()).toEqual([
@@ -97,6 +104,7 @@ describe("正向映射：error_code → reason_code", () => {
       "E_COMMAND_TIMEOUT",
       "E_DEMO_PAYLOAD_TOO_LARGE",
       "E_DISPUTE_TIMEOUT",
+      "E_PLAN_STUB_TOO_LARGE",
       "E_TASK_TIMEOUT",
     ]);
   });
@@ -119,11 +127,11 @@ describe("反向映射：reason_code → error_code[]（一对多）", () => {
     }
   });
 
-  it("反向映射覆盖全部 17 个错误码，无遗漏", () => {
+  it("反向映射覆盖全部 22 个错误码，无遗漏", () => {
     const covered = new Set(
       REASON_CODES.flatMap((reason) => errorCodesForReasonCode(reason)),
     );
-    expect(covered.size).toBe(17);
+    expect(covered.size).toBe(22);
     for (const code of ERROR_CODES) {
       expect(covered.has(code), `uncovered error_code: ${code}`).toBe(true);
     }
@@ -137,18 +145,31 @@ describe("反向映射：reason_code → error_code[]（一对多）", () => {
     }
   });
 
-  it("单射的六个原因码反向只有唯一错误码（UNSAFE_EXECUTION 现有端口冲突并入）", () => {
+  it("仍保持单射的原因码反向只有唯一错误码", () => {
     const singleValued = [
       "UNAUTHORIZED_COMMAND",
       "VERIFICATION_RETRY_LIMIT",
-      "WORKSPACE_LOCKED",
-      "EVIDENCE_STALE",
-      "PREPARATION_INTERRUPTED",
       "WORKTREE_LOST",
     ] as const;
     for (const reason of singleValued) {
       expect(errorCodesForReasonCode(reason)).toHaveLength(1);
     }
+  });
+
+  it("TASK-L.7 计划码并入既有原因码家族", () => {
+    expect(errorCodesForReasonCode("WORKSPACE_LOCKED").sort()).toEqual([
+      "E_PLAN_STUB_LOCKED",
+      "E_WORKSPACE_LOCKED",
+    ]);
+    expect(errorCodesForReasonCode("EVIDENCE_STALE").sort()).toEqual([
+      "E_EVIDENCE_STALE",
+      "E_PLAN_STALE",
+    ]);
+    expect(errorCodesForReasonCode("PREPARATION_INTERRUPTED").sort()).toEqual([
+      "E_PLAN_INVALID",
+      "E_PLAN_STUB_REVIVED",
+      "E_PREPARATION_FAILED",
+    ]);
   });
 });
 
