@@ -141,7 +141,7 @@
 | dec-7 | 部署放在合同状态机里，还是单独一条生命周期？ | 单独的 Release 生命周期，引用已合并的提交；`MERGED` 仍是合同唯一终态。 | 在合同状态机 `MERGED` 之后加 `DEPLOYED` | 不破坏 ADR-0012；一次发布可包含多份合同，失败回滚不应解开已合并的合同。 | high | `user_confirmed` | q17、q22；[ADR-0017](./adr/0017-release-lifecycle-after-merge.md) |
 | dec-8 | ADR-0014「只保留两次点击」下，涉及保护清单的改动怎么授权？（SA-1） | 敏感项默认排除出范围；只有用户原话点名时才进审批，开工按钮一次点击一并授权并带入 plan_digest。 | 保留逐项「可以/不行」 | 守住两次点击，也不放宽保护清单：物理门禁绝不放行未获授权的敏感写入。 | high | `user_confirmed` | q13、q22；[`specs/delivery-lifecycle.md`](./specs/delivery-lifecycle.md) §5 |
 | dec-9 | 凭据保险库（Vault）选择哪种存储后端？（OQ-REL-1） | 系统钥匙串（OS Keychain）：本地开发最安全、防明文泄露能力最强，Worker 运行时只受控注入环境变量。 | 加密 JSON 文件；第三方托管服务 | 系统钥匙串避免明文或对称秘钥落盘在目标仓库或 .stagent/，符合零凭据落盘原则。 | low | `user_confirmed` | q14、q22；[`specs/release-and-operations.md`](./specs/release-and-operations.md) §4.1 |
-| dec-4 | `development-tasks.md`（约 460KB）要不要拆？ | 拆成「卡号索引 + 活跃卡 + 已完成卡 + 修订流水」，卡号不变。 | 维持单文件 | 约 65% 是已完成卡的历史，仍要执行的 J 系列只占约 15%；但拆分会与正在进行的 PR 冲突，需择时。 | low | `pending` | q9；[`ledger/README.md`](./ledger/README.md) DOC-1 |
+| dec-4 | `development-tasks.md`（约 460KB）要不要拆？ | 拆成「卡号索引 + 活跃卡 + 已完成卡 + 修订流水」，卡号不变。 | 维持单文件 | 约 65% 是已完成卡的历史，仍要执行的 J 系列只占约 15%；但拆分会与正在进行的 PR 冲突，需择时。 | low | `user_confirmed` | q9；[`ledger/README.md`](./ledger/README.md) DOC-1 |
 
 ## 7. 分歧（`conflicts[]`）——原话与现行规格打架的地方
 
