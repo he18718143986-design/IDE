@@ -203,7 +203,7 @@
 
 > 这是给 Worker 的「还差什么」。卡号以 [`specs/development-tasks.md`](./specs/development-tasks.md) 为准；supervisor §19 的 L-01～L-10 不在此重复。
 >
-> **2026-10-31 回写**：下表已按 main tip `607d742`（含 J.2～J.10、J.18a/b、L.1～L.7 合入；#17/#18/#21/#22/#23/#24）回写「当前代码事实」；管道口径对齐 [ADR-0018](./adr/0018-intent-to-executable-seal.md)（确认 → Seal MachineFace → PAB → ProjectPlan → Worker；禁确认路径 `buildL0Plan(chat)`）。未合卡（如 J.18c/d、L.8～）不得标关闭；Sprint 指向 **J.18c** / **L.8**。
+> **2026-10-31 回写**：下表已按 main tip `a2fa7df`（含 J.2～J.10、J.18a～d、L.1～L.7 合入；#17/#18/#21/#22/#23/#24/#26/#27）回写「当前代码事实」；管道口径对齐 [ADR-0018](./adr/0018-intent-to-executable-seal.md)（确认 → Seal MachineFace → PAB → ProjectPlan → Worker；禁确认路径 `buildL0Plan(chat)`）。未合卡（如 L.8～）不得标关闭；Sprint 指向 **L.8**。
 
 | id | 方案要求 | 当前代码事实 | 对应卡 / 台账 |
 | :--- | :--- | :--- | :--- |
@@ -212,7 +212,7 @@
 | gap-3 | 中栏 Supervisor 是 Claude Code | **代码已收口（J.10）**：意图编译器生成端 + Daemon 编译循环已合入（journey → `notifyUserTurnCommitted`）；规则 L0 仅作离线兜底。形态仍开放（conf-1 / ADR-0014） | `TASK-J.10` **COMPLETED**（[#17](https://github.com/he18718143986-design/IDE/pull/17) / `97bb0db`）；conf-1；**由 [ADR-0018](./adr/0018-intent-to-executable-seal.md) 封印（编译结果须经密封进入签署）** |
 | gap-4 | Supervisor 只经画布交互 | `JourneyStage` 已由 Daemon 投影并随 `STATE_CHANGED` 下发（J.8）；J.7 交接改为中栏画布卡片、右栏 0 系统消息。规格 §16 旧「右栏插话」叙述仍待正文扫尾 | `TASK-J.8`/`J.7` **COMPLETED**（[#10](https://github.com/he18718143986-design/IDE/pull/10)/[#13](https://github.com/he18718143986-design/IDE/pull/13)）；conf-3 |
 | gap-5 | 机器指令 = 合同 + 任务图；确认冻 MachineFace | **主链已落地**：`ScopePlan` 纯函数→预检→确认谓词→快照绑定→确认接线→中栏白话区块（J.2～J.6）；意图编译器生成端已合入（J.10）。签署路径禁止聊天直推写范围（[ADR-0018](./adr/0018-intent-to-executable-seal.md) INV-SEAL-01～03：禁 `buildL0Plan(chat)`；用户确认方案 → Seal 冻 UserFace+MachineFace → 其后 PAB / ProjectPlan / Worker） | `TASK-J.2`～`J.6` **COMPLETED**（[#4](https://github.com/he18718143986-design/IDE/pull/4)～[#7](https://github.com/he18718143986-design/IDE/pull/7)、[#11](https://github.com/he18718143986-design/IDE/pull/11)）；`TASK-J.10` **COMPLETED**（[#17](https://github.com/he18718143986-design/IDE/pull/17) / `97bb0db`） |
-| gap-6 | 墓地拦截 Worker 复活被否决方案 | **部分收口**：G-MATCH / 产出物投影已合入（J.18a）；合同 `scheme_binding` + 快照 1.2 墓地权威源已合入（J.18b，GAP-W1/W2）。**尚未关闭**：门禁裁决 / 优先级格 / 派工绑定（J.18c）与写路径接线（J.18d）未合入，工地侧仍不能拦截复活。 | `TASK-J.18a`/`J.18b` **COMPLETED**（[#24](https://github.com/he18718143986-design/IDE/pull/24)/`20c2d46`；[#22](https://github.com/he18718143986-design/IDE/pull/22)/`ca9ed8f`）；余量 `TASK-J.18c`/`J.18d` |
+| gap-6 | 墓地拦截 Worker 复活被否决方案 | **已收口**：G-MATCH / 产出物投影（J.18a）；合同 `scheme_binding` + 快照 1.2 墓地权威源（J.18b，GAP-W1/W2）；门禁裁决 / 优先级格 / 派工绑定（J.18c）；写路径接线 / CLI pack / 全量扫描（J.18d，GAP-W3/W4/W6）。母卡 `TASK-J.18` 仍 `[SPLIT]`。 | `TASK-J.18a`～`J.18d` **COMPLETED**（[#24](https://github.com/he18718143986-design/IDE/pull/24)/`20c2d46`；[#22](https://github.com/he18718143986-design/IDE/pull/22)/`ca9ed8f`；[#26](https://github.com/he18718143986-design/IDE/pull/26)/`b6922ac`；[#27](https://github.com/he18718143986-design/IDE/pull/27)/`a2fa7df`） |
 | gap-7 | 试玩「这里不对」自查 | 旧 `dispute` 实现有 7 处缺陷 | TASK-J.16（预告）；[`specs/playtest-self-check.md`](./specs/playtest-self-check.md) |
 | gap-8 | `SchemePatch` 零模型合并 | 引擎已合入：`src/lib/journey/scheme-patch-engine.ts`（§6 矩阵）；生成端循环已合入（J.10） | `TASK-J.9` **COMPLETED**（[#12](https://github.com/he18718143986-design/IDE/pull/12) / `1ad6eab`）；`TASK-J.10` **COMPLETED**（[#17](https://github.com/he18718143986-design/IDE/pull/17) / `97bb0db`） |
 | gap-9 | 早期卡把右栏写成「编码 Worker 对话窗口」 | C.1、W.1、W.5a、C.6、P.1、E.1、Sprint 1 门禁的旧叙述 | 已在任务卡文件头加取代说明；原文不改 |
