@@ -15,11 +15,11 @@
 
 ## 文档治理挂账（2026-10-29 新增）
 
-2026-10-29 通读 `docs/` 时挂账。**第 0 波**已 RESOLVED：DOC-3 / DOC-4 / DOC-11（#40）。**第 1 波（SSOT / 代码对齐，2026-11-01）**已 RESOLVED：DOC-2 / DOC-5 / DOC-6 / DOC-7 / DOC-8 / DOC-9 / DOC-10（见各行；[#41](https://github.com/he18718143986-design/IDE/pull/41)）。**第 2 波（DOC-1 拆卡，2026-11-01）**已 RESOLVED：DOC-1（见下行；本 PR）。
+2026-10-29 通读 `docs/` 时挂账。**第 0 波**已 RESOLVED：DOC-3 / DOC-4 / DOC-11（#40）。**第 1 波（SSOT / 代码对齐，2026-11-01）**已 RESOLVED：DOC-2 / DOC-5 / DOC-6 / DOC-7 / DOC-8 / DOC-9 / DOC-10（见各行；[#41](https://github.com/he18718143986-design/IDE/pull/41)）。**第 2 波（DOC-1 拆卡，2026-11-01）**已 RESOLVED：DOC-1（见下行；#42）。
 
 | 编号 | 问题 | 位置 | 建议 | 阻断级别 |
 | :--- | :--- | :--- | :--- | :--- |
-| DOC-1 | `development-tasks.md` 约 460KB：约 65% 是已完成卡历史，版本头 84 条状态回写与 §6 修订流水重复，卡内样板句重复上百次 | `specs/development-tasks.md` | 拆成卡号索引 + 活跃卡 + 已完成卡 + 修订流水，卡号不变（[`../scheme.md`](../scheme.md) dec-4） → **已做**：拆为枢纽 + index/active/completed/changelog；卡号不变 | **RESOLVED**（docs 冗余治理第 2 波 · 本 PR） |
+| DOC-1 | `development-tasks.md` 约 460KB：约 65% 是已完成卡历史，版本头 84 条状态回写与 §6 修订流水重复，卡内样板句重复上百次 | `specs/development-tasks.md` | 拆成卡号索引 + 活跃卡 + 已完成卡 + 修订流水，卡号不变（[`../scheme.md`](../scheme.md) dec-4） → **已做**：拆为枢纽 + index/active/completed/changelog；卡号不变 | **RESOLVED**（docs 冗余治理第 2 波 · #42） |
 | DOC-2 | 任务卡状态矛盾：C.14f、C.15a、C.15c、C.15d 矩阵写 COMPLETED、卡内写 NEW_TASK；J.1 代码已合入（PR #29 / #30）但卡仍为 NEW_TASK | 同上 | 由卡 owner 按 supervisor §10 判定口径回写 → **已做**：四卡回写 COMPLETED（证据 `5f6ca93`）；J.1 此前已对齐；全库矩阵↔卡内抽查仅余该四处 | **RESOLVED**（docs 冗余治理第 1 波 · #41） |
 | DOC-3 | 任务卡文件内三处「当前基线」互相矛盾（`6415fbd` / `4280de6` / `f14c8cb`） | 同上 L28、L121、§4 | 只保留一处，其余改指针 → **已做**：权威 tip 见 Sprint「当前工程物理起点」/`e4351b0`，另两处改历史指针 | **RESOLVED**（docs 冗余治理第 0 波 · #40） |
 | DOC-4 | 约 24 处引用已删除的 `docs/archive/*`，约 98 处引用已删除的「走查报告 §6.x」 | 同上 | 统一改为「见 Git 历史」或删除 → **已做**（docs 内活引用改指针；历史叙述保留路径字面作溯源） | **RESOLVED**（docs 冗余治理第 0 波 · #40） |
@@ -40,7 +40,7 @@
 | Worktree seal 路径前缀 | `daemon/guard/worktree-seal.ts` 使用 `.stagent/worktrees/{id}/`，与 `worktree-manager` 的 `task-{id}` 不一致；docs 已注明，**改代码另立卡** |
 | 草案升格 | `constants-and-paths.md` / `state-machine-contract.md` 仍 `[DRAFT / HISTORICAL]`，并入 runtime 另议 |
 | RFC 正文 | DOC-8/9 正文冲突大改待 v0.2 立项 |
-| DOC-1 | **RESOLVED**（第 2 波 · 本 PR） |
+| DOC-1 | **RESOLVED**（第 2 波 · #42） |
 
 ## 纪律
 
