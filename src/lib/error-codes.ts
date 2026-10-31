@@ -3,7 +3,7 @@ import type { ReasonCode } from "./evidence.schema";
 /**
  * 运行时错误码目录 (ErrorCode Catalog) —— 《Stagent 系统架构设计规范 v1.2.1》§9.3。
  *
- * 关系：17 个 `error_code`（触发点事实，由具体组件抛出）
+ * 关系：`error_code`（触发点事实，由具体组件抛出）
  *       → 9 个 `reason_code`（证据包结论归因，写入 EvidenceBundle.verdict.reason_code）。
  *
  * 多对一是规范刻意设计：同一个 reason_code 可由多个不同组件在不同阶段触发
@@ -35,6 +35,11 @@ export const ERROR_CODES = [
   "E_PORT_CONFLICT",
   "E_DEMO_PAYLOAD_TOO_LARGE",
   "E_DISPUTE_TIMEOUT",
+  "E_PLAN_INVALID",
+  "E_PLAN_STALE",
+  "E_PLAN_STUB_LOCKED",
+  "E_PLAN_STUB_TOO_LARGE",
+  "E_PLAN_STUB_REVIVED",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -235,6 +240,55 @@ export const ERROR_CODE_CATALOG: Readonly<Record<ErrorCode, ErrorCodeSpec>> = {
     plain_message:
       "这次自查超时了（60 秒内没算完），系统已停止自动归因，把已抓到的三方事实交给您判断。",
     http_status: 504,
+  },
+  E_PLAN_INVALID: {
+    code: "E_PLAN_INVALID",
+    reason_code: "PREPARATION_INTERRUPTED",
+    component: "Project Plan Validator",
+    task: "TASK-L.7",
+    condition:
+      "ProjectPlan 未通过 project-decomposition §3 确定性规则（D-1～D-11）；响应体列出规则号与对象",
+    plain_message: "这样拆还不行，我再拆一次。",
+    http_status: 422,
+  },
+  E_PLAN_STALE: {
+    code: "E_PLAN_STALE",
+    reason_code: "EVIDENCE_STALE",
+    component: "Project Plan Store",
+    task: "TASK-L.7",
+    condition:
+      "计划补丁 base_revision 落后，且重算一次后仍落后于现行 plan_revision",
+    plain_message: "项目地图有更新，请基于最新一版再调整。",
+    http_status: 409,
+  },
+  E_PLAN_STUB_LOCKED: {
+    code: "E_PLAN_STUB_LOCKED",
+    reason_code: "WORKSPACE_LOCKED",
+    component: "Project Plan Patch",
+    task: "TASK-L.7",
+    condition: "试图修改已签署或已合并的合同桩（status 为 signed/merged）",
+    plain_message: "这一份已经开工或合入了，不能再改内容。",
+    http_status: 409,
+  },
+  E_PLAN_STUB_TOO_LARGE: {
+    code: "E_PLAN_STUB_TOO_LARGE",
+    reason_code: "BUDGET_EXHAUSTED",
+    component: "Project Plan / ScopePlan",
+    task: "TASK-L.7",
+    condition:
+      "合同桩 size_estimate 或 ScopePlan 超出 D-1 默认预算（files≤10 / diff_lines≤2000 / minutes≤30）",
+    plain_message: "这一份太大，我拆成几份小的。",
+    http_status: 409,
+  },
+  E_PLAN_STUB_REVIVED: {
+    code: "E_PLAN_STUB_REVIVED",
+    reason_code: "PREPARATION_INTERRUPTED",
+    component: "Project Plan Validator",
+    task: "TASK-L.7",
+    condition:
+      "graveyard 中 removed_by=user 的桩标题经 G-MATCH-NL 与新桩标题命中（D-11）",
+    plain_message: "这个你之前删过，要重新加回来吗？",
+    http_status: 409,
   },
 };
 
