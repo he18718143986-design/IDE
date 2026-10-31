@@ -210,7 +210,7 @@
 
 > 这是给 Worker 的「还差什么」。卡号以 [`specs/development-tasks.md`](./specs/development-tasks.md) 为准；supervisor §19 的 L-01～L-10 不在此重复。
 >
-> **2026-11-01 回写**：下表已按 main tip `e4351b0`（含 J.2～J.10、J.18a～d、L.1～L.10、**L.14** 合入；另含 #28～#38 文档/实现）回写「当前代码事实」；管道口径对齐 [ADR-0018](./adr/0018-intent-to-executable-seal.md)（确认 → Seal MachineFace → PAB → ProjectPlan → Worker；禁确认路径 `buildL0Plan(chat)`）。未合实现卡（如 L.11～）不得标关闭；Sprint 指向 **L.11**。
+> **2026-11-01 回写**：下表已按 main tip `78ec236`（含 J.2～J.10、J.18a～d、L.1～L.11、**L.14** 合入；另含 #28～#44 文档/实现）回写「当前代码事实」；管道口径对齐 [ADR-0018](./adr/0018-intent-to-executable-seal.md)（确认 → Seal MachineFace → PAB → ProjectPlan → Worker；禁确认路径 `buildL0Plan(chat)`）。未合实现卡（如 L.12～）不得标关闭；Sprint 指向 **L.12**。
 
 | id | 方案要求 | 当前代码事实 | 对应卡 / 台账 |
 | :--- | :--- | :--- | :--- |
@@ -229,7 +229,7 @@
 | gap-13 | 大需求拆成合同序列 | **代码已收口（L.7+L.8+L.9+L.10）**：`ProjectPlan` 类型/校验/落盘（L.7）；`PlanPatch`/分解器/API（L.8）；合同序列/`nextStub`/桩视图预检/互斥/`E_CONTRACT_IN_FLIGHT`/桩状态回填（L.9）；画布同页嵌「项目地图」+ `GET /api/project/plan` 权威下一份（L.10，tip `e4351b0` / #38）已合入。任务图一份合同一张的旧路径仍在。 | `TASK-L.7` **COMPLETED**（[#23](https://github.com/he18718143986-design/IDE/pull/23)/`607d742`）；`TASK-L.8` **COMPLETED**（[#33](https://github.com/he18718143986-design/IDE/pull/33)/`fb27504`）；`TASK-L.9` **COMPLETED**（[#35](https://github.com/he18718143986-design/IDE/pull/35)/`e1cf1bb`）；`TASK-L.10` **COMPLETED**（[#38](https://github.com/he18718143986-design/IDE/pull/38)/`e4351b0`） |
 | gap-14 | 新功能带测试 | Worker 指令已补「你会被这样检查」（L.2）；合同元数据 / `withSystemScope` / `stagent check` 义务与削弱检测已合入（L.3）；**两段式先红后绿编排已合入（L.4）**（`runWorker`→`runTwoPhase`）；**M2 黄金切片 E2E 已合入（L.6）** | `L.2`/`L.3`/`L.4`/`L.6` **COMPLETED**（[#8](https://github.com/he18718143986-design/IDE/pull/8)/[#15](https://github.com/he18718143986-design/IDE/pull/15)/[#18](https://github.com/he18718143986-design/IDE/pull/18)/[#21](https://github.com/he18718143986-design/IDE/pull/21) / `93589bf`） |
 | gap-15 | 试玩看到真实应用 | Worktree 真实应用预览已合入（`daemon/supervisor/preview/app-runner.ts`；端口段 4200～4210，与 Demo 段隔离） | `TASK-L.5` **COMPLETED**（[#14](https://github.com/he18718143986-design/IDE/pull/14) / `0b6bc7f`） |
-| gap-16 | 技术方案与系统知识 | 无设计产物；`daemon/arch/*` 只做按需展示 | TASK-L.11～L.13 |
+| gap-16 | 技术方案与系统知识 | **部分收口（L.11）**：`DesignNote` 生成/DN-1～5 校验/升级挂起/`design-note.json`+`obligations.json`/Worker「技术方案」注入已合入（tip `78ec236` / #43）；DN-2「可以」领域方法已测，**HTTP/意外卡入口**挂 DLV-6。系统知识库与漂移门禁仍待 **L.12**；追踪链仍待 **L.13**；`daemon/arch/*` 仍只做按需展示 | `TASK-L.11` **COMPLETED**（[#43](https://github.com/he18718143986-design/IDE/pull/43)/`78ec236`）；余量 `TASK-L.12`/`L.13`；DLV-6 |
 | gap-17 | 合并后可发布 | deploy / release / health_check 全库 0 命中 | TASK-L.15、L.16 |
 
 ---

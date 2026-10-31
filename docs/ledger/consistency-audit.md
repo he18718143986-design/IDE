@@ -116,4 +116,12 @@
 | 14. OP-1 | 销项（洗白裁决已落笔） | 见「一之二」OP-1；`scheme.md` dec-10 |
 | 15. OP-13 | 销项（第一印象不阻塞） | 见「一之二」OP-13；supervisor §13.3 |
 
+
+### DLV-6（2026-11-01 · L.11 合入挂账，非 OP）
+
+- **项**：DN-2「可以」HTTP / 画布意外卡入口缺口。
+- **事实**：`PipelineOrchestrator.resolveDesignDependencyAllow` + `applyDesignDependencyAllow` 已合入；集成测直接调用；生产路径无 HTTP action / 卡片路由可达。
+- **处理**：挂 [`README.md`](./README.md) **DLV-6**（NON_BLOCKER）；入口接线归后续卡（如 J.7 交接类或另立），本波 docs 回写不补端点。
+- **依据**：Tina 合前确认「若本是后续卡职责则挂账即可」；PR #43 正文审查确认。
+
 **未覆盖**：本轮未逐字核对的范围见 OP-18；`src/` 与 `daemon/` 的检查基于 `e610016` 快照的文本检索，未运行测试。
