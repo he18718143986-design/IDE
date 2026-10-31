@@ -383,8 +383,9 @@ function evaluateScopeGate(
       demo_mode: demoMode,
     };
   }
+  // SSOT §15.5 / SA-1：仅「尚未表态」(null) 阻断；approved===false 表示已拒绝并入 never_touch。
   const pending = scopePlan.needs_approval.filter(
-    (item) => item.approved !== true,
+    (item) => item.approved === null,
   );
   if (pending.length > 0) {
     const message = `还有 ${pending.length} 处敏感改动会写在确认开工上`;

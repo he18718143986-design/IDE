@@ -16,6 +16,11 @@ import {
   EMPTY_DEMO_GATE,
   evaluateSchemeConfirmation,
 } from "@/lib/journey/scheme-draft";
+import type { ScopePlan } from "@/lib/journey/scope-plan";
+import {
+  ScopeAcceptanceBlock,
+  type ScopeAcceptanceMode,
+} from "@/components/studio/ScopeAcceptanceBlock";
 
 export interface SchemeReviewPaneProps {
   scheme: SchemeDraft | null;
@@ -26,6 +31,11 @@ export interface SchemeReviewPaneProps {
   confirmBusy?: boolean | undefined;
   errorMessage?: string | null | undefined;
   confirmation?: SchemeConfirmationDecision | undefined;
+  /** TASK-J.6：与当前修订绑定的范围预检 */
+  scopePlan?: ScopePlan | null | undefined;
+  scopeAcceptanceMode?: ScopeAcceptanceMode | undefined;
+  forceExpandSensitive?: boolean | undefined;
+  onDeclineSensitive?: (() => void) | undefined;
   onConfirmDecision?: ((decisionId: string) => void) | undefined;
   onResolveConflict?:
     ((conflictId: string, optionId: string) => void) | undefined;
@@ -74,8 +84,16 @@ export function SchemeReviewPane(props: SchemeReviewPaneProps) {
           reasons: ["方案尚未生成"],
           demo_mode: "none" as const,
         });
+  // SA-1：E_SCOPE_APPROVAL_REQUIRED 仍可点确认——点击时一键授权并提交。
+  const approvalRequired = confirmation.code === "E_SCOPE_APPROVAL_REQUIRED";
   const canConfirm =
-    Boolean(scheme) && confirmation.ok && props.confirmBusy !== true;
+    Boolean(scheme) &&
+    props.confirmBusy !== true &&
+    !frozen &&
+    (confirmation.ok || approvalRequired);
+  const pendingSensitiveCount =
+    props.scopePlan?.needs_approval.filter((i) => i.approved === null).length ??
+    0;
   const demoConfirmed =
     scheme != null &&
     (demoGate.status === "ready" || demoGate.status === "degraded_flowcard") &&
@@ -260,6 +278,22 @@ export function SchemeReviewPane(props: SchemeReviewPaneProps) {
         </section>
       ) : null}
 
+      <ScopeAcceptanceBlock
+        plan={props.scopePlan ?? null}
+        mode={
+          props.scopeAcceptanceMode ??
+          (frozen ? "frozen" : "pre_start")
+        }
+        frozen={frozen}
+        policyMessage={
+          confirmation.code === "E_SCOPE_POLICY" ? confirmation.message : null
+        }
+        approvalRequired={approvalRequired}
+        forceExpandSensitive={props.forceExpandSensitive}
+        busy={props.confirmBusy}
+        onDeclineSensitive={props.onDeclineSensitive}
+      />
+
       <section className="mb-3 rounded border border-border p-3">
         <h3 className="mb-1.5 text-xs font-semibold">手改备注（可选）</h3>
         <textarea
@@ -403,7 +437,9 @@ export function SchemeReviewPane(props: SchemeReviewPaneProps) {
             ? "冻结并开工中…"
             : frozen
               ? "方案已确认"
-              : "确认方案"}
+              : pendingSensitiveCount > 0
+                ? `确认方案（含 ${pendingSensitiveCount} 处敏感改动）`
+                : "确认方案"}
         </button>
         <p className="mt-1.5 text-[10px] text-muted-foreground">
           确认后冻结 Spec 并直接开工写代码。Demo

@@ -350,7 +350,7 @@ describe("T-GATE J.3/J.5 范围纳入唯一确认谓词（恒开启）", () => {
     expect(decision.message.toLowerCase()).not.toMatch(/glob/);
   });
 
-  it("T-GATE-015 未授权敏感项（approved !== true）→ E_SCOPE_APPROVAL_REQUIRED", () => {
+  it("T-GATE-015 未表态敏感项（approved === null）→ E_SCOPE_APPROVAL_REQUIRED", () => {
     const plan = compliantScopePlan({
       needs_approval: [
         {
@@ -370,6 +370,27 @@ describe("T-GATE J.3/J.5 范围纳入唯一确认谓词（恒开启）", () => {
     expect(decision.ok).toBe(false);
     expect(decision.code).toBe("E_SCOPE_APPROVAL_REQUIRED");
     expect(decision.message).toBe("还有 1 处敏感改动会写在确认开工上");
+  });
+
+  it("T-GATE-015b 已拒绝敏感项（approved === false）不阻断确认（SA-1 / §15.5）", () => {
+    const plan = compliantScopePlan({
+      needs_approval: [
+        {
+          id: "prot-0",
+          label: "项目依赖清单",
+          why: "命中保护清单",
+          paths: ["package.json"],
+          approved: false,
+        },
+      ],
+    });
+    const decision = evaluateSchemeConfirmation(
+      makeDraft(),
+      EMPTY_DEMO_GATE,
+      plan,
+    );
+    expect(decision.ok).toBe(true);
+    expect(decision.code).toBe("OK");
   });
 
   it("T-GATE-016 全部满足 → ok", () => {
