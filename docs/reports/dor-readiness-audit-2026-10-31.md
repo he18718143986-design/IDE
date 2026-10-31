@@ -1,5 +1,8 @@
 # 任务卡就绪度（DoR）全量审计
 
+> ⚠️ **基线快照声明（2026-11-01 · docs 冗余治理第 0 波）**：本报告仅描述当时 `main` @ `a2fa7df` 的 DoR 判定。**不代表当前排期、不代表今日任务矩阵状态**。后续 L.8～L.10 / J.18 等回写以 [`../specs/development-tasks.md`](../specs/development-tasks.md) §1.1 与 Git tip 为准；DOR-2 / DOR-3 见 [`../ledger/README.md`](../ledger/README.md) `[NEEDS_RECHECK]`（历史技术债，不阻断现行 J/L 链路施工）。
+
+
 > **日期**：2026-10-31（Asia/Hong_Kong）· **基线**：`main` @ `a2fa7df`（含 PR #27 / J.18d 代码合入；docs 状态回写 PR #28 当时尚未合入）
 > **标尺**：[`../specs/task-card-standard.md`](../specs/task-card-standard.md) §1 就绪定义 R-1～R-12。任一条不满足 = 卡未就绪。
 > **卡源**：[`../specs/development-tasks.md`](../specs/development-tasks.md) §3.4 及子节详细正文；状态对照 §1.1 矩阵。
