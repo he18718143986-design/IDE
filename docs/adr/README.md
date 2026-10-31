@@ -29,7 +29,8 @@
 | 0015 | [合同是最小可验收交付单元；项目 → 里程碑 → 合同 → 节点](./0015-contract-as-unit-of-delivery.md) | ACCEPTED（随 PR 合入生效） | 目标能力 q18 |
 | 0016 | [目标项目系统知识库随代码入库](./0016-system-knowledge-base-in-repo.md) | ACCEPTED（随 PR 合入生效） | 目标能力 q19 |
 | 0017 | [发布是合并之后的独立生命周期](./0017-release-lifecycle-after-merge.md) | ACCEPTED（随 PR 合入生效） | 目标能力 q17 |
-| 0018 | [项目级架构基线先于大型项目分解与合同施工](./0018-project-architecture-baseline.md) | PROPOSED（随 PR 合入生效） | 目标能力 q18～q20；审计 S3/S4 断层 |
+| 0018 | [意图→可签执行物唯一真相缝](./0018-intent-to-executable-seal.md) | PROPOSED（随 PR 合入生效） | 目标能力 q1/q17～q21；审计「方案→合同」断链；绝对唯一榜首 |
+| 0019 | [项目级架构基线先于大型项目分解与合同施工](./0019-project-architecture-baseline.md) | PROPOSED（随 PR 合入生效） | 密封之后的下一步；目标能力 q18～q20；审计 S3/S4 |
 
 ---
 

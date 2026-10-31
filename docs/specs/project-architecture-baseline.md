@@ -1,12 +1,12 @@
 # 项目架构基线规格（Project Architecture Baseline · PAB）
 
-> **地位**：实施口径，从属 [ADR-0018](../adr/0018-project-architecture-baseline.md)。施工授权仍以 [`runtime-contract-and-safety.md`](./runtime-contract-and-safety.md) 为准。
-> **主干位置**：可编译方案之后、项目分解之前；见 [`delivery-lifecycle.md`](./delivery-lifecycle.md)。
+> **地位**：实施口径，从属 [ADR-0019](../adr/0019-project-architecture-baseline.md)；上游密封见 [ADR-0018](../adr/0018-intent-to-executable-seal.md)。施工授权仍以 [`runtime-contract-and-safety.md`](./runtime-contract-and-safety.md) 为准。
+> **主干位置**：ADR-0018 方案密封之后、项目分解之前；见 [`delivery-lifecycle.md`](./delivery-lifecycle.md)。
 > **状态**：设计定稿 · 待施工。
 
 ## 0. 一句话
 
-先给整个项目定下有证据、可检验、可演进的架构边界，再拆成合同；禁止让一组局部可执行卡片临场拼出系统。
+在已按 ADR-0018 密封的方案之上，先给整个项目定下有证据、可检验、可演进的架构边界，再拆成合同；PAB 不是唯一脑力瓶颈（绝对榜首为 ADR-0018 密封），禁止让一组局部可执行卡片临场拼出系统。
 
 ## 1. 产物边界
 
@@ -28,9 +28,10 @@ PAB 不是合同、写范围、用户开工确认、秘密凭据授权，也不�
 - 新项目无知识库时，以仓库事实和方案建立 `initial` PAB，明确“尚无系统知识库”；不得把推断冒充代码观察。
 
 ```text
-SchemeDraftV2（可编译） → 仓库事实快照 + PAB（ready） → ProjectPlan
-→ ContractStub（引用 PAB） → ScopePlan / 用户确认开工 → Contract + DesignNote
-→ Worker / 验证 / 合入 → docs/system/ 更新与漂移检查
+SchemeDraftV2（可编译） → 用户确认方案 / [ADR-0018] 冻结 UserFace+MachineFace
+→ 仓库事实快照 + PAB（ready，ADR-0019） → ProjectPlan
+→ ContractStub（引用 PAB） → 合同级 ScopePlan 投影（只吃 MachineFace，禁聊天直推）
+→ Contract + DesignNote → Worker / 验证 / 合入 → docs/system/ 更新与漂移检查
 ```
 
 未决业务问题与 ADR-0016 升级项由 Supervisor 显示决议卡；一般技术取舍由架构责任者提出并记录。PAB 不增加授权点击。
