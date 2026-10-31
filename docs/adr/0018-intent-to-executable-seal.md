@@ -1,6 +1,6 @@
 # ADR-0018: 意图→可签执行物唯一真相缝（Intent-to-Executable Seal）
 
-> **状态**: PROPOSED（随本 PR 合入生效；合入 `main` 后升格 ACCEPTED）
+> **状态**: ACCEPTED（合入 `main` @ `931b188`；2026-10-31 完整诊断补丁加固白话与按钮口径）
 > **日期**: 2026-10-31（Asia/Hong_Kong）
 > **决策依据**: 通读 `docs/` 后的强制单选结论；方案 A 双保险闭环（本 ADR 为绝对唯一榜首，PAB 顺延 ADR-0019）；上游意图见 [`../scheme.md`](../scheme.md) goal-1、goal-7～goal-10（`q1`、`q17`～`q21`）；审计依据见 [`../reports/delivery-path-audit.md`](../reports/delivery-path-audit.md) §0 / §2「方案条目 → 合同」断链；上位机制见 [`../specs/supervisor.md`](../specs/supervisor.md) §14～§15、[`../specs/delivery-lifecycle.md`](../specs/delivery-lifecycle.md) §3 / §6。
 > **相关**: ADR-0005（确定性验证）、ADR-0007 / ADR-0014（分权与两次点击）、ADR-0010（Demo 可选）、ADR-0015（合同为最小交付单元）、ADR-0016（知识库）、ADR-0019（项目架构基线，密封之后）
@@ -10,16 +10,23 @@
 
 ## 0. 一句话
 
-**用户确认方案 / 开工那一刻，唯一合法进入合同与 Worker 的输入，是冻结后的「双面方案产物」；原始聊天只作证据，不得再被用来临时推断写范围。** 这条缝一旦开着旁路，整套从模糊需求到可交付软件的体系要么瘫痪，要么沦为「证据齐全地交付错软件」的精致玩具——且无法靠普通模型按任务卡施工修补。
+**用户点「确认开工」那一刻，唯一合法进入合同与 Worker 的输入，是冻结后的「双面方案产物」；原始聊天只作证据，不得再被用来临时推断写范围。** 这条缝一旦开着旁路，整套从模糊需求到可交付软件的体系要么瘫痪，要么沦为「证据齐全地交付错软件」的精致玩具——且无法靠普通模型按任务卡施工修补。
+
+**用户侧白话（必须可对非技术用户复述）**：
+
+> **中栏确认的范围 = Worker 拿到的范围。**  
+> 你在中栏看到并点头的改动地方、验收与预算，就是施工工蚁唯一能写的地方。聊天记录只用来证明「你说过什么」，**禁止**再拿聊天文本临时推出另一套写范围（禁 `buildL0Plan(chat)` 及后继）。
+
+**UI 文案定型**：主按钮一律写 **「确认开工」**；规格/代码里的「确认方案」仅作内部别名（同一次点击、同一事务）。多合同场景下：**每份合同各点一次「确认开工」、各点一次「合入」**。
 
 流水线自洽（方案 A）：
 
 ```text
-用户确认方案
-  → [ADR-0018 真相缝] 冻结 MachineFace（禁聊天直推 ScopePlan）
-  → [ADR-0019 PAB] 全系统管网基线（standard/large）
+用户点「确认开工」
+  → [ADR-0018 真相缝] 冻结 UserFace + MachineFace（禁聊天直推 ScopePlan）
+  → [ADR-0019 PAB] 全系统管网基线（standard/large；等待态见交付主干）
   → [ADR-0015 ProjectPlan] 拆合同
-  → Worker 施工
+  → 下一份合同再点「确认开工」→ Worker 施工
 ```
 
 ---
@@ -56,7 +63,7 @@
 
 ### 1.3 用户侧真实诉求
 
-非技术用户路径要求：右栏自由聊 → 中栏出现可审阅方案（图表 / 决议 / 可选 Demo）→ 「确认方案/开工」冻结 → Worker 按机器指令施工。确认时需要同时留下：
+非技术用户路径要求：右栏自由聊 → 中栏出现可审阅方案（图表 / 决议 / 可选 Demo）→ 点「确认开工」冻结 → Worker 按机器指令施工。确认时需要同时留下：
 
 1. **原始聊天记录**（证据，可溯源）；
 2. **给用户看的最终方案面**（白话摘要、图、决议、可选 Demo）；
@@ -76,7 +83,7 @@
 | :--- | :--- | :--- |
 | **INV-SEAL-01** | **禁聊天直推合同范围** | 带 `confirmation_id` 的合同创建路径，`writable_paths` / `forbidden_paths` / `verification_spec` / `budget` **只能**来自冻结快照内的 `ScopePlan`；**禁止**调用以原始聊天文本为输入的 `buildL0Plan`（或其后继）生成签署范围。违 → `409 E_SCHEME_SNAPSHOT_MISMATCH` 或新建 `E_SEAL_CHAT_SCOPE_BYPASS`（实施期二选一，须入 runtime §2.3 Daemon 专属码）。 |
 | **INV-SEAL-02** | **ScopePlan 只由方案结构派生** | `ScopePlan` 的 `areas[].module_ids` / 验收引用必须指向当前 `SchemeDraftV2` 条目；`plan_digest` 绑定 `scheme_revision`；方案一变即作废重算（承接 supervisor §15.3）。启发式离线兜底产出的无 `evidence` 条目**不得**单独支撑可签署的 `ScopePlan`（无溯源入口，见 supervisor §14.7）。多合同场景下，单桩 `ScopePlan` 必须是已冻结 MachineFace / 方案视图对应该桩的确定性投影，不得回退到聊天关键词。 |
-| **INV-SEAL-03** | **确认瞬间冻结双面产物** | 「确认方案」或「确认开工」进入可签路径时，`FREEZE_SNAPSHOT` 必须同时落盘：**(A) UserFace** = 冻结 `SchemeDraftV2`（及确定性渲染出的图的输入结构；Demo 按 ADR-0010 可选）+ **(B) MachineFace** = 同修订的完整 `ScopePlan`（含 `plan_digest`）+ 将写入合同的 `scheme_item_ids` / `acceptance_refs` / `stub_id`（若有 ProjectPlan）。缺任一面 → 拒绝签署。`tiny` Fast Path 可一次点击同时完成确认方案与确认开工，但仍须双面齐全。 |
+| **INV-SEAL-03** | **确认瞬间冻结双面产物** | 用户点 UI「确认开工」（内部别名「确认方案」）进入可签路径时，`FREEZE_SNAPSHOT` 必须同时落盘：**(A) UserFace** = 冻结 `SchemeDraftV2`（及确定性渲染出的图的输入结构；Demo 按 ADR-0010 可选）+ **(B) MachineFace** = 同修订的完整 `ScopePlan`（含 `plan_digest`）+ 将写入合同的 `scheme_item_ids` / `acceptance_refs` / `stub_id`（若有 ProjectPlan）。缺任一面 → 拒绝签署。`tiny` Fast Path 可一次点击完成双面冻结并开工，但仍须双面齐全。 |
 | **INV-SEAL-04** | **确认后保留清单（DEC-01 定型）** | 见 §2.2。不在清单内的过程物允许 GC；清单内对象在合同 `MERGED` 或显式放弃前不得删。 |
 | **INV-SEAL-05** | **编译器是唯一允许「发明结构」的模型位** | 右栏搭档不写方案；Worker 不扩需求；DesignNote / PAB 提案不得新增方案级 `goals` / `modules` / `acceptance`（只能在已签合同的 `writable_paths` 与既有 `acceptance_refs` 内细化，或在已密封方案结构上提出架构约束）。新意图只能回到未冻结方案，经编译器补丁进入。 |
 
@@ -167,7 +174,7 @@
 | [`scheme.md`](../scheme.md) gap-3、gap-5 | 落差登记的根因条目；合入后应回写「由 ADR-0018 封印」 |
 | [`delivery-path-audit.md`](../reports/delivery-path-audit.md) | 审计已指出断链；本 ADR 是对该断链的架构答复 |
 | ADR-0010 | Demo 仍可选；不进入 INV-SEAL-03 的硬面 |
-| ADR-0014 | 两次点击与形态开放不变；密封发生在确认方案 / 第一次点击的冻结阶段 |
+| ADR-0014 | 两次点击与形态开放不变；密封发生在「确认开工」（第 1 次点击）的冻结阶段 |
 | ADR-0015 | 消费本密封之后的产物拆合同；不替代本 ADR |
 | ADR-0016～0017 | 知识库与发布；建立在正确交付物之上 |
 | ADR-0019 | PAB；密封之后的全局技术契约，**禁止再称唯一瓶颈** |

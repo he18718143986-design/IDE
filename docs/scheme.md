@@ -8,13 +8,13 @@
 | :--- | :--- |
 | `scheme_id` | `stagent-self` |
 | `scheme_revision` | 3（2026-10-30 目标能力补全：交付全链路） |
-| `frozen` | `false`——方案仍在演进；冻结点由用户「确认方案」决定 |
+| `frozen` | `false`——方案仍在演进；冻结点由用户点「确认开工」决定（内部别名「确认方案」） |
 | `title` | 只说需求与偏好，其余交给 Agent 的本地编程工作台 |
 | `audience` | 能说清「想要什么」、但不想做技术决策的人（含非技术业务用户） |
 | `size_hint` | `large` |
 | `notes` | （只由用户填写，Agent 不写） |
 
-**`summary`**：用户只描述需求与主观偏好。右栏是不带系统提示的成熟 Agent（Claude Code 等），陪用户只读地自由脑暴；中栏 Supervisor 旁观这段对话，把它整理成一张可审阅的方案画布；用户在画布上拍板后，Supervisor 产出的机器指令交给 Worktree 里的施工 Worker 执行，Daemon 用真实命令出证据，用户试玩满意再合入。
+**`summary`**：用户只描述需求与主观偏好。右栏是不带系统提示的成熟 Agent（Claude Code 等），陪用户只读地自由脑暴；中栏 Supervisor 旁观这段对话，把它整理成**垂直卡片流方案工作台**（画布≠拖拽白板）；用户点「确认开工」后，冻结范围即 Worker 唯一写范围（ADR-0018），Daemon 用真实命令出证据，用户试玩满意再合入。
 
 ---
 
@@ -82,14 +82,14 @@
 | oos-1 | v0.1 不做多 Worktree 并行施工；单工作区互斥。 | `user_confirmed` | [ADR-0002](./adr/0002-single-workspace-mutex.md) |
 | oos-2 | 不宣称 OS 级安全容器；Worktree 只是文件与分支隔离。 | `user_confirmed` | [ADR-0003](./adr/0003-worktree-capability-boundary.md) |
 | oos-3 | 不上云：代码与意图不出本机；本地 JSON 不承诺防篡改。 | `user_confirmed` | [ADR-0006](./adr/0006-local-first-no-tamper-proof.md) |
-| oos-4 | 不为了「少打扰用户」而放宽底层门禁。 | `user_confirmed` | [ADR-0001](./adr/0001-target-user-positioning.md)「单向约束」 |
+| oos-4 | 不为了「少打扰用户」而放宽底层门禁；允许降频/合并/延后卡片。 | `user_confirmed` | [ADR-0001](./adr/0001-target-user-positioning.md)「单向约束」+体验层弹性 |
 
 ## 3. 模块（`modules[]`）——三个 Agent 加一个裁判
 
 | id | name | purpose | user_visible | source | evidence |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | mod-1 | **右栏 · 需求对话 Agent（AI 搭档）** | 成熟 Agent 引擎（Claude Code，可换 OpenHands 等）。作用像网页版 AI：仓库不空时只读地看文件，和用户自由脑暴。**不设置系统 prompt**，话题由用户主导。 | 是 | `user_said` | q4、q5；R-OP28 |
-| mod-2 | **中栏 · Supervisor + 方案画布** | 也是 Claude Code。旁观用户与右栏的对话，把它编译成方案；**只通过画布（canvas）与用户交互**，不在右栏插话。 | 是 | `user_said` | q6 |
+| mod-2 | **中栏 · Supervisor + 方案画布** | 意图编译组件（形态开放，ADR-0014）。旁观用户与右栏的对话，把它编译成方案；**只通过垂直卡片流画布与用户交互**（非拖拽白板），不在右栏插话。 | 是 | `user_said` | q6；Canvas 定型 2026-10-31 |
 | mod-3 | **施工 Worker** | 在 Worktree 里直接执行 Supervisor 生成的机器指令；不聊产品、不扩范围、不合主干。 | 否（用户只看到步骤点亮） | `user_said` | q7；[ADR-0007](./adr/0007-dual-agent-daemon-authority.md) |
 | mod-4 | **Daemon（裁判，不是 Agent）** | 确定性宿主程序：状态机、写盘、凭证、真实命令验证、合并放行。三个 Agent 都无权自批、自判、自合。 | 否 | `ai_inferred` | [ADR-0007](./adr/0007-dual-agent-daemon-authority.md)、[ADR-0005](./adr/0005-deterministic-verification-gate.md)；用户原话未提，补上是因为没有它三 Agent 的分权不成立 |
 | mod-6 | **项目计划（ProjectPlan）** | 把方案拆成里程碑与合同序列；画布上显示「项目地图」：每份合同在哪一幕、还剩几份。 | 是 | `ai_inferred` | q18；[`specs/project-decomposition.md`](./specs/project-decomposition.md) |
@@ -107,14 +107,14 @@
 | 2 | 右栏 Agent | 只读地看仓库，发散、追问、解释；不宣称方案已改 | mod-1 |
 | 3 | Supervisor | 旁观每一条**用户**消息，增量编译方案补丁（`SchemePatch`） | mod-2 |
 | 4 | Supervisor | 在画布上呈现：摘要、图、决议区、改动范围与验收方式、Demo | mod-2 |
-| 5 | 用户 | 在画布上拍板分歧、点头范围、「确认方案」 | mod-2 |
+| 5 | 用户 | 在画布上拍板分歧、点头范围、点「确认开工」 | mod-2 |
 | 6 | Daemon | 冻结快照，从 `ScopePlan` 确定性生成合同，签发执行凭证 | mod-4 |
 | 7 | Worker | 在 Worktree 内按机器指令施工、自测 | mod-3 |
 | 8 | Daemon | 跑真实验证命令，产出 Evidence，点亮任务图 | mod-4 |
 | 9 | 用户 | 试玩；说「这里不对」或「合入项目」 | mod-2 |
 | 10 | Daemon | 合并，终态 `MERGED` | mod-4 |
 
-**flow-2 · 文档治理（本文的产生方式）**：用户一句模糊意图（U1）→ Agent 通读 `docs/` → 剪原话（§0）→ 写目标与模块（§1～§3）→ 把与现行规格的冲突摆进决议区（§6、§7）→ 把落差映射到任务卡（§9）→ 用户审阅 PR（= 「确认方案」）。
+**flow-2 · 文档治理（本文的产生方式）**：用户一句模糊意图（U1）→ Agent 通读 `docs/` → 剪原话（§0）→ 写目标与模块（§1～§3）→ 把与现行规格的冲突摆进决议区（§6、§7）→ 把落差映射到任务卡（§9）→ 用户审阅 PR（= 「确认开工」语义）。
 
 ## 5. 实体（`entities[]`）
 
@@ -227,11 +227,11 @@
 
 ## 12. 本次文档治理的改动范围与验收（`ScopePlan` 示范）
 
-> 用 §15 的白话五块，示范 Supervisor 在「确认方案」前要给用户看的东西。对象是本次文档治理本身。
+> 用 §15 的白话五块，示范 Supervisor 在「确认开工」前要给用户看的东西。对象是本次文档治理本身。
 
 - **会改动的地方**：`docs/` 下的索引、本文、`ledger/` 目录；`specs/` 与 `rfc/` 只加取代说明与修正失效链接，不改条款；一处代码注释的失效链接。
 - **这次不会碰**：任何产品代码行为；任务卡状态；ADR 条款；`specs/` 正文条款。
-- **需要你点头**：§6 的四项推荐、§7 的七张冲突卡、§8 的四个待澄清问题。审阅本 PR 即是一次「确认方案」；合入不等于这些项已拍板。
+- **需要你点头**：§6 的四项推荐、§7 的七张冲突卡、§8 的四个待澄清问题。审阅本 PR 即是一次「确认开工」语义；合入不等于这些项已拍板。
 - **怎么算做完**：`docs/` 内所有相对链接可解析（脚本校验）；§0 每句原话都是用户消息的逐字子串（脚本校验）；`npm run lint` 与 `npm run typecheck` 不因本次改动变红。
 - **预计规模**：新增 2 份文档，移动 3 份文件，约 20 份文档加注或修链接。
 

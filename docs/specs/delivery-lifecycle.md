@@ -39,9 +39,9 @@ Release ── 引用一个已合并提交，可覆盖多份合同（.stagent/re
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **S1 需求摄取** | 用户消息、参考资料 | 会话记录（`.stagent/sessions/`）；用户消息带 `U<seq>` 别名 | 右栏 Agent（只读、无系统提示） | 右栏工具白名单 `Read,Glob,Grep`；无任何前缀注入 | 自由聊 | ADR-0014 §1；supervisor §13.2、§14.5 | 只读已实现；纯净化 → **L.1** |
 | **S2 方案编译** | 用户消息 | `SchemeDraftV2` + 证据台账（冻结后 `.stagent/drafts/schemes/{confirmation_id}.json`） | 中栏意图编译组件 | `SchemePatch` 引擎零模型合并；INV-LEDGER-01～04 | 拍板分歧（冲突卡） | supervisor §14；[`scheme-patch-engine.md`](./scheme-patch-engine.md)；[`intent-compiler-prompt.md`](./intent-compiler-prompt.md) | 规格完备、实现 0% → **J.9、J.10′** |
-| **S2→Seal 意图密封** | 可编译方案 | 冻结快照 UserFace+MachineFace | Daemon | INV-SEAL-01～05；禁 buildL0Plan(chat) | 确认方案/开工 | ADR-0018 | → J.2～J.5′ |
-| **S3 项目架构基线** | 已密封方案 + 仓库/知识库事实 | PAB（版本化项目级架构约束） | Supervisor 提案、Daemon 确定性校验 | 覆盖、边界、来源、验证映射与 freshness | 仅升级裁决时触点；非授权 | [`project-architecture-baseline.md`](./project-architecture-baseline.md)；ADR-0019 | 待施工；先于 L.7/L.8 |
-| **S3 项目分解** | 已密封方案 + ready PAB（standard/large） | `ProjectPlan`：里程碑、合同桩、依赖 DAG（引用 PAB digest） | Supervisor（分解器） | 计划补丁校验 + PAB 引用一致性 | 无（画布只读展示「项目地图」） | [`project-decomposition.md`](./project-decomposition.md) | 空白 → **L.7～L.10** |
+| **S2→Seal 意图密封** | 可编译方案 | 冻结快照 UserFace+MachineFace | Daemon | INV-SEAL-01～05；禁 buildL0Plan(chat) | **「确认开工」**（UI；内部别名「确认方案」） | ADR-0018 | → J.2～J.5′ |
+| **S3 项目架构基线** | 已密封方案 + 仓库/知识库事实 | PAB（版本化项目级架构约束） | Supervisor 提案、Daemon 确定性校验 | 覆盖、边界、来源、验证映射与 freshness | 中栏同页等待态「正在整理项目地图…」（非授权点击） | [`project-architecture-baseline.md`](./project-architecture-baseline.md)；ADR-0019 | 待施工；先于 L.7/L.8 |
+| **S3 项目分解** | 已密封方案 + ready PAB（standard/large） | `ProjectPlan`：里程碑、合同桩、依赖 DAG（引用 PAB digest） | Supervisor（分解器） | 计划补丁校验 + PAB 引用一致性 | 同页嵌「项目地图」（非第二套导航）；下一份旁「确认开工」 | [`project-decomposition.md`](./project-decomposition.md) | 空白 → **L.7～L.10** |
 | **S3→合同** | 计划中的下一份合同桩 + 已密封 MachineFace | `ScopePlan` → 合同（`.stagent/contracts/<id>.json`） | Daemon | 唯一确认谓词 `evaluateSchemeConfirmation`；§3 可编译判定；ADR-0018 密封门禁 | **「确认开工」**（第 1 次点击） | supervisor §15、§17 D7；runtime §2；ADR-0018 | 未施工 → **J.2～J.6′** |
 | **S4 技术方案** | 已签合同 + ready PAB + 系统知识库 | `DesignNote`（`.stagent/records/<id>/design-note.json`）+ 知识库增量计划 | 设计步骤（中栏组件或专用 Agent，形态开放） | DesignNote Schema 与 PAB 一致性校验；五类决策升级规则 | 仅在五类决策时弹意外卡 | [`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) | 空白 → **L.11** |
 | **S5 施工** | 合同 + DesignNote + 测试义务 | Worktree 内的改动（`.stagent/worktrees/task-<id>`，分支 `task/<id>`） | Worker | 网关写范围；预算三维熔断；墓地门禁 | 无（看步骤点亮） | runtime §1～§5；ADR-0003、0013；[`worker-graveyard-gate.md`](./worker-graveyard-gate.md) | 单合同已实现；验证命令进指令 → **L.2**；墓地 → **J.18** |
@@ -73,14 +73,20 @@ Release ── 引用一个已合并提交，可覆盖多份合同（.stagent/re
 | :--- | :--- | :--- | :--- |
 | 聊 | 任何时候，在右栏 | — | 右栏里不出现 Supervisor 的系统消息（DEC-005） |
 | 拍板分歧 | 方案出现互斥选项时 | 选一个选项 | 技术分类、glob、哈希 |
-| **确认开工** | 每份合同一次 | 授权这份合同：目标、验收、预算、敏感项（§5） | 路径树、命令明细（后置到验收幕） |
-| 处理意外 | 扩范围、超预算、五类技术决策、外部服务 | 在白话卡上点一下 | 原始错误栈 |
+| **确认开工** | 每份合同一次（UI 主文案；「确认方案」=内部别名） | 授权这份合同：目标、验收、预算、敏感项（§5）；**中栏确认的范围 = Worker 拿到的范围**（ADR-0018） | 路径树、命令明细（后置到验收幕）；聊天直推范围 |
+| 处理意外 | 扩范围、超预算、五类技术决策、外部服务 | 在白话卡上点一下（可降频/合并/延后，ADR-0001） | 原始错误栈；把 E_* 当第一句 |
 | 试玩 | 合同验证通过后 | — | — |
 | **合入** | 每份合同一次 | 接受这份合同进主分支 | — |
 | **发布** | 用户想上线时 | 把指定提交部署到指定目标 | 密钥明文 |
 | 回滚 | 发布失败或不满意时 | 回到上一个 LIVE | — |
 
 ---
+
+### 4.1 多合同与等待态（2026-10-31 完整诊断）
+
+- **每份合同**各需一次「确认开工」+ 一次「合入」；不得用单次点击冒充多份授权。
+- 首次「确认开工」若触发 PAB / ProjectPlan：中栏同页显示「正在整理项目地图…」，完成后嵌地图，**不**新开旅程或第二套导航。
+- `JourneyStage` 只由 Daemon 投影；前端禁止自拼。
 
 ## 5. ADR-0014 下的敏感项授权（SA-1，用户正式拍板生效，dec-8 / q22）
 

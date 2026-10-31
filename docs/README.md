@@ -92,6 +92,7 @@
 - [`reports/v0.1-hardening-closure.md`](./reports/v0.1-hardening-closure.md) — v0.1 硬化收官（Tag `v0.1.0`）
 - [`reports/J1-partner-cli-verification-2026-10-28.md`](./reports/J1-partner-cli-verification-2026-10-28.md) — `TASK-J.1` 右栏只读的真实 CLI 验证（替身模型端点）
 - [`reports/delivery-path-audit.md`](./reports/delivery-path-audit.md) — 交付全链路审计（2026-10-30）：七环逐环核查、「Agent 能否无脑开发」结论与补全清单
+- [`reports/完整诊断修订纪要-2026-10-31.md`](./reports/完整诊断修订纪要-2026-10-31.md) — 完整诊断十四定型（确认开工/D9/Canvas/JourneyStage/等待态；仅文档）
 
 ---
 
