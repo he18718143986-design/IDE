@@ -46,9 +46,9 @@ Release ── 引用一个已合并提交，可覆盖多份合同（.stagent/re
 | **S4 技术方案** | 已签合同 + ready PAB + 系统知识库 | `DesignNote`（`.stagent/records/<id>/design-note.json`）+ 知识库增量计划 | 设计步骤（中栏组件或专用 Agent，形态开放） | DesignNote Schema 与 PAB 一致性校验；五类决策升级规则 | 仅在五类决策时弹意外卡 | [`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) | 空白 → **L.11** |
 | **S5 施工** | 合同 + DesignNote + 测试义务 | Worktree 内的改动（`.stagent/worktrees/task-<id>`，分支 `task/<id>`） | Worker | 网关写范围；预算三维熔断；墓地门禁 | 无（看步骤点亮） | runtime §1～§5；ADR-0003、0013；[`worker-graveyard-gate.md`](./worker-graveyard-gate.md) | 单合同已实现；验证命令进指令 → **L.2**；墓地：**J.18a～J.18d COMPLETED**（#24/#22/#26/#27 / tip `a2fa7df`；母卡 J.18 仍 `[SPLIT]`） |
 | **S6 验证与验收** | 候选提交 | `EvidenceBundle`（`.stagent/evidence/<contractId>-<evidenceId>.json`）；试玩记录；合并提交 + Trailer | Daemon（判卷）+ 用户（试玩） | `can_merge` 只由退出码派生；测试义务红→绿；知识库漂移检查 | 试玩；**「合入」**（第 2 次点击） | ADR-0005；[`verification-strategy.md`](./verification-strategy.md)；[`evidence-and-acceptance-criteria.md`](./evidence-and-acceptance-criteria.md)；[`playtest-self-check.md`](./playtest-self-check.md) | 测试义务 **L.3 COMPLETED**（#15）；两段式 **L.4 COMPLETED**（#18）；真实预览 **L.5 COMPLETED**（#14）；M2 黄金切片 **L.6 COMPLETED**（#21 / `93589bf`）；知识库检查 → **L.12** |
-| **S7 发布与运维** | 已合并提交 | `ReleaseRecord`（`.stagent/releases/<id>.json`）；健康检查证据 | Daemon | 构建与健康检查退出码；失败自动回滚 | **「发布」**（独立点击）；回滚 | [`release-and-operations.md`](./release-and-operations.md) | 空白 → **L.14～L.16** |
+| **S7 发布与运维** | 已合并提交 | `ReleaseRecord`（`.stagent/releases/<id>.json`）；健康检查证据 | Daemon | 构建与健康检查退出码；失败自动回滚 | **「发布」**（独立点击）；回滚 | [`release-and-operations.md`](./release-and-operations.md) | 保险库 **L.14 COMPLETED**（#31 / `ae57543`）；发布/回流余量 → **L.15～L.16** |
 
-**横切**：追踪链 → **L.13**；北极星外网摄取 → **L.17**（依赖 L.14）。
+**横切**：追踪链 → **L.13**；北极星外网摄取 → **L.17**（依赖已合入的 L.14）。
 
 ---
 
@@ -146,7 +146,7 @@ q<n>（原话） → scheme item id（goal-* / mod-* / acc-*） → milestone_id
 | 设计说明 | `.stagent/records/<contract_id>/design-note.json` | 否 | 新增（L.11） |
 | 系统知识库 | 目标仓库 `docs/system/` | **是** | 新增（ADR-0016，L.12） |
 | 发布记录 | `.stagent/releases/<release_id>.json` | 否 | 新增（L.15） |
-| 凭据 | 保险库（后端见 OQ-REL-1） | 否，且不落明文 | 新增（L.14） |
+| 凭据 | 保险库（后端见 OQ-REL-1；Keychain / 加密文件回退） | 否，且不落明文 | **L.14 COMPLETED**（#31 / `ae57543`） |
 
 > `.stagent/` 整体被写进 `.git/info/exclude`。需要跨机器保留、需要随代码评审的东西，只有系统知识库，所以只有它入库。
 
