@@ -60,6 +60,7 @@ import {
 } from "../guard/test-integrity";
 import { guardAgentFileOperation } from "../protection/protection-list";
 import { ExecTokenError, type ExecTokenStore } from "../core/exec-token";
+import { getActiveVault } from "../vault";
 
 /**
  * TASK-D.3 / D-5：命令超时分层。
@@ -576,11 +577,15 @@ export class ScopedWorktreeGateway {
     env: Record<string, string>;
   } {
     // W.3：环境白名单 / env_file_grants / 网络策略统一由 policy-guard 组装
-    return buildCommandEnvironment({
+    const base = buildCommandEnvironment({
       permissions: this.contract.authorization.execution_permissions,
       worktreeRoot: this.worktreeRoot,
       alias,
     });
+    // TASK-L.14：保险库值并入脱敏清单；**不**注入子进程环境（仅 L.15/L.17 注入）
+    const vaultValues = getActiveVault()?.currentValues() ?? [];
+    const secretValues = [...base.secretValues, ...vaultValues];
+    return { ...base, secretValues };
   }
 
   private logAudit(entry: {

@@ -21,7 +21,8 @@ import {
  * + S.4 增补 E_DEMO_PAYLOAD_TOO_LARGE
  * + S.5 增补 E_DISPUTE_TIMEOUT
  * + L.7 增补 E_PLAN_* ×5
- * + J.18c 增补 E_PROPOSAL_PREVIOUSLY_REJECTED / E_GATE_SCAN_FAILED = 24 个 → 9 个 reason_code，正反向均可闭环。
+ * + J.18c 增补 E_PROPOSAL_PREVIOUSLY_REJECTED / E_GATE_SCAN_FAILED
+ * + L.14 增补 E_VAULT_* ×3 = 27 个 → 9 个 reason_code，正反向均可闭环。
  */
 
 /** A §9.3 表格的逐行期望值（手工登记，不以实现反推） */
@@ -54,12 +55,16 @@ const EXPECTED_MAPPING: Record<ErrorCode, string> = {
   // TASK-J.18c：墓地门禁 / 全量扫描失败
   E_PROPOSAL_PREVIOUSLY_REJECTED: "SCOPE_VIOLATION",
   E_GATE_SCAN_FAILED: "PREPARATION_INTERRUPTED",
+  // TASK-L.14：凭据保险库
+  E_VAULT_VALUE_TOO_SHORT: "PREPARATION_INTERRUPTED",
+  E_VAULT_NAME_INVALID: "PREPARATION_INTERRUPTED",
+  E_VAULT_NOT_FOUND: "PREPARATION_INTERRUPTED",
 };
 
-describe("目录基数：24 个 error_code → 9 个 reason_code", () => {
-  it("恰好 24 个错误码且无重复", () => {
-    expect(ERROR_CODES).toHaveLength(24);
-    expect(new Set(ERROR_CODES).size).toBe(24);
+describe("目录基数：27 个 error_code → 9 个 reason_code", () => {
+  it("恰好 27 个错误码且无重复", () => {
+    expect(ERROR_CODES).toHaveLength(27);
+    expect(new Set(ERROR_CODES).size).toBe(27);
   });
 
   it("恰好 9 个运行时原因码；均为 evidence.schema reasonCodeSchema 子集（L.3 义务码仅用于证据载荷）", () => {
@@ -139,11 +144,11 @@ describe("反向映射：reason_code → error_code[]（一对多）", () => {
     }
   });
 
-  it("反向映射覆盖全部 24 个错误码，无遗漏", () => {
+  it("反向映射覆盖全部 27 个错误码，无遗漏", () => {
     const covered = new Set(
       REASON_CODES.flatMap((reason) => errorCodesForReasonCode(reason)),
     );
-    expect(covered.size).toBe(24);
+    expect(covered.size).toBe(27);
     for (const code of ERROR_CODES) {
       expect(covered.has(code), `uncovered error_code: ${code}`).toBe(true);
     }
@@ -182,6 +187,9 @@ describe("反向映射：reason_code → error_code[]（一对多）", () => {
       "E_PLAN_INVALID",
       "E_PLAN_STUB_REVIVED",
       "E_PREPARATION_FAILED",
+      "E_VAULT_NAME_INVALID",
+      "E_VAULT_NOT_FOUND",
+      "E_VAULT_VALUE_TOO_SHORT",
     ]);
   });
 

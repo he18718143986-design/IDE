@@ -12,6 +12,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { getActiveVault } from "../vault";
 
 export const DEBUG_LOGS_DIR_REL = ".stagent/logs";
 export const DAEMON_LOG_FILE = "daemon.jsonl";
@@ -150,8 +151,21 @@ function appendLine(filePath: string, line: string, maxBytes: number): void {
 }
 
 /** 剥掉常见密钥形态，避免误写入 */
-export function redactSecrets(text: string): string {
-  return text
+export function redactSecrets(
+  text: string,
+  secretValues: string[] = [],
+): string {
+  const fromVault = getActiveVault()?.currentValues() ?? [];
+  const all = [...secretValues, ...fromVault].filter(
+    (v) => typeof v === "string" && v.length >= 6,
+  );
+  let out = text;
+  for (const secret of all) {
+    if (out.includes(secret)) {
+      out = out.split(secret).join("[REDACTED]");
+    }
+  }
+  return out
     .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED]")
     .replace(
       /(?:api[_-]?key|token|secret|password)\s*[:=]\s*["']?[^\s"',}]+/gi,
