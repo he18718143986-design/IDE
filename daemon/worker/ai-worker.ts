@@ -11,6 +11,13 @@ import {
   MANAGED_AI_CAPABILITY,
   type AdapterCapabilityDeclaration,
 } from "./worker-adapter.interface";
+import {
+  evaluateGraveyardGate,
+  pickPrimaryVerdict,
+  type BlockingCode,
+  type LineVerdict,
+} from "../guard/worker-graveyard-gate";
+import { artifactChangesFromProposedWrites } from "../guard/graveyard-wiring";
 
 /**
  * 受控 AI Worker（Daemon 侧，替代已删除的浏览器 Worker）。
@@ -82,7 +89,7 @@ export interface WorkerRunResult {
 }
 
 export class WorkerScopeError extends Error {
-  readonly code = "E_OUT_OF_SCOPE";
+  readonly code: string;
   readonly blockers: Array<{ code: string; message: string }>;
   /** 失败发生的合同 / Worktree / 阶段，供控制面生成 BLOCKED 证据 */
   readonly context?: WorkerFailureContext | undefined;
@@ -90,11 +97,14 @@ export class WorkerScopeError extends Error {
   constructor(
     blockers: Array<{ code: string; message: string }>,
     context?: WorkerFailureContext | undefined,
+    primaryCode?: string | undefined,
   ) {
+    const code = primaryCode ?? "E_OUT_OF_SCOPE";
     super(
-      `[E_OUT_OF_SCOPE] Worker changes rejected: ${blockers.map((b) => b.message).join("; ")}`,
+      `[${code}] Worker changes rejected: ${blockers.map((b) => b.message).join("; ")}`,
     );
     this.name = "WorkerScopeError";
+    this.code = code;
     this.blockers = blockers;
     this.context = context;
   }
@@ -195,6 +205,7 @@ export class AiWorker {
    * `WorkerBoundaryError`，调用方无需自行拼装提示词。
    */
   prepare(): WorkerTaskInstruction {
+    const gate = this.gateway.getGraveyardGate?.() ?? null;
     return buildWorkerTaskInstruction({
       contract: this.gateway.getContract(),
       worktreeRoot: this.gateway.getWorktreeRoot(),
@@ -206,6 +217,9 @@ export class AiWorker {
       ...(this.checksExtras === undefined
         ? {}
         : { checksExtras: this.checksExtras }),
+      ...(gate && gate.availability === "snapshot"
+        ? { graveyard: gate.graveyard }
+        : {}),
     });
   }
 
@@ -245,11 +259,21 @@ export class AiWorker {
       );
     }
 
-    const blockers = this.validateChanges(contract, generated.changes);
+    const { blockers, lineVerdicts } = this.validateChanges(
+      contract,
+      generated.changes,
+      generated.log,
+    );
     if (blockers.length > 0) {
+      const primary = pickPrimaryVerdict(
+        lineVerdicts.length > 0
+          ? lineVerdicts
+          : blockers.map((b) => ({ code: b.code as BlockingCode })),
+      );
       throw new WorkerScopeError(
         blockers,
         this.failureContext("SCOPE_VALIDATION", task.worktree_root),
+        primary?.code,
       );
     }
 
@@ -325,11 +349,15 @@ export class AiWorker {
     return files;
   }
 
-  /** 整批预校验：任一越权（含 phaseOverlay 收窄）→ 全部拒绝，绝不写半成品 */
+  /** 整批预校验：任一越权 / 墓地强命中 → 全部拒绝，绝不写半成品 */
   private validateChanges(
     contract: SoftwareContract,
     changes: WorkerChange[],
-  ): Array<{ code: string; message: string }> {
+    log: string[] = [],
+  ): {
+    blockers: Array<{ code: string; message: string }>;
+    lineVerdicts: LineVerdict[];
+  } {
     const blockers: Array<{ code: string; message: string }> = [];
     const budget = contract.authorization.budget_limits.max_file_modifications;
 
@@ -341,6 +369,7 @@ export class AiWorker {
     }
 
     const seen = new Set<string>();
+    const lineVerdicts: LineVerdict[] = [];
     for (const change of changes) {
       if (seen.has(change.path)) {
         blockers.push({
@@ -353,15 +382,52 @@ export class AiWorker {
       // TASK-L.4：经网关评估，使 phaseOverlay 收窄在预校验阶段即生效
       const access = this.gateway.assessWriteAccess(change.path);
       if (!access.allowed) {
+        const code = access.code ?? "E_OUT_OF_SCOPE";
         blockers.push({
-          code: access.code ?? "E_OUT_OF_SCOPE",
+          code,
           message:
             access.message ??
             `Path '${change.path}' is outside authorized writable scope`,
         });
+        if (
+          code === "E_FORBIDDEN_PATH" ||
+          code === "E_OUT_OF_SCOPE" ||
+          code === "E_OUT_OF_SCOPE_UNTRACKED"
+        ) {
+          lineVerdicts.push({ code: code as BlockingCode });
+        }
       }
     }
 
-    return blockers;
+    // TASK-J.18d：墓地门禁（整批）；阻断则与路径越权一并进入 pickPrimaryVerdict
+    const gateCtx = this.gateway.getGraveyardGate?.() ?? null;
+    if (gateCtx) {
+      const artifactChanges = artifactChangesFromProposedWrites(
+        this.gateway.getWorktreeRoot(),
+        changes,
+      );
+      const gate = evaluateGraveyardGate({
+        graveyard: gateCtx.graveyard,
+        changes: artifactChanges,
+        commands: [],
+        texts: log.map((text) => ({ text, source: "log" as const })),
+        availability: gateCtx.availability,
+      });
+      if (gate.block && gate.primary) {
+        blockers.push({
+          code: gate.primary.code,
+          message:
+            `触及用户否决过的方案（${gate.primary.rejected_id}）；整批不写盘`,
+        });
+        lineVerdicts.push({
+          code: gate.primary.code,
+          detail: { lock: gate.primary.lock, rejected_id: gate.primary.rejected_id },
+        });
+      }
+      // 弱证据 / unavailable：不阻断；warnings 由编排器在证据侧记录
+      void gate.warnings;
+    }
+
+    return { blockers, lineVerdicts };
   }
 }

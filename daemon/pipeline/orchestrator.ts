@@ -20,6 +20,14 @@ import {
   type ExecTokenStore,
 } from "../core/exec-token";
 import { runBoundaryStop } from "../guard/boundary-stop";
+import {
+  graveyardBlockMessage,
+  graveyardViolationTags,
+  prepareDispatchGate,
+  scanWorktreeGraveyard,
+  type GraveyardGateContext,
+} from "../guard/graveyard-wiring";
+import { WorkerScopeError } from "../worker/ai-worker";
 import { loadBaselineDirtyExclusions } from "../baseline/scope-defaults";
 import {
   evaluateLatestDemoGate,
@@ -200,6 +208,8 @@ export class ContractOrchestrator {
   /** TASK-C.12a：合同 → 当前有效 exec_token 明文（仅进程内；日志用指纹） */
   private readonly activeExecTokens = new Map<string, string>();
   private readonly execTokenStore: ExecTokenStore = getExecTokenStore();
+  /** TASK-J.18d：合同 → 派工墓地上下文（resume / buildRuntime 复用） */
+  private readonly graveyardGates = new Map<string, GraveyardGateContext>();
 
   constructor(options: OrchestratorOptions) {
     this.repoRoot = path.resolve(options.repoRoot);
@@ -411,8 +421,28 @@ export class ContractOrchestrator {
             contractId,
             lifecycleState: "EXECUTING",
           });
-          // TASK-C.12a：签署开工后签发 exec_token
+          // TASK-J.18d：派工前绑定校验 + gate pack；失败不签发
           const wt = getWorktreePath(this.repoRoot, contractId);
+          const gatePrep = await prepareDispatchGate(this.repoRoot, executing);
+          if (!gatePrep.ok) {
+            await this.writeEvidence(executing, {
+              status: "BLOCKED",
+              reasonCode: "PREPARATION_INTERRUPTED",
+              summary: `[${gatePrep.code}] ${gatePrep.message}`,
+              verificationResults: [],
+              scopePassed: false,
+              forbiddenViolations: [],
+              modifiedFiles: [],
+            });
+            // 回退待批：快照对不上需重新确认
+            return this.store.transition({
+              contractId,
+              lifecycleState: "PENDING_APPROVAL",
+              approvalStatus: "PENDING_REVIEW",
+            });
+          }
+          this.graveyardGates.set(contractId, gatePrep.context);
+          // TASK-C.12a：签署开工后签发 exec_token
           this.issueExecForContract(executing, wt);
           // TASK-C.15b：签署开工时冻结 assertion_id 集合
           this.seedReworkOnApprove(executing);
@@ -869,6 +899,15 @@ export class ContractOrchestrator {
       verificationResults,
     });
 
+    // TASK-J.18d：POST_VERIFICATION 墓地全量扫描
+    await this.assertGraveyardScan({
+      contract: current,
+      worktreePath,
+      phase: "POST_VERIFICATION",
+      costMonitor,
+      verificationResults,
+    });
+
     const worktreeChanged = [
       ...parsePorcelainPaths(preCommitStatus.stdout),
       ...parsePorcelainPaths(postVerifyStatus.stdout),
@@ -958,6 +997,11 @@ export class ContractOrchestrator {
         forbiddenViolations: [],
         modifiedFiles,
         testsModified,
+        ...(this.graveyardGates.has(contractId)
+          ? {
+              graveyardCheck: this.graveyardGates.get(contractId)!.availability,
+            }
+          : {}),
       },
       costMonitor,
       worktreePath,
@@ -1232,6 +1276,51 @@ export class ContractOrchestrator {
             },
           };
         } catch (err) {
+          if (err instanceof WorkerScopeError) {
+            const gyTags = err.blockers
+              .filter((b) => b.code === "E_PROPOSAL_PREVIOUSLY_REJECTED")
+              .map((b) => {
+                const m = /（([^），]+)）/.exec(b.message);
+                return m ? `graveyard:${m[1]}` : "graveyard:unknown";
+              });
+            // Prefer explicit rejected_id from message; fallback tag
+            const violations =
+              gyTags.length > 0
+                ? gyTags
+                : err.code === "E_PROPOSAL_PREVIOUSLY_REJECTED"
+                  ? ["graveyard:blocked"]
+                  : [];
+            if (
+              err.code === "E_PROPOSAL_PREVIOUSLY_REJECTED" ||
+              violations.length > 0
+            ) {
+              this.revokeExecTokenFor(contractId);
+              this.store.transition({
+                contractId,
+                lifecycleState: "PENDING_RESUME",
+              });
+              const gateCtx = this.graveyardGates.get(contractId);
+              await this.writeEvidence(
+                current,
+                {
+                  status: "BLOCKED",
+                  reasonCode: "SCOPE_VIOLATION",
+                  summary: err.message,
+                  verificationResults: [],
+                  scopePassed: false,
+                  forbiddenViolations: violations,
+                  modifiedFiles: [...gateway.getModifiedFiles()],
+                  testsModified: gateway.wasTestsModified(),
+                  ...(gateCtx
+                    ? { graveyardCheck: gateCtx.availability }
+                    : {}),
+                },
+                costMonitor,
+                gateway.getWorktreeRoot(),
+              );
+            }
+            throw err;
+          }
           if (costMonitor.isTripped()) {
             this.revokeExecTokenFor(contractId);
             this.store.transition({
@@ -1483,6 +1572,9 @@ export class ContractOrchestrator {
       requireRepoTrust: true,
       dirtyExclusions,
       ...(phaseOverlay === undefined ? {} : { phaseOverlay }),
+      ...(this.graveyardGates.has(contract.contract_id)
+        ? { graveyardGate: this.graveyardGates.get(contract.contract_id) }
+        : {}),
       ...(this.deadlock === null ? {} : { deadlock: this.deadlock }),
       ...(signal === undefined ? {} : { signal }),
       ...(this.onTerminalLine === undefined
@@ -1555,6 +1647,108 @@ export class ContractOrchestrator {
    *
    * 未抛错即代表本轮未跟踪文件全部落在合同授权内。
    */
+
+  /**
+   * TASK-J.18d：POST_VERIFICATION / 执行末墓地全量扫描。
+   * 扫描失败 → E_GATE_SCAN_FAILED；强命中 → SCOPE_VIOLATION + graveyard:ID。
+   */
+  private async assertGraveyardScan(options: {
+    contract: SoftwareContract;
+    worktreePath: string;
+    phase: string;
+    costMonitor?: CostMonitor | undefined;
+    verificationResults?: VerificationResultInput[] | undefined;
+  }): Promise<void> {
+    let gateCtx = this.graveyardGates.get(options.contract.contract_id);
+    if (!gateCtx) {
+      // resume 后 Map 可能空：按合同即时绑定（legacy → unavailable）
+      const prep = await prepareDispatchGate(this.repoRoot, options.contract);
+      if (!prep.ok) {
+        await this.writeEvidence(
+          options.contract,
+          {
+            status: "BLOCKED",
+            reasonCode: "PREPARATION_INTERRUPTED",
+            summary: `[${prep.code}] ${prep.message}`,
+            verificationResults: options.verificationResults ?? [],
+            scopePassed: false,
+            forbiddenViolations: [],
+            modifiedFiles: [],
+          },
+          options.costMonitor,
+          options.worktreePath,
+        );
+        this.store.transition({
+          contractId: options.contract.contract_id,
+          lifecycleState: "PENDING_RESUME",
+        });
+        throw new Error(`[${prep.code}] ${prep.message}`);
+      }
+      gateCtx = prep.context;
+      this.graveyardGates.set(options.contract.contract_id, gateCtx);
+    }
+
+    const baseBranch = options.contract.authorization.git.base_branch;
+    const scan = await scanWorktreeGraveyard({
+      worktreePath: options.worktreePath,
+      baseBranch,
+      context: gateCtx,
+    });
+
+    if (!scan.ok) {
+      await this.writeEvidence(
+        options.contract,
+        {
+          status: "BLOCKED",
+          reasonCode: "PREPARATION_INTERRUPTED",
+          summary: `[E_GATE_SCAN_FAILED] ${scan.reason}`,
+          verificationResults: options.verificationResults ?? [],
+          scopePassed: false,
+          forbiddenViolations: [],
+          modifiedFiles: [],
+          graveyardCheck: gateCtx.availability,
+        },
+        options.costMonitor,
+        options.worktreePath,
+      );
+      this.store.transition({
+        contractId: options.contract.contract_id,
+        lifecycleState: "PENDING_RESUME",
+      });
+      throw new Error(`[E_GATE_SCAN_FAILED] ${scan.reason}`);
+    }
+
+    if (scan.gate.block) {
+      const violations = graveyardViolationTags(scan.gate);
+      await this.writeEvidence(
+        options.contract,
+        {
+          status: "BLOCKED",
+          reasonCode: "SCOPE_VIOLATION",
+          summary: graveyardBlockMessage(scan.gate),
+          verificationResults: options.verificationResults ?? [],
+          scopePassed: false,
+          forbiddenViolations: violations,
+          modifiedFiles: [],
+          graveyardCheck: gateCtx.availability,
+        },
+        options.costMonitor,
+        options.worktreePath,
+      );
+      this.revokeExecTokenFor(options.contract.contract_id);
+      this.store.transition({
+        contractId: options.contract.contract_id,
+        lifecycleState: "PENDING_RESUME",
+      });
+      throw new Error(graveyardBlockMessage(scan.gate));
+    }
+
+    // legacy unavailable：在后续 PASSED 证据里带 graveyard_check（由调用方合并时写入）
+    // 这里把上下文挂回 Map 即可
+    void options.phase;
+    void scan.warnings;
+  }
+
   private async assertUntrackedScope(options: {
     contract: SoftwareContract;
     worktreePath: string;
@@ -1718,6 +1912,8 @@ export class ContractOrchestrator {
       manualConfirmationRecord?: ManualConfirmationRecord;
       /** TASK-W.4：运行时降级后 Evidence 记录实际控制模式 */
       workerControlMode?: "GATEWAY_ENFORCED" | "UNCONTROLLED_EXTERNAL";
+      /** TASK-J.18d：墓地检查可用性 */
+      graveyardCheck?: "snapshot" | "unavailable";
     },
     costMonitor?: CostMonitor,
     worktreePath?: string,
@@ -1800,6 +1996,9 @@ export class ContractOrchestrator {
         })),
         forbidden_violations: input.forbiddenViolations,
         budget_exhausted: costMonitor?.isTripped() ?? false,
+        ...(input.graveyardCheck === undefined
+          ? {}
+          : { graveyard_check: input.graveyardCheck }),
       },
       verification_results: input.verificationResults
         .slice(-MAX_EVIDENCE_VERIFICATION_RESULTS)

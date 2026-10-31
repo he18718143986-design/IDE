@@ -45,6 +45,16 @@ import {
 } from "../guard/cost-monitor";
 import { LoopGuard, E_LOOP_CIRCUIT_TRIPPED } from "../guard/loop-guard";
 import {
+  evaluateGraveyardGate,
+  pickPrimaryVerdict,
+  type LineVerdict,
+} from "../guard/worker-graveyard-gate";
+import {
+  artifactChangeForWrite,
+  graveyardBlockMessage,
+  type GraveyardGateContext,
+} from "../guard/graveyard-wiring";
+import {
   isTestPath,
   scopeExplicitlyIncludesTests,
 } from "../guard/test-integrity";
@@ -216,6 +226,11 @@ export interface ScopedGatewayOptions {
    */
   dirtyExclusions?: readonly string[] | undefined;
   /**
+   * TASK-J.18d：墓地门禁上下文（派工绑定结果）。
+   * 缺省跳过墓地检查（兼容旧单测）；orchestrator 派工后必传。
+   */
+  graveyardGate?: GraveyardGateContext | undefined;
+  /**
    * TASK-L.4：运行期收窄（verification-strategy §3.2 / §3.3）。
    * 只比合同更窄，不持久化、不改合同。可通过 setPhaseOverlay 在 T/I 段切换。
    */
@@ -259,6 +274,7 @@ export class ScopedWorktreeGateway {
   private readonly execToken?: ScopedGatewayOptions["execToken"];
   private readonly onScopeBlocked?: ScopedGatewayOptions["onScopeBlocked"];
   private readonly dirtyExclusions: readonly string[];
+  private graveyardGate: GraveyardGateContext | undefined;
   /** TASK-L.4：可变运行期收窄；不写回合同 */
   private phaseOverlay: PhaseOverlay | undefined;
 
@@ -293,7 +309,17 @@ export class ScopedWorktreeGateway {
     this.execToken = options.execToken;
     this.onScopeBlocked = options.onScopeBlocked;
     this.dirtyExclusions = options.dirtyExclusions ?? [];
+    this.graveyardGate = options.graveyardGate;
     this.phaseOverlay = options.phaseOverlay;
+  }
+
+  /** TASK-J.18d：派工后可热更新（resume / 重派） */
+  setGraveyardGate(ctx: GraveyardGateContext | undefined): void {
+    this.graveyardGate = ctx;
+  }
+
+  getGraveyardGate(): GraveyardGateContext | undefined {
+    return this.graveyardGate;
   }
 
   /** TASK-L.4：切换运行期收窄（T/I 段）；传 undefined 清除 */
@@ -950,7 +976,7 @@ export class ScopedWorktreeGateway {
       const access = checkWriteAccess(file, scope);
       if (!access.allowed) {
         blockers.push({
-          code: access.reason ?? "E_OUT_OF_SCOPE",
+          code: this.scopeBlockCode(access.reason, file),
           message:
             `Path '${file}' is outside authorized writable scope: ${access.message ?? ""}`.trim(),
         });
@@ -1066,6 +1092,61 @@ export class ScopedWorktreeGateway {
     };
   }
 
+
+  /**
+   * TASK-J.18d：单次写的墓地门禁。强命中 → onScopeBlocked + 阻断；
+   * 弱命中 / unavailable / 未配置 → 不阻断。
+   */
+  private evaluateWriteGraveyard(
+    tool: string,
+    relativePath: string,
+    content: string,
+  ): MCPToolCallResult | null {
+    if (!this.graveyardGate) return null;
+    const change = artifactChangeForWrite(
+      this.worktreeRoot,
+      relativePath,
+      content,
+    );
+    const gate = evaluateGraveyardGate({
+      graveyard: this.graveyardGate.graveyard,
+      changes: [change],
+      commands: [],
+      texts: [],
+      availability: this.graveyardGate.availability,
+    });
+    if (!gate.block || !gate.primary) return null;
+
+    const code = gate.primary.code;
+    const msg = graveyardBlockMessage(gate);
+    this.logAudit({
+      tool,
+      input: { path: relativePath },
+      outcome: "BLOCKED",
+      violationCode: code,
+      details: msg,
+    });
+    this.onScopeBlocked?.({
+      tool,
+      path: relativePath,
+      code,
+      message: msg,
+    });
+    return {
+      isError: true,
+      content: [{ type: "text", text: msg }],
+      error: {
+        code,
+        message: msg,
+        details: {
+          path: relativePath,
+          rejected_id: gate.primary.rejected_id,
+          lock: gate.primary.lock,
+        },
+      },
+    };
+  }
+
   private async handleWriteFile(rawInput: unknown): Promise<MCPToolCallResult> {
     const parsed = StagentWriteFileSchema.safeParse(rawInput);
     if (!parsed.success) {
@@ -1177,6 +1258,16 @@ export class ScopedWorktreeGateway {
       safe.relativePath,
     );
     if (protectedWrite) return protectedWrite;
+
+    // 3.45 TASK-J.18d：保护清单之后做墓地内容门禁
+    {
+      const denied = this.evaluateWriteGraveyard(
+        "stagent_write_file",
+        safe.relativePath,
+        content,
+      );
+      if (denied) return denied;
+    }
 
     // 3.5 测试完整性门禁：测试文件写入要求 writable_paths 中存在显式测试
     // 模式（tests/**、**/*.test.ts 等）。仅被 src/** 这类宽泛模式覆盖时坚决

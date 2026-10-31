@@ -21,6 +21,12 @@ import {
   describeUntrackedViolations,
   enforceUntrackedScope,
 } from "./untracked-scope-guard";
+import {
+  graveyardBlockMessage,
+  graveyardViolationTags,
+  prepareDispatchGate,
+  scanWorktreeGraveyard,
+} from "../guard/graveyard-wiring";
 import type { FileSystemScope } from "../../src/lib/scope";
 import {
   contractLockPath,
@@ -472,6 +478,29 @@ async function mergeInternal(
     worktreePath,
     scope: contract.authorization.file_system_scope,
   });
+
+  // 3.55 TASK-J.18d：PRE_MERGE 墓地全量扫描（纵深：绕过 hook 仍拦）
+  {
+    const prep = await prepareDispatchGate(repoRoot, contract);
+    if (!prep.ok) {
+      throw new MergeGateError(prep.code, prep.message);
+    }
+    const scan = await scanWorktreeGraveyard({
+      worktreePath,
+      baseBranch: contract.authorization.git.base_branch,
+      context: prep.context,
+    });
+    if (!scan.ok) {
+      throw new MergeGateError("E_GATE_SCAN_FAILED", scan.reason);
+    }
+    if (scan.gate.block) {
+      const tags = graveyardViolationTags(scan.gate).join(", ");
+      throw new MergeGateError(
+        "E_PROPOSAL_PREVIOUSLY_REJECTED",
+        `${graveyardBlockMessage(scan.gate)}（${tags}）`,
+      );
+    }
+  }
 
   // 3.6 防偷渡门禁：Worktree 指纹必须与 Evidence 记录一致。
   // 用户在验证通过后外部篡改 Worktree（VS Code 直改 / 脚本写入）→ 指纹不符 →
