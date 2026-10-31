@@ -15,23 +15,32 @@
 
 ## 文档治理挂账（2026-10-29 新增）
 
-2026-10-29 通读 `docs/` 时挂账。**第 0 波（机械对齐，2026-11-01）已 RESOLVED：DOC-3 / DOC-4 / DOC-11**（见各行）。其余项仍属「改条款」或第 1/2 波，要用户先拍板（见 [`../scheme.md`](../scheme.md) §12）。
+2026-10-29 通读 `docs/` 时挂账。**第 0 波**已 RESOLVED：DOC-3 / DOC-4 / DOC-11（#40）。**第 1 波（SSOT / 代码对齐，2026-11-01）**已 RESOLVED：DOC-2 / DOC-5 / DOC-6 / DOC-7 / DOC-8 / DOC-9 / DOC-10（见各行；PR 待填）。DOC-1 仍属第 2 波，要用户先拍板（见 [`../scheme.md`](../scheme.md) §12）。
 
 | 编号 | 问题 | 位置 | 建议 | 阻断级别 |
 | :--- | :--- | :--- | :--- | :--- |
 | DOC-1 | `development-tasks.md` 约 460KB：约 65% 是已完成卡历史，版本头 84 条状态回写与 §6 修订流水重复，卡内样板句重复上百次 | `specs/development-tasks.md` | 拆成卡号索引 + 活跃卡 + 已完成卡 + 修订流水，卡号不变（[`../scheme.md`](../scheme.md) dec-4） | NON_BLOCKER |
-| DOC-2 | 任务卡状态矛盾：C.14f、C.15a、C.15c、C.15d 矩阵写 COMPLETED、卡内写 NEW_TASK；J.1 代码已合入（PR #29 / #30）但卡仍为 NEW_TASK | 同上 | 由卡 owner 按 supervisor §10 判定口径回写 | NON_BLOCKER |
+| DOC-2 | 任务卡状态矛盾：C.14f、C.15a、C.15c、C.15d 矩阵写 COMPLETED、卡内写 NEW_TASK；J.1 代码已合入（PR #29 / #30）但卡仍为 NEW_TASK | 同上 | 由卡 owner 按 supervisor §10 判定口径回写 → **已做**：四卡回写 COMPLETED（证据 `5f6ca93`）；J.1 此前已对齐；全库矩阵↔卡内抽查仅余该四处 | **RESOLVED**（docs 冗余治理第 1 波 · #PR） |
 | DOC-3 | 任务卡文件内三处「当前基线」互相矛盾（`6415fbd` / `4280de6` / `f14c8cb`） | 同上 L28、L121、§4 | 只保留一处，其余改指针 → **已做**：权威 tip 见 Sprint「当前工程物理起点」/`e4351b0`，另两处改历史指针 | **RESOLVED**（docs 冗余治理第 0 波 · #40） |
 | DOC-4 | 约 24 处引用已删除的 `docs/archive/*`，约 98 处引用已删除的「走查报告 §6.x」 | 同上 | 统一改为「见 Git 历史」或删除 → **已做**（docs 内活引用改指针；历史叙述保留路径字面作溯源） | **RESOLVED**（docs 冗余治理第 0 波 · #40） |
-| DOC-5 | 路径三方不一致：Worktree 目录（`task-{id}` vs `{id}`）、Demo 目录（`.stagent/demo/` vs `.stagent/prototypes/`）、Git Trailer 键名与长度上限 | `system-architecture.md` §5、`constants-and-paths.md` §2/§3、`runtime-contract-and-safety.md` §5.3、代码 | 以代码为准回写规格，或立卡改代码 | NON_BLOCKER |
-| DOC-6 | `delivery-state.ts` 仍有 `DELIVERED`，与 ADR-0012、`state-machine-contract.md` 冲突；两套状态机（生命周期 9 态 / 交付轨 A）关系未交代 | `state-machine-contract.md`、runtime §7、§9 | 在 state-machine-contract 补一节两轨关系 | NON_BLOCKER |
-| DOC-7 | `state-machine-contract.md` 标「目标、待测试固化」，但 `src/lib/state-machine.ts` 已实现其迁移表；`constants-and-paths.md` 同为草案 | `specs/` 两份草案 | 核对后升格或合并入 runtime 契约 | NON_BLOCKER |
-| DOC-8 | RFC v0.2 阶段 0「右栏可写主干」、§3.1「删除旁听」与现行 SSOT 冲突；附录 A/B/C 是 UI 候选清单，不是 RFC | `rfc/v0.2-multi-agent-pipeline.md` | 已加取代横幅；正文改写待 v0.2 立项 | NON_BLOCKER |
-| DOC-9 | RFC-003 内两份 `SchemeSnapshot` 定义并存；Ed25519「防篡改」措辞与 ADR-0006 冲突 | `rfc/scheme-snapshot-and-attestation-model.md` | v0.2 立项时一并修 | NON_BLOCKER |
-| DOC-10 | 三份实施口径（引擎 / 墓地门禁 / 试玩自查）把 K-1～K-13、G-MATCH、墓地交叉逻辑各写一遍，已出现 K-9 漂移 | `specs/scheme-patch-engine.md` 等 | 只在 supervisor §14.11 保留一份，其余改指针 | NON_BLOCKER |
+| DOC-5 | 路径三方不一致：Worktree 目录（`task-{id}` vs `{id}`）、Demo 目录（`.stagent/demo/` vs `.stagent/prototypes/`）、Git Trailer 键名与长度上限 | `system-architecture.md` §5、`constants-and-paths.md` §2/§3、`runtime-contract-and-safety.md` §5.3、代码 | 以代码为准回写规格，或立卡改代码 → **已做**：constants §0 代码事实表 + runtime §2/§5.3 注记；**`worktree-seal` 无 `task-` 前缀与创建路径不一致 → 需立卡改代码（本波未改代码）** | **RESOLVED**（docs 冗余治理第 1 波 · #PR；代码对齐另立卡） |
+| DOC-6 | `delivery-state.ts` 仍有 `DELIVERED`，与 ADR-0012、`state-machine-contract.md` 冲突；两套状态机（生命周期 9 态 / 交付轨 A）关系未交代 | `state-machine-contract.md`、runtime §7、§9 | 在 state-machine-contract 补一节两轨关系 → **已做**：§0 两轨关系 + ADR-0012/H.2 指针；`DELIVERED` 仅交付投影内部标记 | **RESOLVED**（docs 冗余治理第 1 波 · #PR） |
+| DOC-7 | `state-machine-contract.md` 标「目标、待测试固化」，但 `src/lib/state-machine.ts` 已实现其迁移表；`constants-and-paths.md` 同为草案 | `specs/` 两份草案 | 核对后升格或合并入 runtime 契约 → **已做**：两文件头加 `[DRAFT / HISTORICAL]` + 权威指针；**未升格合并**（避免本波改条款过大） | **RESOLVED**（docs 冗余治理第 1 波 · #PR；升格另议） |
+| DOC-8 | RFC v0.2 阶段 0「右栏可写主干」、§3.1「删除旁听」与现行 SSOT 冲突；附录 A/B/C 是 UI 候选清单，不是 RFC | `rfc/v0.2-multi-agent-pipeline.md` | 已加取代横幅；正文改写待 v0.2 立项 → **已做**：顶部 `[DEFERRED / 非现行]` 横幅加固 + 附录非规范短注；正文大改仍待立项 | **RESOLVED**（docs 冗余治理第 1 波 · #PR；正文改写另议） |
+| DOC-9 | RFC-003 内两份 `SchemeSnapshot` 定义并存；Ed25519「防篡改」措辞与 ADR-0006 冲突 | `rfc/scheme-snapshot-and-attestation-model.md` | v0.2 立项时一并修 → **已做**：`[PROPOSED / 非现行]` 横幅 + 双定义/防篡改短注；正文大改仍待立项 | **RESOLVED**（docs 冗余治理第 1 波 · #PR；正文改写另议） |
+| DOC-10 | 三份实施口径（引擎 / 墓地门禁 / 试玩自查）把 K-1～K-13、G-MATCH、墓地交叉逻辑各写一遍，已出现 K-9 漂移 | `specs/scheme-patch-engine.md` 等 | 只在 supervisor §14.11 保留一份，其余改指针 → **已做**：三份删重复公式/K 表，改 SSOT 指针；K-9/K-13/K-15 以 supervisor 为准；supervisor §14.11 标明唯一权威 | **RESOLVED**（docs 冗余治理第 1 波 · #PR） |
 | DOC-11 | `supervisor.md` 内部旧节号（§9.5 写「§3.1–§3.5」、L694「§5.4」）与计数（§18 写 35 条、实为 39 条）；intent-compiler few-shot 例 6 用 `remove_item` 处理否决，与 §4.5 冲突 | `specs/supervisor.md`、`specs/intent-compiler-prompt.md` | 机械修复 → **已做**：§9.1–§9.5、§11.3、changelog 对齐 39 条；例 6 改 `reject_item` | **RESOLVED**（docs 冗余治理第 0 波 · #40） |
 
 ---
+
+## 第 1 波遗留（需另立卡 / 不改代码）
+
+| 项 | 说明 |
+| :--- | :--- |
+| Worktree seal 路径前缀 | `daemon/guard/worktree-seal.ts` 使用 `.stagent/worktrees/{id}/`，与 `worktree-manager` 的 `task-{id}` 不一致；docs 已注明，**改代码另立卡** |
+| 草案升格 | `constants-and-paths.md` / `state-machine-contract.md` 仍 `[DRAFT / HISTORICAL]`，并入 runtime 另议 |
+| RFC 正文 | DOC-8/9 正文冲突大改待 v0.2 立项 |
+| DOC-1 | 第 2 波 |
 
 ## 纪律
 

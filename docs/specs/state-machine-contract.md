@@ -1,7 +1,22 @@
 # Stagent 合同状态机硬契约
 
-> **状态**：待核验目标规范草案（Target Contract Draft）
+> **状态**：**`[DRAFT / HISTORICAL]`** — 目标规范草案，**不是**现行施工权威
 > **声明**：本文件融合了已查证的代码基线与待落地的目标架构设计，未注明的流转规则需在开发期通过测试用例核验并逐步固化。
+>
+> > **DOC-6 / DOC-7（2026-11-01）**：生命周期迁移的机器可读权威是 [`src/lib/state-machine.ts`](../../src/lib/state-machine.ts)；对外运行时终态口径见 [ADR-0012](../adr/0012-merged-as-terminal-state.md) 与 [`runtime-contract-and-safety.md`](./runtime-contract-and-safety.md)。交付投影轨见 [`src/lib/state/delivery-state.ts`](../../src/lib/state/delivery-state.ts) + [`terminal-delivery-closure.ts`](../../src/lib/state/terminal-delivery-closure.ts)（H.2）。**本文不得单独当作现行状态机 SSOT**。升格或并入 runtime 另立卡。
+
+## 0. 两轨关系（DOC-6 · 代码事实）
+
+系统实际有两套相关但不相同的状态面：
+
+| 轨 | 类型 / 模块 | 是否含 `DELIVERED` | 对外终态 |
+| :--- | :--- | :--- | :--- |
+| **生命周期轨**（合同 lifecycle × approval） | `LifecycleState` + `ApprovalStatus`；校验 [`src/lib/state-machine.ts`](../../src/lib/state-machine.ts) | **否**（9 态止于 `MERGED` / `ABORTED`） | 成功公开终态 = **`MERGED`**（ADR-0012） |
+| **交付投影轨**（EO-01 / UI / 归档事务） | `DeliveryState`；[`src/lib/state/delivery-state.ts`](../../src/lib/state/delivery-state.ts) | **是**：`DELIVERED` 仅表示 **MERGED 后归档事务成功** 的内部/投影标记 | 对外文案收敛为 `MERGED`（[`terminal-delivery-closure.ts`](../../src/lib/state/terminal-delivery-closure.ts)；禁止悬空承诺独立 `DELIVERED` 运行时名） |
+
+**关系**：lifecycle 进入 `MERGED` 后，归档流水线（如 `daemon/pipeline/sign-gc.ts`）可尝试 `MERGED → DELIVERED` 投影；**任一步失败则停在 `MERGED`，绝不回退 lifecycle**。这与 ADR-0012「不为 `DELIVERED` 建独立运行时 lifecycle 枚举」一致：`DeliveryState.DELIVERED` ≠ `LifecycleState`。
+
+**注**：`state-machine.ts` **已实现**本文迁移表的核心组合/跃迁校验；本文仍标 DRAFT，是因为全文「目标/待测试固化」叙事未整体升格——以代码 + ADR-0012 + runtime 为准，勿把本文件当第二真相。
 
 ## 1. 目标状态空间与终态
 
@@ -18,7 +33,7 @@ export type LifecycleState =
   | "ABORTED";
 ```
 
-上述 9 态是**目标生命周期模型**。`DELIVERED` **不是 LifecycleState、ApprovalStatus、EvidenceVerdictStatus 或 PresentationState 枚举值**，在本目标模型中一律废止。归档成功只能作为 `MERGED` 后的审计结果/标记；归档失败也不得把已合并合同回退为其他 lifecycle。
+上述 9 态是**目标生命周期模型**。`DELIVERED` **不是 `LifecycleState`**（亦非 Approval / EvidenceVerdict / Presentation 枚举）；在 **lifecycle 轨**中不设该态（ADR-0012）。归档成功在 **交付投影轨** 可作为 `DeliveryState.DELIVERED` 内部标记（见 §0），**不得**对外冒充第三运行时终态；归档失败也不得把已合并合同回退为其他 lifecycle。
 
 | LifecycleState | 唯一合法 ApprovalStatus | 语义 |
 | --- | --- | --- |

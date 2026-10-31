@@ -1,5 +1,9 @@
 # RFC · Scheme 快照规范化模型、三元绑定与终态清理协议
 
+> ## `[PROPOSED / 未批准 / 非现行]` · 不得当施工依据（DOC-9）
+>
+> 本文**不进入**现行 Supervisor / ADR / runtime。与 SSOT 冲突时以 SSOT 为准。正文内两份 `SchemeSnapshot` 定义并存、以及 Ed25519「防篡改」措辞与 [ADR-0006](../adr/0006-local-first-no-tamper-proof.md) 的冲突，**本波不改正文**，仅横幅提示；大改待 v0.2 立项（ledger DOC-9）。
+
 > **状态**：**PROPOSED · 未批准 · 不进入现行规范**
 > **提案编号**：RFC-2026-003（文档治理重组时分配）
 > **来源**：原 `docs/rfc/scheme-snapshot-and-attestation-model.md`（修订草案，2026-10-27）
@@ -57,6 +61,7 @@ export type SchemeStatus =
   | 'FROZEN'          // 用户点击「确认方案」，只读锁定，准备编译 Contract
   | 'ABANDONED';      // 方案废弃
 
+// DOC-9：本 RFC 内另有一份 SchemeSnapshot 定义并存；以现行代码/SSOT 为准，此处仅提案稿。
 export interface SchemeSnapshot {
   schema_version: '2.0.0';
   scheme_id: string;                    // 方案唯一实例 ID
@@ -188,6 +193,7 @@ export type SchemeDemoBinding =
       stale_trigger: 'REVISION_MISMATCH' | 'DIGEST_MISMATCH'; 
     };
 
+// DOC-9：本 RFC 内另有一份 SchemeSnapshot 定义并存；以现行代码/SSOT 为准，此处仅提案稿。
 export interface SchemeSnapshot {
   scheme_id: string;
   revision: number;                 // 每次语义内容变化单调递增
@@ -357,7 +363,7 @@ export type ExecutionTask =
 
 #### 4.7.5 AST、Markdown 工件与 ExecutionContract 三元哈希绑定与差异追溯
 
-为实现「所见即所签，所签即所建」，系统建立严密的三元哈希防篡改链条：
+为实现「所见即所签，所签即所建」，系统建立严密的三元哈希完整性链条（**DOC-9**：措辞「防篡改」易与 [ADR-0006](../adr/0006-local-first-no-tamper-proof.md) 完整性/证据链口径混淆；本 RFC 提案语义不得覆盖 ADR-0006）：
 
 1. **确定性规范化渲染**：
    - `SchemeSnapshot` 基于 RFC 8785 键名排序计算规范化 SHA-256 摘要 $H_{ast}$；

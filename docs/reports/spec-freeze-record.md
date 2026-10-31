@@ -1,7 +1,7 @@
 # Stagent 规范资产封版记录（Spec Freeze Record）
 
 > **Supervisor SSOT 升级（2026-10-26）**：体验与监理合流权威见 [`../specs/supervisor.md`](../specs/supervisor.md)（`TASK-C.19`）。本 Freeze 记录仍是**全局多主题封版索引**（保留在 `docs/reports/`，**未**整份归档）。  
-> **合流前五正文已归档**（Tina t908u · `TASK-C.20`），原位于 见 Git 历史（原 `docs/archive/supervisor-pre-ssot/`）；该目录已于 2026-10-27 文档治理整体移除，原文查 Git 历史（`git log --diff-filter=D -- docs/archive/`）。**与 SSOT 冲突的体验旧词（五视口日常入口、≤2 轮问卷门控等）以 SSOT 为准**。
+> **合流前五正文已归档**（Tina t908u · `TASK-C.20`），原位于 `docs/archive/supervisor-pre-ssot/`（目录已移除，见 Git 历史）；该目录已于 2026-10-27 文档治理整体移除，原文查 Git 历史（`git log --diff-filter=D -- docs/archive/`）。**与 SSOT 冲突的体验旧词（五视口日常入口、≤2 轮问卷门控等）以 SSOT 为准**。
 
 **日期**: 2026-10-26（Asia/Hong_Kong）  
 **定位**: 短锚点 / 索引 — **不**合并五份正文；正文继续分治。  

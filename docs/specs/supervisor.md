@@ -49,7 +49,7 @@
 **本文是 Stagent Supervisor 的单一事实源（Single Source of Truth）。**
 
 - 凡「右栏怎么聊、中栏怎么显、何时出 Demo、如何确认开工、施工门禁与异常怎么处置」——**只认本文**。
-- 下列合流前碎片若与本文冲突，**一律以本文为准**。Tina t908u「归档」（`TASK-C.20`）后正文曾置于 见 Git 历史（原 `docs/archive/supervisor-pre-ssot/`）；该目录已于 2026-10-27 文档治理整体移除，原文查 Git 历史（`git log --diff-filter=D -- docs/archive/`）：
+- 下列合流前碎片若与本文冲突，**一律以本文为准**。Tina t908u「归档」（`TASK-C.20`）后正文曾置于 `docs/archive/supervisor-pre-ssot/`（目录已移除，见 Git 历史）；该目录已于 2026-10-27 文档治理整体移除，原文查 Git 历史（`git log --diff-filter=D -- docs/archive/`）：
   - `right-panel-conversation-design.md`
   - `supervisor-end-to-end-workflow.md`
   - `clarification-and-authorization.md`
@@ -1223,7 +1223,7 @@ export interface EvidenceLedger {
 
 #### 4. 实施口径与收紧项（`TASK-J.9`）
 
-`INV-LEDGER-01～03` 的零模型判定算法见 [`scheme-patch-engine.md`](./scheme-patch-engine.md)：引用锚定 §3，墓地复活 §4。该文件 §1.3 登记了对本节的收紧与补全，要点如下：
+`INV-LEDGER-01～03` 的零模型判定算法见 [`scheme-patch-engine.md`](./scheme-patch-engine.md)：引用锚定 §3，墓地复活 §4。**本节（§14.11）是 K-1～K-16 与 G-MATCH 的唯一权威正文（DOC-10）**；`scheme-patch-engine.md` §1.3 仅保留实现索引指针，不再复述 K 表。要点如下：
 
 - **K-1**：编译器 op 只能携带 `TurnRef`；op 里的 `EditRef` 一律判伪造。`EditRef` 只由用户手改产生。
 - **K-2**：`mark_user_confirmed`、墓地复活、新条目声明 `user_said` 三种场景 `quote` 必填（后者缺失时降级为 `ai_inferred`）。

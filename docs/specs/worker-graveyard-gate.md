@@ -3,8 +3,10 @@
 > **状态**：**设计定稿 · 待施工（已拆卡）**（母卡 [`TASK-J.18`](./development-tasks.md) 为 `[SPLIT]`；可开工子卡 **`TASK-J.18a`～`J.18d`**，见 `development-tasks.md` §3.4c。原单卡估算 L，按 DoR R-11 禁止直接开工。）
 > **建立日期**：2026-10-28（Asia/Hong_Kong）
 > **上位规格**：[`supervisor.md`](./supervisor.md) §14.11（`INV-LEDGER-03` 第 1 款「机器侧拦截」）、§14.11 第 5 小节 G-MATCH（本卡新增的单一语义源）、§15.6、§16.6；[`runtime-contract-and-safety.md`](./runtime-contract-and-safety.md) §2.1、§2.3、§5.2、§8；[`scheme-patch-engine.md`](./scheme-patch-engine.md) §4.2～§4.3（墓碑指纹、`matchesTombstone`、`revival_keys`）。
-> **与上位规格的关系**：本文是工地侧的实施口径。墓地匹配的**语义**只在 SSOT G-MATCH 定义一次；引擎与本门禁是它的两处投影。冲突时以 SSOT 为准。
+> **与上位规格的关系**：本文是工地侧的实施口径。墓地匹配的**语义**只在 SSOT G-MATCH 定义一次；引擎与本门禁是它的两处投影。**冲突时以 [`supervisor.md`](./supervisor.md) §14.11 为准**（含 K-9 / K-15）。
 > **逐字核对基线**：本文引用的码名、常量与规则均已对照 `main` @ `c9922b1` 原文。引擎码表为 51 码（`PATCH_CODES` 13 + `OP_CODES` 26 + `SUGGESTION_KINDS` 4 + `WARNING_CODES` 8）。
+>
+> > **DOC-10（2026-11-01）**：G-MATCH-CODE 公式与 K-9 解释冲突段已改为 SSOT 指针；本文件只保留工地投影、词表与裁决顺序等非重复内容。
 
 ---
 
@@ -81,24 +83,11 @@ before 的来源：API Worker 写前读 worktree 当前文件（F-2 处已有上
 
 ### 2.4 代码通道的匹配语义（G-MATCH-CODE，正文在 SSOT §14.11 第 5 小节）
 
-```text
-artifact_keys(entry) =
-    去重排序(
-      { w | w 是 entry.fingerprint.lexemes 与 entry.revival_keys 中的 ASCII 字母数字词，长度 ≥ 3，且 w ∉ CODE_STOPLIST }
-      ∪ ALIAS_LEXICON[w]  对上述每个 w 展开
-    )
+> **SSOT**：`artifact_keys` / `code_tokens` / 命中规则 / 证据强度见 [`supervisor.md`](./supervisor.md) §14.11 **G-MATCH-CODE-1～4**。本文**不复述公式**；实现见 `src/lib/journey/graveyard-match.ts`。自然语言单元 `U-NL` 按 **G-MATCH-NL** (b)(c)(d) 投影（弱证据）。
 
-code_tokens(text) =
-    把 text 按非字母数字切分；驼峰与下划线再切分；全部转小写；
-    同时保留完整模块说明符（"@scope/name"、"mongodb"、"github.com/x/y"）的小写原样
+**仅属本门禁的非重复补充**（词表内容，非匹配语义）：
 
-命中(unit, entry) ⇔ entry.status === "active" 且 ∃ k ∈ artifact_keys(entry)：
-    U-DEP / U-CMD / U-IMPORT：k === 包名（或模块说明符的最后一段、或 @scope/name 的 name）
-    U-PATH / U-IDENT：k ∈ code_tokens(unit.text)
-```
-
-- **不用 Dice**：代码单元的词素集合与墓碑的中文词素几乎不相交，Dice 只会制造假阴性。
-- **`CODE_STOPLIST`**：`api data file user list page app src lib test util index main config server client db http json` 等通用编程词。墓碑「做个 API 网关」的 `api` 因此不进入代码通道，只走自然语言通道（弱）。这是为了防止大面积误拦，代价已列入残余风险。
+- **`CODE_STOPLIST`**（实现常量）：`api data file user list page app src lib test util index main config server client db http json` 等通用编程词。墓碑「做个 API 网关」的 `api` 因此不进入代码通道，只走自然语言通道（弱）。这是为了防止大面积误拦，代价已列入残余风险。
 - **`ALIAS_LEXICON`**：版本化的静态别名表（`ALIAS_LEXICON_VERSION`），只收「同一方案的常见包名」，例：
 
 | 键 | 别名 |
@@ -237,7 +226,7 @@ stateDiagram-v2
 
 ### 4.2 规范写法
 
-1. **SSOT 段落只写定义，不写实现**：每条规则一个编号（`G-MATCH-NL-1`…、`G-MATCH-CODE-1`…）。引擎文档与本文在需要处写「按 G-MATCH-NL-3」，**禁止**复述公式或常量值。现有引擎文档 §4.2 的公式文字保留为历史记录，并加一行「语义以 SSOT G-MATCH 为准」（随本卡 PR 只加指针，不改正文）。
+1. **SSOT 段落只写定义，不写实现**：每条规则一个编号（`G-MATCH-NL-1`…、`G-MATCH-CODE-1`…）。引擎文档与本文在需要处写「按 G-MATCH-NL-3」，**禁止**复述公式或常量值。**DOC-10（2026-11-01）已落实**：引擎 §4.2 / 本文 §2.4 的公式副本已改为 SSOT 指针。
 2. **代码只有一份实现**：`matchNormalize`、`lexemes`、`dice` 在引擎 §5.1 布局里归属 `evidence-anchor.ts`。本卡把它们迁到 `graveyard-match.ts`，由 `evidence-anchor.ts` **再导出**，保持引擎文档里的导入路径仍然有效。`GRAVEYARD_DICE_THRESHOLD`、`NEGATION_CUES` 等常量同样只定义一次。
 3. **投影函数显式命名**：引擎侧 `primaryTextOf(op)`，门禁侧 `projectArtifact(change) → GateUnit[]`。两者都不得自己实现匹配逻辑，只能调用实现层。
 4. **ESLint 守卫**：`no-restricted-syntax` 禁止在 `graveyard-match.ts` 之外出现 `GRAVEYARD_DICE_THRESHOLD` 字面值 `0.75` 与 `.normalize("NFKC")` 用于墓地比较（以注释标签 `// G-MATCH` 定位）。
@@ -338,7 +327,7 @@ runtime §8 新增 §8.1「L3 执行期码闭集」，列：码 / 触发点 / �
 | `E_GATE_SCAN_FAILED` | **本卡新增**：全量扫描无法读取 diff | 失败关闭：不进入合并 | 「自动检查没跑完」 | **待登记** | `PREPARATION_INTERRUPTED`（提案） |
 | `E_CHECKPOINT_FAILED` | 开一轮前打检查点 | 不开工 | — | 否 | **移出 L3**，改登记为开工前码（提案） |
 
-**K-9 解释冲突（已拍板：按建议登记，见 K-15）**：K-9 规定引擎码「不登记入 `src/lib/error-codes.ts` 的 `ERROR_CODES`」，并把 `E_PROPOSAL_PREVIOUSLY_REJECTED` 列为例外，但例外条文只说明它出现在 `journal.verdicts` 且归属门禁层，**没有说明它是否进 `ERROR_CODES`**。工地侧拦截要写证据包 `verdict.reason_code`，而 `error-codes.ts` 规定每个运行时 `error_code` 都映射到一个 `reason_code`。**决定**：作为 L3 运行时码登记进 `ERROR_CODES`，映射 `SCOPE_VIOLATION`（不新增原因码）；由 K-15 明确「引擎编译期产出的同名码仍是编译日志码，工地侧产出的才是运行时码」。登记的代码动作随 **TASK-J.18c** 实施 PR 完成；在该 PR 合入前，门禁只写日志与 `forbiddenViolations`，不写 `reason_code` 新映射。
+**K-9 / K-15（SSOT）**：权威正文见 [`supervisor.md`](./supervisor.md) §14.11 **K-9** 与 **K-15**（工地侧 `E_PROPOSAL_PREVIOUSLY_REJECTED` 为 L3 运行时码并进 `ERROR_CODES` → `SCOPE_VIOLATION`；编译期同名码仍是编译日志码）。本文不复述。登记的代码动作随 **TASK-J.18c** 实施；合入前门禁只写日志与 `forbiddenViolations`，不写 `reason_code` 新映射（实施注，非二次定义）。
 
 ---
 
