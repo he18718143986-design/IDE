@@ -477,4 +477,3 @@ export function contractMatchesScopePlan(
   };
   return stableStringify(actualShape) === stableStringify(expectedShape);
 }
-
