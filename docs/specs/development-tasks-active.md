@@ -98,6 +98,30 @@
 
 ---
 
+<a id="task-w.6"></a>
+
+#### 【Task W.6】AdapterRegistry 接线与 Claude Code Worker 派工 `[NEW_TASK]` · **NON_BLOCKER**（ledger **DLV-3**）
+
+* **任务编号**：`TASK-W.6`
+* **任务名称**：把 `AdapterRegistry` 接到派工路径；Claude Code `role: "worker"` 可受控派工
+* **对应规格**：架构 / W.1 适配器抽象；ledger **DLV-3**；[`../ledger/README.md`](../ledger/README.md) DLV-3；审计依据：Worker 仅 OpenAI `AiWorker`
+* **前置依赖**：`TASK-W.1`（COMPLETED）、`TASK-W.5a`（COMPLETED · Claude Code 适配器已有）
+* **优先级**：P3 · **NON_BLOCKER**（M2 不依赖；**不阻断** `TASK-L.12`；不与 W.5b/c 抢位）
+* **状态**：`[NEW_TASK]`
+* **对照痛点（代码事实）**：`daemon/worker/adapter-registry.ts::AdapterRegistry` 已实现 register/get/requireControlled，但 `daemon/pipeline/orchestrator.ts` 派工组装真实 `AiWorker` + `OpenAiWorkerClient`（约 L1376–L1509）；`ClaudeCodeAdapter` 在 `daemon/server.ts` 主要用于右栏 `partner`，**未**经 Registry 作为受控 Worker 进入派工。
+* **一句话目标**：派工可按合同/设置选择已注册的受控适配器；至少 Claude Code worker 角色能走 Gateway 受控路径，不再写死只认 OpenAI `AiWorker`。
+* **范围**：
+  1. Daemon 启动或项目打开时注册默认适配器进 `AdapterRegistry`（含 OpenAI/`AiWorker` 封装与 Claude Code `worker`）。
+  2. orchestrator 派工：`requireControlled(adapterId)`（或等价）取代硬编码 `new AiWorker(...)`；缺注册/非受控 → 明确错误码，不得静默降级到无网关执行。
+  3. 配置面：设置「高级」或合同元数据可选 `adapter_id`（最小可用；UI 可糙）。
+  4. 测试：`tests/unit/adapter-registry-dispatch.test.ts`：注册 Claude worker → 派工命中；未注册 / `UNCONTROLLED_EXTERNAL` → 拒绝。
+* **非目标**：不做 W.5b cursor-agent / W.5c OpenHands 实测（仍各卡）；不改右栏 partner 只读白名单（J.1）；不宣称多 Agent 并行 DAG（v0.2 RFC）。
+* **不变声明**：Gateway 写范围 / Demo Origin / 鉴权：**不变**；`UNCONTROLLED_EXTERNAL` 仍不得当受控证据。
+* **验收（PASS）**：Registry 接线后至少一条非 OpenAI 受控适配器可被派工测试命中；负例拒绝成立。
+* **FAIL**：Registry 仍无生产调用却标完成；或绕过 Gateway 直改主树。
+* **关键文件**：`daemon/worker/adapter-registry.ts`、`daemon/pipeline/orchestrator.ts`、`daemon/worker/cli-host/claude-code-adapter.ts`、`daemon/server.ts`（注册点）、新测
+* **估算**：M
+* **台账**：ledger **DLV-3** → 已立卡 `TASK-W.6`。
 
 ---
 
@@ -144,7 +168,7 @@
   4. 新建 `daemon/knowledge/bootstrap-draft.ts`：`draftModules(repoRoot)`：顶层源码目录 → 候选模块，`buildDependencyGraph` → `depends_on`（确定性）。`knowledge_bootstrap` 合同的设计步骤以它为输入。
   5. `reasonCodeSchema`（`src/lib/evidence.schema.ts`）增加 `KNOWLEDGE_DRIFT`。
   6. `renderChecksSection` 追加 KB-1～KB-5 规则摘要（verification-strategy §8 第 3 项）。
-* **非目标**：不做「为什么有这段代码」入口（L.13）；不做系统地图 UI（随 L.10 第二页，另卡）。
+* **非目标**：不做「为什么有这段代码」入口（L.13）；不做系统地图 UI（**`TASK-L.18`** / DLV-5；本卡之后排期，不抢本卡）。
 * **不变声明**：网关写范围判定函数不变，只扩合同范围。
 * **验收（PASS）**：`tests/unit/knowledge-check.test.ts`：TD-06～TD-08、TD-10；`tests/unit/knowledge-bootstrap.test.ts`：TD-09。
 * **FAIL**：未覆盖的改动文件仍 `can_merge`；`docs/system/**` 写入占用文件预算。
@@ -244,6 +268,152 @@
 * **FAIL**：Worker 输入、日志、证据中出现账密；请求打到白名单外域名。
 * **关键文件**：`daemon/web-ingest/*`（新）、`daemon/mcp/gateway.ts`
 * **估算**：L（裁决后拆分）
+
+
+<a id="task-l.18"></a>
+
+#### 【Task L.18】系统地图 UI 与「改这里会影响什么」`[NEW_TASK]` · **NON_BLOCKER**（ledger **DLV-5**）
+
+* **任务编号**：`TASK-L.18`
+* **任务名称**：中栏系统地图（知识库第二页）+ 影响闭包入口
+* **对应规格**：[`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) §5；supervisor 中栏/地图嵌入；ledger **DLV-5**；对照 `TASK-L.10`（项目地图已 COMPLETED）
+* **前置依赖**：`TASK-L.10`（COMPLETED）、`TASK-L.12`（系统知识库 · 提供 `modules.yaml`；**本卡不抢 L.12 开工权**）
+* **优先级**：P3 · **NON_BLOCKER**（相对 Sprint「当前首要」**仍为 L.12**；本卡排在 L.12 之后）
+* **状态**：`[NEW_TASK]`
+* **对照痛点（代码事实）**：L.10 已同页嵌「项目地图」（计划/合同桩）；技术规格 §5 要求的「系统地图」（`modules.yaml` 白话卡片 + 依赖图）与「改这里会影响什么」（`depends_on` 反向闭包 + `interfaces/` 消费者）**尚未立卡实现**。
+* **一句话目标**：用户能在中栏看到系统模块地图，并在编辑器/右栏只读问答里问「改这里会影响什么」得到确定性闭包，而不是空话。
+* **范围**：
+  1. 中栏方案工作台内嵌「系统地图」页（**同页嵌**，禁止另开 ActivityBar「项目」Tab——沿用 L.10 入口纪律）：读目标仓 `docs/system/modules.yaml`，代码渲染依赖图（不由模型画图）。
+  2. `daemon` 或 `src/lib`：`impactClosure({ modules, path })` → 受影响模块列表（反向 `depends_on` + interfaces 消费者）；`GET /api/knowledge/impact?path=`。
+  3. 编辑器右键 / 右栏只读问答入口调用上述 API，白话展示。
+  4. 测试：`tests/unit/knowledge-impact.test.ts` + UI 烟测（地图空态 / 有 modules 渲染）。
+* **非目标**：不做 L.13「这段为什么存在」（Trailer 反查）；不重做 L.10 项目计划地图；不引入 Cytoscape 架构雷达（C.4 仍 DEFERRED）。
+* **不变声明**：右栏只读（J.1）；网关写范围不变。
+* **验收（PASS）**：有 `modules.yaml` 时地图可见模块卡；对已知边 `impactClosure` 与夹具一致；无 modules 时诚实空态。
+* **FAIL**：另开独立 ActivityBar Tab；或用模型生成依赖图当权威。
+* **关键文件**：`src/components/` 地图页（新）、impact 纯函数/API（新）、L.10 同页嵌入口（改）、测试
+* **估算**：M
+* **台账**：ledger **DLV-5** → 已立卡 `TASK-L.18`；L.12 非目标「系统地图另卡」→ 本卡。
+
+---
+
+### 3.4e 台账债立卡（2026-11-01 · NON_BLOCKER · 不抢 L.12）
+
+> Tina 授权将第一类六项写成任务卡。Sprint「当前首要」仍为 **`TASK-L.12`**。本节目的：把 ledger 待立卡改代码项变成可排期卡。
+
+
+<a id="task-a.7"></a>
+
+#### 【Task A.7】Worktree seal 路径前缀对齐 `[NEW_TASK]` · **NON_BLOCKER**
+
+* **任务编号**：`TASK-A.7`
+* **任务名称**：seal / manifest 目录与 `worktree-manager` 统一为 `task-{id}`
+* **对应规格**：[`runtime-contract-and-safety.md`](./runtime-contract-and-safety.md) §10.5 D1；ledger DOC-5 / 「第 1 波遗留 · Worktree seal 路径前缀」；[`../ledger/README.md`](../ledger/README.md)
+* **前置依赖**：`TASK-A.1`（COMPLETED）、`TASK-C.15d`（COMPLETED）
+* **优先级**：P3 · **NON_BLOCKER**（**不阻断** `TASK-L.12` 主序；不抢 Sprint「当前首要」）
+* **状态**：`[NEW_TASK]`
+* **对照痛点（代码事实）**：`daemon/guard/worktree-seal.ts::worktreeDir` 拼 `.stagent/worktrees/{contractId}/`（**无** `task-` 前缀）；`daemon/git/worktree-manager.ts` 创建路径为 `.stagent/worktrees/task-{contractId}`（约 L217）；`daemon/editor/launcher.ts` / Evidence 文案亦按 `task-{id}`。seal 与真实 Worktree 目录错位。
+* **一句话目标**：封存 / 清单读写命中与创建 Worktree **同一**物理目录 `task-{id}`，不再写到无前缀的孤儿路径。
+* **范围**：
+  1. 修改 `daemon/guard/worktree-seal.ts::worktreeDir`：目录名改为 `` `task-${sanitizedId}` ``，与 `worktree-manager` 一致。
+  2. 迁移/兼容：若旧无前缀目录仅含 seal manifest、且对应 `task-{id}` 已存在，测试约定只读新路径；不要求本卡做批量磁盘迁仓工具。
+  3. 单测：`tests/unit/worktree-seal-path.test.ts`（或扩既有 C.15d seal 测）断言 manifest 路径含 `/task-` 前缀且与 manager 解析一致。
+* **非目标**：不改 Worktree 分支名约定；不重做 EO-09 语义；不改 A.1 生命周期 API 面；不做 DLV-4 metadata。
+* **不变声明**：鉴权 / Demo Origin / 点亮三证 / 网关写范围：**不变**。
+* **验收（PASS）**：
+  - seal 写入路径 === manager 创建路径（同 `repoRoot`+`contractId`）。
+  - 既有 seal 单测全绿；新增前缀断言绿。
+* **FAIL**：仍写入 `.stagent/worktrees/{id}/`（无 `task-`）；或 seal 与 manager 路径不一致却标完成。
+* **关键文件**：`daemon/guard/worktree-seal.ts`（改）、`daemon/git/worktree-manager.ts`（只读对照）、相关 seal 测试（新/改）
+* **估算**：S
+* **台账**：关闭 ledger「Worktree seal 路径前缀」待立卡 → 本卡；DOC-5 代码侧收口归属本卡。
+
+---
+
+<a id="task-h.9"></a>
+
+#### 【Task H.9】废止 `.stagent/metadata/` 写入（对齐 ADR-0011）`[NEW_TASK]` · **NON_BLOCKER**（ledger **DLV-4**）
+
+* **任务编号**：`TASK-H.9`
+* **任务名称**：清除代码对 `.stagent/metadata/` 的写入，统一到 `.stagent/records/`
+* **对应规格**：[ADR-0011](../adr/0011-audit-sidecar-records-path.md)；ledger **DLV-4**；scheme REJ-007
+* **前置依赖**：`TASK-C.12e` / `TASK-C.15c`（COMPLETED · records 侧车已落地）
+* **优先级**：P3 · **NON_BLOCKER**（**不阻断** `TASK-L.12`）
+* **状态**：`[NEW_TASK]`
+* **对照痛点（代码事实）**：`daemon/supervisor/demo/prototypes.ts` 仍常量 `".stagent/metadata/demo-confirm.json"`；与 ADR-0011「`.stagent/metadata/` 自本 ADR 起废止，任何新代码不得写入」冲突。
+* **一句话目标**：仓库内无生产路径再创建或写入 `.stagent/metadata/**`；Demo 确认类侧车迁到 `.stagent/records/`（或既有 prototypes 约定目录）并测过。
+* **范围**：
+  1. 全文检索 `metadata/` 写入点；将 `demo-confirm`（及同类）迁到 ADR-0011 允许路径（优先 `.stagent/records/...` 或现行 `.stagent/prototypes/` 约定，卡内 PR 说明选型）。
+  2. 读路径兼容：若旧文件存在可只读迁移一次，禁止继续写入旧路径。
+  3. 测试：断言写入路径不含 `.stagent/metadata/`；旧路径写入失败或不再调用。
+* **非目标**：不重做 audit-manifest（C.12e 已完成）；不改用户项目历史目录（仅 Stagent 自身写入约定）。
+* **不变声明**：鉴权 / Demo Origin 隔离：**不变**。
+* **验收（PASS）**：`rg '\.stagent/metadata' daemon src` 无写入字面量（测试夹具除外且须注明）；相关 Demo 确认测绿。
+* **FAIL**：仍 mkdir/write `.stagent/metadata/` 却标完成。
+* **关键文件**：`daemon/supervisor/demo/prototypes.ts`（改）、相关测试
+* **估算**：S
+* **台账**：ledger **DLV-4** → 已立卡 `TASK-H.9`。
+
+---
+
+<a id="task-j.19"></a>
+
+#### 【Task J.19】DN-2「可以」HTTP / 画布入口接线 `[NEW_TASK]` · **NON_BLOCKER**（ledger **DLV-6**）
+
+* **任务编号**：`TASK-J.19`
+* **任务名称**：把已测的 `resolveDesignDependencyAllow` 接到用户可达入口
+* **对应规格**：[`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) DN-2；L.11 合入挂账；ledger **DLV-6**；可参照 `TASK-J.7` 交接/意外卡 UX 模式
+* **前置依赖**：`TASK-L.11`（COMPLETED）、`TASK-J.7`（COMPLETED · 交接三步/右栏解锁模式可复用）
+* **优先级**：P3 · **NON_BLOCKER**（不阻断 L.11 领域验收；**不阻断** `TASK-L.12`）
+* **状态**：`[NEW_TASK]`
+* **对照痛点（代码事实）**：`daemon/pipeline/orchestrator.ts::resolveDesignDependencyAllow` 已合入且集成测覆盖；`POST .../resume` **不**路由至此；画布无「可以」装新库入口 → 用户不可达（DLV-6）。
+* **一句话目标**：设计步骤因 DN-2 挂起时，用户在意外卡点「可以」能走到领域方法并触发重签/依赖桩流程；「不行」走既有拒绝路径。
+* **范围**：
+  1. HTTP：例如 `POST /api/contracts/:id/design/dependency-allow`（名称以实装为准）鉴权后调用 `resolveDesignDependencyAllow`；对称的 deny/拒绝若缺则补。
+  2. 画布意外卡：「可以 / 不行」按钮接线；文案白话；禁止假闭环（须真实调用领域方法）。
+  3. 测试：API 级 + UI/集成各至少一条命中 `resolveDesignDependencyAllow`；`resume` 仍不误路由。
+* **非目标**：不重做 DN-1～DN-5 校验；不改 DesignNote schema；不把入口做成静默自动装依赖。
+* **不变声明**：鉴权不变；未获「可以」不得放行新依赖进施工。
+* **验收（PASS）**：用户路径可达；领域方法被调用；重签/abort 语义与 L.11 卡内「已知挂账」描述一致且不再挂「无入口」。
+* **FAIL**：仅 UI 按钮无 handler；或宣称端到端闭环但未调 `resolveDesignDependencyAllow`。
+* **关键文件**：`daemon/server.ts`（路由）、编排调用、画布意外卡组件、测试
+* **估算**：S
+* **台账**：ledger **DLV-6** → 已立卡 `TASK-J.19`。
+
+---
+
+<a id="task-j.20"></a>
+
+#### 【Task J.20】OP-1 授权清单落地（dec-10 实施约束）`[NEW_TASK]` · **NON_BLOCKER**
+
+* **任务编号**：`TASK-J.20`
+* **任务名称**：确认路径敏感项授权清单的存储、scope 与失效条件
+* **对应规格**：[`../scheme.md`](../scheme.md) dec-10 / q23 / R-OP1；supervisor §14.11 **K-12**（确认路径 occurrence 洗白）；[`delivery-lifecycle.md`](./delivery-lifecycle.md) §5 **SA-1**；consistency-audit OP-1（裁决已销项，**实施**归本卡）
+* **前置依赖**：`TASK-J.3` / `TASK-J.5` / `TASK-J.9`（均 **COMPLETED**）；**不**重开 `TASK-J.9`
+* **优先级**：P2 · **NON_BLOCKER** 相对 L.12 主序（**不抢** Sprint「当前首要」）；实施敏感授权面，须单卡审
+* **状态**：`[NEW_TASK]`
+* **为何不改 J.9**：`TASK-J.9` 已 **COMPLETED**（SchemePatch 零模型合并引擎，[#12](https://github.com/he18718143986-design/IDE/pull/12)）。裁决原文曾写「落地细节由实施卡确定 / 留待 J.9」——**J.9 当时已合入**，属过时指针。证据纪律禁止把未完成实施塞回 COMPLETED 卡。本卡为 **新实施卡**，只补约束与代码，**不重开裁决**、不改 dec-10 方向。
+* **对照痛点（代码事实）**：K-12 / dec-10 已定「确认开工点名敏感项 → 授权清单 → 后续合同同项自动放行」；今日无独立授权清单存储与 scope/失效规则，SA-1 仍以单次合同 `needs_approval` 为主。
+* **一句话目标**：跨合同自动放行**可审计、可失效**；「批一次」≠「永久免检」。
+* **采用的默认值（实施约束 · 本卡写死，勿再开产品冲突卡）**：
+  1. **存储位置**：项目级侧车（建议 `.stagent/records/authorization-allowlist.json` 或 SchemeSnapshot 附属字段；PR 内二选一并测；**禁止**写入已废止的 `.stagent/metadata/`）。
+  2. **scope 粒度**：默认 **按仓库（repoRoot）** 生效；条目键 = 规范化敏感路径或保护项 id（与 SA-1 点名规则同款）；**跨合同**复用同一清单。
+  3. **失效条件**（满足任一即不得自动放行，须重新点名/确认开工）：清单项被用户显式撤销；保护清单/P.1 规则升级导致项重新分类；仓库更换；条目 TTL（若实装则默认 ≤ 90 天，可配置）；契约 `plan_digest` 基线被用户「清空授权」动作清除。
+  4. **不对称**：复活路径仍忽略 `occurrence`（K-12）；本清单**只**服务确认路径自动放行。
+* **范围**：
+  1. 类型 + 读写：`readAllowlist` / `writeAllowlist` / `isPreauthorized(sensitiveId)`。
+  2. 「确认开工」成功路径：将本次点名敏感项写入清单（带 `authorized_at`、`source_contract_id`、`quote` 溯源）。
+  3. `evaluateSchemeConfirmation` / Scope 预检：同项已授权且未失效 → 不再阻塞 `E_SCOPE_APPROVAL_REQUIRED`；证据可审计。
+  4. 测试：跨合同同项自动放行；撤销/TTL/换仓后恢复拦截；复活路径行为不变。
+* **非目标**：不重开 OP-1 裁决；不改 J.9 合并引擎公式；不放宽 P.1 物理门禁（未授权敏感写入仍拒）。
+* **不变声明**：物理保护清单与网关写范围：**不放宽**；鉴权 / Demo Origin：**不变**。
+* **验收（PASS）**：`tests/unit/authorization-allowlist.test.ts`（名可调）覆盖写入、跨合同命中、失效再拦截、复活路径不读清单。
+* **FAIL**：无失效条件的「永久免检」；或把清单写进 `.stagent/metadata/`。
+* **关键文件**：新 allowlist 模块、确认/预检接线、supervisor/delivery 短注（若行为入规格）、测试
+* **估算**：M
+* **台账**：OP-1 裁决仍销项；consistency-audit / scheme R-OP1 补「实施卡 = TASK-J.20」。
+
+---
 
 ### 3.5 架构感知、监听与差异审阅（C.5 落 Sprint 2；B.1/B.2/C.4 推迟至 v0.2+）
 
