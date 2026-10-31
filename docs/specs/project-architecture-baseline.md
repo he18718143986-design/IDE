@@ -28,13 +28,17 @@ PAB 不是合同、写范围、用户开工确认、秘密凭据授权，也不�
 - 新项目无知识库时，以仓库事实和方案建立 `initial` PAB，明确“尚无系统知识库”；不得把推断冒充代码观察。
 
 ```text
-SchemeDraftV2（可编译） → 用户确认方案 / [ADR-0018] 冻结 UserFace+MachineFace
+SchemeDraftV2（可编译）
+→ 需规划：用户点「确认方案，开始规划」 / [ADR-0018] 冻结 UserFace+MachineFace
+→ JourneyStage PROJECT_MAPPING ·「正在整理项目地图…」（右栏可聊）
 → 仓库事实快照 + PAB（ready，ADR-0019） → ProjectPlan
 → ContractStub（引用 PAB） → 合同级 ScopePlan 投影（只吃 MachineFace，禁聊天直推）
-→ Contract + DesignNote → Worker / 验证 / 合入 → docs/system/ 更新与漂移检查
+→ 下一份「确认开工」（施工授权）→ Contract + DesignNote → Worker / 验证 / 合入 → docs/system/ 更新与漂移检查
+
+tiny / 无需 PAB·Plan：方案幕直接「确认开工」或「直接改」（一次密封+授权），跳过 PROJECT_MAPPING
 ```
 
-未决业务问题与 ADR-0016 升级项由 Supervisor 显示决议卡；一般技术取舍由架构责任者提出并记录。PAB 不增加授权点击。
+未决业务问题与 ADR-0016 升级项由 Supervisor 显示决议卡（可降频/合并/延后，ADR-0001）；一般技术取舍由架构责任者提出并记录。PAB 不增加施工授权点击；「开始规划」≠「确认开工」；等待态不是第二套导航。
 
 ## 3. 最小数据模型
 

@@ -1,6 +1,6 @@
 # docs/reports · 历史签收与封版记录
 
-> **更新日期**：2026-10-27（Asia/Hong_Kong）· 文档治理重组
+> **更新日期**：2026-10-31（Asia/Hong_Kong）· 增完整诊断修订纪要
 > **本目录只保留「对外签收凭据」**：封版记录与 v0.1 的两份里程碑纪要。
 > **施工权威不在这里**——造 Stagent 只认 [`../specs/`](../specs/) 四件套 + [`../adr/`](../adr/)。地图见 [`../README.md`](../README.md)。
 
@@ -13,6 +13,7 @@
 | [`spec-freeze-record.md`](./spec-freeze-record.md) | **Spec Freeze 封版索引** | 全局多主题封版锚点（CLOSED 五正文 + 右栏；**CLOSED ≠ 免体验**；C.12a–e / C.14a–c 已 COMPLETED）。Supervisor 体验与监理语义的现行权威已升级为 [`../specs/supervisor.md`](../specs/supervisor.md)，本记录保留为**封版历史索引**。 |
 | [`v0.1-mainline-milestone.md`](./v0.1-mainline-milestone.md) | **v0.1 主路径 Sign-off** | 主路径**可签收**；**不是**全功能完成，不是 87 卡全绿。 |
 | [`v0.1-hardening-closure.md`](./v0.1-hardening-closure.md) | **v0.1 硬化收官** | H.1–H.8 落地；Tag **`v0.1.0`**；终态口径锁定为 `MERGED`（见 [ADR-0012](../adr/0012-merged-as-terminal-state.md)）。 |
+| [`完整诊断修订纪要-2026-10-31.md`](./完整诊断修订纪要-2026-10-31.md) | **完整诊断十四定型** | 产品+交付诊断落盘：确认开工文案、D9、Canvas、JourneyStage、PAB 等待态等；仅文档。 |
 
 ---
 
