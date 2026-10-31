@@ -6,7 +6,7 @@
  *   stagent open  [路径] [--port <n>] [--ui-url <url>] [--no-browser]
  *   stagent start [--repo <path>] [--port <n>] [--ui-url <url>] [--no-browser]
  *   stagent status [--repo <path>]
- *   stagent check obligations --report <path>
+ *   stagent check obligations --report <path> [--phase t|i]
  *   stagent check test-integrity --base <path> --candidate <path> [--lang <lang>]
  *
  * 安全约定（A §6.1 / B TASK-D.1 / D.1b）：
@@ -184,8 +184,9 @@ function printHelp(): void {
   stagent start [--repo <path>] [--port <n>] [--ui-url <url>] [--no-browser]
                                    启动本地 Daemon（仅绑定 127.0.0.1，端口 3001~3010）
   stagent status [--repo <path>]   查看当前仓库 Daemon 状态
-  stagent check obligations --report <path>
-                                   读运行报告，按 classifyRun 给出 red/green/red_invalid（退出码 0=green）
+  stagent check obligations --report <path> [--phase t|i]
+                                   读运行报告分类；无 --phase 时 0=green；
+                                   --phase t 期望 red；--phase i 期望 green
   stagent check test-integrity --base <path> --candidate <path> [--lang ts|js|py|go|rs]
                                    比对基线与候选测试，检测削弱（退出码 0=未削弱）
   stagent version                  显示版本号
@@ -426,6 +427,7 @@ export function runCheckCommand(checkArgv: readonly string[]): {
   const sub = checkArgv[0];
   if (sub === "obligations") {
     const reportPath = parseCheckFlag(checkArgv, "--report");
+    const phaseRaw = parseCheckFlag(checkArgv, "--phase");
     if (!reportPath) {
       const stdout = JSON.stringify({
         ok: false,
@@ -433,13 +435,58 @@ export function runCheckCommand(checkArgv: readonly string[]): {
       });
       return { exitCode: 1, stdout };
     }
+    if (
+      phaseRaw !== undefined &&
+      phaseRaw !== "t" &&
+      phaseRaw !== "i"
+    ) {
+      const stdout = JSON.stringify({
+        ok: false,
+        error: 'invalid --phase; use "t" or "i"',
+      });
+      return { exitCode: 1, stdout };
+    }
     try {
       const report = readJsonFile(path.resolve(reportPath));
       const classification: ObligationRunClass = classifyRun(report);
-      const ok = classification === "green";
+      // 无 --phase：保持 L.3 行为（green → 0）
+      if (phaseRaw === undefined) {
+        const ok = classification === "green";
+        const stdout = JSON.stringify({
+          ok,
+          classification,
+          report: path.resolve(reportPath),
+        });
+        return { exitCode: ok ? 0 : 1, stdout };
+      }
+      // TASK-L.4：分段期望
+      let ok = false;
+      let reason_code:
+        | "OBLIGATION_NOT_RED"
+        | "OBLIGATION_RED_INVALID"
+        | "OBLIGATION_NOT_GREEN"
+        | undefined;
+      if (phaseRaw === "t") {
+        if (classification === "red") {
+          ok = true;
+        } else if (classification === "red_invalid") {
+          reason_code = "OBLIGATION_RED_INVALID";
+        } else {
+          reason_code = "OBLIGATION_NOT_RED";
+        }
+      } else {
+        // phase i
+        if (classification === "green") {
+          ok = true;
+        } else {
+          reason_code = "OBLIGATION_NOT_GREEN";
+        }
+      }
       const stdout = JSON.stringify({
         ok,
         classification,
+        phase: phaseRaw,
+        ...(reason_code === undefined ? {} : { reason_code }),
         report: path.resolve(reportPath),
       });
       return { exitCode: ok ? 0 : 1, stdout };

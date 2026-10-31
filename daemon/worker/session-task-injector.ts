@@ -141,6 +141,11 @@ export interface BuildWorkerInstructionInput {
   declaration?: AdapterCapabilityDeclaration | undefined;
   /** 调用方期望暴露的工具子集；缺省按合同授权推导 */
   exposedTools?: readonly string[] | undefined;
+  /**
+   * TASK-L.4：追加到「你会被这样检查」段末的条目（本段义务清单等）。
+   * 缺省空数组，行为与 L.2 一致。
+   */
+  checksExtras?: readonly string[] | undefined;
 }
 
 /**
@@ -431,7 +436,7 @@ export function buildWorkerTaskInstruction(
         "（适配器未声明已知限制；该状态不允许受控执行）",
       ),
     },
-    renderChecksSection(contract),
+    renderChecksSection(contract, input.checksExtras ?? []),
     {
       title: "输出契约",
       body: [

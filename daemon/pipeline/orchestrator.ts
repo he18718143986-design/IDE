@@ -78,6 +78,8 @@ import {
   removeTaskWorktree,
   type WorktreeInfo,
 } from "../git/worktree-manager";
+import type { PhaseOverlay } from "../mcp/gateway";
+import { runTwoPhaseConstruction, type TwoPhaseHooks } from "./two-phase-runner";
 import {
   E_OUT_OF_SCOPE_UNTRACKED,
   UntrackedScopeViolationError,
@@ -1153,6 +1155,7 @@ export class ContractOrchestrator {
   private buildRuntime(
     contract: SoftwareContract,
     signal?: AbortSignal,
+    phaseOverlay?: PhaseOverlay,
   ): {
     gateway: ScopedWorktreeGateway;
     costMonitor: CostMonitor;
@@ -1207,6 +1210,7 @@ export class ContractOrchestrator {
       runtimeInterceptor: interceptor,
       requireRepoTrust: true,
       dirtyExclusions,
+      ...(phaseOverlay === undefined ? {} : { phaseOverlay }),
       ...(this.deadlock === null ? {} : { deadlock: this.deadlock }),
       ...(signal === undefined ? {} : { signal }),
       ...(this.onTerminalLine === undefined
@@ -1571,6 +1575,57 @@ export class ContractOrchestrator {
       return null;
     }
   }
+  /** TASK-L.4：带运行期收窄的网关（供两段式 / 集成测） */
+  buildRuntimeWithOverlay(
+    contract: SoftwareContract,
+    phaseOverlay?: PhaseOverlay,
+    signal?: AbortSignal,
+  ): {
+    gateway: ScopedWorktreeGateway;
+    costMonitor: CostMonitor;
+    loopGuard: LoopGuard;
+    worktreePath: string;
+    interceptor: RuntimeInterceptor;
+  } {
+    return this.buildRuntime(contract, signal, phaseOverlay);
+  }
+
+  /**
+   * TASK-L.4：两段式施工（先红后绿）。无未豁免义务时退化为单段。
+   * 编排细节见 daemon/pipeline/two-phase-runner.ts。
+   */
+  async runTwoPhase(
+    contractId: string,
+    hooks: TwoPhaseHooks,
+  ): Promise<Awaited<ReturnType<typeof runTwoPhaseConstruction>>> {
+    const current = this.store.get(contractId);
+    if (!current) throw new Error(`Contract not found: ${contractId}`);
+    return runTwoPhaseConstruction(
+      {
+        contract: current,
+        repoRoot: this.repoRoot,
+        buildGateway: (overlay) => {
+          const { gateway } = this.buildRuntime(current, undefined, overlay);
+          return gateway;
+        },
+        transitionPendingResume: (reason, detail) => {
+          try {
+            this.store.transition({
+              contractId,
+              lifecycleState: "PENDING_RESUME",
+            });
+          } catch (err) {
+            // 状态机若拒绝直接跳转，仍写入 suspension.json（runner 已写）
+            void err;
+            void reason;
+            void detail;
+          }
+        },
+      },
+      hooks,
+    );
+  }
+
 }
 
 /** 单条验证命令在 Evidence 中保留的日志尾巴字符数 */
