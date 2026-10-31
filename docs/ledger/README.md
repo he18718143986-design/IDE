@@ -66,3 +66,14 @@
 | DLV-3 | `AdapterRegistry` 未接线，Worker 只有 OpenAI `AiWorker`；Claude Code 作 Worker（W.5a 的 worker 角色）未接入派工 | NON_BLOCKER（M2 不依赖） | 卡 owner | 审计 §2 S5；需另立卡 |
 | DLV-4 | `.stagent/metadata/` 仍在代码写入路径列表中，与 ADR-0011 废止该路径冲突 | NON_BLOCKER | 卡 owner | 审计依据：代码 `.stagent/` 写入清单 |
 | DLV-5 | 系统地图 UI（项目视图第二页）与「改这里会影响什么」入口尚未立卡 | NON_BLOCKER | — | [`../specs/technical-design-and-knowledge.md`](../specs/technical-design-and-knowledge.md) §5 |
+
+
+## DoR 全量审计挂账（2026-10-31 新增）
+
+来源：[`../reports/dor-readiness-audit-2026-10-31.md`](../reports/dor-readiness-audit-2026-10-31.md)（L4 证据；本表只登记结构/状态问题，不改卡条款）。
+
+| 编号 | 问题 | 阻断级别 | 决策人 | 落点 |
+| :--- | :--- | :--- | :--- | :--- |
+| DOR-1 | `TASK-J.18c` / `J.18d`：§1.1 矩阵与卡内状态仍为 `NEW_TASK`，但 `main` @ `a2fa7df`（PR #27）已含 `daemon/guard/worker-graveyard-gate.ts`、`dispatch-binding.ts` 及派工/写路径接线；卡内「代码事实」声称文件不存在 → DoR 无法诚实判 READY，亦不能在未回写时当历史 N/A | NON_BLOCKER（文档真相） | 卡 owner | 回写矩阵与卡状态（或另立「残余工作」差分卡）；参见待合 docs PR（若有） |
+| DOR-2 | §1.1 矩阵有 `TASK-0.1`、`TASK-A.1`～`A.6`，但 `development-tasks.md` §3.4 无对应 `#### 【Task …】` 详细正文 → 无法按 R-1～R-12 举证 | NON_BLOCKER | 卡 owner / 文档治理 | 补历史正文指针，或矩阵改注「正文见 Git 历史 / 已归档」 |
+| DOR-3 | `TASK-W.5b` / `W.5c` 正文远低于现行 DoR（缺范围路径与签名、独立 PASS 清单、估算、代码事实锚点等），却仍挂在矩阵 `NEW_TASK` | NON_BLOCKER（未排入 M2～M4 关键路径） | 卡 owner | 按 `task-card-standard.md` 重写后再进入可开工队列 |
