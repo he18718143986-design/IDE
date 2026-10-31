@@ -32,6 +32,7 @@ const REGRESSION_FINGERPRINT = [
   "tests/unit/task-c15b-rework-live-path.test.ts",
   "tests/unit/dispute-gray.test.ts",
   "tests/unit/task-h7-mainline-regression.test.ts",
+  "tests/e2e/golden-slice.test.ts",
 ];
 
 const missing = REGRESSION_FINGERPRINT.filter(
@@ -56,6 +57,7 @@ const r = spawnSync(
     "tests/unit/task-h5-draft-contract-id.test.ts",
     "tests/unit/task-h6-dirty-guidance.test.ts",
     "tests/unit/task-h8-records-export-cleanup.test.ts",
+    "tests/e2e/golden-slice.test.ts",
   ],
   { cwd: root, stdio: "inherit" },
 );
