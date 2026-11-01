@@ -194,29 +194,6 @@
 
 ### 3.4d 交付全链路 · 目标能力（L 系列 · 2026-10-30 立卡）
 
-<a id="task-l.16"></a>
-
-#### 【Task L.16】线上问题回流 `[NEW_TASK]`
-
-* **任务编号**：`TASK-L.16`
-* **对应规格**：[`release-and-operations.md`](./release-and-operations.md) §5、§7（RO-10）
-* **前置依赖**：`TASK-L.15`、`TASK-L.9`
-* **优先级**：P3（M4）
-* **状态**：`[NEW_TASK]`
-* **对照痛点（代码事实）**：无运行监测；合入后的缺陷只能靠用户重新描述。
-* **一句话目标**：线上应用出错时，画布出现「线上」卡，用户点一下就生成一份带现场信息的修复合同。
-* **范围**：
-  1. `release-manager.ts`：`local_process` 进程退出时记录退出码与脱敏 stderr 尾部；LIVE 后每 60 秒探活（目标配置 `watch: false` 可关）。
-  2. 新建 `src/components/release/LiveIncidentCard.tsx`：「<目标> 停了，最后的错误是…」+「让 AI 看看」。
-  3. 「让 AI 看看」→ 生成 `PlanPatch`：`add_stub` 置顶，`kind: "feature"`，`title` 为白话，`origin: "system"`，`context: { release_id, commit_sha, log_tail }`（L.7 字段），按 project-decomposition §2 放置规则插入。
-  4. supervisor §16.5 分流新增 E 类「线上问题」的判定函数（`src/lib/journey/intent-router.ts`）：消息含 LIVE 目标名或「线上 / 上线后 / 生产」且无施工中合同。
-* **非目标**：不做告警推送到外部渠道；不做热修。
-* **不变声明**：合并后缺陷开新微合同（supervisor §5），不在 `MERGED` 合同上返工。
-* **验收（PASS）**：`tests/integration/live-incident.test.ts`：RO-10；`tests/unit/intent-router.test.ts` 新增 E 类判定用例（命中两条、不命中两条）。
-* **FAIL**：回流修改了已合并合同；日志尾部含密钥明文。
-* **关键文件**：`daemon/release/release-manager.ts`、`src/components/release/LiveIncidentCard.tsx`（新）、`src/lib/journey/intent-router.ts`
-* **估算**：M
-
 <a id="task-l.17"></a>
 
 #### 【Task L.17】受控只读外网摄取（北极星前置） `[NEW_TASK]`
@@ -241,7 +218,7 @@
 
 ### 3.4e 台账债立卡（2026-11-01 · NON_BLOCKER · 不抢主序）
 
-> Tina 授权将第一类六项写成任务卡。Sprint「当前首要」现为 **`TASK-L.16`**（L.15 已 COMPLETED / #52/`9829385`）。本节目的：把 ledger 待立卡改代码项变成可排期卡；`A.7`/`H.9`/`L.18`/`J.19`/`J.20` 已 COMPLETED（见 completed / #58/#60）；余下 **`W.6`** 仍为 NON_BLOCKER，不抢 L.16、且须等 J.19 合入后（现已合）才可开、不与 W.5b/c 同窗。另立 **`TASK-W.7`**（自助注册/自动验证 · 硬前置 W.6 · **不抢** W.5b/c 实测窗口）。
+> Tina 授权将第一类六项写成任务卡。Sprint：主序实现卡 **`L.16` 已 COMPLETED**（#62/`e4dfe1c`）；**`L.17` 仍卡 oq-2 未裁决，主序实现卡已尽**（**不开工** L.17）。本节目的：把 ledger 待立卡改代码项变成可排期卡；`A.7`/`H.9`/`L.18`/`J.19`/`J.20` 已 COMPLETED（见 completed / #58/#60）；余下 **`W.6`** 仍为 NON_BLOCKER（可开；**不与** W.5b/c 同窗）。另立 **`TASK-W.7`**（自助注册/自动验证 · 硬前置 W.6 · **不抢** W.5b/c 实测窗口）。
 
 ### 3.5 架构感知、监听与差异审阅（C.5 落 Sprint 2；B.1/B.2/C.4 推迟至 v0.2+）
 

@@ -210,7 +210,7 @@
 
 > 这是给 Worker 的「还差什么」。卡号以 [`specs/development-tasks.md`](./specs/development-tasks.md) 为准；supervisor §19 的 L-01～L-10 不在此重复。
 >
-> **2026-11-01 回写**：下表已按 L.15 证据 tip `9829385` / 物理 tip `8148c2c`（含 J.2～J.10、J.18a～d、L.1～L.15、**L.14** 合入；另含 #28～#53 文档/实现；A.7/H.9 代码已合入、docs 另回写）回写「当前代码事实」；管道口径对齐 [ADR-0018](./adr/0018-intent-to-executable-seal.md)（确认 → Seal MachineFace → PAB → ProjectPlan → Worker；禁确认路径 `buildL0Plan(chat)`）。未合实现卡（如 L.16～）不得标关闭；Sprint 指向 **L.16**（L.15 已 COMPLETED · #52/`9829385`）。
+> **2026-11-01 回写**：下表已按 L.16 证据 tip `e4dfe1c` / 物理 tip `e4dfe1c`（含 J.2～J.10、J.18a～d、L.1～L.16、**L.14**/L.15/L.18、J.19/J.20、A.7/H.9 合入；另含 #28～#62 文档/实现）回写「当前代码事实」；管道口径对齐 [ADR-0018](./adr/0018-intent-to-executable-seal.md)（确认 → Seal MachineFace → PAB → ProjectPlan → Worker；禁确认路径 `buildL0Plan(chat)`）。未合实现卡（如 L.17～，oq-2 未裁决）不得标关闭；主序实现卡已尽；Sprint **不开工 L.17**。
 
 | id | 方案要求 | 当前代码事实 | 对应卡 / 台账 |
 | :--- | :--- | :--- | :--- |
@@ -230,7 +230,7 @@
 | gap-14 | 新功能带测试 | Worker 指令已补「你会被这样检查」（L.2）；合同元数据 / `withSystemScope` / `stagent check` 义务与削弱检测已合入（L.3）；**两段式先红后绿编排已合入（L.4）**（`runWorker`→`runTwoPhase`）；**M2 黄金切片 E2E 已合入（L.6）** | `L.2`/`L.3`/`L.4`/`L.6` **COMPLETED**（[#8](https://github.com/he18718143986-design/IDE/pull/8)/[#15](https://github.com/he18718143986-design/IDE/pull/15)/[#18](https://github.com/he18718143986-design/IDE/pull/18)/[#21](https://github.com/he18718143986-design/IDE/pull/21) / `93589bf`） |
 | gap-15 | 试玩看到真实应用 | Worktree 真实应用预览已合入（`daemon/supervisor/preview/app-runner.ts`；端口段 4200～4210，与 Demo 段隔离） | `TASK-L.5` **COMPLETED**（[#14](https://github.com/he18718143986-design/IDE/pull/14) / `0b6bc7f`） |
 | gap-16 | 技术方案与系统知识 | **收口（L.11+L.12+L.13+L.18+J.19）**：`DesignNote`/DN-1～5/`design-note.json` 已合入（#43/`78ec236`）。**DN-2 HTTP/画布入口已合入（J.19）**：`/api/design/*` allow/deny + surprise 侧车 + 画布卡（#55/`4bae423`）；DLV-6 **RESOLVED**。**系统知识库与漂移门禁已合入（L.12）**（#47/`39f426a`）。**追踪链已合入（L.13）**（#51/`51ea872`；行号限制见 completed）。**系统地图 UI + impactClosure 已合入（L.18）**（#54/`c8e6a81`）；interfaces consumers 行依赖见挂账。`daemon/arch/*` 仍只做按需展示 | `TASK-L.11`/`L.12`/`L.13`/`L.18`/`J.19` **COMPLETED**；DLV-5/DLV-6 **RESOLVED** |
-| gap-17 | 合并后可发布 | **代码已收口（L.15）**：`daemon/release/*` + `ReleaseRecord` + `local_process`/`user_command`；失败回滚；保险库仅注入 deploy/health；白名单 host env。回流监测仍待 L.16。已知挂账：process-registry 仅内存、`/run` 同步阻塞、替身适配器测未跑真 npm start | `TASK-L.15` **COMPLETED**（[#52](https://github.com/he18718143986-design/IDE/pull/52)/`9829385`）；余量 `TASK-L.16` |
+| gap-17 | 合并后可发布 | **收口（L.15+L.16）**：`daemon/release/*` + `ReleaseRecord` + `local_process`/`user_command`；失败回滚；保险库仅注入 deploy/health；白名单 host env。**线上回流已合入（L.16）**：LIVE 退出/探活 → `live_incident` 落盘 → 发布页「线上」卡 → ask-ai 插 `origin:system` 桩；E 类分流只指引（#62/`e4dfe1c`）。已知挂账：L.15 process-registry 仅内存、`/run` 同步阻塞、替身适配器未跑真 npm start；L.16 卡未进中栏、探活夹具偏 process_exit、重启不重挂 watch 等见 completed | `TASK-L.15` **COMPLETED**（[#52](https://github.com/he18718143986-design/IDE/pull/52)/`9829385`）；`TASK-L.16` **COMPLETED**（[#62](https://github.com/he18718143986-design/IDE/pull/62)/`e4dfe1c`） |
 
 ---
 
