@@ -106,7 +106,7 @@
 * **任务名称**：把 `AdapterRegistry` 接到派工路径；Claude Code `role: "worker"` 可受控派工
 * **对应规格**：架构 / W.1 适配器抽象；ledger **DLV-3**；[`../ledger/README.md`](../ledger/README.md) DLV-3；审计依据：Worker 仅 OpenAI `AiWorker`
 * **前置依赖**：`TASK-W.1`（COMPLETED）、`TASK-W.5a`（COMPLETED · Claude Code 适配器已有）
-* **优先级**：P3 · **NON_BLOCKER**（M2 不依赖；**不阻断** `TASK-L.12`；不与 W.5b/c 抢位）
+* **优先级**：P3 · **NON_BLOCKER**（M2 不依赖；**不阻断** `TASK-L.13`；不与 W.5b/c 抢位）
 * **状态**：`[NEW_TASK]`
 * **对照痛点（代码事实）**：`daemon/worker/adapter-registry.ts::AdapterRegistry` 已实现 register/get/requireControlled，但 `daemon/pipeline/orchestrator.ts` 派工组装真实 `AiWorker` + `OpenAiWorkerClient`（约 L1376–L1509）；`ClaudeCodeAdapter` 在 `daemon/server.ts` 主要用于右栏 `partner`，**未**经 Registry 作为受控 Worker 进入派工。
 * **一句话目标**：派工可按合同/设置选择已注册的受控适配器；至少 Claude Code worker 角色能走 Gateway 受控路径，不再写死只认 OpenAI `AiWorker`。
@@ -149,31 +149,6 @@
 * **估算**：L（**已失效作开工依据**；以子卡 S/M 为准）
 
 ### 3.4d 交付全链路 · 目标能力（L 系列 · 2026-10-30 立卡）
-
-<a id="task-l.12"></a>
-
-#### 【Task L.12】系统知识库：Schema、引导合同与漂移门禁 `[NEW_TASK]`
-
-* **任务编号**：`TASK-L.12`
-* **对应规格**：[`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) §4、§6（TD-06～TD-10）；ADR-0016；`scheme.md` acc-8
-* **前置依赖**：`TASK-L.11`
-* **优先级**：P2（M3）
-* **状态**：`[NEW_TASK]`
-* **对照痛点（代码事实）**：目标项目没有任何系统描述；`daemon/arch/graph.ts::buildDependencyGraph` 结果不落盘。
-* **一句话目标**：每份合同合入时，目标仓库的 `docs/system/` 都覆盖本次改动；漂移即判不合格。
-* **范围**：
-  1. `src/lib/knowledge/modules-schema.ts`（L.11 已建）增加 `coversPath(modules, path)`，glob 匹配复用 `src/lib/scope.ts::matchesAnyPattern`。
-  2. 新建 `daemon/knowledge/check-knowledge.ts`：`checkKnowledge({ worktreeDir, baseSha, candidateSha, designNote }) → { ok, failures: { rule: "KB-1"…"KB-5", target }[] }`；由 `bin/stagent.ts` 子命令 `stagent check knowledge` 以真实进程调用（退出码 0 / 1，ADR-0005），作为验证命令排在 V2 之后；失败 → 证据 `FAILED`、原因码 `KNOWLEDGE_DRIFT`。
-  3. `withSystemScope`（L.3）扩展：目标仓库已有 `docs/system/modules.yaml`，或本桩为 `knowledge_bootstrap` 时，在签署前把 `docs/system/**` 与 `stagent check knowledge` 并入 `ScopePlan`；`daemon/mcp/gateway.ts` 的文件预算计数（约 L1117）排除 `docs/system/**`。
-  4. 新建 `daemon/knowledge/bootstrap-draft.ts`：`draftModules(repoRoot)`：顶层源码目录 → 候选模块，`buildDependencyGraph` → `depends_on`（确定性）。`knowledge_bootstrap` 合同的设计步骤以它为输入。
-  5. `reasonCodeSchema`（`src/lib/evidence.schema.ts`）增加 `KNOWLEDGE_DRIFT`。
-  6. `renderChecksSection` 追加 KB-1～KB-5 规则摘要（verification-strategy §8 第 3 项）。
-* **非目标**：不做「为什么有这段代码」入口（L.13）；不做系统地图 UI（**`TASK-L.18`** / DLV-5；本卡之后排期，不抢本卡）。
-* **不变声明**：网关写范围判定函数不变，只扩合同范围。
-* **验收（PASS）**：`tests/unit/knowledge-check.test.ts`：TD-06～TD-08、TD-10；`tests/unit/knowledge-bootstrap.test.ts`：TD-09。
-* **FAIL**：未覆盖的改动文件仍 `can_merge`；`docs/system/**` 写入占用文件预算。
-* **关键文件**：`src/lib/knowledge/modules-schema.ts`（新）、`daemon/knowledge/check-knowledge.ts`（新）、`daemon/knowledge/bootstrap-draft.ts`（新）、`bin/stagent.ts`、`daemon/mcp/gateway.ts`、`src/lib/scope.ts`（只读复用）、`daemon/arch/graph.ts`（只读复用）
-* **估算**：M
 
 <a id="task-l.13"></a>
 
@@ -277,8 +252,8 @@
 * **任务编号**：`TASK-L.18`
 * **任务名称**：中栏系统地图（知识库第二页）+ 影响闭包入口
 * **对应规格**：[`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) §5；supervisor 中栏/地图嵌入；ledger **DLV-5**；对照 `TASK-L.10`（项目地图已 COMPLETED）
-* **前置依赖**：`TASK-L.10`（COMPLETED）、`TASK-L.12`（系统知识库 · 提供 `modules.yaml`；**本卡不抢 L.12 开工权**）
-* **优先级**：P3 · **NON_BLOCKER**（相对 Sprint「当前首要」**仍为 L.12**；本卡排在 L.12 之后）
+* **前置依赖**：`TASK-L.10`（COMPLETED）、`TASK-L.12`（COMPLETED · 提供 `modules.yaml`；**本卡不抢 L.13**）
+* **优先级**：P3 · **NON_BLOCKER**（相对 Sprint「当前首要」**现为 L.13**；前置 `L.12` 已 COMPLETED；本卡不抢 L.13）
 * **状态**：`[NEW_TASK]`
 * **对照痛点（代码事实）**：L.10 已同页嵌「项目地图」（计划/合同桩）；技术规格 §5 要求的「系统地图」（`modules.yaml` 白话卡片 + 依赖图）与「改这里会影响什么」（`depends_on` 反向闭包 + `interfaces/` 消费者）**尚未立卡实现**。
 * **一句话目标**：用户能在中栏看到系统模块地图，并在编辑器/右栏只读问答里问「改这里会影响什么」得到确定性闭包，而不是空话。
@@ -297,9 +272,9 @@
 
 ---
 
-### 3.4e 台账债立卡（2026-11-01 · NON_BLOCKER · 不抢 L.12）
+### 3.4e 台账债立卡（2026-11-01 · NON_BLOCKER · 不抢主序）
 
-> Tina 授权将第一类六项写成任务卡。Sprint「当前首要」仍为 **`TASK-L.12`**。本节目的：把 ledger 待立卡改代码项变成可排期卡。
+> Tina 授权将第一类六项写成任务卡。Sprint「当前首要」现为 **`TASK-L.13`**（L.12 已 COMPLETED）。本节目的：把 ledger 待立卡改代码项变成可排期卡；六卡仍为 NON_BLOCKER，不抢 L.13。
 
 
 <a id="task-a.7"></a>
@@ -310,7 +285,7 @@
 * **任务名称**：seal / manifest 目录与 `worktree-manager` 统一为 `task-{id}`
 * **对应规格**：[`runtime-contract-and-safety.md`](./runtime-contract-and-safety.md) §10.5 D1；ledger DOC-5 / 「第 1 波遗留 · Worktree seal 路径前缀」；[`../ledger/README.md`](../ledger/README.md)
 * **前置依赖**：`TASK-A.1`（COMPLETED）、`TASK-C.15d`（COMPLETED）
-* **优先级**：P3 · **NON_BLOCKER**（**不阻断** `TASK-L.12` 主序；不抢 Sprint「当前首要」）
+* **优先级**：P3 · **NON_BLOCKER**（**不阻断** `TASK-L.13` 主序；不抢 Sprint「当前首要」）
 * **状态**：`[NEW_TASK]`
 * **对照痛点（代码事实）**：`daemon/guard/worktree-seal.ts::worktreeDir` 拼 `.stagent/worktrees/{contractId}/`（**无** `task-` 前缀）；`daemon/git/worktree-manager.ts` 创建路径为 `.stagent/worktrees/task-{contractId}`（约 L217）；`daemon/editor/launcher.ts` / Evidence 文案亦按 `task-{id}`。seal 与真实 Worktree 目录错位。
 * **一句话目标**：封存 / 清单读写命中与创建 Worktree **同一**物理目录 `task-{id}`，不再写到无前缀的孤儿路径。
@@ -338,7 +313,7 @@
 * **任务名称**：清除代码对 `.stagent/metadata/` 的写入，统一到 `.stagent/records/`
 * **对应规格**：[ADR-0011](../adr/0011-audit-sidecar-records-path.md)；ledger **DLV-4**；scheme REJ-007
 * **前置依赖**：`TASK-C.12e` / `TASK-C.15c`（COMPLETED · records 侧车已落地）
-* **优先级**：P3 · **NON_BLOCKER**（**不阻断** `TASK-L.12`）
+* **优先级**：P3 · **NON_BLOCKER**（**不阻断** `TASK-L.13`）
 * **状态**：`[NEW_TASK]`
 * **对照痛点（代码事实）**：`daemon/supervisor/demo/prototypes.ts` 仍常量 `".stagent/metadata/demo-confirm.json"`；与 ADR-0011「`.stagent/metadata/` 自本 ADR 起废止，任何新代码不得写入」冲突。
 * **一句话目标**：仓库内无生产路径再创建或写入 `.stagent/metadata/**`；Demo 确认类侧车迁到 `.stagent/records/`（或既有 prototypes 约定目录）并测过。
@@ -364,7 +339,7 @@
 * **任务名称**：把已测的 `resolveDesignDependencyAllow` 接到用户可达入口
 * **对应规格**：[`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) DN-2；L.11 合入挂账；ledger **DLV-6**；可参照 `TASK-J.7` 交接/意外卡 UX 模式
 * **前置依赖**：`TASK-L.11`（COMPLETED）、`TASK-J.7`（COMPLETED · 交接三步/右栏解锁模式可复用）
-* **优先级**：P3 · **NON_BLOCKER**（不阻断 L.11 领域验收；**不阻断** `TASK-L.12`）
+* **优先级**：P3 · **NON_BLOCKER**（不阻断 L.11 领域验收；**不阻断** `TASK-L.13`）
 * **状态**：`[NEW_TASK]`
 * **对照痛点（代码事实）**：`daemon/pipeline/orchestrator.ts::resolveDesignDependencyAllow` 已合入且集成测覆盖；`POST .../resume` **不**路由至此；画布无「可以」装新库入口 → 用户不可达（DLV-6）。
 * **一句话目标**：设计步骤因 DN-2 挂起时，用户在意外卡点「可以」能走到领域方法并触发重签/依赖桩流程；「不行」走既有拒绝路径。
@@ -390,7 +365,7 @@
 * **任务名称**：确认路径敏感项授权清单的存储、scope 与失效条件
 * **对应规格**：[`../scheme.md`](../scheme.md) dec-10 / q23 / R-OP1；supervisor §14.11 **K-12**（确认路径 occurrence 洗白）；[`delivery-lifecycle.md`](./delivery-lifecycle.md) §5 **SA-1**；consistency-audit OP-1（裁决已销项，**实施**归本卡）
 * **前置依赖**：`TASK-J.3` / `TASK-J.5` / `TASK-J.9`（均 **COMPLETED**）；**不**重开 `TASK-J.9`
-* **优先级**：P2 · **NON_BLOCKER** 相对 L.12 主序（**不抢** Sprint「当前首要」）；实施敏感授权面，须单卡审
+* **优先级**：P2 · **NON_BLOCKER** 相对 L.13 主序（**不抢** Sprint「当前首要」）；实施敏感授权面，须单卡审
 * **状态**：`[NEW_TASK]`
 * **为何不改 J.9**：`TASK-J.9` 已 **COMPLETED**（SchemePatch 零模型合并引擎，[#12](https://github.com/he18718143986-design/IDE/pull/12)）。裁决原文曾写「落地细节由实施卡确定 / 留待 J.9」——**J.9 当时已合入**，属过时指针。证据纪律禁止把未完成实施塞回 COMPLETED 卡。本卡为 **新实施卡**，只补约束与代码，**不重开裁决**、不改 dec-10 方向。
 * **对照痛点（代码事实）**：K-12 / dec-10 已定「确认开工点名敏感项 → 授权清单 → 后续合同同项自动放行」；今日无独立授权清单存储与 scope/失效规则，SA-1 仍以单次合同 `needs_approval` 为主。
