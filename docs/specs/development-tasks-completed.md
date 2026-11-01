@@ -3060,6 +3060,33 @@
 * **关键文件**：`src/lib/knowledge/modules-schema.ts`、`daemon/knowledge/check-knowledge.ts`（新）、`daemon/knowledge/bootstrap-draft.ts`（新）、`bin/stagent.ts`、`daemon/mcp/gateway.ts`、`src/lib/scope.ts`（只读复用）、`daemon/arch/graph.ts`（只读复用）
 * **估算**：M
 
+<a id="task-l.13"></a>
+
+#### 【Task L.13】追踪链：Trailer 扩展与「这段为什么存在」反查 `[COMPLETED]`
+
+* **任务编号**：`TASK-L.13`
+* **对应规格**：[`delivery-lifecycle.md`](./delivery-lifecycle.md) §6；[`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) §5
+* **前置依赖**：`TASK-L.9`（合同带 `scheme_item_ids`）、`TASK-L.12`（`changelog.md` 条目保证存在）
+* **优先级**：P2（M3）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#51](https://github.com/he18718143986-design/IDE/pull/51) / tip `51ea872`（`feat(L.13): Trailer Scheme-Items + explainLine 追踪链反查`；GitHub squash merge）
+* **合入说明（行号准确范围）**：反查以 Daemon `repoRoot` 的 HEAD 做 `git blame`；**仅对已合入主干、且本地无未提交改动的文件行准确**。Worktree 打开中的未合入文件、或与 HEAD 行号错位的脏工作区，可能「看起来像查成功」但来历对不上——已知限制，未在本卡修 worktree/ref 传参。
+* **已知挂账（合入时）**：① 未提交行（blame 全 0 SHA）当前可能报成「提交无 Stagent Trailer」，更准确应是「该行尚未提交」；② 方案条目只在**当前账本草稿**中查找，后续修订删条目会导致旧代码断在「方案条目」环（规格允许的限制）；③ `rel.includes("..")` 会对合法文件名如 `a..b.ts` 误拒；④ 截断超长 `Stagent-Scheme-Items` 时可能在无知识库仓库凭空建最小 `docs/system/changelog.md`（只在截断路径触发）。
+* **对照痛点（代码事实）**：`daemon/pipeline/merger.ts` 的 Trailer 只到合同与证据（约 L204）；没有方案条目；没有反查入口。
+* **一句话目标**：任意一行合入的代码，都能一键反查到合同、方案条目和用户原话。
+* **范围**：
+  1. `merger.ts`：新增 Trailer `Stagent-Scheme-Items: goal-3,acc-5`（来自合同 `supervisor_metadata.scheme_item_ids`）；超出 512B 单行上限时截断为合同号，并在 `docs/system/changelog.md` 条目中保留全量（L.12 已保证条目存在）。
+  2. 新建 `daemon/trace/why.ts`：`explainLine({ repoRoot, path, line })` → `git blame --porcelain` 取提交 → 解析 Trailer → 读合同、方案快照 → 返回 `{ commit, contract_id, scheme_items: { id, text, quotes: { qid, text }[] }[] }`；任一环缺失返回 `E_TRACE_BROKEN` 并指出断在哪一环。
+  3. `GET /api/trace/why?path=&line=`；编辑器右键「这段为什么存在」调用并以白话卡片显示。
+  4. 错误码 `E_TRACE_BROKEN` 登记。
+* **非目标**：不做影响分析（另卡）。
+* **不变声明**：Trailer 既有键不变；512B / 4KB 上限不变。
+* **验收（PASS）**：`tests/integration/trace-why.test.ts`：夹具仓库合入一份带 `scheme_item_ids` 的合同 → 对新增行调用 `explainLine` 返回原话；对合入前已存在的行返回 `E_TRACE_BROKEN`（断在「提交无 Stagent Trailer」）；超长条目列表时 Trailer 单行 ≤512B。
+* **FAIL**：Trailer 超长导致合并失败；反查返回编造的原话。
+* **关键文件**：`daemon/pipeline/merger.ts`、`daemon/trace/why.ts`（新）、`daemon/server.ts`、`src/components/MonacoEditorPane.tsx`
+* **估算**：M
+
+
 <a id="task-l.14"></a>
 
 #### 【Task L.14】凭据保险库 `[COMPLETED]`

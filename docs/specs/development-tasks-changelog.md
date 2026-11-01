@@ -86,6 +86,8 @@
 - **P-99（立卡，2026-11-01）**：台账债六项写成任务卡（Tina 授权 · 纯文档）：`TASK-A.7`、`TASK-H.9`（DLV-4）、`TASK-W.6`（DLV-3）、`TASK-L.18`（DLV-5）、`TASK-J.19`（DLV-6）、`TASK-J.20`（OP-1 实施；**不**改已 COMPLETED 的 J.9）。同步：版本头第 99 条、§1.1 矩阵、§3.4d/§3.4e、索引、ledger 待立卡→已立卡。Sprint「当前首要」仍 **L.12**。**本条仅文档**；不改生产代码。
 
 - **P-100（状态回写，2026-11-01）**：`TASK-L.12` → **`[COMPLETED]`**（[#47](https://github.com/he18718143986-design/IDE/pull/47)/`39f426a`）。同步：版本头第 100 条、§1.1 矩阵、§3.4d 详细卡迁 completed、索引、Sprint「当前首要」→ **L.13**。并同 PR 轻量对齐 [`../scheme.md`](../scheme.md) gap-16 / acc-8、[`delivery-lifecycle.md`](./delivery-lifecycle.md) S4～S6。合入前 Tina 拍板：KB-1 全量文件；bootstrap 只认 `contract_type`。**本条仅文档**；不改生产代码；**不**开工 L.13。
+- **P-101（状态回写，2026-11-01）**：`TASK-L.13` → **`[COMPLETED]`**（[#51](https://github.com/he18718143986-design/IDE/pull/51)/`51ea872`）。同步：版本头第 101 条、§1.1 矩阵、§3.4d 详细卡迁 completed、索引、Sprint「当前首要」→ **L.15**。并同 PR 轻量对齐 [`../scheme.md`](../scheme.md) gap-16、[`delivery-lifecycle.md`](./delivery-lifecycle.md) §6 追踪链 / S2～S6。已知限制：行号仅对主干已合入、无本地脏改动准确；未提交行/账本条目/路径 `..` 误拒等挂账见 completed 卡。物理 tip 对齐 `34213c8`（含随后合入的 #49/#50；**本条不**回写 A.7/H.9）。**本条仅文档**；不改生产代码；**不**开工 L.15；**不**混入 A.7/H.9 销项。
+
 
 - **P-98（状态回写，2026-11-01）**：`TASK-L.11` → **`[COMPLETED]`**（[#43](https://github.com/he18718143986-design/IDE/pull/43)/`78ec236`）。同步：版本头第 98 条、§1.1 矩阵、§3.4d 详细卡迁 completed、索引、Sprint「当前首要」→ **L.12**。并同 PR 轻量对齐 [`../scheme.md`](../scheme.md) gap-16、[`delivery-lifecycle.md`](./delivery-lifecycle.md) S4；ledger 增 **DLV-6**（DN-2 入口缺口挂账）。**本条仅文档**；不改生产代码；**不**开工 L.12；**不**另立 DLV 代码卡。
 
