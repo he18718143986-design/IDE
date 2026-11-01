@@ -1,6 +1,7 @@
 /**
  * TASK-L.15：画布「发布」页 —— 选目标、发布、进度、回滚。
- * 不显示密钥值；不宣称端到端运维闭环（L.16 另卡）。
+ * TASK-L.16：挂载「线上」卡（LiveIncidentCard）。
+ * 不显示密钥值；不宣称端到端运维闭环。
  */
 import { useCallback, useEffect, useState } from "react";
 import type { DaemonConnection } from "@/lib/daemon-api";
@@ -14,6 +15,7 @@ import type {
   ReleaseRecord,
   ReleaseTargetConfig,
 } from "@/lib/release/release";
+import { LiveIncidentCard } from "./LiveIncidentCard";
 
 export interface ReleasePaneProps {
   conn: DaemonConnection;
@@ -191,6 +193,31 @@ export function ReleasePane(props: ReleasePaneProps) {
           </p>
         ) : null}
       </section>
+
+      {(() => {
+        const openIncidents = releases.filter(
+          (r) => r.live_incident && !r.live_incident.stub_created,
+        );
+        if (openIncidents.length === 0) return null;
+        return (
+          <section data-testid="live-incident-list" className="space-y-2">
+            <h3 className="text-xs font-medium uppercase tracking-wide text-amber-800 dark:text-amber-300">
+              线上
+            </h3>
+            {openIncidents.map((r) =>
+              r.live_incident ? (
+                <LiveIncidentCard
+                  key={r.release_id}
+                  conn={conn}
+                  connected={connected}
+                  incident={r.live_incident}
+                  onStubCreated={() => void refresh()}
+                />
+              ) : null,
+            )}
+          </section>
+        );
+      })()}
 
       <section data-testid="release-list" className="space-y-2">
         <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">

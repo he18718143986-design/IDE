@@ -1,9 +1,10 @@
 /**
  * TASK-L.15：发布编排 —— 草稿 / 执行 / 回滚 / 持久化。
+ * TASK-L.16：LIVE 后进程退出监听 + 周期性探活 → 线上事故回流。
  *
  * 不创建 git worktree：用 `git archive <sha> | tar -x` 导出干净目录。
  * 保险库值只注入 deploy 与 health；install / build 只用明文 build_env。
- * 合同状态机与 MERGED 终态不变（ADR-0012）。
+ * 合同状态机与 MERGED 终态不变（ADR-0012）；回流只开新 system 桩，不改 MERGED。
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -15,14 +16,21 @@ import {
   assertAtMostOneLive,
   assertTransition,
   canTransition,
+  type LiveIncidentPayload,
   type ReleaseRecord,
   type ReleaseStep,
   type ReleaseTargetConfig,
 } from "../../src/lib/release/release";
+import type { ProjectPlan } from "../../src/lib/project/project-plan";
 import { findTarget, loadReleaseTargets } from "./targets-store";
 import type { ReleaseTargetAdapter, StepResult } from "./target-adapter";
 import { LocalProcessAdapter } from "./targets/local-process";
 import { UserCommandAdapter } from "./targets/user-command";
+import {
+  clearLiveProcess,
+  getLiveProcess,
+} from "./process-registry";
+import { insertLiveIncidentStub } from "./live-incident-stub";
 import { getActiveVault, type Vault } from "../vault";
 import { isProtectedBranch } from "../git/branch-guard";
 import { redactSecrets } from "../runner/command-runner";
@@ -36,6 +44,11 @@ export interface ReleaseManagerOptions {
   healthAttempts?: number;
   /** 探活间隔 ms，默认 500（测试可降） */
   healthIntervalMs?: number;
+  /**
+   * TASK-L.16：LIVE 后周期性探活间隔 ms，默认 60_000。
+   * 测试可降到几十毫秒。
+   */
+  watchIntervalMs?: number;
   /** 测试注入：覆盖适配器 */
   adapters?: {
     local_process?: ReleaseTargetAdapter;
@@ -223,6 +236,7 @@ export class ReleaseManager {
   private readonly repoRoot: string;
   private readonly healthAttempts: number;
   private readonly healthIntervalMs: number;
+  private readonly watchIntervalMs: number;
   private readonly adapters: {
     local_process: ReleaseTargetAdapter;
     user_command: ReleaseTargetAdapter;
@@ -230,11 +244,16 @@ export class ReleaseManager {
   private readonly isCommitOnProtectedBranch: (sha: string) => boolean;
   private readonly now: () => Date;
   private vaultOverride: Vault | null | undefined;
+  /** target_id → LIVE 探活定时器 */
+  private readonly watchTimers = new Map<string, NodeJS.Timeout>();
+  /** target_id → 正在监视的 release_id（防串台） */
+  private readonly watchReleaseIds = new Map<string, string>();
 
   constructor(options: ReleaseManagerOptions) {
     this.repoRoot = options.repoRoot;
     this.healthAttempts = options.healthAttempts ?? 3;
     this.healthIntervalMs = options.healthIntervalMs ?? 500;
+    this.watchIntervalMs = options.watchIntervalMs ?? 60_000;
     this.adapters = {
       local_process:
         options.adapters?.local_process ?? new LocalProcessAdapter(),
@@ -246,6 +265,223 @@ export class ReleaseManager {
       ((sha) => defaultIsCommitOnProtectedBranch(this.repoRoot, sha));
     this.now = options.now ?? (() => new Date());
     this.vaultOverride = options.vault;
+  }
+
+  /** 测试 / 停机：清掉所有 LIVE 探活定时器 */
+  stopAllWatches(): void {
+    for (const targetId of [...this.watchTimers.keys()]) {
+      this.clearWatch(targetId);
+    }
+  }
+
+  private clearWatch(targetId: string): void {
+    const t = this.watchTimers.get(targetId);
+    if (t) clearInterval(t);
+    this.watchTimers.delete(targetId);
+    this.watchReleaseIds.delete(targetId);
+  }
+
+  /**
+   * LIVE 后挂监测：进程退出 + 周期性探活（目标 `watch: false` 可关）。
+   */
+  private startLiveWatch(rec: ReleaseRecord, target: ReleaseTargetConfig): void {
+    this.clearWatch(rec.target_id);
+    if (target.watch === false) return;
+
+    this.watchReleaseIds.set(rec.target_id, rec.release_id);
+
+    // local_process：挂进程退出监听
+    if (target.kind === "local_process") {
+      const live = getLiveProcess(target.target_id);
+      if (live && live.release_id === rec.release_id) {
+        const watched = live.process;
+        void watched.exited.then((e) => {
+          const current = getLiveProcess(target.target_id);
+          if (!current || current.process !== watched) return;
+          if (current.stopping) return;
+          if (this.watchReleaseIds.get(target.target_id) !== rec.release_id) {
+            return;
+          }
+          clearLiveProcess(target.target_id);
+          const secrets = this.vault()?.currentValues() ?? [];
+          const rawTail = watched.stderr() || `process exited code=${e.code}`;
+          const { text } = redactSecrets(rawTail, secrets);
+          void this.recordLiveIncident({
+            release_id: rec.release_id,
+            reason: "process_exit",
+            log_tail: text.slice(-8_000),
+            exit_code: e.code,
+            transitionToFailed: true,
+          });
+        });
+      }
+    }
+
+    // 周期性探活（local_process / user_command 均可）
+    const timer = setInterval(() => {
+      void this.runWatchHealth(rec.release_id, target.target_id);
+    }, this.watchIntervalMs);
+    // 不让 timer 拖住进程退出
+    if (typeof timer.unref === "function") timer.unref();
+    this.watchTimers.set(target.target_id, timer);
+  }
+
+  private async runWatchHealth(
+    releaseId: string,
+    targetId: string,
+  ): Promise<void> {
+    if (this.watchReleaseIds.get(targetId) !== releaseId) return;
+    const rec = readRelease(this.repoRoot, releaseId);
+    if (!rec || rec.state !== "LIVE") {
+      this.clearWatch(targetId);
+      return;
+    }
+    if (rec.live_incident) return; // 已有事故，不再刷
+    let target: ReleaseTargetConfig;
+    try {
+      target = findTarget(this.repoRoot, targetId);
+    } catch {
+      this.clearWatch(targetId);
+      return;
+    }
+    if (target.watch === false) {
+      this.clearWatch(targetId);
+      return;
+    }
+    const adapter = this.adapterFor(target);
+    const deployEnv = await this.resolveDeployEnv(target);
+    const dest = checkoutDir(this.repoRoot, rec.release_id);
+    const health = await adapter.health({
+      release: rec,
+      checkoutDir: dest,
+      env: deployEnv.env,
+      target,
+      repoRoot: this.repoRoot,
+    });
+    const secrets = [
+      ...deployEnv.secrets,
+      ...(this.vault()?.currentValues() ?? []),
+    ];
+    health.log_tail = redactSecrets(health.log_tail, secrets).text.slice(
+      -8_000,
+    );
+    if (health.ok) return;
+    await this.recordLiveIncident({
+      release_id: releaseId,
+      reason: "health_watch_failed",
+      log_tail: health.log_tail || "周期性探活失败",
+      exit_code: health.exit_code,
+      transitionToFailed: false,
+    });
+  }
+
+  /**
+   * 记录线上事故（进程崩溃 / 探活失败）。可被测试直接调用。
+   */
+  async recordLiveIncident(input: {
+    release_id: string;
+    reason: LiveIncidentPayload["reason"];
+    log_tail: string;
+    exit_code?: number | null;
+    transitionToFailed?: boolean;
+  }): Promise<ReleaseRecord> {
+    const rec = readRelease(this.repoRoot, input.release_id);
+    if (!rec) {
+      throw new ReleaseInvariantError(
+        "E_RELEASE_NOT_FOUND",
+        `找不到发布 ${input.release_id}`,
+      );
+    }
+    // 已有结构化事故则保持首发（不覆盖）
+    if (rec.live_incident) return rec;
+
+    let label = rec.target_id;
+    try {
+      const t = findTarget(this.repoRoot, rec.target_id);
+      label = t.label ?? t.target_id;
+    } catch {
+      // keep id
+    }
+
+    const secrets = this.vault()?.currentValues() ?? [];
+    const { text: safeTail } = redactSecrets(input.log_tail, secrets);
+
+    const payload: LiveIncidentPayload = {
+      target_id: rec.target_id,
+      target_label: label,
+      release_id: rec.release_id,
+      commit_sha: rec.commit_sha,
+      log_tail: safeTail.slice(-8_000),
+      exit_code: input.exit_code ?? null,
+      reason: input.reason,
+      detected_at: this.now().toISOString(),
+    };
+
+    const plain =
+      input.reason === "process_exit"
+        ? `「${label}」停了（退出码 ${payload.exit_code ?? "?"}）。`
+        : `「${label}」探活失败。`;
+    rec.incident = `${plain} 最后的错误：${payload.log_tail.slice(0, 240)}`;
+    rec.live_incident = payload;
+
+    if (
+      input.transitionToFailed &&
+      rec.state === "LIVE" &&
+      canTransition(rec.state, "FAILED")
+    ) {
+      rec.state = "FAILED";
+    }
+    persist(this.repoRoot, rec);
+    this.clearWatch(rec.target_id);
+    return rec;
+  }
+
+  /** 列出当前有 live_incident 且尚未插桩的记录（画布「线上」卡数据源） */
+  listOpenIncidents(): ReleaseRecord[] {
+    return listReleaseRecords(this.repoRoot).filter(
+      (r) => r.live_incident && !r.live_incident.stub_created,
+    );
+  }
+
+  /**
+   * 「让 AI 看看」：按 §2.1 插入 origin:system 修复桩；不改 MERGED 合同。
+   */
+  async askAiForIncident(releaseId: string): Promise<{
+    release: ReleaseRecord;
+    plan: ProjectPlan;
+    stub_id: string;
+  }> {
+    const rec = readRelease(this.repoRoot, releaseId);
+    if (!rec) {
+      throw new ReleaseInvariantError(
+        "E_RELEASE_NOT_FOUND",
+        `找不到发布 ${releaseId}`,
+      );
+    }
+    if (!rec.live_incident) {
+      throw new ReleaseInvariantError(
+        "E_RELEASE_NO_INCIDENT",
+        "这条发布没有可回流的线上问题",
+      );
+    }
+    const inserted = insertLiveIncidentStub({
+      repoRoot: this.repoRoot,
+      incident: rec.live_incident,
+    });
+    if (!inserted.ok) {
+      throw new ReleaseInvariantError(inserted.code, inserted.message);
+    }
+    rec.live_incident = {
+      ...rec.live_incident,
+      stub_created: true,
+      stub_id: inserted.stub.stub_id,
+    };
+    persist(this.repoRoot, rec);
+    return {
+      release: rec,
+      plan: inserted.plan,
+      stub_id: inserted.stub.stub_id,
+    };
   }
 
   private vault(): Vault | null {
@@ -523,6 +759,9 @@ export class ReleaseManager {
       rec.target_id,
     );
 
+    // 新发布开始：停掉同目标旧 LIVE 探活，避免串台
+    this.clearWatch(rec.target_id);
+
     this.transition(rec, "BUILDING");
 
     const dest = checkoutDir(this.repoRoot, rec.release_id);
@@ -626,6 +865,8 @@ export class ReleaseManager {
       this.transition(rec, "LIVE");
       const all = listReleaseRecords(this.repoRoot);
       assertAtMostOneLive(all, rec.target_id);
+      // TASK-L.16：LIVE 后挂监测（watch:false 可关）
+      this.startLiveWatch(rec, target);
       return rec;
     }
 

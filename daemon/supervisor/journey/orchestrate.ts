@@ -2,6 +2,7 @@
  * 旅程编排入口（TASK-S.6）：右侧一句话 → 分流 → 复用既有引擎。
  *
  * 不重砌 S.2 / S.5 / C.7：只做粘合。
+ * - LIVE_INCIDENT（TASK-L.16 E 类）→ 指引到发布页「线上」卡
  * - DISPUTE → runDisputeSelfCheck
  * - REAL_PLAYTEST → 提示前端挂真机预览（实际启动由 Daemon HTTP / 前端触发）
  * - MAJOR_DRAFT / FAST_PATH → generateContractDraft（Fast Path 标 LOW + skip_demo）
@@ -40,6 +41,10 @@ import {
 export interface JourneyOrchestrateInput {
   message: string;
   repoRoot: string;
+  /** TASK-L.16：LIVE 目标名，供 E 类分流 */
+  liveTargetNames?: string[] | undefined;
+  /** TASK-L.16：有施工中合同时禁止 E */
+  hasInProgressContract?: boolean | undefined;
   /** 当前选中合同；质疑路径必需 */
   contract?: SoftwareContract | undefined;
   sessionId?: string | undefined;
@@ -88,7 +93,10 @@ function formatLocalTime(d: Date): string {
 export async function orchestrateJourney(
   input: JourneyOrchestrateInput,
 ): Promise<JourneyOrchestrateResult> {
-  const intent = classifyJourneyIntent(input.message);
+  const intent = classifyJourneyIntent(input.message, {
+    liveTargetNames: input.liveTargetNames,
+    hasInProgressContract: input.hasInProgressContract,
+  });
   const now = input.now?.() ?? new Date();
   // TASK-C.14c：深度扫未完时防抢跑（不抛异常、不空白）
   const baselineGuard = guardSupervisorAgainstBaselineRace(
@@ -104,6 +112,19 @@ export async function orchestrateJourney(
       plain_summary: withGuard(
         intent.reasons.join(" ") || "好的，我们慢慢聊。",
       ),
+    };
+  }
+
+  // TASK-L.16 E 类：不直接改合同；指引发布页「线上」卡
+  if (intent.kind === "LIVE_INCIDENT") {
+    return {
+      intent,
+      route: "LIVE_INCIDENT",
+      plain_summary: withGuard(
+        intent.reasons.join(" ") ||
+          "这像是线上问题。请打开发布页的「线上」卡，点「让 AI 看看」。",
+      ),
+      skip_demo: true,
     };
   }
 

@@ -68,7 +68,10 @@ import {
 } from "./trace/why";
 import { loadModulesForRepo } from "./knowledge/modules-store";
 import { impactClosure } from "../src/lib/knowledge/impact-closure";
-import { ReleaseManager } from "./release/release-manager";
+import {
+  ReleaseManager,
+  listReleaseRecords,
+} from "./release/release-manager";
 import { loadOrInitLedgerState } from "./supervisor/intent-compiler/scheme-ledger-store";
 import {
   assertContractScopeAllowed,
@@ -149,6 +152,8 @@ import type { IlluminationInput } from "./graph/illumination-verifier";
 import type { SupervisorProposalV1 } from "../src/lib/graph/task-graph";
 import { RequirementsStore } from "./supervisor/specs/requirements-store";
 import { orchestrateJourney } from "./supervisor/journey/orchestrate";
+import { buildJourneyLiveIncidentContext } from "../src/lib/journey/live-incident-context";
+import { findTarget, loadReleaseTargets } from "./release/targets-store";
 import {
   exportRedactedRecordsZip,
   cleanupProjectRecords,
@@ -763,6 +768,8 @@ export class StagentDaemon {
     this.wss = null;
     clearSessionToken(this.repoRoot);
     this.sessionToken = null;
+    // TASK-L.16：停掉 LIVE 探活定时器
+    this.releaseManager?.stopAllWatches();
 
     if (this.server) {
       await new Promise<void>((resolve) => {
@@ -1694,11 +1701,14 @@ export class StagentDaemon {
 
   /**
    * TASK-L.15：发布 API
+   * TASK-L.16：线上问题回流
    * POST /api/releases — 草稿
    * POST /api/releases/:id/run — 执行
    * POST /api/releases/:id/rollback — 手动回滚（新建发布）
+   * POST /api/releases/:id/ask-ai — 「让 AI 看看」插 system 修复桩
    * GET  /api/releases — 列表 + 目标
    * GET  /api/releases/targets — 仅目标
+   * GET  /api/releases/incidents — 未插桩的线上事故
    */
   private async handleReleases(
     req: http.IncomingMessage,
@@ -1716,6 +1726,13 @@ export class StagentDaemon {
         this.sendJson(res, 200, {
           releases: mgr.list(),
           targets: loadReleaseTargets(this.repoRoot),
+        });
+        return;
+      }
+      // TASK-L.16：须在 /:id 之前匹配
+      if (method === "GET" && pathname === "/api/releases/incidents") {
+        this.sendJson(res, 200, {
+          releases: mgr.listOpenIncidents(),
         });
         return;
       }
@@ -1751,6 +1768,18 @@ export class StagentDaemon {
         const id = decodeURIComponent(rbMatch[1]!);
         const release = await mgr.rollback(id);
         this.sendJson(res, 200, { release });
+        return;
+      }
+      // TASK-L.16：「让 AI 看看」——服务端 applyPlanPatch(add_stub)；HTTP /plan/patch 禁 add_stub
+      const askMatch = pathname.match(/^\/api\/releases\/([^/]+)\/ask-ai$/);
+      if (method === "POST" && askMatch) {
+        const id = decodeURIComponent(askMatch[1]!);
+        const result = await mgr.askAiForIncident(id);
+        this.sendJson(res, 200, {
+          release: result.release,
+          plan: result.plan,
+          stub_id: result.stub_id,
+        });
         return;
       }
       const getMatch = pathname.match(/^\/api\/releases\/([^/]+)$/);
@@ -3746,14 +3775,51 @@ export class StagentDaemon {
         repoRoot: this.repoRoot,
       });
 
+      // TASK-L.16：E 类分流真实传参（未传则 hasInProgress 恒假→施工中也会误进 E）
+      const contractStore = this.orchestrator.getStore();
+      const releaseHints = listReleaseRecords(this.repoRoot).map((r) => {
+        let target_label: string | null = r.live_incident?.target_label ?? null;
+        if (!target_label) {
+          try {
+            const t = findTarget(this.repoRoot, r.target_id);
+            target_label = t.label ?? t.target_id;
+          } catch {
+            target_label = r.target_id;
+          }
+        }
+        return {
+          state: r.state,
+          target_id: r.target_id,
+          target_label,
+          live_incident: r.live_incident
+            ? {
+                target_id: r.live_incident.target_id,
+                target_label: r.live_incident.target_label,
+                stub_created: r.live_incident.stub_created,
+              }
+            : null,
+        };
+      });
+      const liveCtx = buildJourneyLiveIncidentContext({
+        releases: releaseHints,
+        contracts: contractStore.list().map((c) => ({
+          lifecycle_state: c.lifecycle_state,
+        })),
+        selectedContract: contract
+          ? { lifecycle_state: contract.lifecycle_state }
+          : null,
+      });
+
       const result = await orchestrateJourney({
         message,
         repoRoot: this.repoRoot,
+        liveTargetNames: liveCtx.liveTargetNames,
+        hasInProgressContract: liveCtx.hasInProgressContract,
         ...(contract === undefined ? {} : { contract }),
         ...(sessionId === undefined ? {} : { sessionId }),
         requirementsStore: this.requirementsStore,
         budgetLedger: ledger,
-        contractStore: this.orchestrator.getStore(),
+        contractStore,
         ...(this.supervisorEnrich === undefined
           ? {}
           : { enrich: this.supervisorEnrich }),

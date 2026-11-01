@@ -1144,6 +1144,29 @@ export async function rollbackRelease(
   );
 }
 
+/** TASK-L.16：未插桩的线上事故列表 */
+export async function fetchReleaseIncidents(
+  conn: DaemonConnection,
+): Promise<{ releases: import("./release/release").ReleaseRecord[] }> {
+  return request(conn, "/api/releases/incidents");
+}
+
+/** TASK-L.16：「让 AI 看看」→ 服务端插 origin:system 修复桩 */
+export async function askAiForReleaseIncident(
+  conn: DaemonConnection,
+  releaseId: string,
+): Promise<{
+  release: import("./release/release").ReleaseRecord;
+  plan: import("./project/project-plan").ProjectPlan;
+  stub_id: string;
+}> {
+  return request(
+    conn,
+    `/api/releases/${encodeURIComponent(releaseId)}/ask-ai`,
+    { method: "POST", body: "{}" },
+  );
+}
+
 /** TASK-L.10：读取项目计划（含服务端权威下一份）。 */
 export async function getProjectPlan(
   conn: DaemonConnection,

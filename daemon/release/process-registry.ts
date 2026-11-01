@@ -9,6 +9,8 @@ export interface LiveProcessEntry {
   checkout_dir: string;
   process: ManagedProcess;
   port: number;
+  /** 适配器主动 stop 时置 true，避免退出监听误报线上事故 */
+  stopping?: boolean;
 }
 
 const byTarget = new Map<string, LiveProcessEntry>();

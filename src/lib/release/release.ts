@@ -28,6 +28,23 @@ export interface ReleaseStep {
   log_tail: string;
 }
 
+/** TASK-L.16：线上问题结构化载荷（供「线上」卡 / 回流合同桩） */
+export interface LiveIncidentPayload {
+  target_id: string;
+  /** 白话目标名 */
+  target_label: string;
+  release_id: string;
+  commit_sha: string;
+  /** 已脱敏 stderr / 探活日志尾部 */
+  log_tail: string;
+  exit_code: number | null;
+  reason: "process_exit" | "health_watch_failed";
+  detected_at: string;
+  /** 用户已点「让 AI 看看」并成功插桩 */
+  stub_created?: boolean;
+  stub_id?: string;
+}
+
 export interface ReleaseRecord {
   schema_version: typeof RELEASE_SCHEMA_VERSION;
   release_id: string;
@@ -41,6 +58,8 @@ export interface ReleaseRecord {
   triggered_by: "USER";
   /** 白话意外说明（如两个版本都起不来 / rollback_supported:false） */
   incident?: string | null;
+  /** TASK-L.16：结构化线上问题；有值时 UI 显示「线上」卡 */
+  live_incident?: LiveIncidentPayload | null;
 }
 
 export const RELEASE_TRANSITIONS: Readonly<
@@ -160,6 +179,11 @@ export interface ReleaseTargetConfig {
   build_env?: Record<string, string>;
   /** 缺省 true；false 时探活失败只进 FAILED */
   rollback_supported?: boolean;
+  /**
+   * TASK-L.16：LIVE 后是否周期性探活（默认 true）。
+   * `false` 时不挂进程退出监听、不跑 60s 探活。
+   */
+  watch?: boolean;
 }
 
 export interface ReleaseTargetsFile {

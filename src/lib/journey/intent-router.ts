@@ -1,8 +1,9 @@
 /**
- * 非技术旅程意图分流（TASK-S.6）。
+ * 非技术旅程意图分流（TASK-S.6 / TASK-L.16）。
  *
  * 纯规则、确定性、零模型：同一句话恒得同一结论，便于单测与白话解释。
  * 产品路由 + 默认闲聊透传：
+ * - LIVE_INCIDENT（E 类）：线上 / 生产 / LIVE 目标名 → 回流「线上」卡
  * - DISPUTE：质疑 / 抱怨做错了 → 调质疑自查
  * - REAL_PLAYTEST：打开真机预览 → 挂中栏/外链（TASK-S.6b）
  * - FAST_PATH：字号/文案/颜色等小事 → 免强制整套 Demo
@@ -14,6 +15,7 @@
  */
 
 export const JOURNEY_INTENT_KINDS = [
+  "LIVE_INCIDENT",
   "DISPUTE",
   "FAST_PATH",
   "MAJOR_DRAFT",
@@ -32,6 +34,24 @@ export interface JourneyIntentResult {
   /** Fast Path 时为 true：产品层免强制整套 Demo */
   skip_demo: boolean;
 }
+
+/** TASK-L.16：E 类分流可选上下文 */
+export interface JourneyIntentContext {
+  /** 当前 LIVE 目标白话名 / target_id；消息命中则走 E */
+  liveTargetNames?: string[];
+  /** 有施工中合同时禁止 E（supervisor §16.5 条件） */
+  hasInProgressContract?: boolean;
+}
+
+const LIVE_INCIDENT_PATTERNS: RegExp[] = [
+  /线上/,
+  /上线后/,
+  /生产环境/,
+  /生产上/,
+  /生产里/,
+  /\bproduction\b/i,
+  /\bprod\b/i,
+];
 
 const DISPUTE_PATTERNS: RegExp[] = [
   /做错[了啦]/,
@@ -141,11 +161,28 @@ function matched(patterns: RegExp[], text: string): string[] {
   return hits;
 }
 
+function matchedLiveTargets(text: string, names: string[] | undefined): string[] {
+  if (!names || names.length === 0) return [];
+  const hits: string[] = [];
+  const lower = text.toLowerCase();
+  for (const name of names) {
+    const n = name.trim();
+    if (!n) continue;
+    if (text.includes(n) || lower.includes(n.toLowerCase())) {
+      hits.push(n);
+    }
+  }
+  return hits;
+}
+
 /**
  * 对用户右侧输入做白话分流。
- * 优先级：质疑 > 真机试玩 > 保护域升格 > Fast Path > 大事草案 > 闲聊。
+ * 优先级：线上问题(E) > 质疑 > 真机试玩 > 保护域升格 > Fast Path > 大事草案 > 闲聊。
  */
-export function classifyJourneyIntent(raw: string): JourneyIntentResult {
+export function classifyJourneyIntent(
+  raw: string,
+  ctx: JourneyIntentContext = {},
+): JourneyIntentResult {
   const text = raw.trim();
   if (text.length === 0) {
     return {
@@ -154,6 +191,27 @@ export function classifyJourneyIntent(raw: string): JourneyIntentResult {
       reasons: ["空消息，不分流"],
       skip_demo: false,
     };
+  }
+
+  // TASK-L.16 E 类：线上问题（无施工中合同）
+  if (!ctx.hasInProgressContract) {
+    const onlineHits = matched(LIVE_INCIDENT_PATTERNS, text);
+    const targetHits = matchedLiveTargets(text, ctx.liveTargetNames);
+    if (onlineHits.length > 0 || targetHits.length > 0) {
+      const bits = [
+        ...onlineHits.slice(0, 2),
+        ...targetHits.slice(0, 2),
+      ];
+      return {
+        kind: "LIVE_INCIDENT",
+        confidence: Math.min(0.95, 0.7 + bits.length * 0.08),
+        reasons: [
+          `听起来像线上/生产问题（命中：${bits.join("、") || "LIVE 目标"}）`,
+          "走线上回流：请到发布页看「线上」卡，点「让 AI 看看」生成带现场信息的修复合同。",
+        ],
+        skip_demo: true,
+      };
+    }
   }
 
   const disputeHits = matched(DISPUTE_PATTERNS, text);
