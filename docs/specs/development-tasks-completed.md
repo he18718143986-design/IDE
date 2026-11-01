@@ -3140,6 +3140,37 @@
 * **关键文件**：`daemon/vault/*`（新）、`daemon/runner/env-filter.ts` 或 `redactSecrets` 所在模块、`src/components/settings/SettingsTab.tsx`、`daemon/server.ts`
 * **估算**：M
 
+<a id="task-l.15"></a>
+
+#### 【Task L.15】发布生命周期与两类部署目标 `[COMPLETED]`
+
+* **任务编号**：`TASK-L.15`
+* **对应规格**：[`release-and-operations.md`](./release-and-operations.md) §1～§3、§6、§7（RO-01～RO-09）；ADR-0017；`scheme.md` acc-9
+* **前置依赖**：`TASK-L.14`
+* **优先级**：P2（M4）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#52](https://github.com/he18718143986-design/IDE/pull/52) / tip `9829385`（`feat(L.15): 发布生命周期与两类部署目标`；GitHub squash merge）
+* **对照痛点（代码事实）**：deploy / release / health_check 全库 0 命中；合并即终点。
+* **一句话目标**：用户点一次「发布」，已合并的提交被构建、部署、探活；失败自动回到上一个能用的版本。
+* **范围**：
+  1. 新建 `src/lib/release/release.ts`：`ReleaseRecord`、`ReleaseState`、`RELEASE_TRANSITIONS`、`canTransition`（纯函数）；不变式 R-INV-1～3 的校验函数。
+  2. 新建 `daemon/release/release-manager.ts`：创建草稿、执行（build → deploy → health → 失败回滚）、持久化 `.stagent/releases/<id>.json`；导出干净目录 `.stagent/releases/<id>/checkout`：用 `git archive <sha> | tar -x`（只读 git，不创建 worktree 元数据，避开 ADR-0002 背景中的并发 `worktree add` 锁问题）；构建前执行检测到的安装命令（`npm ci` 等），复用全局包缓存只读侧（ADR-0002）。
+  3. 新建 `daemon/release/target-adapter.ts` 与 `targets/local-process.ts`、`targets/user-command.ts`；目标配置 `.stagent/release-targets.json`。
+  4. 一次性命令（install、build、`user_command` 部署、健康命令）经 `command-runner.ts`；`local_process` 长驻进程经 `spawnManaged`（同 L.5）。保险库值只注入 deploy 与 health 步骤（`vault.resolveEnv(target.env_keys)`），不注入 install / build（build 只拿目标配置中的明文 `build_env`）；`log_tail` 经脱敏。
+  5. `local_process` 部署顺序：停当前 LIVE 进程 → 启新版本 → 探活；失败 → 停新版本 → 以上一个 LIVE 的导出目录重启 → 探活。手动「回滚」= 以上一个 LIVE 的 `commit_sha` 新建一次发布（不新增状态迁移）。
+  6. HTTP：`POST /api/releases`（草稿）、`POST /api/releases/:id/run`（用户点击）、`POST /api/releases/:id/rollback`、`GET /api/releases`。
+  7. 画布「发布」页（`src/components/release/ReleasePane.tsx`）：选目标、发布、进度、回滚。
+* **非目标**：不做云平台适配器；不做线上问题回流（L.16）。
+* **不变声明**：合同状态机与 `MERGED` 终态不变（ADR-0012）。
+* **验收（PASS）**：`tests/unit/release-state.test.ts`：转移表与 R-INV-1～3；`tests/integration/release-local-process.test.ts`：RO-01～RO-03；`tests/integration/release-user-command.test.ts`：RO-06、RO-07、RO-09；RO-04、RO-05 在 `release-manager` 单测中覆盖。
+* **FAIL**：发布失败改变了任何合同的状态；日志出现密钥明文。
+* **关键文件**：`src/lib/release/release.ts`（新）、`daemon/release/*`（新）、`src/components/release/ReleasePane.tsx`（新）、`daemon/server.ts`
+* **已知挂账（合入时）**：
+  1. `process-registry` 仅内存：Daemon 重启后 LIVE 记录与进程句柄脱节（启动时未自动标 incident）。
+  2. `POST /api/releases/:id/run` 同步阻塞（build 超时上限可达 10 分钟），HTTP/UI 干等。
+  3. 集成测 RO-01～03 注入替身适配器：`git archive` 真实执行，**未**跑真 `npm start` + HTTP 探活路径——不得写成「真实进程已验证」。
+* **估算**：M（如超出，拆为「状态机 + 存储」与「目标适配器 + UI」两卡）
+
 ### 3.5 架构感知、监听与差异审阅（C.5 落 Sprint 2；B.1/B.2/C.4 推迟至 v0.2+）
 
 ---

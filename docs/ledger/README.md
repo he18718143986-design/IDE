@@ -78,7 +78,7 @@
 | DLV-6 | L.11 DN-2「可以」：`resolveDesignDependencyAllow` 已合入且集成测覆盖，**无** HTTP / 画布意外卡入口（`POST .../resume` 不路由至此）。**不**阻断 L.11 领域验收 | NON_BLOCKER | 卡 owner | **已立卡 `TASK-J.19`**（可参照 J.7 UX；不抢 L.15）；代码 `orchestrator.ts::resolveDesignDependencyAllow` |
 
 
-> **OP-1 实施（2026-11-01）**：裁决仍销项（consistency-audit / scheme dec-10）；白名单存储/scope/失效落地归 **`TASK-J.20`**（**不**回写已 COMPLETED 的 `TASK-J.9`）。Sprint 首要现为 **L.15**（代码已合 #52/`9829385`，docs 另回写；物理 tip `8148c2c`；A.7/H.9 docs COMPLETED 本波）。
+> **OP-1 实施（2026-11-01）**：裁决仍销项（consistency-audit / scheme dec-10）；白名单存储/scope/失效落地归 **`TASK-J.20`**（**不**回写已 COMPLETED 的 `TASK-J.9`）。Sprint 首要现为 **L.16**（L.15 已 COMPLETED / #52 / `9829385`；物理 tip `6944f7d`（含 #58 A.7/H.9 docs）；A.7/H.9 docs 已 COMPLETED，见 #58/`6944f7d`）。
 
 ## DoR 全量审计挂账（2026-10-31 新增）
 
