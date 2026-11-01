@@ -2206,6 +2206,34 @@
 * **FAIL**：zip 含明文 Key；或清理删到源码；或上云。
 
 
+<a id="task-h.9"></a>
+
+#### 【Task H.9】废止 `.stagent/metadata/` 写入（对齐 ADR-0011）`[COMPLETED]`（ledger **DLV-4**）
+
+* **任务编号**：`TASK-H.9`
+* **任务名称**：清除代码对 `.stagent/metadata/` 的写入，统一到 `.stagent/records/`
+* **对应规格**：[ADR-0011](../adr/0011-audit-sidecar-records-path.md)；ledger **DLV-4**；scheme REJ-007
+* **前置依赖**：`TASK-C.12e` / `TASK-C.15c`（COMPLETED · records 侧车已落地）
+* **优先级**：P3 · **NON_BLOCKER**（**不阻断** `TASK-L.15`）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#50](https://github.com/he18718143986-design/IDE/pull/50) / tip `34213c8`（`fix(H.9): move demo-confirm from .stagent/metadata to records`；GitHub squash merge）
+* **合入说明**：写入统一 `.stagent/records/demo-confirm.json`；`LEGACY_` 旧路径只读。`readDemoConfirm` 首次读取会迁移落盘；`upsert` 仅在新文件不存在时合并 legacy（有意清空不复活）。
+* **对照痛点（代码事实）**：`daemon/supervisor/demo/prototypes.ts` 仍常量 `".stagent/metadata/demo-confirm.json"`；与 ADR-0011「`.stagent/metadata/` 自本 ADR 起废止，任何新代码不得写入」冲突。
+* **一句话目标**：仓库内无生产路径再创建或写入 `.stagent/metadata/**`；Demo 确认类侧车迁到 `.stagent/records/`（或既有 prototypes 约定目录）并测过。
+* **范围**：
+  1. 全文检索 `metadata/` 写入点；将 `demo-confirm`（及同类）迁到 ADR-0011 允许路径（优先 `.stagent/records/...` 或现行 `.stagent/prototypes/` 约定，卡内 PR 说明选型）。
+  2. 读路径兼容：若旧文件存在可只读迁移一次，禁止继续写入旧路径。
+  3. 测试：断言写入路径不含 `.stagent/metadata/`；旧路径写入失败或不再调用。
+* **非目标**：不重做 audit-manifest（C.12e 已完成）；不改用户项目历史目录（仅 Stagent 自身写入约定）。
+* **不变声明**：鉴权 / Demo Origin 隔离：**不变**。
+* **验收（PASS）**：`rg '\.stagent/metadata' daemon src` 无写入字面量（测试夹具除外且须注明）；相关 Demo 确认测绿。
+* **FAIL**：仍 mkdir/write `.stagent/metadata/` 却标完成。
+* **关键文件**：`daemon/supervisor/demo/prototypes.ts`（改）、相关测试
+* **估算**：S
+* **台账**：ledger **DLV-4** → 已立卡 `TASK-H.9`。
+
+---
+
 <a id="task-c.3"></a>
 
 #### 【Task C.3】Monaco 核心编辑器集成与受控 Worktree 读写
@@ -3113,6 +3141,36 @@
 * **估算**：M
 
 ### 3.5 架构感知、监听与差异审阅（C.5 落 Sprint 2；B.1/B.2/C.4 推迟至 v0.2+）
+
+---
+
+<a id="task-a.7"></a>
+
+#### 【Task A.7】Worktree seal 路径前缀对齐 `[COMPLETED]`
+
+* **任务编号**：`TASK-A.7`
+* **任务名称**：seal / manifest 目录与 `worktree-manager` 统一为 `task-{id}`
+* **对应规格**：[`runtime-contract-and-safety.md`](./runtime-contract-and-safety.md) §10.5 D1；ledger DOC-5 / 「第 1 波遗留 · Worktree seal 路径前缀」；[`../ledger/README.md`](../ledger/README.md)
+* **前置依赖**：`TASK-A.1`（COMPLETED）、`TASK-C.15d`（COMPLETED）
+* **优先级**：P3 · **NON_BLOCKER**（**不阻断** `TASK-L.15` 主序；不抢 Sprint「当前首要」）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#49](https://github.com/he18718143986-design/IDE/pull/49) / tip `4b7a709`（`fix(A.7): align worktree-seal dir with manager task-{id} prefix`；GitHub squash merge）
+* **合入说明**：旧无前缀 `.stagent/worktrees/{id}/` **不迁移**；读时判「未封存」。合前本地已清旧无前缀目录（提交说明自证）。
+* **对照痛点（代码事实）**：`daemon/guard/worktree-seal.ts::worktreeDir` 拼 `.stagent/worktrees/{contractId}/`（**无** `task-` 前缀）；`daemon/git/worktree-manager.ts` 创建路径为 `.stagent/worktrees/task-{contractId}`（约 L217）；`daemon/editor/launcher.ts` / Evidence 文案亦按 `task-{id}`。seal 与真实 Worktree 目录错位。
+* **一句话目标**：封存 / 清单读写命中与创建 Worktree **同一**物理目录 `task-{id}`，不再写到无前缀的孤儿路径。
+* **范围**：
+  1. 修改 `daemon/guard/worktree-seal.ts::worktreeDir`：目录名改为 `` `task-${sanitizedId}` ``，与 `worktree-manager` 一致。
+  2. 迁移/兼容：若旧无前缀目录仅含 seal manifest、且对应 `task-{id}` 已存在，测试约定只读新路径；不要求本卡做批量磁盘迁仓工具。
+  3. 单测：`tests/unit/worktree-seal-path.test.ts`（或扩既有 C.15d seal 测）断言 manifest 路径含 `/task-` 前缀且与 manager 解析一致。
+* **非目标**：不改 Worktree 分支名约定；不重做 EO-09 语义；不改 A.1 生命周期 API 面；不做 DLV-4 metadata。
+* **不变声明**：鉴权 / Demo Origin / 点亮三证 / 网关写范围：**不变**。
+* **验收（PASS）**：
+  - seal 写入路径 === manager 创建路径（同 `repoRoot`+`contractId`）。
+  - 既有 seal 单测全绿；新增前缀断言绿。
+* **FAIL**：仍写入 `.stagent/worktrees/{id}/`（无 `task-`）；或 seal 与 manager 路径不一致却标完成。
+* **关键文件**：`daemon/guard/worktree-seal.ts`（改）、`daemon/git/worktree-manager.ts`（只读对照）、相关 seal 测试（新/改）
+* **估算**：S
+* **台账**：关闭 ledger「Worktree seal 路径前缀」待立卡 → 本卡；DOC-5 代码侧收口归属本卡。
 
 <a id="task-c.5"></a>
 

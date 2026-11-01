@@ -23,7 +23,7 @@
 | DOC-2 | 任务卡状态矛盾：C.14f、C.15a、C.15c、C.15d 矩阵写 COMPLETED、卡内写 NEW_TASK；J.1 代码已合入（PR #29 / #30）但卡仍为 NEW_TASK | 同上 | 由卡 owner 按 supervisor §10 判定口径回写 → **已做**：四卡回写 COMPLETED（证据 `5f6ca93`）；J.1 此前已对齐；全库矩阵↔卡内抽查仅余该四处 | **RESOLVED**（docs 冗余治理第 1 波 · #41） |
 | DOC-3 | 任务卡文件内三处「当前基线」互相矛盾（`6415fbd` / `4280de6` / `f14c8cb`） | 同上 L28、L121、§4 | 只保留一处，其余改指针 → **已做**：权威 tip 见 Sprint「当前工程物理起点」/`e4351b0`，另两处改历史指针 | **RESOLVED**（docs 冗余治理第 0 波 · #40） |
 | DOC-4 | 约 24 处引用已删除的 `docs/archive/*`，约 98 处引用已删除的「走查报告 §6.x」 | 同上 | 统一改为「见 Git 历史」或删除 → **已做**（docs 内活引用改指针；历史叙述保留路径字面作溯源） | **RESOLVED**（docs 冗余治理第 0 波 · #40） |
-| DOC-5 | 路径三方不一致：Worktree 目录（`task-{id}` vs `{id}`）、Demo 目录（`.stagent/demo/` vs `.stagent/prototypes/`）、Git Trailer 键名与长度上限 | `system-architecture.md` §5、`constants-and-paths.md` §2/§3、`runtime-contract-and-safety.md` §5.3、代码 | 以代码为准回写规格，或立卡改代码 → **已做**：constants §0 代码事实表 + runtime §2/§5.3 注记；**`worktree-seal` 无 `task-` 前缀与创建路径不一致 → 需立卡改代码（本波未改代码）** | **RESOLVED**（docs 冗余治理第 1 波 · #41；代码对齐另立卡） |
+| DOC-5 | 路径三方不一致：Worktree 目录（`task-{id}` vs `{id}`）、Demo 目录（`.stagent/demo/` vs `.stagent/prototypes/`）、Git Trailer 键名与长度上限 | `system-architecture.md` §5、`constants-and-paths.md` §2/§3、`runtime-contract-and-safety.md` §5.3、代码 | 以代码为准回写规格，或立卡改代码 → **已做**：constants §0 代码事实表 + runtime §2/§5.3 注记；**`worktree-seal` 无 `task-` 前缀**曾挂代码债 → **代码侧已收口** `TASK-A.7` COMPLETED（[#49](https://github.com/he18718143986-design/IDE/pull/49)/`4b7a709`） | **RESOLVED**（docs 第 1 波 · #41；**代码侧** · #49 / A.7） |
 | DOC-6 | `delivery-state.ts` 仍有 `DELIVERED`，与 ADR-0012、`state-machine-contract.md` 冲突；两套状态机（生命周期 9 态 / 交付轨 A）关系未交代 | `state-machine-contract.md`、runtime §7、§9 | 在 state-machine-contract 补一节两轨关系 → **已做**：§0 两轨关系 + ADR-0012/H.2 指针；`DELIVERED` 仅交付投影内部标记 | **RESOLVED**（docs 冗余治理第 1 波 · #41） |
 | DOC-7 | `state-machine-contract.md` 标「目标、待测试固化」，但 `src/lib/state-machine.ts` 已实现其迁移表；`constants-and-paths.md` 同为草案 | `specs/` 两份草案 | 核对后升格或合并入 runtime 契约 → 第 1 波仅加指针；**2026-11-01 用户拍板提前做**：内容并入 `runtime-contract-and-safety.md` §10 / §11（以代码为准回写）；原文件降为 `[HISTORICAL]` 指针 | **CLOSED**（升格完成 · 2026-11-01；遗留「另议」关闭） |
 | DOC-8 | RFC v0.2 阶段 0「右栏可写主干」、§3.1「删除旁听」与现行 SSOT 冲突；附录 A/B/C 是 UI 候选清单，不是 RFC | `rfc/v0.2-multi-agent-pipeline.md` | 第 1 波仅横幅；**2026-11-01 用户拍板提前做**：§3.1 与附录 A/B/C 改写为与 DEFERRED 一致——保留设想并标注被 REJ-001 / supervisor §14.4 等否决或取代 | **CLOSED**（正文清理完成 · 2026-11-01；遗留「另议」关闭） |
@@ -37,7 +37,7 @@
 
 | 项 | 说明 |
 | :--- | :--- |
-| Worktree seal 路径前缀 | `daemon/guard/worktree-seal.ts` 使用 `.stagent/worktrees/{id}/`，与 `worktree-manager` 的 `task-{id}` 不一致；docs 已注明（runtime §10）。**已立卡 `TASK-A.7`**（NEW_TASK · NON_BLOCKER · 不抢 L.15） |
+| Worktree seal 路径前缀 | **RESOLVED（代码 · 2026-11-01）**：`TASK-A.7` COMPLETED — seal `worktreeDir` 与 manager 统一 `task-{id}`（[#49](https://github.com/he18718143986-design/IDE/pull/49)/`4b7a709`）；旧无前缀不迁移、读时判未封存。DOC-5 **代码侧**随本项收口。 |
 | 草案升格（DOC-7） | **CLOSED（2026-11-01）**：已并入 runtime §10 / §11；原文件 `[HISTORICAL]` 指针 |
 | RFC 正文（DOC-8/9） | **CLOSED（2026-11-01）**：冲突正文已改写为 DEFERRED/PROPOSED 一致表述；ADR-0006 对齐 |
 | DOC-1 | **RESOLVED**（第 2 波 · #42） |
@@ -73,12 +73,12 @@
 | DLV-1 | ADR-0015～0017 均已由用户原话 q22 明确授权生效（DEC-006～008） | **RESOLVED** | 用户（q22） | [`../scheme.md`](../scheme.md) §6 |
 | DLV-2 | PR #3 已由用户批准并执行物理关闭 | **RESOLVED** | 用户 | PR #3 已关闭 |
 | DLV-3 | `AdapterRegistry` 未接线，Worker 只有 OpenAI `AiWorker`；Claude Code 作 Worker（W.5a 的 worker 角色）未接入派工 | NON_BLOCKER（M2 不依赖） | 卡 owner | **已立卡 `TASK-W.6`**（不抢 L.15） |
-| DLV-4 | `.stagent/metadata/` 仍在代码写入路径列表中，与 ADR-0011 废止该路径冲突 | NON_BLOCKER | 卡 owner | **已立卡 `TASK-H.9`**（不抢 L.15） |
+| DLV-4 | `.stagent/metadata/` 写入与 ADR-0011 冲突 → **已迁 records** | **RESOLVED** | 卡 owner | **`TASK-H.9` COMPLETED**（[#50](https://github.com/he18718143986-design/IDE/pull/50)/`34213c8`）；legacy 只读迁移 |
 | DLV-5 | 系统地图 UI（项目视图第二页）与「改这里会影响什么」入口 | NON_BLOCKER | — | **已立卡 `TASK-L.18`**（前置 L.12 COMPLETED；不抢 L.15）；规格 [`../specs/technical-design-and-knowledge.md`](../specs/technical-design-and-knowledge.md) §5 |
 | DLV-6 | L.11 DN-2「可以」：`resolveDesignDependencyAllow` 已合入且集成测覆盖，**无** HTTP / 画布意外卡入口（`POST .../resume` 不路由至此）。**不**阻断 L.11 领域验收 | NON_BLOCKER | 卡 owner | **已立卡 `TASK-J.19`**（可参照 J.7 UX；不抢 L.15）；代码 `orchestrator.ts::resolveDesignDependencyAllow` |
 
 
-> **OP-1 实施（2026-11-01）**：裁决仍销项（consistency-audit / scheme dec-10）；白名单存储/scope/失效落地归 **`TASK-J.20`**（**不**回写已 COMPLETED 的 `TASK-J.9`）。Sprint 首要现为 **L.15**（L.13 已 COMPLETED / #51 / `51ea872`；物理 tip `34213c8`）。
+> **OP-1 实施（2026-11-01）**：裁决仍销项（consistency-audit / scheme dec-10）；白名单存储/scope/失效落地归 **`TASK-J.20`**（**不**回写已 COMPLETED 的 `TASK-J.9`）。Sprint 首要现为 **L.15**（代码已合 #52/`9829385`，docs 另回写；物理 tip `8148c2c`；A.7/H.9 docs COMPLETED 本波）。
 
 ## DoR 全量审计挂账（2026-10-31 新增）
 
