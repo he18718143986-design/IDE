@@ -224,6 +224,9 @@ import { buildDependencyGraph } from "./arch/graph";
 import { readDiffFiles } from "./diff/diff-files";
 import { launchEditor } from "./editor/launcher";
 import { getModelSettings, setRuntimeKey } from "./worker/key-store";
+// TASK-W.6：daemon 启动 / 项目打开时装配默认受控 Worker 注册表
+import { createDefaultWorkerRegistry } from "./worker/default-worker-registry";
+import type { AdapterRegistry } from "./worker/adapter-registry";
 import {
   createVault,
   getActiveVault,
@@ -328,6 +331,12 @@ export interface DaemonServerOptions extends PortFinderOptions {
   maxClients?: number;
   /** 右栏会话适配器（TASK-C.6）；缺省为 保底 + 演示 */
   chatAdapters?: ChatAdapter[];
+  /**
+   * TASK-W.6：受控 Worker 适配器注册表。
+   * 缺省由 `createDefaultWorkerRegistry()` 构造（内置 Managed AI 受控 +
+   * Claude Code worker 仅登记为 UNCONTROLLED_EXTERNAL）；测试可注入自定义 registry。
+   */
+  workerRegistry?: AdapterRegistry;
   /**
    * 草案的 L1 白话补全器（可选）。
    * 不注入时 `/api/supervisor/draft` 走**纯 L0**：零模型调用、零费用，
@@ -474,6 +483,8 @@ export class StagentDaemon {
     });
     this.orchestrator = new ContractOrchestrator({
       repoRoot: this.repoRoot,
+      // TASK-W.6：注入默认受控 Worker 注册表（可被 options.workerRegistry 覆盖）
+      registry: options.workerRegistry ?? createDefaultWorkerRegistry(),
       // TASK-C.5：验证命令的逐行输出实时推给页面（脱敏在 runner 内完成）
       onTerminalLine: (contractId, stream, line) => {
         this.broadcast("TERMINAL_STREAM", {
@@ -4298,6 +4309,23 @@ export class StagentDaemon {
       }
       // 返回持久化快照本身，前端据此在首帧前也能还原界面
       this.sendJson(res, 200, this.getPresentationSnapshot());
+      return;
+    }
+
+    // TASK-W.6：配置面只读诊断——列出已注册 Worker 适配器。
+    // 沿用既有鉴权，不新增豁免、不削弱任何既有端点。
+    if (method === "GET" && pathname === "/api/adapters") {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      const adapters = this.orchestrator.listRegisteredAdapters().map((entry) => ({
+        adapter_id: entry.declaration.adapter_id,
+        control_mode: entry.control_mode,
+        kind: entry.adapter.kind,
+        dispatchable: entry.control_mode === "GATEWAY_ENFORCED",
+      }));
+      this.sendJson(res, 200, { adapters });
       return;
     }
 

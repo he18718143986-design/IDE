@@ -66,11 +66,18 @@ import {
   saveGatewayViolation,
 } from "../guard/gateway-violation-store";
 import {
-  AiWorker,
   type WorkerChange,
   type WorkerModelClient,
   type WorkerRunResult,
 } from "../worker/ai-worker";
+// TASK-W.6：编排器只依赖 Registry 抽象与派工契约，不 import 具体适配器类（OCP）。
+// 内置 Managed AI 工厂由 default-worker-registry 模块持有，经 Registry 注入。
+import type { AdapterRegistry } from "../worker/adapter-registry";
+import {
+  requireControlledDispatch,
+  type WorkerDispatchContext,
+} from "../worker/worker-dispatch";
+import { createDefaultWorkerRegistry } from "../worker/default-worker-registry";
 import {
   RuntimeInterceptor,
   type GatewayViolation,
@@ -148,6 +155,12 @@ export interface OrchestratorOptions {
   onGatewayViolation?: ((violation: GatewayViolation) => void) | undefined;
   /** TASK-L.11：可注入设计步骤生成器（测试桩 / 专用 Agent） */
   designNoteGenerator?: DesignNoteGenerator | undefined;
+  /**
+   * TASK-W.6：受控 Worker 适配器注册表。
+   * 未注入时构造默认注册表（内置 Managed AI，GATEWAY_ENFORCED），
+   * 保证既有派工路径不变；测试可注入含 Fake 适配器的自定义 registry。
+   */
+  registry?: AdapterRegistry | undefined;
 }
 
 export interface ExecutionOutcome {
@@ -273,6 +286,8 @@ export class ContractOrchestrator {
   private readonly execTokenStore: ExecTokenStore = getExecTokenStore();
   /** TASK-J.18d：合同 → 派工墓地上下文（resume / buildRuntime 复用） */
   private readonly graveyardGates = new Map<string, GraveyardGateContext>();
+  /** TASK-W.6：受控适配器注册表（默认内置 Managed AI） */
+  private readonly workerRegistry: AdapterRegistry;
 
   constructor(options: OrchestratorOptions) {
     this.repoRoot = path.resolve(options.repoRoot);
@@ -281,6 +296,13 @@ export class ContractOrchestrator {
     this.onTerminalLine = options.onTerminalLine;
     this.onGatewayViolation = options.onGatewayViolation;
     this.designNoteGenerator = options.designNoteGenerator;
+    this.workerRegistry =
+      options.registry ?? createDefaultWorkerRegistry();
+  }
+
+  /** TASK-W.6：诊断 / 设置面可读取当前已注册适配器 id 列表 */
+  listRegisteredAdapters(): ReturnType<AdapterRegistry["list"]> {
+    return this.workerRegistry.list();
   }
 
   /** 测试/诊断：当前合同是否持有有效 exec_token */
@@ -1255,13 +1277,18 @@ export class ContractOrchestrator {
       modelClient?: WorkerModelClient;
       /**
        * TASK-L.4：测试可注入两段式 hooks 片段（如 readObligationReport）。
-       * 生产 HTTP 路径不传；未覆盖的 runT/runI 由本方法组装真实 AiWorker。
+       * 生产 HTTP 路径不传；未覆盖的 runT/runI 由本方法经 Registry 派工工厂组装受控执行器。
        */
       twoPhase?: Partial<TwoPhaseHooks>;
       /** TASK-L.11：覆盖构造器上的设计生成器 */
       designNoteGenerator?: DesignNoteGenerator;
       /** TASK-L.11：测试可跳过设计步骤（仅旧卡回归）；生产不得跳过 */
       skipDesignStep?: boolean;
+      /**
+       * TASK-W.6：单次派工覆盖适配器注册表（测试注入 Fake 适配器用）。
+       * 未传则用构造器上的默认 / 注入 registry；生产 HTTP 路径不传。
+       */
+      registry?: AdapterRegistry;
     } = {},
   ): Promise<
     WorkerRunResult & { two_phase?: TwoPhaseResult; design?: DesignRunInfo }
@@ -1408,6 +1435,7 @@ export class ContractOrchestrator {
       twoPhase?: Partial<TwoPhaseHooks>;
       designNoteGenerator?: DesignNoteGenerator;
       skipDesignStep?: boolean;
+      registry?: AdapterRegistry;
     } = {},
   ): Promise<
     WorkerRunResult & { two_phase?: TwoPhaseResult; design?: DesignRunInfo }
@@ -1473,6 +1501,15 @@ export class ContractOrchestrator {
         new OpenAiWorkerClient({ repoRoot: this.repoRoot });
       const userHooks = options.twoPhase ?? {};
 
+      // TASK-W.6：派工门禁——按合同 worker_spec.adapter_id 经 Registry 解析受控派工工厂。
+      // 缺注册 / UNCONTROLLED_EXTERNAL / 未挂工厂均抛带 code 的 WorkerDispatchError，
+      // 绝不静默降级到「无网关执行」或写死 AiWorker。
+      const registry = options.registry ?? this.workerRegistry;
+      const dispatchFactory = requireControlledDispatch(
+        registry,
+        current.worker_spec.adapter_id,
+      );
+
       const derived =
         userHooks.obligations !== undefined
           ? {
@@ -1484,7 +1521,8 @@ export class ContractOrchestrator {
       // ----- 全部豁免 / 无义务：保持旧单段路径 -----
       if (!shouldRunTwoPhase(derived.obligations)) {
         const { gateway, costMonitor } = this.buildRuntime(current, signal);
-        const worker = new AiWorker({
+        const context: WorkerDispatchContext = {
+          contract: current,
           gateway,
           costMonitor,
           modelClient,
@@ -1492,7 +1530,9 @@ export class ContractOrchestrator {
           ...(activeDesignNote
             ? { designNote: activeDesignNote }
             : {}),
-        });
+        };
+        // TASK-W.6：执行器由 Registry 解析出的工厂产出，编排器不 new 具体适配器
+        const worker = dispatchFactory(context);
 
         try {
           const result = await worker.run(signal);
@@ -1603,7 +1643,8 @@ export class ContractOrchestrator {
             "ScopedWorktreeGateway missing costMonitor in two-phase run",
           );
         }
-        const worker = new AiWorker({
+        const context: WorkerDispatchContext = {
+          contract: current,
           gateway,
           costMonitor,
           modelClient,
@@ -1612,7 +1653,9 @@ export class ContractOrchestrator {
           ...(activeDesignNote
             ? { designNote: activeDesignNote }
             : {}),
-        });
+        };
+        // TASK-W.6：两段式 T/I 段同样经 Registry 解析出的工厂派工
+        const worker = dispatchFactory(context);
         const result = await worker.run(signal);
         bag.changes.push(...result.changes);
         bag.log.push(...result.log);
@@ -2303,7 +2346,7 @@ export class ContractOrchestrator {
   /**
    * TASK-L.4：两段式施工（先红后绿）。无未豁免义务时退化为单段。
    * 编排细节见 daemon/pipeline/two-phase-runner.ts。
-   * 生产入口：`runWorker` 在存在未豁免义务时调用本方法并组装真实 AiWorker hooks。
+   * 生产入口：`runWorker` 在存在未豁免义务时调用本方法并经 Registry 派工工厂组装 hooks。
    */
   async runTwoPhase(
     contractId: string,
