@@ -3597,3 +3597,28 @@
   2. `mcpToken` 访问 `/api/shutdown` 返回 401 的双轨路由行为测试使用手写 mock server，不是真实 daemon 路由；作为协议参照即可。真实 `StagentDaemon` 实例测试验证了 Worker 生成的 `mcp.json` Authorization 使用 `mcpToken`，但这不是对真实 shutdown 路由拒绝的直接覆盖。建议为 mock 测试添加该边界说明，后续补真实路由测试。
 * **验证**：PR 报告 7 项 MCP endpoint 测试、47 项 Gateway 回归测试通过，`git diff --check` 通过；此处为 PR 报告，并非本次重新运行。
 * **关键文件**：`daemon/mcp/http-server.ts`、`daemon/mcp/gateway.ts`、`daemon/server.ts`、`daemon/worker/cli-host/claude-code-adapter.ts`、`tests/unit/mcp-http-endpoint.test.ts`。
+---
+
+### 3.4d 北极星受控摄取交付（L.17a）
+
+<a id="task-l.17a"></a>
+
+#### 【Task L.17a】受控摄取与代登代理 `[COMPLETED]`
+* **任务编号**：`TASK-L.17a`
+* **状态与证据**：`[COMPLETED]`（[#70](https://github.com/he18718143986-design/IDE/pull/70)/`8516c3d`，squash merge）。
+* **对应规格**：ADR-0014 §3；`scheme.md` goal-2、conf-6、dec-13、oq-3；[`delivery-lifecycle.md`](./delivery-lifecycle.md) M5
+* **交付内容**：
+  1. Daemon 受控只读 GET 代理（`daemon/web-ingest/proxy.ts`），域名白名单精确匹配合同顶层 `references[]`（C.22），未授权域名返回 403 `E_WEB_INGEST_FORBIDDEN_DOMAIN`，非 GET 请求返回 405 `E_WEB_INGEST_METHOD_NOT_ALLOWED`。
+  2. 防御资源滥用与攻击：响应大小限制（Content-Length 预检 + 流式大小双保险，超限 413 `E_WEB_INGEST_PAYLOAD_TOO_LARGE`），突发与分钟级速率限制（429 `E_WEB_INGEST_RATE_LIMITED`）。
+  3. **302 重定向逐跳白名单防线**：`fetch` 显式设置 `redirect: "manual"`，拦截 3xx 重定向并对 Location 目标逐跳重新校验 `references[]` 白名单（上限 3 跳），彻底封堵借合法域名跳转绕过白名单的旁路。
+  4. **Worker 请求头防注入**：强制过滤请求头中的 `Cookie` / `Set-Cookie` / `Authorization`，Daemon 会话凭据优先级强制覆盖，杜绝 Worker 注入或篡改 Session。
+  5. **dec-13 凭据生命周期与静默重登闭环**（`daemon/web-ingest/auth-session.ts`）：
+     - 条款 1：Vault 凭据由用户管理至手动删除，项目切换或会话结束仅清理内存会话，不联动清理 Vault。
+     - 条款 2：上游 401/403 触发 Daemon 读取 Vault 账密静默代登重试一次，Worker 全程无感知。
+     - 诚实鉴权失败：代登无 `Set-Cookie` 或失败时抛出 401 `E_WEB_INGEST_AUTH_FAILED`，绝不伪造凭据。
+  6. **零账密泄漏**：`sanitizeForWorker` 深度脱敏 Vault 活跃值、JSON 字段及内存 Session Cookie，Worker 环境与日志零明文。
+  7. 接通网关：替换 `daemon/mcp/gateway.ts` 的 `E_INGEST_NOT_WIRED` 临时阻断为真实受控 Proxy 调用。
+* **残余边界 / 后续挂账**：
+  1. `request.headers` 目前已对敏感头做严格剥离过滤；当前 gateway 调用暂不传 headers，未来若不需要自定义头可彻底裁剪该字段。
+* **验证**：31 项专用测试全部通过（`web-ingest-proxy.test.ts`、`web-ingest-auth.test.ts`、`web-ingest-lifecycle.test.ts`、`web-ingest-relogin.test.ts`、`mcp-http-endpoint.test.ts`、`contract-schema-references.test.ts`）。
+* **关键文件**：`daemon/web-ingest/proxy.ts`、`daemon/web-ingest/auth-session.ts`、`daemon/mcp/gateway.ts`、`daemon/vault/vault.ts`、`tests/unit/web-ingest-proxy.test.ts`、`tests/unit/web-ingest-auth.test.ts`、`tests/unit/web-ingest-relogin.test.ts`。
