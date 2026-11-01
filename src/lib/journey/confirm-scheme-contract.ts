@@ -9,6 +9,7 @@
 import {
   createContractDraft,
   softwareContractSchema,
+  withPlaytestCommand,
   type SoftwareContract,
 } from "../contract.schema";
 import type { ContractStub } from "../project/project-plan";
@@ -105,11 +106,21 @@ export function buildConfirmContractFromScopePlan(
     },
   };
 
+  // TASK-C.23：本路径以 `verification_spec` 重新覆盖 draft 的命令集合
+  // （只改 createContractDraft 单边会被此处覆盖而失效，漏改即 FAIL），
+  // 故复用同一装配口径 withPlaytestCommand，保证 scheme 确认路径产出的
+  // 北极星合同同样带 playtest 命令；contract_id 取服务端装配值，幂等。
+  const references = scheme.references ?? [];
+
   return softwareContractSchema.parse({
     ...draft,
     authorization: nextAuth,
     verification_spec: {
-      commands: projected.verification_spec.commands,
+      commands: withPlaytestCommand(
+        projected.verification_spec.commands,
+        draft.contract_id,
+        references.length > 0,
+      ),
       ...(projected.verification_spec.manual_confirmation
         ? {
             manual_confirmation:
