@@ -18,8 +18,8 @@
 | `TASK-S.3` | `DEFERRED` | Supervisor HUD 建议流与 WebSocket 广播 | [打开](./development-tasks-active.md#task-s.3) |
 | `TASK-W.5b` | `NEW_TASK` | cursor-agent 适配器黑盒实测 (v1.3.3 新增) | [打开](./development-tasks-active.md#task-w.5b) |
 | `TASK-W.5c` | `SPLIT` | OpenHands 适配器（容器隔离）· 拆分母卡（P-118 经授权拆为 i/ii/iii，保留追溯） | [打开](./development-tasks-active.md#task-w.5c) |
-| `TASK-W.5c-i` | `READY` | 双枚举 `SANDBOX_ENFORCED` + `workerSpec` 目标字段（S/M · Sprint 首要） | [打开](./development-tasks-active.md#task-w.5c-i) |
-| `TASK-W.5c-ii` | `READY（跟随 i）` | 容器运行时 `runInSandbox`（M · mock/stub 可测，不依赖真实容器） | [打开](./development-tasks-active.md#task-w.5c-ii) |
+| `TASK-W.5c-i` | `COMPLETED` | 双枚举 `SANDBOX_ENFORCED` + `workerSpec` 目标字段（[#81](https://github.com/he18718143986-design/IDE/pull/81)/`c3e75cc` · S/M） | [打开](./development-tasks-completed.md#task-w.5c-i) |
+| `TASK-W.5c-ii` | `READY（跟随 i）` | 容器运行时 `runInSandbox`（M · **Sprint 首要** · mock/stub 可测，不依赖真实容器） | [打开](./development-tasks-active.md#task-w.5c-ii) |
 | `TASK-W.5c-iii` | `BLOCKED · 等容器环境` | OpenHands 适配器 + 真实容器实测 + `verified_on`（M · 硬前置容器运行时 + `STAGENT_REAL_OPENHANDS=1`） | [打开](./development-tasks-active.md#task-w.5c-iii) |
 | `TASK-W.6` | `COMPLETED` | 受控派工接线与默认适配器注册（DLV-3 · #74/`b5d8c53`）· NON_BLOCKER | [打开](./development-tasks-completed.md#task-w.6) |
 | `TASK-W.7` | `NEW_TASK` | Worker 自助注册与自动验证（默认 `UNCONTROLLED_EXTERNAL`；探测升格 `GATEWAY_ENFORCED`）· NON_BLOCKER | [打开](./development-tasks-active.md#task-w.7) |
@@ -110,7 +110,7 @@
 | `TASK-C.20` | `COMPLETED` | Supervisor 合流前碎片归档（DOC-ARCHIVE-Supervisor-pre-SSOT） | [打开](./development-tasks-completed.md#task-c.20) |
 | `TASK-C.21` | `COMPLETED` | Supervisor SSOT 审查补丁（DOC-SSOT-Supervisor-Patch） | [打开](./development-tasks-completed.md#task-c.21) |
 | `TASK-C.22` | `COMPLETED` | 合同 schema references[] 字段 | [打开](./development-tasks-completed.md#task-c.22) |
-| `TASK-C.23` | `READY` | `check playtest` 接入北极星合同验收档（ruling 3 兑现 · S） | [打开](./development-tasks-active.md#task-c.23) |
+| `TASK-C.23` | `COMPLETED` | `check playtest` 接入北极星合同验收档（ruling 3 兑现 · [#82](https://github.com/he18718143986-design/IDE/pull/82)/`a5223fb` · S） | [打开](./development-tasks-completed.md#task-c.23) |
 | `TASK-H.1` | `COMPLETED` | Worker JSON/Patch 解析校验与轻量重试 | [打开](./development-tasks-completed.md#task-h.1) |
 | `TASK-H.2` | `COMPLETED` | MERGED/DELIVERED 终态收口消歧 | [打开](./development-tasks-completed.md#task-h.2) |
 | `TASK-H.3` | `COMPLETED` | 基线扫描硬上限与超时熔断 | [打开](./development-tasks-completed.md#task-h.3) |

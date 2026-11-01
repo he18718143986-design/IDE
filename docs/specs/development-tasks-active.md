@@ -130,7 +130,9 @@
 
 <a id="task-w.5c-i"></a>
 
-#### 【Task W.5c-i】双枚举 `SANDBOX_ENFORCED` 与 `workerSpec` 目标字段 `[READY]`
+#### 【Task W.5c-i】双枚举 `SANDBOX_ENFORCED` 与 `workerSpec` 目标字段 `[COMPLETED]`
+
+> **归档注记（2026-11-02 · P-119）**：本卡已 COMPLETED（[#81](https://github.com/he18718143986-design/IDE/pull/81)/`c3e75cc`，squash merge；分支阶段 HEAD `22ed653`，本地两提交 `1a93fb9` 主体 + `22ed653` 下游收窄收尾）。完整交付记录、残余边界与挂账（共 4 条，含 `evidence.schema.ts` 二值有意未扩、`toRuntimeControlMode()` 收窄属窗口期语义、五键测试文件名按代码事实修正）见 [`development-tasks-completed.md`](./development-tasks-completed.md) §3.4h（锚点 `#task-w.5c-i`）。本处保留原始卡文以存追溯，不再作为施工依据。**窗口期语义仍有效**：`SANDBOX_ENFORCED` 注册接受、`requireControlledDispatch()` 显式拒绝派工（`E_ADAPTER_SANDBOX_LOCKED`），**待 `W.5c-ii` `container-host` 落地解锁**；今日仍是「有档位、无运行时」。
 
 > **拆卡立卡（2026-11-02 · P-118 · 经 Tina 授权）**：母卡 `TASK-W.5c` 按 R-11「L 卡不得开工、必须拆分」拆出本卡，为其**第一张**（纯 Schema / 类型机械层，不依赖容器运行时）。本卡正文按 [`../templates/05-task-card.md`](../templates/05-task-card.md) 样板与 [`task-card-standard.md`](./task-card-standard.md) R-1～R-12 逐条写全。
 
@@ -139,7 +141,7 @@
 * **对应规格**（R-1）：[`system-architecture.md`](./system-architecture.md) §9.1（`worker_spec` 目标模型：三值 `control_mode` + `billing_model` + `verified_on`，标题标 `[待实现 - 目标数据模型]`）、§4.2.3 P-17（「沙箱」仅用于 OS 级隔离，普通本地子进程严禁自称沙箱）；[`../adr/0001-target-user-positioning.md`](../adr/0001-target-user-positioning.md) **ADR-0001**（底层强隔离与防越权控制面完全不变）、[`../adr/0003-worktree-capability-boundary.md`](../adr/0003-worktree-capability-boundary.md) **ADR-0003**；母卡 [`development-tasks-active.md`](#task-w.5c) `TASK-W.5c` 拆分规划
 * **前置依赖**（R-3）：`TASK-W.6`（**COMPLETED** · [#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`，`requireControlledDispatch` 派工门禁已就位，窗口期拒绝语义挂接在此）；母卡 `TASK-W.5c`（`[SPLIT]` · 已按 DoR 重写并经授权拆分）
 * **优先级**：P3 · **NON_BLOCKER**
-* **状态**：`[READY]`
+* **状态**：`[COMPLETED]`（2026-11-02 · [#81](https://github.com/he18718143986-design/IDE/pull/81)/`c3e75cc`）
 * **对照痛点（代码事实）**（R-4）：
   1. `src/lib/contract.schema.ts::workerControlModeSchema`（约 :250）与 `daemon/worker/worker-adapter.interface.ts::AdapterControlMode`（:54）均为**二值** `"GATEWAY_ENFORCED" | "UNCONTROLLED_EXTERNAL"`，而 `system-architecture.md:970` 规范为**三值**（含 `"SANDBOX_ENFORCED"`）——该档位无类型 / schema 落点；母卡 W.5c 与 `TASK-W.7` 范围第 3 条均已钉「两处必须同改，漏改单边即 FAIL」。
   2. `src/lib/contract.schema.ts::workerSpecSchema`（约 :256）仅 5 键（`adapter_id` / `runtime_kind` / `model_id` / `control_mode` / `adapter_version`），**无** `billing_model` / `verified_on`；`tests/unit/contract-schema-v12.test.ts:199` 把五键集锁定为断言，新增字段须同步更新该断言。
@@ -238,7 +240,9 @@
 
 <a id="task-c.23"></a>
 
-#### 【Task C.23】`check playtest` 接入北极星合同验收档 `[READY]`
+#### 【Task C.23】`check playtest` 接入北极星合同验收档 `[COMPLETED]`
+
+> **归档注记（2026-11-02 · P-119）**：本卡已 COMPLETED（[#82](https://github.com/he18718143986-design/IDE/pull/82)/`a5223fb`，squash merge；分支 HEAD `1d84f52`，A 卡（#81）合入后 rebase 为 `6f819dd`）。完整交付记录、残余边界与挂账（共 3 条，含 `scopePlanToContractScope()` 不接收 `references` 故接线落在确认覆盖路径、非北极星剔除调用方自带 `playtest` 属收紧、不宣称端到端闭环）见 [`development-tasks-completed.md`](./development-tasks-completed.md) §3.4i（锚点 `#task-c.23`）。本处保留原始卡文以存追溯，不再作为施工依据。**ruling 3 裁决至此兑现**（装配接线完成；判定源仍为 L.17b 交付物、本卡未动）。
 
 > **立卡（2026-11-02 · P-118 · 经 ruling 3 裁决落盘）**：ruling 3（2026-11-02 · P-114 落盘，原文见 [`development-tasks-completed.md`](./development-tasks-completed.md) §3.4f、[`development-tasks-changelog.md`](./development-tasks-changelog.md) P-114、ledger [`../ledger/consistency-audit.md`](../ledger/consistency-audit.md) P-114 落笔）此前明确「实现属小卡，另行立卡或挂账」；本卡即为该实现卡，**P-114 时未立卡系避免未达 DoR 的薄卡债（DOR-3 同款），本次按 R-1～R-12 写全后立卡**。估算 **S**，不宣称端到端闭环（`check playtest` 判定源已由 L.17b 交付，本卡只做装配接线）。
 
@@ -247,7 +251,7 @@
 * **对应规格**（R-1）：ruling 3 裁决（2026-11-02 · P-114，见上引三处）；[`../scheme.md`](../scheme.md) **dec-12**（北极星「一模一样」= 用户对话试玩 + 结构化证据桩，AI 不代判、禁像素/DOM 机器比对）、**REJ-009**；[`development-tasks-completed.md`](./development-tasks-completed.md) §3.4f（L.17b 交付的 `check playtest` 判定源 `daemon/supervisor/preview/playtest-guard.ts`）；[`task-card-standard.md`](./task-card-standard.md) R-1～R-12
 * **前置依赖**（R-3）：`TASK-L.17b`（**COMPLETED** · [#72](https://github.com/he18718143986-design/IDE/pull/72)/`d26def6`，`check playtest` 命令与判定源已交付）；ruling 3 裁决已落盘（P-114）
 * **优先级**：P3 · **NON_BLOCKER**（不阻断 M5 主序，主序已收官）
-* **状态**：`[READY]`
+* **状态**：`[COMPLETED]`（2026-11-02 · [#82](https://github.com/he18718143986-design/IDE/pull/82)/`a5223fb`）
 * **对照痛点（代码事实）**（R-4）：
   1. 合同装配唯一入口 `src/lib/contract.schema.ts::createContractDraft()`（约 :691）在 :764-782 装配 `verification_spec.commands`：`params.commands` 有值则原样采用、否则回落默认 `{alias:"test", executable:"npm", args:["test"]}`；**此处不读 `params.references`**（`references` 由 :712-714 透传、schema 定义于 :536），故带参考站的北极星合同今日不会自动带 `playtest` 命令。
   2. `src/lib/journey/confirm-scheme-contract.ts::buildConfirmContract()`（约 :31）调用 `createContractDraft()` 后，在 :108-124 以 `softwareContractSchema.parse({...draft, verification_spec: {...}})` **重新覆盖** `verification_spec.commands`（取 `projected.verification_spec.commands`，来源 `src/lib/journey/scope-plan.ts::scopePlanToContractScope()` 约 :393）——**只在 `createContractDraft` 单边接线会被该路径覆盖而失效，漏改即 FAIL**。
@@ -309,7 +313,7 @@
 * **对应规格**：架构 / W.1 适配器抽象；`daemon/worker/worker-adapter.interface.ts`；`src/lib/contract.schema.ts::workerSpecSchema`；先例 W.5b/c 人工实测 → 本卡产品化
 * **前置依赖**：**硬** `TASK-W.6`（Registry 进派工，否则测完无池可进；**W.6 已于 2026-11-02 COMPLETED（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`），硬前置已解除**）；**软** `TASK-W.5c`（探测沙箱复用/对齐其容器隔离基建；**排程上 W.5c 为下一张，优先于本卡**）
 * **优先级**：P3 · **NON_BLOCKER**（**不阻断** `TASK-L.16`；**不抢** W.5b/c 实测窗口；与 W.5b/c **不互斥**——本卡落地后 W.5b/c 可作为首批真实用例回归基准）
-* **状态**：`[NEW_TASK]`（硬前置 W.6 已 COMPLETED，就绪障碍解除；但排程上 `TASK-W.5c` 系列为下一张，本卡不抢位、尚未开工）。**邻卡 DoR 正文状态**：`W.5c` 已于 P-115 按 DoR 重写达标、并经 P-118 授权拆为 `W.5c-i`（`[READY]`，Sprint 首要）/ `W.5c-ii`（`[READY（跟随 i）]`）/ `W.5c-iii`（`[BLOCKED · 等容器环境]`）三张子卡，母卡标 `[SPLIT]` 保留追溯；`W.5b` 的 DOR-3 正文重写债仍在。
+* **状态**：`[NEW_TASK]`（硬前置 W.6 已 COMPLETED，就绪障碍解除；但排程上 `TASK-W.5c` 系列为下一张，本卡不抢位、尚未开工）。**邻卡 DoR 正文状态**（2026-11-02 · P-119 同步）：`W.5c` 已于 P-115 按 DoR 重写达标、并经 P-118 授权拆为 `W.5c-i`（**`[COMPLETED]`** · #81/`c3e75cc`）/ `W.5c-ii`（`[READY（跟随 i）]`，**Sprint 首要**）/ `W.5c-iii`（`[BLOCKED · 等容器环境]`）三张子卡，母卡标 `[SPLIT]` 保留追溯；`W.5b` 的 DOR-3 正文重写债仍在。
 * **对照痛点（代码事实）**：
   1. 三层可扩展接口已在：`daemon/worker/worker-adapter.interface.ts::CodingWorkerAdapter`（`AdapterCapabilityDeclaration` 9 项 + `AdapterRejectionCode`）、`daemon/worker/adapter-registry.ts::AdapterRegistry`（`register` / `get` / `requireControlled`）、`src/lib/contract.schema.ts::workerSpecSchema`（`adapter_id` + `control_mode` 二值 `GATEWAY_ENFORCED|UNCONTROLLED_EXTERNAL`）。
   2. ~~派工仍硬编码 `new AiWorker(...)`（`daemon/pipeline/orchestrator.ts`）~~ —— **已由 W.6（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`）改造为经 `AdapterRegistry` → `requireControlledDispatch` 派工工厂接线，本痛点已消除**；本卡不代替 W.6。
@@ -376,7 +380,7 @@
 
 #### 【Task L.17】受控只读外网摄取（北极星前置 · 已拆分） `[SPLIT]`
 
-> **注记（2026-11-01 · oq-3 裁决与 L.17 拆分；11-01 L.17a 交付与 L.17b 解封；11-02 L.17b 交付，M5 主序收官更新）**：本卡已拆分为 **`TASK-L.17a`** 与 **`TASK-L.17b`** 两张子卡，且均已 COMPLETED：L.17a（[#70](https://github.com/he18718143986-design/IDE/pull/70)/`8516c3d`）、**L.17b（[#72](https://github.com/he18718143986-design/IDE/pull/72)/`d26def6`）**。保留历史拆分追溯，不删原文，本母卡不开工实现。**M5 北极星主序（L.16 → L.17a → L.17b）已全部落完**；债卡 `W.6` 亦已 COMPLETED（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`，见 completed §3.4g）。Sprint 首要位置现进入债卡区，排程已裁决写死（2026-11-02 · P-114）：**`W.5c`（容器沙箱，兼 `W.7` 探测地基）→ `W.7`（自助注册/自动验证，硬前置已解除）→ `W.5b`（cursor-agent 实测，作 `W.7` 回归基准）**；`W.5b/c` 保留队列、不再列为待定项。`ruling 3`（`check playtest` 接验收档）已于 P-114 落盘裁决，实现另行立卡或挂账（未开工）。
+> **注记（2026-11-01 · oq-3 裁决与 L.17 拆分；11-01 L.17a 交付与 L.17b 解封；11-02 L.17b 交付，M5 主序收官更新）**：本卡已拆分为 **`TASK-L.17a`** 与 **`TASK-L.17b`** 两张子卡，且均已 COMPLETED：L.17a（[#70](https://github.com/he18718143986-design/IDE/pull/70)/`8516c3d`）、**L.17b（[#72](https://github.com/he18718143986-design/IDE/pull/72)/`d26def6`）**。保留历史拆分追溯，不删原文，本母卡不开工实现。**M5 北极星主序（L.16 → L.17a → L.17b）已全部落完**；债卡 `W.6` 亦已 COMPLETED（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`，见 completed §3.4g）。Sprint 首要位置现进入债卡区，排程已裁决写死（2026-11-02 · P-114）：**`W.5c`（容器沙箱，兼 `W.7` 探测地基）→ `W.7`（自助注册/自动验证，硬前置已解除）→ `W.5b`（cursor-agent 实测，作 `W.7` 回归基准）**；`W.5b/c` 保留队列、不再列为待定项。**P-119 进度同步**：`W.5c-i` 已 COMPLETED（#81/`c3e75cc`）、`TASK-C.23` 已 COMPLETED（#82/`a5223fb`），**Sprint 首要现为 `W.5c-ii`**（容器运行时 `runInSandbox`）。`ruling 3`（`check playtest` 接验收档）已于 P-114 落盘裁决、**已于 P-119 由 `TASK-C.23` 兑现实现**（判定源仍为 L.17b 交付物）。
 
 * **任务编号**：`TASK-L.17`
 * **对应规格**：ADR-0014 §3；`scheme.md` goal-2、conf-6、oq-2（dec-12）；[`delivery-lifecycle.md`](./delivery-lifecycle.md) M5
