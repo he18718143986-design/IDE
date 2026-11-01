@@ -3653,3 +3653,35 @@
   > 另：**`check playtest` 目前是独立命令、尚未被任何 verification profile 引用，合约验收要不要调用它属后续配置面**——本卡未擅自登记为正式挂账，待裁决。
 * **未宣称 / 未接线（不宣称端到端闭环）**：`CompareView` 未挂载进任何 UI 路由；用户原话采集 UI 未实现（右栏引导仅提示，不含提交动作）；`check playtest` 尚未被 verification profile 引用。**本卡交付组件 + lib + 端点 + 门禁判定源，端到端 UI 串联与真机端口联调属后续。**
 * **关键文件**：`src/components/project/CompareView.tsx`、`src/lib/journey/playtest-guidance.ts`、`src/lib/journey/playtest-evidence.ts`、`src/lib/daemon-api.ts`、`daemon/playtest/evidence.ts`、`daemon/release/active-live.ts`、`daemon/supervisor/preview/playtest-guard.ts`、`daemon/server.ts`、`bin/stagent.ts`、`tests/unit/compare-view.test.ts`、`tests/unit/playtest-guidance.test.ts`、`tests/unit/playtest-evidence.test.ts`、`tests/unit/playtest-reset.test.ts`。
+
+---
+
+### 3.4g 受控 Worker 派工接线与默认适配器注册（W.6 · 主序收官后首张债卡）
+
+<a id="task-w.6"></a>
+
+#### 【Task W.6】AdapterRegistry 接线与 Claude Code Worker 派工 `[COMPLETED]`
+* **任务编号**：`TASK-W.6`
+* **状态与证据**：`[COMPLETED]`（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`，squash merge；分支阶段 HEAD `638129d`，含合入前审阅修复）。ledger **DLV-3** 台账债销项；**M5 主序收官后首张落完的债卡**。
+* **对应规格**：架构 / W.1 适配器抽象；ledger **DLV-3** [`../ledger/README.md`](../ledger/README.md)；`daemon/worker/worker-adapter.interface.ts` 能力契约
+* **前置依赖**：`TASK-W.1`（COMPLETED）、`TASK-W.5a`（COMPLETED · Claude Code 适配器已有）
+* **交付内容**：
+  1. **默认注册表 `daemon/worker/default-worker-registry.ts`**：`createDefaultWorkerRegistry()` 在 daemon 构造 `ContractOrchestrator` 时经 `DaemonServerOptions.workerRegistry` 注入（缺省则构造默认表，每次返回独立实例不做全局单例）。内置 Managed AI（`AiWorker` 封装）以 `GATEWAY_ENFORCED` 注册并挂 `managedAiDispatchFactory`；**双 id** `stagent.builtin.ai-sdk`（合同默认 `DEFAULT_WORKER_SPEC.adapter_id`）/ `stagent.managed-ai.v0`（`MANAGED_AI_CAPABILITY` 声明 id）指向同一工厂，化解两者不一致且**不改存量合同默认值**。
+  2. **Claude Code worker 登记口径（红线）**：以 `stagent.claude-code.worker.v0` **仅登记为 `UNCONTROLLED_EXTERNAL`、不挂派工工厂**。能力声明如实写 `filesystem_permissions: DIRECT_UNCONTROLLED` / `command_permissions: UNRESTRICTED_SHELL` / `tool_interception_supported: false` + 三条 `known_limitations`（外部 CLI 不受编排器 ScopedWorktreeGateway 写范围约束、工具调用经 MCP HTTP 端点无法逐次拦截、产物不得作为受控/可合并证据）。**双保险**：受控门禁先拒（非 `GATEWAY_ENFORCED`） + 无工厂兜底。走 W.8 MCP 端点外部 CLI 路径，本就不经 `runWorker`，未接入编排器受控派工。
+  3. **派工接线 `daemon/pipeline/orchestrator.ts`**：单段与两段式两处 `new AiWorker(...)` 全部改为 `requireControlledDispatch(registry, worker_spec.adapter_id)` → 由工厂产出 `run(signal)` 执行器。`WorkerDispatchContext` 的 `gateway` / `costMonitor` / `modelClient` / `repoRoot` 由编排器在 `buildRuntime()` 之后装配，适配器工厂**无自造 Gateway、绕过写范围的机会**（Gateway 语义在类型层面封死）；`checksExtras` 保留两段式「你会被这样检查」注入面。`OrchestratorOptions.registry` 与 `runWorker` 单次 `options.registry` 双通道可注入。
+  4. **门禁与错误码 `daemon/worker/worker-dispatch.ts` + `adapter-registry.ts`**：`requireControlledDispatch()` 复用 `registry.requireControlled()` 判定，把 `AdapterRegistrationError.rejection` 映射为带 `.code` 的 `WorkerDispatchError`——未注册 `E_ADAPTER_NOT_REGISTERED` / 非受控（含 `UNCONTROLLED_EXTERNAL`）`E_ADAPTER_NOT_CONTROLLED` / 已注册但未挂工厂 `E_ADAPTER_NO_DISPATCH_FACTORY`。`.code` 经 `daemon/server.ts::sendActionError` 透出 HTTP（`.rejection` 字段不透的坑已被接住）。**任何分支都不返回裸执行兜底，绝不静默降级到无网关执行**。`registerDispatchFactory` 要求 adapter 先注册，防「幽灵 id 挂工厂」。
+  5. **能力载体 `run()` 语义（合前审阅修复）**：`capabilityAdapter` 与 `claudeCodeWorkerRegistration` 的 `run()` 原返回 `{changes:[]}`「假成功」，合入前按 Tina 2026-11-02 审阅意见改为**显式 `throw new Error("capability carrier is not executable; dispatch via registry dispatchFactory")`**——任何误走 `registry.get(id).run(input)` 的路径显式失败而非静默空转（W.8「假成功返回」同款隐患换了位置）。附测试断言三个默认注册 id 的 `adapter.run()` 均 `rejects`。
+  6. **配置面（最小可用）**：合同创建表单 `src/routes/index.tsx`「高级」折叠区可选 `worker_spec.adapter_id`（留空用默认 `stagent.builtin.ai-sdk`）；复用既有 `workerSpecSchema.shape` 五键，**未新增 schema 字段**（`contract-schema-v12.test.ts` 锁定键集）。新增 `GET /api/adapters` 只读诊断端点，列出已注册适配器的 `adapter_id` / `control_mode` / `kind` / `dispatchable`（`control_mode === GATEWAY_ENFORCED` 派生），沿用既有 `isAuthorized` 鉴权、不新增豁免。校验后置到派工门禁（「UI 可糙」卡面允许）。
+* **不变声明**：Gateway 写范围 / Demo Origin / 鉴权**不变**；`UNCONTROLLED_EXTERNAL` 仍不得作为受控执行/可合并证据；右栏 `role:"partner"` 只读白名单（J.1）**不动**；未做 W.5b/c 人工实测、未做多 Agent 并行 DAG。
+* **验收（PASS）**：`tests/unit/adapter-registry-dispatch.test.ts` **14 passed**——
+  - **OCP 正例**：真 repo + 真 `ContractOrchestrator` + `approve()` + 注入含 `FakeControlledWorkerAdapter` 的 registry；合同 `adapter_id` 指向 Fake 时 `factoryCalls===1` / `workerRuns===1`、`result.changes` 来自 Fake 执行器，证明「Fake 只能经 Registry 到达派工」而非「工厂被调用了」。
+  - **OCP 静态边界（C 组）**：直接读 `orchestrator.ts` 源码断言无 `new AiWorker(`、无 `import { AiWorker }` 值导入、无 `FakeControlledWorkerAdapter` / `ClaudeCodeAdapter`，派工必经 `requireControlledDispatch`。
+  - **负例**：未注册 `adapter_id` → `E_ADAPTER_NOT_REGISTERED`；指向 `UNCONTROLLED_EXTERNAL` 适配器 → `E_ADAPTER_NOT_CONTROLLED`；已注册受控但未挂工厂 → `E_ADAPTER_NO_DISPATCH_FACTORY`。
+  - 默认注册表：双内置 id 受控可解析且挂工厂；Claude Code worker 登记非受控、派工被明确拒绝；能力载体 `run()` 显式抛错；每次调用返回独立实例。
+  - 集成回归：`design-step` / `two-phase-construction` / `ai-worker` / `index-route` / `mcp-http-endpoint` 5 文件 37 passed；`worker-adapter.test.ts` F 组（扫 `daemon/worker/*.ts` 零 `child_process`/原生执行）通过。`npx tsc --noEmit` 全仓 57 个 `error TS` 与 clean `main` 基线一致，改动文件 0 报错（`orchestrator.ts(1459)` 为 clean 基线 `(1431)` 同一处 `runDesignStep` `exactOptionalPropertyTypes` 旧债，因前置 import/字段插入行号下移 28 行）。全量 unit 5 个失败（cli-host-claude-code / evidence-schema-v11 / spawn-whitelist / supervisor-zero-tool-lint / test-port-map 28 对既有端口区间重叠）经 clean-tree stash 对比确认 **pre-existing**，与本卡无关。
+* **残余边界 / 后续挂账（P-113 归拢，共 2 条）**：
+  1. **能力载体 `run()` 语义（合前已修 · 记为设计决策）**：注册用能力载体不可执行，`run()` 显式 `throw`；派工**只**经 Registry 登记的 dispatchFactory 产出执行器。本条已在合入前修复并加测试断言，此处登记为设计决策以防回潮，**非未修挂账**。
+  2. **`GET /api/adapters` 未做端到端 HTTP 验证**：为避免新增测试端口登记段、加剧既有 `test-port-map.test.ts` 端口区间重叠债，本端点仅验证 `ContractOrchestrator.listRegisteredAdapters()` 逻辑，未起真 daemon 做 HTTP 401/200 端到端覆盖。后续若解掉端口重叠债可补。
+  > **口径说明（非挂账）**：卡面「验收」原写「至少一条非 OpenAI 受控适配器可被派工测试命中 / Claude Code worker 可受控派工」；实现按红线落地为「内置 Managed AI 受控派工 + Claude Code worker 仅登记 `UNCONTROLLED_EXTERNAL`」，即 **Claude Code worker 未作为受控执行器进入派工路径**。此口径经 Tina 2026-11-02 审阅明确认可（「把它包装成受控要不如实」），OCP 正例以 Fake 受控适配器达成「非默认适配器经 Registry 派工命中」的验收本质。
+* **未宣称 / 未接线（不宣称端到端闭环）**：Claude Code worker 仅登记在案、未接入编排器受控派工（走 W.8 MCP 端点外部 CLI 路径）；`GET /api/adapters` 未做端到端 HTTP 验证；配置面为「UI 可糙」最小可用（无下拉联动 / 设置页持久化）；`TASK-W.7` 自动探测升格与 `W.5b/c` 实测均未开工。**本卡交付注册表 + 派工门禁 + 错误码 + OCP 验收测试，端到端产品接线属后续。**
+* **关键文件**：`daemon/worker/default-worker-registry.ts`（新）、`daemon/worker/worker-dispatch.ts`（新）、`daemon/worker/adapter-registry.ts`、`daemon/pipeline/orchestrator.ts`、`daemon/server.ts`、`src/routes/index.tsx`、`tests/unit/adapter-registry-dispatch.test.ts`（新）。

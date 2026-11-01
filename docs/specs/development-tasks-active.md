@@ -98,14 +98,16 @@
 
 <a id="task-w.6"></a>
 
-#### 【Task W.6】AdapterRegistry 接线与 Claude Code Worker 派工 `[NEW_TASK]` · **NON_BLOCKER**（ledger **DLV-3**）
+#### 【Task W.6】AdapterRegistry 接线与 Claude Code Worker 派工 `[COMPLETED]` · **NON_BLOCKER**（ledger **DLV-3**）
+
+> **归档注记（2026-11-02 · P-113）**：本卡已 COMPLETED（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`，squash merge；分支阶段 HEAD `638129d`）。完整交付记录、残余边界与挂账见 [`development-tasks-completed.md`](./development-tasks-completed.md) §3.4g（锚点 `#task-w.6`）。本处保留原始卡文以存追溯，不再作为施工依据。**口径澄清**：卡面验收原写「Claude Code worker 可受控派工」，实现按红线落地为「内置 Managed AI（`AiWorker` 封装）以 `GATEWAY_ENFORCED` 受控派工 + Claude Code worker 仅登记为 `UNCONTROLLED_EXTERNAL`、不挂派工工厂」——Claude Code worker 未作为受控执行器进入派工路径（经 Tina 2026-11-02 审阅认可，详见 completed §3.4g）。
 
 * **任务编号**：`TASK-W.6`
 * **任务名称**：把 `AdapterRegistry` 接到派工路径；Claude Code `role: "worker"` 可受控派工
 * **对应规格**：架构 / W.1 适配器抽象；ledger **DLV-3**；[`../ledger/README.md`](../ledger/README.md) DLV-3；审计依据：Worker 仅 OpenAI `AiWorker`
 * **前置依赖**：`TASK-W.1`（COMPLETED）、`TASK-W.5a`（COMPLETED · Claude Code 适配器已有）
 * **优先级**：P3 · **NON_BLOCKER**（M2 不依赖；**不阻断** `TASK-L.16`；不与 W.5b/c 抢位）
-* **状态**：`[NEW_TASK]`
+* **状态**：`[COMPLETED]`（2026-11-02 · [#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`，squash merge；分支阶段 HEAD `638129d`；**M5 主序收官后首张落完的债卡**）
 * **对照痛点（代码事实）**：`daemon/worker/adapter-registry.ts::AdapterRegistry` 已实现 register/get/requireControlled，但 `daemon/pipeline/orchestrator.ts` 派工组装真实 `AiWorker` + `OpenAiWorkerClient`（约 L1376–L1509）；`ClaudeCodeAdapter` 在 `daemon/server.ts` 主要用于右栏 `partner`，**未**经 Registry 作为受控 Worker 进入派工。
 * **一句话目标**：派工可按合同/设置选择已注册的受控适配器；至少 Claude Code worker 角色能走 Gateway 受控路径，不再写死只认 OpenAI `AiWorker`。
 * **范围**：
@@ -130,12 +132,12 @@
 * **任务编号**：`TASK-W.7`
 * **任务名称**：前端自助注册任意 Worker；默认 `UNCONTROLLED_EXTERNAL`；自动探测通过后升格 `GATEWAY_ENFORCED`
 * **对应规格**：架构 / W.1 适配器抽象；`daemon/worker/worker-adapter.interface.ts`；`src/lib/contract.schema.ts::workerSpecSchema`；先例 W.5b/c 人工实测 → 本卡产品化
-* **前置依赖**：**硬** `TASK-W.6`（Registry 进派工，否则测完无池可进；**W.6 仍为 `[NEW_TASK]`，本卡未就绪至 W.6 COMPLETED**）；**软** `TASK-W.5c`（探测沙箱复用/对齐其容器隔离基建）
+* **前置依赖**：**硬** `TASK-W.6`（Registry 进派工，否则测完无池可进；**W.6 已于 2026-11-02 COMPLETED（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`），硬前置已解除**）；**软** `TASK-W.5c`（探测沙箱复用/对齐其容器隔离基建；**排程上 W.5c 为下一张，优先于本卡**）
 * **优先级**：P3 · **NON_BLOCKER**（**不阻断** `TASK-L.16`；**不抢** W.5b/c 实测窗口；与 W.5b/c **不互斥**——本卡落地后 W.5b/c 可作为首批真实用例回归基准）
-* **状态**：`[NEW_TASK]`（**未就绪**：硬前置 W.6 未 COMPLETED）
+* **状态**：`[NEW_TASK]`（硬前置 W.6 已 COMPLETED，就绪障碍解除；但排程上 `TASK-W.5c` 容器沙箱为下一张，本卡不抢位、尚未开工；DOR-3 正文重写债仍在）
 * **对照痛点（代码事实）**：
   1. 三层可扩展接口已在：`daemon/worker/worker-adapter.interface.ts::CodingWorkerAdapter`（`AdapterCapabilityDeclaration` 9 项 + `AdapterRejectionCode`）、`daemon/worker/adapter-registry.ts::AdapterRegistry`（`register` / `get` / `requireControlled`）、`src/lib/contract.schema.ts::workerSpecSchema`（`adapter_id` + `control_mode` 二值 `GATEWAY_ENFORCED|UNCONTROLLED_EXTERNAL`）。
-  2. 派工仍硬编码 `new AiWorker(...)`（`daemon/pipeline/orchestrator.ts`）——由 **W.6** 接线；本卡不代替 W.6。
+  2. ~~派工仍硬编码 `new AiWorker(...)`（`daemon/pipeline/orchestrator.ts`）~~ —— **已由 W.6（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`）改造为经 `AdapterRegistry` → `requireControlledDispatch` 派工工厂接线，本痛点已消除**；本卡不代替 W.6。
   3. 今日无「前端注册 → 自动探测 → 按结果分档」产品路径；W.5b/c 仍是人工黑盒实测卡。
 * **一句话目标**：用户可在设置页添加任意 Worker；默认只能当未受控参考；只有通过内置探测包的才升格受控并被 `requireControlled` 命中。
 * **范围**：
@@ -199,7 +201,7 @@
 
 #### 【Task L.17】受控只读外网摄取（北极星前置 · 已拆分） `[SPLIT]`
 
-> **注记（2026-11-01 · oq-3 裁决与 L.17 拆分；11-01 L.17a 交付与 L.17b 解封；11-02 L.17b 交付，M5 主序收官更新）**：本卡已拆分为 **`TASK-L.17a`** 与 **`TASK-L.17b`** 两张子卡，且均已 COMPLETED：L.17a（[#70](https://github.com/he18718143986-design/IDE/pull/70)/`8516c3d`）、**L.17b（[#72](https://github.com/he18718143986-design/IDE/pull/72)/`d26def6`）**。保留历史拆分追溯，不删原文，本母卡不开工实现。**M5 北极星主序（L.16 → L.17a → L.17b）已全部落完**，Sprint 首要位置之后仅余债卡 `W.6`/`W.7` 与挂账裁决 `W.5b/c` 去留。
+> **注记（2026-11-01 · oq-3 裁决与 L.17 拆分；11-01 L.17a 交付与 L.17b 解封；11-02 L.17b 交付，M5 主序收官更新）**：本卡已拆分为 **`TASK-L.17a`** 与 **`TASK-L.17b`** 两张子卡，且均已 COMPLETED：L.17a（[#70](https://github.com/he18718143986-design/IDE/pull/70)/`8516c3d`）、**L.17b（[#72](https://github.com/he18718143986-design/IDE/pull/72)/`d26def6`）**。保留历史拆分追溯，不删原文，本母卡不开工实现。**M5 北极星主序（L.16 → L.17a → L.17b）已全部落完**；债卡 `W.6` 亦已 COMPLETED（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`，见 completed §3.4g）。Sprint 首要位置现进入债卡区：下一张为 **`W.5c`（容器沙箱）**，`W.7` 硬前置已解除但排程在后，挂账裁决 `W.5b/c` 去留待定。
 
 * **任务编号**：`TASK-L.17`
 * **对应规格**：ADR-0014 §3；`scheme.md` goal-2、conf-6、oq-2（dec-12）；[`delivery-lifecycle.md`](./delivery-lifecycle.md) M5
@@ -268,7 +270,7 @@
 ### 3.4e 台账债立卡（2026-11-01 · NON_BLOCKER · 不抢主序）
 
 
-> Tina 授权将第一类六项写成任务卡。Sprint：主序实现卡 **`L.16` 已 COMPLETED**（#62/`e4dfe1c`）；**`L.17a` 已 COMPLETED**（#70/`8516c3d`）；**`TASK-L.17b` 已 COMPLETED**（#72/`d26def6`）——**M5 北极星主序（L.16 → L.17a → L.17b）全部落完，主序收官**。本节目的：把 ledger 待立卡改代码项变成可排期卡；`A.7`/`H.9`/`L.18`/`J.19`/`J.20`/`C.22`/`W.8`/`L.17a`/`L.17b` 已 COMPLETED（见 completed / #58/#60/#69/#70/#72）；**主序之后 Sprint 首要位置仅余债卡 `W.6`（可开；不与 W.5b/c 同窗）与 `W.7`（自助注册/自动验证 · 硬前置 W.6 · 不抢 W.5b/c 实测窗口），以及挂账裁决 `W.5b/c` 去留**。
+> Tina 授权将第一类六项写成任务卡。Sprint：主序实现卡 **`L.16` 已 COMPLETED**（#62/`e4dfe1c`）；**`L.17a` 已 COMPLETED**（#70/`8516c3d`）；**`TASK-L.17b` 已 COMPLETED**（#72/`d26def6`）——**M5 北极星主序（L.16 → L.17a → L.17b）全部落完，主序收官**。本节目的：把 ledger 待立卡改代码项变成可排期卡；`A.7`/`H.9`/`L.18`/`J.19`/`J.20`/`C.22`/`W.8`/`L.17a`/`L.17b` 已 COMPLETED（见 completed / #58/#60/#69/#70/#72）；**主序收官后债卡区推进**：`W.6` 已 COMPLETED（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`，见 completed §3.4g）；**Sprint 首要位置下一张为 `W.5c`（OpenHands 容器沙箱实测，兼作 `W.7` 探测沙箱地基）**，`W.7`（自助注册/自动验证 · 硬前置 W.6 已解除 · 不抢 W.5b/c 实测窗口）排程在后，挂账裁决 `W.5b/c` 去留待定；`ruling 3`（`check playtest` 接验收档）docs 待落盘**。
 
 ### 3.5 架构感知、监听与差异审阅（C.5 落 Sprint 2；B.1/B.2/C.4 推迟至 v0.2+）
 
