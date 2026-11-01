@@ -3650,8 +3650,8 @@
   4. **（W.8）`claude-code-adapter.ts` token 回退**：解析顺序仍为 `opts.authToken` → `STAGENT_MCP_TOKEN` → `STAGENT_SESSION_TOKEN`；环境中若仍设 session token，最后一级回退可能放宽权限。建议后续移除回退或另立修复。
   5. **（W.8）`/api/shutdown` 401 双轨路由测试用手写 mock**：不等同真实 daemon 路由；真实 `StagentDaemon` 实例测试验证了 `mcp.json` Authorization 使用 `mcpToken`，但非对真实 shutdown 拒绝的直接覆盖。建议补边界说明与真实路由测试。
   6. **（L.17a）`request.headers`**：已对敏感头做严格剥离过滤；当前 gateway 调用暂不传 headers，未来若不需要自定义头可彻底裁剪该字段。
-  > 另：**`check playtest` 目前是独立命令、尚未被任何 verification profile 引用，合约验收要不要调用它属后续配置面**——本卡未擅自登记为正式挂账，待裁决。
-* **未宣称 / 未接线（不宣称端到端闭环）**：`CompareView` 未挂载进任何 UI 路由；用户原话采集 UI 未实现（右栏引导仅提示，不含提交动作）；`check playtest` 尚未被 verification profile 引用。**本卡交付组件 + lib + 端点 + 门禁判定源，端到端 UI 串联与真机端口联调属后续。**
+  > 另：**`check playtest` 目前是独立命令、尚未被任何 verification profile 引用**——**已裁决（ruling 3 · 2026-11-02 · P-114 落盘）**：北极星合同（带 `references[]`）的 `verification_spec.commands` **自动附加** `{alias:"playtest", executable:"stagent", args:["check","playtest","<contract_id>"]}`，使试玩认可成为合并门禁；**非北极星合同不附加**。实现属小卡（合同装配段 + 测试），**另行立卡或挂账**——本轮仅落裁决口径，**未立卡、未开工**（不顺手立 `TASK-C.23`，避免新增未达 `task-card-standard.md` DoR 的薄卡债，DOR-3 同款）。裁决原文见 [`development-tasks-changelog.md`](./development-tasks-changelog.md) P-114 与 ledger [`../ledger/consistency-audit.md`](../ledger/consistency-audit.md) P-114 落笔。
+* **未宣称 / 未接线（不宣称端到端闭环）**：`CompareView` 未挂载进任何 UI 路由；用户原话采集 UI 未实现（右栏引导仅提示，不含提交动作）；`check playtest` 尚未被 verification profile 引用（**ruling 3 裁决已落盘、实现未开工，见上条**；本句是代码事实，不与「已裁决」混淆）。**本卡交付组件 + lib + 端点 + 门禁判定源，端到端 UI 串联与真机端口联调属后续。**
 * **关键文件**：`src/components/project/CompareView.tsx`、`src/lib/journey/playtest-guidance.ts`、`src/lib/journey/playtest-evidence.ts`、`src/lib/daemon-api.ts`、`daemon/playtest/evidence.ts`、`daemon/release/active-live.ts`、`daemon/supervisor/preview/playtest-guard.ts`、`daemon/server.ts`、`bin/stagent.ts`、`tests/unit/compare-view.test.ts`、`tests/unit/playtest-guidance.test.ts`、`tests/unit/playtest-evidence.test.ts`、`tests/unit/playtest-reset.test.ts`。
 
 ---
