@@ -3033,6 +3033,33 @@
 * **关键文件**：`src/lib/knowledge/modules-schema.ts`（新）、`src/lib/design/design-note.ts`（新）、`src/lib/design/paid-sdk-list.ts`（新）、`daemon/supervisor/design/design-step.ts`（新）、`daemon/pipeline/orchestrator.ts`、`daemon/worker/session-task-injector.ts`
 * **估算**：M
 
+<a id="task-l.12"></a>
+
+#### 【Task L.12】系统知识库：Schema、引导合同与漂移门禁 `[COMPLETED]`
+
+* **任务编号**：`TASK-L.12`
+* **对应规格**：[`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) §4、§6（TD-06～TD-10）；ADR-0016；`scheme.md` acc-8
+* **前置依赖**：`TASK-L.11`
+* **优先级**：P2（M3）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#47](https://github.com/he18718143986-design/IDE/pull/47) / tip `39f426a`（`feat(L.12): 系统知识库 checkKnowledge / withSystemScope / bootstrap`；本地 squash 后推送）
+* **合入前拍板（Tina）**：① KB-1 维持「每个改动文件」（含非源码；真实物业口径），不收窄为仅源码；② bootstrap 启发式改 B——只认 `contract_type === "knowledge_bootstrap"`，不以标题含「知识库」触发。
+* **对照痛点（代码事实）**：目标项目没有任何系统描述；`daemon/arch/graph.ts::buildDependencyGraph` 结果不落盘。
+* **一句话目标**：每份合同合入时，目标仓库的 `docs/system/` 都覆盖本次改动；漂移即判不合格。
+* **范围**：
+  1. `src/lib/knowledge/modules-schema.ts`（L.11 已建）增加 `coversPath(modules, path)`，glob 匹配复用 `src/lib/scope.ts::matchesAnyPattern`。
+  2. 新建 `daemon/knowledge/check-knowledge.ts`：`checkKnowledge({ worktreeDir, baseSha, candidateSha, designNote }) → { ok, failures: { rule: "KB-1"…"KB-5", target }[] }`；由 `bin/stagent.ts` 子命令 `stagent check knowledge` 以真实进程调用（退出码 0 / 1，ADR-0005），作为验证命令排在 V2 之后；失败 → 证据 `FAILED`、原因码 `KNOWLEDGE_DRIFT`。
+  3. `withSystemScope`（L.3）扩展：目标仓库已有 `docs/system/modules.yaml`，或本桩为 `knowledge_bootstrap` 时，在签署前把 `docs/system/**` 与 `stagent check knowledge` 并入 `ScopePlan`；`daemon/mcp/gateway.ts` 的文件预算计数排除 `docs/system/**`。
+  4. 新建 `daemon/knowledge/bootstrap-draft.ts`：`draftModules(repoRoot)`：顶层源码目录 → 候选模块，`buildDependencyGraph` → `depends_on`（确定性）。`knowledge_bootstrap` 合同的设计步骤以它为输入（触发条件仅 `contract_type`）。
+  5. `reasonCodeSchema`（`src/lib/evidence.schema.ts`）增加 `KNOWLEDGE_DRIFT`。
+  6. `renderChecksSection` 追加 KB-1～KB-5 规则摘要（verification-strategy §8 第 3 项）。
+* **非目标**：不做「为什么有这段代码」入口（L.13）；不做系统地图 UI（**`TASK-L.18`** / DLV-5）。
+* **不变声明**：网关写范围判定函数不变，只扩合同范围。
+* **验收（PASS）**：`tests/unit/knowledge-check.test.ts`：TD-06～TD-08、TD-10；`tests/unit/knowledge-bootstrap.test.ts`：TD-09。
+* **FAIL**：未覆盖的改动文件仍 `can_merge`；`docs/system/**` 写入占用文件预算。
+* **关键文件**：`src/lib/knowledge/modules-schema.ts`、`daemon/knowledge/check-knowledge.ts`（新）、`daemon/knowledge/bootstrap-draft.ts`（新）、`bin/stagent.ts`、`daemon/mcp/gateway.ts`、`src/lib/scope.ts`（只读复用）、`daemon/arch/graph.ts`（只读复用）
+* **估算**：M
+
 <a id="task-l.14"></a>
 
 #### 【Task L.14】凭据保险库 `[COMPLETED]`
