@@ -283,6 +283,7 @@ import {
 import { ensureGitInit, inspectGitRepo } from "./git/ensure-git-repo";
 import type { ChatAdapter } from "./chat/types";
 import { BaselineChatAdapter } from "./chat/baseline-adapter";
+import { McpHttpServer } from "./mcp/http-server";
 import { DemoChatAdapter } from "./chat/demo-adapter";
 import {
   CLAUDE_CODE_VERIFIED_ON,
@@ -378,6 +379,7 @@ export class StagentDaemon {
   private server: http.Server | null = null;
   private wss: WebSocketServer | null = null;
   private clients: Set<WebSocket> = new Set();
+  readonly mcpServer: McpHttpServer;
   private sessionToken: string | null = null;
   /** TASK-D.1b：安装包 dist/public（同源控制台）；缺失则为 null，不托管 */
   private readonly consolePublicDir: string | null;
@@ -453,6 +455,7 @@ export class StagentDaemon {
     this.maxConnectionsPerWindow = options.maxConnectionsPerWindow ?? 30;
     this.connectionWindowMs = options.connectionWindowMs ?? 10_000;
     this.maxClients = options.maxClients ?? 64;
+    this.mcpServer = new McpHttpServer();
     // §3.3：图状态由 Daemon 独占维护；每次变更都以全量快照广播给前端。
     // 订阅放在构造期而不是首个请求，保证"第一个连接建立前发生的变更"
     // 也能在后续连接拿到磁盘上的最新状态（getGraph 会读盘恢复）。
@@ -4822,6 +4825,12 @@ export class StagentDaemon {
         return;
       }
       await this.handleDesign(req, res, method, pathname);
+      return;
+    }
+
+    // TASK-W.8：受管 MCP HTTP 端点（供 Worker 在 --strict-mcp-config 下挂接）
+    if (pathname === "/api/mcp" || pathname.startsWith("/api/mcp/")) {
+      await this.mcpServer.handleHttpRequest(req, res);
       return;
     }
 

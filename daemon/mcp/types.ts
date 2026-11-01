@@ -109,3 +109,13 @@ export interface AuditLogEntry {
   violationCode?: string;
   details?: string;
 }
+
+/**
+ * TASK-W.8 / TASK-L.17a：只读外网参考源抓取工具输入 Schema。
+ * 目标 URL 的域名必须命中合同/方案 references[] 白名单。
+ */
+export const StagentWebIngestSchema = z.object({
+  url: z.string().url("url must be a valid HTTP/HTTPS URL"),
+  format: z.enum(["html", "text", "summary"]).default("html").optional(),
+});
+export type StagentWebIngestInput = z.infer<typeof StagentWebIngestSchema>;
