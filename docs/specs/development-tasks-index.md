@@ -20,6 +20,7 @@
 | `TASK-W.5c` | `NEW_TASK` | OpenHands 适配器（容器隔离，SANDBOX_ENFORCED）(v1.3.3 新增) | [打开](./development-tasks-active.md#task-w.5c) |
 | `TASK-W.6` | `NEW_TASK` | AdapterRegistry 接线与 Claude Worker 派工（DLV-3）· NON_BLOCKER | [打开](./development-tasks-active.md#task-w.6) |
 | `TASK-W.7` | `NEW_TASK` | Worker 自助注册与自动验证（默认 `UNCONTROLLED_EXTERNAL`；探测升格 `GATEWAY_ENFORCED`）· NON_BLOCKER | [打开](./development-tasks-active.md#task-w.7) |
+| `TASK-W.8` | `NEW_TASK` | Worker 侧 Stagent MCP HTTP 端点 | [打开](./development-tasks-active.md#task-w.8) |
 | `TASK-J.18` | `SPLIT` | Worker 派工墓地门禁（INV-LEDGER-03 工地侧）· 拆分母卡 | [打开](./development-tasks-active.md#task-j.18) |
 | `TASK-J.19` | `COMPLETED` | DN-2「可以」HTTP/画布入口（DLV-6） | [打开](./development-tasks-completed.md#task-j.19) |
 | `TASK-J.20` | `COMPLETED` | OP-1 授权清单落地（dec-10 实施） | [打开](./development-tasks-completed.md#task-j.20) |
@@ -28,8 +29,8 @@
 | `TASK-L.15` | `COMPLETED` | 发布生命周期与两类部署目标 | [打开](./development-tasks-completed.md#task-l.15) |
 | `TASK-L.16` | `COMPLETED` | 线上问题回流 | [打开](./development-tasks-completed.md#task-l.16) |
 | `TASK-L.17` | `SPLIT` | 受控只读外网摄取（北极星前置 · 已拆分） | [打开](./development-tasks-active.md#task-l.17) |
-| `TASK-L.17a` | `READY` | 受控摄取与代登代理 | [打开](./development-tasks-active.md#task-l.17a) |
-| `TASK-L.17b` | `READY（待 L.17a）` | 对比视图与试玩证据桩 | [打开](./development-tasks-active.md#task-l.17b) |
+| `TASK-L.17a` | `BLOCKED · 待 C.22 + W.8` | 受控摄取与代登代理 | [打开](./development-tasks-active.md#task-l.17a) |
+| `TASK-L.17b` | `BLOCKED（待 L.17a）` | 对比视图与试玩证据桩 | [打开](./development-tasks-active.md#task-l.17b) |
 | `TASK-L.18` | `COMPLETED` | 系统地图 UI +「改这里会影响什么」（DLV-5） | [打开](./development-tasks-completed.md#task-l.18) |
 | `TASK-H.9` | `COMPLETED` | 废止 `.stagent/metadata/` 写入（DLV-4 · ADR-0011） | [打开](./development-tasks-completed.md#task-h.9) |
 | `TASK-B.1` | `DEFERRED` | 本地 AST 增量依赖图分析引擎 | [打开](./development-tasks-active.md#task-b.1) |
@@ -105,6 +106,7 @@
 | `TASK-C.19` | `COMPLETED` | Supervisor SSOT 合流（DOC-SSOT-Supervisor） | [打开](./development-tasks-completed.md#task-c.19) |
 | `TASK-C.20` | `COMPLETED` | Supervisor 合流前碎片归档（DOC-ARCHIVE-Supervisor-pre-SSOT） | [打开](./development-tasks-completed.md#task-c.20) |
 | `TASK-C.21` | `COMPLETED` | Supervisor SSOT 审查补丁（DOC-SSOT-Supervisor-Patch） | [打开](./development-tasks-completed.md#task-c.21) |
+| `TASK-C.22` | `NEW_TASK` | 合同 schema references[] 字段 | [打开](./development-tasks-active.md#task-c.22) |
 | `TASK-H.1` | `COMPLETED` | Worker JSON/Patch 解析校验与轻量重试 | [打开](./development-tasks-completed.md#task-h.1) |
 | `TASK-H.2` | `COMPLETED` | MERGED/DELIVERED 终态收口消歧 | [打开](./development-tasks-completed.md#task-h.2) |
 | `TASK-H.3` | `COMPLETED` | 基线扫描硬上限与超时熔断 | [打开](./development-tasks-completed.md#task-h.3) |

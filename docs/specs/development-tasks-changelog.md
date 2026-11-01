@@ -4,6 +4,8 @@
 
 ## v1.6.2 修订记录与一致性核对
 
+- **P-109（L.17a 前置探查与两卡立卡，2026-11-01）**：核实 L.17a 卡遗漏两项真实前置：合同 schema / scheme 快照无 `references[]` 权威字段；Worker 经 `--strict-mcp-config` 可调用的 Stagent MCP HTTP 端点不存在（W.4 实为 threat-guard）。新增 **`TASK-C.22`**（合同 schema references[]，估算 S）与 **`TASK-W.8`**（Worker 侧 Stagent MCP HTTP 端点，估算 M；无硬前置，可与 C.22 并行）；`TASK-L.17a` 回写 **`[BLOCKED · 待 C.22 + W.8]`**，并在卡正文注明代理与代登代码留在 `feat/l17a-web-ingest`（未合）。同步 §1.1 矩阵、索引、active 卡、Sprint 指针、DAG 两条边与 ledger。**本 PR 纯 docs**，不改代码、不改右栏、不宣称端到端闭环；编号 P-109/#109 顺延。
+
 - **P-1**：TASK-E.1/E.2 更正为 `[COMPLETED]`，保留历史提交与实存交付物；Sprint 6 不再重复排期。
 - **P-2**：从已完成卡剥离四个未交付的 v1.5.0 补齐块；状态投影/广播归 TASK-D.3，文件树动效归 TASK-C.7，质疑入口路由归 TASK-S.5 / Studio 集成。
 - **P-3**：已完成 TASK-W.2/TASK-D.2 中的 v1.6.1 增补拆为 TASK-W.2b/TASK-D.2b，明确前置与验收。

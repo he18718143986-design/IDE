@@ -169,6 +169,34 @@
 
 ---
 
+
+<a id="task-w.8"></a>
+
+#### 【Task W.8】Worker 侧 Stagent MCP HTTP 端点 `[NEW_TASK]`
+
+* **任务编号**：`TASK-W.8`
+* **任务名称**：Daemon 暴露受管 MCP HTTP 端点并接入 Worker
+* **对应规格**：`daemon/mcp/gateway.ts`；`daemon/worker/cli-host/claude-code-adapter.ts`；TASK-L.17a（仅承接其 MCP 传输前置）
+* **前置依赖**：无硬前置；可与 `TASK-C.22` 并行
+* **优先级**：P3（L.17a 前置）
+* **状态**：`[NEW_TASK]`
+* **对照痛点（代码事实）**：Daemon 侧已有 `daemon/mcp/gateway.ts` 工具网关，但 Worker 经 `--strict-mcp-config` 可调用的 Stagent MCP HTTP 端点不存在；`claude-code-adapter.ts` 仍写入 `{ mcpServers: {} }`。其注释误指 W.4（W.4 实际为 threat-guard），应改为本卡 W.8。
+* **一句话目标**：Daemon 暴露 MCP HTTP 端点并将其挂入 Worker 的 `mcpServers` 配置，首批只注册 `stagent_web_ingest` 工具供 L.17a 调用。
+* **范围**：
+  1. 在 Daemon Gateway 权限边界内提供受管 MCP HTTP server/endpoint，并复用现有工具定义、输入校验、调度和授权，不允许绕开 Gateway 直接访问资源。
+  2. 定义明确的工具注册面；首批仅挂 `stagent_web_ingest`，默认拒绝未注册或未授权工具。
+  3. 将真实端点配置写入 `claude-code-adapter.ts` 生成的 `mcpPath`，替代空 `mcpServers`；维持 `--strict-mcp-config`，端点不可用时明确失败，不静默降级为空集合。
+  4. 修正适配器注释中关于 MCP 端点由 W.4 落地的误指，改为 W.8。
+  5. 测试：HTTP MCP 握手、工具发现与调用；未授权/未知工具拒绝；Worker strict 配置确实指向受管端点。
+* **非目标**：不实现 web_ingest 抓取逻辑（归 L.17a）；不扩展右栏工具白名单；不开放通用任意工具注册或绕过 Gateway 的传输路径。
+* **不变声明**：Worker 的 `--strict-mcp-config` 约束保持；Gateway 权限、Scope 与工具授权边界不变；右栏只读工具白名单不变。
+* **验收（PASS）**：Worker 端在 strict MCP 配置下可发现并调用 `stagent` 命名空间工具；端点与工具调用均经过 Gateway 权限边界。
+* **FAIL**：端点绕开 Gateway 权限边界；Worker 配置仍生成空 `mcpServers`；端点不可用时静默降级。
+* **关键文件**：`daemon/mcp/gateway.ts`、Daemon HTTP server 注册点、`daemon/worker/cli-host/claude-code-adapter.ts`、新增 MCP server/transport 模块及测试
+* **估算**：M
+
+---
+
 ### 3.4c 闭环旅程 v2.1 第一批（Journey · 规格 `supervisor.md` 第三部分 §13～§20；对应 §19 落差 L-01～L-10）
 
 <a id="task-j.18"></a>
@@ -198,7 +226,7 @@
 
 #### 【Task L.17】受控只读外网摄取（北极星前置 · 已拆分） `[SPLIT]`
 
-> **注记（2026-11-01 · oq-3 裁决与 L.17 拆分）**：本卡已拆分为 **`TASK-L.17a`** 与 **`TASK-L.17b`** 两张子卡，均满足 DoR R-1～R-12（≤M 估算）且状态为 `[READY]`。**已拆分为 L.17a + L.17b，保留追溯**，不删原文，本母卡不开工实现。
+> **注记（2026-11-01 · oq-3 裁决与 L.17 拆分；11-01 前置探查状态更新）**：本卡已拆分为 **`TASK-L.17a`** 与 **`TASK-L.17b`** 两张子卡；此前 DoR 检查曾标为 `[READY]`，但开工探查发现 `references[]` schema 字段与 Worker MCP HTTP 端点两项未列前置，当前 **L.17a 为 `[BLOCKED · 待 C.22 + W.8]`，L.17b 随之等待 L.17a**。保留历史拆分追溯，不删原文，本母卡不开工实现。
 
 * **任务编号**：`TASK-L.17`
 * **对应规格**：ADR-0014 §3；`scheme.md` goal-2、conf-6、oq-2（dec-12）；[`delivery-lifecycle.md`](./delivery-lifecycle.md) M5
@@ -232,14 +260,16 @@
 
 <a id="task-l.17a"></a>
 
-#### 【Task L.17a】受控摄取与代登代理 `[READY]`
+#### 【Task L.17a】受控摄取与代登代理 `[BLOCKED · 待 C.22 + W.8]`
 
 * **任务编号**：`TASK-L.17a`
+
+> **前置探查注记（2026-11-01）**：开工探查发现两个未列前置——合同 schema 缺少 `references[]` 字段、Worker 侧 MCP HTTP 端点缺失；已分别立卡 `TASK-C.22` 与 `TASK-W.8`。代理与代登实现已在 `feat/l17a-web-ingest` 分支上（未合），待前置就绪后继续；本注记不代表端到端闭环。
 * **任务名称**：受控只读外网摄取与 Vault 代登代理
 * **对应规格**：ADR-0014 §3；`scheme.md` goal-2、conf-6、dec-13、oq-3；[`delivery-lifecycle.md`](./delivery-lifecycle.md) M5
-* **前置依赖**：`TASK-L.14`（COMPLETED · #31/`ae57543`）+ **oq-3 裁决**（**RESOLVED · dec-13**）
+* **前置依赖**：`TASK-L.14`（COMPLETED · #31/`ae57543`）+ **oq-3 裁决**（**RESOLVED · dec-13**）+ `TASK-C.22`（references[] 字段进入合同 schema 与 scheme 快照）+ `TASK-W.8`（Worker 侧 Stagent MCP HTTP 端点）
 * **优先级**：P3（M5）
-* **状态**：`[READY]`（估算 M；前置依赖已全部 COMPLETED/RESOLVED，满足 task-card-standard R-1～R-12）
+* **状态**：`[BLOCKED · 待 C.22 + W.8]`（未就绪；前置 references[] 权威字段与 Worker MCP HTTP 端点尚未交付）
 * **对照痛点（代码事实）**：`ALWAYS_DENY` 含 `WebFetch` / `WebSearch`（`daemon/worker/cli-host/claude-code-adapter.ts`）；Worker 无法接触外网，无受控只读 GET 代理与 Vault 代登 session/cookie 保持能力。
 * **一句话目标**：Worker 能经 Daemon 代理只读抓取方案 `references[]` 登记的参考站，支持由 Daemon 用 Vault 凭据代登并持有 cookie，Worker 全程无感、全程不见账密。
 * **范围（照 L.17 卡内拆分规划 1、2、3 与 dec-13 规定）**：
@@ -268,14 +298,14 @@
 
 <a id="task-l.17b"></a>
 
-#### 【Task L.17b】对比视图与试玩证据桩 `[READY（待 L.17a）]`
+#### 【Task L.17b】对比视图与试玩证据桩 `[BLOCKED（待 L.17a）]`
 
 * **任务编号**：`TASK-L.17b`
 * **任务名称**：对比视图与试玩证据桩
 * **对应规格**：ADR-0014 §3；`scheme.md` goal-2、dec-12、oq-2、acc-6；[`delivery-lifecycle.md`](./delivery-lifecycle.md) M5
 * **前置依赖**：`TASK-L.17a`（受控摄取与代登代理）+ `TASK-L.16`（COMPLETED · #62/`e4dfe1c`，复用「让 AI 看看」通道做试玩引导）
 * **优先级**：P3（M5）
-* **状态**：`[READY（待 L.17a）]`（随 L.17a，估算 M；前置 L.16 已 COMPLETED，满足 task-card-standard R-1～R-12）
+* **状态**：`[BLOCKED（待 L.17a）]`（随 L.17a，估算 M；前置 L.16 已 COMPLETED；L.17a 当前待 C.22 + W.8）
 * **对照痛点（代码事实）**：方案工作台尚无参考站抓取快照与生成站预览对比；右栏缺少试玩比对引导；`check: playtest` 缺乏带版本号与用户原话的结构化证据落盘桩。
 * **一句话目标**：方案工作台呈现参考站抓取成果与生成站预览对比；用户经右栏搭档试玩引导后明确表态确认，落盘 dec-12 结构化证据桩，新版本部署后自动重置认可。
 * **范围（照 L.17 卡内拆分规划 4、5、6 与 dec-12 规定）**：
@@ -299,7 +329,29 @@
 
 ### 3.4e 台账债立卡（2026-11-01 · NON_BLOCKER · 不抢主序）
 
-> Tina 授权将第一类六项写成任务卡。Sprint：主序实现卡 **`L.16` 已 COMPLETED**（#62/`e4dfe1c`）；**`L.17` 已完成拆分为 `L.17a` + `L.17b` 并均达到 `[READY]`**（前置 oq-2 dec-12 与 oq-3 dec-13 均已裁决）；主序实现首要推进 **`TASK-L.17a`（已就绪）**。本节目的：把 ledger 待立卡改代码项变成可排期卡；`A.7`/`H.9`/`L.18`/`J.19`/`J.20` 已 COMPLETED（见 completed / #58/#60）；余下 **`W.6`** 仍为 NON_BLOCKER（可开；**不与** W.5b/c 同窗）。另立 **`TASK-W.7`**（自助注册/自动验证 · 硬前置 W.6 · **不抢** W.5b/c 实测窗口）。
+
+<a id="task-c.22"></a>
+
+#### 【Task C.22】合同 schema references[] 字段 `[NEW_TASK]`
+
+* **任务编号**：`TASK-C.22`
+* **任务名称**：合同 schema references[] 字段
+* **对应规格**：`src/lib/contract.schema.ts`；方案快照 / SchemeDraft 序列化结构；TASK-L.17a 白名单来源
+* **前置依赖**：无
+* **优先级**：P3（L.17a 前置）
+* **状态**：`[NEW_TASK]`
+* **一句话目标**：`contract.schema.ts` 增加可选 `references[]` URL 数组字段并进入 scheme 快照，为 L.17a 白名单提供权威来源。
+* **范围**：
+  1. 在 `worker_spec` 或合同顶层添加可选 `references: string[]` 字段，并校验每项为合法 URL。
+  2. 保持序列化、反序列化及 scheme 快照兼容；旧合同缺字段时不得因默认值或必填变更而失效。
+  3. 单测覆盖字段缺失、空数组、合法 URL 与非法 URL 拒收，并验证 scheme 快照包含已登记字段。
+* **非目标**：不实现任何抓取逻辑；不改右栏及其工具白名单。
+* **验收（PASS）**：字段进入合同 schema 与 scheme 快照；缺失/空数组兼容；非法 URL 被拒绝。
+* **FAIL**：字段进入合同但快照不含该字段；新增默认值/必填约束导致旧合同失效；右栏发生改动。
+* **关键文件**：`src/lib/contract.schema.ts`、合同/SchemeDraft 快照序列化与恢复模块、新增 schema/快照测试
+* **估算**：S
+
+> Tina 授权将第一类六项写成任务卡。Sprint：主序实现卡 **`L.16` 已 COMPLETED**（#62/`e4dfe1c`）；`L.17` 已拆分为 `L.17a` + `L.17b`，但开工探查发现未列前置，当前 **L.17a `[BLOCKED · 待 C.22 + W.8]`、L.17b 随之等待 L.17a**；主序实现前置推进 **`TASK-C.22` + `TASK-W.8`**。本节目的：把 ledger 待立卡改代码项变成可排期卡；`A.7`/`H.9`/`L.18`/`J.19`/`J.20` 已 COMPLETED（见 completed / #58/#60）；余下 **`W.6`** 仍为 NON_BLOCKER（可开；**不与** W.5b/c 同窗）。另立 **`TASK-W.7`**（自助注册/自动验证 · 硬前置 W.6 · **不抢** W.5b/c 实测窗口）。
 
 ### 3.5 架构感知、监听与差异审阅（C.5 落 Sprint 2；B.1/B.2/C.4 推迟至 v0.2+）
 
