@@ -3793,6 +3793,8 @@ function ContractForm({
     () => mountSeed?.acceptance ?? [],
   );
   const [formError, setFormError] = useState<string | null>(null);
+  /** TASK-W.6：高级可选项——指定 worker_spec.adapter_id，留空则用默认受控适配器 */
+  const [adapterId, setAdapterId] = useState("");
 
   /** 已经套用过预填的那份草案（按引用比较）；之后用户改字段不会被它覆盖 */
   const [seededDraft, setSeededDraft] = useState<SupervisorDraftResult | null>(
@@ -3858,6 +3860,10 @@ function ContractForm({
           },
         ],
         ...fromDraft,
+        // TASK-W.6：高级可选项——指定 worker_spec.adapter_id（留空则用默认受控适配器）
+        ...(adapterId.trim()
+          ? { workerSpec: { adapter_id: adapterId.trim() } }
+          : {}),
       });
       onCreate(
         softwareContractSchema.parse({
@@ -3956,6 +3962,24 @@ function ContractForm({
           />
         </label>
       </div>
+      <details className="mt-2 rounded border border-border/70 p-2">
+        <summary className="cursor-pointer text-[11px] text-muted-foreground">
+          高级 · Worker 适配器（可选）
+        </summary>
+        <label className="mt-1 block text-[11px]">
+          adapter_id（留空 = 默认 stagent.builtin.ai-sdk 受控适配器）
+          <input
+            data-testid="intent-adapter-id"
+            value={adapterId}
+            onChange={(e) => setAdapterId(e.target.value)}
+            placeholder="stagent.builtin.ai-sdk"
+            className="mt-0.5 w-full rounded border border-border bg-background px-2 py-1 outline-none"
+          />
+        </label>
+        <p className="mt-1 text-[10px] text-muted-foreground">
+          仅受控（GATEWAY_ENFORCED）且已注册的适配器可派工；未注册或非受控会被明确拒绝。
+        </p>
+      </details>
       {formError && (
         <div className="mt-2 text-[11px] text-destructive">{formError}</div>
       )}
