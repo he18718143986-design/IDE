@@ -1,6 +1,14 @@
 /** TASK-C.1 工作台共享类型（v1.3.3：运行模式为 VIBE / PROTECTED，见架构规范 §0.6） */
 export type RunMode = "VIBE" | "PROTECTED";
-export type WorkerControl = "GATEWAY_ENFORCED" | "UNCONTROLLED_EXTERNAL";
+/**
+ * TASK-W.5c-i：与合同 `worker_spec.control_mode` 同步为三值。
+ * 本类型仅用于工作台**展示**，不涉及门禁判定；窗口期 `SANDBOX_ENFORCED`
+ * 不改变右栏 `role:"partner"` 只读白名单（J.1）与任何既有门禁。
+ */
+export type WorkerControl =
+  | "GATEWAY_ENFORCED"
+  | "SANDBOX_ENFORCED"
+  | "UNCONTROLLED_EXTERNAL";
 export type ExecutionStatus =
   "IDLE" | "APPROVED" | "EXECUTING" | "PAUSED" | "DONE";
 

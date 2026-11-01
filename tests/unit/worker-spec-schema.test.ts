@@ -31,6 +31,7 @@ import {
   E_ADAPTER_SANDBOX_LOCKED,
   WorkerDispatchError,
   requireControlledDispatch,
+  toRuntimeControlMode,
   type WorkerDispatchFactory,
 } from "../../daemon/worker/worker-dispatch";
 
@@ -178,6 +179,18 @@ describe("SE-03：窗口期语义——注册接受、派工显式拒绝", () =>
     });
     registry.registerDispatchFactory(GATEWAY_ID, factory);
     expect(requireControlledDispatch(registry, GATEWAY_ID)).toBe(factory);
+  });
+});
+
+describe("SE-05：窗口期档位窄化（下游收尾，不得产生假受控证据）", () => {
+  it("SANDBOX_ENFORCED 记入运行时 / 证据时按 UNCONTROLLED_EXTERNAL 处理", () => {
+    expect(toRuntimeControlMode("SANDBOX_ENFORCED")).toBe(
+      "UNCONTROLLED_EXTERNAL",
+    );
+    expect(toRuntimeControlMode("UNCONTROLLED_EXTERNAL")).toBe(
+      "UNCONTROLLED_EXTERNAL",
+    );
+    expect(toRuntimeControlMode("GATEWAY_ENFORCED")).toBe("GATEWAY_ENFORCED");
   });
 });
 

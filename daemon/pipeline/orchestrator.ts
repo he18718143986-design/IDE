@@ -75,6 +75,7 @@ import {
 import type { AdapterRegistry } from "../worker/adapter-registry";
 import {
   requireControlledDispatch,
+  toRuntimeControlMode,
   type WorkerDispatchContext,
 } from "../worker/worker-dispatch";
 import { createDefaultWorkerRegistry } from "../worker/default-worker-registry";
@@ -1174,9 +1175,11 @@ export class ContractOrchestrator {
       {
         status,
         ...(reasonCode === undefined ? {} : { reasonCode }),
+        // TASK-W.5c-i：窗口期 SANDBOX_ENFORCED 不视为受控，按 UNCONTROLLED_EXTERNAL
+        // 记入证据（待 W.5c-ii container-host 落地解锁）。
         workerControlMode: interceptorBlocked
           ? "UNCONTROLLED_EXTERNAL"
-          : current.worker_spec.control_mode,
+          : toRuntimeControlMode(current.worker_spec.control_mode),
         summary: interceptorBlocked
           ? "运行时复检发现 Adapter 能力漂移或越权通道，已降级为 UNCONTROLLED_EXTERNAL 并停止受控执行"
           : threatBlocked
@@ -1824,7 +1827,8 @@ export class ContractOrchestrator {
     const interceptor = new RuntimeInterceptor({
       snapshot: {
         adapter_id: contract.worker_spec.adapter_id,
-        control_mode: contract.worker_spec.control_mode,
+        // TASK-W.5c-i：同上，窗口期 SANDBOX_ENFORCED 按不受控装配拦截器。
+        control_mode: toRuntimeControlMode(contract.worker_spec.control_mode),
         tool_interception_supported: true,
         filesystem_permissions: "GATEWAY_ONLY",
         command_permissions: "WHITELIST_ONLY",
@@ -2221,8 +2225,10 @@ export class ContractOrchestrator {
       evidence_id: evidenceId,
       contract_id: contract.contract_id,
       generated_at: new Date().toISOString(),
-      worker_control_mode:
+      // TASK-W.5c-i：同上，窗口期 SANDBOX_ENFORCED 不产生受控证据。
+      worker_control_mode: toRuntimeControlMode(
         input.workerControlMode ?? contract.worker_spec.control_mode,
+      ),
       usage:
         totals && totals.totalTokens > 0
           ? {

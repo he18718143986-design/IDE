@@ -87,6 +87,24 @@ export type WorkerDispatchFactory = (
 ) => DispatchedWorker;
 
 /**
+ * TASK-W.5c-i 窗口期档位窄化：把合同 / 适配器档位降为运行时二值档位。
+ *
+ * `SANDBOX_ENFORCED` 在 `W.5c-ii` `container-host` 落地前**不视为受控**——写入
+ * Evidence、装配运行时拦截器时一律按 `UNCONTROLLED_EXTERNAL` 处理，杜绝
+ * 「标了沙箱档却没有沙箱」的假受控证据；派工面另由 `requireControlledDispatch()`
+ * 以 `E_ADAPTER_SANDBOX_LOCKED` 显式拒绝。本函数只收窄，不扩张可执行面。
+ *
+ * 解锁条件：`W.5c-ii` `container-host` 落地（届时改为按容器宿主可用性判定）。
+ */
+export function toRuntimeControlMode(
+  mode: "GATEWAY_ENFORCED" | "SANDBOX_ENFORCED" | "UNCONTROLLED_EXTERNAL",
+): "GATEWAY_ENFORCED" | "UNCONTROLLED_EXTERNAL" {
+  return mode === "GATEWAY_ENFORCED"
+    ? "GATEWAY_ENFORCED"
+    : "UNCONTROLLED_EXTERNAL";
+}
+
+/**
  * 单一判定源：解析受控派工工厂。
  *
  * 0. TASK-W.5c-i 窗口期：已登记为 `SANDBOX_ENFORCED` → `E_ADAPTER_SANDBOX_LOCKED`
