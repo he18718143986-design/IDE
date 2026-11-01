@@ -266,6 +266,8 @@ export class ClaudeCodeAdapter implements ChatAdapter {
         token = this.opts.authToken();
       } else if (typeof this.opts.authToken === "string") {
         token = this.opts.authToken;
+      } else if (process.env["STAGENT_MCP_TOKEN"]) {
+        token = process.env["STAGENT_MCP_TOKEN"];
       } else if (process.env["STAGENT_SESSION_TOKEN"]) {
         token = process.env["STAGENT_SESSION_TOKEN"];
       }

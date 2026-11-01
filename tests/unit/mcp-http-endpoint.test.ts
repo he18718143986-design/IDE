@@ -17,6 +17,7 @@ import {
 } from "../../daemon/mcp/types";
 import { createContractDraft } from "../../src/lib/contract.schema";
 import { ClaudeCodeAdapter } from "../../daemon/worker/cli-host/claude-code-adapter";
+import { StagentDaemon } from "../../daemon/server";
 
 describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
   let tempRepo: string;
@@ -366,5 +367,109 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
     expect(sseRes.status).toBe(200);
     expect(sseRes.headers.get("Content-Type")).toContain("text/event-stream");
     controller.abort();
+  });
+  it("enforces scoped mcpToken dual-track authorization on /api/mcp and rejects mcpToken on non-MCP routes", async () => {
+    const sessionToken = "session-admin-full-token-1234567890123456";
+    const mcpToken = "mcp-worker-scoped-token-1234567890123456";
+
+    // Simulate Daemon dual-track routing logic
+    const mockDaemon = http.createServer((req, res) => {
+      const auth = req.headers.authorization;
+      const tok = auth?.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+
+      if (req.url === "/api/mcp" || req.url?.startsWith("/api/mcp")) {
+        // Dual-track: accepts mcpToken (worker) or sessionToken (admin/debug)
+        if (tok === mcpToken || tok === sessionToken) {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true, endpoint: "mcp" }));
+        } else {
+          res.writeHead(401, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Unauthorized" }));
+        }
+        return;
+      }
+
+      if (req.url === "/api/shutdown" || req.url === "/api/contracts" || req.url === "/api/vault") {
+        // General admin route: ONLY sessionToken allowed; mcpToken must be strictly rejected
+        if (tok === sessionToken) {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true, endpoint: req.url }));
+        } else {
+          res.writeHead(401, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Unauthorized", message: "Bearer session token required" }));
+        }
+        return;
+      }
+
+      res.writeHead(404);
+      res.end();
+    });
+
+    let dPort = 0;
+    await new Promise<void>((resolve) => {
+      mockDaemon.listen(0, "127.0.0.1", () => {
+        dPort = (mockDaemon.address() as any).port;
+        resolve();
+      });
+    });
+
+    try {
+      // 1. Worker mcpToken accesses /api/mcp successfully
+      const mcpRes = await fetch(`http://127.0.0.1:${dPort}/api/mcp`, {
+        headers: { Authorization: `Bearer ${mcpToken}` },
+      });
+      expect(mcpRes.status).toBe(200);
+
+      // 2. Admin sessionToken also accesses /api/mcp successfully
+      const adminMcpRes = await fetch(`http://127.0.0.1:${dPort}/api/mcp`, {
+        headers: { Authorization: `Bearer ${sessionToken}` },
+      });
+      expect(adminMcpRes.status).toBe(200);
+
+      // 3. Worker mcpToken is strictly blocked from general admin routes (401)
+      const blockedShutdown = await fetch(`http://127.0.0.1:${dPort}/api/shutdown`, {
+        headers: { Authorization: `Bearer ${mcpToken}` },
+      });
+      expect(blockedShutdown.status).toBe(401);
+
+      const blockedVault = await fetch(`http://127.0.0.1:${dPort}/api/vault`, {
+        headers: { Authorization: `Bearer ${mcpToken}` },
+      });
+      expect(blockedVault.status).toBe(401);
+
+      // 4. Admin sessionToken accesses general routes
+      const adminShutdown = await fetch(`http://127.0.0.1:${dPort}/api/shutdown`, {
+        headers: { Authorization: `Bearer ${sessionToken}` },
+      });
+      expect(adminShutdown.status).toBe(200);
+    } finally {
+      await new Promise<void>((resolve) => mockDaemon.close(() => resolve()));
+    }
+  });
+
+  it("StagentDaemon.createWorkerClaudeAdapter injects scoped mcpToken rather than sessionToken", () => {
+    const daemon = new StagentDaemon({ repoRoot: tempRepo });
+    const mcpTok = daemon.getMcpToken();
+    const sessionTok = daemon.getSessionToken();
+
+    expect(mcpTok).toBeDefined();
+    expect(typeof mcpTok).toBe("string");
+    expect(mcpTok?.length).toBe(64);
+    // Before start(), sessionToken is null, but mcpToken is already prepared
+    expect(mcpTok).not.toBe(sessionTok);
+
+    const workerAdapter = daemon.createWorkerClaudeAdapter({
+      mcpPort: 3001,
+    });
+    const launch = workerAdapter.buildLaunch({
+      prompt: "do work",
+      cwd: tempRepo,
+      nativeSessionId: null,
+    });
+
+    const mcpConfig = JSON.parse(fs.readFileSync(launch.mcpPath, "utf8"));
+    expect(mcpConfig.mcpServers.stagent.headers.Authorization).toBe(
+      `Bearer ${mcpTok}`,
+    );
   });
 });

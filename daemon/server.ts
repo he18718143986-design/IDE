@@ -1,7 +1,7 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { WebSocketServer, WebSocket } from "ws";
 import { findAvailablePort, PortFinderOptions } from "./core/port-finder";
@@ -383,6 +383,8 @@ export class StagentDaemon {
   private clients: Set<WebSocket> = new Set();
   readonly mcpServer: McpHttpServer;
   private sessionToken: string | null = null;
+  /** TASK-W.8：受限 MCP Token（仅允许访问 /api/mcp，供 Worker 最小权限通信） */
+  private mcpToken: string | null = null;
   /** TASK-D.1b：安装包 dist/public（同源控制台）；缺失则为 null，不托管 */
   private readonly consolePublicDir: string | null;
 
@@ -457,9 +459,10 @@ export class StagentDaemon {
     this.maxConnectionsPerWindow = options.maxConnectionsPerWindow ?? 30;
     this.connectionWindowMs = options.connectionWindowMs ?? 10_000;
     this.maxClients = options.maxClients ?? 64;
+    this.mcpToken = randomBytes(32).toString("hex");
     this.mcpServer = new McpHttpServer({
       gateway: () => this.orchestrator.getActiveGateway() ?? undefined,
-      isAuthorized: (req) => this.isAuthorized(req),
+      isAuthorized: (req) => this.isMcpAuthorized(req),
     });
     // §3.3：图状态由 Daemon 独占维护；每次变更都以全量快照广播给前端。
     // 订阅放在构造期而不是首个请求，保证"第一个连接建立前发生的变更"
@@ -624,6 +627,7 @@ export class StagentDaemon {
 
     // 规范 TASK-D.1 PASS-2：单次随机会话 Token，独立于 PID 文件
     this.sessionToken = createSessionToken(this.repoRoot);
+    this.mcpToken = randomBytes(32).toString("hex");
 
     // TASK-L.14：启动时挂载凭据保险库（钥匙串优先，否则加密文件；测可设 STAGENT_VAULT_BACKEND）
     try {
@@ -776,6 +780,7 @@ export class StagentDaemon {
     this.wss = null;
     clearSessionToken(this.repoRoot);
     this.sessionToken = null;
+    this.mcpToken = null;
     // TASK-L.16：停掉 LIVE 探活定时器
     this.releaseManager?.stopAllWatches();
 
@@ -800,6 +805,11 @@ export class StagentDaemon {
     return this.sessionToken;
   }
 
+  /** TASK-W.8：供 Worker / 测试读取受限 MCP Token（仅允许访问 /api/mcp 端点） */
+  getMcpToken(): string | null {
+    return this.mcpToken;
+  }
+
   /** TASK-W.8：动态更新/设置受管 MCP 端点绑定的 Gateway */
   setActiveGateway(gateway: ScopedWorktreeGateway | null | undefined): void {
     this.mcpServer.setGateway(gateway ?? undefined);
@@ -812,7 +822,7 @@ export class StagentDaemon {
     return new ClaudeCodeAdapter({
       role: "worker",
       mcpPort: () => this.port ?? undefined,
-      authToken: () => this.sessionToken ?? undefined,
+      authToken: () => this.mcpToken ?? undefined,
       ...options,
     });
   }
@@ -1849,11 +1859,31 @@ export class StagentDaemon {
   private isAuthorized(req: http.IncomingMessage): boolean {
     // HTTP API 仅接受 Authorization: Bearer（非浏览器客户端可用）。
     // 绝不接受 ?token= query（规范 TASK-D.1 FAIL：query 会进入访问日志与浏览器历史）
+    // 注意：受限 mcpToken 绝不能通过本方法，严格限制在 /api/mcp 端点，杜绝 Worker 越权访问控制台 API
     const authHeader = req.headers.authorization;
     const headerToken =
       typeof authHeader === "string" && authHeader.startsWith("Bearer ")
         ? authHeader.slice("Bearer ".length).trim()
         : null;
+    return verifySessionToken(headerToken, this.sessionToken);
+  }
+
+  /**
+   * TASK-W.8：受管 MCP 端点专用鉴权。
+   * 双轨认证（最小权限原则）：
+   * 1. Worker 进程凭受限 mcpToken 通行（无其他 API 访问权）；
+   * 2. 控制台 / 调试工具凭主 sessionToken 亦可通行。
+   */
+  private isMcpAuthorized(req: http.IncomingMessage): boolean {
+    const authHeader = req.headers.authorization;
+    const headerToken =
+      typeof authHeader === "string" && authHeader.startsWith("Bearer ")
+        ? authHeader.slice("Bearer ".length).trim()
+        : null;
+    if (!headerToken) return false;
+    if (this.mcpToken && verifySessionToken(headerToken, this.mcpToken)) {
+      return true;
+    }
     return verifySessionToken(headerToken, this.sessionToken);
   }
 
@@ -4852,10 +4882,10 @@ export class StagentDaemon {
 
     // TASK-W.8：受管 MCP HTTP 端点（供 Worker 在 --strict-mcp-config 下挂接）
     if (pathname === "/api/mcp" || pathname.startsWith("/api/mcp/")) {
-      if (!this.isAuthorized(req)) {
+      if (!this.isMcpAuthorized(req)) {
         this.sendJson(res, 401, {
           error: "Unauthorized",
-          message: "Bearer session token required",
+          message: "Bearer session or MCP token required",
         });
         return;
       }
