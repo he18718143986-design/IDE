@@ -82,7 +82,7 @@
 
 > **OP-1 实施（2026-11-01）**：裁决仍销项（consistency-audit / scheme dec-10）。**`TASK-J.20` COMPLETED**（[#57](https://github.com/he18718143986-design/IDE/pull/57)/`4d2f8e1`）。**`TASK-L.16` COMPLETED**（[#62](https://github.com/he18718143986-design/IDE/pull/62)/`e4dfe1c`）。
 > **oq-2 裁决（2026-11-01）**：北极星「一模一样」判据裁决已落笔（`scheme.md` dec-12 / `consistency-audit.md`「一之二」）。**`TASK-L.17` 产品阻塞已解除**，补写 PASS/FAIL 证据桩；按 DoR R-11 仍待拆分 L 估算开工；主序实现卡阶段性完备。物理 tip `e4dfe1c`。
-> **oq-3 裁决（2026-11-01）**：凭据保管与代登重登口径已落笔（`scheme.md` dec-13 / `consistency-audit.md`「一之二」）。**`TASK-L.17` 拆分为 `L.17a` + `L.17b` 并均达到 `[READY]`**；主序首要推进 `TASK-L.17a`（已就绪）。物理 tip 对齐 `042e570`。
+> **oq-3 裁决（2026-11-01）**：凭据保管与代登重登口径已落笔（`scheme.md` dec-13 / `consistency-audit.md`「一之二」）。`TASK-L.17a` 曾因前置缺失阻断；现 C.22 #67 与 W.8 #68 已合入，恢复 `[READY]`。当前物理 tip `090e5c1`。
 
 ## DoR 全量审计挂账（2026-10-31 新增）
 

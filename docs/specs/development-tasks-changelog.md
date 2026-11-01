@@ -4,7 +4,7 @@
 
 ## v1.6.2 修订记录与一致性核对
 
-- **P-109（L.17a 前置探查与两卡立卡，2026-11-01）**：核实 L.17a 卡遗漏两项真实前置：合同 schema / scheme 快照无 `references[]` 权威字段；Worker 经 `--strict-mcp-config` 可调用的 Stagent MCP HTTP 端点不存在（W.4 实为 threat-guard）。新增 **`TASK-C.22`**（合同 schema references[]，估算 S）与 **`TASK-W.8`**（Worker 侧 Stagent MCP HTTP 端点，估算 M；无硬前置，可与 C.22 并行）；`TASK-L.17a` 回写 **`[BLOCKED · 待 C.22 + W.8]`**，并在卡正文注明代理与代登代码留在 `feat/l17a-web-ingest`（未合）。同步 §1.1 矩阵、索引、active 卡、Sprint 指针、DAG 两条边与 ledger。**本 PR 纯 docs**，不改代码、不改右栏、不宣称端到端闭环；编号 P-109/#109 顺延。
+- **P-109（L.17a 前置探查与两卡立卡，历史记录）**：确认 L.17a 两项前置并立 `TASK-C.22` / `TASK-W.8`；初始状态为 `[BLOCKED · 待 C.22 + W.8]`。后由 P-110 回写完成状态。
 
 - **P-1**：TASK-E.1/E.2 更正为 `[COMPLETED]`，保留历史提交与实存交付物；Sprint 6 不再重复排期。
 - **P-2**：从已完成卡剥离四个未交付的 v1.5.0 补齐块；状态投影/广播归 TASK-D.3，文件树动效归 TASK-C.7，质疑入口路由归 TASK-S.5 / Studio 集成。
@@ -109,3 +109,5 @@
 - **P-107（裁决，2026-11-01）**：Tina 拍板 oq-2 北极星「一模一样」判定标准（`scheme.md` dec-12）：用户对话试玩 + 结构化证据桩（绑定版本/原话/时间戳）；AI 引导不代判；无机器自动比对。`TASK-L.17` 解除 oq-2 产品阻塞，补全 PASS/FAIL 验收判据并给出 R-11 拆分规划（L.17a/b）。同步：版本头第 107 条、§1.1 矩阵、ledger consistency-audit / README 销项、delivery-lifecycle M5。**本条仅文档**；不改生产代码；**不**开工 L.17 / W.6。
 
 - **P-108（裁决+立卡，2026-11-01）**：Tina 拍板 oq-3 凭据保管口径（`scheme.md` dec-13）：① 凭据存 Vault 至用户手动删除（不设自动过期、不按项目联动清理）；② 代登 cookie 过期后由 Daemon 用 Vault 账密静默重登，Worker 全程无感、全程不见账密；重申 ADR-0014 §3 账密/cookie 绝不进合同/日志/Worker 环境。`TASK-L.17` 拆分为两张 ≤M 就绪子卡：`TASK-L.17a`（受控摄取与代登代理，前置 L.14 COMPLETED + oq-3 dec-13，估算 M，`[READY]`）与 `TASK-L.17b`（对比视图与试玩证据桩，前置 L.17a + L.16 COMPLETED，估算 M，`[READY（待 L.17a）]`）；母卡 L.17 标 `[SPLIT]` 保留追溯。同步：版本头第 108 条、§1.1 矩阵、索引、ledger consistency-audit / README 销项、delivery-lifecycle M5 拆分完成。权威 tip 对齐 `042e570`（#64 squash）。**本条仅文档**；不改生产代码；**不**开工实现。
+
+- **P-110（交付回写，2026-11-01）**：`TASK-C.22` 与 `TASK-W.8` 由 `[NEW_TASK]` → **`[COMPLETED]`**：C.22 = [#67](https://github.com/he18718143986-design/IDE/pull/67)/`014cbfc`；W.8 = [#68](https://github.com/he18718143986-design/IDE/pull/68)/`090e5c1`。同步：active 卡归档至 completed、矩阵、索引、Sprint、ledger；`TASK-L.17a` 由 `[BLOCKED · 待 C.22 + W.8]` 恢复 `[READY]`。W.8 完成注记保留 MCP 最小权限决策，以及两项边界：适配器仍有 `STAGENT_SESSION_TOKEN` 回退观察；路由拒绝测试的手写 mock 不等同真实 daemon 路由。当前远端未找到 `feat/l17a-web-ingest`（404），故文档不宣称已 rebase 或恢复其实现。main tip `090e5c1`。本次仅 docs 回写，不改产品代码，不宣称 L.17a 端到端完成。

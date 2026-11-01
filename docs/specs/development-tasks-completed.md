@@ -695,7 +695,7 @@
 #### 【Task W.5a】Claude Code 适配器与 cli-host 黑盒实测 (v1.3.3 新增)
 * **任务编号**：`TASK-W.5a`
 * **前置依赖**：`TASK-W.2`, `TASK-C.6`（右栏会话通道）
-* **任务状态**：**[PASS · verified_on: `Claude Code 2.1.296 (DeepSeek API 兼容模式) · 2026-10-21`]**（分支 `feat/w5a-claude-code`。cli-host 唯一 spawn（shell:false、进程组、SIGINT→SIGTERM→整树 SIGKILL）；一律 API Key；隔离启动见核心目标 2；真实 CLI 上流式输出、工具卡片、打断（约 0.5s）、跨 Daemon 重启 `--resume` 续接、4 类绕过负例均实测通过，证据见 见 Git 历史（原 `docs/archive/claude-code-isolation-design.md`）。**2026-10-21 步骤 D 实测收口**：以 `deepseek-chat` @ `https://api.deepseek.com/anthropic` 复跑真实 CLI 负例 **6/6 全绿**（48.58s），首次落盘 `PreToolUse hook` 的 `deny` 日志原文（含 symlink 逃逸判定）；并补测 `allowBash=true` 分支——Shell 命令触碰保护清单路径时，`shellProtectionVerdict` 按字面量拒绝并投递白话确认卡（`rm`/`mv` 均被拦，目标文件完好），证据归档 `docs/reports/W5a-真实CLI验证报告-2026-10-21.md` §4.4。**后续回归项（不阻塞）**：用官方 Anthropic 原装模型 + 官方 CLI 重跑负例；每次升级 CLI 重跑 `STAGENT_REAL_CLAUDE=1` 真实测试；Gateway MCP 端点依赖 W.4。**同轮发现并已加固（2026-10-22）**：`allowBash=true` 原先只做保护清单字面量匹配，缺「命令是否指向工作目录之外」的通用检查，`../` 越界写与 `rm -rf .stagent` 实测可绕；现 Bash 分支已串接 `reservedMetadataHit()`（`.stagent/.git/.claude/.cursor/.env` 按路径段拒绝）与 `shellEscapeVerdict()`（重定向目标与全部词元的越界判定，含 symlink 真实路径），同一攻击复测被拒且 `outside/` 为空；`/dev/null`、通配符前缀等常规用法保留，21 条命令矩阵零误伤；证据见报告 §4.5。）
+* **任务状态**：**[PASS · verified_on: `Claude Code 2.1.296 (DeepSeek API 兼容模式) · 2026-10-21`]**（分支 `feat/w5a-claude-code`。cli-host 唯一 spawn（shell:false、进程组、SIGINT→SIGTERM→整树 SIGKILL）；一律 API Key；隔离启动见核心目标 2；真实 CLI 上流式输出、工具卡片、打断（约 0.5s）、跨 Daemon 重启 `--resume` 续接、4 类绕过负例均实测通过，证据见 见 Git 历史（原 `docs/archive/claude-code-isolation-design.md`）。**2026-10-21 步骤 D 实测收口**：以 `deepseek-chat` @ `https://api.deepseek.com/anthropic` 复跑真实 CLI 负例 **6/6 全绿**（48.58s），首次落盘 `PreToolUse hook` 的 `deny` 日志原文（含 symlink 逃逸判定）；并补测 `allowBash=true` 分支——Shell 命令触碰保护清单路径时，`shellProtectionVerdict` 按字面量拒绝并投递白话确认卡（`rm`/`mv` 均被拦，目标文件完好），证据归档 `docs/reports/W5a-真实CLI验证报告-2026-10-21.md` §4.4。**后续回归项（不阻塞）**：用官方 Anthropic 原装模型 + 官方 CLI 重跑负例；每次升级 CLI 重跑 `STAGENT_REAL_CLAUDE=1` 真实测试；Gateway MCP HTTP 端点由 W.8 实现；W.4 是 threat-guard。**同轮发现并已加固（2026-10-22）**：`allowBash=true` 原先只做保护清单字面量匹配，缺「命令是否指向工作目录之外」的通用检查，`../` 越界写与 `rm -rf .stagent` 实测可绕；现 Bash 分支已串接 `reservedMetadataHit()`（`.stagent/.git/.claude/.cursor/.env` 按路径段拒绝）与 `shellEscapeVerdict()`（重定向目标与全部词元的越界判定，含 symlink 真实路径），同一攻击复测被拒且 `outside/` 为空；`/dev/null`、通配符前缀等常规用法保留，21 条命令矩阵零误伤；证据见报告 §4.5。）
 * **核心目标**：
   1. 在 `daemon/worker/cli-host/` 专用子进程隔离模块中以 spawn 挂载 Claude Code CLI（结构化 argv、`shell:false`、进程树托管回收）；**全仓其余位置维持零 `child_process` 静态禁令**。
   2. **收敛策略（已实测，verified_on: `Claude Code 2.1.296 (DeepSeek API 兼容模式) · 2026-10-21`）**：优先保留 Claude Code 原生工具，通过官方 **Pre-tool hook** 配合 Stagent 网关拦截；辅以工具白名单/黑名单收窄内置 Edit/Write/Bash/WebFetch；避免粗暴剥离原生工具导致模型死循环。工作目录锁定 Worktree。**隔离启动（`[用户已确认 · 2026-10-20]`，替代 `--bare`——实测 2.1.296 的 `--bare` 会跳过 `--settings` 中的 hooks）**：
@@ -3574,3 +3574,26 @@
 ---
 
 
+### 3.4e 台账前置交付（C.22 / W.8）
+
+<a id="task-c.22"></a>
+
+#### 【Task C.22】合同 schema references[] 字段 `[COMPLETED]`
+* **任务编号**：`TASK-C.22`
+* **状态与证据**：`[COMPLETED]`（[#67](https://github.com/he18718143986-design/IDE/pull/67)/`014cbfc`，squash merge）。
+* **交付**：合同顶层可选 `references: string[]` URL 数组；SchemeDraft 和签署投影透传；不可变 scheme snapshot 冻结并将 references 纳入摘要。兼容缺省与空数组，拒收非法 URL。
+* **验证**：PR 报告 7 项专用测试通过；相关回归 80 项通过；`git diff --check` 通过。以上为 PR 报告的验证结果。
+* **关键文件**：`src/lib/contract.schema.ts`、`src/lib/journey/scheme-draft.ts`、`src/lib/journey/confirm-scheme-contract.ts`、`daemon/pipeline/scheme-snapshot-store.ts`、`tests/unit/contract-schema-references.test.ts`。
+
+<a id="task-w.8"></a>
+
+#### 【Task W.8】Worker 侧 Stagent MCP HTTP 端点 `[COMPLETED]`
+* **任务编号**：`TASK-W.8`
+* **状态与证据**：`[COMPLETED]`（[#68](https://github.com/he18718143986-design/IDE/pull/68)/`090e5c1`，squash merge）。
+* **交付**：Daemon 提供 MCP HTTP/SSE 端点；Worker strict MCP 配置挂载受管端点，首批仅 `stagent_web_ingest`；工具调用复用 Gateway 校验、权限与审计路径；右栏 Partner 维持隔离且未开放外部 MCP。
+* **安全决策留痕**：Worker MCP 使用专用 `mcpToken`，通用路由 `isAuthorized` 只识别 session token，MCP token 不具备通用路由授权能力；MCP 路由另走 `isMcpAuthorized` 双轨校验。此处是刻意的最小权限隔离，不以路由前缀作为唯一边界。
+* **残余边界 / 后续观察**：
+  1. `claude-code-adapter.ts` 的 token 解析顺序仍为 `opts.authToken` → `STAGENT_MCP_TOKEN` → `STAGENT_SESSION_TOKEN`。Worker 正常注入首项；若环境中仍设置 session token，最后一级回退可能放宽权限。建议后续移除回退或另立修复。
+  2. `mcpToken` 访问 `/api/shutdown` 返回 401 的双轨路由行为测试使用手写 mock server，不是真实 daemon 路由；作为协议参照即可。真实 `StagentDaemon` 实例测试验证了 Worker 生成的 `mcp.json` Authorization 使用 `mcpToken`，但这不是对真实 shutdown 路由拒绝的直接覆盖。建议为 mock 测试添加该边界说明，后续补真实路由测试。
+* **验证**：PR 报告 7 项 MCP endpoint 测试、47 项 Gateway 回归测试通过，`git diff --check` 通过；此处为 PR 报告，并非本次重新运行。
+* **关键文件**：`daemon/mcp/http-server.ts`、`daemon/mcp/gateway.ts`、`daemon/server.ts`、`daemon/worker/cli-host/claude-code-adapter.ts`、`tests/unit/mcp-http-endpoint.test.ts`。
