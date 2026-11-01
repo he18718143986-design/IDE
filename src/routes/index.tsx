@@ -71,6 +71,9 @@ import {
   mergeContract,
   resumeContract,
   runWorker,
+  fetchDesignDependencySurprise,
+  allowDesignDependency,
+  denyDesignDependency,
   saveConnection,
   saveOpenAiKey,
   undoProtectionRound,
@@ -125,6 +128,7 @@ import { SchemeReviewPane } from "@/components/studio/SchemeReviewPane";
 import { DemoPreviewPane } from "@/components/studio/DemoPreviewPane";
 import { PlainContractAuthorizeCard } from "@/components/supervisor/PlainContractAuthorizeCard";
 import { ScopePausedDialog } from "@/components/supervisor/ScopePausedDialog";
+import { DesignDependencySurpriseCard } from "@/components/supervisor/DesignDependencySurpriseCard";
 import {
   formatClarificationDefaultsSummary,
   type ClarificationRound,
@@ -423,6 +427,13 @@ function Console() {
     attempted_path?: string;
   } | null>(null);
   const [scopePausedBusy, setScopePausedBusy] = useState(false);
+  /** TASK-J.19：DN-2 设计依赖意外卡 */
+  const [designDepSurprise, setDesignDepSurprise] = useState<{
+    contract_id: string;
+    detail: string;
+    dependencies: Array<{ name: string; version: string; why: string }>;
+  } | null>(null);
+  const [designDepBusy, setDesignDepBusy] = useState(false);
 
   const schemeConfirmation = useMemo(
     () =>
@@ -1407,6 +1418,22 @@ ${trimmed}`
       try {
         const worker = await runWorker(conn, committed.contract_id);
         setWorkerResult(worker);
+        if (
+          worker.design?.status === "suspended" &&
+          worker.design.reason === "DESIGN_NEEDS_DEPENDENCY"
+        ) {
+          const res = await fetchDesignDependencySurprise(
+            conn,
+            committed.contract_id,
+          );
+          if (res) {
+            setDesignDepSurprise({
+              contract_id: res.surprise.contract_id,
+              detail: res.surprise.detail,
+              dependencies: res.surprise.dependencies,
+            });
+          }
+        }
       } catch (err) {
         // Worker 重试提示进中栏错误条，不进右栏系统消息。
         setConfirmPrototypeError(
@@ -2562,6 +2589,28 @@ ${trimmed}`
                 runAction("worker", async () => {
                   const result = await runWorker(conn, selected.contract_id);
                   setWorkerResult(result);
+                  if (
+                    result.design?.status === "suspended" &&
+                    result.design.reason === "DESIGN_NEEDS_DEPENDENCY"
+                  ) {
+                    const res = await fetchDesignDependencySurprise(
+                      conn,
+                      selected.contract_id,
+                    );
+                    if (res) {
+                      setDesignDepSurprise({
+                        contract_id: res.surprise.contract_id,
+                        detail: res.surprise.detail,
+                        dependencies: res.surprise.dependencies,
+                      });
+                    } else {
+                      setDesignDepSurprise({
+                        contract_id: selected.contract_id,
+                        detail: result.design.detail ?? "需要新依赖",
+                        dependencies: [],
+                      });
+                    }
+                  }
                 })
               }
               className="flex items-center gap-1 rounded border border-border px-3 py-1.5 text-xs hover:bg-accent disabled:opacity-40"
@@ -2788,6 +2837,45 @@ ${trimmed}`
     });
   }, [stream.alerts]);
 
+  // TASK-J.19：PENDING_RESUME 时拉取 DN-2 意外卡；非本原因则清空
+  useEffect(() => {
+    const selectedContract = selectedId
+      ? contracts.find((c) => c.contract_id === selectedId)
+      : null;
+    if (
+      !connected ||
+      !selectedContract ||
+      selectedContract.lifecycle_state !== "PENDING_RESUME"
+    ) {
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetchDesignDependencySurprise(
+          conn,
+          selectedContract.contract_id,
+        );
+        if (cancelled) return;
+        if (!res) {
+          setDesignDepSurprise(null);
+          return;
+        }
+        setDesignDepSurprise({
+          contract_id: res.surprise.contract_id,
+          detail: res.surprise.detail,
+          dependencies: res.surprise.dependencies,
+        });
+      } catch {
+        if (!cancelled) setDesignDepSurprise(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [connected, conn, selectedId, contracts]);
+
+
   const needsProtectionConfirm =
     admission != null && shouldConfirmAdmission(admission);
   // C.10a：进行中只跟忙碌/确认/三步台；历史 journeyCards 不粘住 in_progress
@@ -2840,6 +2928,46 @@ ${trimmed}`
           }}
           onDismiss={() => setScopePaused(null)}
         />
+        <DesignDependencySurpriseCard
+          view={designDepSurprise}
+          busy={designDepBusy}
+          onAllow={() => {
+            if (!designDepSurprise) return;
+            setDesignDepBusy(true);
+            void runAction("design-dep-allow", async () => {
+              await allowDesignDependency(conn, designDepSurprise.contract_id);
+              setDesignDepSurprise(null);
+              setJourneyCards((prev) => [
+                ...prev.slice(-19),
+                {
+                  id: `dn2-allow-${Date.now()}`,
+                  kind: "SYSTEM",
+                  text: "已允许加依赖：原合同已中止，计划里插入了依赖桩，请重签后再开干。",
+                },
+              ]);
+            }).finally(() => setDesignDepBusy(false));
+          }}
+          onDeny={() => {
+            if (!designDepSurprise) return;
+            setDesignDepBusy(true);
+            void runAction("design-dep-deny", async () => {
+              await denyDesignDependency(conn, designDepSurprise.contract_id, {
+                reviewer: "local-user",
+              });
+              setDesignDepSurprise(null);
+              setJourneyCards((prev) => [
+                ...prev.slice(-19),
+                {
+                  id: `dn2-deny-${Date.now()}`,
+                  kind: "SYSTEM",
+                  text: "已拒绝新依赖：合同已中止，不会装库。",
+                },
+              ]);
+            }).finally(() => setDesignDepBusy(false));
+          }}
+          onDismiss={() => setDesignDepSurprise(null)}
+        />
+
         <WorkspaceLayout
           repoName={repoName}
           repoPath={repoRoot ?? "（连接 Daemon 后显示仓库路径）"}
@@ -3052,6 +3180,22 @@ ${trimmed}`
                 void runAction("worker", async () => {
                   const result = await runWorker(conn, selected.contract_id);
                   setWorkerResult(result);
+                  if (
+                    result.design?.status === "suspended" &&
+                    result.design.reason === "DESIGN_NEEDS_DEPENDENCY"
+                  ) {
+                    const res = await fetchDesignDependencySurprise(
+                      conn,
+                      selected.contract_id,
+                    );
+                    if (res) {
+                      setDesignDepSurprise({
+                        contract_id: res.surprise.contract_id,
+                        detail: res.surprise.detail,
+                        dependencies: res.surprise.dependencies,
+                      });
+                    }
+                  }
                   const restored = await fetchEvidence(
                     conn,
                     selected.contract_id,

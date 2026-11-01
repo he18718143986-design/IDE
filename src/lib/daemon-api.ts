@@ -515,6 +515,76 @@ export interface WorkerRunResult {
   log: string[];
   usage: { inputTokens: number; outputTokens: number };
   blockers: Array<{ code: string; message: string }>;
+  /** TASK-L.11 / J.19：设计步骤挂起信息（若有） */
+  design?: {
+    status: "ok" | "suspended";
+    reason?: string;
+    detail?: string;
+  };
+}
+
+/** TASK-J.19：DN-2 意外卡载荷 */
+export interface DesignDependencySurprise {
+  schema_version: "1.0.0";
+  contract_id: string;
+  reason: "DESIGN_NEEDS_DEPENDENCY";
+  original_stub_id: string | null;
+  dependencies: Array<{ name: string; version: string; why: string }>;
+  detail: string;
+  created_at: string;
+}
+
+export async function fetchDesignDependencySurprise(
+  conn: DaemonConnection,
+  contractId: string,
+): Promise<{ ok: true; surprise: DesignDependencySurprise; lifecycle_state: string } | null> {
+  try {
+    return await request<{
+      ok: true;
+      surprise: DesignDependencySurprise;
+      lifecycle_state: string;
+    }>(
+      conn,
+      `/api/design/${encodeURIComponent(contractId)}/dependency-surprise`,
+    );
+  } catch (err) {
+    if (err instanceof DaemonApiError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+export async function allowDesignDependency(
+  conn: DaemonConnection,
+  contractId: string,
+  body: {
+    dependencies?: Array<{ name: string; version: string; why: string }>;
+    original_stub_id?: string;
+    reason?: string;
+  } = {},
+): Promise<{
+  ok: true;
+  choice: "allow";
+  contract: SoftwareContract;
+  dependency_stub_id: string;
+  contract_bytes_unchanged: boolean;
+}> {
+  return request(
+    conn,
+    `/api/design/${encodeURIComponent(contractId)}/dependency-allow`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
+}
+
+export async function denyDesignDependency(
+  conn: DaemonConnection,
+  contractId: string,
+  body: { reviewer?: string; reason?: string } = {},
+): Promise<{ ok: true; choice: "deny"; contract: SoftwareContract }> {
+  return request(
+    conn,
+    `/api/design/${encodeURIComponent(contractId)}/dependency-deny`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
 }
 
 export async function runWorker(
