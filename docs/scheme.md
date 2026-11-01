@@ -184,7 +184,7 @@
 | acc-5 | Worker 只在 Worktree 与合同范围内写盘。 | `auto` | Gateway / P.1 现有测试 | PASS |
 | acc-7 | 每份合同的验收条目（`check: auto`）都有至少一条测试，且该测试在基线上失败、在候选上通过。 | `auto` | [`specs/verification-strategy.md`](./specs/verification-strategy.md) §3；TASK-L.3、L.4 | ⏳ |
 | acc-8 | 合入后知识库覆盖本次改动的全部文件。 | `auto` | [`specs/technical-design-and-knowledge.md`](./specs/technical-design-and-knowledge.md) §4.4；TASK-L.12（[#47](https://github.com/he18718143986-design/IDE/pull/47)/`39f426a`；KB-1 全量文件） | 机制已落地（单测 TD-06～08/10）；端到端产品验收仍 ⏳ |
-| acc-9 | 一次发布失败后自动回到上一个 LIVE 版本。 | `auto` | [`specs/release-and-operations.md`](./specs/release-and-operations.md) §1、§3.3；TASK-L.15 | ⏳ |
+| acc-9 | 一次发布失败后自动回到上一个 LIVE 版本。 | `auto` | [`specs/release-and-operations.md`](./specs/release-and-operations.md) §1、§3.3；TASK-L.15 | **机制已落地**（#52/`9829385`；失败回滚路径+LIVE→FAILED）；端到端产品验收（真 npm start）仍 ⏳ |
 | acc-6 | 北极星：给网址 + 登录信息，用户只回答偏好问题，产出站点经试玩认可。 | `playtest` | 无（依赖 conf-6、oq-2、oq-3） | ⏳ |
 
 ---
@@ -210,7 +210,7 @@
 
 > 这是给 Worker 的「还差什么」。卡号以 [`specs/development-tasks.md`](./specs/development-tasks.md) 为准；supervisor §19 的 L-01～L-10 不在此重复。
 >
-> **2026-11-01 回写**：下表已按 L.13 证据 tip `51ea872` / 物理 tip `34213c8`（含 J.2～J.10、J.18a～d、L.1～L.13、**L.14** 合入；另含 #28～#51 文档/实现；A.7/H.9 代码已合入、docs 另回写）回写「当前代码事实」；管道口径对齐 [ADR-0018](./adr/0018-intent-to-executable-seal.md)（确认 → Seal MachineFace → PAB → ProjectPlan → Worker；禁确认路径 `buildL0Plan(chat)`）。未合实现卡（如 L.15～）不得标关闭；Sprint 指向 **L.15**。
+> **2026-11-01 回写**：下表已按 L.15 证据 tip `9829385` / 物理 tip `8148c2c`（含 J.2～J.10、J.18a～d、L.1～L.15、**L.14** 合入；另含 #28～#53 文档/实现；A.7/H.9 代码已合入、docs 另回写）回写「当前代码事实」；管道口径对齐 [ADR-0018](./adr/0018-intent-to-executable-seal.md)（确认 → Seal MachineFace → PAB → ProjectPlan → Worker；禁确认路径 `buildL0Plan(chat)`）。未合实现卡（如 L.16～）不得标关闭；Sprint 指向 **L.16**（L.15 已 COMPLETED · #52/`9829385`）。
 
 | id | 方案要求 | 当前代码事实 | 对应卡 / 台账 |
 | :--- | :--- | :--- | :--- |
@@ -225,12 +225,12 @@
 | gap-9 | 早期卡把右栏写成「编码 Worker 对话窗口」 | C.1、W.1、W.5a、C.6、P.1、E.1、Sprint 1 门禁的旧叙述 | 已在任务卡文件头加取代说明；原文不改 |
 | gap-10 | 用户不做技术决策 | 现行有 `needs_approval` 逐项表态等审批点 | conf-5 |
 | gap-11 | 复刻网站需读参考站 | 全部 Agent 禁 `WebFetch` / `WebSearch` | conf-6；无卡 |
-| gap-12 | 登录凭据受控使用 | **代码已收口（L.14）**：`daemon/vault/` + `/api/vault` + Settings「密钥」区；日志/命令输出精确脱敏；HTTP 不回明文。发布/摄取注入仍待 L.15/L.17 | oq-3；`TASK-L.14` **COMPLETED**（[#31](https://github.com/he18718143986-design/IDE/pull/31)/`ae57543`） |
+| gap-12 | 登录凭据受控使用 | **代码已收口（L.14）**：`daemon/vault/` + `/api/vault` + Settings「密钥」区；日志/命令输出精确脱敏；HTTP 不回明文。发布注入已随 L.15 落地；摄取仍待 L.17 | oq-3；`TASK-L.14` **COMPLETED**（[#31](https://github.com/he18718143986-design/IDE/pull/31)/`ae57543`） |
 | gap-13 | 大需求拆成合同序列 | **代码已收口（L.7+L.8+L.9+L.10）**：`ProjectPlan` 类型/校验/落盘（L.7）；`PlanPatch`/分解器/API（L.8）；合同序列/`nextStub`/桩视图预检/互斥/`E_CONTRACT_IN_FLIGHT`/桩状态回填（L.9）；画布同页嵌「项目地图」+ `GET /api/project/plan` 权威下一份（L.10，tip `e4351b0` / #38）已合入。任务图一份合同一张的旧路径仍在。 | `TASK-L.7` **COMPLETED**（[#23](https://github.com/he18718143986-design/IDE/pull/23)/`607d742`）；`TASK-L.8` **COMPLETED**（[#33](https://github.com/he18718143986-design/IDE/pull/33)/`fb27504`）；`TASK-L.9` **COMPLETED**（[#35](https://github.com/he18718143986-design/IDE/pull/35)/`e1cf1bb`）；`TASK-L.10` **COMPLETED**（[#38](https://github.com/he18718143986-design/IDE/pull/38)/`e4351b0`） |
 | gap-14 | 新功能带测试 | Worker 指令已补「你会被这样检查」（L.2）；合同元数据 / `withSystemScope` / `stagent check` 义务与削弱检测已合入（L.3）；**两段式先红后绿编排已合入（L.4）**（`runWorker`→`runTwoPhase`）；**M2 黄金切片 E2E 已合入（L.6）** | `L.2`/`L.3`/`L.4`/`L.6` **COMPLETED**（[#8](https://github.com/he18718143986-design/IDE/pull/8)/[#15](https://github.com/he18718143986-design/IDE/pull/15)/[#18](https://github.com/he18718143986-design/IDE/pull/18)/[#21](https://github.com/he18718143986-design/IDE/pull/21) / `93589bf`） |
 | gap-15 | 试玩看到真实应用 | Worktree 真实应用预览已合入（`daemon/supervisor/preview/app-runner.ts`；端口段 4200～4210，与 Demo 段隔离） | `TASK-L.5` **COMPLETED**（[#14](https://github.com/he18718143986-design/IDE/pull/14) / `0b6bc7f`） |
 | gap-16 | 技术方案与系统知识 | **部分收口（L.11+L.12+L.13）**：`DesignNote` 生成/DN-1～5 校验/升级挂起/`design-note.json`+`obligations.json`/Worker「技术方案」注入已合入（tip `78ec236` / #43）；DN-2「可以」领域方法已测，**HTTP/意外卡入口**挂 DLV-6。**系统知识库与漂移门禁已合入（L.12）**：`checkKnowledge` KB-1～5、`stagent check knowledge`、`withSystemScope` 并入、`KNOWLEDGE_DRIFT`、bootstrap 草稿（`contract_type` 触发）；Tina 拍板 KB-1=全量改动文件、启发式只认 `contract_type`（tip `39f426a` / #47）。**追踪链已合入（L.13）**：Trailer `Stagent-Scheme-Items`、`explainLine`/`GET /api/trace/why`、右键「这段为什么存在」、`E_TRACE_BROKEN`（tip `51ea872` / #51）；行号仅对主干已合入、无本地脏改动准确（已知限制）。系统地图 UI 仍待 **L.18**；`daemon/arch/*` 仍只做按需展示 | `TASK-L.11` **COMPLETED**（[#43](https://github.com/he18718143986-design/IDE/pull/43)/`78ec236`）；`TASK-L.12` **COMPLETED**（[#47](https://github.com/he18718143986-design/IDE/pull/47)/`39f426a`）；`TASK-L.13` **COMPLETED**（[#51](https://github.com/he18718143986-design/IDE/pull/51)/`51ea872`）；余量 `TASK-L.18`；DLV-6 |
-| gap-17 | 合并后可发布 | deploy / release / health_check 全库 0 命中 | TASK-L.15、L.16 |
+| gap-17 | 合并后可发布 | **代码已收口（L.15）**：`daemon/release/*` + `ReleaseRecord` + `local_process`/`user_command`；失败回滚；保险库仅注入 deploy/health；白名单 host env。回流监测仍待 L.16。已知挂账：process-registry 仅内存、`/run` 同步阻塞、替身适配器测未跑真 npm start | `TASK-L.15` **COMPLETED**（[#52](https://github.com/he18718143986-design/IDE/pull/52)/`9829385`）；余量 `TASK-L.16` |
 
 ---
 
