@@ -47,6 +47,8 @@ export interface SchemeSnapshot {
   graveyard?: GraveyardEntry[];
   /** 1.2：墓地内容的稳定摘要；与 digest 一并用于篡改检测。 */
   graveyard_digest?: string;
+  /** TASK-C.22 / L.17a：可选参考源 URL 列表（与 scheme.references 对齐）。 */
+  references?: string[];
 }
 
 export class SchemeSnapshotConflictError extends Error {
@@ -273,6 +275,9 @@ export function writeSchemeSnapshot(
     scope_plan: input.scope_plan,
     graveyard,
     graveyard_digest: gyDigest,
+    ...(input.scheme.references && input.scheme.references.length > 0
+      ? { references: [...input.scheme.references] }
+      : {}),
   };
   writeJsonAtomic(schemeSnapshotPath(repoRoot, confirmationId), snapshot);
   return { snapshot, idempotent: false };

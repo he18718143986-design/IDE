@@ -124,6 +124,10 @@ export function buildConfirmContractFromScopePlan(
             }
           : {}),
     },
+    // TASK-C.22 / L.17a：参考源 URL 列表投影进入合同顶层
+    ...(scheme.references && scheme.references.length > 0
+      ? { references: [...scheme.references] }
+      : {}),
     // Tina 拍板 B：合同身份只认 contract_type（由桩 kind 投影）
     ...(stub ? { contract_type: stub.kind } : {}),
     // TASK-L.3 / L.9：追踪元数据（签署后不改合同正文）

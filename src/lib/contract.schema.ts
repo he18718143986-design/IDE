@@ -532,6 +532,10 @@ export const softwareContractSchema = z
     approval: approvalSchema,
     /** TASK-J.18b / GAP-W1：可选；仅带 confirmation_id 的新路径写入，签署后不可改 */
     scheme_binding: schemeBindingSchema.optional(),
+    /** TASK-C.22 / TASK-L.17a：可选参考源 URL 列表，为外网只读抓取提供白名单权威源 */
+    references: z
+      .array(z.string().url("references must be valid URLs"))
+      .optional(),
   })
   .superRefine((contract, ctx) => {
     // §9.1.1 双状态机联动规则：拒绝非法的 lifecycle × approval 组合
@@ -683,6 +687,7 @@ export function createContractDraft(params: {
   conversationRef?: ConversationRef | undefined;
   supervisorMetadata?: SupervisorMetadata | undefined;
   contractType?: ContractType | undefined;
+  references?: string[] | undefined;
 }): SoftwareContractV12 {
   const contractId = `contract_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const baseBranch = params.baseBranch ?? "main";
@@ -704,6 +709,9 @@ export function createContractDraft(params: {
     ...(params.contractType === undefined
       ? {}
       : { contract_type: params.contractType }),
+    ...(params.references === undefined
+      ? {}
+      : { references: params.references }),
     lifecycle_state: "DRAFT" as const,
     intent: {
       title: params.title,

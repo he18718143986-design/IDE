@@ -79,6 +79,10 @@ export interface SchemeDraft {
     text: string;
     check: "auto" | "playtest" | "both";
   }>;
+  /**
+   * TASK-C.22 / TASK-L.17a：参考源 URL 列表（可选，投影进合同 references 字段）。
+   */
+  references?: string[];
 }
 
 /**
@@ -173,6 +177,7 @@ export function emptySchemeDraft(partial?: Partial<SchemeDraft>): SchemeDraft {
     updatedAt: now,
     pinned_fields: [],
     business_input_rounds: 0,
+    ...(partial?.references ? { references: [...partial.references] } : {}),
     ...partial,
   };
 }
