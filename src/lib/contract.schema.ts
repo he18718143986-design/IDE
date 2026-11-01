@@ -246,12 +246,33 @@ export type RuntimeKind = z.infer<typeof runtimeKindSchema>;
 /**
  * §9.1 Schema 不变式：`UNCONTROLLED_EXTERNAL` 的 Worker 不得进入合同执行状态，
  * 不得生成可合并 Evidence。`GATEWAY_ENFORCED` 必须绑定经测试的 Adapter 能力。
+ *
+ * TASK-W.5c-i：`SANDBOX_ENFORCED` 为容器隔离档位，与
+ * `daemon/worker/worker-adapter.interface.ts::AdapterControlMode` **必须同改**
+ * （漏改单边即 FAIL）。窗口期语义：`SANDBOX_ENFORCED` 登记面接受，但派工门禁
+ * `requireControlledDispatch()` 显式拒绝，待 `W.5c-ii` `container-host` 落地解锁。
  */
 export const workerControlModeSchema = z.enum([
   "GATEWAY_ENFORCED",
+  "SANDBOX_ENFORCED",
   "UNCONTROLLED_EXTERNAL",
 ]);
 export type WorkerControlMode = z.infer<typeof workerControlModeSchema>;
+
+/** §9.1 目标数据模型：计费模型（可选，缺省不写） */
+export const workerBillingModelSchema = z.enum([
+  "PER_TOKEN",
+  "SUBSCRIPTION",
+  "QUOTA",
+]);
+export type WorkerBillingModel = z.infer<typeof workerBillingModelSchema>;
+
+/** §9.1 目标数据模型：实测验证记录（可选，缺省不写；实测值归 W.5c-iii 填） */
+export const workerVerifiedOnSchema = z.object({
+  cli_version: z.string().min(1),
+  verified_at: z.string().min(1),
+});
+export type WorkerVerifiedOn = z.infer<typeof workerVerifiedOnSchema>;
 
 export const workerSpecSchema = z.object({
   adapter_id: z.string().min(1),
@@ -259,6 +280,9 @@ export const workerSpecSchema = z.object({
   model_id: z.string().min(1).optional(),
   control_mode: workerControlModeSchema,
   adapter_version: z.string().min(1),
+  // TASK-W.5c-i §9.1 目标模型：两可选键，缺省不写（实测值归 W.5c-iii）
+  billing_model: workerBillingModelSchema.optional(),
+  verified_on: workerVerifiedOnSchema.optional(),
 });
 export type WorkerSpec = z.infer<typeof workerSpecSchema>;
 
