@@ -43,6 +43,8 @@ import {
   extractPathsFromText,
   isGreenfieldRepo,
 } from "./rules-l0";
+
+import { applyRepoAllowlistToScopePlan } from "./authorization-allowlist-store";
 import type { SupervisorMessage } from "./types";
 
 /** 构建器接受的方案输入：兼容现行 SchemeDraft 与未来 SchemeDraftV2 子集 */
@@ -602,8 +604,10 @@ export function buildScopePlan(
   }
 
   if (input.decisions) {
-    return applyScopeDecisions(plan, input.decisions);
+    plan = applyScopeDecisions(plan, input.decisions);
   }
+  // TASK-J.20：确认路径授权清单——同项未失效则自动放行（不碰复活路径）
+  plan = applyRepoAllowlistToScopePlan(repoRoot, plan);
   return plan;
 }
 
