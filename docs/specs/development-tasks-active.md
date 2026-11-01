@@ -106,7 +106,7 @@
 * **任务名称**：把 `AdapterRegistry` 接到派工路径；Claude Code `role: "worker"` 可受控派工
 * **对应规格**：架构 / W.1 适配器抽象；ledger **DLV-3**；[`../ledger/README.md`](../ledger/README.md) DLV-3；审计依据：Worker 仅 OpenAI `AiWorker`
 * **前置依赖**：`TASK-W.1`（COMPLETED）、`TASK-W.5a`（COMPLETED · Claude Code 适配器已有）
-* **优先级**：P3 · **NON_BLOCKER**（M2 不依赖；**不阻断** `TASK-L.13`；不与 W.5b/c 抢位）
+* **优先级**：P3 · **NON_BLOCKER**（M2 不依赖；**不阻断** `TASK-L.15`；不与 W.5b/c 抢位）
 * **状态**：`[NEW_TASK]`
 * **对照痛点（代码事实）**：`daemon/worker/adapter-registry.ts::AdapterRegistry` 已实现 register/get/requireControlled，但 `daemon/pipeline/orchestrator.ts` 派工组装真实 `AiWorker` + `OpenAiWorkerClient`（约 L1376–L1509）；`ClaudeCodeAdapter` 在 `daemon/server.ts` 主要用于右栏 `partner`，**未**经 Registry 作为受控 Worker 进入派工。
 * **一句话目标**：派工可按合同/设置选择已注册的受控适配器；至少 Claude Code worker 角色能走 Gateway 受控路径，不再写死只认 OpenAI `AiWorker`。
@@ -149,29 +149,6 @@
 * **估算**：L（**已失效作开工依据**；以子卡 S/M 为准）
 
 ### 3.4d 交付全链路 · 目标能力（L 系列 · 2026-10-30 立卡）
-
-<a id="task-l.13"></a>
-
-#### 【Task L.13】追踪链：Trailer 扩展与「这段为什么存在」反查 `[NEW_TASK]`
-
-* **任务编号**：`TASK-L.13`
-* **对应规格**：[`delivery-lifecycle.md`](./delivery-lifecycle.md) §6；[`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) §5
-* **前置依赖**：`TASK-L.9`（合同带 `scheme_item_ids`）、`TASK-L.12`（`changelog.md` 条目保证存在）
-* **优先级**：P2（M3）
-* **状态**：`[NEW_TASK]`
-* **对照痛点（代码事实）**：`daemon/pipeline/merger.ts` 的 Trailer 只到合同与证据（约 L204）；没有方案条目；没有反查入口。
-* **一句话目标**：任意一行合入的代码，都能一键反查到合同、方案条目和用户原话。
-* **范围**：
-  1. `merger.ts`：新增 Trailer `Stagent-Scheme-Items: goal-3,acc-5`（来自合同 `supervisor_metadata.scheme_item_ids`）；超出 512B 单行上限时截断为合同号，并在 `docs/system/changelog.md` 条目中保留全量（L.12 已保证条目存在）。
-  2. 新建 `daemon/trace/why.ts`：`explainLine({ repoRoot, path, line })` → `git blame --porcelain` 取提交 → 解析 Trailer → 读合同、方案快照 → 返回 `{ commit, contract_id, scheme_items: { id, text, quotes: { qid, text }[] }[] }`；任一环缺失返回 `E_TRACE_BROKEN` 并指出断在哪一环。
-  3. `GET /api/trace/why?path=&line=`；编辑器右键「这段为什么存在」调用并以白话卡片显示。
-  4. 错误码 `E_TRACE_BROKEN` 登记。
-* **非目标**：不做影响分析（另卡）。
-* **不变声明**：Trailer 既有键不变；512B / 4KB 上限不变。
-* **验收（PASS）**：`tests/integration/trace-why.test.ts`：夹具仓库合入一份带 `scheme_item_ids` 的合同 → 对新增行调用 `explainLine` 返回原话；对合入前已存在的行返回 `E_TRACE_BROKEN`（断在「提交无 Stagent Trailer」）；超长条目列表时 Trailer 单行 ≤512B。
-* **FAIL**：Trailer 超长导致合并失败；反查返回编造的原话。
-* **关键文件**：`daemon/pipeline/merger.ts`、`daemon/trace/why.ts`（新）、`daemon/server.ts`、`src/components/MonacoEditorPane.tsx`
-* **估算**：M
 
 <a id="task-l.15"></a>
 
@@ -252,8 +229,8 @@
 * **任务编号**：`TASK-L.18`
 * **任务名称**：中栏系统地图（知识库第二页）+ 影响闭包入口
 * **对应规格**：[`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) §5；supervisor 中栏/地图嵌入；ledger **DLV-5**；对照 `TASK-L.10`（项目地图已 COMPLETED）
-* **前置依赖**：`TASK-L.10`（COMPLETED）、`TASK-L.12`（COMPLETED · 提供 `modules.yaml`；**本卡不抢 L.13**）
-* **优先级**：P3 · **NON_BLOCKER**（相对 Sprint「当前首要」**现为 L.13**；前置 `L.12` 已 COMPLETED；本卡不抢 L.13）
+* **前置依赖**：`TASK-L.10`（COMPLETED）、`TASK-L.12`（COMPLETED · 提供 `modules.yaml`；**本卡不抢 L.15**）
+* **优先级**：P3 · **NON_BLOCKER**（相对 Sprint「当前首要」**现为 L.15**；前置 `L.12`/`L.13` 已 COMPLETED；本卡不抢 L.15）
 * **状态**：`[NEW_TASK]`
 * **对照痛点（代码事实）**：L.10 已同页嵌「项目地图」（计划/合同桩）；技术规格 §5 要求的「系统地图」（`modules.yaml` 白话卡片 + 依赖图）与「改这里会影响什么」（`depends_on` 反向闭包 + `interfaces/` 消费者）**尚未立卡实现**。
 * **一句话目标**：用户能在中栏看到系统模块地图，并在编辑器/右栏只读问答里问「改这里会影响什么」得到确定性闭包，而不是空话。
@@ -274,7 +251,7 @@
 
 ### 3.4e 台账债立卡（2026-11-01 · NON_BLOCKER · 不抢主序）
 
-> Tina 授权将第一类六项写成任务卡。Sprint「当前首要」现为 **`TASK-L.13`**（L.12 已 COMPLETED）。本节目的：把 ledger 待立卡改代码项变成可排期卡；六卡仍为 NON_BLOCKER，不抢 L.13。
+> Tina 授权将第一类六项写成任务卡。Sprint「当前首要」现为 **`TASK-L.15`**（L.13 已 COMPLETED）。本节目的：把 ledger 待立卡改代码项变成可排期卡；六卡仍为 NON_BLOCKER，不抢 L.15（A.7/H.9 代码已合入、docs 回写另开）。
 
 
 <a id="task-a.7"></a>
@@ -285,7 +262,7 @@
 * **任务名称**：seal / manifest 目录与 `worktree-manager` 统一为 `task-{id}`
 * **对应规格**：[`runtime-contract-and-safety.md`](./runtime-contract-and-safety.md) §10.5 D1；ledger DOC-5 / 「第 1 波遗留 · Worktree seal 路径前缀」；[`../ledger/README.md`](../ledger/README.md)
 * **前置依赖**：`TASK-A.1`（COMPLETED）、`TASK-C.15d`（COMPLETED）
-* **优先级**：P3 · **NON_BLOCKER**（**不阻断** `TASK-L.13` 主序；不抢 Sprint「当前首要」）
+* **优先级**：P3 · **NON_BLOCKER**（**不阻断** `TASK-L.15` 主序；不抢 Sprint「当前首要」）
 * **状态**：`[NEW_TASK]`
 * **对照痛点（代码事实）**：`daemon/guard/worktree-seal.ts::worktreeDir` 拼 `.stagent/worktrees/{contractId}/`（**无** `task-` 前缀）；`daemon/git/worktree-manager.ts` 创建路径为 `.stagent/worktrees/task-{contractId}`（约 L217）；`daemon/editor/launcher.ts` / Evidence 文案亦按 `task-{id}`。seal 与真实 Worktree 目录错位。
 * **一句话目标**：封存 / 清单读写命中与创建 Worktree **同一**物理目录 `task-{id}`，不再写到无前缀的孤儿路径。
@@ -313,7 +290,7 @@
 * **任务名称**：清除代码对 `.stagent/metadata/` 的写入，统一到 `.stagent/records/`
 * **对应规格**：[ADR-0011](../adr/0011-audit-sidecar-records-path.md)；ledger **DLV-4**；scheme REJ-007
 * **前置依赖**：`TASK-C.12e` / `TASK-C.15c`（COMPLETED · records 侧车已落地）
-* **优先级**：P3 · **NON_BLOCKER**（**不阻断** `TASK-L.13`）
+* **优先级**：P3 · **NON_BLOCKER**（**不阻断** `TASK-L.15`）
 * **状态**：`[NEW_TASK]`
 * **对照痛点（代码事实）**：`daemon/supervisor/demo/prototypes.ts` 仍常量 `".stagent/metadata/demo-confirm.json"`；与 ADR-0011「`.stagent/metadata/` 自本 ADR 起废止，任何新代码不得写入」冲突。
 * **一句话目标**：仓库内无生产路径再创建或写入 `.stagent/metadata/**`；Demo 确认类侧车迁到 `.stagent/records/`（或既有 prototypes 约定目录）并测过。
@@ -339,7 +316,7 @@
 * **任务名称**：把已测的 `resolveDesignDependencyAllow` 接到用户可达入口
 * **对应规格**：[`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) DN-2；L.11 合入挂账；ledger **DLV-6**；可参照 `TASK-J.7` 交接/意外卡 UX 模式
 * **前置依赖**：`TASK-L.11`（COMPLETED）、`TASK-J.7`（COMPLETED · 交接三步/右栏解锁模式可复用）
-* **优先级**：P3 · **NON_BLOCKER**（不阻断 L.11 领域验收；**不阻断** `TASK-L.13`）
+* **优先级**：P3 · **NON_BLOCKER**（不阻断 L.11 领域验收；**不阻断** `TASK-L.15`）
 * **状态**：`[NEW_TASK]`
 * **对照痛点（代码事实）**：`daemon/pipeline/orchestrator.ts::resolveDesignDependencyAllow` 已合入且集成测覆盖；`POST .../resume` **不**路由至此；画布无「可以」装新库入口 → 用户不可达（DLV-6）。
 * **一句话目标**：设计步骤因 DN-2 挂起时，用户在意外卡点「可以」能走到领域方法并触发重签/依赖桩流程；「不行」走既有拒绝路径。
@@ -365,7 +342,7 @@
 * **任务名称**：确认路径敏感项授权清单的存储、scope 与失效条件
 * **对应规格**：[`../scheme.md`](../scheme.md) dec-10 / q23 / R-OP1；supervisor §14.11 **K-12**（确认路径 occurrence 洗白）；[`delivery-lifecycle.md`](./delivery-lifecycle.md) §5 **SA-1**；consistency-audit OP-1（裁决已销项，**实施**归本卡）
 * **前置依赖**：`TASK-J.3` / `TASK-J.5` / `TASK-J.9`（均 **COMPLETED**）；**不**重开 `TASK-J.9`
-* **优先级**：P2 · **NON_BLOCKER** 相对 L.13 主序（**不抢** Sprint「当前首要」）；实施敏感授权面，须单卡审
+* **优先级**：P2 · **NON_BLOCKER** 相对 L.15 主序（**不抢** Sprint「当前首要」）；实施敏感授权面，须单卡审
 * **状态**：`[NEW_TASK]`
 * **为何不改 J.9**：`TASK-J.9` 已 **COMPLETED**（SchemePatch 零模型合并引擎，[#12](https://github.com/he18718143986-design/IDE/pull/12)）。裁决原文曾写「落地细节由实施卡确定 / 留待 J.9」——**J.9 当时已合入**，属过时指针。证据纪律禁止把未完成实施塞回 COMPLETED 卡。本卡为 **新实施卡**，只补约束与代码，**不重开裁决**、不改 dec-10 方向。
 * **对照痛点（代码事实）**：K-12 / dec-10 已定「确认开工点名敏感项 → 授权清单 → 后续合同同项自动放行」；今日无独立授权清单存储与 scope/失效规则，SA-1 仍以单次合同 `needs_approval` 为主。

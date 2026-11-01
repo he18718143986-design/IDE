@@ -23,7 +23,7 @@
 | `TASK-J.19` | `NEW_TASK` | DN-2「可以」HTTP/画布入口（DLV-6）· NON_BLOCKER | [打开](./development-tasks-active.md#task-j.19) |
 | `TASK-J.20` | `NEW_TASK` | OP-1 授权清单落地（dec-10 实施；不回写 J.9）· NON_BLOCKER | [打开](./development-tasks-active.md#task-j.20) |
 | `TASK-L.12` | `COMPLETED` | 系统知识库：Schema、引导合同与漂移门禁 | [打开](./development-tasks-completed.md#task-l.12) |
-| `TASK-L.13` | `NEW_TASK` | 追踪链：Trailer 扩展与「这段为什么存在」反查 | [打开](./development-tasks-active.md#task-l.13) |
+| `TASK-L.13` | `COMPLETED` | 追踪链：Trailer 扩展与「这段为什么存在」反查 | [打开](./development-tasks-completed.md#task-l.13) |
 | `TASK-L.15` | `NEW_TASK` | 发布生命周期与两类部署目标 | [打开](./development-tasks-active.md#task-l.15) |
 | `TASK-L.16` | `NEW_TASK` | 线上问题回流 | [打开](./development-tasks-active.md#task-l.16) |
 | `TASK-L.17` | `NEW_TASK` | 受控只读外网摄取（北极星前置） | [打开](./development-tasks-active.md#task-l.17) |
