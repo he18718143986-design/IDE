@@ -80,6 +80,7 @@ import {
   ScopeInvariantBrokenError,
   ScopePlanDriftError,
 } from "./supervisor/scope-preflight";
+import { recordConfirmAuthorizations } from "./supervisor/authorization-allowlist-store";
 import type { ScopePlan } from "../src/lib/journey/scope-plan";
 import {
   createRealPreviewServer,
@@ -4731,6 +4732,20 @@ export class StagentDaemon {
             }
           }
           const created = admission?.contract ?? saved;
+          // TASK-J.20：确认开工成功 → 点名敏感项写入授权清单（跨合同自动放行；可失效）
+          if (body.confirmation_id) {
+            const snapForAllow = readSchemeSnapshot(
+              this.repoRoot,
+              body.confirmation_id,
+            );
+            if (snapForAllow?.scope_plan) {
+              recordConfirmAuthorizations(this.repoRoot, {
+                scopePlan: snapForAllow.scope_plan,
+                source_contract_id: created.contract_id,
+                source_confirmation_id: body.confirmation_id,
+              });
+            }
+          }
           // TASK-L.9：合同生成回填桩 status=signed + contract_id
           const createdStubId = stubIdFromContract(created);
           if (createdStubId) {
