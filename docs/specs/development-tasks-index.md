@@ -27,7 +27,9 @@
 | `TASK-L.13` | `COMPLETED` | 追踪链：Trailer 扩展与「这段为什么存在」反查 | [打开](./development-tasks-completed.md#task-l.13) |
 | `TASK-L.15` | `COMPLETED` | 发布生命周期与两类部署目标 | [打开](./development-tasks-completed.md#task-l.15) |
 | `TASK-L.16` | `COMPLETED` | 线上问题回流 | [打开](./development-tasks-completed.md#task-l.16) |
-| `TASK-L.17` | `NEW_TASK` | 受控只读外网摄取（北极星前置） | [打开](./development-tasks-active.md#task-l.17) |
+| `TASK-L.17` | `SPLIT` | 受控只读外网摄取（北极星前置 · 已拆分） | [打开](./development-tasks-active.md#task-l.17) |
+| `TASK-L.17a` | `READY` | 受控摄取与代登代理 | [打开](./development-tasks-active.md#task-l.17a) |
+| `TASK-L.17b` | `READY（待 L.17a）` | 对比视图与试玩证据桩 | [打开](./development-tasks-active.md#task-l.17b) |
 | `TASK-L.18` | `COMPLETED` | 系统地图 UI +「改这里会影响什么」（DLV-5） | [打开](./development-tasks-completed.md#task-l.18) |
 | `TASK-H.9` | `COMPLETED` | 废止 `.stagent/metadata/` 写入（DLV-4 · ADR-0011） | [打开](./development-tasks-completed.md#task-h.9) |
 | `TASK-B.1` | `DEFERRED` | 本地 AST 增量依赖图分析引擎 | [打开](./development-tasks-active.md#task-b.1) |
