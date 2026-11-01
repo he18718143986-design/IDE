@@ -11,6 +11,12 @@ import {
   listTopLevelSourceDirs,
 } from "../../daemon/knowledge/bootstrap-draft";
 import { withSystemScope } from "../../daemon/supervisor/scope-plan-builder";
+import { defaultDesignNoteGenerator } from "../../daemon/supervisor/design/design-step";
+import {
+  createContractDraft,
+  softwareContractSchema,
+} from "../../src/lib/contract.schema";
+import { buildConfirmContractFromScopePlan } from "../../src/lib/journey/confirm-scheme-contract";
 import {
   scopePlanDigest,
   type ScopePlan,
@@ -169,5 +175,121 @@ describe("TASK-L.12 withSystemScope 知识库并入", () => {
     expect(next.areas.some((a) => a.paths.includes("docs/system/**"))).toBe(
       true,
     );
+  });
+});
+
+
+describe("TASK-L.12 Tina 拍板 B：contract_type 身份门", () => {
+  let root: string;
+
+  beforeEach(() => {
+    root = fs.realpathSync(
+      fs.mkdtempSync(path.join(os.tmpdir(), "stagent-l12-ctype-")),
+    );
+    fs.mkdirSync(path.join(root, "pkg"), { recursive: true });
+    fs.writeFileSync(path.join(root, "pkg", "index.ts"), "export const x = 1;\n");
+    fs.mkdirSync(path.join(root, "docs", "system"), { recursive: true });
+  });
+
+  afterEach(() => {
+    safeRmSync(root);
+  });
+
+  it("contract_type=knowledge_bootstrap → draftModules 填入 modules_upsert", () => {
+    const draft = createContractDraft({
+      title: "随便标题",
+      description: "引导",
+      acceptanceCriteria: ["知识库齐"],
+      writablePaths: ["docs/system/**"],
+      contractType: "knowledge_bootstrap",
+    });
+    const contract = softwareContractSchema.parse({
+      ...draft,
+      lifecycle_state: "EXECUTING",
+      approval: {
+        status: "APPROVED",
+        approved_by: "tina",
+        approved_at: new Date().toISOString(),
+      },
+    });
+    const { note } = defaultDesignNoteGenerator({
+      contract,
+      modules: [],
+      docsSystemDir: path.join(root, "docs", "system"),
+      attempt: 1,
+      forbidDependencies: false,
+    });
+    expect(note.knowledge_delta.modules_upsert.length).toBeGreaterThan(0);
+    expect(
+      note.knowledge_delta.modules_upsert.every(
+        (m) => m.introduced_by === "knowledge_bootstrap",
+      ),
+    ).toBe(true);
+  });
+
+  it("title 含「知识库」但无 contract_type → 不引导", () => {
+    const draft = createContractDraft({
+      title: "搭建系统知识库 knowledge_bootstrap",
+      description: "标题诱饵",
+      acceptanceCriteria: ["不应触发"],
+      writablePaths: ["docs/system/**", "src/**"],
+    });
+    const contract = softwareContractSchema.parse({
+      ...draft,
+      lifecycle_state: "EXECUTING",
+      approval: {
+        status: "APPROVED",
+        approved_by: "tina",
+        approved_at: new Date().toISOString(),
+      },
+    });
+    expect(contract.contract_type).toBeUndefined();
+    const { note } = defaultDesignNoteGenerator({
+      contract,
+      modules: [],
+      docsSystemDir: path.join(root, "docs", "system"),
+      attempt: 1,
+      forbidDependencies: false,
+    });
+    expect(note.knowledge_delta.modules_upsert).toEqual([]);
+  });
+
+  it("buildConfirmContractFromScopePlan 把 stub.kind 投影为 contract_type", () => {
+    const scheme = {
+      ...emptySchemeDraft(),
+      scheme_id: "sch-kb",
+      scheme_revision: 1,
+      title: "引导",
+      summary: "知识库",
+      acceptance: [{ id: "sys-acc-knowledge", text: "KB 齐", check: "playtest" as const }],
+    };
+    const plan = minimalPlan();
+    plan.areas.push({
+      id: "area-docs-system",
+      label: "系统知识库",
+      why: "引导",
+      module_ids: [],
+      kind: "create_new",
+      paths: ["docs/system/**"],
+      excluded_by_user: false,
+    });
+    plan.plan_digest = scopePlanDigest(plan);
+    const stub = {
+      stub_id: "stub-kb",
+      milestone_id: "m1",
+      kind: "knowledge_bootstrap",
+      origin: "system",
+      title: "先写系统知识库",
+      scheme_item_ids: ["sys-acc-knowledge"],
+      acceptance_ids: ["sys-acc-knowledge"],
+      area_hints: ["docs/system"],
+      depends_on: [],
+      size_estimate: { files: 10, diff_lines: 200, minutes: 30 },
+      status: "planned",
+      contract_id: null,
+    } satisfies ContractStub;
+    const contract = buildConfirmContractFromScopePlan(scheme, plan, { stub });
+    expect(contract.contract_type).toBe("knowledge_bootstrap");
+    expect(contract.supervisor_metadata?.stub_id).toBe("stub-kb");
   });
 });

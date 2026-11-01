@@ -322,6 +322,17 @@ export const supervisorMetadataSchema = z.object({
 });
 export type SupervisorMetadata = z.infer<typeof supervisorMetadataSchema>;
 
+/** 合同身份（与 ContractStub.kind 对齐）；签署时由桩投影，启发式只认此字段 */
+export const contractTypeSchema = z.enum([
+  "feature",
+  "interface_first",
+  "test_foundation",
+  "refactor",
+  "knowledge_bootstrap",
+  "dependency",
+]);
+export type ContractType = z.infer<typeof contractTypeSchema>;
+
 // --- 7. Git 授权凭证 (§9.1 authorization.git，v1.3.0 补齐) ---
 
 /**
@@ -493,6 +504,8 @@ export const softwareContractSchema = z
     conversation_ref: conversationRefSchema.optional(),
     supervisor_metadata: supervisorMetadataSchema.optional(),
     worker_spec: workerSpecSchema,
+    /** 与桩 kind 对齐的合同身份；缺省表示未投影（旧合同 / 直签草案） */
+    contract_type: contractTypeSchema.optional(),
 
     lifecycle_state: lifecycleStateSchema,
     intent: z.object({
@@ -669,6 +682,7 @@ export function createContractDraft(params: {
   workerSpec?: Partial<WorkerSpec> | undefined;
   conversationRef?: ConversationRef | undefined;
   supervisorMetadata?: SupervisorMetadata | undefined;
+  contractType?: ContractType | undefined;
 }): SoftwareContractV12 {
   const contractId = `contract_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const baseBranch = params.baseBranch ?? "main";
@@ -687,6 +701,9 @@ export function createContractDraft(params: {
       ? {}
       : { supervisor_metadata: params.supervisorMetadata }),
     worker_spec: { ...DEFAULT_WORKER_SPEC, ...(params.workerSpec ?? {}) },
+    ...(params.contractType === undefined
+      ? {}
+      : { contract_type: params.contractType }),
     lifecycle_state: "DRAFT" as const,
     intent: {
       title: params.title,

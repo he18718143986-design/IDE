@@ -177,13 +177,8 @@ export function defaultDesignNoteGenerator(
     },
   };
 
-  // TASK-L.12：knowledge_bootstrap —— 以确定性草稿为 modules_upsert 输入
-  const wantsKnowledge =
-    writable.some(
-      (p) => p === "docs/system/**" || p.startsWith("docs/system/"),
-    ) ||
-    contract.intent.title.includes("知识库") ||
-    contract.intent.title.includes("knowledge_bootstrap");
+  // TASK-L.12 / Tina 拍板 B：只认 contract_type（真实身份），不看 title / writable 启发式
+  const wantsKnowledge = contract.contract_type === "knowledge_bootstrap";
   if (wantsKnowledge && input.modules.length === 0 && input.docsSystemDir) {
     const repoRoot = path.resolve(input.docsSystemDir, "..", "..");
     const modules = draftModules(repoRoot);
