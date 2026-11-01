@@ -49,9 +49,17 @@ export type WorkerAdapterKind = "MANAGED_AI" | "CLI";
 /**
  * 注册模式：
  * - `GATEWAY_ENFORCED`：受控模式，全部文件/命令操作经受管 Gateway；
+ * - `SANDBOX_ENFORCED`：容器隔离受控模式（TASK-W.5c-i 新增档位）。能力声明按
+ *   受控严格模式校验（与 `GATEWAY_ENFORCED` 同），**登记面接受注册**；但容器
+ *   运行时 `container-host` 尚未落地（TASK-W.5c-ii），**窗口期内不得派工**——
+ *   派工门禁 `requireControlledDispatch()` 对其显式拒绝，避免「标了沙箱档却没有
+ *   沙箱」的假受控状态。解锁条件：`W.5c-ii` `container-host` 落地。
  * - `UNCONTROLLED_EXTERNAL`：用户自管的外部编辑器/助手，**不得**作为执行证据。
  */
-export type AdapterControlMode = "GATEWAY_ENFORCED" | "UNCONTROLLED_EXTERNAL";
+export type AdapterControlMode =
+  | "GATEWAY_ENFORCED"
+  | "SANDBOX_ENFORCED"
+  | "UNCONTROLLED_EXTERNAL";
 
 export type AdapterRejectionCode =
   | "ADAPTER_ID_INVALID"
@@ -101,7 +109,10 @@ function isNonEmptyString(value: unknown): value is string {
 /**
  * 能力声明校验（受控模式为严格模式）。
  *
- * `GATEWAY_ENFORCED` 的拒绝条件（任一命中即拒绝）：
+ * 严格模式适用于 `GATEWAY_ENFORCED` 与 `SANDBOX_ENFORCED`（TASK-W.5c-i）：后者是
+ * **更严**的容器隔离档位，能力声明不得比 `GATEWAY_ENFORCED` 宽松，故同走严格校验。
+ *
+ * 严格模式的拒绝条件（任一命中即拒绝）：
  * 1. `known_limitations` 未声明或为空——不允许「宣称零限制」的黑盒适配器；
  * 2. `filesystem_permissions !== "GATEWAY_ONLY"`——直连文件系统不可受控；
  * 3. `command_permissions !== "WHITELIST_ONLY"`——无限制 Shell 不可受控；

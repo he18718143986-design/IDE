@@ -196,6 +196,8 @@ describe("creator 枚举对齐 ADR-007 双 Agent 术语", () => {
 describe("worker_spec（v1.2.0 新增，必填）", () => {
   it("五个字段与 A §9.1 一致", () => {
     // 断言 Schema 形状（含可选字段），而非某个实例的键集合
+    // TASK-W.5c-i：新增 billing_model / verified_on 两可选键（缺省不写），
+    // 既有四必需键语义不变。
     expect(Object.keys(workerSpecSchema.shape).sort()).toEqual(
       [
         "adapter_id",
@@ -203,6 +205,8 @@ describe("worker_spec（v1.2.0 新增，必填）", () => {
         "control_mode",
         "runtime_kind",
         "model_id",
+        "billing_model",
+        "verified_on",
       ].sort(),
     );
     // 实例必须含四个必填字段
@@ -217,8 +221,11 @@ describe("worker_spec（v1.2.0 新增，必填）", () => {
       "MANAGED_TOOL_CALLING",
       "EXTERNAL_CLI",
     ]);
+    // TASK-W.5c-i：control_mode 由二值扩为三值（新增 SANDBOX_ENFORCED），
+    // 与 daemon/worker/worker-adapter.interface.ts::AdapterControlMode 同步。
     expect(workerControlModeSchema.options).toEqual([
       "GATEWAY_ENFORCED",
+      "SANDBOX_ENFORCED",
       "UNCONTROLLED_EXTERNAL",
     ]);
   });
