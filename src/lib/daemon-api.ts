@@ -944,6 +944,39 @@ export async function deleteVaultSecret(
   );
 }
 
+/** TASK-L.13：编辑器「这段为什么存在」 */
+export interface TraceWhyQuote {
+  qid: string;
+  text: string;
+}
+
+export interface TraceWhySchemeItem {
+  id: string;
+  text: string;
+  quotes: TraceWhyQuote[];
+}
+
+export interface TraceWhyResult {
+  commit: string;
+  contract_id: string;
+  scheme_items: TraceWhySchemeItem[];
+  scheme_items_trailer_truncated: boolean;
+}
+
+export async function fetchTraceWhy(
+  conn: DaemonConnection,
+  filePath: string,
+  line: number,
+): Promise<TraceWhyResult> {
+  const q = new URLSearchParams({
+    path: filePath,
+    line: String(line),
+  });
+  return request<TraceWhyResult>(conn, `/api/trace/why?${q.toString()}`, {
+    method: "GET",
+  });
+}
+
 /** TASK-L.10：读取项目计划（含服务端权威下一份）。 */
 export async function getProjectPlan(
   conn: DaemonConnection,

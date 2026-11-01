@@ -46,6 +46,7 @@ export const ERROR_CODES = [
   "E_VAULT_NAME_INVALID",
   "E_VAULT_NOT_FOUND",
   "E_CONTRACT_IN_FLIGHT",
+  "E_TRACE_BROKEN",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -352,6 +353,16 @@ export const ERROR_CODE_CATALOG: Readonly<Record<ErrorCode, ErrorCodeSpec>> = {
       "已有合同处于 PREPARING～AUDITED 时签署下一份（ADR-0002 合同级互斥）",
     plain_message: "上一份还没做完，做完我再开下一份。",
     http_status: 409,
+  },
+  E_TRACE_BROKEN: {
+    code: "E_TRACE_BROKEN",
+    reason_code: "PREPARATION_INTERRUPTED",
+    component: "Trace / explainLine",
+    task: "TASK-L.13",
+    condition:
+      "追踪链任一环缺失（提交无 Stagent Trailer / 合同 / 方案条目 / 原话）",
+    plain_message: "这段代码找不到完整的来历，链在某一环断了。",
+    http_status: 404,
   },
 
 };

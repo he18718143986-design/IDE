@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import Editor from "@monaco-editor/react";
+import Editor, { type OnMount } from "@monaco-editor/react";
 import { useWorktreeFile, type WorktreeFileIO } from "@/hooks/useWorktreeFile";
 import { MarkdownPreview } from "@/components/editor/MarkdownPreview";
 import {
@@ -7,6 +7,12 @@ import {
   isMarkdownPath,
   type MarkdownViewMode,
 } from "@/lib/markdown-file";
+import {
+  DaemonApiError,
+  fetchTraceWhy,
+  loadConnection,
+  type TraceWhyResult,
+} from "@/lib/daemon-api";
 
 export interface MonacoEditorPaneProps {
   path: string;
@@ -31,7 +37,13 @@ const LANG: Record<string, string> = {
   yaml: "yaml",
 };
 
-/** TASK-C.3 中栏 Monaco；TASK-C.10j：.md 默认好看预览，可切源码 */
+type TraceCardState =
+  | { status: "idle" }
+  | { status: "loading"; line: number }
+  | { status: "ok"; line: number; result: TraceWhyResult }
+  | { status: "broken"; line: number; message: string; ring?: string };
+
+/** TASK-C.3 中栏 Monaco；TASK-C.10j：.md 默认好看预览；TASK-L.13：右键「这段为什么存在」 */
 export function MonacoEditorPane({
   path,
   io,
@@ -43,12 +55,51 @@ export function MonacoEditorPane({
   const [viewMode, setViewMode] = useState<MarkdownViewMode>(() =>
     defaultMarkdownViewMode(path),
   );
+  const [traceCard, setTraceCard] = useState<TraceCardState>({ status: "idle" });
 
   useEffect(() => {
     setViewMode(defaultMarkdownViewMode(path));
+    setTraceCard({ status: "idle" });
   }, [path]);
 
   const showPreview = markdown && viewMode === "preview";
+
+  const onMount: OnMount = (editor, monaco) => {
+    editor.addAction({
+      id: "stagent.trace.why",
+      label: "这段为什么存在",
+      contextMenuGroupId: "navigation",
+      contextMenuOrder: 1.5,
+      run: async (ed) => {
+        const position = ed.getPosition();
+        if (!position) return;
+        const line = position.lineNumber;
+        setTraceCard({ status: "loading", line });
+        try {
+          const conn = loadConnection();
+          const result = await fetchTraceWhy(conn, path, line);
+          setTraceCard({ status: "ok", line, result });
+        } catch (err) {
+          const message =
+            err instanceof DaemonApiError
+              ? err.message
+              : err instanceof Error
+                ? err.message
+                : String(err);
+          const ring =
+            err instanceof DaemonApiError &&
+            err.body &&
+            typeof err.body === "object" &&
+            typeof (err.body as { ring?: unknown }).ring === "string"
+              ? ((err.body as { ring: string }).ring)
+              : undefined;
+          setTraceCard({ status: "broken", line, message, ring });
+        }
+      },
+    });
+    // 保留 monaco 引用以免未使用告警（主题等后续可扩展）
+    void monaco;
+  };
 
   return (
     <div
@@ -125,6 +176,60 @@ export function MonacoEditorPane({
           {f.error}
         </div>
       )}
+      {traceCard.status !== "idle" ? (
+        <div
+          data-testid="trace-why-card"
+          role="dialog"
+          aria-label="这段为什么存在"
+          className="border-b bg-amber-50 px-3 py-2 text-xs text-zinc-800"
+        >
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <strong>这段为什么存在 · 第 {traceCard.line} 行</strong>
+            <button
+              type="button"
+              className="rounded border px-1.5"
+              onClick={() => setTraceCard({ status: "idle" })}
+            >
+              关闭
+            </button>
+          </div>
+          {traceCard.status === "loading" ? (
+            <p>正在沿着提交 → 合同 → 方案 → 原话查找…</p>
+          ) : null}
+          {traceCard.status === "broken" ? (
+            <p className="text-destructive">
+              链断了
+              {traceCard.ring ? `（断在「${traceCard.ring}」）` : ""}：
+              {traceCard.message}
+            </p>
+          ) : null}
+          {traceCard.status === "ok" ? (
+            <div className="space-y-2">
+              <p>
+                合同 <code>{traceCard.result.contract_id}</code> · 提交{" "}
+                <code>{traceCard.result.commit.slice(0, 12)}</code>
+                {traceCard.result.scheme_items_trailer_truncated
+                  ? " · 方案条目清单在 changelog（Trailer 已截断）"
+                  : null}
+              </p>
+              {traceCard.result.scheme_items.map((item) => (
+                <div key={item.id} className="rounded border bg-white p-2">
+                  <div className="font-medium">
+                    {item.id}：{item.text}
+                  </div>
+                  <ul className="mt-1 list-disc pl-4 text-zinc-700">
+                    {item.quotes.map((q) => (
+                      <li key={`${item.id}:${q.qid}`}>
+                        用户原话（{q.qid}）：「{q.text}」
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       <div
         className={`relative min-h-[300px] flex-1 ${f.writable && !showPreview ? "" : "bg-zinc-50"}`}
       >
@@ -140,6 +245,7 @@ export function MonacoEditorPane({
               language={LANG[ext] ?? "plaintext"}
               value={f.content}
               onChange={(v) => f.setContent(v ?? "")}
+              onMount={onMount}
               options={{
                 readOnly: !f.writable,
                 minimap: { enabled: false },
