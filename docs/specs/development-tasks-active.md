@@ -186,7 +186,7 @@
   1. 在 Daemon Gateway 权限边界内提供受管 MCP HTTP server/endpoint，并复用现有工具定义、输入校验、调度和授权，不允许绕开 Gateway 直接访问资源。
   2. 定义明确的工具注册面；首批仅挂 `stagent_web_ingest`，默认拒绝未注册或未授权工具。
   3. 将真实端点配置写入 `claude-code-adapter.ts` 生成的 `mcpPath`，替代空 `mcpServers`；维持 `--strict-mcp-config`，端点不可用时明确失败，不静默降级为空集合。
-  4. 修正适配器注释中关于 MCP 端点由 W.4 落地的误指，改为 W.8。
+  4. **施工时同步修正** `daemon/worker/cli-host/claude-code-adapter.ts` 注释中「MCP 端点由 W.4 落地」的误指，改为 W.8；该代码注释修正不属于本 docs PR。
   5. 测试：HTTP MCP 握手、工具发现与调用；未授权/未知工具拒绝；Worker strict 配置确实指向受管端点。
 * **非目标**：不实现 web_ingest 抓取逻辑（归 L.17a）；不扩展右栏工具白名单；不开放通用任意工具注册或绕过 Gateway 的传输路径。
 * **不变声明**：Worker 的 `--strict-mcp-config` 约束保持；Gateway 权限、Scope 与工具授权边界不变；右栏只读工具白名单不变。
