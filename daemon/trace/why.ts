@@ -3,6 +3,9 @@
  *
  * 链路：git blame → Trailer → 合同 → 方案条目 → 原话。
  * 任一环缺失 → E_TRACE_BROKEN（指出断环）；绝不编造原话。
+ *
+ * 已知限制：blame/explain 仅对已合入主干、无本地未提交改动的文件准确；
+ * worktree / 脏缓冲下的行号可能与 repoRoot HEAD 错位且不报错。
  */
 import fs from "node:fs";
 import path from "node:path";
