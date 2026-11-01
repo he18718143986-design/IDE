@@ -61,6 +61,11 @@ import {
   schemeBindingFromSnapshot,
   SchemeSnapshotConflictError,
 } from "./pipeline/scheme-snapshot-store";
+import {
+  explainLine,
+  TraceBrokenError,
+  E_TRACE_BROKEN,
+} from "./trace/why";
 import { loadOrInitLedgerState } from "./supervisor/intent-compiler/scheme-ledger-store";
 import {
   assertContractScopeAllowed,
@@ -234,7 +239,10 @@ import {
   decompose,
   type ReadyPabView,
 } from "./supervisor/decomposer";
-import { httpStatusForErrorCode } from "../src/lib/error-codes";
+import {
+  httpStatusForErrorCode,
+  plainMessageForErrorCode,
+} from "../src/lib/error-codes";
 import { ChatSessionManager } from "./chat/session-manager";
 import {
   decideWrite,
@@ -4203,6 +4211,57 @@ export class StagentDaemon {
           model_calls: result.model_calls,
         });
       } catch (err) {
+        this.sendJson(res, 500, { error: (err as Error).message });
+      }
+      return;
+    }
+
+    // TASK-L.13：追踪链反查「这段为什么存在」
+    if (method === "GET" && pathname === "/api/trace/why") {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      const filePath = parsedUrl.searchParams.get("path") ?? "";
+      const lineRaw = parsedUrl.searchParams.get("line") ?? "";
+      const line = Number(lineRaw);
+      if (!filePath.trim() || !Number.isInteger(line) || line < 1) {
+        this.sendJson(res, 400, {
+          error: "path and positive integer line are required",
+          code: "E_TRACE_BROKEN",
+        });
+        return;
+      }
+      // 拒绝绝对路径与 .. 逃逸
+      const rel = filePath.replace(/\\/g, "/");
+      if (rel.startsWith("/") || rel.includes("..")) {
+        this.sendJson(res, 400, {
+          error: "path must be repo-relative without ..",
+          code: "E_TRACE_BROKEN",
+        });
+        return;
+      }
+      try {
+        const result = await explainLine({
+          repoRoot: this.repoRoot,
+          path: rel,
+          line,
+        });
+        this.sendJson(res, 200, result);
+      } catch (err) {
+        if (err instanceof TraceBrokenError) {
+          this.sendJson(res, 404, {
+            ok: false,
+            code: err.code,
+            error: err.message,
+            ring: err.ring,
+            detail: err.detail,
+            commit: err.commit ?? null,
+            contract_id: err.contract_id ?? null,
+            plain_message: plainMessageForErrorCode(E_TRACE_BROKEN),
+          });
+          return;
+        }
         this.sendJson(res, 500, { error: (err as Error).message });
       }
       return;

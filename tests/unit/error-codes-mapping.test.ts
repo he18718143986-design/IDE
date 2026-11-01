@@ -22,7 +22,8 @@ import {
  * + S.5 增补 E_DISPUTE_TIMEOUT
  * + L.7 增补 E_PLAN_* ×5
  * + J.18c 增补 E_PROPOSAL_PREVIOUSLY_REJECTED / E_GATE_SCAN_FAILED
- * + L.14 增补 E_VAULT_* ×3 + L.9 增补 E_CONTRACT_IN_FLIGHT = 28 个 → 9 个 reason_code，正反向均可闭环。
+ * + L.14 增补 E_VAULT_* ×3 + L.9 增补 E_CONTRACT_IN_FLIGHT
+ * + L.13 增补 E_TRACE_BROKEN = 29 个 → 9 个 reason_code，正反向均可闭环。
  */
 
 /** A §9.3 表格的逐行期望值（手工登记，不以实现反推） */
@@ -61,12 +62,14 @@ const EXPECTED_MAPPING: Record<ErrorCode, string> = {
   E_VAULT_NOT_FOUND: "PREPARATION_INTERRUPTED",
   // TASK-L.9：合同级互斥
   E_CONTRACT_IN_FLIGHT: "WORKSPACE_LOCKED",
+  // TASK-L.13：追踪链断环
+  E_TRACE_BROKEN: "PREPARATION_INTERRUPTED",
 };
 
-describe("目录基数：28 个 error_code → 9 个 reason_code", () => {
-  it("恰好 28 个错误码且无重复", () => {
-    expect(ERROR_CODES).toHaveLength(28);
-    expect(new Set(ERROR_CODES).size).toBe(28);
+describe("目录基数：29 个 error_code → 9 个 reason_code", () => {
+  it("恰好 29 个错误码且无重复", () => {
+    expect(ERROR_CODES).toHaveLength(29);
+    expect(new Set(ERROR_CODES).size).toBe(29);
   });
 
   it("恰好 9 个运行时原因码；均为 evidence.schema reasonCodeSchema 子集（L.3 义务码仅用于证据载荷）", () => {
@@ -150,7 +153,7 @@ describe("反向映射：reason_code → error_code[]（一对多）", () => {
     const covered = new Set(
       REASON_CODES.flatMap((reason) => errorCodesForReasonCode(reason)),
     );
-    expect(covered.size).toBe(28);
+    expect(covered.size).toBe(29);
     for (const code of ERROR_CODES) {
       expect(covered.has(code), `uncovered error_code: ${code}`).toBe(true);
     }
@@ -190,6 +193,7 @@ describe("反向映射：reason_code → error_code[]（一对多）", () => {
       "E_PLAN_INVALID",
       "E_PLAN_STUB_REVIVED",
       "E_PREPARATION_FAILED",
+      "E_TRACE_BROKEN",
       "E_VAULT_NAME_INVALID",
       "E_VAULT_NOT_FOUND",
       "E_VAULT_VALUE_TOO_SHORT",

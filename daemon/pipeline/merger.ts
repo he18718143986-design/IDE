@@ -207,10 +207,16 @@ export function buildMergeCommitMessage(
   conflictResolution: "USER_FIRST_DISCARD" | null = null,
   options: MergeCommitMessageOptions = {},
 ): string {
-  const trailers = [
-    `Stagent-Contract-ID: ${contract.contract_id}`,
-    `Stagent-Evidence-ID: ${evidence.evidence_id}`,
-  ];
+  const trailers = [`Stagent-Contract-ID: ${contract.contract_id}`];
+  // TASK-L.13：方案条目 Trailer（超长截断为合同号；全量进 changelog）
+  const schemeItems = resolveSchemeItemsTrailerValue(
+    contract.contract_id,
+    contract.supervisor_metadata?.scheme_item_ids,
+  );
+  if (schemeItems.value !== null) {
+    trailers.push(`Stagent-Scheme-Items: ${schemeItems.value}`);
+  }
+  trailers.push(`Stagent-Evidence-ID: ${evidence.evidence_id}`);
   if (options.evidenceHash) {
     trailers.push(`Stagent-Evidence-Hash: ${options.evidenceHash}`);
   }
@@ -258,6 +264,64 @@ export function buildMergeCommitMessage(
 export const MAX_TRAILER_LINE_BYTES = 512;
 export const MAX_TRAILER_BLOCK_BYTES = 4096;
 
+/**
+ * TASK-L.13：`Stagent-Scheme-Items` 取值。
+ * 全量 id 逗号拼接后若整行（含键名）> 512B，截断为合同号，并在 changelog 留全量。
+ * （对其它 Trailer 仍禁止静默截断；本键是规格明确的截断例外。）
+ */
+export function resolveSchemeItemsTrailerValue(
+  contractId: string,
+  schemeItemIds: readonly string[] | undefined,
+): { value: string | null; truncated: boolean; fullIds: string[] } {
+  const ids = (schemeItemIds ?? []).map((s) => s.trim()).filter(Boolean);
+  if (ids.length === 0) return { value: null, truncated: false, fullIds: [] };
+  const full = ids.join(",");
+  const line = `Stagent-Scheme-Items: ${full}`;
+  if (Buffer.byteLength(line, "utf-8") <= MAX_TRAILER_LINE_BYTES) {
+    return { value: full, truncated: false, fullIds: ids };
+  }
+  return { value: contractId, truncated: true, fullIds: ids };
+}
+
+function escapeRegExpLiteral(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * TASK-L.13：截断时在 `docs/system/changelog.md` 本合同条目下保留全量 scheme_item_ids。
+ * L.12 保证条目存在；若缺失则补最小标题，避免合并因缺文件失败。
+ */
+export function ensureChangelogSchemeItemIds(
+  repoRoot: string,
+  contractId: string,
+  schemeItemIds: readonly string[],
+): string {
+  const rel = path.join("docs", "system", "changelog.md");
+  const abs = path.join(repoRoot, rel);
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
+  const marker = `<!-- stagent-scheme-items:${contractId} -->`;
+  const listLine = `${marker} scheme_item_ids: ${schemeItemIds.join(", ")}`;
+  let text = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : "";
+  const heading = new RegExp(
+    `^##\\s+${escapeRegExpLiteral(contractId)}\\b`,
+    "m",
+  );
+  if (!heading.test(text)) {
+    const prefix = text.trimEnd();
+    text = `${prefix}${prefix ? "\n\n" : ""}## ${contractId}\n\n${listLine}\n`;
+  } else if (text.includes(marker)) {
+    text = text.replace(
+      new RegExp(`${escapeRegExpLiteral(marker)}[^\\n]*`),
+      listLine,
+    );
+  } else {
+    text = text.replace(heading, (m) => `${m}\n\n${listLine}`);
+  }
+  fs.writeFileSync(abs, text, "utf8");
+  return rel.replace(/\\/g, "/");
+}
+
+
 /** Trailer 行形态：`Key: value`，Key 为字母开头的连字符标识 */
 const TRAILER_LINE_PATTERN = /^[A-Za-z][A-Za-z0-9-]*: /;
 
@@ -292,7 +356,7 @@ export function measureTrailerBounds(message: string): TrailerBounds {
   };
 }
 
-/** 尺寸越界即阻断提交，绝不静默截断审计字段 */
+/** 尺寸越界即阻断提交；Scheme-Items 须先经 resolveSchemeItemsTrailerValue 截断，其余键绝不静默截断 */
 export function assertTrailerBounds(message: string): TrailerBounds {
   const bounds = measureTrailerBounds(message);
   const oversize = bounds.lines.find(
@@ -585,6 +649,26 @@ async function mergeInternal(
   const evidenceHash = createHash("sha256")
     .update(fs.readFileSync(evidencePath))
     .digest("hex");
+  // TASK-L.13：Scheme-Items 超长时先截断为合同号，并把全量 id 写入 changelog 再入暂存
+  const schemeItemsMeta = resolveSchemeItemsTrailerValue(
+    contract.contract_id,
+    contract.supervisor_metadata?.scheme_item_ids,
+  );
+  if (schemeItemsMeta.truncated) {
+    const changelogRel = ensureChangelogSchemeItemIds(
+      repoRoot,
+      contract.contract_id,
+      schemeItemsMeta.fullIds,
+    );
+    const addCl = await execGit(["add", "--", changelogRel], repoRoot);
+    if (addCl.exitCode !== 0) {
+      throw new MergeGateError(
+        "E_COMMIT_FAILED",
+        `无法将 changelog 方案条目清单纳入暂存：${addCl.stderr || addCl.stdout}`,
+      );
+    }
+  }
+
   const message = buildMergeCommitMessage(
     contract,
     snapshot,
@@ -592,7 +676,7 @@ async function mergeInternal(
     conflictResolution,
     { evidenceHash },
   );
-  // TASK-D.2b：Trailer 尺寸红线，越界即拒绝提交（不静默截断审计字段）
+  // TASK-D.2b：Trailer 尺寸红线；Scheme-Items 已在上方按规格截断，其余键仍禁止静默截断
   assertTrailerBounds(message);
   const commit = await execGit(["commit", "-m", message], repoRoot);
   if (commit.exitCode !== 0) {
