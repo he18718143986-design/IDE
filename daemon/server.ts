@@ -154,6 +154,7 @@ import { RequirementsStore } from "./supervisor/specs/requirements-store";
 import { orchestrateJourney } from "./supervisor/journey/orchestrate";
 import { buildJourneyLiveIncidentContext } from "../src/lib/journey/live-incident-context";
 import { findTarget, loadReleaseTargets } from "./release/targets-store";
+import { handlePlaytestEvidenceRequest } from "./playtest/evidence";
 import {
   exportRedactedRecordsZip,
   cleanupProjectRecords,
@@ -4900,6 +4901,32 @@ export class StagentDaemon {
         return;
       }
       await this.handleReleases(req, res, method, pathname);
+      return;
+    }
+
+    // TASK-L.17b：结构化试玩证据。请求体只收 contract_id + user_verdict；
+    // release_id / timestamp / operator 一律服务端装配（防伪造用户认可）。
+    if (pathname === "/api/playtest/evidence") {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      if (method !== "POST") {
+        this.sendJson(res, 405, { error: "Method not allowed" });
+        return;
+      }
+      let rawBody: unknown = {};
+      try {
+        rawBody = await this.readJsonBody(req);
+      } catch (err) {
+        this.sendJson(res, 400, {
+          error: (err as Error).message,
+          code: "E_PLAYTEST_BAD_REQUEST",
+        });
+        return;
+      }
+      const result = handlePlaytestEvidenceRequest(this.repoRoot, rawBody);
+      this.sendJson(res, result.status, result.body);
       return;
     }
     // TASK-L.14：凭据保险库 HTTP（永不返回明文值）

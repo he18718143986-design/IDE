@@ -255,7 +255,7 @@ function buildRequestHeaders(
   return headers;
 }
 
-async function request<T>(
+export async function request<T>(
   conn: DaemonConnection,
   path: string,
   init: RequestInit = {},
