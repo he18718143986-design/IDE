@@ -10,6 +10,7 @@
 > **2026-11-01 裁决落笔（Tina · oq-2）**：北极星「一模一样」判据 → 用户对话试玩 + 结构化证据桩（绑定版本/原话/时间戳）；AI 引导不代判；无机器自动对比。见「一之二」增补；落点 `scheme.md` dec-12、oq-2（已销项）、acc-6，解除 `TASK-L.17` 产品阻塞。
 > **2026-11-01 裁决落笔（Tina · oq-3）**：凭据存 Vault 至用户手动删除（不设自动过期、不按项目联动清理）；代登 cookie 过期后由 Daemon 用 Vault 账密静默重登，Worker 全程无感、零账密。见「一之二」增补；落点 `scheme.md` dec-13、oq-3（已销项），解除 `TASK-L.17a` 前置依赖。
 > **2026-11-01 L.17a 交付与 L.17b 解封**：L.17a #70（`8516c3d`）已合入 main，标记为 `[COMPLETED]`；`TASK-L.17b`（对比视图与试玩证据桩）正式解除阻塞恢复 `[READY]`。当前 main tip 为 `8516c3d`。
+> **2026-11-02 L.17b 交付（P-112 · M5 主序收官）**：L.17b #72（`d26def6`，squash merge）已合入 main，标记 `[COMPLETED]`；**M5 北极星主序（L.16 → L.17a → L.17b）全部落完**。当前 main tip 为 `d26def6`。交付口径见 `development-tasks-completed.md` §3.4f。残余边界挂账共 6 条，**同批归拢**至 `development-tasks-completed.md` §3.4f「残余边界 / 后续挂账」节；其中 L.17b 三条在本文「三」新增登记为 OP-36～OP-38（`resolveCurrentLiveReleaseId` 回退粒度 / 合同文件名两套口径 / 每合同只留最新证据无历史链），另 3 条为 W.8 两条（`STAGENT_SESSION_TOKEN` 回退、`/api/shutdown` 手写 mock）与 L.17a `request.headers` 一条，仅归拢不另立 OP 号。另：`check playtest` 尚未被 verification profile 引用，属后续配置面，**待裁决，本卡未擅自登记为正式挂账**。不宣称端到端 UI 闭环（CompareView 未挂路由、原话采集 UI 未实现）。
 > **基线**：`main` @ `e610016`。**PR #9 仍为 open、未合入**。本记录的机械修复与 PR #9 不重叠：PR #9 改动 supervisor §12 与 §20、dev-tasks 的 S.5 / J.10 / J.16 与状态回写 39→83、runtime §8 L3 行、README 附属段；本记录不触及这些位置。两者合并顺序互不影响。**本记录完成后更新**：PR #9（`e430193`）与本记录所在 PR #10（`99cfe51`）已先后合入 main；上文「open、未合入」为撰写时的历史状态。
 > **行号**：本文「行号」指 `e610016` 快照中的物理行，仅供审计定位；规格正文不引用行号。
 > **编号**：`C-` 待裁决矛盾；`M-` 本 PR 机械修复；`OP-` 挂账项。`C-1` 本轮无前次记录，留空位。
@@ -93,6 +94,9 @@
 | OP-33 | Windows 单测既有红（main 基线 45 项/20 文件；每次都失败的稳定层 26 项：spawn/信号、符号链接、合并、迁移、worktree 等；WS/auth/Origin/端口类为抖动层） | 待指定 | 已登记-挂账 | 关联 PR #19 合并；基线 run 40821117113；PR 重跑 run 40838762021 |
 | OP-34 | macOS CI runner 不稳定（多次出现 job 排队后零步骤取消，PR #28/#29/#30 均发生，判定为 GitHub 平台侧问题非测试失败；main 同 job 在 95c6698/4144a201 为绿） | 待指定 | 已登记-挂账 | 与 OP-33 Windows 债并列独立；关联 PR #28/#29/#30 判定声明 |
 | OP-35 | 跨平台测试偶发抖动（① ipc-stream.test.ts 期望 ERROR 帧先收到 BASELINE_PROGRESS 帧的 WS 竞态，Ubuntu 与 macOS 均有发生，重跑即转绿；② scheme-confirm-scope-drift.test.ts 的 git index.lock 并发竞态，全量跑 2 条失败、单文件复跑 4/4 通过） | 待指定 | 已登记-挂账 | 与 OP-33/OP-34 分开登记；见 PR #28/#29/#30 CI 记录与 e7f57b4 本地实机基线验证 |
+| OP-36 | L.17b 证据绑定粒度：`resolveCurrentLiveReleaseId` 在合同 `contract_ids` 无匹配时回退「最近一条 LIVE」，多合同仓里合同 A 的认可可能绑到合同 B 的发布（方向保守：版本变更照样 STALE，逼重新认可而非误放行） | 待指定 | 已登记-挂账（P-112） | #72/`d26def6`；`daemon/release/active-live.ts`；语义是「最新 LIVE 即当前版本」而非「本合同的 LIVE」 |
+| OP-37 | L.17b 合同文件名两套口径：`readContractReferences` 用原始 `contractId + ".json"`（不做别名归一），`playtestEvidencePath` 对 `contract_id` 做字符归一；含特殊字符的 id 会读不到合同文件但写得了证据（实际 id 受控生成，风险低） | 待指定 | 已登记-挂账（P-112） | #72/`d26def6`；`playtest-guard.ts` / `daemon/playtest/evidence.ts` |
+| OP-38 | L.17b 证据无历史链：`playtest-{contract_id}.json` 覆盖写，重新认可后旧证据丢失，审计只有「当前认可」无「认可历史」（dec-12 未要求历史） | 待指定 | 已登记-挂账（P-112） | #72/`d26def6`；`daemon/playtest/evidence.ts`；与 W.8 两条（`STAGENT_SESSION_TOKEN` 回退、`/api/shutdown` 手写 mock）、L.17a `request.headers` 一条同批归拢，详见 `development-tasks-completed.md` §3.4f |
 
 ## 四、三层皮权威表
 

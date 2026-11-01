@@ -193,7 +193,7 @@
 | acc-7 | 每份合同的验收条目（`check: auto`）都有至少一条测试，且该测试在基线上失败、在候选上通过。 | `auto` | [`specs/verification-strategy.md`](./specs/verification-strategy.md) §3；TASK-L.3、L.4 | ⏳ |
 | acc-8 | 合入后知识库覆盖本次改动的全部文件。 | `auto` | [`specs/technical-design-and-knowledge.md`](./specs/technical-design-and-knowledge.md) §4.4；TASK-L.12（[#47](https://github.com/he18718143986-design/IDE/pull/47)/`39f426a`；KB-1 全量文件） | 机制已落地（单测 TD-06～08/10）；端到端产品验收仍 ⏳ |
 | acc-9 | 一次发布失败后自动回到上一个 LIVE 版本。 | `auto` | [`specs/release-and-operations.md`](./specs/release-and-operations.md) §1、§3.3；TASK-L.15 | **机制已落地**（#52/`9829385`；失败回滚路径+LIVE→FAILED）；端到端产品验收（真 npm start）仍 ⏳ |
-| acc-6 | 北极星：给网址 + 登录信息，用户只回答偏好问题，产出站点经试玩认可。 | `playtest` | 用户与 AI 对话确认 + 结构化证据桩（用户原话 + release_id + 时间戳），版本变更新建重置（dec-12）；凭据 Vault 存至手动删、cookie 过期 Daemon 静默重登（dec-13）。依赖 conf-6、L.14（已 COMPLETED）、L.17a（已 COMPLETED）、L.17b | ⏳ |
+| acc-6 | 北极星：给网址 + 登录信息，用户只回答偏好问题，产出站点经试玩认可。 | `playtest` | 用户与 AI 对话确认 + 结构化证据桩（用户原话 + release_id + 时间戳），版本变更新建重置（dec-12）；凭据 Vault 存至手动删、cookie 过期 Daemon 静默重登（dec-13）。依赖 conf-6、L.14（COMPLETED）、L.17a（COMPLETED）、**L.17b（COMPLETED · #72/`d26def6`）**：对比视图仅供人眼对照、`check playtest` 以 `release_id` 单一事实源判 `STALE_VERSION`、证据桩服务端装配 | 机制已落地（四组测试 33 passed；#72）；端到端产品验收仍 ⏳（CompareView 未挂 UI 路由、原话采集 UI 未实现，见 completed §3.4f） |
 
 ---
 
@@ -220,6 +220,7 @@
 > 这是给 Worker 的「还差什么」。卡号以 [`specs/development-tasks.md`](./specs/development-tasks.md) 为准；supervisor §19 的 L-01～L-10 不在此重复。
 >
 > **2026-11-01 回写**：下表已按 L.16 证据 tip `e4dfe1c` / 物理 tip `e4dfe1c`（含 J.2～J.10、J.18a～d、L.1～L.16、**L.14**/L.15/L.18、J.19/J.20、A.7/H.9 合入；另含 #28～#62 文档/实现）回写「当前代码事实」；管道口径对齐 [ADR-0018](./adr/0018-intent-to-executable-seal.md)（确认 → Seal MachineFace → PAB → ProjectPlan → Worker；禁确认路径 `buildL0Plan(chat)`）。未合实现卡（如 L.17～，oq-2 未裁决）不得标关闭；主序实现卡已尽；Sprint **不开工 L.17**。
+> **（本段为 2026-11-01 历史快照，保留原文作溯源；更新指针 2026-11-02 · P-112）**：oq-2 已由 dec-12 裁决、oq-3 已由 dec-13 裁决；`TASK-L.17` 拆为 L.17a（COMPLETED · #70）与 L.17b（COMPLETED · #72/`d26def6`），**M5 北极星主序全部落完**。上句「未裁决 / 不开工 L.17」仅为当日状态，现行代码事实见本表 gap-11 / gap-12 与 `development-tasks-completed.md` §3.4f；物理 tip 现为 `d26def6`。
 
 | id | 方案要求 | 当前代码事实 | 对应卡 / 台账 |
 | :--- | :--- | :--- | :--- |
@@ -233,7 +234,7 @@
 | gap-8 | `SchemePatch` 零模型合并 | 引擎已合入：`src/lib/journey/scheme-patch-engine.ts`（§6 矩阵）；生成端循环已合入（J.10） | `TASK-J.9` **COMPLETED**（[#12](https://github.com/he18718143986-design/IDE/pull/12) / `1ad6eab`）；`TASK-J.10` **COMPLETED**（[#17](https://github.com/he18718143986-design/IDE/pull/17) / `97bb0db`） |
 | gap-9 | 早期卡把右栏写成「编码 Worker 对话窗口」 | C.1、W.1、W.5a、C.6、P.1、E.1、Sprint 1 门禁的旧叙述 | 已在任务卡文件头加取代说明；原文不改 |
 | gap-10 | 用户不做技术决策 | 现行有 `needs_approval` 逐项表态等审批点 | conf-5 |
-| gap-11 | 复刻网站需读参考站 | 全部 Agent 禁 `WebFetch` / `WebSearch`；判据已由 dec-12 裁决、凭据保管已由 dec-13 裁决；L.17a 已落地受控只读代理与代登（#70/`8516c3d`），待 L.17b 落地对比与证据桩 | conf-6、dec-12、dec-13；`TASK-L.17a`（COMPLETED）、`TASK-L.17b` |
+| gap-11 | 复刻网站需读参考站 | 全部 Agent 禁 `WebFetch` / `WebSearch`；判据由 dec-12 裁决、凭据保管由 dec-13 裁决；L.17a 落地受控只读代理与代登（#70/`8516c3d`）；**L.17b 落地对比视图与证据桩（#72/`d26def6`）**——对比双栏仅供人眼对照（REJ-009 不复活）、结构化证据桩服务端装配 `release_id`/`timestamp`/`operator`、`check playtest` 跨版本重置。**代码落差已关闭**，端到端 UI 接线（CompareView 挂路由、原话采集 UI）仍挂账 | conf-6、dec-12、dec-13；`TASK-L.17a`（COMPLETED）、`TASK-L.17b`（**COMPLETED** · #72） |
 | gap-12 | 登录凭据受控使用 | **代码已收口（L.14+L.17a）**：`daemon/vault/` + `/api/vault` + Settings「密钥」区；日志/命令输出精确脱敏；HTTP 不回明文。发布注入已随 L.15 落地；oq-3 凭据代登与静默重登已随 L.17a（#70/`8516c3d`）落地 | oq-3（已裁 dec-13）；`TASK-L.14` **COMPLETED**（[#31](https://github.com/he18718143986-design/IDE/pull/31)/`ae57543`）；`TASK-L.17a` **COMPLETED**（[#70](https://github.com/he18718143986-design/IDE/pull/70)/`8516c3d`） |
 | gap-13 | 大需求拆成合同序列 | **代码已收口（L.7+L.8+L.9+L.10）**：`ProjectPlan` 类型/校验/落盘（L.7）；`PlanPatch`/分解器/API（L.8）；合同序列/`nextStub`/桩视图预检/互斥/`E_CONTRACT_IN_FLIGHT`/桩状态回填（L.9）；画布同页嵌「项目地图」+ `GET /api/project/plan` 权威下一份（L.10，tip `e4351b0` / #38）已合入。任务图一份合同一张的旧路径仍在。 | `TASK-L.7` **COMPLETED**（[#23](https://github.com/he18718143986-design/IDE/pull/23)/`607d742`）；`TASK-L.8` **COMPLETED**（[#33](https://github.com/he18718143986-design/IDE/pull/33)/`fb27504`）；`TASK-L.9` **COMPLETED**（[#35](https://github.com/he18718143986-design/IDE/pull/35)/`e1cf1bb`）；`TASK-L.10` **COMPLETED**（[#38](https://github.com/he18718143986-design/IDE/pull/38)/`e4351b0`） |
 | gap-14 | 新功能带测试 | Worker 指令已补「你会被这样检查」（L.2）；合同元数据 / `withSystemScope` / `stagent check` 义务与削弱检测已合入（L.3）；**两段式先红后绿编排已合入（L.4）**（`runWorker`→`runTwoPhase`）；**M2 黄金切片 E2E 已合入（L.6）** | `L.2`/`L.3`/`L.4`/`L.6` **COMPLETED**（[#8](https://github.com/he18718143986-design/IDE/pull/8)/[#15](https://github.com/he18718143986-design/IDE/pull/15)/[#18](https://github.com/he18718143986-design/IDE/pull/18)/[#21](https://github.com/he18718143986-design/IDE/pull/21) / `93589bf`） |
