@@ -66,6 +66,8 @@ import {
   TraceBrokenError,
   E_TRACE_BROKEN,
 } from "./trace/why";
+import { loadModulesForRepo } from "./knowledge/modules-store";
+import { impactClosure } from "../src/lib/knowledge/impact-closure";
 import { ReleaseManager } from "./release/release-manager";
 import { loadOrInitLedgerState } from "./supervisor/intent-compiler/scheme-ledger-store";
 import {
@@ -4375,6 +4377,95 @@ export class StagentDaemon {
           });
           return;
         }
+        this.sendJson(res, 500, { error: (err as Error).message });
+      }
+      return;
+    }
+
+
+    // TASK-L.18：系统知识库只读 API（/api/knowledge/*；与 /api/design/* 错开）
+    if (method === "GET" && pathname === "/api/knowledge/modules") {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      try {
+        const loaded = loadModulesForRepo(this.repoRoot);
+        if (!loaded.ok) {
+          this.sendJson(res, 200, {
+            ok: false,
+            modules: [],
+            edges: [],
+            reason: loaded.reason,
+            message:
+              loaded.reason === "missing"
+                ? "还没有系统模块地图。等知识库引导合同写好 docs/system/modules.yaml 后，这里会显示模块卡和依赖。"
+                : `modules.yaml 无法解析：${loaded.detail}`,
+          });
+          return;
+        }
+        const edges: Array<{ from: string; to: string }> = [];
+        for (const m of loaded.data.modules) {
+          for (const dep of m.depends_on) {
+            edges.push({ from: m.id, to: dep });
+          }
+        }
+        this.sendJson(res, 200, {
+          ok: true,
+          modules: loaded.data.modules.map((m) => ({
+            id: m.id,
+            name: m.name,
+            purpose: m.purpose,
+            paths: m.paths,
+            depends_on: m.depends_on,
+            interfaces: m.interfaces,
+          })),
+          edges,
+          reason: null,
+          message: null,
+        });
+      } catch (err) {
+        this.sendJson(res, 500, { error: (err as Error).message });
+      }
+      return;
+    }
+
+    if (method === "GET" && pathname === "/api/knowledge/impact") {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      const filePath = parsedUrl.searchParams.get("path") ?? "";
+      const rel = filePath.replace(/\\/g, "/");
+      if (!rel.trim()) {
+        this.sendJson(res, 400, { error: "path is required" });
+        return;
+      }
+      if (rel.startsWith("/") || rel.includes("..")) {
+        this.sendJson(res, 400, {
+          error: "path must be repo-relative without ..",
+        });
+        return;
+      }
+      try {
+        const loaded = loadModulesForRepo(this.repoRoot);
+        if (!loaded.ok) {
+          this.sendJson(res, 200, {
+            path: rel,
+            owners: [],
+            affected: [],
+            edges: [],
+            empty_reason: "no_modules",
+          });
+          return;
+        }
+        const result = impactClosure({
+          modules: loaded.data.modules,
+          path: rel,
+          interfaceConsumers: loaded.interfaceConsumers,
+        });
+        this.sendJson(res, 200, result);
+      } catch (err) {
         this.sendJson(res, 500, { error: (err as Error).message });
       }
       return;

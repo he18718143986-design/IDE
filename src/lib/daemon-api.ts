@@ -977,6 +977,59 @@ export async function fetchTraceWhy(
   });
 }
 
+/** TASK-L.18：系统地图 / 影响闭包只读 API */
+export interface KnowledgeModuleCard {
+  id: string;
+  name: string;
+  purpose: string;
+  paths: string[];
+  depends_on: string[];
+  interfaces: string[];
+}
+
+export interface KnowledgeModulesResult {
+  ok: boolean;
+  modules: KnowledgeModuleCard[];
+  edges: Array<{ from: string; to: string }>;
+  message?: string | null;
+  reason?: "missing" | "invalid" | null;
+}
+
+export interface KnowledgeImpactModule {
+  id: string;
+  name: string;
+  purpose: string;
+  via: Array<"depends_on" | "interface_consumer">;
+}
+
+export interface KnowledgeImpactResult {
+  path: string;
+  owners: Array<{ id: string; name: string; purpose: string }>;
+  affected: KnowledgeImpactModule[];
+  edges: Array<{ from: string; to: string }>;
+  empty_reason: "ok" | "no_owner" | "no_modules";
+}
+
+export async function fetchKnowledgeModules(
+  conn: DaemonConnection,
+): Promise<KnowledgeModulesResult> {
+  return request<KnowledgeModulesResult>(conn, "/api/knowledge/modules", {
+    method: "GET",
+  });
+}
+
+export async function fetchKnowledgeImpact(
+  conn: DaemonConnection,
+  filePath: string,
+): Promise<KnowledgeImpactResult> {
+  const q = new URLSearchParams({ path: filePath });
+  return request<KnowledgeImpactResult>(
+    conn,
+    `/api/knowledge/impact?${q.toString()}`,
+    { method: "GET" },
+  );
+}
+
 /** TASK-L.15 */
 export interface ReleaseListResponse {
   releases: import("./release/release").ReleaseRecord[];
