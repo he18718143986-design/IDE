@@ -45,11 +45,10 @@ describe("TASK-L.15 release-state", () => {
     expect(canTransition("CHECKING_HEALTH", "FAILED")).toBe(true);
     expect(canTransition("ROLLING_BACK", "ROLLED_BACK")).toBe(true);
     expect(canTransition("LIVE", "SUPERSEDED")).toBe(true);
-    expect(canTransition("LIVE", "FAILED")).toBe(false);
+    // 部署失败恢复不了时，允许去掉假 LIVE
+    expect(canTransition("LIVE", "FAILED")).toBe(true);
     expect(canTransition("FAILED", "LIVE")).toBe(false);
-    expect(() => assertTransition("LIVE", "FAILED")).toThrow(
-      ReleaseInvariantError,
-    );
+    expect(() => assertTransition("LIVE", "FAILED")).not.toThrow();
     // 每个状态的目标都在表内
     for (const [from, tos] of Object.entries(RELEASE_TRANSITIONS) as [
       ReleaseState,

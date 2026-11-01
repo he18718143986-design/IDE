@@ -362,6 +362,88 @@ export class ReleaseManager {
   }
 
 
+
+  /**
+   * 部署失败后的恢复：适配器可能已 stop 旧 LIVE。
+   * - 有上一 LIVE 且允许回滚 → 尝试重新 deploy 上一版（保持其 LIVE）
+   * - 否则给上一 LIVE 打 incident，并迁到 FAILED（去掉「进程已死仍显示 LIVE」）
+   */
+  private async recoverPreviousAfterDeployFailure(
+    rec: ReleaseRecord,
+    target: ReleaseTargetConfig,
+    adapter: ReleaseTargetAdapter,
+    deployEnv: { env: Record<string, string>; secrets: string[] },
+  ): Promise<void> {
+    const prevId = rec.previous_live_release_id;
+    if (!prevId) return;
+    const prev = readRelease(this.repoRoot, prevId);
+    if (!prev) return;
+    const rollbackSupported = target.rollback_supported !== false;
+    if (rollbackSupported) {
+      const prevCheckout = checkoutDir(this.repoRoot, prev.release_id);
+      if (!fs.existsSync(prevCheckout)) {
+        try {
+          exportCheckout(this.repoRoot, prev.commit_sha, prevCheckout);
+        } catch (err) {
+          prev.incident =
+            `新版本部署失败，且无法导出上一版本目录：${(err as Error).message}`;
+          if (prev.state === "LIVE" && canTransition(prev.state, "FAILED")) {
+            prev.state = "FAILED";
+          }
+          persist(this.repoRoot, prev);
+          rec.incident = "新版本部署失败；恢复上一 LIVE 时导出失败。";
+          persist(this.repoRoot, rec);
+          return;
+        }
+      }
+      const redeploy = await adapter.deploy({
+        release: prev,
+        checkoutDir: prevCheckout,
+        env: deployEnv.env,
+        target,
+        repoRoot: this.repoRoot,
+      });
+      redeploy.log_tail = redactSecrets(
+        redeploy.log_tail,
+        deployEnv.secrets,
+      ).text.slice(-8_000);
+      rec.steps.push(
+        stepFromResult("rollback", {
+          ...redeploy,
+          argv: ["recover-previous-deploy", ...redeploy.argv],
+        }),
+      );
+      persist(this.repoRoot, rec);
+      if (redeploy.ok) {
+        if (prev.state !== "LIVE") {
+          prev.state = "LIVE";
+        }
+        prev.incident = null;
+        persist(this.repoRoot, prev);
+        rec.incident = "新版本部署失败；已重新拉起上一 LIVE。";
+        persist(this.repoRoot, rec);
+        return;
+      }
+      prev.incident =
+        "新版本部署失败，且重新拉起上一版本也失败；进程可能已停。";
+      if (prev.state === "LIVE" && canTransition(prev.state, "FAILED")) {
+        prev.state = "FAILED";
+      }
+      persist(this.repoRoot, prev);
+      rec.incident = "新版本部署失败；恢复上一 LIVE 未成功。";
+      persist(this.repoRoot, rec);
+      return;
+    }
+    prev.incident =
+      "部署新版本时已停止本进程，且目标不支持自动恢复（rollback_supported: false）。";
+    if (prev.state === "LIVE" && canTransition(prev.state, "FAILED")) {
+      prev.state = "FAILED";
+    }
+    persist(this.repoRoot, prev);
+    rec.incident = "新版本部署失败；上一 LIVE 未自动恢复。";
+    persist(this.repoRoot, rec);
+  }
+
   private async resolveDeployEnv(
     target: ReleaseTargetConfig,
   ): Promise<{ env: Record<string, string>; secrets: string[]; missing: string[] }> {
@@ -496,6 +578,9 @@ export class ReleaseManager {
     rec.steps.push(stepFromResult("deploy", deployResult));
     persist(this.repoRoot, rec);
     if (!deployResult.ok) {
+      // local_process 等适配器会先 stop 旧进程再启新进程；部署失败时旧 LIVE 可能已无进程。
+      // 尽量恢复上一 LIVE；恢复不了则给旧记录打 incident，并允许 LIVE→FAILED（去掉假 LIVE）。
+      await this.recoverPreviousAfterDeployFailure(rec, target, adapter, deployEnv);
       this.transition(rec, "FAILED");
       return rec;
     }
@@ -551,6 +636,18 @@ export class ReleaseManager {
       if (!rollbackSupported && prevId) {
         rec.incident =
           "该目标声明不支持自动回滚（rollback_supported: false）；探活失败后请手动处理。";
+        persist(this.repoRoot, rec);
+      }
+      // 探活失败且无法回滚：FAILED 前先停掉新进程，避免 FAILED 发布占端口
+      if (adapter.stop) {
+        const stopNew = await adapter.stop({
+          release: rec,
+          checkoutDir: dest,
+          env: deployEnv.env,
+          target,
+          repoRoot: this.repoRoot,
+        });
+        rec.steps.push(stepFromResult("rollback", stopNew));
         persist(this.repoRoot, rec);
       }
       this.transition(rec, "FAILED");

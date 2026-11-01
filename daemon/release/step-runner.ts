@@ -9,6 +9,48 @@ import type { StepResult } from "./target-adapter";
 const DEFAULT_TIMEOUT_MS = 10 * 60_000;
 const LOG_TAIL = 8_000;
 
+/** install/build/deploy 宿主环境白名单：禁止继承 Daemon 全量 process.env（含模型密钥等）。 */
+const HOST_ENV_ALLOWLIST = [
+  "PATH",
+  "PATHEXT",
+  "HOME",
+  "USER",
+  "LOGNAME",
+  "SHELL",
+  "LANG",
+  "LC_ALL",
+  "LC_CTYPE",
+  "LC_MESSAGES",
+  "TERM",
+  "TMPDIR",
+  "TEMP",
+  "TMP",
+  "TZ",
+  "COLOR",
+  "FORCE_COLOR",
+  "NO_COLOR",
+  "NODE_OPTIONS",
+  "npm_config_registry",
+  "NPM_CONFIG_REGISTRY",
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "NO_PROXY",
+  "http_proxy",
+  "https_proxy",
+  "no_proxy",
+] as const;
+
+export function hostEnvAllowlist(
+  extra: Record<string, string> = {},
+): Record<string, string> {
+  const base: Record<string, string> = {};
+  for (const key of HOST_ENV_ALLOWLIST) {
+    const v = process.env[key];
+    if (typeof v === "string" && v.length > 0) base[key] = v;
+  }
+  return { ...base, ...extra };
+}
+
 export async function runReleaseCommand(opts: {
   argv: string[];
   cwd: string;
@@ -21,14 +63,8 @@ export async function runReleaseCommand(opts: {
   const started_at = new Date().toISOString();
   const executable = opts.argv[0]!;
   const args = opts.argv.slice(1);
-  const mergedEnv: Record<string, string> = {
-    ...Object.fromEntries(
-      Object.entries(process.env).filter(
-        (e): e is [string, string] => typeof e[1] === "string",
-      ),
-    ),
-    ...opts.env,
-  };
+  // 白名单 + opts.env；不 `{...process.env}`（L.15 审查三处之三）
+  const mergedEnv: Record<string, string> = hostEnvAllowlist(opts.env);
   try {
     const result = await runCommand(executable, {
       cwd: opts.cwd,

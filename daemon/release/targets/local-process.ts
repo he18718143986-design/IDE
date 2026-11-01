@@ -5,6 +5,7 @@ import { spawnManaged } from "../../worker/cli-host/process-host";
 import type { ReleaseTargetAdapter, ReleaseContext, StepResult } from "../target-adapter";
 import {
   detectInstallArgv,
+  hostEnvAllowlist,
   httpHealthCheck,
   readPackageScripts,
   runReleaseCommand,
@@ -104,11 +105,12 @@ export class LocalProcessAdapter implements ReleaseTargetAdapter {
     // 停当前 LIVE
     await this.stop(ctx);
 
-    const env: Record<string, string> = {
+    // spawnManaged 在传入 env 时整表替换（不合并 process.env）；必须带白名单基底。
+    const env: Record<string, string> = hostEnvAllowlist({
       ...ctx.env,
       PORT: String(port),
       STAGENT_RELEASE_PORT: String(port),
-    };
+    });
     const secretValues = Object.values(ctx.env).filter((v) => v.length >= 6);
 
     const proc = spawnManaged({

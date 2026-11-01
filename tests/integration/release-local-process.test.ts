@@ -32,21 +32,41 @@ type HealthMode = "pass" | "fail";
 
 function makeLocalAdapter(opts: {
   health: HealthMode | (() => HealthMode);
+  /** 返回 false 表示本次 deploy 失败 */
+  deployOk?: boolean | ((ctx: ReleaseContext) => boolean);
   onDeploy?: (ctx: ReleaseContext) => void;
-}): ReleaseTargetAdapter & { deploys: string[]; healthCalls: number } {
-  const state = { deploys: [] as string[], healthCalls: 0 };
+}): ReleaseTargetAdapter & {
+  deploys: string[];
+  healthCalls: number;
+  stops: string[];
+} {
+  const state = {
+    deploys: [] as string[],
+    healthCalls: 0,
+    stops: [] as string[],
+  };
   const adapter: ReleaseTargetAdapter & {
     deploys: string[];
     healthCalls: number;
+    stops: string[];
   } = {
     kind: "local_process",
     deploys: state.deploys,
     healthCalls: 0,
+    stops: state.stops,
     build: async () => stamp(["npm", "run", "build"], true),
     deploy: async (ctx) => {
       state.deploys.push(ctx.release.release_id);
       opts.onDeploy?.(ctx);
-      return stamp(["npm", "run", "start"], true, `started ${ctx.release.release_id}`);
+      const ok =
+        typeof opts.deployOk === "function"
+          ? opts.deployOk(ctx)
+          : opts.deployOk !== false;
+      return stamp(
+        ["npm", "run", "start"],
+        ok,
+        ok ? `started ${ctx.release.release_id}` : "deploy boom",
+      );
     },
     health: async () => {
       state.healthCalls += 1;
@@ -59,8 +79,14 @@ function makeLocalAdapter(opts: {
         mode === "pass" ? "HTTP 200" : "HTTP 500",
       );
     },
-    stop: async (ctx) =>
-      stamp(["spawnManaged.stop"], true, `stopped ${ctx.release.release_id}`),
+    stop: async (ctx) => {
+      state.stops.push(ctx.release.release_id);
+      return stamp(
+        ["spawnManaged.stop"],
+        true,
+        `stopped ${ctx.release.release_id}`,
+      );
+    },
   };
   return adapter;
 }
@@ -209,7 +235,7 @@ describe("TASK-L.15 release-local-process RO-01～03", () => {
     expect(adapter2.deploys).toContain(first.release_id);
   });
 
-  it("RO-03：探活失败且无上一 LIVE → FAILED", async () => {
+  it("RO-03：探活失败且无上一 LIVE → FAILED，且 stop 新进程", async () => {
     const adapter = makeLocalAdapter({ health: "fail" });
     const mgr = new ReleaseManager({
       repoRoot: repo,
@@ -225,5 +251,57 @@ describe("TASK-L.15 release-local-process RO-01～03", () => {
     const failed = await mgr.run(draft.release_id);
     expect(failed.state).toBe("FAILED");
     expect(failed.previous_live_release_id).toBeNull();
+    expect(adapter.stops).toContain(failed.release_id);
+  });
+
+  it("部署失败且有上一 LIVE → 尝试恢复上一版；新发布 FAILED，上一仍 LIVE", async () => {
+    const adapter1 = makeLocalAdapter({ health: "pass" });
+    const mgr1 = new ReleaseManager({
+      repoRoot: repo,
+      adapters: { local_process: adapter1 },
+      isCommitOnProtectedBranch: () => true,
+      healthAttempts: 1,
+      healthIntervalMs: 1,
+    });
+    const d1 = await mgr1.createDraft({ target_id: "local", commit_sha: sha });
+    const first = await mgr1.run(d1.release_id);
+    expect(first.state).toBe("LIVE");
+
+    fs.writeFileSync(path.join(repo, "bump.txt"), "x\n");
+    git(repo, ["add", "."]);
+    git(repo, [
+      "-c",
+      "user.email=t@t",
+      "-c",
+      "user.name=t",
+      "commit",
+      "-m",
+      "bump",
+    ]);
+    const sha2 = git(repo, ["rev-parse", "HEAD"]).trim();
+
+    let deployN = 0;
+    const adapter2 = makeLocalAdapter({
+      health: "pass",
+      deployOk: () => {
+        deployN += 1;
+        // 第一次是新版本 → 失败；随后 recover previous → 成功
+        return deployN > 1;
+      },
+    });
+    const mgr2 = new ReleaseManager({
+      repoRoot: repo,
+      adapters: { local_process: adapter2 },
+      isCommitOnProtectedBranch: () => true,
+      healthAttempts: 1,
+      healthIntervalMs: 1,
+    });
+    const d2 = await mgr2.createDraft({ target_id: "local", commit_sha: sha2 });
+    const second = await mgr2.run(d2.release_id);
+    expect(second.state).toBe("FAILED");
+    expect(second.incident).toMatch(/上一 LIVE/);
+    const prev = mgr2.get(first.release_id) as ReleaseRecord;
+    expect(prev.state).toBe("LIVE");
+    expect(adapter2.deploys).toContain(first.release_id);
   });
 });
