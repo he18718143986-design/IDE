@@ -54,6 +54,7 @@ import {
   tryReuseRunningDaemon,
 } from "../daemon/core/open-workspace";
 import { ensureGitInit, inspectGitRepo } from "../daemon/git/ensure-git-repo";
+import { evaluatePlaytestGuard } from "../daemon/supervisor/preview/playtest-guard";
 
 // 兼容 D.1b 单测：仍从本模块 re-export
 export {
@@ -194,6 +195,9 @@ function printHelp(): void {
   stagent check knowledge --base <sha> --candidate <sha> --contract-id <id>
                           [--worktree <path>] [--design-note <path>] [--all]
                                    比对基线与候选测试，检测削弱（退出码 0=未削弱）
+  stagent check playtest --contract-id <id> [--repo <path>]
+                                   试玩认可门禁：证据完整性 + release_id 与当前 LIVE 匹配
+                                   （不匹配 STALE_VERSION 重置认可；退出码 0=认可有效）
   stagent version                  显示版本号
   stagent help                     显示帮助
 
@@ -614,10 +618,48 @@ export function runCheckCommand(checkArgv: readonly string[]): {
     }
   }
 
+  if (sub === "playtest") {
+    const contractId = parseCheckFlag(checkArgv, "--contract-id");
+    const repoFlag = parseCheckFlag(checkArgv, "--repo");
+    if (!contractId) {
+      return {
+        exitCode: 1,
+        stdout: JSON.stringify({
+          ok: false,
+          error: "missing --contract-id <id>",
+        }),
+      };
+    }
+    const repoRoot = path.resolve(repoFlag ?? process.cwd());
+    try {
+      const verdict = evaluatePlaytestGuard({ repoRoot, contractId });
+      const stdout = JSON.stringify({
+        ok: verdict.ok,
+        code: verdict.code,
+        status: verdict.status,
+        contract_id: verdict.contract_id,
+        evidence_release_id: verdict.evidence_release_id,
+        current_release_id: verdict.current_release_id,
+        reset_approval: verdict.reset_approval,
+        message: verdict.message,
+      });
+      return { exitCode: verdict.ok ? 0 : 1, stdout };
+    } catch (err) {
+      return {
+        exitCode: 1,
+        stdout: JSON.stringify({
+          ok: false,
+          code: "PLAYTEST_GUARD_ERROR",
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      };
+    }
+  }
+
   const stdout = JSON.stringify({
     ok: false,
     error:
-      'unknown check subcommand; use "obligations", "test-integrity", or "knowledge"',
+      'unknown check subcommand; use "obligations", "test-integrity", "knowledge", or "playtest"',
   });
   return { exitCode: 1, stdout };
 }
