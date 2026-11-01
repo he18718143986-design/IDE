@@ -58,6 +58,12 @@ export interface ClaudeCodeAdapterOptions {
    * 不写用户个人的 ~/.claude；目录固定（不是临时目录），否则 --resume 跨重启找不到会话。
    */
   configDir?: string;
+  /** TASK-W.8：受管 MCP HTTP 端点 URL 或解析器（Worker 角色写入 mcp.json） */
+  mcpServerUrl?: string | (() => string | undefined);
+  /** TASK-W.8：Daemon 端口号或解析器（用于动态合成 http://127.0.0.1:<port>/api/mcp） */
+  mcpPort?: number | (() => number | undefined);
+  /** TASK-W.8：MCP 认证 Token 或解析器（注入 mcpServers.stagent.headers.Authorization） */
+  authToken?: string | (() => string | undefined);
 }
 
 /**
@@ -210,8 +216,78 @@ export class ClaudeCodeAdapter implements ChatAdapter {
     const settingsPath = path.join(dir, "settings.json");
     const mcpPath = path.join(dir, "mcp.json");
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
-    // Stagent Gateway 的 MCP 端点在 W.4 落地；此前只挂空集合，且 --strict-mcp-config
-    fs.writeFileSync(mcpPath, JSON.stringify({ mcpServers: {} }));
+    // TASK-W.8：Stagent Gateway 的受管 MCP HTTP 端点在 W.8 落地；Worker 经 --strict-mcp-config 挂接真实端点，严禁静默降级为空集合
+    // （注：此前注释误指 W.4，W.4 实为 threat-guard，已在 W.8 纠正）
+    let mcpServers: Record<string, unknown> = {};
+    if (partner) {
+      // partner 恒为右栏只读搭档，只读白名单保持不变，不挂外部 MCP 端点
+      mcpServers = {};
+    } else {
+      // worker 施工工人路径：必须挂接真实 Stagent MCP 端点；若端点不可用/未配置则明确报错，严禁静默降级为空集合
+      let resolvedUrl: string | undefined = undefined;
+
+      if (typeof this.opts.mcpServerUrl === "function") {
+        resolvedUrl = this.opts.mcpServerUrl();
+      } else if (typeof this.opts.mcpServerUrl === "string") {
+        resolvedUrl = this.opts.mcpServerUrl;
+      }
+
+      if (!resolvedUrl) {
+        resolvedUrl = process.env["STAGENT_MCP_URL"];
+      }
+
+      if (!resolvedUrl) {
+        let port: number | undefined = undefined;
+        if (typeof this.opts.mcpPort === "function") {
+          port = this.opts.mcpPort();
+        } else if (typeof this.opts.mcpPort === "number") {
+          port = this.opts.mcpPort;
+        } else if (process.env["STAGENT_DAEMON_PORT"]) {
+          const parsed = Number.parseInt(process.env["STAGENT_DAEMON_PORT"], 10);
+          if (!Number.isNaN(parsed) && parsed > 0) {
+            port = parsed;
+          }
+        }
+        if (port && port > 0) {
+          resolvedUrl = `http://127.0.0.1:${port}/api/mcp`;
+        }
+      }
+
+      if (!resolvedUrl || typeof resolvedUrl !== "string" || resolvedUrl.trim().length === 0) {
+        throw new Error(
+          "Worker MCP endpoint URL is required under --strict-mcp-config; silent fallback to empty mcpServers is prohibited (TASK-W.8)",
+        );
+      }
+
+      const mcpUrl = resolvedUrl.trim();
+
+      let token: string | undefined = undefined;
+      if (typeof this.opts.authToken === "function") {
+        token = this.opts.authToken();
+      } else if (typeof this.opts.authToken === "string") {
+        token = this.opts.authToken;
+      } else if (process.env["STAGENT_MCP_TOKEN"]) {
+        token = process.env["STAGENT_MCP_TOKEN"];
+      } else if (process.env["STAGENT_SESSION_TOKEN"]) {
+        token = process.env["STAGENT_SESSION_TOKEN"];
+      }
+
+      const stagentConfig: Record<string, unknown> = {
+        type: "http",
+        url: mcpUrl,
+      };
+
+      if (token && token.trim().length > 0) {
+        stagentConfig["headers"] = {
+          Authorization: `Bearer ${token.trim()}`,
+        };
+      }
+
+      mcpServers = {
+        stagent: stagentConfig,
+      };
+    }
+    fs.writeFileSync(mcpPath, JSON.stringify({ mcpServers }, null, 2));
 
     // 不用 --bare：实测 Claude Code 2.1.x 的 --bare 会跳过 --settings 里的 hooks，
     // 并把工具集缩成 Bash/Edit/Read，PreToolUse 兜底会静默失效。

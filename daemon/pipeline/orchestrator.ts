@@ -315,6 +315,32 @@ export class ContractOrchestrator {
     return issued.token;
   }
 
+  /** TASK-W.8：活动 Gateway 实例（供 Daemon MCP HTTP 端点动态调用与审计） */
+  private activeGateway: ScopedWorktreeGateway | null = null;
+  private readonly activeGateways = new Map<string, ScopedWorktreeGateway>();
+
+  public getActiveGateway(contractId?: string): ScopedWorktreeGateway | null {
+    if (contractId) {
+      return this.activeGateways.get(contractId) ?? null;
+    }
+    return this.activeGateway;
+  }
+
+  public setActiveGateway(
+    contractId: string,
+    gateway: ScopedWorktreeGateway | null,
+  ): void {
+    if (gateway) {
+      this.activeGateway = gateway;
+      this.activeGateways.set(contractId, gateway);
+    } else {
+      this.activeGateways.delete(contractId);
+      if (this.activeGateway === gateway || this.activeGateways.size === 0) {
+        this.activeGateway = null;
+      }
+    }
+  }
+
   /** TASK-D.3：由 Daemon 注入看门狗实例（同一张表，避免各层各自判死） */
   setDeadlock(resilience: DeadlockResilience | null): void {
     this.deadlock = resilience;
@@ -1829,6 +1855,8 @@ export class ContractOrchestrator {
         });
       },
     });
+    this.activeGateway = gateway;
+    this.activeGateways.set(contract.contract_id, gateway);
     return { gateway, costMonitor, loopGuard, worktreePath, interceptor };
   }
 

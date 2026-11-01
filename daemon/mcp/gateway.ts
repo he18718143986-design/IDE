@@ -13,6 +13,9 @@ import {
   StagentListDirSchema,
   StagentDeleteFileSchema,
   StagentDeclareCompleteSchema,
+  StagentWebIngestSchema,
+  E_INGEST_NOT_WIRED,
+  E_WEB_INGEST_FORBIDDEN_DOMAIN,
   type AuditLogEntry,
   type MCPToolCallResult,
   type MCPToolDefinition,
@@ -729,6 +732,26 @@ export class ScopedWorktreeGateway {
           },
         },
       },
+      {
+        name: "stagent_web_ingest",
+        description:
+          "Fetch read-only content (HTML/DOM/summary) from an allowed reference URL through Stagent Daemon proxy. Target domain must match references[] in contract/scheme whitelist.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            url: {
+              type: "string",
+              description: "Target HTTP/HTTPS URL to ingest; domain must be in references whitelist",
+            },
+            format: {
+              type: "string",
+              enum: ["html", "text", "summary"],
+              description: "Format of content to return (default: html)",
+            },
+          },
+          required: ["url"],
+        },
+      },
     ];
   }
 
@@ -783,6 +806,8 @@ export class ScopedWorktreeGateway {
         return this.handleDeleteFile(rawInput);
       case "stagent_declare_complete":
         return this.handleDeclareComplete(rawInput);
+      case "stagent_web_ingest":
+        return this.handleWebIngest(rawInput);
       default:
         this.logAudit({
           tool: name,
@@ -979,6 +1004,97 @@ export class ScopedWorktreeGateway {
    * 第 5 个工具：服务端依据真实 Scope、预算与验证结果判定是否可进入审计。
    * 规范 TASK-A.2 PASS-4：返回 { ready_for_audit, blockers }。
    */
+  /**
+   * TASK-W.8 / TASK-L.17a：受管外网只读抓取工具。
+   * 严格验证目标域名在合同/方案 references[] 白名单内。
+   */
+  private async handleWebIngest(rawInput: unknown): Promise<MCPToolCallResult> {
+    const parsed = StagentWebIngestSchema.safeParse(rawInput);
+    if (!parsed.success) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Invalid web_ingest input: ${parsed.error.message}`,
+          },
+        ],
+        error: { code: "INVALID_INPUT", message: parsed.error.message },
+      };
+    }
+
+    const { url: rawUrl, format } = parsed.data;
+
+    let targetUrl: URL;
+    try {
+      targetUrl = new URL(rawUrl);
+    } catch {
+      return {
+        isError: true,
+        content: [{ type: "text", text: `Invalid URL format: '${rawUrl}'` }],
+        error: { code: "INVALID_URL", message: `Invalid URL: '${rawUrl}'` },
+      };
+    }
+
+    // 域名白名单匹配：合同 references[] 中的域名精确匹配（TASK-C.22/L.17a）
+    const allowedUrls: string[] =
+      (this.contract as { references?: string[] }).references ?? [];
+    const allowedHosts = new Set<string>(
+      allowedUrls
+        .map((u: string): string | null => {
+          try {
+            return new URL(u).hostname.toLowerCase();
+          } catch {
+            return null;
+          }
+        })
+        .filter((h: string | null): h is string => typeof h === "string" && h.length > 0),
+    );
+
+    const targetHost = targetUrl.hostname.toLowerCase();
+    if (!allowedHosts.has(targetHost)) {
+      const code = E_WEB_INGEST_FORBIDDEN_DOMAIN;
+      const message = `Host '${targetHost}' is not in authorized references[] whitelist`;
+      this.logAudit({
+        tool: "stagent_web_ingest",
+        input: rawInput,
+        outcome: "BLOCKED",
+        violationCode: code,
+        details: message,
+      });
+      return {
+        isError: true,
+        content: [{ type: "text", text: `[${code}] ${message}` }],
+        error: {
+          code,
+          message,
+          details: { host: targetHost, allowedHosts: Array.from(allowedHosts) },
+        },
+      };
+    }
+
+    // TASK-W.8: Domain verified, but web ingest backend proxy is pending TASK-L.17a.
+    // Return E_INGEST_NOT_WIRED honestly to prevent polluting delivery evidence.
+    const code = E_INGEST_NOT_WIRED;
+    const message = `Web ingest proxy backend is not wired (pending TASK-L.17a). Target domain '${targetHost}' is verified in references[] whitelist.`;
+    this.logAudit({
+      tool: "stagent_web_ingest",
+      input: rawInput,
+      outcome: "BLOCKED",
+      violationCode: code,
+      details: message,
+    });
+    return {
+      isError: true,
+      content: [{ type: "text", text: `[${code}] ${message}` }],
+      error: {
+        code,
+        message,
+        details: { host: targetHost, url: rawUrl, format: format ?? "html" },
+      },
+    };
+  }
+
   private async handleDeclareComplete(
     rawInput: unknown,
   ): Promise<MCPToolCallResult> {
