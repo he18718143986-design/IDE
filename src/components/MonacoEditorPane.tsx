@@ -9,8 +9,10 @@ import {
 } from "@/lib/markdown-file";
 import {
   DaemonApiError,
+  fetchKnowledgeImpact,
   fetchTraceWhy,
   loadConnection,
+  type KnowledgeImpactResult,
   type TraceWhyResult,
 } from "@/lib/daemon-api";
 
@@ -43,7 +45,13 @@ type TraceCardState =
   | { status: "ok"; line: number; result: TraceWhyResult }
   | { status: "broken"; line: number; message: string; ring?: string };
 
-/** TASK-C.3 中栏 Monaco；TASK-C.10j：.md 默认好看预览；TASK-L.13：右键「这段为什么存在」 */
+type ImpactCardState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "ok"; result: KnowledgeImpactResult }
+  | { status: "error"; message: string };
+
+/** TASK-C.3 中栏 Monaco；TASK-C.10j：.md 默认好看预览；TASK-L.13：右键「这段为什么存在」；TASK-L.18：右键「改这里会影响什么」 */
 export function MonacoEditorPane({
   path,
   io,
@@ -56,10 +64,12 @@ export function MonacoEditorPane({
     defaultMarkdownViewMode(path),
   );
   const [traceCard, setTraceCard] = useState<TraceCardState>({ status: "idle" });
+  const [impactCard, setImpactCard] = useState<ImpactCardState>({ status: "idle" });
 
   useEffect(() => {
     setViewMode(defaultMarkdownViewMode(path));
     setTraceCard({ status: "idle" });
+    setImpactCard({ status: "idle" });
   }, [path]);
 
   const showPreview = markdown && viewMode === "preview";
@@ -94,6 +104,28 @@ export function MonacoEditorPane({
               ? ((err.body as { ring: string }).ring)
               : undefined;
           setTraceCard({ status: "broken", line, message, ring });
+        }
+      },
+    });
+    editor.addAction({
+      id: "stagent.knowledge.impact",
+      label: "改这里会影响什么",
+      contextMenuGroupId: "navigation",
+      contextMenuOrder: 1.6,
+      run: async () => {
+        setImpactCard({ status: "loading" });
+        try {
+          const conn = loadConnection();
+          const result = await fetchKnowledgeImpact(conn, path);
+          setImpactCard({ status: "ok", result });
+        } catch (err) {
+          const message =
+            err instanceof DaemonApiError
+              ? err.message
+              : err instanceof Error
+                ? err.message
+                : String(err);
+          setImpactCard({ status: "error", message });
         }
       },
     });
@@ -196,6 +228,63 @@ export function MonacoEditorPane({
           {traceCard.status === "loading" ? (
             <p>正在沿着提交 → 合同 → 方案 → 原话查找…</p>
           ) : null}
+
+      {impactCard.status !== "idle" ? (
+        <div
+          data-testid="knowledge-impact-card"
+          role="dialog"
+          aria-label="改这里会影响什么"
+          className="border-b bg-sky-50 px-3 py-2 text-xs text-zinc-800"
+        >
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <strong>改这里会影响什么 · {path}</strong>
+            <button
+              type="button"
+              className="rounded border px-1.5"
+              onClick={() => setImpactCard({ status: "idle" })}
+            >
+              关闭
+            </button>
+          </div>
+          {impactCard.status === "loading" ? (
+            <p>正在按 modules.yaml 计算影响闭包…</p>
+          ) : null}
+          {impactCard.status === "error" ? (
+            <p className="text-destructive">{impactCard.message}</p>
+          ) : null}
+          {impactCard.status === "ok" ? (
+            <div className="space-y-1">
+              {impactCard.result.empty_reason === "no_modules" ? (
+                <p>还没有系统模块地图（缺少 modules.yaml）。</p>
+              ) : null}
+              {impactCard.result.empty_reason === "no_owner" ? (
+                <p>当前文件未被任何模块的 paths 覆盖。</p>
+              ) : null}
+              {impactCard.result.empty_reason === "ok" ? (
+                <>
+                  <p>
+                    归属：
+                    {impactCard.result.owners
+                      .map((o) => `${o.name}（${o.id}）`)
+                      .join("、")}
+                  </p>
+                  {impactCard.result.affected.length === 0 ? (
+                    <p>没有其它模块会受影响。</p>
+                  ) : (
+                    <ul className="list-disc pl-4">
+                      {impactCard.result.affected.map((a) => (
+                        <li key={a.id}>
+                          {a.name}（{a.id}）· 经由 {a.via.join("+")}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
           {traceCard.status === "broken" ? (
             <p className="text-destructive">
               链断了

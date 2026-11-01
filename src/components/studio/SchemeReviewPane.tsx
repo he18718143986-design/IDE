@@ -30,6 +30,7 @@ import {
   type ScopeAcceptanceMode,
 } from "@/components/studio/ScopeAcceptanceBlock";
 import { ProjectMapPane } from "@/components/project/ProjectMapPane";
+import { SystemMapPane } from "@/components/project/SystemMapPane";
 import type { ProjectPlan } from "@/lib/project/project-plan";
 
 export interface SchemeReviewPaneProps {
@@ -194,6 +195,8 @@ export function SchemeReviewPane(props: SchemeReviewPaneProps) {
         />
       ) : null}
 
+      {/* TASK-L.18：同页嵌系统地图（禁止另开 ActivityBar Tab） */}
+      <SystemMapPane />
 
       <section className="mb-3 rounded border border-border p-3">
         <h3
