@@ -166,7 +166,7 @@
 * **对应规格**：架构 / W.1 适配器抽象；`daemon/worker/worker-adapter.interface.ts`；`src/lib/contract.schema.ts::workerSpecSchema`；先例 W.5b/c 人工实测 → 本卡产品化
 * **前置依赖**：**硬** `TASK-W.6`（Registry 进派工，否则测完无池可进；**W.6 已于 2026-11-02 COMPLETED（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`），硬前置已解除**）；**软** `TASK-W.5c`（探测沙箱复用/对齐其容器隔离基建；**排程上 W.5c 为下一张，优先于本卡**）
 * **优先级**：P3 · **NON_BLOCKER**（**不阻断** `TASK-L.16`；**不抢** W.5b/c 实测窗口；与 W.5b/c **不互斥**——本卡落地后 W.5b/c 可作为首批真实用例回归基准）
-* **状态**：`[NEW_TASK]`（硬前置 W.6 已 COMPLETED，就绪障碍解除；但排程上 `TASK-W.5c` 容器沙箱为下一张，本卡不抢位、尚未开工；`W.5c` 正文已于 P-115 按 DoR 重写达标但判 L、开工前须拆分子卡待授权，`W.5b` 的 DOR-3 正文重写债仍在）
+* **状态**：`[NEW_TASK]`（硬前置 W.6 已 COMPLETED，就绪障碍解除；但排程上 `TASK-W.5c` 容器沙箱为下一张，本卡不抢位、尚未开工）。**邻卡 DoR 正文状态**：`W.5c` 已于 P-115 按 DoR 重写达标但判 L、开工前须拆分子卡待授权；`W.5b` 的 DOR-3 正文重写债仍在。
 * **对照痛点（代码事实）**：
   1. 三层可扩展接口已在：`daemon/worker/worker-adapter.interface.ts::CodingWorkerAdapter`（`AdapterCapabilityDeclaration` 9 项 + `AdapterRejectionCode`）、`daemon/worker/adapter-registry.ts::AdapterRegistry`（`register` / `get` / `requireControlled`）、`src/lib/contract.schema.ts::workerSpecSchema`（`adapter_id` + `control_mode` 二值 `GATEWAY_ENFORCED|UNCONTROLLED_EXTERNAL`）。
   2. ~~派工仍硬编码 `new AiWorker(...)`（`daemon/pipeline/orchestrator.ts`）~~ —— **已由 W.6（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`）改造为经 `AdapterRegistry` → `requireControlledDispatch` 派工工厂接线，本痛点已消除**；本卡不代替 W.6。
