@@ -48,7 +48,7 @@ Release ── 引用一个已合并提交，可覆盖多份合同（.stagent/re
 | **S6 验证与验收** | 候选提交 | `EvidenceBundle`（`.stagent/evidence/<contractId>-<evidenceId>.json`）；试玩记录；合并提交 + Trailer | Daemon（判卷）+ 用户（试玩） | `can_merge` 只由退出码派生；测试义务红→绿；知识库漂移检查 | 试玩；**「合入」**（第 2 次点击） | ADR-0005；[`verification-strategy.md`](./verification-strategy.md)；[`evidence-and-acceptance-criteria.md`](./evidence-and-acceptance-criteria.md)；[`playtest-self-check.md`](./playtest-self-check.md) | 测试义务 **L.3 COMPLETED**（#15）；两段式 **L.4 COMPLETED**（#18）；真实预览 **L.5 COMPLETED**（#14）；M2 黄金切片 **L.6 COMPLETED**（#21 / `93589bf`）；知识库检查 **L.12 COMPLETED**（#47 / `39f426a`）；Trailer/反查 **L.13 COMPLETED**（#51 / `51ea872`）；发布 **L.15 COMPLETED**（#52/`9829385`）；回流 **L.16 COMPLETED**（#62/`e4dfe1c`） |
 | **S7 发布与运维** | 已合并提交 | `ReleaseRecord`（`.stagent/releases/<id>.json`）；健康检查证据；`live_incident` 回流 | Daemon | 构建与健康检查退出码；失败自动回滚；LIVE 监测 → 线上卡 | **「发布」**（独立点击）；回滚；「让 AI 看看」 | [`release-and-operations.md`](./release-and-operations.md) | 保险库 **L.14 COMPLETED**（#31 / `ae57543`）；**发布生命周期 L.15 COMPLETED**（#52 / `9829385`）；**线上回流 L.16 COMPLETED**（#62 / `e4dfe1c`；挂账见 completed） |
 
-**横切**：追踪链 **L.13 COMPLETED**（#51 / `51ea872`）；发布 **L.15 COMPLETED**（#52 / `9829385`）；回流 **L.16 COMPLETED**（#62 / `e4dfe1c`）；北极星外网摄取与试玩 **L.17a 已 COMPLETED**（#70/`8516c3d`），**L.17b 已解封就绪**（oq-2 dec-12、oq-3 dec-13 均已裁决）。
+**横切**：追踪链 **L.13 COMPLETED**（#51 / `51ea872`）；发布 **L.15 COMPLETED**（#52 / `9829385`）；回流 **L.16 COMPLETED**（#62 / `e4dfe1c`）；北极星外网摄取与试玩 **L.17a COMPLETED**（#70/`8516c3d`）、**L.17b COMPLETED**（#72/`d26def6`）——**M5 北极星主序全部落完**（oq-2 dec-12、oq-3 dec-13 均已裁决；L.17b 未宣称端到端 UI 闭环，挂账见 completed §3.4f）。
 
 ---
 
@@ -160,7 +160,7 @@ q<n>（原话） → scheme item id（goal-* / mod-* / acc-*） → milestone_id
 | **M2 · 黄金切片** | 一句话需求 → 一次开工 → 真实预览 → 一次合入，全程无技术决策 | L.1、J.2、J.3′、J.4、J.5′、J.6′、J.7′、J.8、J.9、J.10′、L.2、L.3、L.4、L.5、L.6 | L.6 端到端测试通过：替身模型下，从右栏一条消息到 `MERGED`；用户只点 2 次；候选含至少 1 条红→绿测试；预览加载的是 Worktree 里运行的真实应用 |
 | **M3 · 大项目可控** | 一个需求被拆成多份合同，逐份交付，系统始终可理解 | L.7、L.8、L.9、L.10、L.11、L.12、L.13、J.18a～J.18d | 夹具项目：一段多模块需求被分解为 ≥3 份合同、≥2 个里程碑；逐份合入后 `docs/system/modules.yaml` 覆盖全部改动文件；任意一行新代码能反查到原话 |
 | **M4 · 可发布** | 合并的提交能一键上线并能回滚 | L.14、L.15、L.16 | `local_process` 与 `user_command` 两类目标各有 1 条端到端测试：发布 → 健康检查 → LIVE；人为让健康检查失败 → 自动回到上一个 LIVE；日志与证据中搜不到任何保险库明文 |
-| **M5 · 北极星** | 给网址 + 登录信息，复刻网站 | L.17a（COMPLETED · #70）+ L.17b（READY） | 目标闭环：受控只读抓取 + Vault 代登 + 静默重登（L.17a 已落地）与用户对话试玩结构化证据桩（绑定版本/原话/时间戳；AI 引导不代判；L.17b 待开工；dec-12/13） |
+| **M5 · 北极星** | 给网址 + 登录信息，复刻网站 | L.17a（COMPLETED · #70）+ L.17b（COMPLETED · #72 · **主序收官**） | 目标闭环：受控只读抓取 + Vault 代登 + 静默重登（L.17a）与用户对话试玩结构化证据桩（L.17b：绑定 `release_id`/原话/时间戳；AI 引导不代判；跨版本 `STALE_VERSION` 重置；`check playtest` 门禁；对比视图仅供人眼对照 REJ-009；dec-12/13）。**主序实现卡全部落完**；未宣称端到端 UI 闭环（CompareView 未挂路由、原话采集 UI 未实现），挂账见 completed §3.4f |
 
 **排期规则**：M2 之前不开 M3 的卡；同一里程碑内按 [`development-tasks.md`](./development-tasks.md) §2.1 的 DAG 边串行；每张卡开工前必须满足 [`task-card-standard.md`](./task-card-standard.md) 的就绪定义。
 

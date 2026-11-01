@@ -3622,3 +3622,34 @@
   1. `request.headers` 目前已对敏感头做严格剥离过滤；当前 gateway 调用暂不传 headers，未来若不需要自定义头可彻底裁剪该字段。
 * **验证**：31 项专用测试全部通过（`web-ingest-proxy.test.ts`、`web-ingest-auth.test.ts`、`web-ingest-lifecycle.test.ts`、`web-ingest-relogin.test.ts`、`mcp-http-endpoint.test.ts`、`contract-schema-references.test.ts`）。
 * **关键文件**：`daemon/web-ingest/proxy.ts`、`daemon/web-ingest/auth-session.ts`、`daemon/mcp/gateway.ts`、`daemon/vault/vault.ts`、`tests/unit/web-ingest-proxy.test.ts`、`tests/unit/web-ingest-auth.test.ts`、`tests/unit/web-ingest-relogin.test.ts`。
+
+---
+
+### 3.4f 北极星对话试玩与证据桩交付（L.17b · M5 主序收官）
+
+<a id="task-l.17b"></a>
+
+#### 【Task L.17b】对比视图与试玩证据桩 `[COMPLETED]`
+* **任务编号**：`TASK-L.17b`
+* **状态与证据**：`[COMPLETED]`（[#72](https://github.com/he18718143986-design/IDE/pull/72)/`d26def6`，squash merge；分支阶段 HEAD `9c75af9`）。**M5 北极星主序（L.16 → L.17a → L.17b）至此全部落完**。
+* **对应规格**：ADR-0014 §3；`scheme.md` goal-2、dec-12、oq-2、acc-6、gap-11；[`delivery-lifecycle.md`](./delivery-lifecycle.md) M5
+* **前置依赖**：`TASK-L.17a`（COMPLETED · #70/`8516c3d`）+ `TASK-L.16`（COMPLETED · #62/`e4dfe1c`，复用「让 AI 看看」通道做试玩引导）
+* **交付内容**：
+  1. **对比视图 `src/components/project/CompareView.tsx`**：左栏参考站抓取成果（HTML 快照 / DOM 摘要 / 截图预览），右栏 `iframe` 直连真机 / LIVE 预览端口并保留外链直达；**仅复用 lib 层 `realPlaytestIframeProps`**，不引入 studio 层 `RealPlaytestPane` 布局依赖；标题栏明写「仅供人眼对照 · 不做自动比对」——**像素 / DOM 量化机器比对不复活（REJ-009）**。
+  2. **右栏试玩引导 `src/lib/journey/playtest-guidance.ts`**：复用 L.16「让 AI 看看」通道（`origin:system` 插桩 + `classifyJourneyIntent` 分流），引导用户对照参考站试玩、提修改意见；修改意见回流微合同修正闭环，路由结论**不带可执行动作**；引导消息维持只读白名单（`read_only:true` / `executable:false` / `permissions:[]`）。
+  3. **证据客户端 `src/lib/journey/playtest-evidence.ts`**：仅 zod schema + `submitPlaytestEvidence()` 客户端调用；不 import `node:fs`、不直碰 `.stagent/`。
+  4. **Daemon 证据端点与原子落盘**：`POST /api/playtest/evidence`（`daemon/playtest/evidence.ts` + `daemon/server.ts`）请求体**只收** `contract_id + user_verdict`（非空原话，空/缺省/空白三态均拒）；`release_id`（服务端从当前 LIVE 记录解析）/`timestamp`(ISO 精确)/`operator:"user"` 全部服务端装配，请求体携带任一装配字段即判伪造拒绝（400 `E_PLAYTEST_FORGED_FIELD`），无 LIVE 返回 409 `E_PLAYTEST_NO_ACTIVE_RELEASE`；落盘 `.stagent/evidence/playtest-{contract_id}.json` 经 `writeJsonAtomic`（临时文件 → fsync → rename → 目录项 fsync），禁裸 `writeFileSync(finalPath)`。
+  5. **版本指纹单一事实源 `daemon/release/active-live.ts`**：独立只读解析当前 LIVE `release_id`，**刻意不 import `release-manager`**，避开 `vault/keychain-backend → node:child_process` 闭包，令 `daemon/supervisor/**` 零工具 lint 不新增违规。
+  6. **门禁 `check playtest`**：`bin/stagent.ts` 注册子命令，委托 `daemon/supervisor/preview/playtest-guard.ts` 单一判定源。证据 `release_id` 与当前 LIVE 不匹配 → `STALE_VERSION` + `reset_approval:true`（旧认可即刻失效，不跨版本穿透）；合同无 `references[]` / 非北极星场景 → 明确 `NOT_NORTHSTAR_SCENARIO`，**不静默 PASS**；检查**不碰 canvas 模块**。
+* **不变声明**：右栏只读工具白名单不变；AI 仅做引导不代判；证据必须经用户明确表态（原话）后由服务端装配生成；机器自动比对不复活。
+* **验收（PASS）**：四组 `tests/unit`（`compare-view` / `playtest-guidance` / `playtest-evidence` / `playtest-reset`）**33 passed**；含真实 HTTP daemon 接线（401 未鉴权 / 400 伪造字段 / 400 空原话 / 201 有效原话且 `release_id` 服务端填入）；核心用例「同 `contract_id` 不同 `release_id` → `STALE_VERSION`」非「文件不存在」退化路径。`npx tsc --noEmit` 全仓 57 个 `error TS` 与 clean `main` 基线一致，新增/修改文件 0 报错。
+* **残余边界 / 后续挂账（P-112 归拢，共 6 条）**：
+  1. **`resolveCurrentLiveReleaseId` 回退语义**：合同 `contract_ids` 无匹配时回退「最近一条 LIVE」——多合同仓里合同 A 的认可可能绑到合同 B 的发布上。方向保守（绑错后版本变更照样 `STALE_VERSION`，逼重新认可而非误放行），但语义是「最新 LIVE 即当前版本」而非「本合同的 LIVE」，**多合同场景证据绑定粒度粗**。
+  2. **合同文件名口径不一致**：`readContractReferences` 用原始 `contractId + ".json"`（不做别名归一），而 `playtestEvidencePath` 对 `contract_id` 做字符归一；两套命名约定并存，含特殊字符的 `contract_id` 会读不到合同文件但写得了证据。实际合同 id 受控生成，风险低。
+  3. **每合同只留最新证据**：`playtest-{contract_id}.json` 覆盖写、无历史链；重新认可后旧证据丢失，审计上只有「当前认可」没有「认可历史」。dec-12 未要求历史，可接受。
+  4. **（W.8）`claude-code-adapter.ts` token 回退**：解析顺序仍为 `opts.authToken` → `STAGENT_MCP_TOKEN` → `STAGENT_SESSION_TOKEN`；环境中若仍设 session token，最后一级回退可能放宽权限。建议后续移除回退或另立修复。
+  5. **（W.8）`/api/shutdown` 401 双轨路由测试用手写 mock**：不等同真实 daemon 路由；真实 `StagentDaemon` 实例测试验证了 `mcp.json` Authorization 使用 `mcpToken`，但非对真实 shutdown 拒绝的直接覆盖。建议补边界说明与真实路由测试。
+  6. **（L.17a）`request.headers`**：已对敏感头做严格剥离过滤；当前 gateway 调用暂不传 headers，未来若不需要自定义头可彻底裁剪该字段。
+  > 另：**`check playtest` 目前是独立命令、尚未被任何 verification profile 引用，合约验收要不要调用它属后续配置面**——本卡未擅自登记为正式挂账，待裁决。
+* **未宣称 / 未接线（不宣称端到端闭环）**：`CompareView` 未挂载进任何 UI 路由；用户原话采集 UI 未实现（右栏引导仅提示，不含提交动作）；`check playtest` 尚未被 verification profile 引用。**本卡交付组件 + lib + 端点 + 门禁判定源，端到端 UI 串联与真机端口联调属后续。**
+* **关键文件**：`src/components/project/CompareView.tsx`、`src/lib/journey/playtest-guidance.ts`、`src/lib/journey/playtest-evidence.ts`、`src/lib/daemon-api.ts`、`daemon/playtest/evidence.ts`、`daemon/release/active-live.ts`、`daemon/supervisor/preview/playtest-guard.ts`、`daemon/server.ts`、`bin/stagent.ts`、`tests/unit/compare-view.test.ts`、`tests/unit/playtest-guidance.test.ts`、`tests/unit/playtest-evidence.test.ts`、`tests/unit/playtest-reset.test.ts`。

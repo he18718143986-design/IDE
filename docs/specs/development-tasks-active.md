@@ -199,7 +199,7 @@
 
 #### 【Task L.17】受控只读外网摄取（北极星前置 · 已拆分） `[SPLIT]`
 
-> **注记（2026-11-01 · oq-3 裁决与 L.17 拆分；11-01 L.17a 交付与 L.17b 解封更新）**：本卡已拆分为 **`TASK-L.17a`** 与 **`TASK-L.17b`** 两张子卡；`TASK-L.17a` 已 COMPLETED（[#70](https://github.com/he18718143986-design/IDE/pull/70)/`8516c3d`），**`TASK-L.17b` 已解除阻断并就绪为 `[READY]`**。保留历史拆分追溯，不删原文，本母卡不开工实现。
+> **注记（2026-11-01 · oq-3 裁决与 L.17 拆分；11-01 L.17a 交付与 L.17b 解封；11-02 L.17b 交付，M5 主序收官更新）**：本卡已拆分为 **`TASK-L.17a`** 与 **`TASK-L.17b`** 两张子卡，且均已 COMPLETED：L.17a（[#70](https://github.com/he18718143986-design/IDE/pull/70)/`8516c3d`）、**L.17b（[#72](https://github.com/he18718143986-design/IDE/pull/72)/`d26def6`）**。保留历史拆分追溯，不删原文，本母卡不开工实现。**M5 北极星主序（L.16 → L.17a → L.17b）已全部落完**，Sprint 首要位置之后仅余债卡 `W.6`/`W.7` 与挂账裁决 `W.5b/c` 去留。
 
 * **任务编号**：`TASK-L.17`
 * **对应规格**：ADR-0014 §3；`scheme.md` goal-2、conf-6、oq-2（dec-12）；[`delivery-lifecycle.md`](./delivery-lifecycle.md) M5
@@ -234,14 +234,16 @@
 
 <a id="task-l.17b"></a>
 
-#### 【Task L.17b】对比视图与试玩证据桩 `[READY]`
+#### 【Task L.17b】对比视图与试玩证据桩 `[COMPLETED]`
+
+> **归档注记（2026-11-02 · P-112）**：本卡已 COMPLETED（[#72](https://github.com/he18718143986-design/IDE/pull/72)/`d26def6`，squash merge）。完整交付记录、残余边界与挂账见 [`development-tasks-completed.md`](./development-tasks-completed.md) §3.4f（锚点 `#task-l.17b`）。本处保留原始卡文以存追溯，不再作为施工依据；**M5 北极星主序收官**。
 
 * **任务编号**：`TASK-L.17b`
 * **任务名称**：对比视图与试玩证据桩
 * **对应规格**：ADR-0014 §3；`scheme.md` goal-2、dec-12、oq-2、acc-6；[`delivery-lifecycle.md`](./delivery-lifecycle.md) M5
 * **前置依赖**：`TASK-L.17a`（COMPLETED · [#70](https://github.com/he18718143986-design/IDE/pull/70)/`8516c3d`）+ `TASK-L.16`（COMPLETED · #62/`e4dfe1c`，复用「让 AI 看看」通道做试玩引导）
 * **优先级**：P3（M5）
-* **状态**：`[READY]`（2026-11-01 · 前置 L.17a #70/`8516c3d` 与 L.16 #62 均已 COMPLETED；M5 北极星主序最后一张卡）
+* **状态**：`[COMPLETED]`（2026-11-02 · [#72](https://github.com/he18718143986-design/IDE/pull/72)/`d26def6`，squash merge；前置 L.17a #70/`8516c3d` 与 L.16 #62 均已 COMPLETED；**M5 北极星主序最后一张卡已落完**）
 * **对照痛点（代码事实）**：方案工作台尚无参考站抓取快照与生成站预览对比；右栏缺少试玩比对引导；`check: playtest` 缺乏带版本号与用户原话的结构化证据落盘桩。
 * **一句话目标**：方案工作台呈现参考站抓取成果与生成站预览对比；用户经右栏搭档试玩引导后明确表态确认，落盘 dec-12 结构化证据桩，新版本部署后自动重置认可。
 * **范围（照 L.17 卡内拆分规划 4、5、6 与 dec-12 规定）**：
@@ -266,7 +268,7 @@
 ### 3.4e 台账债立卡（2026-11-01 · NON_BLOCKER · 不抢主序）
 
 
-> Tina 授权将第一类六项写成任务卡。Sprint：主序实现卡 **`L.16` 已 COMPLETED**（#62/`e4dfe1c`）；**`L.17a` 已 COMPLETED**（#70/`8516c3d`）；**`TASK-L.17b` 已解除阻断进入 `[READY]`**，成为 M5 北极星主序首要推进的最后一张卡。本节目的：把 ledger 待立卡改代码项变成可排期卡；`A.7`/`H.9`/`L.18`/`J.19`/`J.20`/`C.22`/`W.8`/`L.17a` 已 COMPLETED（见 completed / #58/#60/#69/#70）；余下 **`W.6`** 仍为 NON_BLOCKER（可开；**不与** W.5b/c 同窗）。另立 **`TASK-W.7`**（自助注册/自动验证 · 硬前置 W.6 · **不抢** W.5b/c 实测窗口）。
+> Tina 授权将第一类六项写成任务卡。Sprint：主序实现卡 **`L.16` 已 COMPLETED**（#62/`e4dfe1c`）；**`L.17a` 已 COMPLETED**（#70/`8516c3d`）；**`TASK-L.17b` 已 COMPLETED**（#72/`d26def6`）——**M5 北极星主序（L.16 → L.17a → L.17b）全部落完，主序收官**。本节目的：把 ledger 待立卡改代码项变成可排期卡；`A.7`/`H.9`/`L.18`/`J.19`/`J.20`/`C.22`/`W.8`/`L.17a`/`L.17b` 已 COMPLETED（见 completed / #58/#60/#69/#70/#72）；**主序之后 Sprint 首要位置仅余债卡 `W.6`（可开；不与 W.5b/c 同窗）与 `W.7`（自助注册/自动验证 · 硬前置 W.6 · 不抢 W.5b/c 实测窗口），以及挂账裁决 `W.5b/c` 去留**。
 
 ### 3.5 架构感知、监听与差异审阅（C.5 落 Sprint 2；B.1/B.2/C.4 推迟至 v0.2+）
 
