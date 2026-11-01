@@ -75,8 +75,10 @@ export class LocalProcessAdapter implements ReleaseTargetAdapter {
         ended_at: nowIso(),
       };
     }
-    const stopResult = await live.process.stop();
+    // 先标 stopping 再 clear，避免 L.16 退出监听把主动 stop 当成崩溃
+    live.stopping = true;
     clearLiveProcess(ctx.target.target_id);
+    const stopResult = await live.process.stop();
     return {
       ok: true,
       exit_code: 0,
