@@ -72,7 +72,7 @@
 | SA-1 | ADR-0014 敏感项授权已选定开工一并授权机制（dec-8） | **RESOLVED** | 用户（q22） | [`../specs/delivery-lifecycle.md`](../specs/delivery-lifecycle.md) §5 |
 | DLV-1 | ADR-0015～0017 均已由用户原话 q22 明确授权生效（DEC-006～008） | **RESOLVED** | 用户（q22） | [`../scheme.md`](../scheme.md) §6 |
 | DLV-2 | PR #3 已由用户批准并执行物理关闭 | **RESOLVED** | 用户 | PR #3 已关闭 |
-| DLV-3 | `AdapterRegistry` 未接线，Worker 只有 OpenAI `AiWorker`；Claude Code 作 Worker（W.5a 的 worker 角色）未接入派工 | NON_BLOCKER（M2 不依赖） | 卡 owner | **已立卡 `TASK-W.6`**（不抢 L.15） |
+| DLV-3 | `AdapterRegistry` 未接线，Worker 只有 OpenAI `AiWorker`；Claude Code 作 Worker（W.5a 的 worker 角色）未接入派工 | NON_BLOCKER（M2 不依赖） | 卡 owner | **已立卡 `TASK-W.6`**（不抢 L.16）；**自助注册/自动验证已立卡 `TASK-W.7`**（硬前置 W.6；落地后 W.5b/c 可作回归用例） |
 | DLV-4 | `.stagent/metadata/` 写入与 ADR-0011 冲突 → **已迁 records** | **RESOLVED** | 卡 owner | **`TASK-H.9` COMPLETED**（[#50](https://github.com/he18718143986-design/IDE/pull/50)/`34213c8`）；legacy 只读迁移 |
 | DLV-5 | 系统地图 UI（项目视图第二页）与「改这里会影响什么」入口 | **RESOLVED** | 卡 owner | **`TASK-L.18` COMPLETED**（[#54](https://github.com/he18718143986-design/IDE/pull/54)/`c8e6a81`）；interfaces consumers 行依赖见 completed 挂账 |
 | DLV-6 | L.11 DN-2「可以」HTTP / 画布入口 | **RESOLVED** | 卡 owner | **`TASK-J.19` COMPLETED**（[#55](https://github.com/he18718143986-design/IDE/pull/55)/`4bae423`）；`/api/design/*` + 画布卡；resume 不误路由 |
@@ -90,4 +90,4 @@
 | :--- | :--- | :--- | :--- | :--- |
 | DOR-1 | ~~`TASK-J.18c` / `J.18d`：矩阵与卡内仍 `NEW_TASK`，但代码已合入 `a2fa7df`（#27）~~ → **已关闭（2026-10-31）**：随 [#28](https://github.com/he18718143986-design/IDE/pull/28)/`e7ac058` 回写为 `[COMPLETED]`；main tip 含 J.18c/d 文档闭环 | NON_BLOCKER（文档真相） | 卡 owner | **RESOLVED**：#28 合入；本行保留作审计溯源 |
 | DOR-2 | §1.1 矩阵有 `TASK-0.1`、`TASK-A.1`～`A.6`，但 `development-tasks.md` §3.4 无对应 `#### 【Task …】` 详细正文 → 无法按 R-1～R-12 举证 | NON_BLOCKER · **`[NEEDS_RECHECK]`**（2026-11-01 第 0 波：历史技术债，**不阻断**现行 J/L 链路施工；本波不重写历史卡正文） | 卡 owner / 文档治理 | 补历史正文指针，或矩阵改注「正文见 Git 历史 / 已归档」 |
-| DOR-3 | `TASK-W.5b` / `W.5c` 正文远低于现行 DoR（缺范围路径与签名、独立 PASS 清单、估算、代码事实锚点等），却仍挂在矩阵 `NEW_TASK` | NON_BLOCKER（未排入 M2～M4 关键路径）· **`[NEEDS_RECHECK]`**（2026-11-01 第 0 波：历史技术债，**不阻断**现行 J/L 链路施工；本波不重写历史卡正文） | 卡 owner | 按 `task-card-standard.md` 重写后再进入可开工队列 |
+| DOR-3 | `TASK-W.5b` / `W.5c` 正文远低于现行 DoR（缺范围路径与签名、独立 PASS 清单、估算、代码事实锚点等），却仍挂在矩阵 `NEW_TASK` | NON_BLOCKER（未排入 M2～M4 关键路径）· **`[NEEDS_RECHECK]`**（2026-11-01 第 0 波：历史技术债，**不阻断**现行 J/L 链路施工；本波不重写历史卡正文） | 卡 owner | 按 `task-card-standard.md` 重写后再进入可开工队列；**注**：`TASK-W.7` 落地后 W.5b/c 转为回归用例基准（不解除本行重写债） |

@@ -19,6 +19,7 @@
 | `TASK-W.5b` | `NEW_TASK` | cursor-agent 适配器黑盒实测 (v1.3.3 新增) | [打开](./development-tasks-active.md#task-w.5b) |
 | `TASK-W.5c` | `NEW_TASK` | OpenHands 适配器（容器隔离，SANDBOX_ENFORCED）(v1.3.3 新增) | [打开](./development-tasks-active.md#task-w.5c) |
 | `TASK-W.6` | `NEW_TASK` | AdapterRegistry 接线与 Claude Worker 派工（DLV-3）· NON_BLOCKER | [打开](./development-tasks-active.md#task-w.6) |
+| `TASK-W.7` | `NEW_TASK` | Worker 自助注册与自动验证（默认 `UNCONTROLLED_EXTERNAL`；探测升格 `GATEWAY_ENFORCED`）· NON_BLOCKER | [打开](./development-tasks-active.md#task-w.7) |
 | `TASK-J.18` | `SPLIT` | Worker 派工墓地门禁（INV-LEDGER-03 工地侧）· 拆分母卡 | [打开](./development-tasks-active.md#task-j.18) |
 | `TASK-J.19` | `COMPLETED` | DN-2「可以」HTTP/画布入口（DLV-6） | [打开](./development-tasks-completed.md#task-j.19) |
 | `TASK-J.20` | `COMPLETED` | OP-1 授权清单落地（dec-10 实施） | [打开](./development-tasks-completed.md#task-j.20) |

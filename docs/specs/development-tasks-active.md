@@ -123,6 +123,52 @@
 
 ---
 
+<a id="task-w.7"></a>
+
+#### 【Task W.7】Worker 自助注册与自动验证 `[NEW_TASK]` · **NON_BLOCKER**
+
+* **任务编号**：`TASK-W.7`
+* **任务名称**：前端自助注册任意 Worker；默认 `UNCONTROLLED_EXTERNAL`；自动探测通过后升格 `GATEWAY_ENFORCED`
+* **对应规格**：架构 / W.1 适配器抽象；`daemon/worker/worker-adapter.interface.ts`；`src/lib/contract.schema.ts::workerSpecSchema`；先例 W.5b/c 人工实测 → 本卡产品化
+* **前置依赖**：**硬** `TASK-W.6`（Registry 进派工，否则测完无池可进；**W.6 仍为 `[NEW_TASK]`，本卡未就绪至 W.6 COMPLETED**）；**软** `TASK-W.5c`（探测沙箱复用/对齐其容器隔离基建）
+* **优先级**：P3 · **NON_BLOCKER**（**不阻断** `TASK-L.16`；**不抢** W.5b/c 实测窗口；与 W.5b/c **不互斥**——本卡落地后 W.5b/c 可作为首批真实用例回归基准）
+* **状态**：`[NEW_TASK]`（**未就绪**：硬前置 W.6 未 COMPLETED）
+* **对照痛点（代码事实）**：
+  1. 三层可扩展接口已在：`daemon/worker/worker-adapter.interface.ts::CodingWorkerAdapter`（`AdapterCapabilityDeclaration` 9 项 + `AdapterRejectionCode`）、`daemon/worker/adapter-registry.ts::AdapterRegistry`（`register` / `get` / `requireControlled`）、`src/lib/contract.schema.ts::workerSpecSchema`（`adapter_id` + `control_mode` 二值 `GATEWAY_ENFORCED|UNCONTROLLED_EXTERNAL`）。
+  2. 派工仍硬编码 `new AiWorker(...)`（`daemon/pipeline/orchestrator.ts`）——由 **W.6** 接线；本卡不代替 W.6。
+  3. 今日无「前端注册 → 自动探测 → 按结果分档」产品路径；W.5b/c 仍是人工黑盒实测卡。
+* **一句话目标**：用户可在设置页添加任意 Worker；默认只能当未受控参考；只有通过内置探测包的才升格受控并被 `requireControlled` 命中。
+* **范围**：
+  1. **两级注册语义**：`POST /api/workers` 接受 `adapter_id` + 启动命令 + 能力声明；**默认且唯一可直写档**为 `UNCONTROLLED_EXTERNAL`（仅 Vibe/参考，**不得**产出合同证据）。升格 `GATEWAY_ENFORCED` **必须**经自动探测通过；**禁止「填表即受控」**。
+  2. **自动探测任务包**（daemon 内置 fixture，四类确定性断言）：
+     - 文件围栏：诱导越权写；扫主树与 `.stagent/records/`，越权须失败关闭。
+     - 命令围栏：白名单外命令须被拒。
+     - 证据完整性：diff / 写操作必须经 Gateway 工具集，绕过即失败。
+     - 能力声明对账：声明 `TOOL_INTERCEPTION_SUPPORTED` 等须实测命中，声明未兑现 → 不得升格。
+     - 输出报告：探测项清单 + 结论；措辞限定为「**通过已知探测集**」，**不得**写「绝对受控」。
+  3. **探测沙箱前置**：探测在隔离环境执行（临时 worktree + 无网络 + 超时）；复用/对齐 W.5c 容器隔离基建。**显式前置说明（实现时必做，漏改即 FAIL）**：把 `SANDBOX_ENFORCED` 扩进 **两处**枚举——`daemon/worker/worker-adapter.interface.ts` 与 `src/lib/contract.schema.ts` 各一处；只改单边 → schema 与注册侧不一致。
+  4. **验证结果绑定版本**：`verified_on` 绑定适配器版本号/命令指纹；版本或指纹变更 → **自动降级**回 `UNCONTROLLED_EXTERNAL` 待重验；定期重测机制留接口（本卡可只留 hook/类型，不实现调度器）。
+  5. **路由与 UI**：
+     - `POST /api/workers`：注册，强制 `UNCONTROLLED_EXTERNAL`。
+     - `POST /api/workers/:id/verify`：异步启动探测；另提供报告查询路由（如 `GET /api/workers/:id/verify` 或等价）。
+     - 前端 Worker 设置页 + 「验证」按钮。
+     - 命名空间 **不得**与 `/api/design/*`、`/api/knowledge/*` 冲突（用 `/api/workers*`）。
+  6. 测试：`tests/unit/worker-self-serve-verify.test.ts`（或等价）：默认注册档、四类探测断言可跑、通过升格且 `requireControlled` 命中、失败留 UNCONTROLLED 附报告、版本变更降级；负例：表单直进受控、无沙箱探测、报告「绝对受控」、枚举单边。
+* **非目标**：不代替 W.6 Registry 接线；不在本卡内完成 W.5b/c 人工实测正文重写（DOR-3）；不宣称探测=绝对安全；不做通用第三方商店/市场；不改鉴权 / Demo Origin。
+* **不变声明**：Gateway 写范围 / Demo Origin / 鉴权 / 点亮三证：**不变**；`UNCONTROLLED_EXTERNAL` 仍不得当受控合同证据；报告不得宣称「绝对受控」。
+* **验收（PASS）**：
+  1. 注册默认且仅能落 `UNCONTROLLED_EXTERNAL`。
+  2. 探测包四类断言可在沙箱内跑通（正/负例）。
+  3. 通过者升格 `GATEWAY_ENFORCED` 并被 `AdapterRegistry.requireControlled` 命中。
+  4. 失败者留 `UNCONTROLLED_EXTERNAL` 且附探测报告。
+  5. `verified_on` 版本/指纹变更后自动降级待重验。
+* **FAIL**：表单/API 直进受控档；探测无沙箱直接跑主树；报告宣称「绝对受控」；`SANDBOX_ENFORCED` 只改 `worker-adapter.interface.ts` 或只改 `contract.schema.ts` 单边；未就绪（W.6 未合）却标本卡完成。
+* **关键文件**：`daemon/worker/worker-adapter.interface.ts`、`daemon/worker/adapter-registry.ts`、`src/lib/contract.schema.ts`、`daemon/server.ts`（`/api/workers*` 注册）、新 `daemon/worker/verify/*`（探测包+沙箱）、前端 Worker 设置页组件、新测
+* **估算**：L（实现时宜再拆：枚举扩面 / 探测包 / API+UI；本卡先立产品口径）
+* **台账**：ledger **DLV-3** 加注「自助注册/自动验证已立卡 W.7」；W.5b/c 挂账讨论处注明「W.7 落地后可作回归用例」。
+
+---
+
 ### 3.4c 闭环旅程 v2.1 第一批（Journey · 规格 `supervisor.md` 第三部分 §13～§20；对应 §19 落差 L-01～L-10）
 
 <a id="task-j.18"></a>
@@ -195,7 +241,7 @@
 
 ### 3.4e 台账债立卡（2026-11-01 · NON_BLOCKER · 不抢主序）
 
-> Tina 授权将第一类六项写成任务卡。Sprint「当前首要」现为 **`TASK-L.16`**（L.15 已 COMPLETED / #52/`9829385`）。本节目的：把 ledger 待立卡改代码项变成可排期卡；`A.7`/`H.9`/`L.18`/`J.19`/`J.20` 已 COMPLETED（见 completed / #58/#60）；余下 **`W.6`** 仍为 NON_BLOCKER，不抢 L.16、且须等 J.19 合入后（现已合）才可开、不与 W.5b/c 同窗。
+> Tina 授权将第一类六项写成任务卡。Sprint「当前首要」现为 **`TASK-L.16`**（L.15 已 COMPLETED / #52/`9829385`）。本节目的：把 ledger 待立卡改代码项变成可排期卡；`A.7`/`H.9`/`L.18`/`J.19`/`J.20` 已 COMPLETED（见 completed / #58/#60）；余下 **`W.6`** 仍为 NON_BLOCKER，不抢 L.16、且须等 J.19 合入后（现已合）才可开、不与 W.5b/c 同窗。另立 **`TASK-W.7`**（自助注册/自动验证 · 硬前置 W.6 · **不抢** W.5b/c 实测窗口）。
 
 ### 3.5 架构感知、监听与差异审阅（C.5 落 Sprint 2；B.1/B.2/C.4 推迟至 v0.2+）
 
