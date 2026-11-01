@@ -1,4 +1,4 @@
-import { Files, Settings, Sparkles, TerminalSquare } from "lucide-react";
+import { Files, Rocket, Settings, Sparkles, TerminalSquare } from "lucide-react";
 import { WORKBENCH_LABEL } from "../../lib/workbench-labels";
 
 /**
@@ -16,6 +16,8 @@ export interface ActivityBarProps {
   onOpenWorkbench: () => void;
   settingsOpen: boolean;
   onOpenSettings: () => void;
+  releaseOpen?: boolean;
+  onOpenRelease?: () => void;
   terminalOpen: boolean;
   onToggleTerminal: () => void;
 }
@@ -60,6 +62,8 @@ export function ActivityBar({
   onOpenWorkbench,
   settingsOpen,
   onOpenSettings,
+  releaseOpen = false,
+  onOpenRelease,
   terminalOpen,
   onToggleTerminal,
 }: ActivityBarProps) {
@@ -86,6 +90,16 @@ export function ActivityBar({
         <Sparkles className="h-5 w-5" />
       </BarButton>
       <div className="mt-auto flex flex-col items-center gap-1">
+        {onOpenRelease ? (
+          <BarButton
+            label={WORKBENCH_LABEL.release}
+            testId="activity-release"
+            active={releaseOpen}
+            onClick={onOpenRelease}
+          >
+            <Rocket className="h-5 w-5" />
+          </BarButton>
+        ) : null}
         <BarButton
           label={WORKBENCH_LABEL.settings}
           testId="activity-settings"

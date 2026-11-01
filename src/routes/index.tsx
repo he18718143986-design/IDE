@@ -179,6 +179,7 @@ import {
 } from "@/components/studio/DisputeConsolePane";
 import { SupervisorTab } from "@/components/supervisor/SupervisorTab";
 import { SettingsTab } from "@/components/settings/SettingsTab";
+import { ReleasePane } from "@/components/release/ReleasePane";
 import { applyTaskGraphFrame } from "@/components/graph/graph-view-model";
 import {
   FileTreeSpecsSection,
@@ -3180,6 +3181,12 @@ ${trimmed}`
                     }
                   : null
               }
+            />
+          }
+          releaseContent={
+            <ReleasePane
+              conn={conn}
+              connected={connected}
             />
           }
           banner={

@@ -14,6 +14,7 @@ export const WORKBENCH_LABEL = {
   /** 保留键名兼容；文案改为方案审阅 */
   graph: "方案审阅",
   settings: "设置",
+  release: "发布",
 } as const;
 
 export type WorkbenchLabelKey = keyof typeof WORKBENCH_LABEL;

@@ -66,6 +66,7 @@ import {
   TraceBrokenError,
   E_TRACE_BROKEN,
 } from "./trace/why";
+import { ReleaseManager } from "./release/release-manager";
 import { loadOrInitLedgerState } from "./supervisor/intent-compiler/scheme-ledger-store";
 import {
   assertContractScopeAllowed,
@@ -348,6 +349,7 @@ export class StagentDaemon {
   readonly repoRoot: string;
   /** TASK-L.14：进程级保险库（启动时 hydrate） */
   private vault: Vault | null = null;
+  private releaseManager: ReleaseManager | null = null;
   readonly host: string;
   readonly version: string;
   readonly startPort: number;
@@ -1397,6 +1399,116 @@ export class StagentDaemon {
       clearTimeout(authTimer);
       this.clients.delete(ws);
     });
+  }
+
+  private getReleaseManager(): ReleaseManager {
+    if (!this.releaseManager) {
+      this.releaseManager = new ReleaseManager({
+        repoRoot: this.repoRoot,
+        vault: this.vault ?? getActiveVault(),
+      });
+    }
+    return this.releaseManager;
+  }
+
+  /**
+   * TASK-L.15：发布 API
+   * POST /api/releases — 草稿
+   * POST /api/releases/:id/run — 执行
+   * POST /api/releases/:id/rollback — 手动回滚（新建发布）
+   * GET  /api/releases — 列表 + 目标
+   * GET  /api/releases/targets — 仅目标
+   */
+  private async handleReleases(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    method: string,
+    pathname: string,
+  ): Promise<void> {
+    const mgr = this.getReleaseManager();
+    try {
+      if (method === "GET" && pathname === "/api/releases/targets") {
+        this.sendJson(res, 200, { targets: loadReleaseTargets(this.repoRoot) });
+        return;
+      }
+      if (method === "GET" && pathname === "/api/releases") {
+        this.sendJson(res, 200, {
+          releases: mgr.list(),
+          targets: loadReleaseTargets(this.repoRoot),
+        });
+        return;
+      }
+      if (method === "POST" && pathname === "/api/releases") {
+        const body = (await this.readJsonBody(req)) as {
+          target_id?: string;
+          commit_sha?: string;
+        };
+        if (!body.target_id || !body.commit_sha) {
+          this.sendJson(res, 400, {
+            error: "target_id and commit_sha are required",
+            code: "E_RELEASE_BAD_REQUEST",
+          });
+          return;
+        }
+        const draft = await mgr.createDraft({
+          target_id: body.target_id,
+          commit_sha: body.commit_sha,
+        });
+        this.sendJson(res, 200, { release: draft });
+        return;
+      }
+
+      const runMatch = pathname.match(/^\/api\/releases\/([^/]+)\/run$/);
+      if (method === "POST" && runMatch) {
+        const id = decodeURIComponent(runMatch[1]!);
+        const release = await mgr.run(id);
+        this.sendJson(res, 200, { release });
+        return;
+      }
+      const rbMatch = pathname.match(/^\/api\/releases\/([^/]+)\/rollback$/);
+      if (method === "POST" && rbMatch) {
+        const id = decodeURIComponent(rbMatch[1]!);
+        const release = await mgr.rollback(id);
+        this.sendJson(res, 200, { release });
+        return;
+      }
+      const getMatch = pathname.match(/^\/api\/releases\/([^/]+)$/);
+      if (method === "GET" && getMatch) {
+        const id = decodeURIComponent(getMatch[1]!);
+        const release = mgr.get(id);
+        if (!release) {
+          this.sendJson(res, 404, {
+            error: "Not Found",
+            code: "E_RELEASE_NOT_FOUND",
+          });
+          return;
+        }
+        this.sendJson(res, 200, { release });
+        return;
+      }
+      if (method === "DELETE" && getMatch) {
+        const id = decodeURIComponent(getMatch[1]!);
+        mgr.cancelDraft(id);
+        this.sendJson(res, 200, { ok: true });
+        return;
+      }
+
+      this.sendJson(res, 404, { error: "Not Found", path: pathname });
+    } catch (err) {
+      if (err instanceof ReleaseInvariantError) {
+        const status =
+          err.code === "E_RELEASE_NOT_FOUND"
+            ? 404
+            : err.code === "E_RELEASE_MISSING_SECRETS" ||
+                err.code === "E_RELEASE_INV2" ||
+                err.code === "E_RELEASE_INV3"
+              ? 409
+              : 400;
+        this.sendJson(res, status, { error: err.message, code: err.code });
+        return;
+      }
+      this.sendJson(res, 500, { error: (err as Error).message });
+    }
   }
 
   private isAuthorized(req: http.IncomingMessage): boolean {
@@ -4267,6 +4379,15 @@ export class StagentDaemon {
       return;
     }
 
+    // TASK-L.15：发布生命周期
+    if (pathname === "/api/releases" || pathname.startsWith("/api/releases/")) {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      await this.handleReleases(req, res, method, pathname);
+      return;
+    }
     // TASK-L.14：凭据保险库 HTTP（永不返回明文值）
     if (method === "GET" && pathname === "/api/vault") {
       if (!this.isAuthorized(req)) {
