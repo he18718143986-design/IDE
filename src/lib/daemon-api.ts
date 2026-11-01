@@ -977,6 +977,50 @@ export async function fetchTraceWhy(
   });
 }
 
+/** TASK-L.15 */
+export interface ReleaseListResponse {
+  releases: import("./release/release").ReleaseRecord[];
+  targets: import("./release/release").ReleaseTargetConfig[];
+}
+
+export async function fetchReleases(
+  conn: DaemonConnection,
+): Promise<ReleaseListResponse> {
+  return request<ReleaseListResponse>(conn, "/api/releases");
+}
+
+export async function createReleaseDraft(
+  conn: DaemonConnection,
+  body: { target_id: string; commit_sha: string },
+): Promise<{ release: import("./release/release").ReleaseRecord }> {
+  return request(conn, "/api/releases", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function runRelease(
+  conn: DaemonConnection,
+  releaseId: string,
+): Promise<{ release: import("./release/release").ReleaseRecord }> {
+  return request(
+    conn,
+    `/api/releases/${encodeURIComponent(releaseId)}/run`,
+    { method: "POST", body: "{}" },
+  );
+}
+
+export async function rollbackRelease(
+  conn: DaemonConnection,
+  releaseId: string,
+): Promise<{ release: import("./release/release").ReleaseRecord }> {
+  return request(
+    conn,
+    `/api/releases/${encodeURIComponent(releaseId)}/rollback`,
+    { method: "POST", body: "{}" },
+  );
+}
+
 /** TASK-L.10：读取项目计划（含服务端权威下一份）。 */
 export async function getProjectPlan(
   conn: DaemonConnection,

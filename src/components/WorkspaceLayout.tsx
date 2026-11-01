@@ -31,6 +31,7 @@ export const STUDIO_TAB_ID = "system:supervisor-studio";
 export const SUPERVISOR_TAB_ID = "system:supervisor";
 /** 设置 Tab（⚙️ 图标入口；连接/诊断/开关全在这一页） */
 export const SETTINGS_TAB_ID = "system:settings";
+export const RELEASE_TAB_ID = "system:release";
 /** @deprecated C.10c：独立图谱 Tab 不再作为日常主路径；保留 id 仅兼容旧会话/测试。日常入口改开合同操作台内视口。 */
 export const GRAPH_TAB_ID = "system:task-graph";
 
@@ -86,6 +87,7 @@ export interface WorkspaceLayoutProps {
   supervisorContent?: ReactNode;
   /** 设置 Tab 内容（由主页面注入，连接与模型 Key 面板在那里） */
   settingsContent?: ReactNode;
+  releaseContent?: ReactNode;
   /** @deprecated C.10c 独立图谱 Tab；日常请用 studio 内图谱视口 */
   graphContent?: ReactNode;
   /**
@@ -297,6 +299,22 @@ export function WorkspaceLayout(props: WorkspaceLayoutProps) {
     setActiveTab(SETTINGS_TAB_ID);
   };
 
+  const openRelease = () => {
+    setTabs((t) =>
+      t.some((x) => x.id === RELEASE_TAB_ID)
+        ? t
+        : [
+            ...t,
+            {
+              id: RELEASE_TAB_ID,
+              title: "发布",
+              system: true,
+            },
+          ],
+    );
+    setActiveTab(RELEASE_TAB_ID);
+  };
+
   const settingsReq = props.openSettingsRequest;
   useEffect(() => {
     if (!settingsReq) return;
@@ -369,6 +387,19 @@ export function WorkspaceLayout(props: WorkspaceLayoutProps) {
       )}
     </div>
   );
+
+  const release = (
+    <div
+      data-testid="release-pane-host"
+      className="flex h-full min-h-0 flex-1 flex-col overflow-hidden"
+    >
+      {props.releaseContent ?? (
+        <div className="p-4 text-sm text-muted-foreground">
+          发布页未接线。
+        </div>
+      )}
+    </div>
+  );
   const graphPane = (
     <div
       data-testid="graph-pane"
@@ -412,6 +443,7 @@ export function WorkspaceLayout(props: WorkspaceLayoutProps) {
     id !== STUDIO_TAB_ID &&
     id !== SUPERVISOR_TAB_ID &&
     id !== SETTINGS_TAB_ID &&
+    id !== RELEASE_TAB_ID &&
     id !== GRAPH_TAB_ID ? (
       props.renderFile ? (
         props.renderFile(id, useWorktree)
@@ -427,6 +459,7 @@ export function WorkspaceLayout(props: WorkspaceLayoutProps) {
   const isStudio = activeTab === STUDIO_TAB_ID;
   const isSupervisor = activeTab === SUPERVISOR_TAB_ID;
   const isSettings = activeTab === SETTINGS_TAB_ID;
+  const isRelease = activeTab === RELEASE_TAB_ID;
   const isGraph = activeTab === GRAPH_TAB_ID;
   /** 没有打开任何标签，或顶栏强制切回欢迎页（C.10e） */
   const showWelcome =
@@ -484,6 +517,8 @@ export function WorkspaceLayout(props: WorkspaceLayoutProps) {
           onOpenWorkbench={openStudio}
           settingsOpen={isSettings}
           onOpenSettings={openSettings}
+          releaseOpen={activeTab === RELEASE_TAB_ID}
+          onOpenRelease={openRelease}
           terminalOpen={terminalOpen}
           onToggleTerminal={() => setTerminalOpen((v) => !v)}
         />
@@ -642,6 +677,8 @@ export function WorkspaceLayout(props: WorkspaceLayoutProps) {
               supervisor
             ) : isSettings ? (
               settings
+            ) : isRelease ? (
+              release
             ) : isGraph ? (
               graphPane
             ) : (
