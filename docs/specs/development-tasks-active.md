@@ -164,7 +164,7 @@
   3. 通过者升格 `GATEWAY_ENFORCED` 并被 `AdapterRegistry.requireControlled` 命中。
   4. 失败者留 `UNCONTROLLED_EXTERNAL` 且附探测报告。
   5. `verified_on` 版本/指纹变更后自动降级待重验。
-* **FAIL**：表单/API 直进受控档；探测无沙箱直接跑主树；报告宣称「绝对受控」；`SANDBOX_ENFORCED` 只改 `worker-adapter.interface.ts` 或只改 `contract.schema.ts` 单边；未就绪（W.6 未合）却标本卡完成。
+* **FAIL**：表单/API 直进受控档；探测无沙箱直接跑主树；报告宣称「绝对受控」；`SANDBOX_ENFORCED` 只改 `worker-adapter.interface.ts` 或只改 `contract.schema.ts` 单边；未满足就绪条件（硬前置 `W.6` 未 COMPLETED / DoR 未达标）却标本卡完成。
 * **关键文件**：`daemon/worker/worker-adapter.interface.ts`、`daemon/worker/adapter-registry.ts`、`src/lib/contract.schema.ts`、`daemon/server.ts`（`/api/workers*` 注册）、新 `daemon/worker/verify/*`（探测包+沙箱）、前端 Worker 设置页组件、新测
 * **估算**：L（实现时宜再拆：枚举扩面 / 探测包 / API+UI；本卡先立产品口径）
 * **台账**：ledger **DLV-3** 加注「自助注册/自动验证已立卡 W.7」；W.5b/c 挂账讨论处注明「W.7 落地后可作回归用例」。
@@ -201,7 +201,7 @@
 
 #### 【Task L.17】受控只读外网摄取（北极星前置 · 已拆分） `[SPLIT]`
 
-> **注记（2026-11-01 · oq-3 裁决与 L.17 拆分；11-01 L.17a 交付与 L.17b 解封；11-02 L.17b 交付，M5 主序收官更新）**：本卡已拆分为 **`TASK-L.17a`** 与 **`TASK-L.17b`** 两张子卡，且均已 COMPLETED：L.17a（[#70](https://github.com/he18718143986-design/IDE/pull/70)/`8516c3d`）、**L.17b（[#72](https://github.com/he18718143986-design/IDE/pull/72)/`d26def6`）**。保留历史拆分追溯，不删原文，本母卡不开工实现。**M5 北极星主序（L.16 → L.17a → L.17b）已全部落完**；债卡 `W.6` 亦已 COMPLETED（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`，见 completed §3.4g）。Sprint 首要位置现进入债卡区：下一张为 **`W.5c`（容器沙箱）**，`W.7` 硬前置已解除但排程在后，挂账裁决 `W.5b/c` 去留待定。
+> **注记（2026-11-01 · oq-3 裁决与 L.17 拆分；11-01 L.17a 交付与 L.17b 解封；11-02 L.17b 交付，M5 主序收官更新）**：本卡已拆分为 **`TASK-L.17a`** 与 **`TASK-L.17b`** 两张子卡，且均已 COMPLETED：L.17a（[#70](https://github.com/he18718143986-design/IDE/pull/70)/`8516c3d`）、**L.17b（[#72](https://github.com/he18718143986-design/IDE/pull/72)/`d26def6`）**。保留历史拆分追溯，不删原文，本母卡不开工实现。**M5 北极星主序（L.16 → L.17a → L.17b）已全部落完**；债卡 `W.6` 亦已 COMPLETED（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`，见 completed §3.4g）。Sprint 首要位置现进入债卡区，排程已裁决写死（2026-11-02 · P-114）：**`W.5c`（容器沙箱，兼 `W.7` 探测地基）→ `W.7`（自助注册/自动验证，硬前置已解除）→ `W.5b`（cursor-agent 实测，作 `W.7` 回归基准）**；`W.5b/c` 保留队列、不再列为待定项。`ruling 3`（`check playtest` 接验收档）已于 P-114 落盘裁决，实现另行立卡或挂账（未开工）。
 
 * **任务编号**：`TASK-L.17`
 * **对应规格**：ADR-0014 §3；`scheme.md` goal-2、conf-6、oq-2（dec-12）；[`delivery-lifecycle.md`](./delivery-lifecycle.md) M5
@@ -270,7 +270,7 @@
 ### 3.4e 台账债立卡（2026-11-01 · NON_BLOCKER · 不抢主序）
 
 
-> Tina 授权将第一类六项写成任务卡。Sprint：主序实现卡 **`L.16` 已 COMPLETED**（#62/`e4dfe1c`）；**`L.17a` 已 COMPLETED**（#70/`8516c3d`）；**`TASK-L.17b` 已 COMPLETED**（#72/`d26def6`）——**M5 北极星主序（L.16 → L.17a → L.17b）全部落完，主序收官**。本节目的：把 ledger 待立卡改代码项变成可排期卡；`A.7`/`H.9`/`L.18`/`J.19`/`J.20`/`C.22`/`W.8`/`L.17a`/`L.17b` 已 COMPLETED（见 completed / #58/#60/#69/#70/#72）；**主序收官后债卡区推进**：`W.6` 已 COMPLETED（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`，见 completed §3.4g）；**Sprint 首要位置下一张为 `W.5c`（OpenHands 容器沙箱实测，兼作 `W.7` 探测沙箱地基）**，`W.7`（自助注册/自动验证 · 硬前置 W.6 已解除 · 不抢 W.5b/c 实测窗口）排程在后，挂账裁决 `W.5b/c` 去留待定；`ruling 3`（`check playtest` 接验收档）docs 待落盘**。
+> Tina 授权将第一类六项写成任务卡。Sprint：主序实现卡 **`L.16` 已 COMPLETED**（#62/`e4dfe1c`）；**`L.17a` 已 COMPLETED**（#70/`8516c3d`）；**`TASK-L.17b` 已 COMPLETED**（#72/`d26def6`）——**M5 北极星主序（L.16 → L.17a → L.17b）全部落完，主序收官**。本节目的：把 ledger 待立卡改代码项变成可排期卡；`A.7`/`H.9`/`L.18`/`J.19`/`J.20`/`C.22`/`W.8`/`L.17a`/`L.17b` 已 COMPLETED（见 completed / #58/#60/#69/#70/#72）；**主序收官后债卡区推进**：`W.6` 已 COMPLETED（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`，见 completed §3.4g）。**Sprint 排程已裁决写死（2026-11-02 · P-114）：`W.5c`（OpenHands 容器沙箱实测，兼作 `W.7` 探测沙箱地基）→ `W.7`（自助注册/自动验证 · 硬前置 W.6 已解除）→ `W.5b`（cursor-agent 实测，作 `W.7` 回归基准）**；`W.5b/c` 保留队列、不再列为待定项。**`ruling 3`（`check playtest` 接验收档）已于 P-114 落盘裁决**：北极星合同（带 `references[]`）的 `verification_spec.commands` 自动附加 `{alias:"playtest", executable:"stagent", args:["check","playtest","<contract_id>"]}`，试玩认可成为合并门禁；非北极星合同不附加；实现属小卡（合同装配段 + 测试），另行立卡或挂账（本轮未立卡、未开工）。裁决原文见 completed §3.4f、changelog P-114、ledger consistency-audit P-114。
 
 ### 3.5 架构感知、监听与差异审阅（C.5 落 Sprint 2；B.1/B.2/C.4 推迟至 v0.2+）
 
