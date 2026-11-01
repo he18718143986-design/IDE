@@ -8,8 +8,13 @@ import {
   STAGENT_WEB_INGEST_TOOL_NAME,
   E_MCP_UNAUTHORIZED_TOOL,
   E_MCP_METHOD_NOT_FOUND,
+  E_MCP_GATEWAY_UNAVAILABLE,
 } from "../../daemon/mcp/http-server";
 import { ScopedWorktreeGateway } from "../../daemon/mcp/gateway";
+import {
+  E_INGEST_NOT_WIRED,
+  E_WEB_INGEST_FORBIDDEN_DOMAIN,
+} from "../../daemon/mcp/types";
 import { createContractDraft } from "../../src/lib/contract.schema";
 import { ClaudeCodeAdapter } from "../../daemon/worker/cli-host/claude-code-adapter";
 
@@ -129,7 +134,24 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
     );
   });
 
-  it("dispatches stagent_web_ingest through Gateway and checks domain whitelist", async () => {
+  it("fails closed when no active Gateway is mounted", async () => {
+    const unmountedServer = new McpHttpServer();
+    const res = await unmountedServer.handleJsonRpc({
+      jsonrpc: "2.0",
+      id: 25,
+      method: "tools/call",
+      params: {
+        name: STAGENT_WEB_INGEST_TOOL_NAME,
+        arguments: { url: "https://example.com" },
+      },
+    });
+
+    expect(res.error).toBeDefined();
+    expect(res.error?.code).toBe(-32603);
+    expect(res.error?.message).toContain(E_MCP_GATEWAY_UNAVAILABLE);
+  });
+
+  it("dispatches stagent_web_ingest through Gateway and checks domain whitelist with E_INGEST_NOT_WIRED", async () => {
     const baseDraft = createContractDraft({
       title: "W.8 Gateway Ingest Contract",
       description: "Testing MCP dispatch over HTTP through Gateway",
@@ -161,9 +183,9 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
     expect(blockedCall.result).toBeDefined();
     const blockedResult = blockedCall.result as any;
     expect(blockedResult.isError).toBe(true);
-    expect(blockedResult.error?.code).toBe("E_WEB_INGEST_FORBIDDEN_DOMAIN");
+    expect(blockedResult.error?.code).toBe(E_WEB_INGEST_FORBIDDEN_DOMAIN);
 
-    // 2. Allowed when domain is in contract references[]
+    // 2. Verified domain in contract references[] returns E_INGEST_NOT_WIRED (no fake success)
     const allowedCall = await customMcpServer.handleJsonRpc({
       jsonrpc: "2.0",
       id: 31,
@@ -179,27 +201,87 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
 
     expect(allowedCall.result).toBeDefined();
     const allowedResult = allowedCall.result as any;
-    expect(allowedResult.isError).toBe(false);
-    expect(allowedResult.data?.host).toBe("allowed.partner.com");
+    expect(allowedResult.isError).toBe(true);
+    expect(allowedResult.error?.code).toBe(E_INGEST_NOT_WIRED);
+    expect(allowedResult.error?.message).toContain("TASK-L.17a");
 
     // 3. Gateway audit log records both calls
     const logs = gateway.getAuditLog();
     const blockedLog = logs.find(
-      (l) => l.violationCode === "E_WEB_INGEST_FORBIDDEN_DOMAIN",
+      (l) => l.violationCode === E_WEB_INGEST_FORBIDDEN_DOMAIN,
     );
     expect(blockedLog).toBeDefined();
     expect(blockedLog?.outcome).toBe("BLOCKED");
 
-    const successLog = logs.find(
-      (l) => l.tool === STAGENT_WEB_INGEST_TOOL_NAME && l.outcome === "SUCCESS",
+    const notWiredLog = logs.find(
+      (l) => l.violationCode === E_INGEST_NOT_WIRED,
     );
-    expect(successLog).toBeDefined();
+    expect(notWiredLog).toBeDefined();
+    expect(notWiredLog?.outcome).toBe("BLOCKED");
   });
 
-  it("writes real stagent MCP endpoint into mcp.json for worker role under --strict-mcp-config", () => {
+  it("enforces bearer token authorization and rejects unauthorized access with 401", async () => {
+    const authMcpServer = new McpHttpServer({
+      isAuthorized: (req) =>
+        req.headers.authorization === "Bearer test-session-token-w8",
+    });
+
+    let authPort = 0;
+    const authServer = http.createServer((req, res) => {
+      void authMcpServer.handleHttpRequest(req, res);
+    });
+
+    await new Promise<void>((resolve) => {
+      authServer.listen(0, "127.0.0.1", () => {
+        authPort = (authServer.address() as any).port;
+        resolve();
+      });
+    });
+
+    try {
+      // 1. Missing Authorization header -> 401
+      const unauthRes = await fetch(`http://127.0.0.1:${authPort}/api/mcp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
+      });
+      expect(unauthRes.status).toBe(401);
+      const unauthJson = await unauthRes.json();
+      expect(unauthJson.error).toBe("Unauthorized");
+
+      // 2. Wrong token -> 401
+      const wrongRes = await fetch(`http://127.0.0.1:${authPort}/api/mcp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer invalid-token",
+        },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "ping" }),
+      });
+      expect(wrongRes.status).toBe(401);
+
+      // 3. Valid token -> 200
+      const okRes = await fetch(`http://127.0.0.1:${authPort}/api/mcp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer test-session-token-w8",
+        },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "ping" }),
+      });
+      expect(okRes.status).toBe(200);
+      const okJson = await okRes.json();
+      expect(okJson.result).toEqual({});
+    } finally {
+      await new Promise<void>((resolve) => authServer.close(() => resolve()));
+    }
+  });
+
+  it("writes real stagent MCP endpoint and auth header into mcp.json for worker role under --strict-mcp-config", () => {
     const adapter = new ClaudeCodeAdapter({
       role: "worker",
       mcpServerUrl: `http://127.0.0.1:${port}/api/mcp`,
+      authToken: "sample-auth-token-123",
     });
 
     const launch = adapter.buildLaunch({
@@ -215,6 +297,9 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
     expect(mcpConfig.mcpServers.stagent).toEqual({
       type: "http",
       url: `http://127.0.0.1:${port}/api/mcp`,
+      headers: {
+        Authorization: "Bearer sample-auth-token-123",
+      },
     });
 
     // Partner role maintains read-only whitelist without external MCP endpoints
@@ -232,14 +317,33 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
     expect(partnerConfig.mcpServers).toEqual({});
   });
 
-  it("throws explicitly instead of silently downgrading to empty mcpServers when worker endpoint is missing/empty", () => {
-    const invalidAdapter = new ClaudeCodeAdapter({
+  it("dynamically resolves port and auth token from options or environment for worker and throws when unconfigured", () => {
+    // 1. Dynamic port getter and token getter
+    const dynamicAdapter = new ClaudeCodeAdapter({
       role: "worker",
-      mcpServerUrl: "   ", // whitespace only / empty
+      mcpPort: () => 4567,
+      authToken: () => "dynamic-session-token",
+    });
+    const launch = dynamicAdapter.buildLaunch({
+      prompt: "do work",
+      cwd: tempRepo,
+      nativeSessionId: null,
+    });
+    const mcpConfig = JSON.parse(fs.readFileSync(launch.mcpPath, "utf8"));
+    expect(mcpConfig.mcpServers.stagent).toEqual({
+      type: "http",
+      url: "http://127.0.0.1:4567/api/mcp",
+      headers: {
+        Authorization: "Bearer dynamic-session-token",
+      },
     });
 
+    // 2. Throws when no URL, port, or environment variable is set (no hardcoded 4000 fallback)
+    const noConfigAdapter = new ClaudeCodeAdapter({
+      role: "worker",
+    });
     expect(() => {
-      invalidAdapter.buildLaunch({
+      noConfigAdapter.buildLaunch({
         prompt: "do work",
         cwd: tempRepo,
         nativeSessionId: null,

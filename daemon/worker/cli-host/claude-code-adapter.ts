@@ -58,8 +58,12 @@ export interface ClaudeCodeAdapterOptions {
    * 不写用户个人的 ~/.claude；目录固定（不是临时目录），否则 --resume 跨重启找不到会话。
    */
   configDir?: string;
-  /** TASK-W.8：受管 MCP HTTP 端点 URL（Worker 角色写入 mcp.json） */
-  mcpServerUrl?: string;
+  /** TASK-W.8：受管 MCP HTTP 端点 URL 或解析器（Worker 角色写入 mcp.json） */
+  mcpServerUrl?: string | (() => string | undefined);
+  /** TASK-W.8：Daemon 端口号或解析器（用于动态合成 http://127.0.0.1:<port>/api/mcp） */
+  mcpPort?: number | (() => number | undefined);
+  /** TASK-W.8：MCP 认证 Token 或解析器（注入 mcpServers.stagent.headers.Authorization） */
+  authToken?: string | (() => string | undefined);
 }
 
 /**
@@ -220,22 +224,65 @@ export class ClaudeCodeAdapter implements ChatAdapter {
       mcpServers = {};
     } else {
       // worker 施工工人路径：必须挂接真实 Stagent MCP 端点；若端点不可用/未配置则明确报错，严禁静默降级为空集合
-      const mcpUrl =
-        this.opts.mcpServerUrl ??
-        process.env["STAGENT_MCP_URL"] ??
-        "http://127.0.0.1:4000/api/mcp";
+      let resolvedUrl: string | undefined = undefined;
 
-      if (!mcpUrl || typeof mcpUrl !== "string" || mcpUrl.trim().length === 0) {
+      if (typeof this.opts.mcpServerUrl === "function") {
+        resolvedUrl = this.opts.mcpServerUrl();
+      } else if (typeof this.opts.mcpServerUrl === "string") {
+        resolvedUrl = this.opts.mcpServerUrl;
+      }
+
+      if (!resolvedUrl) {
+        resolvedUrl = process.env["STAGENT_MCP_URL"];
+      }
+
+      if (!resolvedUrl) {
+        let port: number | undefined = undefined;
+        if (typeof this.opts.mcpPort === "function") {
+          port = this.opts.mcpPort();
+        } else if (typeof this.opts.mcpPort === "number") {
+          port = this.opts.mcpPort;
+        } else if (process.env["STAGENT_DAEMON_PORT"]) {
+          const parsed = Number.parseInt(process.env["STAGENT_DAEMON_PORT"], 10);
+          if (!Number.isNaN(parsed) && parsed > 0) {
+            port = parsed;
+          }
+        }
+        if (port && port > 0) {
+          resolvedUrl = `http://127.0.0.1:${port}/api/mcp`;
+        }
+      }
+
+      if (!resolvedUrl || typeof resolvedUrl !== "string" || resolvedUrl.trim().length === 0) {
         throw new Error(
           "Worker MCP endpoint URL is required under --strict-mcp-config; silent fallback to empty mcpServers is prohibited (TASK-W.8)",
         );
       }
 
+      const mcpUrl = resolvedUrl.trim();
+
+      let token: string | undefined = undefined;
+      if (typeof this.opts.authToken === "function") {
+        token = this.opts.authToken();
+      } else if (typeof this.opts.authToken === "string") {
+        token = this.opts.authToken;
+      } else if (process.env["STAGENT_SESSION_TOKEN"]) {
+        token = process.env["STAGENT_SESSION_TOKEN"];
+      }
+
+      const stagentConfig: Record<string, unknown> = {
+        type: "http",
+        url: mcpUrl,
+      };
+
+      if (token && token.trim().length > 0) {
+        stagentConfig["headers"] = {
+          Authorization: `Bearer ${token.trim()}`,
+        };
+      }
+
       mcpServers = {
-        stagent: {
-          type: "http",
-          url: mcpUrl.trim(),
-        },
+        stagent: stagentConfig,
       };
     }
     fs.writeFileSync(mcpPath, JSON.stringify({ mcpServers }, null, 2));

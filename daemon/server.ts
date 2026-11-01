@@ -288,7 +288,9 @@ import { DemoChatAdapter } from "./chat/demo-adapter";
 import {
   CLAUDE_CODE_VERIFIED_ON,
   ClaudeCodeAdapter,
+  type ClaudeCodeAdapterOptions,
 } from "./worker/cli-host/claude-code-adapter";
+import type { ScopedWorktreeGateway } from "./mcp/gateway";
 import {
   generateContractDraft,
   type DraftEnrichment,
@@ -455,7 +457,10 @@ export class StagentDaemon {
     this.maxConnectionsPerWindow = options.maxConnectionsPerWindow ?? 30;
     this.connectionWindowMs = options.connectionWindowMs ?? 10_000;
     this.maxClients = options.maxClients ?? 64;
-    this.mcpServer = new McpHttpServer();
+    this.mcpServer = new McpHttpServer({
+      gateway: () => this.orchestrator.getActiveGateway() ?? undefined,
+      isAuthorized: (req) => this.isAuthorized(req),
+    });
     // §3.3：图状态由 Daemon 独占维护；每次变更都以全量快照广播给前端。
     // 订阅放在构造期而不是首个请求，保证"第一个连接建立前发生的变更"
     // 也能在后续连接拿到磁盘上的最新状态（getGraph 会读盘恢复）。
@@ -793,6 +798,23 @@ export class StagentDaemon {
   /** 供 CLI / 测试读取本次会话 Token（服务端内存值） */
   getSessionToken(): string | null {
     return this.sessionToken;
+  }
+
+  /** TASK-W.8：动态更新/设置受管 MCP 端点绑定的 Gateway */
+  setActiveGateway(gateway: ScopedWorktreeGateway | null | undefined): void {
+    this.mcpServer.setGateway(gateway ?? undefined);
+  }
+
+  /** TASK-W.8：为 Worker 角色创建携带受管 MCP 端点认证与端口配置的 ClaudeCodeAdapter */
+  createWorkerClaudeAdapter(
+    options: Partial<ClaudeCodeAdapterOptions> = {},
+  ): ClaudeCodeAdapter {
+    return new ClaudeCodeAdapter({
+      role: "worker",
+      mcpPort: () => this.port ?? undefined,
+      authToken: () => this.sessionToken ?? undefined,
+      ...options,
+    });
   }
 
   /**
@@ -4830,6 +4852,13 @@ export class StagentDaemon {
 
     // TASK-W.8：受管 MCP HTTP 端点（供 Worker 在 --strict-mcp-config 下挂接）
     if (pathname === "/api/mcp" || pathname.startsWith("/api/mcp/")) {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, {
+          error: "Unauthorized",
+          message: "Bearer session token required",
+        });
+        return;
+      }
       await this.mcpServer.handleHttpRequest(req, res);
       return;
     }

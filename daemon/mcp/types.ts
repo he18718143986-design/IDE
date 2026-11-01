@@ -119,3 +119,6 @@ export const StagentWebIngestSchema = z.object({
   format: z.enum(["html", "text", "summary"]).default("html").optional(),
 });
 export type StagentWebIngestInput = z.infer<typeof StagentWebIngestSchema>;
+
+export const E_INGEST_NOT_WIRED = "E_INGEST_NOT_WIRED";
+export const E_WEB_INGEST_FORBIDDEN_DOMAIN = "E_WEB_INGEST_FORBIDDEN_DOMAIN";

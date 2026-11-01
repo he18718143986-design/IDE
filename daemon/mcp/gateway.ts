@@ -14,6 +14,8 @@ import {
   StagentDeleteFileSchema,
   StagentDeclareCompleteSchema,
   StagentWebIngestSchema,
+  E_INGEST_NOT_WIRED,
+  E_WEB_INGEST_FORBIDDEN_DOMAIN,
   type AuditLogEntry,
   type MCPToolCallResult,
   type MCPToolDefinition,
@@ -1051,7 +1053,7 @@ export class ScopedWorktreeGateway {
 
     const targetHost = targetUrl.hostname.toLowerCase();
     if (!allowedHosts.has(targetHost)) {
-      const code = "E_WEB_INGEST_FORBIDDEN_DOMAIN";
+      const code = E_WEB_INGEST_FORBIDDEN_DOMAIN;
       const message = `Host '${targetHost}' is not in authorized references[] whitelist`;
       this.logAudit({
         tool: "stagent_web_ingest",
@@ -1071,25 +1073,24 @@ export class ScopedWorktreeGateway {
       };
     }
 
+    // TASK-W.8: Domain verified, but web ingest backend proxy is pending TASK-L.17a.
+    // Return E_INGEST_NOT_WIRED honestly to prevent polluting delivery evidence.
+    const code = E_INGEST_NOT_WIRED;
+    const message = `Web ingest proxy backend is not wired (pending TASK-L.17a). Target domain '${targetHost}' is verified in references[] whitelist.`;
     this.logAudit({
       tool: "stagent_web_ingest",
       input: rawInput,
-      outcome: "SUCCESS",
+      outcome: "BLOCKED",
+      violationCode: code,
+      details: message,
     });
-
     return {
-      isError: false,
-      content: [
-        {
-          type: "text",
-          text: `[stagent_web_ingest] Successfully ingested content from '${rawUrl}' (format: ${format ?? "html"})`,
-        },
-      ],
-      data: {
-        url: rawUrl,
-        host: targetHost,
-        format: format ?? "html",
-        status: 200,
+      isError: true,
+      content: [{ type: "text", text: `[${code}] ${message}` }],
+      error: {
+        code,
+        message,
+        details: { host: targetHost, url: rawUrl, format: format ?? "html" },
       },
     };
   }

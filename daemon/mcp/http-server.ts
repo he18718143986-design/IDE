@@ -1,5 +1,4 @@
 import type http from "node:http";
-import { URL } from "node:url";
 import {
   StagentWebIngestSchema,
   type MCPToolCallResult,
@@ -18,6 +17,7 @@ import type { ScopedWorktreeGateway } from "./gateway";
 export const E_MCP_UNAUTHORIZED_TOOL = "E_MCP_UNAUTHORIZED_TOOL";
 export const E_MCP_METHOD_NOT_FOUND = "E_MCP_METHOD_NOT_FOUND";
 export const E_MCP_INVALID_REQUEST = "E_MCP_INVALID_REQUEST";
+export const E_MCP_GATEWAY_UNAVAILABLE = "E_MCP_GATEWAY_UNAVAILABLE";
 
 export const STAGENT_WEB_INGEST_TOOL_NAME = "stagent_web_ingest";
 
@@ -63,11 +63,13 @@ export interface JsonRpcResponse {
 export interface McpHttpServerOptions {
   gateway?: ScopedWorktreeGateway | (() => ScopedWorktreeGateway | undefined);
   allowedTools?: string[];
+  isAuthorized?: ((req: http.IncomingMessage) => boolean) | undefined;
 }
 
 export class McpHttpServer {
-  private readonly getGateway: () => ScopedWorktreeGateway | undefined;
+  private getGateway: () => ScopedWorktreeGateway | undefined;
   private readonly allowedTools: Set<string>;
+  private readonly isAuthorized?: ((req: http.IncomingMessage) => boolean) | undefined;
 
   constructor(options: McpHttpServerOptions = {}) {
     if (typeof options.gateway === "function") {
@@ -79,6 +81,20 @@ export class McpHttpServer {
     this.allowedTools = new Set(
       options.allowedTools ?? [STAGENT_WEB_INGEST_TOOL_NAME],
     );
+    this.isAuthorized = options.isAuthorized;
+  }
+
+  public setGateway(
+    gateway:
+      | ScopedWorktreeGateway
+      | (() => ScopedWorktreeGateway | undefined)
+      | undefined,
+  ): void {
+    if (typeof gateway === "function") {
+      this.getGateway = gateway;
+    } else {
+      this.getGateway = () => gateway;
+    }
   }
 
   public getRegisteredTools(): MCPToolDefinition[] {
@@ -178,68 +194,31 @@ export class McpHttpServer {
           };
         }
 
-        // Dispatch through Gateway
+        // Dispatch through Gateway (must fail-closed if no active gateway is mounted)
         const gateway = this.getGateway();
-        if (gateway) {
-          const callResult: MCPToolCallResult = await gateway.callTool(
-            toolName,
-            params.arguments ?? {},
-          );
+        if (!gateway) {
           return {
             jsonrpc: "2.0",
             id,
-            result: {
-              content: callResult.content,
-              isError: callResult.isError ?? false,
-              data: callResult.data,
-              error: callResult.error,
+            error: {
+              code: -32603,
+              message: `[${E_MCP_GATEWAY_UNAVAILABLE}] No active Worktree Gateway mounted to execute tool '${toolName}'`,
             },
           };
         }
 
-        // If no active gateway is mounted, validate schema directly and report unmounted
-        if (toolName === STAGENT_WEB_INGEST_TOOL_NAME) {
-          const parsed = StagentWebIngestSchema.safeParse(params.arguments ?? {});
-          if (!parsed.success) {
-            return {
-              jsonrpc: "2.0",
-              id,
-              result: {
-                isError: true,
-                content: [{ type: "text", text: parsed.error.message }],
-                error: {
-                  code: "INVALID_INPUT",
-                  message: parsed.error.message,
-                },
-              },
-            };
-          }
-          return {
-            jsonrpc: "2.0",
-            id,
-            result: {
-              isError: false,
-              content: [
-                {
-                  type: "text",
-                  text: `[stagent_web_ingest] URL '${parsed.data.url}' accepted (Gateway ready)`,
-                },
-              ],
-              data: {
-                url: parsed.data.url,
-                format: parsed.data.format ?? "html",
-                status: 200,
-              },
-            },
-          };
-        }
-
+        const callResult: MCPToolCallResult = await gateway.callTool(
+          toolName,
+          params.arguments ?? {},
+        );
         return {
           jsonrpc: "2.0",
           id,
-          error: {
-            code: -32601,
-            message: `Tool '${toolName}' not executable`,
+          result: {
+            content: callResult.content,
+            isError: callResult.isError ?? false,
+            data: callResult.data,
+            error: callResult.error,
           },
         };
       }
@@ -265,12 +244,32 @@ export class McpHttpServer {
 
     if (method === "OPTIONS") {
       res.writeHead(204, {
-        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Origin": req.headers.origin ?? "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
       });
       res.end();
       return;
+    }
+
+    if (this.isAuthorized && !this.isAuthorized(req)) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          error: "Unauthorized",
+          message: "Bearer session token required",
+        }),
+      );
+      return;
+    }
+
+    const corsHeaders: Record<string, string> = {
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    };
+    if (req.headers.origin) {
+      corsHeaders["Access-Control-Allow-Origin"] = req.headers.origin;
+      corsHeaders["Vary"] = "Origin";
     }
 
     if (method === "GET") {
@@ -281,7 +280,7 @@ export class McpHttpServer {
           "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache",
           Connection: "keep-alive",
-          "Access-Control-Allow-Origin": "*",
+          ...corsHeaders,
         });
         res.write(`event: endpoint\ndata: /api/mcp\n\n`);
         return;
@@ -289,7 +288,7 @@ export class McpHttpServer {
 
       res.writeHead(200, {
         "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
+        ...corsHeaders,
       });
       res.end(
         JSON.stringify({
@@ -304,10 +303,31 @@ export class McpHttpServer {
 
     if (method === "POST") {
       let body = "";
+      const limit = 2 * 1024 * 1024; // 2 MiB limit
+      let exceeded = false;
       req.on("data", (chunk: Buffer) => {
         body += chunk.toString("utf-8");
+        if (body.length > limit) {
+          exceeded = true;
+          res.writeHead(413, {
+            "Content-Type": "application/json",
+            ...corsHeaders,
+          });
+          res.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: null,
+              error: {
+                code: -32600,
+                message: "Payload Too Large: request body exceeds 2 MiB limit",
+              },
+            }),
+          );
+          req.destroy();
+        }
       });
       req.on("end", async () => {
+        if (exceeded) return;
         try {
           const json = JSON.parse(body) as JsonRpcRequest | JsonRpcRequest[];
           if (Array.isArray(json)) {
@@ -316,7 +336,7 @@ export class McpHttpServer {
             );
             res.writeHead(200, {
               "Content-Type": "application/json",
-              "Access-Control-Allow-Origin": "*",
+              ...corsHeaders,
             });
             res.end(JSON.stringify(results));
             return;
@@ -325,13 +345,13 @@ export class McpHttpServer {
           const response = await this.handleJsonRpc(json);
           res.writeHead(200, {
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
+            ...corsHeaders,
           });
           res.end(JSON.stringify(response));
         } catch (err) {
           res.writeHead(400, {
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
+            ...corsHeaders,
           });
           res.end(
             JSON.stringify({
@@ -348,7 +368,7 @@ export class McpHttpServer {
       return;
     }
 
-    res.writeHead(405, { "Content-Type": "application/json" });
+    res.writeHead(405, { "Content-Type": "application/json", ...corsHeaders });
     res.end(JSON.stringify({ error: "Method Not Allowed" }));
   }
 }
