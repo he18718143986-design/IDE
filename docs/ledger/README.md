@@ -10,7 +10,7 @@
 
 | 文件 | 内容 | 状态 |
 | :--- | :--- | :--- |
-| [`consistency-audit.md`](./consistency-audit.md) | 规格一致性审计台账：`C-` 待裁决矛盾、`M-` 机械修复、`OP-` 挂账项（OP-1～OP-35）、权威分层表 | 持续追加；**OP-1 / OP-13 / oq-2 已于 2026-11-01 销项**（见 consistency-audit「一之二」） |
+| [`consistency-audit.md`](./consistency-audit.md) | 规格一致性审计台账：`C-` 待裁决矛盾、`M-` 机械修复、`OP-` 挂账项（OP-1～OP-35）、权威分层表 | 持续追加；**OP-1 / OP-13 / oq-2 / oq-3 已于 2026-11-01 销项**（见 consistency-audit「一之二」） |
 | [`w3-known-gaps.md`](./w3-known-gaps.md) | W.3 环境 / 秘密 / 网络守卫的已知缺口 | 7 项中 2 项未修（`tmpRoot` GC、`splitShellSegments` 引号边界） |
 
 ## 文档治理挂账（2026-10-29 新增）
@@ -77,10 +77,12 @@
 | DLV-5 | 系统地图 UI（项目视图第二页）与「改这里会影响什么」入口 | **RESOLVED** | 卡 owner | **`TASK-L.18` COMPLETED**（[#54](https://github.com/he18718143986-design/IDE/pull/54)/`c8e6a81`）；interfaces consumers 行依赖见 completed 挂账 |
 | DLV-6 | L.11 DN-2「可以」HTTP / 画布入口 | **RESOLVED** | 卡 owner | **`TASK-J.19` COMPLETED**（[#55](https://github.com/he18718143986-design/IDE/pull/55)/`4bae423`）；`/api/design/*` + 画布卡；resume 不误路由 |
 | OQ-2 | 北极星「一模一样」判定标准已由用户拍板（dec-12）：对话试玩 + 结构化证据桩（绑定版本/原话/时间戳）；AI 引导不代判 | **RESOLVED** | 用户（q25） | [`../scheme.md`](../scheme.md) dec-12；L.17 验收标准补齐 |
+| OQ-3 | 登录信息保管口径已由用户拍板（dec-13）：凭据存 Vault 至手动删；cookie 过期 Daemon 静默重登（Worker 全程无感、零账密） | **RESOLVED** | 用户（q26） | [`../scheme.md`](../scheme.md) dec-13；`TASK-L.17a` 条款 |
 
 
 > **OP-1 实施（2026-11-01）**：裁决仍销项（consistency-audit / scheme dec-10）。**`TASK-J.20` COMPLETED**（[#57](https://github.com/he18718143986-design/IDE/pull/57)/`4d2f8e1`）。**`TASK-L.16` COMPLETED**（[#62](https://github.com/he18718143986-design/IDE/pull/62)/`e4dfe1c`）。
 > **oq-2 裁决（2026-11-01）**：北极星「一模一样」判据裁决已落笔（`scheme.md` dec-12 / `consistency-audit.md`「一之二」）。**`TASK-L.17` 产品阻塞已解除**，补写 PASS/FAIL 证据桩；按 DoR R-11 仍待拆分 L 估算开工；主序实现卡阶段性完备。物理 tip `e4dfe1c`。
+> **oq-3 裁决（2026-11-01）**：凭据保管与代登重登口径已落笔（`scheme.md` dec-13 / `consistency-audit.md`「一之二」）。**`TASK-L.17` 拆分为 `L.17a` + `L.17b` 并均达到 `[READY]`**；主序首要推进 `TASK-L.17a`（已就绪）。物理 tip 对齐 `042e570`。
 
 ## DoR 全量审计挂账（2026-10-31 新增）
 
