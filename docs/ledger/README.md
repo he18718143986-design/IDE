@@ -10,7 +10,7 @@
 
 | 文件 | 内容 | 状态 |
 | :--- | :--- | :--- |
-| [`consistency-audit.md`](./consistency-audit.md) | 规格一致性审计台账：`C-` 待裁决矛盾、`M-` 机械修复、`OP-` 挂账项（OP-1～OP-38）、权威分层表 | 持续追加；**OP-1 / OP-13 / oq-2 / oq-3 已于 2026-11-01 销项**（见 consistency-audit「一之二」）；**2026-11-02 P-112 新增 OP-36～OP-38**（L.17b 三条边界，见 completed §3.4f） |
+| [`consistency-audit.md`](./consistency-audit.md) | 规格一致性审计台账：`C-` 待裁决矛盾、`M-` 机械修复、`OP-` 挂账项（OP-1～OP-38）、权威分层表 | 持续追加；**OP-1 / OP-13 / oq-2 / oq-3 已于 2026-11-01 销项**（见 consistency-audit「一之二」）；**2026-11-02 P-112 新增 OP-36～OP-38**（L.17b 三条边界，见 completed §3.4f）；**P-113 W.6 两条边界沿用 P-112 先例仅归拢至 completed §3.4g、不另立 OP 号** |
 | [`w3-known-gaps.md`](./w3-known-gaps.md) | W.3 环境 / 秘密 / 网络守卫的已知缺口 | 7 项中 2 项未修（`tmpRoot` GC、`splitShellSegments` 引号边界） |
 
 ## 文档治理挂账（2026-10-29 新增）
@@ -72,7 +72,7 @@
 | SA-1 | ADR-0014 敏感项授权已选定开工一并授权机制（dec-8） | **RESOLVED** | 用户（q22） | [`../specs/delivery-lifecycle.md`](../specs/delivery-lifecycle.md) §5 |
 | DLV-1 | ADR-0015～0017 均已由用户原话 q22 明确授权生效（DEC-006～008） | **RESOLVED** | 用户（q22） | [`../scheme.md`](../scheme.md) §6 |
 | DLV-2 | PR #3 已由用户批准并执行物理关闭 | **RESOLVED** | 用户 | PR #3 已关闭 |
-| DLV-3 | `AdapterRegistry` 未接线，Worker 只有 OpenAI `AiWorker`；Claude Code 作 Worker（W.5a 的 worker 角色）未接入派工 | NON_BLOCKER（M2 不依赖） | 卡 owner | **已立卡 `TASK-W.6`**（可开；不与 W.5b/c 同窗；L.16 已 COMPLETED 不抢位）；**自助注册/自动验证已立卡 `TASK-W.7`**（硬前置 W.6；落地后 W.5b/c 可作回归用例） |
+| DLV-3 | ~~`AdapterRegistry` 未接线，Worker 只有 OpenAI `AiWorker`；Claude Code 作 Worker 未接入派工~~ | **RESOLVED**（原 NON_BLOCKER · M2 不依赖） | 卡 owner | **`TASK-W.6` COMPLETED**（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`）：Registry 挂派工工厂、双内置 id 受控派工、缺注册/非受控显式错误码不静默降级；Claude Code worker 仅登记 `UNCONTROLLED_EXTERNAL`（红线，不作受控执行器）；能力载体 `run()` 显式抛错。见 completed §3.4g。**自助注册/自动验证 `TASK-W.7`** 硬前置已解除（仍 `[NEW_TASK]`，排程在 W.5c 之后）；落地后 W.5b/c 可作回归用例 |
 | DLV-4 | `.stagent/metadata/` 写入与 ADR-0011 冲突 → **已迁 records** | **RESOLVED** | 卡 owner | **`TASK-H.9` COMPLETED**（[#50](https://github.com/he18718143986-design/IDE/pull/50)/`34213c8`）；legacy 只读迁移 |
 | DLV-5 | 系统地图 UI（项目视图第二页）与「改这里会影响什么」入口 | **RESOLVED** | 卡 owner | **`TASK-L.18` COMPLETED**（[#54](https://github.com/he18718143986-design/IDE/pull/54)/`c8e6a81`）；interfaces consumers 行依赖见 completed 挂账 |
 | DLV-6 | L.11 DN-2「可以」HTTP / 画布入口 | **RESOLVED** | 卡 owner | **`TASK-J.19` COMPLETED**（[#55](https://github.com/he18718143986-design/IDE/pull/55)/`4bae423`）；`/api/design/*` + 画布卡；resume 不误路由 |
@@ -84,6 +84,7 @@
 > **oq-2 裁决（2026-11-01）**：北极星「一模一样」判据裁决已落笔（`scheme.md` dec-12 / `consistency-audit.md`「一之二」）。**`TASK-L.17` 产品阻塞已解除**，补写 PASS/FAIL 证据桩；按 DoR R-11 仍待拆分 L 估算开工；主序实现卡阶段性完备。物理 tip `e4dfe1c`。
 > **oq-3 裁决（2026-11-01）**：凭据保管与代登重登口径已落笔（`scheme.md` dec-13 / `consistency-audit.md`「一之二」）。`TASK-L.17a`（受控摄取与代登代理）已合入完成 **`[COMPLETED]`**（[#70](https://github.com/he18718143986-design/IDE/pull/70)/`8516c3d`）；`TASK-L.17b` 解除阻断就绪为 **`[READY]`**。当前物理 tip `8516c3d`。
 > **L.17b 交付（2026-11-02 · P-112 · M5 主序收官）**：`TASK-L.17b`（对比视图与试玩证据桩）已合入完成 **`[COMPLETED]`**（[#72](https://github.com/he18718143986-design/IDE/pull/72)/`d26def6`，squash merge）。**M5 北极星主序 L.16 → L.17a → L.17b 全部落完**，当前物理 tip `d26def6`。残余边界 6 条同批归拢（L.17b 三条 OP-36～38 + W.8 两条 + L.17a `request.headers` 一条，见 consistency-audit「三」与 completed §3.4f）。**不宣称端到端 UI 闭环**（CompareView 未挂路由、原话采集 UI 未实现、`check playtest` 未接 verification profile）。
+> **W.6 交付（2026-11-02 · P-113 · 主序收官后首张债卡销项）**：`TASK-W.6`（AdapterRegistry 接线与 Claude Worker 派工，ledger **DLV-3**）已合入完成 **`[COMPLETED]`**（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`，squash merge），**DLV-3 台账债销项**。当前物理 tip `b5d8c53`。落实「Registry 挂派工工厂」：内置 Managed AI 受控派工 + 双 id 别名化解默认值不一致；Claude Code worker 仅登记 `UNCONTROLLED_EXTERNAL`、不挂工厂（红线：不当受控证据）；缺注册/非受控/无工厂显式错误码、不静默降级；能力载体 `run()` 合前审阅修复为显式 `throw`。残余边界 2 条（能力载体 `run()` 语义已修记为设计决策、`GET /api/adapters` 未做端到端 HTTP 验证）**仅归拢**至 `development-tasks-completed.md` §3.4g，**沿用 P-112 先例不另立 OP 号**（OP 范围仍 OP-1～OP-38）。**不宣称端到端闭环**；Sprint 下一张 `W.5c`（容器沙箱），`ruling 3`（`check playtest` 接验收档）docs 待落盘。
 
 ## DoR 全量审计挂账（2026-10-31 新增）
 
