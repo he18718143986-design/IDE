@@ -74,11 +74,11 @@
 | DLV-2 | PR #3 已由用户批准并执行物理关闭 | **RESOLVED** | 用户 | PR #3 已关闭 |
 | DLV-3 | `AdapterRegistry` 未接线，Worker 只有 OpenAI `AiWorker`；Claude Code 作 Worker（W.5a 的 worker 角色）未接入派工 | NON_BLOCKER（M2 不依赖） | 卡 owner | **已立卡 `TASK-W.6`**（不抢 L.15） |
 | DLV-4 | `.stagent/metadata/` 写入与 ADR-0011 冲突 → **已迁 records** | **RESOLVED** | 卡 owner | **`TASK-H.9` COMPLETED**（[#50](https://github.com/he18718143986-design/IDE/pull/50)/`34213c8`）；legacy 只读迁移 |
-| DLV-5 | 系统地图 UI（项目视图第二页）与「改这里会影响什么」入口 | NON_BLOCKER | — | **已立卡 `TASK-L.18`**（前置 L.12 COMPLETED；不抢 L.15）；规格 [`../specs/technical-design-and-knowledge.md`](../specs/technical-design-and-knowledge.md) §5 |
-| DLV-6 | L.11 DN-2「可以」：`resolveDesignDependencyAllow` 已合入且集成测覆盖，**无** HTTP / 画布意外卡入口（`POST .../resume` 不路由至此）。**不**阻断 L.11 领域验收 | NON_BLOCKER | 卡 owner | **已立卡 `TASK-J.19`**（可参照 J.7 UX；不抢 L.15）；代码 `orchestrator.ts::resolveDesignDependencyAllow` |
+| DLV-5 | 系统地图 UI（项目视图第二页）与「改这里会影响什么」入口 | **RESOLVED** | 卡 owner | **`TASK-L.18` COMPLETED**（[#54](https://github.com/he18718143986-design/IDE/pull/54)/`c8e6a81`）；interfaces consumers 行依赖见 completed 挂账 |
+| DLV-6 | L.11 DN-2「可以」HTTP / 画布入口 | **RESOLVED** | 卡 owner | **`TASK-J.19` COMPLETED**（[#55](https://github.com/he18718143986-design/IDE/pull/55)/`4bae423`）；`/api/design/*` + 画布卡；resume 不误路由 |
 
 
-> **OP-1 实施（2026-11-01）**：裁决仍销项（consistency-audit / scheme dec-10）；白名单存储/scope/失效落地归 **`TASK-J.20`**（**不**回写已 COMPLETED 的 `TASK-J.9`）。Sprint 首要现为 **L.16**（L.15 已 COMPLETED / #52 / `9829385`；物理 tip `6944f7d`（含 #58 A.7/H.9 docs）；A.7/H.9 docs 已 COMPLETED，见 #58/`6944f7d`）。
+> **OP-1 实施（2026-11-01）**：裁决仍销项（consistency-audit / scheme dec-10）。**`TASK-J.20` COMPLETED**（[#57](https://github.com/he18718143986-design/IDE/pull/57)/`4d2f8e1`）——白名单粒度：**同一路径集**精确匹配、TTL ≤90d、保护清单内容指纹变失效；复活路径仍忽略 occurrence。Sprint 首要现为 **L.16**；物理 tip `4bae423`（含 #55/#54/#57）。
 
 ## DoR 全量审计挂账（2026-10-31 新增）
 

@@ -3205,6 +3205,102 @@
 
 <a id="task-c.5"></a>
 
+<a id="task-l.18"></a>
+
+#### 【Task L.18】系统地图 UI 与「改这里会影响什么」`[COMPLETED]`（ledger **DLV-5**）
+
+* **任务编号**：`TASK-L.18`
+* **任务名称**：中栏系统地图（知识库第二页）+ 影响闭包入口
+* **对应规格**：[`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) §5；supervisor 中栏/地图嵌入；ledger **DLV-5**；对照 `TASK-L.10`（项目地图已 COMPLETED）
+* **前置依赖**：`TASK-L.10`（COMPLETED）、`TASK-L.12`（COMPLETED · 提供 `modules.yaml`；**本卡不抢 L.15**）
+* **优先级**：P3 · **NON_BLOCKER**（合入时相对 Sprint 首要；前置 `L.12`/`L.13` 已 COMPLETED）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#54](https://github.com/he18718143986-design/IDE/pull/54) / tip `c8e6a81`（`feat(L.18): 系统地图 UI + impactClosure（/api/knowledge/*）`；本地 squash merge 后推送 main）
+* **合入说明**：同页嵌 `SystemMapPane`；`impactClosure` 纯函数；`GET /api/knowledge/modules|impact`（Auth）。
+* **已知挂账（合入时）**：interfaces 消费者解析只认 `consumers:` / `消费者:` 行——模块文档不写该行则静默漏消费者；`rel.includes("..")` 与 L.13 同款误拒（如 `a..b.ts`）。**不宣称端到端闭环**。
+* **对照痛点（代码事实 · 合入前）**：L.10 已有「项目地图」；本卡落地系统地图与 impactClosure（见合入证据）。
+* **一句话目标**：用户能在中栏看到系统模块地图，并在编辑器/右栏只读问答里问「改这里会影响什么」得到确定性闭包，而不是空话。
+* **范围**：
+  1. 中栏方案工作台内嵌「系统地图」页（**同页嵌**，禁止另开 ActivityBar「项目」Tab——沿用 L.10 入口纪律）：读目标仓 `docs/system/modules.yaml`，代码渲染依赖图（不由模型画图）。
+  2. `daemon` 或 `src/lib`：`impactClosure({ modules, path })` → 受影响模块列表（反向 `depends_on` + interfaces 消费者）；`GET /api/knowledge/impact?path=`。
+  3. 编辑器右键 / 右栏只读问答入口调用上述 API，白话展示。
+  4. 测试：`tests/unit/knowledge-impact.test.ts` + UI 烟测（地图空态 / 有 modules 渲染）。
+* **非目标**：不做 L.13「这段为什么存在」（Trailer 反查）；不重做 L.10 项目计划地图；不引入 Cytoscape 架构雷达（C.4 仍 DEFERRED）。
+* **不变声明**：右栏只读（J.1）；网关写范围不变。
+* **验收（PASS）**：有 `modules.yaml` 时地图可见模块卡；对已知边 `impactClosure` 与夹具一致；无 modules 时诚实空态。
+* **FAIL**：另开独立 ActivityBar Tab；或用模型生成依赖图当权威。
+* **关键文件**：`src/components/` 地图页（新）、impact 纯函数/API（新）、L.10 同页嵌入口（改）、测试
+* **估算**：M
+* **台账**：ledger **DLV-5** → 已立卡 `TASK-L.18`；L.12 非目标「系统地图另卡」→ 本卡。
+
+---
+
+<a id="task-j.19"></a>
+
+#### 【Task J.19】DN-2「可以」HTTP / 画布入口接线 `[COMPLETED]`（ledger **DLV-6**）
+
+* **任务编号**：`TASK-J.19`
+* **任务名称**：把已测的 `resolveDesignDependencyAllow` 接到用户可达入口
+* **对应规格**：[`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) DN-2；L.11 合入挂账；ledger **DLV-6**；可参照 `TASK-J.7` 交接/意外卡 UX 模式
+* **前置依赖**：`TASK-L.11`（COMPLETED）、`TASK-J.7`（COMPLETED · 交接三步/右栏解锁模式可复用）
+* **优先级**：P3 · **NON_BLOCKER**（不阻断 L.11 领域验收；**不阻断** `TASK-L.16`）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#55](https://github.com/he18718143986-design/IDE/pull/55) / tip `4bae423`（`feat(J.19): DN-2「可以/不行」HTTP + 画布入口`；本地 squash merge 后推送 main；rebase 时 `server.ts` 保留 `/api/knowledge/*` + `/api/design/*`）
+* **合入说明**：HTTP `/api/design/:id/dependency-surprise|allow|deny`；allow → `resolveDesignDependencyAllow`；deny → abort 不插桩；侧车 `.stagent/records/`；resume 不误路由。
+* **已知挂账（合入时）**：无 ledger 时 HTTP 用 `synthesizeSchemeFromPlan` 合成最小 scheme（goals/modules 标 `source: "user_said"`）——降级路径，不是真用户原话。**不宣称端到端产品闭环**。
+* **对照痛点（代码事实）**：`daemon/pipeline/orchestrator.ts::resolveDesignDependencyAllow` 已合入且集成测覆盖；`POST .../resume` **不**路由至此；画布无「可以」装新库入口 → 用户不可达（DLV-6）。
+* **一句话目标**：设计步骤因 DN-2 挂起时，用户在意外卡点「可以」能走到领域方法并触发重签/依赖桩流程；「不行」走既有拒绝路径。
+* **范围**：
+  1. HTTP：例如 `POST /api/contracts/:id/design/dependency-allow`（名称以实装为准）鉴权后调用 `resolveDesignDependencyAllow`；对称的 deny/拒绝若缺则补。
+  2. 画布意外卡：「可以 / 不行」按钮接线；文案白话；禁止假闭环（须真实调用领域方法）。
+  3. 测试：API 级 + UI/集成各至少一条命中 `resolveDesignDependencyAllow`；`resume` 仍不误路由。
+* **非目标**：不重做 DN-1～DN-5 校验；不改 DesignNote schema；不把入口做成静默自动装依赖。
+* **不变声明**：鉴权不变；未获「可以」不得放行新依赖进施工。
+* **验收（PASS）**：用户路径可达；领域方法被调用；重签/abort 语义与 L.11 卡内「已知挂账」描述一致且不再挂「无入口」。
+* **FAIL**：仅 UI 按钮无 handler；或宣称端到端闭环但未调 `resolveDesignDependencyAllow`。
+* **关键文件**：`daemon/server.ts`（路由）、编排调用、画布意外卡组件、测试
+* **估算**：S
+* **台账**：ledger **DLV-6** → 已立卡 `TASK-J.19`。
+
+---
+
+<a id="task-j.20"></a>
+
+#### 【Task J.20】OP-1 授权清单落地（dec-10 实施约束）`[COMPLETED]`
+
+* **任务编号**：`TASK-J.20`
+* **任务名称**：确认路径敏感项授权清单的存储、scope 与失效条件
+* **对应规格**：[`../scheme.md`](../scheme.md) dec-10 / q23 / R-OP1；supervisor §14.11 **K-12**（确认路径 occurrence 洗白）；[`delivery-lifecycle.md`](./delivery-lifecycle.md) §5 **SA-1**；consistency-audit OP-1（裁决已销项，**实施**归本卡）
+* **前置依赖**：`TASK-J.3` / `TASK-J.5` / `TASK-J.9`（均 **COMPLETED**）；**不**重开 `TASK-J.9`
+* **优先级**：P2 · **NON_BLOCKER** 相对 L.15 主序（**不抢** Sprint「当前首要」）；实施敏感授权面，须单卡审
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#57](https://github.com/he18718143986-design/IDE/pull/57) / tip `4d2f8e1`（`feat(J.20): OP-1 授权清单落地（records 侧车 + 确认路径自动放行）`；GitHub squash merge）
+* **合入说明**：存储 `.stagent/records/authorization-allowlist.json`；确认路径 `buildScopePlan` 末尾挂载；复活路径源码级断言仍 `ignoreOccurrence` 且不含 allowlist 字样。
+* **已知挂账（合入时）**：① 「同一敏感项」= 规范化路径集合完全相同（精确匹配，不是语义区域）；② 路径含 `|` 字符理论上会撞键（现实几乎不存在）。**不宣称端到端闭环**。
+* **为何不改 J.9**：`TASK-J.9` 已 **COMPLETED**（SchemePatch 零模型合并引擎，[#12](https://github.com/he18718143986-design/IDE/pull/12)）。裁决原文曾写「落地细节由实施卡确定 / 留待 J.9」——**J.9 当时已合入**，属过时指针。证据纪律禁止把未完成实施塞回 COMPLETED 卡。本卡为 **新实施卡**，只补约束与代码，**不重开裁决**、不改 dec-10 方向。
+* **对照痛点（代码事实）**：K-12 / dec-10 已定「确认开工点名敏感项 → 授权清单 → 后续合同同项自动放行」；今日无独立授权清单存储与 scope/失效规则，SA-1 仍以单次合同 `needs_approval` 为主。
+* **一句话目标**：跨合同自动放行**可审计、可失效**；「批一次」≠「永久免检」。
+* **采用的默认值（实施约束 · 本卡写死，勿再开产品冲突卡）**：
+  1. **存储位置**：项目级侧车（建议 `.stagent/records/authorization-allowlist.json` 或 SchemeSnapshot 附属字段；PR 内二选一并测；**禁止**写入已废止的 `.stagent/metadata/`）。
+  2. **scope 粒度**：默认 **按仓库（repoRoot）** 生效；条目键 = 规范化敏感路径或保护项 id（与 SA-1 点名规则同款）；**跨合同**复用同一清单。
+  3. **失效条件**（满足任一即不得自动放行，须重新点名/确认开工）：清单项被用户显式撤销；保护清单/P.1 规则升级导致项重新分类；仓库更换；条目 TTL（若实装则默认 ≤ 90 天，可配置）；契约 `plan_digest` 基线被用户「清空授权」动作清除。
+  4. **不对称**：复活路径仍忽略 `occurrence`（K-12）；本清单**只**服务确认路径自动放行。
+* **范围**：
+  1. 类型 + 读写：`readAllowlist` / `writeAllowlist` / `isPreauthorized(sensitiveId)`。
+  2. 「确认开工」成功路径：将本次点名敏感项写入清单（带 `authorized_at`、`source_contract_id`、`quote` 溯源）。
+  3. `evaluateSchemeConfirmation` / Scope 预检：同项已授权且未失效 → 不再阻塞 `E_SCOPE_APPROVAL_REQUIRED`；证据可审计。
+  4. 测试：跨合同同项自动放行；撤销/TTL/换仓后恢复拦截；复活路径行为不变。
+* **非目标**：不重开 OP-1 裁决；不改 J.9 合并引擎公式；不放宽 P.1 物理门禁（未授权敏感写入仍拒）。
+* **不变声明**：物理保护清单与网关写范围：**不放宽**；鉴权 / Demo Origin：**不变**。
+* **验收（PASS）**：`tests/unit/authorization-allowlist.test.ts`（名可调）覆盖写入、跨合同命中、失效再拦截、复活路径不读清单。
+* **FAIL**：无失效条件的「永久免检」；或把清单写进 `.stagent/metadata/`。
+* **关键文件**：新 allowlist 模块、确认/预检接线、supervisor/delivery 短注（若行为入规格）、测试
+* **估算**：M
+* **台账**：OP-1 裁决仍销项；consistency-audit / scheme R-OP1 补「实施卡 = TASK-J.20」。
+
+---
+
+
 #### 【Task C.5】双栏 Diff 审阅器与结构化终端日志回放
 * **任务编号**：`TASK-C.5`
 * **前置依赖**：`TASK-C.1`, `TASK-A.4` (COMPLETED)（v1.3.3：移除已推迟的 `TASK-C.4`）
