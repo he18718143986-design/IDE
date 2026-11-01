@@ -218,4 +218,95 @@ describe("TASK-L.17a: Daemon Web Ingest Proxy", () => {
     expect(summary.title).toBe("Test Title");
     expect(summary.h1).toEqual(["H1 Heading"]);
   });
+
+  it("blocks redirect bypass when whitelisted domain returns 302 to external domain (ADR-0014 §3)", async () => {
+    const mockFetch = vi.fn().mockImplementation((url: string, opts: any) => {
+      expect(opts.redirect).toBe("manual");
+      if (url === "https://docs.reference.org/external-jump") {
+        return new Response("", {
+          status: 302,
+          headers: {
+            Location: "https://evil.external-attacker.com/pwned",
+          },
+        });
+      }
+      return new Response("OK", { status: 200 });
+    });
+
+    const proxy = new WebIngestProxy({
+      allowedDomains: allowedReferences,
+      fetchFn: mockFetch as any,
+    });
+
+    await expect(
+      proxy.fetch({ url: "https://docs.reference.org/external-jump" }),
+    ).rejects.toMatchObject({
+      code: E_WEB_INGEST_FORBIDDEN_DOMAIN,
+      status: 403,
+    });
+  });
+
+  it("allows redirect within whitelisted domains and tracks final url", async () => {
+    let callCount = 0;
+    const mockFetch = vi.fn().mockImplementation((url: string, opts: any) => {
+      expect(opts.redirect).toBe("manual");
+      callCount++;
+      if (url === "https://docs.reference.org/old-guide") {
+        return new Response("", {
+          status: 301,
+          headers: {
+            Location: "https://docs.reference.org/guide",
+          },
+        });
+      }
+      if (url === "https://docs.reference.org/guide") {
+        return new Response("<html><body>Safe Guide Content</body></html>", {
+          status: 200,
+          headers: { "Content-Type": "text/html" },
+        });
+      }
+      return new Response("Not Found", { status: 404 });
+    });
+
+    const proxy = new WebIngestProxy({
+      allowedDomains: allowedReferences,
+      fetchFn: mockFetch as any,
+    });
+
+    const result = await proxy.fetch({ url: "https://docs.reference.org/old-guide" });
+    expect(result.status).toBe(200);
+    expect(result.url).toBe("https://docs.reference.org/guide");
+    expect(result.content).toContain("Safe Guide Content");
+    expect(callCount).toBe(2);
+  });
+
+  it("prevents Worker from injecting or overriding Cookie or Authorization via request.headers", async () => {
+    let capturedHeaders: Record<string, string> = {};
+    const mockFetch = vi.fn().mockImplementation((_url: string, opts: any) => {
+      capturedHeaders = opts.headers;
+      return new Response("OK", { status: 200 });
+    });
+
+    const proxy = new WebIngestProxy({
+      allowedDomains: allowedReferences,
+      fetchFn: mockFetch as any,
+    });
+
+    await proxy.fetch({
+      url: "https://docs.reference.org/guide",
+      headers: {
+        Cookie: "worker_injected_cookie=malicious",
+        cookie: "lowercase_cookie=evil",
+        Authorization: "Bearer worker_token",
+        "X-Custom-Safe": "allowed-value",
+      },
+    });
+
+    // Injected Cookie and Authorization headers MUST be stripped
+    expect(capturedHeaders["Cookie"]).toBeUndefined();
+    expect(capturedHeaders["cookie"]).toBeUndefined();
+    expect(capturedHeaders["Authorization"]).toBeUndefined();
+    expect(capturedHeaders["authorization"]).toBeUndefined();
+    expect(capturedHeaders["X-Custom-Safe"]).toBe("allowed-value");
+  });
 });

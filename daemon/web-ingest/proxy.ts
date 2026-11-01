@@ -104,64 +104,131 @@ export class WebIngestProxy {
       );
     }
 
-    const host = targetUrl.hostname.toLowerCase();
     const allowed = this.getAllowedDomains();
-    if (!allowed.has(host)) {
-      throw new WebIngestError(
-        E_WEB_INGEST_FORBIDDEN_DOMAIN,
-        `Host '${host}' is not in authorized references[] whitelist`,
-        403,
-        { host, allowedHosts: Array.from(allowed) },
-      );
-    }
-
-    // 3. 速率限制检查
-    this.checkRateLimit(host);
-
-    // 4. 携带代登 Session Cookie（若有）
-    const headers: Record<string, string> = {
-      "User-Agent": "Stagent-Daemon-WebIngest/1.0",
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      ...(request.headers ?? {}),
-    };
-
-    let cookie = await this.authSessionManager.authenticate(host, {
-      fetchFn: this.fetchFn,
-    });
-    if (cookie) {
-      headers["Cookie"] = cookie;
-    }
-
-    // 5. 向上游发起抓取请求
+    const maxRedirectHops = 3;
+    let currentUrl = targetUrl;
     let res: Response;
-    try {
-      res = await this.fetchFn(targetUrl.toString(), {
-        method: "GET",
-        headers,
-      });
-    } catch (err: unknown) {
-      throw new WebIngestError(
-        E_WEB_INGEST_FETCH_FAILED,
-        `Failed to reach upstream host '${host}': ${(err as Error).message}`,
-        502,
-      );
-    }
 
-    // 6. dec-13 条款 2：Cookie 过期静默重登
-    // 若收到 401/403 且配置了代登凭据，由 Daemon 用 Vault 账密静默重登换取新 Cookie 并重试一次，Worker 全程无感
-    if ((res.status === 401 || res.status === 403) && this.authSessionManager.hasAuthConfig(host)) {
-      try {
-        cookie = await this.authSessionManager.handleSessionExpired(host, this.fetchFn);
-        if (cookie) {
-          headers["Cookie"] = cookie;
-          res = await this.fetchFn(targetUrl.toString(), {
-            method: "GET",
-            headers,
-          });
-        }
-      } catch {
-        // 重登尝试失败不向 Worker 暴露账密或重登内部细节，按常规上游响应处理
+    // 重定向与抓取循环：redirect: "manual" 强制逐跳检查白名单，防止 302 旁路绕过
+    for (let hop = 0; ; hop++) {
+      const host = currentUrl.hostname.toLowerCase();
+      if (!allowed.has(host)) {
+        throw new WebIngestError(
+          E_WEB_INGEST_FORBIDDEN_DOMAIN,
+          `Host '${host}' is not in authorized references[] whitelist`,
+          403,
+          { host, allowedHosts: Array.from(allowed) },
+        );
       }
+
+      // 3. 速率限制检查
+      this.checkRateLimit(host);
+
+      // 4. 安全过滤外部传入的 headers，禁止 Worker 伪造/注入 Cookie 与 Authorization
+      const safeCustomHeaders: Record<string, string> = {};
+      if (request.headers) {
+        for (const [k, v] of Object.entries(request.headers)) {
+          const lower = k.toLowerCase();
+          if (lower === "cookie" || lower === "authorization" || lower === "set-cookie") {
+            continue;
+          }
+          safeCustomHeaders[k] = v;
+        }
+      }
+
+      const headers: Record<string, string> = {
+        "User-Agent": "Stagent-Daemon-WebIngest/1.0",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        ...safeCustomHeaders,
+      };
+
+      // 5. 携带代登 Session Cookie（Daemon 凭据覆盖，Worker 无法覆盖）
+      let cookie = await this.authSessionManager.authenticate(host, {
+        fetchFn: this.fetchFn,
+      });
+      if (cookie) {
+        headers["Cookie"] = cookie;
+      }
+
+      // 6. 向上游发起抓取请求（redirect: "manual" 禁止底层自动跳转）
+      try {
+        res = await this.fetchFn(currentUrl.toString(), {
+          method: "GET",
+          headers,
+          redirect: "manual",
+        });
+      } catch (err: unknown) {
+        throw new WebIngestError(
+          E_WEB_INGEST_FETCH_FAILED,
+          `Failed to reach upstream host '${host}': ${(err as Error).message}`,
+          502,
+        );
+      }
+
+      // 7. dec-13 条款 2：Cookie 过期静默重登
+      // 若收到 401/403 且配置了代登凭据，由 Daemon 用 Vault 账密静默重登换取新 Cookie 并重试一次，Worker 全程无感
+      if ((res.status === 401 || res.status === 403) && this.authSessionManager.hasAuthConfig(host)) {
+        try {
+          cookie = await this.authSessionManager.handleSessionExpired(host, this.fetchFn);
+          if (cookie) {
+            headers["Cookie"] = cookie;
+            res = await this.fetchFn(currentUrl.toString(), {
+              method: "GET",
+              headers,
+              redirect: "manual",
+            });
+          }
+        } catch {
+          // 重登尝试失败不向 Worker 暴露账密或重登内部细节，按常规上游响应处理
+        }
+      }
+
+      // 8. 检查 3xx 重定向防线（白名单防旁路）
+      if (res.status >= 300 && res.status < 400) {
+        const locationHeader = res.headers.get("location");
+        if (locationHeader) {
+          if (hop >= maxRedirectHops) {
+            throw new WebIngestError(
+              E_WEB_INGEST_FETCH_FAILED,
+              `Too many redirects (exceeded limit of ${maxRedirectHops} hops) from '${host}'`,
+              502,
+            );
+          }
+          let redirectTarget: URL;
+          try {
+            redirectTarget = new URL(locationHeader, currentUrl);
+          } catch {
+            throw new WebIngestError(
+              E_WEB_INGEST_INVALID_URL,
+              `Invalid redirect location header '${locationHeader}' from '${host}'`,
+              400,
+            );
+          }
+
+          if (redirectTarget.protocol !== "http:" && redirectTarget.protocol !== "https:") {
+            throw new WebIngestError(
+              E_WEB_INGEST_INVALID_URL,
+              `Redirect protocol '${redirectTarget.protocol}' not supported`,
+              400,
+            );
+          }
+
+          const redirectHost = redirectTarget.hostname.toLowerCase();
+          if (!allowed.has(redirectHost)) {
+            throw new WebIngestError(
+              E_WEB_INGEST_FORBIDDEN_DOMAIN,
+              `Redirect target host '${redirectHost}' is not in authorized references[] whitelist`,
+              403,
+              { host: redirectHost, allowedHosts: Array.from(allowed) },
+            );
+          }
+
+          currentUrl = redirectTarget;
+          continue;
+        }
+      }
+
+      break;
     }
 
     // 7. 检查响应大小上限（通过 Content-Length 预检）
@@ -217,7 +284,7 @@ export class WebIngestProxy {
     }
 
     return {
-      url: targetUrl.toString(),
+      url: currentUrl.toString(),
       status: res.status,
       format,
       content,

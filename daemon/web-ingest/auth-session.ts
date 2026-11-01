@@ -146,14 +146,29 @@ export class AuthSessionManager {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(creds),
       });
+      if (!res.ok) {
+        throw new WebIngestError(
+          E_WEB_INGEST_AUTH_FAILED,
+          `Login request to '${config.loginUrl}' failed with status ${res.status}`,
+          401,
+        );
+      }
       const setCookie = res.headers.get("set-cookie");
       if (setCookie) {
         cookie = setCookie;
       } else {
-        cookie = `session_token=${encodeURIComponent(rawSecret.slice(0, 32))}`;
+        throw new WebIngestError(
+          E_WEB_INGEST_AUTH_FAILED,
+          `Login request to '${config.loginUrl}' succeeded but returned no Set-Cookie header`,
+          401,
+        );
       }
     } else {
-      cookie = `auth_token=${encodeURIComponent(rawSecret)}`;
+      throw new WebIngestError(
+        E_WEB_INGEST_AUTH_FAILED,
+        `No loginHandler or loginUrl configured for domain '${norm}'`,
+        401,
+      );
     }
 
     this.sessions.set(norm, {

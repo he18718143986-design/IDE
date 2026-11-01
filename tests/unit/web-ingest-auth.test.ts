@@ -112,4 +112,58 @@ describe("TASK-L.17a: Web Ingest Vault Auth and Worker Redaction", () => {
       status: 401,
     });
   });
+
+  it("fails honestly with E_WEB_INGEST_AUTH_FAILED when loginUrl returns no Set-Cookie or non-2xx status", async () => {
+    // 1. Case: loginUrl returns 200 but no Set-Cookie header
+    authManager.registerAuthConfig({
+      domain: "login-nocookie.partner.com",
+      credentialName: mockSecretName,
+      loginUrl: "https://login-nocookie.partner.com/api/login",
+    });
+
+    const mockFetchNoCookie = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await expect(
+      authManager.authenticate("login-nocookie.partner.com", { fetchFn: mockFetchNoCookie as any }),
+    ).rejects.toMatchObject({
+      code: "E_WEB_INGEST_AUTH_FAILED",
+      status: 401,
+    });
+
+    // 2. Case: loginUrl returns 401 Unauthorized
+    authManager.registerAuthConfig({
+      domain: "login-fail.partner.com",
+      credentialName: mockSecretName,
+      loginUrl: "https://login-fail.partner.com/api/login",
+    });
+
+    const mockFetchFail = vi.fn().mockResolvedValue(
+      new Response("Invalid credentials", { status: 401 }),
+    );
+
+    await expect(
+      authManager.authenticate("login-fail.partner.com", { fetchFn: mockFetchFail as any }),
+    ).rejects.toMatchObject({
+      code: "E_WEB_INGEST_AUTH_FAILED",
+      status: 401,
+    });
+
+    // 3. Case: neither loginUrl nor loginHandler configured
+    authManager.registerAuthConfig({
+      domain: "no-handler.partner.com",
+      credentialName: mockSecretName,
+    });
+
+    await expect(
+      authManager.authenticate("no-handler.partner.com"),
+    ).rejects.toMatchObject({
+      code: "E_WEB_INGEST_AUTH_FAILED",
+      status: 401,
+    });
+  });
 });
