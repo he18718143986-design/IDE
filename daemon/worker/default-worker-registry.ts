@@ -57,11 +57,13 @@ function capabilityAdapter(
   return {
     declaration,
     kind: "MANAGED_AI",
-    run: async () => ({
-      changes: [],
-      log: [],
-      usage: { inputTokens: 0, outputTokens: 0 },
-    }),
+    // 注册用能力载体不可执行：误走 adapter.run 必须显式失败，
+    // 而不是返回「成功但什么都没干」的假结果（W.8 同款隐患，见 W.6 审阅意见）
+    run: async () => {
+      throw new Error(
+        "capability carrier is not executable; dispatch via registry dispatchFactory",
+      );
+    },
   };
 }
 
@@ -99,11 +101,13 @@ function claudeCodeWorkerRegistration(): CodingWorkerAdapter {
       ],
     },
     kind: "CLI",
-    run: async () => ({
-      changes: [],
-      log: [],
-      usage: { inputTokens: 0, outputTokens: 0 },
-    }),
+    // 注册用能力载体不可执行：误走 adapter.run 必须显式失败，
+    // 而不是返回「成功但什么都没干」的假结果（W.8 同款隐患，见 W.6 审阅意见）
+    run: async () => {
+      throw new Error(
+        "capability carrier is not executable; dispatch via registry dispatchFactory",
+      );
+    },
   };
 }
 

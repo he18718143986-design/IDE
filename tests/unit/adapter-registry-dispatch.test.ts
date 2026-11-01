@@ -29,6 +29,7 @@ import { ContractOrchestrator } from "../../daemon/pipeline/orchestrator";
 import { AdapterRegistry } from "../../daemon/worker/adapter-registry";
 import {
   MANAGED_AI_CAPABILITY,
+  type AdapterTaskInput,
   type CodingWorkerAdapter,
 } from "../../daemon/worker/worker-adapter.interface";
 import {
@@ -197,6 +198,24 @@ describe("B. createDefaultWorkerRegistry 默认注册", () => {
     const b = createDefaultWorkerRegistry();
     expect(a).not.toBe(b);
     expect(a.list()).toHaveLength(3);
+  });
+
+  it("能力载体 run() 显式抛错，不返回「成功但空转」的假结果", async () => {
+    const registry = createDefaultWorkerRegistry();
+    const ids = [
+      BUILTIN_AI_SDK_ADAPTER_ID,
+      MANAGED_AI_ADAPTER_ID,
+      CLAUDE_CODE_WORKER_ADAPTER_ID,
+    ];
+    const dummy = {} as AdapterTaskInput;
+    for (const id of ids) {
+      const adapter = registry.get(id)?.adapter;
+      expect(adapter, `${id} 应已注册`).toBeDefined();
+      await expect(
+        adapter!.run(dummy),
+        `${id} 能力载体 run() 必须显式失败而非空转`,
+      ).rejects.toThrow(/capability carrier is not executable/);
+    }
   });
 });
 
