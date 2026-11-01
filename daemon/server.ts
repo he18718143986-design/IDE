@@ -227,6 +227,12 @@ import {
 } from "./vault";
 import { readPlan, writePlan } from "./project/plan-store";
 import {
+  readDesignDependencySurprise,
+  clearDesignDependencySurprise,
+} from "./supervisor/design/design-dependency-surprise";
+import { synthesizeSchemeFromPlan } from "./supervisor/design/scheme-from-plan";
+import { readSchemeLedger } from "./supervisor/intent-compiler/scheme-ledger-store";
+import {
   applyContractStubTerminal,
   findInFlightContract,
   stubIdFromContract,
@@ -1412,6 +1418,278 @@ export class StagentDaemon {
       });
     }
     return this.releaseManager;
+  }
+
+  /**
+   * TASK-J.19：DN-2 依赖意外卡 HTTP。
+   * - GET  /api/design/:contractId/dependency-surprise
+   * - POST /api/design/:contractId/dependency-allow  → resolveDesignDependencyAllow
+   * - POST /api/design/:contractId/dependency-deny   → abort（不插依赖桩）
+   * 不路由到 resume；不改派工面。
+   */
+  private async handleDesign(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    method: string,
+    pathname: string,
+  ): Promise<void> {
+    const match = pathname.match(
+      /^\/api\/design\/([^/]+)\/(dependency-surprise|dependency-allow|dependency-deny)$/,
+    );
+    if (!match) {
+      this.sendJson(res, 404, { error: "Not Found", path: pathname });
+      return;
+    }
+    const contractId = decodeURIComponent(match[1]!);
+    const action = match[2]!;
+    const store = this.orchestrator.getStore();
+    const contract = store.get(contractId);
+    if (!contract) {
+      this.sendJson(res, 404, { error: "Contract not found", contract_id: contractId });
+      return;
+    }
+
+    if (method === "GET" && action === "dependency-surprise") {
+      const surprise = readDesignDependencySurprise(this.repoRoot, contractId);
+      if (!surprise) {
+        this.sendJson(res, 404, {
+          error: "No DESIGN_NEEDS_DEPENDENCY surprise",
+          code: "E_DESIGN_SURPRISE_MISSING",
+          contract_id: contractId,
+        });
+        return;
+      }
+      this.sendJson(res, 200, { ok: true, surprise, lifecycle_state: contract.lifecycle_state });
+      return;
+    }
+
+    if (method === "POST" && action === "dependency-deny") {
+      if (contract.lifecycle_state !== "PENDING_RESUME") {
+        this.sendJson(res, 409, {
+          error: `expected PENDING_RESUME, got ${contract.lifecycle_state}`,
+          code: "E_INVALID_STATE_TRANSITION",
+        });
+        return;
+      }
+      const suspensionPath = path.join(
+        this.repoRoot,
+        ".stagent",
+        "records",
+        contractId,
+        "suspension.json",
+      );
+      let suspensionReason: string | null = null;
+      try {
+        if (fs.existsSync(suspensionPath)) {
+          const raw = JSON.parse(fs.readFileSync(suspensionPath, "utf8")) as {
+            reason?: string;
+          };
+          suspensionReason = raw.reason ?? null;
+        }
+      } catch {
+        suspensionReason = null;
+      }
+      if (suspensionReason !== "DESIGN_NEEDS_DEPENDENCY") {
+        this.sendJson(res, 409, {
+          error: "suspension is not DESIGN_NEEDS_DEPENDENCY",
+          code: "E_DESIGN_SURPRISE_MISMATCH",
+          suspension_reason: suspensionReason,
+        });
+        return;
+      }
+      try {
+        const body = (await this.readJsonBody(req)) as {
+          reviewer?: string;
+          reason?: string;
+        };
+        const aborted = await this.orchestrator.abort(contractId, {
+          reviewer: body.reviewer ?? "local-user",
+          reason:
+            body.reason ??
+            "DN-2: user denied new dependency; aborting without dependency stub",
+        });
+        clearDesignDependencySurprise(this.repoRoot, contractId);
+        this.emitContractUpdate(aborted);
+        this.sendJson(res, 200, {
+          ok: true,
+          choice: "deny",
+          contract: aborted,
+        });
+      } catch (err) {
+        this.sendActionError(res, err);
+      }
+      return;
+    }
+
+    if (method === "POST" && action === "dependency-allow") {
+      if (contract.lifecycle_state !== "PENDING_RESUME") {
+        this.sendJson(res, 409, {
+          error: `expected PENDING_RESUME, got ${contract.lifecycle_state}`,
+          code: "E_INVALID_STATE_TRANSITION",
+        });
+        return;
+      }
+      const suspensionPath = path.join(
+        this.repoRoot,
+        ".stagent",
+        "records",
+        contractId,
+        "suspension.json",
+      );
+      let suspensionReason: string | null = null;
+      try {
+        if (fs.existsSync(suspensionPath)) {
+          const raw = JSON.parse(fs.readFileSync(suspensionPath, "utf8")) as {
+            reason?: string;
+          };
+          suspensionReason = raw.reason ?? null;
+        }
+      } catch {
+        suspensionReason = null;
+      }
+      if (suspensionReason !== "DESIGN_NEEDS_DEPENDENCY") {
+        this.sendJson(res, 409, {
+          error: "suspension is not DESIGN_NEEDS_DEPENDENCY",
+          code: "E_DESIGN_SURPRISE_MISMATCH",
+          suspension_reason: suspensionReason,
+        });
+        return;
+      }
+
+      const body = (await this.readJsonBody(req)) as {
+        dependencies?: Array<{ name: string; version: string; why: string }>;
+        original_stub_id?: string;
+        reason?: string;
+      };
+      const surprise = readDesignDependencySurprise(this.repoRoot, contractId);
+      const dependencies =
+        Array.isArray(body.dependencies) && body.dependencies.length > 0
+          ? body.dependencies
+          : (surprise?.dependencies ?? []);
+      if (dependencies.length === 0) {
+        this.sendJson(res, 400, {
+          error: "dependencies required",
+          code: "E_NO_DEPENDENCY",
+        });
+        return;
+      }
+
+      const plan = readPlan(this.repoRoot);
+      if (!plan) {
+        this.sendJson(res, 404, {
+          error: "project plan not found",
+          code: "E_PLAN_INVALID",
+        });
+        return;
+      }
+
+      let originalStubId =
+        (typeof body.original_stub_id === "string" && body.original_stub_id) ||
+        surprise?.original_stub_id ||
+        stubIdFromContract(contract);
+      if (!originalStubId) {
+        const byContract = plan.contracts.find(
+          (c) => c.contract_id === contractId,
+        );
+        originalStubId = byContract?.stub_id ?? null;
+      }
+      if (!originalStubId) {
+        this.sendJson(res, 400, {
+          error: "original_stub_id required",
+          code: "E_STUB_NOT_FOUND",
+        });
+        return;
+      }
+
+      const ledger = readSchemeLedger(this.repoRoot);
+      const scheme = ledger?.state.draft
+        ? {
+            scheme_id: ledger.state.draft.scheme_id,
+            scheme_revision: ledger.state.draft.scheme_revision,
+            size_hint: ledger.state.draft.size_hint,
+            goals: ledger.state.draft.goals,
+            out_of_scope: ledger.state.draft.out_of_scope,
+            modules: ledger.state.draft.modules,
+            entities: ledger.state.draft.entities,
+            acceptance: ledger.state.draft.acceptance,
+          }
+        : synthesizeSchemeFromPlan(plan);
+
+      const existingDirs: string[] = [];
+      for (const d of ["src", "tests", "docs", "daemon"]) {
+        if (fs.existsSync(path.join(this.repoRoot, d))) existingDirs.push(d);
+      }
+      let hasTestScript = false;
+      try {
+        const pkgPath = path.join(this.repoRoot, "package.json");
+        if (fs.existsSync(pkgPath)) {
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as {
+            scripts?: Record<string, string>;
+          };
+          hasTestScript = typeof pkg.scripts?.test === "string";
+        }
+      } catch {
+        hasTestScript = false;
+      }
+      const repoFacts: RepoFacts = {
+        has_test_script: hasTestScript,
+        has_modules_yaml: fs.existsSync(
+          path.join(this.repoRoot, "docs", "system", "modules.yaml"),
+        ),
+        existing_dirs: existingDirs,
+      };
+
+      try {
+        const resolved = await this.orchestrator.resolveDesignDependencyAllow(
+          contractId,
+          {
+            plan,
+            scheme,
+            repoFacts,
+            originalStubId,
+            dependencies,
+            ...(body.reason ? { reason: body.reason } : {}),
+          },
+        );
+        clearDesignDependencySurprise(this.repoRoot, contractId);
+        this.emitContractUpdate(resolved.aborted);
+        // L.9：ABORTED → 桩 aborted；必要时触发重新分解（与 abort 路由对齐）
+        let redecompose_requested = false;
+        const abortedStubId = stubIdFromContract(resolved.aborted) ?? originalStubId;
+        if (abortedStubId) {
+          const sync = applyContractStubTerminal(
+            this.repoRoot,
+            abortedStubId,
+            "aborted",
+            resolved.aborted.contract_id,
+          );
+          if (sync?.redecompose && sync.plan) {
+            const req = triggerRedecomposeIfNeeded(
+              this.repoRoot,
+              sync.plan,
+              abortedStubId,
+              resolved.aborted.contract_id,
+            );
+            redecompose_requested = Boolean(req);
+          }
+        }
+        this.sendJson(res, 200, {
+          ok: true,
+          choice: "allow",
+          contract: resolved.aborted,
+          dependency_stub_id: resolved.dependencyStubId,
+          plan: resolved.plan,
+          contract_bytes_unchanged:
+            resolved.contractBytesBeforeAllow === resolved.contractBytesAfterAllow,
+          redecompose_requested,
+        });
+      } catch (err) {
+        this.sendActionError(res, err);
+      }
+      return;
+    }
+
+    this.sendJson(res, 405, { error: "Method Not Allowed" });
   }
 
   /**
@@ -4468,6 +4746,16 @@ export class StagentDaemon {
       } catch (err) {
         this.sendJson(res, 500, { error: (err as Error).message });
       }
+      return;
+    }
+
+    // TASK-J.19：DN-2「可以/不行」设计依赖入口（命名空间 /api/design/*）
+    if (pathname === "/api/design" || pathname.startsWith("/api/design/")) {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      await this.handleDesign(req, res, method, pathname);
       return;
     }
 

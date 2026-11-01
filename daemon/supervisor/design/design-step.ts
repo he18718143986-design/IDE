@@ -26,6 +26,7 @@ import { applyPlanPatch } from "../../../src/lib/project/plan-patch";
 import type { ProjectPlanScheme, RepoFacts } from "../../../src/lib/project/project-plan";
 import { writePlan, readPlan } from "../../project/plan-store";
 import { writeSuspension } from "../../pipeline/two-phase";
+import { writeDesignDependencySurprise } from "./design-dependency-surprise";
 
 export type DesignSuspensionReason =
   | "DESIGN_INVALID"
@@ -84,6 +85,26 @@ export interface RunDesignStepOptions {
   paidSdkList?: readonly string[];
   /** 测试可注入已解析的 modules */
   modules?: ModuleEntry[];
+}
+
+
+function persistDn2Surprise(
+  repoRoot: string,
+  contract: SoftwareContract,
+  deps: Array<{ name: string; version: string; why: string }>,
+  detail: string,
+): void {
+  const stubId =
+    typeof contract.supervisor_metadata?.stub_id === "string"
+      ? contract.supervisor_metadata.stub_id
+      : null;
+  writeDesignDependencySurprise(repoRoot, {
+    contract_id: contract.contract_id,
+    reason: "DESIGN_NEEDS_DEPENDENCY",
+    original_stub_id: stubId,
+    dependencies: deps,
+    detail,
+  });
 }
 
 function recordsDir(repoRoot: string, contractId: string): string {
@@ -267,15 +288,17 @@ export async function runDesignStep(
         (retry.note.dependencies.length > 0
           ? retry.note.dependencies
           : gen.note.dependencies);
+      const detail = `需要新依赖：${deps.map((d) => `${d.name}@${d.version}`).join(", ")}`;
       const suspensionPath = writeSuspension(repoRoot, contract.contract_id, {
         reason: "DESIGN_NEEDS_DEPENDENCY",
         phase: "design",
         detail: `需要新依赖：${deps.map((d) => d.name).join(", ")}`,
       });
+      persistDn2Surprise(repoRoot, contract, deps, detail);
       return {
         status: "suspended",
         reason: "DESIGN_NEEDS_DEPENDENCY",
-        detail: `需要新依赖：${deps.map((d) => `${d.name}@${d.version}`).join(", ")}`,
+        detail,
         suspensionPath,
         note: retry.note,
         neededDependencies: deps,
@@ -304,6 +327,7 @@ export async function runDesignStep(
         phase: "design",
         detail: validation.message,
       });
+      persistDn2Surprise(repoRoot, contract, deps, validation.message);
       return {
         status: "suspended",
         reason: "DESIGN_NEEDS_DEPENDENCY",
