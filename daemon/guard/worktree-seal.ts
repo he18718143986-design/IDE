@@ -1,6 +1,10 @@
 /**
  * TASK-C.15d / EO-09：Worktree 路径稳定封存（禁止裸 mv）。
- * 在 `.stagent/worktrees/{contract_id}/.stagent_manifest.json` 标记 sealed。
+ * TASK-A.7：目录与 worktree-manager 对齐为 `.stagent/worktrees/task-{contract_id}/`。
+ * 在 `.stagent/worktrees/task-{contract_id}/.stagent_manifest.json` 标记 sealed。
+ *
+ * 迁移约定（A.7）：只读写带 `task-` 前缀的新路径；不做旧无前缀目录的批量迁仓。
+ * 旧路径上的 manifest 因此不可见，读侧会表现为「未封存」。
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -23,12 +27,25 @@ export interface SealResult {
   error?: string;
 }
 
+function sanitizeContractId(contractId: string): string {
+  return (
+    contractId.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 128) || "unknown"
+  );
+}
+
+/**
+ * 物理目录 = manager `getWorktreePath` 同构：`<repo>/.stagent/worktrees/task-{id}`。
+ * 根路径解析与 manager 一致（存在则 realpath），避免 macOS /var vs /private/var 漂移。
+ */
 function worktreeDir(repoRoot: string, contractId: string): string {
+  const resolvedRoot = fs.existsSync(repoRoot)
+    ? fs.realpathSync(repoRoot)
+    : path.resolve(repoRoot);
   return path.join(
-    path.resolve(repoRoot),
+    resolvedRoot,
     ".stagent",
     "worktrees",
-    contractId.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 128) || "unknown",
+    `task-${sanitizeContractId(contractId)}`,
   );
 }
 
