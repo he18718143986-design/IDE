@@ -3175,6 +3175,39 @@
 
 ---
 
+<a id="task-l.16"></a>
+
+#### 【Task L.16】线上问题回流 `[COMPLETED]`
+
+* **任务编号**：`TASK-L.16`
+* **对应规格**：[`release-and-operations.md`](./release-and-operations.md) §5、§7（RO-10）
+* **前置依赖**：`TASK-L.15`、`TASK-L.9`
+* **优先级**：P3（M4）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#62](https://github.com/he18718143986-design/IDE/pull/62) / tip `e4dfe1c`（`feat(L.16): 线上问题回流（LiveIncident + E 类分流）`；GitHub squash merge；合入前接线补丁 `52f4eca` 已 squash 进 tip）
+* **对照痛点（代码事实）**：无运行监测；合入后的缺陷只能靠用户重新描述。
+* **一句话目标**：线上应用出错时，画布出现「线上」卡，用户点一下就生成一份带现场信息的修复合同。
+* **范围**：
+  1. `release-manager.ts`：`local_process` 进程退出时记录退出码与脱敏 stderr 尾部；LIVE 后每 60 秒探活（目标配置 `watch: false` 可关）。
+  2. 新建 `src/components/release/LiveIncidentCard.tsx`：「<目标> 停了，最后的错误是…」+「让 AI 看看」。
+  3. 「让 AI 看看」→ 生成 `PlanPatch`：`add_stub` 置顶，`kind: "feature"`，`title` 为白话，`origin: "system"`，`context: { release_id, commit_sha, log_tail }`（L.7 字段），按 project-decomposition §2 放置规则插入。
+  4. supervisor §16.5 分流新增 E 类「线上问题」的判定函数（`src/lib/journey/intent-router.ts`）：消息含 LIVE 目标名或「线上 / 上线后 / 生产」且无施工中合同。
+* **非目标**：不做告警推送到外部渠道；不做热修。
+* **不变声明**：合并后缺陷开新微合同（supervisor §5），不在 `MERGED` 合同上返工。
+* **验收（PASS）**：`tests/integration/live-incident.test.ts`：RO-10；`tests/unit/intent-router.test.ts` 新增 E 类判定用例（命中两条、不命中两条）。
+* **FAIL**：回流修改了已合并合同；日志尾部含密钥明文。
+* **关键文件**：`daemon/release/release-manager.ts`、`daemon/release/live-incident-stub.ts`（新）、`src/components/release/LiveIncidentCard.tsx`（新）、`src/lib/journey/intent-router.ts`、`src/lib/journey/live-incident-context.ts`（新）、`daemon/server.ts`、`daemon/supervisor/journey/orchestrate.ts`
+* **已知挂账（合入时）**：
+  1. 「线上」卡挂在发布页（`ReleasePane`），**未**进主画布中栏。
+  2. 探活失败（`health_watch_failed`）路径有代码；集成夹具偏 `process_exit`。
+  3. E 类分流只指引、不自动触发 ask-ai / 开合同。
+  4. Daemon 重启后 watch 不重挂（与 L.15 `process-registry` 仅内存同源：定时器随 manager 实例消失；持久化 LIVE 记录重启后无探活、无退出监听）。
+  5. E 类词表（`线上`/`生产`/`prod`）可能误报非事故语境（如「线上活动」「生产报表」）；只指引不动作，代价低。
+  6. 插桩 patch `reason: "user_request"` 与桩上 `origin: "system"` 语义略歪（无伤大雅）。
+  7. （核实无问题）`sys-acc-incident` 已在 `SYSTEM_ACCEPTANCE`；`server.ts` 调用 `orchestrateJourney` 已传 `liveTargetNames` / `hasInProgressContract`（接线 tip `52f4eca`，squash 进 `e4dfe1c`）。
+* **估算**：M
+* **纪律尾注**：仅文档回写销项；**不**宣称端到端产品闭环；**不**开工 L.17 / W.6。
+
 <a id="task-a.7"></a>
 
 #### 【Task A.7】Worktree seal 路径前缀对齐 `[COMPLETED]`
