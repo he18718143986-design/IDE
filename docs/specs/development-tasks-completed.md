@@ -3685,3 +3685,65 @@
   > **口径说明（非挂账）**：卡面「验收」原写「至少一条非 OpenAI 受控适配器可被派工测试命中 / Claude Code worker 可受控派工」；实现按红线落地为「内置 Managed AI 受控派工 + Claude Code worker 仅登记 `UNCONTROLLED_EXTERNAL`」，即 **Claude Code worker 未作为受控执行器进入派工路径**。此口径经 Tina 2026-11-02 审阅明确认可（「把它包装成受控要不如实」），OCP 正例以 Fake 受控适配器达成「非默认适配器经 Registry 派工命中」的验收本质。
 * **未宣称 / 未接线（不宣称端到端闭环）**：Claude Code worker 仅登记在案、未接入编排器受控派工（走 W.8 MCP 端点外部 CLI 路径）；`GET /api/adapters` 未做端到端 HTTP 验证；配置面为「UI 可糙」最小可用（无下拉联动 / 设置页持久化）；`TASK-W.7` 自动探测升格与 `W.5b/c` 实测均未开工。**本卡交付注册表 + 派工门禁 + 错误码 + OCP 验收测试，端到端产品接线属后续。**
 * **关键文件**：`daemon/worker/default-worker-registry.ts`（新）、`daemon/worker/worker-dispatch.ts`（新）、`daemon/worker/adapter-registry.ts`、`daemon/pipeline/orchestrator.ts`、`daemon/server.ts`、`src/routes/index.tsx`、`tests/unit/adapter-registry-dispatch.test.ts`（新）。
+
+---
+
+### 3.4h 双枚举 `SANDBOX_ENFORCED` 与 `workerSpec` 目标字段（W.5c-i · 容器隔离第一张子卡）
+
+<a id="task-w.5c-i"></a>
+
+#### 【Task W.5c-i】双枚举 `SANDBOX_ENFORCED` 与 `workerSpec` 目标字段 `[COMPLETED]`
+* **任务编号**：`TASK-W.5c-i`
+* **状态与证据**：`[COMPLETED]`（[#81](https://github.com/he18718143986-design/IDE/pull/81)/`c3e75cc`，squash merge；分支阶段 HEAD `22ed653`，本地两提交 `1a93fb9` 主体 + `22ed653` 下游收窄收尾）。母卡 `TASK-W.5c` 已于 P-118 经授权拆为 `i`/`ii`/`iii`，本卡为**第一张子卡**（纯 Schema / 类型机械层，不依赖容器运行时）。
+* **对应规格**：[`system-architecture.md`](./system-architecture.md) §9.1（`worker_spec` 目标模型：三值 `control_mode` + `billing_model` + `verified_on`，标题标 `[待实现 - 目标数据模型]`）、§4.2.3 P-17；ADR-0001（底层强隔离与防越权控制面不变）、ADR-0003；[`task-card-standard.md`](./task-card-standard.md) R-1～R-12；母卡 `TASK-W.5c` 拆分规划（P-118）
+* **前置依赖**：`TASK-W.6`（COMPLETED · #74/`b5d8c53`，`requireControlledDispatch` 派工门禁已就位，窗口期拒绝语义挂接在此）
+* **交付内容**：
+  1. **双枚举同步扩 `SANDBOX_ENFORCED`（漏改单边即 FAIL）**：`daemon/worker/worker-adapter.interface.ts::AdapterControlMode` 与 `src/lib/contract.schema.ts::workerControlModeSchema` **两处**同改，均为三值 `GATEWAY_ENFORCED` / `SANDBOX_ENFORCED` / `UNCONTROLLED_EXTERNAL`。能力声明校验 `validateAdapterCapability()` 对 `SANDBOX_ENFORCED` 走**受控严格模式**（与 `GATEWAY_ENFORCED` 同），该档位是**更严**而非更宽。
+  2. **`workerSpecSchema` 增 §9.1 两可选目标字段**（缺省不写）：`billing_model?`（`PER_TOKEN` / `SUBSCRIPTION` / `QUOTA`）与 `verified_on?`（`{ cli_version, verified_at }`）。既有四必需键语义不变，`DEFAULT_WORKER_SPEC` 仍为 `GATEWAY_ENFORCED`。
+  3. **窗口期语义写死（Tina 2026-11-02 定）：注册接受、派工显式拒绝**。`requireControlledDispatch()` 在调 `registry.requireControlled()` **之前**直接查 `registry.get(adapterId)?.control_mode === "SANDBOX_ENFORCED"`，抛**新增**错误码 `E_ADAPTER_SANDBOX_LOCKED`，消息注明「待 `W.5c-ii` `container-host` 落地解锁」；**即便已挂派工工厂也拒绝**。刻意**不复用** `E_ADAPTER_NOT_CONTROLLED`（语义为「非受控适配器」，与本档位「受控档位待解锁」不同）。`GATEWAY_ENFORCED` 既有派工语义与 `E_ADAPTER_NOT_REGISTERED` / `E_ADAPTER_NOT_CONTROLLED` / `E_ADAPTER_NO_DISPATCH_FACTORY` 三码不变，不静默降级到无网关执行。
+  4. **下游档位收窄（扩枚举的必然连带，`22ed653`）**：三值档位流入三处二值赋值点（`orchestrator.ts:1177` / `:1827` / `:2224`）与两处 UI 展示类型（`src/routes/index.tsx`），tsc 报 5 处 TS2322。新增 `toRuntimeControlMode()` 作为**唯一收窄口径**：`SANDBOX_ENFORCED` 在写入 Evidence `worker_control_mode` 与装配 `RuntimeInterceptor` 快照时按 `UNCONTROLLED_EXTERNAL` 记档——窗口期该档位本就不可派工（路径不可达），即便有人绕开门禁写入，证据也不会出现「沙箱档受控」的假记录。`src/components/workspace-types.ts::WorkerControl`（**纯展示类型**）同步为三值以保证工作台显示真实档位，不涉及门禁判定、不改右栏 `role:"partner"` 只读白名单（J.1）。
+* **不变声明**：鉴权 / Demo Origin / 点亮三证 / 网关写范围**不变**（ADR-0001 纪律）。`SANDBOX_ENFORCED` **不放宽** `GATEWAY_ENFORCED` 既有门禁；`UNCONTROLLED_EXTERNAL` 仍不得作为受控 / 可合并证据；窗口期派工拒绝**只收窄、不扩张**可执行面。
+* **验收（PASS）**：新建 `tests/unit/worker-spec-schema.test.ts` **13 passed**——
+  - `SE-01`：两处枚举均含 `SANDBOX_ENFORCED`；**读 `worker-adapter.interface.ts` 源码做正则断言**，只改 `contract.schema.ts` 单边在源码层面即 FAIL，不依赖类型系统间接报错。
+  - `SE-02`：`workerSpecSchema` 接受 `billing_model` / `verified_on` 且缺省不写时解析通过；`DEFAULT_WORKER_SPEC` 仍 `GATEWAY_ENFORCED`（明确断言未被改成 `SANDBOX_ENFORCED`）。
+  - `SE-03`：注册 `SANDBOX_ENFORCED` 成功（登记面接受），**挂了派工工厂后** `requireControlledDispatch()` 仍抛 `E_ADAPTER_SANDBOX_LOCKED`，消息含 `W.5c-ii` / `container-host`；`GATEWAY_ENFORCED` 派工正例仍通过（不回归）。
+  - `SE-04`：五键锁定断言更新后既有四必需键语义不变。
+  - `SE-05`：`toRuntimeControlMode()` 收窄口径（`SANDBOX_ENFORCED` → `UNCONTROLLED_EXTERNAL`）。
+  - 同步更新 `tests/unit/contract-schema-v12.test.ts`：`:199` 五键 shape 断言（含两可选键）与 `:220` 二值枚举断言（卡正文未列后者，但扩三值后必然 FAIL，属必然配套）。
+  - `npx tsc --noEmit` 全仓 **57 个 `error TS` 与 clean `main` 基线一致**（收窄后 `SANDBOX_ENFORCED` 相关 0 报错）；全量 `vitest run` **2555 passed / 10 failed**，10 项失败逐条与 baseline 复跑一致（`cli-host-claude-code` 缺 MCP endpoint 属 TASK-W.8 行为、`tmp-helper` ×3 为并发下磁盘探测 flaky 且单跑全绿、其余为既有静态扫描/端口区间债），**本卡零新增失败**。
+* **残余边界 / 后续挂账（P-119 归拢，共 4 条）**：
+  1. **`evidence.schema.ts` 的 `worker_control_mode` 仍为二值**（有意未扩）：冻结的证据模型不在本卡范围，扩列会污染历史证据的语义稳定性。**`W.5c-ii` 落地时若 `SANDBOX_ENFORCED` 要成为真受控证据档，需另评证据模型版本语义**（本卡以收窄替代扩列，见「交付内容」第 4 条）。
+  2. **下游收窄登记为设计决策（防回潮）**：`toRuntimeControlMode()` 的收窄是**窗口期**语义；`W.5c-ii` 解锁后应改为按容器宿主可用性判定，而非继续按 `UNCONTROLLED_EXTERNAL` 记档。
+  3. **五键测试文件名的指令误传已按代码事实修正**：施工指令写「`tests/unit/worker-mcp-tools.test.ts` 五键锁定测试」；代码事实为该文件是 **TASK-W.2「五大受控 MCP 工具」**测试（`WORKER_MCP_TOOLS`），对 `worker_spec` / `control_mode` / `adapter_id` **零断言**；真正的五键锁定断言在 `tests/unit/contract-schema-v12.test.ts:199`（与卡正文一致）。按代码事实更新后者，前者无需改动。
+  4. **容器运行时未实现**：`runInSandbox` 归 `W.5c-ii`；`verified_on` 实测值与 OpenHands 适配器归 `W.5c-iii`。
+* **未宣称 / 未接线（不宣称端到端闭环）**：`SANDBOX_ENFORCED` 今日仍是「**有档位、无运行时**」——可登记、可写进合同、派工被显式拒绝，但没有任何容器隔离执行能力。本卡交付枚举 / schema / 门禁 / 测试，**容器隔离执行面属 `W.5c-ii`**。
+* **关键文件**：`daemon/worker/worker-adapter.interface.ts`、`src/lib/contract.schema.ts`、`daemon/worker/worker-dispatch.ts`、`daemon/pipeline/orchestrator.ts`、`src/components/workspace-types.ts`、`tests/unit/worker-spec-schema.test.ts`（新）、`tests/unit/contract-schema-v12.test.ts`。
+
+---
+
+### 3.4i `check playtest` 接入北极星合同验收档（C.23 · ruling 3 兑现）
+
+<a id="task-c.23"></a>
+
+#### 【Task C.23】北极星合同自动附加 `check playtest` 验收命令 `[COMPLETED]`
+* **任务编号**：`TASK-C.23`
+* **状态与证据**：`[COMPLETED]`（[#82](https://github.com/he18718143986-design/IDE/pull/82)/`a5223fb`，squash merge；分支 HEAD `1d84f52`，A 卡合入后 rebase 为 `6f819dd`）。兑现 **ruling 3**（2026-11-02 · P-114 落盘裁决）。
+* **对应规格**：ruling 3 裁决（P-114，原文见 [`development-tasks-changelog.md`](./development-tasks-changelog.md) P-114、ledger [`../ledger/consistency-audit.md`](../ledger/consistency-audit.md) P-114）；[`../scheme.md`](../scheme.md) dec-12（北极星「一模一样」= 用户对话试玩 + 结构化证据桩，AI 不代判、禁像素/DOM 机器比对）、REJ-009；本文件 §3.4f（L.17b 交付的 `check playtest` 判定源）
+* **前置依赖**：`TASK-L.17b`（COMPLETED · #72/`d26def6`，`check playtest` 命令与判定源已交付）
+* **交付内容（双装配点，只改单边即 FAIL）**：以**单一 helper** 保证两条路径同口径——
+  1. `src/lib/contract.schema.ts`：新增唯一装配口径 `PLAYTEST_ALIAS` / `buildPlaytestCommand()` / `withPlaytestCommand()`；`createContractDraft()` 在 `:805` 调用。
+  2. `src/lib/journey/confirm-scheme-contract.ts::buildConfirmContractFromScopePlan()` 在 `:119` 调用同一 helper——该路径以 `verification_spec` **重新覆盖** draft 的命令集合，只在 `createContractDraft` 单边接线会被覆盖而失效。
+  - 装配值（ruling 3 唯一口径）：`{ alias:"playtest", executable:"stagent", args:["check","playtest",<contract_id>] }`。
+  - **北极星判据** = `references[]` 非空（与 `playtest-guard.ts` 判定源判据一致，只读复用）；**非北极星不附加**，并**剔除**调用方自带的 `playtest` 项（不得绕开判据手动挂验收命令，卡正文未写、属语义必然的加固）；**幂等**（已存在同 `alias` 命令时不重复追加，结果恰好 1 条）；**防伪造**（`args` 内 `contract_id` 一律取服务端装配值，不接受调用方传入）。
+* **不变声明**：鉴权 / Demo Origin / 点亮三证 / 网关写范围**不变**（ADR-0001 纪律）。不改 dec-12 / dec-13 判定口径、**不复活 REJ-009**（不引入像素/DOM 机器比对）；判定源 `daemon/supervisor/preview/playtest-guard.ts` **完全未动**；本卡只增验收命令装配，不放宽任何既有门禁。
+* **验收（PASS）**：新建 `tests/unit/contract-playtest-wiring.test.ts` **10 passed**，`PW-01`/`PW-02`/`PW-03` 在**两条装配路径各验一遍**——
+  - `PW-01`：`references[]` 非空 → `commands` 含 `playtest`，`args[2]` 等于本合同 `contract_id`；既有默认 `test` 命令保留、`playtest` 追加在后。
+  - `PW-02`：无 `references` / `references: []` → 不含任何 `alias:"playtest"` 项，默认 `test` 命令不受影响；非北极星合同即便调用方自带 `playtest` 也被剔除。
+  - `PW-03`：调用方 `commands` 已含 `playtest`（`args` 传伪造 `contract_forged`）→ 结果恰好 1 条且 `args[2]` 被服务端 `contract_id` 覆盖（显式断言 `!== "contract_forged"`）；重复执行装配仍恰好 1 条。
+  - 相关回归 7 文件 **97 passed**（`contract-schema-references` / `confirm-scheme-atomic` / `j18b-scheme-binding` / `test-obligations` / `contract-schema-v12` / `contract-schema-v13` / `task-c22-confirm-wiring`）。`npx tsc --noEmit` **57 = baseline**；全量 `vitest run` **2555 passed / 8 failed**，失败项逐条为 baseline 既有或并发 flaky（`demo-service` 单独跑 19/19 全绿属端口类 flaky），**本卡零新增失败**。
+* **残余边界 / 后续挂账（P-119 归拢，共 3 条）**：
+  1. **`scopePlanToContractScope()` 未按卡正文点名改动**：该函数**不接收** `references`（`references` 来自 `scheme`，在确认路径 `:128-130` 才投影进合同），故接线落在确认路径的**覆盖装配处**——即卡正文所指「覆盖式装配路径同步接线」。若要求落到该函数内部，需先为其加 `references` 入参（改动面更大）。
+  2. **非北极星剔除调用方自带 `playtest`**：卡正文只写「不附加」，实现上进一步剔除已存在项以防绕开判据（**收紧**）。若调用方确有合法用途需保留，须另行裁决。
+  3. **不宣称端到端闭环**：`check playtest` 判定源由 L.17b 交付、本卡只做装配接线；`CompareView` UI 路由挂载与用户原话采集 UI 仍属后续（L.17b 已声明未接线）。
+* **未宣称 / 未接线（不宣称端到端闭环）**：本卡交付「合同装配时自动带验收命令」，**未**验证真实 `check playtest` 在门禁链路上的端到端执行；装配出的命令是否真被执行、执行结果如何回写，属门禁执行链路（后续）。
+* **关键文件**：`src/lib/contract.schema.ts`、`src/lib/journey/confirm-scheme-contract.ts`、`tests/unit/contract-playtest-wiring.test.ts`（新）；只读复用 `bin/stagent.ts`、`daemon/supervisor/preview/playtest-guard.ts`。
