@@ -68,7 +68,10 @@ import {
 } from "./trace/why";
 import { loadModulesForRepo } from "./knowledge/modules-store";
 import { impactClosure } from "../src/lib/knowledge/impact-closure";
-import { ReleaseManager } from "./release/release-manager";
+import {
+  ReleaseManager,
+  listReleaseRecords,
+} from "./release/release-manager";
 import { loadOrInitLedgerState } from "./supervisor/intent-compiler/scheme-ledger-store";
 import {
   assertContractScopeAllowed,
@@ -149,6 +152,8 @@ import type { IlluminationInput } from "./graph/illumination-verifier";
 import type { SupervisorProposalV1 } from "../src/lib/graph/task-graph";
 import { RequirementsStore } from "./supervisor/specs/requirements-store";
 import { orchestrateJourney } from "./supervisor/journey/orchestrate";
+import { buildJourneyLiveIncidentContext } from "../src/lib/journey/live-incident-context";
+import { findTarget, loadReleaseTargets } from "./release/targets-store";
 import {
   exportRedactedRecordsZip,
   cleanupProjectRecords,
@@ -3770,14 +3775,51 @@ export class StagentDaemon {
         repoRoot: this.repoRoot,
       });
 
+      // TASK-L.16：E 类分流真实传参（未传则 hasInProgress 恒假→施工中也会误进 E）
+      const contractStore = this.orchestrator.getStore();
+      const releaseHints = listReleaseRecords(this.repoRoot).map((r) => {
+        let target_label: string | null = r.live_incident?.target_label ?? null;
+        if (!target_label) {
+          try {
+            const t = findTarget(this.repoRoot, r.target_id);
+            target_label = t.label ?? t.target_id;
+          } catch {
+            target_label = r.target_id;
+          }
+        }
+        return {
+          state: r.state,
+          target_id: r.target_id,
+          target_label,
+          live_incident: r.live_incident
+            ? {
+                target_id: r.live_incident.target_id,
+                target_label: r.live_incident.target_label,
+                stub_created: r.live_incident.stub_created,
+              }
+            : null,
+        };
+      });
+      const liveCtx = buildJourneyLiveIncidentContext({
+        releases: releaseHints,
+        contracts: contractStore.list().map((c) => ({
+          lifecycle_state: c.lifecycle_state,
+        })),
+        selectedContract: contract
+          ? { lifecycle_state: contract.lifecycle_state }
+          : null,
+      });
+
       const result = await orchestrateJourney({
         message,
         repoRoot: this.repoRoot,
+        liveTargetNames: liveCtx.liveTargetNames,
+        hasInProgressContract: liveCtx.hasInProgressContract,
         ...(contract === undefined ? {} : { contract }),
         ...(sessionId === undefined ? {} : { sessionId }),
         requirementsStore: this.requirementsStore,
         budgetLedger: ledger,
-        contractStore: this.orchestrator.getStore(),
+        contractStore,
         ...(this.supervisorEnrich === undefined
           ? {}
           : { enrich: this.supervisorEnrich }),
