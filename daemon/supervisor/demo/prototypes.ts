@@ -9,7 +9,12 @@ import { writeDemo, type WriteDemoResult } from "./demo-generator";
 
 export const PROTOTYPES_ROOT = ".stagent/prototypes" as const;
 
+/** TASK-H.9 / ADR-0011：Demo 确认态落 `.stagent/records/`，禁止写入已废止的 `.stagent/metadata/` */
 export const DEMO_CONFIRM_STATE_FILE =
+  ".stagent/records/demo-confirm.json" as const;
+
+/** 历史路径：仅只读兼容；写入一律走 DEMO_CONFIRM_STATE_FILE */
+export const LEGACY_DEMO_CONFIRM_STATE_FILE =
   ".stagent/metadata/demo-confirm.json" as const;
 
 export type DemoMode =
@@ -59,26 +64,52 @@ export function writePrototype(
   return { ...result, prototype_id: id, relative_root };
 }
 
-export function readDemoConfirm(
-  repoRoot: string,
-  prototypeId?: string,
-): DemoConfirmRecord | null {
-  const abs = path.join(repoRoot, DEMO_CONFIRM_STATE_FILE);
+function parseDemoConfirmFile(abs: string): DemoConfirmRecord[] | null {
   if (!fs.existsSync(abs)) return null;
   try {
     const raw = JSON.parse(fs.readFileSync(abs, "utf8")) as {
       records?: DemoConfirmRecord[];
     };
-    const records = Array.isArray(raw.records) ? raw.records : [];
-    if (prototypeId) {
-      const id = sanitizePrototypeId(prototypeId);
-      return records.find((r) => r.prototype_id === id) ?? null;
-    }
-    // 最近一条
-    return records.length > 0 ? records[records.length - 1]! : null;
+    return Array.isArray(raw.records) ? raw.records : [];
   } catch {
     return null;
   }
+}
+
+/**
+ * 读确认态：优先新路径；若仅有历史 `.stagent/metadata/` 文件则只读迁移到 records（不回写旧路径）。
+ */
+export function readDemoConfirm(
+  repoRoot: string,
+  prototypeId?: string,
+): DemoConfirmRecord | null {
+  const absNew = path.join(repoRoot, DEMO_CONFIRM_STATE_FILE);
+  const absLegacy = path.join(repoRoot, LEGACY_DEMO_CONFIRM_STATE_FILE);
+  let records = parseDemoConfirmFile(absNew);
+  if (records === null) {
+    const legacy = parseDemoConfirmFile(absLegacy);
+    if (legacy !== null) {
+      // 一次性只读迁移：写到 records，之后写入只走新路径
+      fs.mkdirSync(path.dirname(absNew), { recursive: true });
+      fs.writeFileSync(
+        absNew,
+        JSON.stringify(
+          { records: legacy, migrated_from: LEGACY_DEMO_CONFIRM_STATE_FILE, updated_at: new Date().toISOString() },
+          null,
+          2,
+        ),
+        "utf8",
+      );
+      records = legacy;
+    }
+  }
+  if (records === null) return null;
+  if (prototypeId) {
+    const id = sanitizePrototypeId(prototypeId);
+    return records.find((r) => r.prototype_id === id) ?? null;
+  }
+  // 最近一条
+  return records.length > 0 ? records[records.length - 1]! : null;
 }
 
 export function upsertDemoConfirm(
@@ -86,17 +117,15 @@ export function upsertDemoConfirm(
   record: DemoConfirmRecord,
 ): void {
   const abs = path.join(repoRoot, DEMO_CONFIRM_STATE_FILE);
+  // 禁止写入 LEGACY_DEMO_CONFIRM_STATE_FILE（ADR-0011 / TASK-H.9）
   fs.mkdirSync(path.dirname(abs), { recursive: true });
-  let records: DemoConfirmRecord[] = [];
-  if (fs.existsSync(abs)) {
-    try {
-      const raw = JSON.parse(fs.readFileSync(abs, "utf8")) as {
-        records?: DemoConfirmRecord[];
-      };
-      records = Array.isArray(raw.records) ? raw.records : [];
-    } catch {
-      records = [];
-    }
+  let records: DemoConfirmRecord[] = parseDemoConfirmFile(abs) ?? [];
+  if (records.length === 0) {
+    // 新路径尚空时，合并历史只读内容一次，再只写 records
+    const legacy = parseDemoConfirmFile(
+      path.join(repoRoot, LEGACY_DEMO_CONFIRM_STATE_FILE),
+    );
+    if (legacy !== null) records = legacy;
   }
   const idx = records.findIndex((r) => r.prototype_id === record.prototype_id);
   if (idx >= 0) records[idx] = record;
