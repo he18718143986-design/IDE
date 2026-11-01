@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -11,6 +11,7 @@ import {
   E_MCP_GATEWAY_UNAVAILABLE,
 } from "../../daemon/mcp/http-server";
 import { ScopedWorktreeGateway } from "../../daemon/mcp/gateway";
+import { WebIngestProxy } from "../../daemon/web-ingest/proxy";
 import {
   E_INGEST_NOT_WIRED,
   E_WEB_INGEST_FORBIDDEN_DOMAIN,
@@ -152,9 +153,9 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
     expect(res.error?.message).toContain(E_MCP_GATEWAY_UNAVAILABLE);
   });
 
-  it("dispatches stagent_web_ingest through Gateway and checks domain whitelist with E_INGEST_NOT_WIRED", async () => {
+  it("dispatches stagent_web_ingest through Gateway and checks domain whitelist with real WebIngestProxy", async () => {
     const baseDraft = createContractDraft({
-      title: "W.8 Gateway Ingest Contract",
+      title: "W.8 / L.17a Gateway Ingest Contract",
       description: "Testing MCP dispatch over HTTP through Gateway",
       acceptanceCriteria: ["whitelist check"],
       writablePaths: ["src/**"],
@@ -167,7 +168,23 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
       ],
     };
 
-    const gateway = new ScopedWorktreeGateway(tempRepo, contract);
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response("<html><head><title>Spec V1</title></head><body><h1>API Spec</h1><p>Doc content</p></body></html>", {
+        status: 200,
+        headers: { "Content-Type": "text/html" },
+      }),
+    );
+    const proxy = new WebIngestProxy({
+      allowedDomains: [
+        "allowed.partner.com",
+        "docs.github.com",
+      ],
+      fetchFn: mockFetch as any,
+    });
+
+    const gateway = new ScopedWorktreeGateway(tempRepo, contract, {
+      webIngestProxy: proxy,
+    });
     const customMcpServer = new McpHttpServer({ gateway });
 
     // 1. Rejected when domain is not in contract references[]
@@ -185,8 +202,9 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
     const blockedResult = blockedCall.result as any;
     expect(blockedResult.isError).toBe(true);
     expect(blockedResult.error?.code).toBe(E_WEB_INGEST_FORBIDDEN_DOMAIN);
+    expect(mockFetch).not.toHaveBeenCalled();
 
-    // 2. Verified domain in contract references[] returns E_INGEST_NOT_WIRED (no fake success)
+    // 2. Verified domain in contract references[] routes to proxy and returns content
     const allowedCall = await customMcpServer.handleJsonRpc({
       jsonrpc: "2.0",
       id: 31,
@@ -202,9 +220,11 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
 
     expect(allowedCall.result).toBeDefined();
     const allowedResult = allowedCall.result as any;
-    expect(allowedResult.isError).toBe(true);
-    expect(allowedResult.error?.code).toBe(E_INGEST_NOT_WIRED);
-    expect(allowedResult.error?.message).toContain("TASK-L.17a");
+    expect(allowedResult.isError).toBe(false);
+    expect(allowedResult.content[0].text).toContain("Doc content");
+    expect(allowedResult.data.status).toBe(200);
+    expect(allowedResult.data.url).toBe("https://allowed.partner.com/spec/v1");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
 
     // 3. Gateway audit log records both calls
     const logs = gateway.getAuditLog();
@@ -214,11 +234,11 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
     expect(blockedLog).toBeDefined();
     expect(blockedLog?.outcome).toBe("BLOCKED");
 
-    const notWiredLog = logs.find(
-      (l) => l.violationCode === E_INGEST_NOT_WIRED,
+    const successLog = logs.find(
+      (l) => l.outcome === "SUCCESS",
     );
-    expect(notWiredLog).toBeDefined();
-    expect(notWiredLog?.outcome).toBe("BLOCKED");
+    expect(successLog).toBeDefined();
+    expect(successLog?.details).toContain("Successfully ingested");
   });
 
   it("enforces bearer token authorization and rejects unauthorized access with 401", async () => {

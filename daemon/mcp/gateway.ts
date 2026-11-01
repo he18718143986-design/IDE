@@ -1,3 +1,4 @@
+import { WebIngestProxy } from "../web-ingest/proxy";
 import fs from "node:fs";
 import path from "node:path";
 import type { SoftwareContract } from "../../src/lib/contract.schema";
@@ -215,6 +216,8 @@ export interface ScopedGatewayOptions {
         getToken: () => string | null | undefined;
       }
     | undefined;
+  /** TASK-L.17a: 受控只读外网代理（缺省按合同 references[] 自动构建） */
+  webIngestProxy?: WebIngestProxy | undefined;
   /** TASK-C.12c：写/删越界被阻断后回调（调用方可跑 SIGINT→…→PAUSED） */
   onScopeBlocked?:
     | ((info: {
@@ -276,6 +279,7 @@ export class ScopedWorktreeGateway {
   private readonly requireRepoTrust: boolean;
   private readonly deadlock?: CommandTimeoutTracker | undefined;
   private readonly execToken?: ScopedGatewayOptions["execToken"];
+  private readonly webIngestProxy?: WebIngestProxy | undefined;
   private readonly onScopeBlocked?: ScopedGatewayOptions["onScopeBlocked"];
   private readonly dirtyExclusions: readonly string[];
   private graveyardGate: GraveyardGateContext | undefined;
@@ -312,6 +316,7 @@ export class ScopedWorktreeGateway {
     this.deadlock = options.deadlock;
     this.execToken = options.execToken;
     this.onScopeBlocked = options.onScopeBlocked;
+    this.webIngestProxy = options.webIngestProxy;
     this.dirtyExclusions = options.dirtyExclusions ?? [];
     this.graveyardGate = options.graveyardGate;
     this.phaseOverlay = options.phaseOverlay;
@@ -1073,26 +1078,58 @@ export class ScopedWorktreeGateway {
       };
     }
 
-    // TASK-W.8: Domain verified, but web ingest backend proxy is pending TASK-L.17a.
-    // Return E_INGEST_NOT_WIRED honestly to prevent polluting delivery evidence.
-    const code = E_INGEST_NOT_WIRED;
-    const message = `Web ingest proxy backend is not wired (pending TASK-L.17a). Target domain '${targetHost}' is verified in references[] whitelist.`;
-    this.logAudit({
-      tool: "stagent_web_ingest",
-      input: rawInput,
-      outcome: "BLOCKED",
-      violationCode: code,
-      details: message,
-    });
-    return {
-      isError: true,
-      content: [{ type: "text", text: `[${code}] ${message}` }],
-      error: {
-        code,
-        message,
-        details: { host: targetHost, url: rawUrl, format: format ?? "html" },
-      },
-    };
+    // TASK-L.17a: 真实只读代理调用接通接缝（替代原先的 E_INGEST_NOT_WIRED）
+    try {
+      const proxy =
+        this.webIngestProxy ??
+        new WebIngestProxy({
+          allowedDomains: Array.from(allowedHosts),
+        });
+
+      const ingestResult = await proxy.fetch({
+        url: targetUrl.toString(),
+        format: format ?? "html",
+      });
+
+      this.logAudit({
+        tool: "stagent_web_ingest",
+        input: rawInput,
+        outcome: "SUCCESS",
+        details: `Successfully ingested ${ingestResult.byteLength} bytes from ${targetHost} (format: ${ingestResult.format})`,
+      });
+
+      return {
+        isError: false,
+        content: [{ type: "text", text: ingestResult.content }],
+        data: {
+          url: ingestResult.url,
+          status: ingestResult.status,
+          format: ingestResult.format,
+          byteLength: ingestResult.byteLength,
+          summary: ingestResult.summary,
+        },
+      };
+    } catch (err: unknown) {
+      const errorObj = err as { code?: string; message?: string };
+      const code = errorObj.code ?? "E_WEB_INGEST_FETCH_FAILED";
+      const message = errorObj.message ?? String(err);
+      this.logAudit({
+        tool: "stagent_web_ingest",
+        input: rawInput,
+        outcome: "BLOCKED",
+        violationCode: code,
+        details: message,
+      });
+      return {
+        isError: true,
+        content: [{ type: "text", text: `[${code}] ${message}` }],
+        error: {
+          code,
+          message,
+          details: { host: targetHost, url: rawUrl, format: format ?? "html" },
+        },
+      };
+    }
   }
 
   private async handleDeclareComplete(
