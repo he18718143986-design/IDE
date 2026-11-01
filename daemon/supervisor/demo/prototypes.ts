@@ -78,6 +78,7 @@ function parseDemoConfirmFile(abs: string): DemoConfirmRecord[] | null {
 
 /**
  * 读确认态：优先新路径；若仅有历史 `.stagent/metadata/` 文件则只读迁移到 records（不回写旧路径）。
+ * 副作用：新路径不存在而旧路径存在时，**首次读取会迁移落盘**到 DEMO_CONFIRM_STATE_FILE（一次性写 records）。
  */
 export function readDemoConfirm(
   repoRoot: string,
@@ -119,9 +120,10 @@ export function upsertDemoConfirm(
   const abs = path.join(repoRoot, DEMO_CONFIRM_STATE_FILE);
   // 禁止写入 LEGACY_DEMO_CONFIRM_STATE_FILE（ADR-0011 / TASK-H.9）
   fs.mkdirSync(path.dirname(abs), { recursive: true });
-  let records: DemoConfirmRecord[] = parseDemoConfirmFile(abs) ?? [];
-  if (records.length === 0) {
-    // 新路径尚空时，合并历史只读内容一次，再只写 records
+  const parsedNew = parseDemoConfirmFile(abs);
+  let records: DemoConfirmRecord[] = parsedNew ?? [];
+  // 仅当新文件不存在时合并 legacy，避免「有意清空的 records」被旧确认态复活
+  if (parsedNew === null) {
     const legacy = parseDemoConfirmFile(
       path.join(repoRoot, LEGACY_DEMO_CONFIRM_STATE_FILE),
     );
