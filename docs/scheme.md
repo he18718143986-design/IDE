@@ -48,10 +48,12 @@
 | q22 | U4 | 直接对这两个 PR 执行变更，认同三篇 ADR 和两个推荐项 |
 | q23 | U5 | 确认路径上 occurrence 机制生效——用户在「确认开工」时点名的敏感项进入授权清单，后续合同中同一敏感项再次出现自动放行 |
 | q24 | U5 | 第一印象速记窗口不设等待时长、非阻塞、可跳过；用户跳过则直接进入验收决定；用户异议随时经右栏走 user_dispute trigger |
+| q25 | U6 | acc-6 判定 = 用户与 AI 对话确认 + 「认可完成」动作落成结构化证据（用户原话 + 版本号 + 时间戳）；AI 只做引导，不做判定；无机器自动对比（不追求像素/DOM 指标）。 |
 
 > `U3` = 2026-10-30 用户提出的目标能力与审计要求（任务 TINA16-3 第三轮）。审计结论见 [`reports/delivery-path-audit.md`](./reports/delivery-path-audit.md)。
 > `U4` = 2026-10-30 用户对三篇 ADR（ADR-0015～0017）及两项推荐（SA-1 与凭据钥匙串 OQ-REL-1）的正式授权拍板（原话见 q22）。
 > `U5` = 2026-11-01 用户拍板 OP-1「洗白」、OP-13「第一印象窗口不阻塞」、DOC-7 草案升格与 DOC-8/9 RFC 正文清理（原话见 q23、q24）。
+> `U6` = 2026-11-01 用户拍板 oq-2 北极星「一模一样」判据：对话试玩 + 结构化证据桩（原话见 q25）。
 
 **已落盘的用户裁决**（不是本轮原话，但属于 `user_confirmed`，可作证据）：
 
@@ -62,6 +64,7 @@
 | R-ADR | ADR-0001～0013（均 ACCEPTED） | [`adr/README.md`](./adr/README.md) |
 | R-OP1 | 确认路径 occurrence → 洗白 / 授权清单（SA-1 语义） | 本文 §6 dec-10；[`ledger/consistency-audit.md`](./ledger/consistency-audit.md) OP-1；supervisor §14.11 K-12；**实施卡 `TASK-J.20`**（不回写 COMPLETED J.9） |
 | R-OP13 | 第一印象速记：不设等待、非阻塞、可跳过 | 本文 §6 dec-11；[`ledger/consistency-audit.md`](./ledger/consistency-audit.md) OP-13；supervisor §13.3 |
+| R-OQ2 | 北极星「一模一样」：用户对话试玩 + 结构化证据桩（绑定版本/原话/时间戳） | 本文 §6 dec-12；§8 oq-2；§9 acc-6；[`specs/delivery-lifecycle.md`](./specs/delivery-lifecycle.md) M5 |
 
 ---
 
@@ -149,6 +152,7 @@
 | dec-4 | `development-tasks.md`（约 460KB）要不要拆？ | 拆成「卡号索引 + 活跃卡 + 已完成卡 + 修订流水」，卡号不变。 | 维持单文件 | 约 65% 是已完成卡的历史，仍要执行的 J 系列只占约 15%；但拆分会与正在进行的 PR 冲突，需择时。 | low | `user_confirmed` | q9；[`ledger/README.md`](./ledger/README.md) DOC-1 |
 | dec-10 | 确认路径上 `occurrence` 是否保留（OP-1「洗白面」）？ | **洗白**：确认路径 `occurrence` 机制生效——用户在「确认开工」时点名的敏感项进入授权清单，后续合同中同一敏感项再次出现自动放行（对齐 supervisor §14.11 K-12「显式风险」与 SA-1 授权清单语义）。落地细节（白名单存储位置、scope 粒度、失效条件）由实施卡 **`TASK-J.20`** 确定（J.9 已 COMPLETED，不回写）；本裁决只定方向。 | 取消确认路径 `occurrence`；或另建独立白名单字段、与 quote 锚点脱钩 | 与 dec-8 / SA-1「原话点名 → 开工一并授权」同向；复活路径仍按 K-12 忽略 `occurrence`（取最后一处）。 | high | `user_confirmed` | **用户拍板 2026-11-01**；原话 q23：「确认路径上 occurrence 机制生效——用户在「确认开工」时点名的敏感项进入授权清单，后续合同中同一敏感项再次出现自动放行」。**实施卡：`TASK-J.20`**（存储/scope/失效；跨合同≠永久免检；**不**重开本裁决、**不**回写 J.9） |
 | dec-11 | 第一印象速记窗口要不要计时阻塞（OP-13）？ | **不阻塞**：不设等待时长；可选速记提示；可跳过；跳过则直接进入验收决定；异议随时经右栏走 `user_dispute` trigger。 | 设固定计时窗口后再入账 | 不新增决定类型、不挡「合入 / 这里不对」；与 §13.3「五种决定」纪律一致。 | low | `user_confirmed` | **用户拍板 2026-11-01**；原话 q24：「第一印象速记窗口不设等待时长、非阻塞、可跳过；用户跳过则直接进入验收决定；用户异议随时经右栏走 user_dispute trigger」 |
+| dec-12 | 北极星场景里的「一模一样」用什么判定（oq-2）？ | **用户对话试玩 + 结构化证据桩**：用户在右栏对着 AI 自由评阅，最终判定由用户明确表态（点「认可完成」按钮或原话认可）并落成带 `contract_id`、用户确认原话、版本号（`release_id` 或快照）与时间戳的结构化证据记录；AI 在对话中只做对比引导与修改建议（对接现场问题/微合同机制），不做机器自动代判；无机器自动对比（不追求像素/DOM 指标）。认可状态严格与版本绑定，版本变更时认可重置。机器对比初筛作为后续可能增强另议。 | 像素精确比对；机器 DOM 树匹配 | 「像不像」为主观判断，像素与 DOM 自动化比对脆弱易裂、阻碍真正意图表达且无法捕捉交互体验；AI 仅作引导员不能当代判员，乙方不可自验其活；必须由用户终审且落盘结构化证据闭环。 | high | `user_confirmed` | **用户拍板 2026-11-01**；原话 q25：「acc-6 判定 = 用户与 AI 对话确认 + 「认可完成」动作落成结构化证据（用户原话 + 版本号 + 时间戳）；AI 只做引导，不做判定；无机器自动对比（不追求像素/DOM 指标）」 |
 
 ## 7. 分歧（`conflicts[]`）——原话与现行规格打架的地方
 
@@ -169,7 +173,7 @@
 | id | text | 阻断级别 | evidence |
 | :--- | :--- | :--- | :--- |
 | oq-1 | 右栏是否允许用户切换为 OpenHands 等其他引擎？若允许，「只读」由谁保证？（现行：做不到只读的适配器不得作右栏） | NON_BLOCKER | q4；supervisor §13.2 |
-| oq-2 | 北极星场景里的「一模一样」用什么判定：像素对比、DOM 结构、还是用户试玩？ | BLOCKER（对 goal-2） | q2 |
+| ~~oq-2~~ | ~~北极星场景里的「一模一样」用什么判定：像素对比、DOM 结构、还是用户试玩？~~ | **已销项（dec-12）**：非机器对比；用户与 AI 对话确认 + 「认可完成」结构化证据桩（用户原话 + 版本号 + 时间戳），AI 仅引导不代判。 | q2、q25；`scheme.md` dec-12 |
 | oq-3 | 登录信息属于用户秘密：保存多久、谁能读、是否允许进入 Worker 环境？ | BLOCKER（对 goal-2） | q2；README「凭据」边界 |
 | oq-4 | 中栏 Supervisor 若改为 Claude Code，三维预算熔断（ADR-0004）如何对它计账？ | NON_BLOCKER | q6；ADR-0004 |
 
@@ -185,7 +189,7 @@
 | acc-7 | 每份合同的验收条目（`check: auto`）都有至少一条测试，且该测试在基线上失败、在候选上通过。 | `auto` | [`specs/verification-strategy.md`](./specs/verification-strategy.md) §3；TASK-L.3、L.4 | ⏳ |
 | acc-8 | 合入后知识库覆盖本次改动的全部文件。 | `auto` | [`specs/technical-design-and-knowledge.md`](./specs/technical-design-and-knowledge.md) §4.4；TASK-L.12（[#47](https://github.com/he18718143986-design/IDE/pull/47)/`39f426a`；KB-1 全量文件） | 机制已落地（单测 TD-06～08/10）；端到端产品验收仍 ⏳ |
 | acc-9 | 一次发布失败后自动回到上一个 LIVE 版本。 | `auto` | [`specs/release-and-operations.md`](./specs/release-and-operations.md) §1、§3.3；TASK-L.15 | **机制已落地**（#52/`9829385`；失败回滚路径+LIVE→FAILED）；端到端产品验收（真 npm start）仍 ⏳ |
-| acc-6 | 北极星：给网址 + 登录信息，用户只回答偏好问题，产出站点经试玩认可。 | `playtest` | 无（依赖 conf-6、oq-2、oq-3） | ⏳ |
+| acc-6 | 北极星：给网址 + 登录信息，用户只回答偏好问题，产出站点经试玩认可。 | `playtest` | 用户与 AI 对话确认 + 结构化证据桩（用户原话 + release_id + 时间戳），版本变更新建重置（dec-12）。依赖 conf-6、L.14（已 COMPLETED）、L.17 | ⏳ |
 
 ---
 
@@ -203,6 +207,7 @@
 | REJ-006 | 每个任务图节点一个 Git commit 作为点亮依据 | user | 改为三证 + 变更指纹 | [ADR-0009](./adr/0009-serial-graph-fingerprint.md) |
 | REJ-007 | 审计侧车放 `.stagent/metadata/` | user | 统一到 `.stagent/records/{contract_id}/` | [ADR-0011](./adr/0011-audit-sidecar-records-path.md) |
 | REJ-008 | 「≤2 轮问卷」门控与 Studio 五视口日常入口 | user | 单页方案工作台取代 | supervisor §0、TASK-C.18 |
+| REJ-009 | 北极星「一模一样」以像素对比或 DOM 树自动化比对为验收判据 | user | 自动化比对脆弱易裂且无法捕捉主观交互意图；AI 必须由用户终审，不能机器代判 | q25；`scheme.md` dec-12；oq-2 裁决 |
 
 ---
 
@@ -224,7 +229,7 @@
 | gap-8 | `SchemePatch` 零模型合并 | 引擎已合入：`src/lib/journey/scheme-patch-engine.ts`（§6 矩阵）；生成端循环已合入（J.10） | `TASK-J.9` **COMPLETED**（[#12](https://github.com/he18718143986-design/IDE/pull/12) / `1ad6eab`）；`TASK-J.10` **COMPLETED**（[#17](https://github.com/he18718143986-design/IDE/pull/17) / `97bb0db`） |
 | gap-9 | 早期卡把右栏写成「编码 Worker 对话窗口」 | C.1、W.1、W.5a、C.6、P.1、E.1、Sprint 1 门禁的旧叙述 | 已在任务卡文件头加取代说明；原文不改 |
 | gap-10 | 用户不做技术决策 | 现行有 `needs_approval` 逐项表态等审批点 | conf-5 |
-| gap-11 | 复刻网站需读参考站 | 全部 Agent 禁 `WebFetch` / `WebSearch` | conf-6；无卡 |
+| gap-11 | 复刻网站需读参考站 | 全部 Agent 禁 `WebFetch` / `WebSearch`；判据已由 dec-12 裁决，待实现卡落地 | conf-6、dec-12；`TASK-L.17` |
 | gap-12 | 登录凭据受控使用 | **代码已收口（L.14）**：`daemon/vault/` + `/api/vault` + Settings「密钥」区；日志/命令输出精确脱敏；HTTP 不回明文。发布注入已随 L.15 落地；摄取仍待 L.17 | oq-3；`TASK-L.14` **COMPLETED**（[#31](https://github.com/he18718143986-design/IDE/pull/31)/`ae57543`） |
 | gap-13 | 大需求拆成合同序列 | **代码已收口（L.7+L.8+L.9+L.10）**：`ProjectPlan` 类型/校验/落盘（L.7）；`PlanPatch`/分解器/API（L.8）；合同序列/`nextStub`/桩视图预检/互斥/`E_CONTRACT_IN_FLIGHT`/桩状态回填（L.9）；画布同页嵌「项目地图」+ `GET /api/project/plan` 权威下一份（L.10，tip `e4351b0` / #38）已合入。任务图一份合同一张的旧路径仍在。 | `TASK-L.7` **COMPLETED**（[#23](https://github.com/he18718143986-design/IDE/pull/23)/`607d742`）；`TASK-L.8` **COMPLETED**（[#33](https://github.com/he18718143986-design/IDE/pull/33)/`fb27504`）；`TASK-L.9` **COMPLETED**（[#35](https://github.com/he18718143986-design/IDE/pull/35)/`e1cf1bb`）；`TASK-L.10` **COMPLETED**（[#38](https://github.com/he18718143986-design/IDE/pull/38)/`e4351b0`） |
 | gap-14 | 新功能带测试 | Worker 指令已补「你会被这样检查」（L.2）；合同元数据 / `withSystemScope` / `stagent check` 义务与削弱检测已合入（L.3）；**两段式先红后绿编排已合入（L.4）**（`runWorker`→`runTwoPhase`）；**M2 黄金切片 E2E 已合入（L.6）** | `L.2`/`L.3`/`L.4`/`L.6` **COMPLETED**（[#8](https://github.com/he18718143986-design/IDE/pull/8)/[#15](https://github.com/he18718143986-design/IDE/pull/15)/[#18](https://github.com/he18718143986-design/IDE/pull/18)/[#21](https://github.com/he18718143986-design/IDE/pull/21) / `93589bf`） |

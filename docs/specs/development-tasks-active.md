@@ -199,26 +199,36 @@
 #### 【Task L.17】受控只读外网摄取（北极星前置） `[NEW_TASK]`
 
 * **任务编号**：`TASK-L.17`
-* **对应规格**：ADR-0014 §3；`scheme.md` goal-2、conf-6、oq-2
-* **前置依赖**：`TASK-L.14`（硬，ADR-0014 §3 要求与保险库同步落地）；**oq-2 裁决**（「一模一样」的判据）
+* **对应规格**：ADR-0014 §3；`scheme.md` goal-2、conf-6、oq-2（dec-12）；[`delivery-lifecycle.md`](./delivery-lifecycle.md) M5
+* **前置依赖**：`TASK-L.14`（COMPLETED · #31/`ae57543`）；**oq-2 裁决**（**RESOLVED · dec-12**，北极星「一模一样」判定口径：对话试玩 + 结构化证据桩，AI 引导不代判）
 * **优先级**：P3（M5）
-* **状态**：`[NEW_TASK]`（**未就绪**：oq-2 未裁决，按 task-card-standard R-10 不得开工）
-* **对照痛点（代码事实）**：`ALWAYS_DENY` 含 `WebFetch` / `WebSearch`（`daemon/worker/cli-host/claude-code-adapter.ts`）；Worker 无任何外网能力。
-* **一句话目标**：Worker 能经 Daemon 代理只读抓取方案里登记的参考站点；需要登录的站点由 Daemon 用保险库凭据代为登录，Worker 看不到账密。
-* **范围（草案，oq-2 裁决后细化）**：
-  1. Daemon 代理 `daemon/web-ingest/proxy.ts`：只允许 GET；域名白名单 = 方案 `references[]` 中用户给出的 URL 的域名；响应大小与速率上限。
-  2. 登录：凭据名在目标配置中登记，Daemon 用保险库值完成登录并持有 cookie；Worker 只拿到页面内容（HTML / 截图 / DOM 摘要）。
-  3. 作为 MCP 工具经网关暴露给 Worker（`--strict-mcp-config` 下的 Stagent 网关端点）。
-* **非目标**：不给右栏开外网（conf-7 / DEC-005）；不做通用搜索。
-* **不变声明**：右栏工具白名单不变；Worker 环境不含保险库值。
-* **验收（PASS）**：oq-2 裁决后补写。
-* **FAIL**：Worker 输入、日志、证据中出现账密；请求打到白名单外域名。
-* **关键文件**：`daemon/web-ingest/*`（新）、`daemon/mcp/gateway.ts`
-* **估算**：L（裁决后拆分）
+* **状态**：`[NEW_TASK]`（**oq-2 产品阻塞已解除**；按 task-card-standard R-11 估算 L 须拆为 ≤M 子卡后方可开工实现，见下文拆分规划）
+* **对照痛点（代码事实）**：`ALWAYS_DENY` 含 `WebFetch` / `WebSearch`（`daemon/worker/cli-host/claude-code-adapter.ts`）；Worker 无任何受控外网摄取能力；方案工作台尚无参考站比对与试玩证据桩通道。
+* **一句话目标**：Worker 能经 Daemon 代理只读抓取方案登记参考站，结合凭据代登进行复刻施工；用户经右栏搭档试玩比对并在确认后生成带版本绑定的结构化认可证据。
+* **范围（基于 dec-12 细化）**：
+  1. Daemon 受控代理 `daemon/web-ingest/proxy.ts`：只允许 GET；域名白名单 = 方案 `references[]` 中用户给出的 URL 域名；响应大小与速率上限。
+  2. 凭据代登：凭据名在目标配置登记，Daemon 用保险库值代登并持有 session/cookie；Worker 仅拿到页面内容（HTML / 截图 / DOM 摘要），环境变量零账密暴露。
+  3. 作为 MCP 工具经网关暴露给 Worker（`--strict-mcp-config` 下受管端点）。
+  4. 对比视图与右栏试玩引导：方案工作台呈现参考站抓取成果与生成站预览对比；右栏搭档（只读白名单不变）引导用户试玩与提修改意见。
+  5. 结构化证据落盘桩：用户在试玩后明确表态（点「认可完成」按钮或原话认可），生成带 `contract_id`、`release_id`（版本指纹）、用户确认原话与精确时间戳的证据文件落盘，`check: playtest` 基于此断言。
+  6. 跨版本重置：认可状态与当前版本严格绑定；后续微合同修改或新 Release 部署后，认可状态自动重置，不可跨版本复用。
+* **非目标**：不给右栏开外网（conf-7 / DEC-005）；不做通用搜索；不追求像素级/DOM 树机器对比指标（机器初筛作为后续自动化增强另议）。
+* **不变声明**：右栏只读工具白名单不变；Worker 环境不含保险库明文；AI 仅做引导不代判。
+* **验收（PASS）**：
+  1. 摄取安全与凭据隔离：Worker 经 Daemon 代理只读抓取参考站且白名单外域名请求被 403 阻断；凭据代登后 Worker 进程输入/环境变量/日志/证据零账密泄漏。
+  2. 试玩对比体验：工作台正确呈现参考站与生成站的对比展示；用户与右栏搭档对话正常交互且无任何主干写权限穿透。
+  3. 结构化证据落盘：用户完成试玩表态后，生成包含 `contract_id`、`release_id`、用户确认原话与时间戳的证据文件落盘，`check: playtest` 判定基于该证据文件。
+  4. 跨版本自动重置：微合同修改产生新版本后，原认可标志自动重置为未认可，防止旧版认可穿透新版。
+* **FAIL**：Worker 输入、日志、证据中出现账密；请求打到白名单外域名；AI 自行生成无用户确认的伪造证据；旧版本认可状态跨版本保留。
+* **拆分规划（满足 DoR R-11 ≤M 估算要求）**：
+  - `TASK-L.17a`：受控只读外网摄取与 Vault 代登代理（范围 1、2、3；估算 M）
+  - `TASK-L.17b`：对比视图、右栏试玩引导与结构化证据桩（范围 4、5、6；估算 M）
+* **关键文件**：`daemon/web-ingest/*`（新）、`daemon/mcp/gateway.ts`、`src/components/project/*`、`src/lib/journey/*`
+* **估算**：L（待按 L.17a / L.17b 拆分执行）
 
 ### 3.4e 台账债立卡（2026-11-01 · NON_BLOCKER · 不抢主序）
 
-> Tina 授权将第一类六项写成任务卡。Sprint：主序实现卡 **`L.16` 已 COMPLETED**（#62/`e4dfe1c`）；**`L.17` 仍卡 oq-2 未裁决，主序实现卡已尽**（**不开工** L.17）。本节目的：把 ledger 待立卡改代码项变成可排期卡；`A.7`/`H.9`/`L.18`/`J.19`/`J.20` 已 COMPLETED（见 completed / #58/#60）；余下 **`W.6`** 仍为 NON_BLOCKER（可开；**不与** W.5b/c 同窗）。另立 **`TASK-W.7`**（自助注册/自动验证 · 硬前置 W.6 · **不抢** W.5b/c 实测窗口）。
+> Tina 授权将第一类六项写成任务卡。Sprint：主序实现卡 **`L.16` 已 COMPLETED**（#62/`e4dfe1c`）；**`L.17` oq-2 裁决已落笔（dec-12，解除产品阻塞）**，按 R-11 待拆分为 L.17a/b ≤M 卡后开工；主序实现卡阶段性完备。本节目的：把 ledger 待立卡改代码项变成可排期卡；`A.7`/`H.9`/`L.18`/`J.19`/`J.20` 已 COMPLETED（见 completed / #58/#60）；余下 **`W.6`** 仍为 NON_BLOCKER（可开；**不与** W.5b/c 同窗）。另立 **`TASK-W.7`**（自助注册/自动验证 · 硬前置 W.6 · **不抢** W.5b/c 实测窗口）。
 
 ### 3.5 架构感知、监听与差异审阅（C.5 落 Sprint 2；B.1/B.2/C.4 推迟至 v0.2+）
 
