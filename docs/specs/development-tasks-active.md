@@ -87,12 +87,44 @@
 
 <a id="task-w.5c"></a>
 
-#### 【Task W.5c】OpenHands 适配器（容器隔离，SANDBOX_ENFORCED）(v1.3.3 新增)
+#### 【Task W.5c】OpenHands 适配器（容器隔离，SANDBOX_ENFORCED）(v1.3.3 新增) `[NEW_TASK]`
+
+> **DoR 正文重写（2026-11-02 · P-115）**：原正文仅 5 行（任务编号 / 前置依赖 / 状态 / 核心目标 / Pass-Fail），经 [`task-card-standard.md`](./task-card-standard.md) R-1～R-12 复核**仅 R-3 达标**，即 ledger **DOR-3** 债。本轮按 [`../templates/05-task-card.md`](../templates/05-task-card.md) 样板（`TASK-J.2`）逐条补齐 12 条，**仅重写卡正文、不改状态 `[NEW_TASK]`、不改产品代码、不开工实现、不动 Sprint 排程（`W.5c → W.7 → W.5b`）与 §1.1 矩阵**。**估算判 L**：按 R-11「L 卡不得开工、必须拆分」，本卡正文达标 **≠ 可开工**——拆分子卡须 Tina 另行授权（见文末估算）。原卡「D.2 Gate 0 与 A §9.1 不变式承认该模式」经复核：`system-architecture.md` §9.1 标题为 `[待实现 - 目标数据模型]`、代码侧三值未落地，属**落差而非既成事实**，本版改为如实写明（见对照痛点）。
+
 * **任务编号**：`TASK-W.5c`
-* **前置依赖**：`TASK-W.5a`
-* **任务状态**：**[NEW_TASK]**
-* **核心目标**：容器内仅挂载任务 Worktree，网络按合同策略；对应 `control_mode = "SANDBOX_ENFORCED"`，D.2 Gate 0 与 A §9.1 不变式承认该模式。
-* **Pass/Fail 验收判定**：容器逃逸/越界挂载负例实测失败关闭；`verified_on` 填写实测版本与日期。
+* **任务名称**：OpenHands 适配器容器隔离（`SANDBOX_ENFORCED`）黑盒实测
+* **对应规格**（R-1）：[`system-architecture.md`](./system-architecture.md) §9.1（`worker_spec` 目标模型：三值 `control_mode` + `billing_model` + `verified_on`，标题标 `[待实现 - 目标数据模型]`）、§4.2.3 P-17（术语纠偏：「沙箱」仅用于 OS 级命名空间 / cgroups / MicroVM / 专用容器隔离，**普通本地子进程严禁自称为沙箱**）、§2.7 Git Worktree Engine (Isolation Guard)；[`../adr/0001-target-user-positioning.md`](../adr/0001-target-user-positioning.md) **ADR-0001**（底层强隔离与防越权控制面完全不变）、[`../adr/0003-worktree-capability-boundary.md`](../adr/0003-worktree-capability-boundary.md) **ADR-0003**（Worktree 能力边界 · 非对抗性沙箱）；[`task-card-standard.md`](./task-card-standard.md) R-1～R-12 / §4；先例 [`development-tasks-completed.md`](./development-tasks-completed.md) §3.4a `TASK-W.5a` 实测纪律；ledger [`../ledger/README.md`](../ledger/README.md) **DOR-3**
+* **前置依赖**（R-3）：`TASK-W.5a`（**COMPLETED** · cli-host 黑盒实测先例）；`TASK-W.6`（**COMPLETED** · [#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`，Registry 受控派工接线，否则测完无池可注册）；**软** `TASK-W.7`（本卡容器隔离基建为其探测沙箱复用 / 对齐，排程在 W.7 之前）
+* **优先级**：P3 · **NON_BLOCKER**（M2 不依赖；不阻断 `TASK-L.16`）
+* **状态**：`[NEW_TASK]`（**正文已按 DoR 补齐；估算 L，开工前须先拆分子卡**）
+* **对照痛点（代码事实）**（R-4）：
+  1. `src/lib/contract.schema.ts::workerControlModeSchema`（约 :250）与 `daemon/worker/worker-adapter.interface.ts::AdapterControlMode`（:54）均为**二值** `"GATEWAY_ENFORCED" | "UNCONTROLLED_EXTERNAL"`，而 `system-architecture.md:970` 规范为**三值**（含 `"SANDBOX_ENFORCED"`）——该档位无类型 / schema 落点。
+  2. `src/lib/contract.schema.ts::workerSpecSchema`（约 :256）仅 5 键（`adapter_id` / `runtime_kind` / `model_id` / `control_mode` / `adapter_version`），**无** `billing_model` / `verified_on`；该文件头部注释（约 :29-33）已明确登记这批 §9.1 目标字段「未在本卡落地」，`tests/unit/contract-schema-v12.test.ts:199` 把五键集锁定为断言。
+  3. `src/lib/chat-events.ts::ChatAdapterInfo.control_mode`（:49）同为二值，`daemon/worker/cli-host/claude-code-adapter.ts::info()`（约 :154）以 `opts.verifiedOn` 派生档位；扩枚举不得影响右栏 `role:"partner"` 只读白名单（J.1）。
+  4. `TASK-W.7` 卡范围第 3 条（本文件 W.7 卡）已钉：「把 `SANDBOX_ENFORCED` 扩进**两处**枚举——`worker-adapter.interface.ts` 与 `contract.schema.ts` 各一处；只改单边 → schema 与注册侧不一致，漏改即 FAIL」。本卡作为 W.7 探测地基承接该双枚举扩展。
+* **一句话目标**（R-2）：合同可选 `control_mode = "SANDBOX_ENFORCED"` 的 OpenHands Worker，其容器内**仅挂载任务 Worktree**、网络按合同策略；越界挂载 / 容器逃逸负例实测失败关闭后，`verified_on` 才按实测版本与日期填写，未通过者仅登记 `UNCONTROLLED_EXTERNAL`（仅 Vibe、UI 显示「未受控」）。
+* **ADR 修订**（R-9）：**无冲突、不修订**。`SANDBOX_ENFORCED` 是新增更严档位，强化而非放宽 ADR-0001「底层强隔离 / 防越权控制面完全不变」；须满足 §4.2.3 P-17 与 ADR-0003 边界，**不得**把普通本地子进程标为沙箱。
+* **采用的默认值**（R-10）：凭证途径**仅限 API Key**（`[用户已确认 · 2026-10-20]` 所有 Worker 模式统一，不使用官方登录 / 订阅会话——该裁决标记见 W.5a / W.5b 卡；原 W.5b 卡所引「架构 §0.6.6」节号不存在，本卡不沿用）；未通过实测者默认 `UNCONTROLLED_EXTERNAL`。依赖的 `scheme.md` 冲突卡与 OQ（oq-2 dec-12 / oq-3 dec-13）均已裁决，无未决产品问题。
+* **范围**（R-5）：
+  1. **双枚举扩展（漏改单边即 FAIL）**：`daemon/worker/worker-adapter.interface.ts` 的 `AdapterControlMode`、`src/lib/contract.schema.ts` 的 `workerControlModeSchema` **各增** `"SANDBOX_ENFORCED"`，两处必须同改。
+  2. `src/lib/contract.schema.ts::workerSpecSchema` 增 `billing_model?`（`"PER_TOKEN" | "SUBSCRIPTION" | "QUOTA"`）与 `verified_on?`（`{ cli_version, verified_at }`）两可选键，对齐 §9.1 目标模型；同步更新 `tests/unit/contract-schema-v12.test.ts:199` 五键锁定断言（既有四必需键语义不变、`DEFAULT_WORKER_SPEC` 仍为 `GATEWAY_ENFORCED`）。
+  3. 新建 `daemon/worker/sandbox/container-host.ts`：导出 `runInSandbox(input: SandboxRunInput, signal?: AbortSignal): Promise<SandboxRunOutcome>`；容器内仅挂载任务 Worktree、网络按合同策略、OS 级隔离（命名空间 / cgroups / 容器运行时）、超时熔断。
+  4. 新建 `daemon/worker/cli-host/openhands-adapter.ts`：实现 `CodingWorkerAdapter`（`run(input, signal)`），能力声明 9 项 + `known_limitations` 如实写容器边界；凭证仅 API Key、env 白名单沿用 W.5a 纪律。
+  5. `daemon/worker/default-worker-registry.ts::createDefaultWorkerRegistry()` 登记 OpenHands 为 `SANDBOX_ENFORCED`（**仅登记**；未经实测不得挂进受控派工面，派工门禁按 W.6 语义）。
+  6. 新建 `tests/unit/openhands-sandbox.test.ts`（确定性负例）与 `tests/e2e/openhands-isolation.real.test.ts`（真实容器，`STAGENT_REAL_OPENHANDS=1` 时运行）；实测证据归档 `docs/reports/`。
+* **非目标**（R-6）：不做 W.5b cursor-agent 实测（仍各卡）；不实现 W.7 自助注册 / 自动探测包（本卡只提供可复用容器隔离基建）；不改右栏 `role:"partner"` 只读白名单（J.1）；不宣称「绝对受控」、不做多 Agent 并行 DAG（v0.2 RFC）；不改鉴权 / Demo Origin。
+* **不变声明**（R-12）：**不改变：鉴权 / Demo Origin / 点亮三证 / 网关写范围**（ADR-0001 纪律）。`SANDBOX_ENFORCED` 为新增**更严**档位，**不放宽** `GATEWAY_ENFORCED` 既有门禁；`UNCONTROLLED_EXTERNAL` 仍不得作为受控 / 可合并证据。
+* **验收（PASS）**（R-7）：新增 `tests/unit/openhands-sandbox.test.ts`，逐条可译为 `it(...)`：
+  1. `OS-01`：`workerControlModeSchema` 与 `AdapterControlMode` **两处**均含 `"SANDBOX_ENFORCED"`；只改一处的夹具 → 断言失败（漏改即 FAIL）。
+  2. `OS-02`：`workerSpecSchema` 接受 `billing_model` / `verified_on`，五键旧断言更新后仍通过；`DEFAULT_WORKER_SPEC` 保持 `GATEWAY_ENFORCED` 不受影响。
+  3. `OS-03`：越界挂载负例——诱导挂载宿主根 / `.git` / `.stagent` 保护区，容器拒绝且宿主文件完好。
+  4. `OS-04`：容器逃逸负例——诱导 escape / 提权 / 网络出站至未授权域名，全部失败关闭。
+  5. `OS-05`：`runInSandbox()` 仅见任务 Worktree 路径，`cwd` 外写入被拒。
+  6. `OS-06`：真实容器（`STAGENT_REAL_OPENHANDS=1`）负例通过后 `verified_on` 非空（CLI 版本 + 日期）；未通过则空、登记 `UNCONTROLLED_EXTERNAL`。
+  7. `OS-07`：能力声明对账——`known_limitations` 非空且如实，`filesystem_permissions` / `command_permissions` 与容器实测一致。
+* **FAIL**（R-8）：`SANDBOX_ENFORCED` 只改 `worker-adapter.interface.ts` 或只改 `contract.schema.ts` 单边；普通本地子进程自称沙箱（违反 §4.2.3 P-17）；任一越界挂载 / 逃逸负例可用；未实测即填 `verified_on` 或标受控；凭证走官方登录 / 订阅会话；为达成实测放宽鉴权 / Demo Origin / 网关写范围；本卡估算判 L 却未拆分子卡即开工或标本卡完成。
+* **关键文件**：`src/lib/contract.schema.ts`（改）、`daemon/worker/worker-adapter.interface.ts`（改）、`tests/unit/contract-schema-v12.test.ts`（改）、`daemon/worker/sandbox/container-host.ts`（新）、`daemon/worker/cli-host/openhands-adapter.ts`（新）、`daemon/worker/default-worker-registry.ts`（改）、`tests/unit/openhands-sandbox.test.ts`（新）、`tests/e2e/openhands-isolation.real.test.ts`（新）、`src/lib/chat-events.ts`（只读核对）、`daemon/worker/cli-host/claude-code-adapter.ts`（只读复用 env 白名单纪律）
+* **估算**（R-11）：**L**（跨「Schema / 类型层 + 容器运行时层 + 适配器 + 黑盒实测」多层，PASS 断言 7 条且含真实容器实测，超过 §4「一张卡只碰一个层」）。按 R-11「L 卡不得开工，必须拆分」，建议拆为 ① `W.5c-i` 双枚举 + `workerSpecSchema` 目标字段（S/M）② `W.5c-ii` 容器运行时 `runInSandbox`（M）③ `W.5c-iii` OpenHands 适配器 + 真实容器实测与 `verified_on`（M）。**拆卡须 Tina 另行授权**：本轮仅重写正文、不拆、不开工、不改 Sprint 排程与 §1.1 矩阵；`TASK-W.5b` 的 DOR-3 债保留挂账、本轮不动。
 
 ---
 
@@ -134,7 +166,7 @@
 * **对应规格**：架构 / W.1 适配器抽象；`daemon/worker/worker-adapter.interface.ts`；`src/lib/contract.schema.ts::workerSpecSchema`；先例 W.5b/c 人工实测 → 本卡产品化
 * **前置依赖**：**硬** `TASK-W.6`（Registry 进派工，否则测完无池可进；**W.6 已于 2026-11-02 COMPLETED（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`），硬前置已解除**）；**软** `TASK-W.5c`（探测沙箱复用/对齐其容器隔离基建；**排程上 W.5c 为下一张，优先于本卡**）
 * **优先级**：P3 · **NON_BLOCKER**（**不阻断** `TASK-L.16`；**不抢** W.5b/c 实测窗口；与 W.5b/c **不互斥**——本卡落地后 W.5b/c 可作为首批真实用例回归基准）
-* **状态**：`[NEW_TASK]`（硬前置 W.6 已 COMPLETED，就绪障碍解除；但排程上 `TASK-W.5c` 容器沙箱为下一张，本卡不抢位、尚未开工；DOR-3 正文重写债仍在）
+* **状态**：`[NEW_TASK]`（硬前置 W.6 已 COMPLETED，就绪障碍解除；但排程上 `TASK-W.5c` 容器沙箱为下一张，本卡不抢位、尚未开工；`W.5c` 正文已于 P-115 按 DoR 重写达标但判 L、开工前须拆分子卡待授权，`W.5b` 的 DOR-3 正文重写债仍在）
 * **对照痛点（代码事实）**：
   1. 三层可扩展接口已在：`daemon/worker/worker-adapter.interface.ts::CodingWorkerAdapter`（`AdapterCapabilityDeclaration` 9 项 + `AdapterRejectionCode`）、`daemon/worker/adapter-registry.ts::AdapterRegistry`（`register` / `get` / `requireControlled`）、`src/lib/contract.schema.ts::workerSpecSchema`（`adapter_id` + `control_mode` 二值 `GATEWAY_ENFORCED|UNCONTROLLED_EXTERNAL`）。
   2. ~~派工仍硬编码 `new AiWorker(...)`（`daemon/pipeline/orchestrator.ts`）~~ —— **已由 W.6（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`）改造为经 `AdapterRegistry` → `requireControlledDispatch` 派工工厂接线，本痛点已消除**；本卡不代替 W.6。
