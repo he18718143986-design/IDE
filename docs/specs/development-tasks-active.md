@@ -199,7 +199,7 @@
 
 #### 【Task L.17】受控只读外网摄取（北极星前置 · 已拆分） `[SPLIT]`
 
-> **注记（2026-11-01 · oq-3 裁决与 L.17 拆分；11-01 前置探查状态更新）**：本卡已拆分为 **`TASK-L.17a`** 与 **`TASK-L.17b`** 两张子卡；此前 DoR 检查曾标为 `[READY]`，但开工探查发现 `references[]` schema 字段与 Worker MCP HTTP 端点两项未列前置，当前 **L.17a 已解除前置阻断并回到 `[READY]`，L.17b 仍等待 L.17a**。保留历史拆分追溯，不删原文，本母卡不开工实现。
+> **注记（2026-11-01 · oq-3 裁决与 L.17 拆分；11-01 L.17a 交付与 L.17b 解封更新）**：本卡已拆分为 **`TASK-L.17a`** 与 **`TASK-L.17b`** 两张子卡；`TASK-L.17a` 已 COMPLETED（[#70](https://github.com/he18718143986-design/IDE/pull/70)/`8516c3d`），**`TASK-L.17b` 已解除阻断并就绪为 `[READY]`**。保留历史拆分追溯，不删原文，本母卡不开工实现。
 
 * **任务编号**：`TASK-L.17`
 * **对应规格**：ADR-0014 §3；`scheme.md` goal-2、conf-6、oq-2（dec-12）；[`delivery-lifecycle.md`](./delivery-lifecycle.md) M5
@@ -229,56 +229,19 @@
 * **关键文件**：`daemon/web-ingest/*`（新）、`daemon/mcp/gateway.ts`、`src/components/project/*`、`src/lib/journey/*`
 * **估算**：L（已拆分为 L.17a / L.17b 执行，保留本卡追溯）
 
----
-
-<a id="task-l.17a"></a>
-
-#### 【Task L.17a】受控摄取与代登代理 `[READY]`
-
-* **任务编号**：`TASK-L.17a`
-
-> **前置与恢复注记（2026-11-01）**：两项此前缺失的前置均已合入 main，故本卡由 `[BLOCKED]` 恢复为 `[READY]`。此前记录的 `feat/l17a-web-ingest` 在本轮 GitHub 远端分支查询中返回 404；不据此宣称该分支上的实现仍可取用或已 rebase。开工前须核实/恢复施工分支并基于当前 main；不代表端到端闭环。
-* **任务名称**：受控只读外网摄取与 Vault 代登代理
-* **对应规格**：ADR-0014 §3；`scheme.md` goal-2、conf-6、dec-13、oq-3；[`delivery-lifecycle.md`](./delivery-lifecycle.md) M5
-* **前置依赖**：`TASK-L.14`（COMPLETED · #31/`ae57543`）+ **oq-3 裁决**（**RESOLVED · dec-13**）+ 合同 `references[]` 字段与 Worker 侧 Stagent MCP HTTP 端点（均已完成；证据见 completed §3.4e）
-* **优先级**：P3（M5）
-* **状态**：`[READY]`（2026-11-01 · C.22 #67 与 W.8 #68 均已合入 main；施工分支仍需核实）
-* **对照痛点（代码事实）**：`ALWAYS_DENY` 含 `WebFetch` / `WebSearch`（`daemon/worker/cli-host/claude-code-adapter.ts`）；Worker 无法接触外网，无受控只读 GET 代理与 Vault 代登 session/cookie 保持能力。
-* **一句话目标**：Worker 能经 Daemon 代理只读抓取方案 `references[]` 登记的参考站，支持由 Daemon 用 Vault 凭据代登并持有 cookie，Worker 全程无感、全程不见账密。
-* **范围（照 L.17 卡内拆分规划 1、2、3 与 dec-13 规定）**：
-  1. Daemon 受控代理 `daemon/web-ingest/proxy.ts`：只允许只读 GET 请求；域名白名单 = 方案 `references[]` 中用户给出的 URL 域名；严格施加响应大小与速率上限。
-  2. 凭据代登与会话持有 `daemon/web-ingest/auth-session.ts`：凭据名在目标配置登记，Daemon 读取 Vault（OS Keychain）账密完成代登并持有 session/cookie；Worker 仅拿到页面内容（HTML / 截图 / DOM 摘要），环境变量零账密暴露。
-  3. 经 MCP 暴露给 Worker：作为只读 MCP 工具经网关暴露给 Worker（`--strict-mcp-config` 下受管端点 `daemon/mcp/gateway.ts`）。
-  4. **必须写死条款 1（来自 dec-13）**：凭据生命周期 = 用户手动删除为止（凭据存入 Vault 直至用户手动删除，不设自动过期，不按项目联动清理）。
-  5. **必须写死条款 2（来自 dec-13）**：cookie 过期静默重登的实现归属 = Daemon（代登 cookie 过期后由 Daemon 用 Vault 账密静默重登，Worker 全程无感、全程不见账密）。
-* **非目标**：不给右栏开外网（conf-7 / DEC-005）；不做通用搜索引擎抓取；不负责前端对比视图与试玩引导（归 L.17b）；不把账密写入任何文件。
-* **不变声明**：右栏只读工具白名单不变；账密/cookie 不进合同、不进日志、不进 Worker 环境——维持 ADR-0014 §3 原口径。
-* **验收（PASS）**：
-  1. `tests/unit/web-ingest-proxy.test.ts`：Worker 经 Daemon proxy 抓取 `references[]` 白名单内域名返回 200 及页面摘要；非白名单域名返回 403 阻断；非 GET 请求返回 405 阻断。
-  2. `tests/unit/web-ingest-auth.test.ts`：Daemon 使用 Vault 账密代登并持久持有 cookie；向 Worker 暴露的 MCP 返回值及 Worker 进程环境、执行日志中零账密明文。
-  3. `tests/unit/web-ingest-lifecycle.test.ts`：凭据生命周期严格遵守 dec-13，项目切换或会话结束不清理 Vault 凭据，仅用户手动删除生效。
-  4. `tests/unit/web-ingest-relogin.test.ts`：模拟代登 session/cookie 过期，Daemon 静默使用 Vault 账密重新代登并刷新 cookie，抓取操作平滑完成，Worker 全程无感知且代登状态对 Worker 零暴露。
-  5. 响应大小上限（超限截断或 413）与速率限制生效，突发洪水请求被正确限流。
-* **FAIL**：
-  1. 账密或 cookie 明文出现在 Worker 环境、日志、合同或证据中。
-  2. 代登状态对 Worker 暴露（Worker 获知内部 token、cookie 或凭据重试状态）。
-  3. 请求打到白名单外域名或非 GET 请求穿透。
-  4. 凭据发生自动过期或随项目联动删除。
-* **关键文件**：`daemon/web-ingest/proxy.ts`（新）、`daemon/web-ingest/auth-session.ts`（新）、`daemon/mcp/gateway.ts`、`tests/unit/web-ingest-proxy.test.ts`（新）
-* **估算**：M
 
 ---
 
 <a id="task-l.17b"></a>
 
-#### 【Task L.17b】对比视图与试玩证据桩 `[BLOCKED（待 L.17a）]`
+#### 【Task L.17b】对比视图与试玩证据桩 `[READY]`
 
 * **任务编号**：`TASK-L.17b`
 * **任务名称**：对比视图与试玩证据桩
 * **对应规格**：ADR-0014 §3；`scheme.md` goal-2、dec-12、oq-2、acc-6；[`delivery-lifecycle.md`](./delivery-lifecycle.md) M5
-* **前置依赖**：`TASK-L.17a`（受控摄取与代登代理）+ `TASK-L.16`（COMPLETED · #62/`e4dfe1c`，复用「让 AI 看看」通道做试玩引导）
+* **前置依赖**：`TASK-L.17a`（COMPLETED · [#70](https://github.com/he18718143986-design/IDE/pull/70)/`8516c3d`）+ `TASK-L.16`（COMPLETED · #62/`e4dfe1c`，复用「让 AI 看看」通道做试玩引导）
 * **优先级**：P3（M5）
-* **状态**：`[BLOCKED（待 L.17a）]`（随 L.17a，估算 M；前置 L.16 已 COMPLETED）
+* **状态**：`[READY]`（2026-11-01 · 前置 L.17a #70/`8516c3d` 与 L.16 #62 均已 COMPLETED；M5 北极星主序最后一张卡）
 * **对照痛点（代码事实）**：方案工作台尚无参考站抓取快照与生成站预览对比；右栏缺少试玩比对引导；`check: playtest` 缺乏带版本号与用户原话的结构化证据落盘桩。
 * **一句话目标**：方案工作台呈现参考站抓取成果与生成站预览对比；用户经右栏搭档试玩引导后明确表态确认，落盘 dec-12 结构化证据桩，新版本部署后自动重置认可。
 * **范围（照 L.17 卡内拆分规划 4、5、6 与 dec-12 规定）**：
@@ -303,7 +266,7 @@
 ### 3.4e 台账债立卡（2026-11-01 · NON_BLOCKER · 不抢主序）
 
 
-> Tina 授权将第一类六项写成任务卡。Sprint：主序实现卡 **`L.16` 已 COMPLETED**（#62/`e4dfe1c`）；`L.17` 已拆分为 `L.17a` + `L.17b`，但开工探查发现未列前置，当前 **L.17a `[READY]`**（C.22 #67 + W.8 #68 已合入 main），L.17b 等待 L.17a；恢复 L.17a 施工前先核实/恢复缺失的远端分支并 rebase 到最新 main。本节目的：把 ledger 待立卡改代码项变成可排期卡；`A.7`/`H.9`/`L.18`/`J.19`/`J.20` 已 COMPLETED（见 completed / #58/#60）；余下 **`W.6`** 仍为 NON_BLOCKER（可开；**不与** W.5b/c 同窗）。另立 **`TASK-W.7`**（自助注册/自动验证 · 硬前置 W.6 · **不抢** W.5b/c 实测窗口）。
+> Tina 授权将第一类六项写成任务卡。Sprint：主序实现卡 **`L.16` 已 COMPLETED**（#62/`e4dfe1c`）；**`L.17a` 已 COMPLETED**（#70/`8516c3d`）；**`TASK-L.17b` 已解除阻断进入 `[READY]`**，成为 M5 北极星主序首要推进的最后一张卡。本节目的：把 ledger 待立卡改代码项变成可排期卡；`A.7`/`H.9`/`L.18`/`J.19`/`J.20`/`C.22`/`W.8`/`L.17a` 已 COMPLETED（见 completed / #58/#60/#69/#70）；余下 **`W.6`** 仍为 NON_BLOCKER（可开；**不与** W.5b/c 同窗）。另立 **`TASK-W.7`**（自助注册/自动验证 · 硬前置 W.6 · **不抢** W.5b/c 实测窗口）。
 
 ### 3.5 架构感知、监听与差异审阅（C.5 落 Sprint 2；B.1/B.2/C.4 推迟至 v0.2+）
 

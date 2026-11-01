@@ -193,7 +193,7 @@
 | acc-7 | 每份合同的验收条目（`check: auto`）都有至少一条测试，且该测试在基线上失败、在候选上通过。 | `auto` | [`specs/verification-strategy.md`](./specs/verification-strategy.md) §3；TASK-L.3、L.4 | ⏳ |
 | acc-8 | 合入后知识库覆盖本次改动的全部文件。 | `auto` | [`specs/technical-design-and-knowledge.md`](./specs/technical-design-and-knowledge.md) §4.4；TASK-L.12（[#47](https://github.com/he18718143986-design/IDE/pull/47)/`39f426a`；KB-1 全量文件） | 机制已落地（单测 TD-06～08/10）；端到端产品验收仍 ⏳ |
 | acc-9 | 一次发布失败后自动回到上一个 LIVE 版本。 | `auto` | [`specs/release-and-operations.md`](./specs/release-and-operations.md) §1、§3.3；TASK-L.15 | **机制已落地**（#52/`9829385`；失败回滚路径+LIVE→FAILED）；端到端产品验收（真 npm start）仍 ⏳ |
-| acc-6 | 北极星：给网址 + 登录信息，用户只回答偏好问题，产出站点经试玩认可。 | `playtest` | 用户与 AI 对话确认 + 结构化证据桩（用户原话 + release_id + 时间戳），版本变更新建重置（dec-12）；凭据 Vault 存至手动删、cookie 过期 Daemon 静默重登（dec-13）。依赖 conf-6、L.14（已 COMPLETED）、L.17a、L.17b | ⏳ |
+| acc-6 | 北极星：给网址 + 登录信息，用户只回答偏好问题，产出站点经试玩认可。 | `playtest` | 用户与 AI 对话确认 + 结构化证据桩（用户原话 + release_id + 时间戳），版本变更新建重置（dec-12）；凭据 Vault 存至手动删、cookie 过期 Daemon 静默重登（dec-13）。依赖 conf-6、L.14（已 COMPLETED）、L.17a（已 COMPLETED）、L.17b | ⏳ |
 
 ---
 
@@ -233,8 +233,8 @@
 | gap-8 | `SchemePatch` 零模型合并 | 引擎已合入：`src/lib/journey/scheme-patch-engine.ts`（§6 矩阵）；生成端循环已合入（J.10） | `TASK-J.9` **COMPLETED**（[#12](https://github.com/he18718143986-design/IDE/pull/12) / `1ad6eab`）；`TASK-J.10` **COMPLETED**（[#17](https://github.com/he18718143986-design/IDE/pull/17) / `97bb0db`） |
 | gap-9 | 早期卡把右栏写成「编码 Worker 对话窗口」 | C.1、W.1、W.5a、C.6、P.1、E.1、Sprint 1 门禁的旧叙述 | 已在任务卡文件头加取代说明；原文不改 |
 | gap-10 | 用户不做技术决策 | 现行有 `needs_approval` 逐项表态等审批点 | conf-5 |
-| gap-11 | 复刻网站需读参考站 | 全部 Agent 禁 `WebFetch` / `WebSearch`；判据已由 dec-12 裁决、凭据保管已由 dec-13 裁决，待实现卡 L.17a/L.17b 落地 | conf-6、dec-12、dec-13；`TASK-L.17a`、`TASK-L.17b` |
-| gap-12 | 登录凭据受控使用 | **代码已收口（L.14）**：`daemon/vault/` + `/api/vault` + Settings「密钥」区；日志/命令输出精确脱敏；HTTP 不回明文。发布注入已随 L.15 落地；oq-3 已裁决（dec-13），实现待 L.17a | oq-3（已裁 dec-13）；`TASK-L.14` **COMPLETED**（[#31](https://github.com/he18718143986-design/IDE/pull/31)/`ae57543`）；`TASK-L.17a` |
+| gap-11 | 复刻网站需读参考站 | 全部 Agent 禁 `WebFetch` / `WebSearch`；判据已由 dec-12 裁决、凭据保管已由 dec-13 裁决；L.17a 已落地受控只读代理与代登（#70/`8516c3d`），待 L.17b 落地对比与证据桩 | conf-6、dec-12、dec-13；`TASK-L.17a`（COMPLETED）、`TASK-L.17b` |
+| gap-12 | 登录凭据受控使用 | **代码已收口（L.14+L.17a）**：`daemon/vault/` + `/api/vault` + Settings「密钥」区；日志/命令输出精确脱敏；HTTP 不回明文。发布注入已随 L.15 落地；oq-3 凭据代登与静默重登已随 L.17a（#70/`8516c3d`）落地 | oq-3（已裁 dec-13）；`TASK-L.14` **COMPLETED**（[#31](https://github.com/he18718143986-design/IDE/pull/31)/`ae57543`）；`TASK-L.17a` **COMPLETED**（[#70](https://github.com/he18718143986-design/IDE/pull/70)/`8516c3d`） |
 | gap-13 | 大需求拆成合同序列 | **代码已收口（L.7+L.8+L.9+L.10）**：`ProjectPlan` 类型/校验/落盘（L.7）；`PlanPatch`/分解器/API（L.8）；合同序列/`nextStub`/桩视图预检/互斥/`E_CONTRACT_IN_FLIGHT`/桩状态回填（L.9）；画布同页嵌「项目地图」+ `GET /api/project/plan` 权威下一份（L.10，tip `e4351b0` / #38）已合入。任务图一份合同一张的旧路径仍在。 | `TASK-L.7` **COMPLETED**（[#23](https://github.com/he18718143986-design/IDE/pull/23)/`607d742`）；`TASK-L.8` **COMPLETED**（[#33](https://github.com/he18718143986-design/IDE/pull/33)/`fb27504`）；`TASK-L.9` **COMPLETED**（[#35](https://github.com/he18718143986-design/IDE/pull/35)/`e1cf1bb`）；`TASK-L.10` **COMPLETED**（[#38](https://github.com/he18718143986-design/IDE/pull/38)/`e4351b0`） |
 | gap-14 | 新功能带测试 | Worker 指令已补「你会被这样检查」（L.2）；合同元数据 / `withSystemScope` / `stagent check` 义务与削弱检测已合入（L.3）；**两段式先红后绿编排已合入（L.4）**（`runWorker`→`runTwoPhase`）；**M2 黄金切片 E2E 已合入（L.6）** | `L.2`/`L.3`/`L.4`/`L.6` **COMPLETED**（[#8](https://github.com/he18718143986-design/IDE/pull/8)/[#15](https://github.com/he18718143986-design/IDE/pull/15)/[#18](https://github.com/he18718143986-design/IDE/pull/18)/[#21](https://github.com/he18718143986-design/IDE/pull/21) / `93589bf`） |
 | gap-15 | 试玩看到真实应用 | Worktree 真实应用预览已合入（`daemon/supervisor/preview/app-runner.ts`；端口段 4200～4210，与 Demo 段隔离） | `TASK-L.5` **COMPLETED**（[#14](https://github.com/he18718143986-design/IDE/pull/14) / `0b6bc7f`） |
