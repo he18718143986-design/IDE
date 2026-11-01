@@ -38,6 +38,8 @@ export const reasonCodeSchema = z.enum([
   "OBLIGATION_RED_INVALID",
   "OBLIGATION_NOT_GREEN",
   "TEST_WEAKENED",
+  // TASK-L.12 / technical-design-and-knowledge §4.4
+  "KNOWLEDGE_DRIFT",
 ]);
 export type ReasonCode = z.infer<typeof reasonCodeSchema>;
 

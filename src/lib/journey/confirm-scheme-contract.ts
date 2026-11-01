@@ -124,6 +124,8 @@ export function buildConfirmContractFromScopePlan(
             }
           : {}),
     },
+    // Tina 拍板 B：合同身份只认 contract_type（由桩 kind 投影）
+    ...(stub ? { contract_type: stub.kind } : {}),
     // TASK-L.3 / L.9：追踪元数据（签署后不改合同正文）
     supervisor_metadata: {
       suggestion_id: stub

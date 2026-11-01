@@ -590,6 +590,7 @@ export function buildScopePlan(
   const withSystem = withSystemScope(plan, {
     repoRoot,
     scheme,
+    stub: input.stub ?? null,
   });
   plan = withSystem;
 
@@ -613,10 +614,17 @@ export interface SystemScopeContext {
   /** 可注入；缺省时从 package.json / go.mod / pytest 线索探测 */
   repoFacts?: RepoFacts;
   runner?: DetectedRunner;
+  /**
+   * TASK-L.12：桩种类。`knowledge_bootstrap` 时即使尚无 modules.yaml
+   * 也要并入 docs/system/** 与 check-knowledge。
+   */
+  stub?: import("../../src/lib/project/project-plan").ContractStub | null;
 }
 
 const SYSTEM_TESTS_PATH = "tests/stagent/**";
 const SYSTEM_AREA_ID = "system-tests-stagent";
+const SYSTEM_DOCS_PATH = "docs/system/**";
+const SYSTEM_DOCS_AREA_ID = "system-docs-knowledge";
 
 function readRepoFacts(repoRoot: string): RepoFacts {
   const facts: RepoFacts = {};
@@ -668,23 +676,38 @@ function hasAutoAcceptance(
 }
 
 /**
- * TASK-L.3：签署前系统贡献。
+ * TASK-L.3 / TASK-L.12：签署前系统贡献。
  *
  * - 方案含 check: auto/both 且 detectRunner 非空 → 写范围 tests/stagent/**
- * - 追加义务命令 + `stagent check obligations` + `stagent check test-integrity`
- * - 无 auto 条目或无运行器时原样返回（digest 不变）
+ *   并追加义务命令 + `stagent check obligations` + `stagent check test-integrity`
+ * - 目标仓已有 `docs/system/modules.yaml`，或本桩为 `knowledge_bootstrap`
+ *   → 写范围 `docs/system/**` + `stagent check knowledge`（排在既有命令之后）
+ * - 两者皆不触发时原样返回（digest / 引用不变，便于 L.3 回归）
  */
 export function withSystemScope(
   plan: ScopePlan,
   ctx: SystemScopeContext,
 ): ScopePlan {
-  if (!hasAutoAcceptance(ctx.scheme)) {
-    return plan;
-  }
+  const modulesYamlPath = path.join(
+    ctx.repoRoot,
+    "docs",
+    "system",
+    "modules.yaml",
+  );
+  const knowledgeNeeded =
+    ctx.stub?.kind === "knowledge_bootstrap" ||
+    fs.existsSync(modulesYamlPath);
 
-  const facts = ctx.repoFacts ?? readRepoFacts(ctx.repoRoot);
-  const runner = ctx.runner ?? detectRunner(facts);
-  if (runner.kind === null) {
+  const wantsTests = hasAutoAcceptance(ctx.scheme);
+  const facts = wantsTests
+    ? (ctx.repoFacts ?? readRepoFacts(ctx.repoRoot))
+    : (ctx.repoFacts ?? {});
+  const runner = wantsTests
+    ? (ctx.runner ?? detectRunner(facts))
+    : (ctx.runner ?? { kind: null, reportArgs: [] });
+  const canTests = wantsTests && runner.kind !== null;
+
+  if (!canTests && !knowledgeNeeded) {
     return plan;
   }
 
@@ -722,83 +745,149 @@ export function withSystemScope(
     plan_digest: "",
   };
 
-  const alreadyHasTestsPath = next.areas.some((a) =>
-    a.paths.includes(SYSTEM_TESTS_PATH),
-  );
-  if (!alreadyHasTestsPath) {
-    next.areas.push({
-      id: SYSTEM_AREA_ID,
-      label: plainAreaLabel(SYSTEM_TESTS_PATH),
-      why: "本合同验收条目需要自动测试义务",
-      module_ids: [],
-      kind: "create_new",
-      paths: [SYSTEM_TESTS_PATH],
-      excluded_by_user: false,
-    });
+  if (canTests) {
+    const alreadyHasTestsPath = next.areas.some((a) =>
+      a.paths.includes(SYSTEM_TESTS_PATH),
+    );
+    if (!alreadyHasTestsPath) {
+      next.areas.push({
+        id: SYSTEM_AREA_ID,
+        label: plainAreaLabel(SYSTEM_TESTS_PATH),
+        why: "本合同验收条目需要自动测试义务",
+        module_ids: [],
+        kind: "create_new",
+        paths: [SYSTEM_TESTS_PATH],
+        excluded_by_user: false,
+      });
+    }
+
+    const obligationPaths = (ctx.scheme.acceptance ?? [])
+      .filter((a) => a.check === "auto" || a.check === "both")
+      .map((a) =>
+        `tests/stagent/${a.id}.test.${runner.kind === "pytest" ? "py" : runner.kind === "go" ? "go" : "ts"}`,
+      );
+
+    const cmd = obligationCommand(runner, obligationPaths);
+    const extraCommands: VerificationCommand[] = [];
+    if (cmd) {
+      extraCommands.push({
+        alias: "obligation-tests",
+        executable: cmd.executable,
+        args: cmd.args,
+        expected_exit_code: 0,
+        timeout_seconds: 300,
+      });
+    }
+    extraCommands.push(
+      {
+        alias: "check-obligations",
+        executable: "stagent",
+        args: [
+          "check",
+          "obligations",
+          "--report",
+          ".stagent/records/obligation-report.json",
+        ],
+        expected_exit_code: 0,
+        timeout_seconds: 60,
+      },
+      {
+        alias: "check-test-integrity",
+        executable: "stagent",
+        args: [
+          "check",
+          "test-integrity",
+          "--base",
+          ".stagent/records/test-baseline",
+          "--candidate",
+          ".stagent/records/test-candidate",
+          "--lang",
+          runner.kind === "pytest" ? "py" : runner.kind === "go" ? "go" : "ts",
+        ],
+        expected_exit_code: 0,
+        timeout_seconds: 60,
+      },
+    );
+
+    const existingAliases = new Set(
+      next.verification.commands.map((c) => c.alias),
+    );
+    for (const c of extraCommands) {
+      if (existingAliases.has(c.alias)) continue;
+      next.verification.commands.push(c);
+      existingAliases.add(c.alias);
+    }
+    if (next.verification.commands.length > 0) {
+      next.verification.manual_only = false;
+      if (
+        !next.verification.plain.includes(
+          "义务测试先红后绿，且既有测试不被削弱",
+        )
+      ) {
+        next.verification.plain.push(
+          "义务测试先红后绿，且既有测试不被削弱",
+        );
+      }
+    }
   }
 
-  const obligationPaths = (ctx.scheme.acceptance ?? [])
-    .filter((a) => a.check === "auto" || a.check === "both")
-    .map((a) => `tests/stagent/${a.id}.test.${runner.kind === "pytest" ? "py" : runner.kind === "go" ? "go" : "ts"}`);
+  if (knowledgeNeeded) {
+    const alreadyHasDocs = next.areas.some((a) =>
+      a.paths.includes(SYSTEM_DOCS_PATH),
+    );
+    if (!alreadyHasDocs) {
+      next.areas.push({
+        id: SYSTEM_DOCS_AREA_ID,
+        label: plainAreaLabel(SYSTEM_DOCS_PATH),
+        why: "本合同须维护系统知识库（modules.yaml / changelog / decisions）",
+        module_ids: [],
+        kind: "change_existing",
+        paths: [SYSTEM_DOCS_PATH],
+        excluded_by_user: false,
+      });
+    }
 
-  const cmd = obligationCommand(runner, obligationPaths);
-  const extraCommands: VerificationCommand[] = [];
-  if (cmd) {
-    extraCommands.push({
-      alias: "obligation-tests",
-      executable: cmd.executable,
-      args: cmd.args,
-      expected_exit_code: 0,
-      timeout_seconds: 300,
-    });
-  }
-  extraCommands.push(
-    {
-      alias: "check-obligations",
+    const knowledgeArgs =
+      ctx.stub?.kind === "knowledge_bootstrap"
+        ? [
+            "check",
+            "knowledge",
+            "--all",
+            "--base",
+            "__STAGENT_BASE_SHA__",
+            "--candidate",
+            "__STAGENT_CANDIDATE_SHA__",
+            "--contract-id",
+            "__STAGENT_CONTRACT_ID__",
+          ]
+        : [
+            "check",
+            "knowledge",
+            "--base",
+            "__STAGENT_BASE_SHA__",
+            "--candidate",
+            "__STAGENT_CANDIDATE_SHA__",
+            "--contract-id",
+            "__STAGENT_CONTRACT_ID__",
+          ];
+
+    const knowledgeCmd: VerificationCommand = {
+      alias: "check-knowledge",
       executable: "stagent",
-      args: [
-        "check",
-        "obligations",
-        "--report",
-        ".stagent/records/obligation-report.json",
-      ],
+      args: knowledgeArgs,
       expected_exit_code: 0,
-      timeout_seconds: 60,
-    },
-    {
-      alias: "check-test-integrity",
-      executable: "stagent",
-      args: [
-        "check",
-        "test-integrity",
-        "--base",
-        ".stagent/records/test-baseline",
-        "--candidate",
-        ".stagent/records/test-candidate",
-        "--lang",
-        runner.kind === "pytest" ? "py" : runner.kind === "go" ? "go" : "ts",
-      ],
-      expected_exit_code: 0,
-      timeout_seconds: 60,
-    },
-  );
-
-  const existingAliases = new Set(
-    next.verification.commands.map((c) => c.alias),
-  );
-  for (const c of extraCommands) {
-    if (existingAliases.has(c.alias)) continue;
-    next.verification.commands.push(c);
-    existingAliases.add(c.alias);
-  }
-  if (next.verification.commands.length > 0) {
+      timeout_seconds: 120,
+    };
+    if (
+      !next.verification.commands.some((c) => c.alias === knowledgeCmd.alias)
+    ) {
+      next.verification.commands.push(knowledgeCmd);
+    }
     next.verification.manual_only = false;
     if (
-      !next.verification.plain.includes("义务测试先红后绿，且既有测试不被削弱")
+      !next.verification.plain.includes("系统知识库检查全部通过")
     ) {
-      next.verification.plain.push(
-        "义务测试先红后绿，且既有测试不被削弱",
-      );
+      next.verification.plain.push("系统知识库检查全部通过");
     }
   }
 

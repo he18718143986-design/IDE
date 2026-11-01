@@ -97,6 +97,7 @@ import { shouldRunTwoPhase } from "./two-phase";
 import {
   runDesignStep,
   applyDesignDependencyAllow,
+  designNotePath,
   type DesignNoteGenerator,
   type DesignSuspensionReason,
 } from "../supervisor/design/design-step";
@@ -208,6 +209,43 @@ export interface DesignRunInfo {
   detail?: string;
   note?: DesignNote | null;
   escalation_missed?: DetectedEscalation[];
+}
+
+
+/** TASK-L.12：把 check-knowledge 占位 SHA / 合同号换成真实值，并挂上 design-note 路径。 */
+function resolveKnowledgeCheckArgs(
+  args: readonly string[],
+  ctx: {
+    baseSha: string;
+    candidateSha: string;
+    contractId: string;
+    worktreePath: string;
+    designNoteFile: string | null;
+  },
+): string[] {
+  const next = [...args];
+  const setFlag = (name: string, value: string): void => {
+    const idx = next.indexOf(name);
+    if (idx >= 0 && idx + 1 < next.length) {
+      next[idx + 1] = value;
+    } else {
+      next.push(name, value);
+    }
+  };
+  setFlag("--base", ctx.baseSha);
+  setFlag("--candidate", ctx.candidateSha);
+  setFlag("--contract-id", ctx.contractId);
+  setFlag("--worktree", ctx.worktreePath);
+  if (ctx.designNoteFile) {
+    setFlag("--design-note", ctx.designNoteFile);
+  }
+  // 清掉未替换的占位符（防御）
+  for (let i = 0; i < next.length; i += 1) {
+    if (next[i] === "__STAGENT_BASE_SHA__") next[i] = ctx.baseSha;
+    if (next[i] === "__STAGENT_CANDIDATE_SHA__") next[i] = ctx.candidateSha;
+    if (next[i] === "__STAGENT_CONTRACT_ID__") next[i] = ctx.contractId;
+  }
+  return next;
 }
 
 export class ContractOrchestrator {
@@ -913,10 +951,38 @@ export class ContractOrchestrator {
         continue;
       }
 
+      // TASK-L.12：check-knowledge 占位符 → 真实 base/candidate/合同号
+      let commandArgs = [...command.args];
+      if (
+        command.alias === "check-knowledge" ||
+        (command.executable === "stagent" &&
+          command.args[0] === "check" &&
+          command.args[1] === "knowledge")
+      ) {
+        const candidateSha =
+          this.syncGit(worktreePath, ["rev-parse", "HEAD"]) ?? "HEAD";
+        const baseSha =
+          this.syncGit(this.repoRoot, [
+            "rev-parse",
+            current.authorization.git.base_branch,
+          ]) ?? candidateSha;
+        const dnFile = designNotePath(
+          this.repoRoot,
+          current.contract_id,
+        );
+        commandArgs = resolveKnowledgeCheckArgs(commandArgs, {
+          baseSha,
+          candidateSha,
+          contractId: current.contract_id,
+          worktreePath,
+          designNoteFile: fs.existsSync(dnFile) ? dnFile : null,
+        });
+      }
+
       // W.4：威胁守卫必须在创建子进程之前；拒绝即跳过 gateway，不产生任何进程
       const threat = assessCommandThreat({
         executable: command.executable,
-        args: command.args,
+        args: commandArgs,
         worktreeRoot: worktreePath,
         repoTrusted,
       });
@@ -937,7 +1003,7 @@ export class ContractOrchestrator {
         "stagent_exec_command",
         {
           executable: command.executable,
-          args: command.args,
+          args: commandArgs,
         },
         { internal: true },
       );
@@ -1034,6 +1100,9 @@ export class ContractOrchestrator {
               : tripped
                 ? "BLOCKED"
                 : "FAILED";
+    const knowledgeFailed = verificationResults.some(
+      (r) => !r.passed && r.alias === "check-knowledge",
+    );
     const reasonCode = interceptorBlocked
       ? ("UNSAFE_EXECUTION" as const)
       : threatBlocked
@@ -1048,7 +1117,9 @@ export class ContractOrchestrator {
                 ? ("BUDGET_EXHAUSTED" as const)
                 : loopGuard.isTripped()
                   ? ("VERIFICATION_RETRY_LIMIT" as const)
-                  : ("UNSAFE_EXECUTION" as const);
+                  : knowledgeFailed
+                    ? ("KNOWLEDGE_DRIFT" as const)
+                    : ("UNSAFE_EXECUTION" as const);
 
     const evidence = await this.writeEvidence(
       current,

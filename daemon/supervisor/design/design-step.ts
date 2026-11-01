@@ -6,6 +6,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { load as parseYaml } from "js-yaml";
+import { draftModules } from "../../knowledge/bootstrap-draft";
 import type { SoftwareContract } from "../../../src/lib/contract.schema";
 import {
   detectEscalations,
@@ -106,7 +107,8 @@ export function loadModulesFromDocsSystem(
   const docsSystemDir = path.join(repoRoot, "docs", "system");
   const modulesFile = path.join(docsSystemDir, "modules.yaml");
   if (!fs.existsSync(modulesFile)) {
-    return { modules: [], docsSystemDir: null };
+    // L.12：引导合同仍需 docsSystemDir 推回仓库根以跑 draftModules
+    return { modules: [], docsSystemDir };
   }
   try {
     const rawText = fs.readFileSync(modulesFile, "utf8");
@@ -174,6 +176,22 @@ export function defaultDesignNoteGenerator(
       overview_changed: false,
     },
   };
+
+  // TASK-L.12 / Tina 拍板 B：只认 contract_type（真实身份），不看 title / writable 启发式
+  const wantsKnowledge = contract.contract_type === "knowledge_bootstrap";
+  if (wantsKnowledge && input.modules.length === 0 && input.docsSystemDir) {
+    const repoRoot = path.resolve(input.docsSystemDir, "..", "..");
+    const modules = draftModules(repoRoot);
+    if (modules.length > 0) {
+      note.knowledge_delta = {
+        ...note.knowledge_delta,
+        modules_upsert: modules,
+        overview_changed: true,
+      };
+      note.approach =
+        note.approach + " 以引导草稿划分模块，补齐白话名与 purpose。";
+    }
+  }
 
   if (forbidDependencies) {
     return { note, stillNeedsDependencies: false };

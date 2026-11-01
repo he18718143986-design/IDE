@@ -5,6 +5,7 @@ import type { DesignNote } from "../../src/lib/design/design-note";
 import type { GraveyardEntry } from "../../src/lib/journey/scheme-patch-types";
 import { renderRejectedProposalsSection } from "../guard/graveyard-wiring";
 import type { AdapterCapabilityDeclaration } from "./worker-adapter.interface";
+import { KNOWLEDGE_CHECK_RULE_SUMMARIES } from "../knowledge/check-knowledge";
 
 /**
  * Worker 任务指令装配器（TASK-W.1 目标 2 / 规范 A §2.3、§4.1）。
@@ -306,7 +307,13 @@ export function renderChecksSection(
     }
   }
 
-  for (const extra of extras) {
+  const hasKnowledgeCheck = commands.some(
+    (c) => c.alias === "check-knowledge",
+  );
+  const kbExtras = hasKnowledgeCheck
+    ? KNOWLEDGE_CHECK_RULE_SUMMARIES
+    : [];
+  for (const extra of [...kbExtras, ...extras]) {
     lines.push(extra);
   }
 
