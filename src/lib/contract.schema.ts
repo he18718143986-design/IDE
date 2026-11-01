@@ -686,6 +686,47 @@ export const DEFAULT_WORKER_SPEC: WorkerSpec = {
   adapter_version: "0.1.0",
 };
 
+/**
+ * TASK-C.23：北极星合同自动附加 `check playtest` 验收命令（ruling 3 裁决口径）。
+ *
+ * 北极星判据 = 合同 `references[]` 非空（与 `playtest-guard.ts` 判定源一致，
+ * 本卡只读复用其判据、不改其判定逻辑）。装配值唯一：
+ * `{ alias: "playtest", executable: "stagent", args: ["check", "playtest", <contract_id>] }`。
+ *
+ * 纪律：
+ * - 幂等：已存在同 `alias` 命令时不重复追加（恰好 1 条）；
+ * - 防伪造：`args` 内的 `contract_id` 一律取服务端装配值，不接受调用方传入；
+ * - 非北极星（`references[]` 为空）不附加，并剔除调用方自带的 `playtest` 项，
+ *   避免绕开判据挂验收命令。
+ *
+ * 本函数是**唯一装配口径**：`createContractDraft()` 与 scheme 确认覆盖路径
+ * （`confirm-scheme-contract.ts`）必须都调它，只改单边即 FAIL。
+ */
+export const PLAYTEST_ALIAS = "playtest" as const;
+
+export function buildPlaytestCommand(contractId: string): VerificationCommand {
+  return {
+    alias: PLAYTEST_ALIAS,
+    executable: "stagent",
+    args: ["check", "playtest", contractId],
+    // 与既有默认命令一致（zod default 仅作用于运行时，输出类型为必填）
+    expected_exit_code: 0,
+    timeout_seconds: 60,
+  };
+}
+
+export function withPlaytestCommand(
+  commands: readonly VerificationCommand[],
+  contractId: string,
+  enabled: boolean,
+): VerificationCommand[] {
+  if (!enabled) {
+    return commands.filter((c) => c.alias !== PLAYTEST_ALIAS);
+  }
+  const rest = commands.filter((c) => c.alias !== PLAYTEST_ALIAS);
+  return [...rest, buildPlaytestCommand(contractId)];
+}
+
 // Helper to create a new Contract Draft adhering to v1.2.0
 export function createContractDraft(params: {
   title: string;
@@ -786,7 +827,9 @@ export function createContractDraft(params: {
       },
     },
     verification_spec: {
-      commands:
+      // TASK-C.23：北极星合同（references[] 非空）自动附加 check playtest 验收命令；
+      // 命令参数中的 contract_id 由服务端装配，幂等且不重复。
+      commands: withPlaytestCommand(
         params.commands !== undefined
           ? params.commands
           : params.manualConfirmation !== undefined
@@ -800,6 +843,9 @@ export function createContractDraft(params: {
                   timeout_seconds: 60,
                 },
               ],
+        contractId,
+        (params.references ?? []).length > 0,
+      ),
       ...(params.manualConfirmation === undefined
         ? {}
         : { manual_confirmation: params.manualConfirmation }),
