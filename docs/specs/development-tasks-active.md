@@ -76,7 +76,9 @@
 
 <a id="task-w.5b"></a>
 
-#### 【Task W.5b】cursor-agent 适配器黑盒实测（外部适配器实测 + W.7 探测包非容器回归基准）(v1.3.3 新增)
+#### 【Task W.5b】cursor-agent 适配器黑盒实测（外部适配器实测 + W.7 探测包非容器回归基准）`[COMPLETED]` · **NON_BLOCKER**
+
+> **归档注记（2026-11-02 · P-125）**：本卡已 **COMPLETED**（[#92](https://github.com/he18718143986-design/IDE/pull/92)/`bdac805`，squash merge；分支 `feat/w5b-cursor-agent-verify`，本地 `33cf6c2`，parent `b8d53c5`，合入后 tree 与分支一致）。卡正文**保留原文作溯源**，不再作为施工依据；交付内容、PASS 8 条逐条结果、6 条挂账与「不宣称」边界见 [`development-tasks-completed.md`](./development-tasks-completed.md#task-w.5b) §3.4m。**读本卡注意**：**PASS 8 条中 `CA-06`（真实 CLI 四类越权负例）未执行**——本机无有效 `CURSOR_API_KEY`，且卡内 FAIL 禁止拿订阅登录态凑数，故 `verified_on` 保持空、本卡**不产出任何受控证据**（挂账 1）。口径经 Tina 2026-11-02 裁决：代码侧闭环即标 `[COMPLETED]` + `CA-06` 挂账，**不得**把本卡读成「cursor-agent 已验证」。
 
 > **DoR 正文重写（2026-11-02 · P-124）**：原正文仅 5 行（任务编号 / 前置依赖 / 状态 / 核心目标 / Pass-Fail），经 [`task-card-standard.md`](./task-card-standard.md) R-1～R-12 复核**仅 R-3 达标**，即 ledger **DOR-3** 债（与 `W.5c` 当年同款处理）。本轮按 [`../templates/05-task-card.md`](../templates/05-task-card.md) 样板与 `W.5c` 重写范式逐条补齐 12 条，**仅重写卡正文、状态仍 `[NEW_TASK]`、不改产品代码、不开工、不动 Sprint 排程（`W.5b` 为现行首要）与 §1.1 矩阵语义**。**两处按事实纠正原卡**：① 原卡「注入规则见 架构 §0.6.6」——该节号**不存在**（`system-architecture.md` §0.6 下仅 0.6.1 执行模式 / 0.6.2 全局保护清单 / 0.6.3 冲突仲裁，见 `:261` / `:265` / `:269` / `:298`），本版改引真实节号并把凭证规则落到代码与 CLI 事实；② 原卡隐含「实测可能测出受控档」——按现行代码，`GATEWAY_ENFORCED` / `SANDBOX_ENFORCED` 两档对**宿主进程型**适配器**均不可达**，唯一合法档位是 `UNCONTROLLED_EXTERNAL`（判据见「可达档位」条），实测**不改变档位**，只决定能力声明的真实性与 Vibe 可用性。**本卡不实现宿主侧探测执行面**（见非目标第 1 条）。
 
@@ -85,7 +87,7 @@
 * **对应规格**（R-1）：[`system-architecture.md`](./system-architecture.md) §2.3（`:393` Coding Worker Agent；`:394` 明文把 cursor-agent 列入 Worker 例）、§4.2.3 P-17（`:591` 术语纠偏：「沙箱」仅用于 OS 级命名空间 / cgroups / MicroVM / 专用容器隔离，**普通本地子进程严禁自称为沙箱**）、§0.6.1（`:265` 执行模式 VIBE vs PROTECTED —— 本卡「仅 Vibe 可用」的出典）、§9.1（`:937` `[待实现 - 目标数据模型]`：三值 `control_mode` + `verified_on`）、`:1374` **P5.5** 成熟 Agent 受控实测表行（「各 Adapter 记录真实 `verified_on`；4 类绕过负例在真实 CLI 上全部失败关闭」）；[`../adr/0001-target-user-positioning.md`](../adr/0001-target-user-positioning.md) **ADR-0001**（防越权控制面完全不变）、[`../adr/0003-worktree-capability-boundary.md`](../adr/0003-worktree-capability-boundary.md) **ADR-0003**（Worktree 能力边界 · 非对抗性沙箱）；[`task-card-standard.md`](./task-card-standard.md) R-1～R-12 / §4；先例 [`development-tasks-completed.md`](./development-tasks-completed.md) §3.4a `TASK-W.5a`（cli-host 黑盒实测纪律：`buildLaunch` argv / env 白名单、缺 MCP 端点即 throw）与 §3.4l `TASK-W.7`（探测包五类断言与 id）；ledger [`../ledger/README.md`](../ledger/README.md) **DOR-3**；[`../scheme.md`](../scheme.md) §10 墓地 **REJ-010**（能力声明不得按宿主侧修辞口径造假）
 * **前置依赖**（R-3）：`TASK-W.5a`（**COMPLETED** · cli-host 黑盒实测先例与环境白名单纪律）；`TASK-W.6`（**COMPLETED** · [#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53` · `AdapterRegistry` 派工门禁四码，否则登记后无门禁可断言）；`TASK-W.7`（**COMPLETED** · [#89](https://github.com/he18718143986-design/IDE/pull/89)/`be480bb` · 探测包五类断言 + `promoteControlMode()` 唯一升格入口 —— 本卡身份 ② 的被测对象）。**环境前置已核查**（只读，见文末「开工前置」）：`cursor-agent` 可执行且版本已锁定，**但凭证前置未满足**（当前为订阅登录态），须先隔离后方可实测
 * **优先级**：P3 · **NON_BLOCKER**（M2 不依赖；不阻断任何主序卡）
-* **任务状态**：**[NEW_TASK]**（DoR 已达标，**开工须 Tina 授权**；授权前不动代码）
+* **任务状态**：**[COMPLETED]**（[#92](https://github.com/he18718143986-design/IDE/pull/92)/`bdac805` · 2026-11-02，见 completed §3.4m；`CA-06` 未执行属挂账 1，`verified_on` 恒空，不产出受控证据）
 * **双重身份（读卡先读这条）**：
   1. **身份 ①（本卡原始用途）**：cursor-agent 外部适配器黑盒实测 —— 能力声明逐项按实测事实填、`verified_on` 真实填（或明确标注「未通过，仅 Vibe」）。
   2. **身份 ②（P-123 追加）**：W.7 探测包对「**非容器外部适配器**」的**回归基准** —— 被测对象是**探测包本身**，断言方向是**负向**：探测包必须**拒绝**这一类适配器。若某类适配器能让探测包产出 `pass`，那才是缺陷。

@@ -3874,3 +3874,52 @@
   - **不宣称多平台**：平台矩阵只是声明结构校验，本卡未在任何平台做真实容器实测（见挂账 2）。
   - **不改变**：鉴权 / Demo Origin / 点亮三证 / 网关写范围（ADR-0001 纪律）；`UNCONTROLLED_EXTERNAL` 仍不得作为受控 / 可合并证据；`requireControlled()` 的放行口径未放宽。
 * **关键文件**：`daemon/worker/verify/worker-registration.ts`（新）、`daemon/worker/verify/worker-probe.ts`（新）、`daemon/worker/verify/worker-store.ts`（新）、`daemon/worker/verify/probe-execution-sandbox.ts`（新）、`daemon/worker/verify/worker-registration-service.ts`（新）、`daemon/worker/adapter-registry.ts`（改 · `promoteControlMode()` + `ADAPTER_PROMOTION_REFUSED`）、`daemon/server.ts`（改 · `/api/workers*` 四路由 + 错误码映射）、`src/lib/daemon-api.ts`（改 · 四个客户端方法与类型）、`src/components/settings/WorkerRegistrationPanel.tsx`（新）、`src/components/settings/SettingsTab.tsx`（改 · 挂载入口）、`tests/unit/worker-self-serve-verify.test.ts`（新 · 34 用例）。
+
+---
+
+### 3.4m cursor-agent 外部适配器与探测包非容器回归基准（W.5b · 双重身份）
+
+<a id="task-w.5b"></a>
+
+#### 【Task W.5b】cursor-agent 适配器黑盒实测（外部适配器实测 + W.7 探测包非容器回归基准）`[COMPLETED]`
+* **任务编号**：`TASK-W.5b`
+* **状态与证据**：`[COMPLETED]`（[#92](https://github.com/he18718143986-design/IDE/pull/92)/`bdac805`，squash merge；分支 `feat/w5b-cursor-agent-verify`，本地单提交 `33cf6c2`，parent `b8d53c5`；合入后 main 的 tree 与分支**完全一致**）。**口径经 Tina 2026-11-02 裁决：代码侧闭环 → `[COMPLETED]` + CA-06 挂账**（PASS 8 条中 `CA-06` 未执行，见挂账 1）；`verified_on` 保持空，**本卡不产出任何受控证据**。
+* **对应规格**：[`system-architecture.md`](./system-architecture.md) §2.3（`:393` Coding Worker Agent / `:394` 把 cursor-agent 列入 Worker 例）、§4.2.3 P-17（`:591` 术语纠偏：「沙箱」仅用于 OS 级隔离）、§0.6.1（`:265` VIBE vs PROTECTED —— 「仅 Vibe 可用」的出典）、§9.1（`:937` 三值 `control_mode` + `verified_on` 目标模型）、`:1374` **P5.5**（各 Adapter 记录真实 `verified_on`）；[ADR-0001](../adr/0001-target-user-positioning.md) / [ADR-0003](../adr/0003-worktree-capability-boundary.md)；[`../scheme.md`](../scheme.md) §10 墓地 **REJ-010**（能力声明不得按宿主修辞口径造假）
+* **前置依赖**：`TASK-W.5a`（**COMPLETED** · cli-host 黑盒实测先例与 env 白名单纪律）、`TASK-W.6`（**COMPLETED** · [#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53` · 派工门禁四码）、`TASK-W.7`（**COMPLETED** · [#89](https://github.com/he18718143986-design/IDE/pull/89)/`be480bb` · 探测包五类断言与被测对象）——三者均已在位
+* **交付内容**：
+  1. **适配器能力载体**（`daemon/worker/cli-host/cursor-agent-adapter.ts`，新，393 行）：`CURSOR_AGENT_WORKER_ADAPTER_ID = "stagent.cursor-agent.v0"`、`CURSOR_AGENT_CAPABILITY`（9 项 + 6 条 `known_limitations`）、`CursorAgentAdapter`（`kind: "CLI"`）。
+  2. **声明按最坏事实写**：`filesystem_permissions: "DIRECT_UNCONTROLLED"`、`command_permissions: "UNRESTRICTED_SHELL"`、`tool_interception_supported: false`。**只读档（`--mode plan|ask`）能否真正拒写写进 `known_limitations` 而不是写成缓解**——因为它未实测；把未验证的缓解写成事实就是 REJ-010。
+  3. **`buildLaunch()` 纯构建（本卡唯一可测契约面）**：argv = `--print` / `--output-format stream-json` / `--mode plan` / `--workspace <worktree_root>` /（可选 `--resume`）/ `--` / `<prompt>`；env 仅 `PATH` / `HOME`（**改写到专用配置目录**）/ `LANG` / `CURSOR_API_KEY`；MCP 只写一份 `<HOME>/.cursor/mcp.json`（仅 `stagent` 一项），端点缺失即抛 `E_CURSOR_AGENT_MCP_ENDPOINT_MISSING`（不静默空集合）。
+  4. **`assertNoForbiddenFlags()` 独立强制点**：`-f`/`--force`/`--yolo`/`--auto-review`/`--approve-mcps`/`--trust`/`--add-dir`/`-w`/`--worktree`/`--worktree-base`/`--skip-worktree-setup`/`--plugin-dir`/`--api-key` 一律拦（`E_CURSOR_AGENT_FORBIDDEN_FLAG`）；只检查 `--` 终止符之前的**旗标位**。
+  5. **`run()` 两段失败**（**本卡不提供执行入口**）：缺 key → `E_CURSOR_AGENT_NO_API_KEY`；有 key → `E_CURSOR_AGENT_NO_EXECUTOR`（`stream-json` 字段 schema 未实测，不猜解析器，避免把「能跑」伪装出来）。
+  6. **登记**：`default-worker-registry.ts` 增 1 行 `registry.register(new CursorAgentAdapter(), "UNCONTROLLED_EXTERNAL")`、**不挂派工工厂**；注册表项数 4 → 5。
+  7. **探测包五类断言适用性表**（写进测试并断言覆盖 `PROBE_IDS` 全量，N/A 必写理由、不跳计数）：`capability_declaration` **适用且应判 `fail`**（负向基准）；`dispatch_witness` **N/A-by-design**（`required:false`，且 `FenceProbeInput.target_mode` 类型不含 `UNCONTROLLED_EXTERNAL`）；`filesystem_fence` / `command_fence` / `evidence_integrity` **不可执行**（唯一执行面 `SandboxProbeExecutionPort` 经 `runInSandbox()` 入容器；`runProbePack()` 首行判 `isAvailable()` 即抛 `E_PROBE_SANDBOX_UNAVAILABLE`，**拒绝退回主树**）。
+  8. **实测中新发现并当场修掉的注入面**：不带 `--` 时 `cursor-agent --print --yolo` 解析成功（`--yolo` 被当作真旗标）→ **prompt 内容可变成启动参数**。argv 已在 prompt 前插入 `--` 终止符，`assertNoForbiddenFlags()` 同步改为只查终止符之前的旗标位（否则 prompt 里写 `--force` 会被误杀）。
+* **验收（PASS）**：新增 `tests/unit/cursor-agent-adapter.test.ts`（33 用例）+ `tests/e2e/cursor-agent-real.real.test.ts`（8 用例，`STAGENT_REAL_CURSOR=1`）：
+  1. `CA-01` 声明如实且严格档必拒——**达成**（`validateAdapterCapability(cap, "GATEWAY_ENFORCED").ok === false`，拒因 `FILESYSTEM_DIRECT_UNCONTROLLED`；另加反向断言：美化副本「能过严格档」，证明失败源于如实而非校验失效）。
+  2. `CA-02` 档位与门禁——**达成**（`UNCONTROLLED_EXTERNAL`；`requireControlledDispatch()` 抛 `E_ADAPTER_NOT_CONTROLLED`；`getDispatchFactory()` 为 `undefined`；项数 5；`WorkerRegistrationService.get()` 返回 `builtin:true` / `dispatchable:false` 附阻断原因，且**不写** `.stagent/workers.json`）。
+  3. `CA-03` argv 白名单——**达成**（含 `--print` / `--output-format stream-json` / `--mode plan` / `--workspace <cwd>`；禁用旗标逐个断言不出现；key 不进 argv；`--flag=value` 形态同样被拦）。
+  4. `CA-04` env 白名单与凭证前置——**达成但判法调整**（见挂账 3）：键集合 ⊆ {`PATH`,`HOME`,`LANG`,`CURSOR_API_KEY`}；哨兵环境变量不透传；缺 key 与有 key 的错误**码**不同（证明凭证检查先于执行器检查）。
+  5. `CA-05` MCP 面——**达成**（落点 `<HOME>/.cursor/mcp.json`；只有 `stagent` 一项；token 走 `Authorization: Bearer`；无 token 不写空 headers）。
+  6. `CA-06` 真实 CLI 四类越权负例——**未执行**（挂账 1）：本机无有效 `CURSOR_API_KEY`，四类负例需模型驱动工具调用；e2e 里写成 `describe.skipIf(!HAS_KEY)` + **启用即显式失败**的桩，不用 skip 冒充通过。
+  7. `CA-07` 探测包非容器负向回归——**达成**（`capability_declaration` 判 `fail`；`dispatch_witness` 在 `GATEWAY_ENFORCED` 目标下 `not_verified` + `required:false`，换 `SANDBOX_ENFORCED` 目标即判 `fail`（说明 N/A 只对非容器档成立）；执行面不可用时 `runProbePack()` 抛 `E_PROBE_SANDBOX_UNAVAILABLE`）。
+  8. `CA-08` `verified_on` 与升格拒绝——**达成**（`CURSOR_AGENT_VERIFIED_ON === undefined`；升格到 `GATEWAY_ENFORCED` 被严格档拒（`FILESYSTEM_DIRECT_UNCONTROLLED`）；无指纹升格被 `ADAPTER_PROMOTION_REFUSED` 拒）。
+* **测试与证据**：
+  - `npx vitest run tests/unit/cursor-agent-adapter.test.ts` → **33 passed**。
+  - `STAGENT_REAL_CURSOR=1 npx vitest run tests/e2e/cursor-agent-real.real.test.ts` → **7 passed | 1 skipped**（跳过的是需有效 API Key 的 `CA-06`）。真跑到的观测：专用 `HOME` 下 `status` = `Not logged in`；无 key 直跑 = `Error: Authentication required...`（**未回落订阅会话**）；假 key = `The provided API key is invalid.` + 来源为 `CURSOR_API_KEY` 环境变量；`--help` 逐项核对白名单与禁用旗标**都是真旗标**；`mcp list` 只读到 `stagent` 一项。
+  - `npx tsc --noEmit`：**57 个 `error TS`，与基线一致**（`cursor` 相关 0 条）。
+  - 全量 `vitest run`：**272 passed files / 8 failed / 3 skipped（283）**，`2694 passed / 7 failed`；8 个失败文件经 `git stash -u` 在 `main` 基线复跑**同组同因**（`cli-host-claude-code` 缺 `STAGENT_MCP_URL` 时 buildLaunch 抛错、`spawn-whitelist` 违规清单为 `why.ts` / `proxy.ts`，**不含新增文件**）。
+  - 真实 CLI 版本与环境：`cursor-agent` `2026.10.01-e373342` @ `darwin-arm64`，实测日 `2026-11-02`（记录在 `CURSOR_AGENT_MEASUREMENT`）。
+* **残余边界 / 后续挂账（P-125 归拢，共 6 条）**：
+  1. **`CA-06` 四类越权负例未执行（本卡唯一的 PASS 缺口）**：本机 `CURSOR_API_KEY` 未设置且 CLI 处于订阅登录态；按卡内 FAIL「凭证走订阅会话 = FAIL」，**没有**拿订阅会话凑数。因此 `CURSOR_AGENT_VERIFIED_ON` 恒 `undefined`、`CURSOR_AGENT_MEASUREMENT.negative_cases_executed: false`。补齐条件：有效 API Key + 隔离 `HOME`（断言 `status` 未登录）下跑完四类负例，**才能**填 `verified_on`。**在此之前不得把 cursor-agent 读成「已验证」**，它只是「已登记、未受控、不可派工」。
+  2. **`WorkerSpecRegistry` 符号不存在**：施工指令里「注册（`WorkerSpecRegistry` 持久化 `.stagent/workers.json`）」与代码事实不符——全仓无该类，`.stagent/workers.json` 是 W.7 **自注册** worker 的持久层，内建项写进去会与注册表同 id 冲突（`E_WORKER_DUPLICATED` / 「已被内建适配器占用」）。故按卡正文走**内建登记**，并加断言证明「列表可见 + 显示未受控 + 不可派工 + 不写 `workers.json`」。
+  3. **`CA-04` 的「spawn 零调用（spy 断言）」换成了顺序断言**：本卡无执行器，`run()` 物理上不启动任何进程，「spy 零调用」会变成永远为真的空断言。改为「缺 key 抛 A、有 key 抛 B」的错误码顺序断言——证明凭证检查先于执行器检查，且两条路径都不执行。
+  4. **env 白名单比卡内更窄**：卡写 `PATH`/`HOME`/`LANG`/`CURSOR_API_KEY`/`STAGENT_*`，实现**没有**透传任何 `STAGENT_*`（无观测需求）；窄于卡内，不是放宽。
+  5. **`docs/reports/` 实测证据归档未做**：本 PR 限定纯代码、不碰 `docs/`；证据记录在 `CURSOR_AGENT_MEASUREMENT` 常量与 #92 描述里。
+  6. **两处已知边界（如实登记，未修）**：① `AdapterRegistry.promoteControlMode()` 只校验指纹**形态**，自造指纹可把该适配器档位改成 `SANDBOX_ENFORCED`（改后派工仍被 `E_ADAPTER_SANDBOX_LOCKED` 拒）——真正挡住它的是「探测包产不出报告」；本卡非目标不许改注册表语义，故只做特征化断言。② 项目级 `.cursor/mcp.json` 在 `mcp list` 显示 `not loaded (needs approval)`，故 MCP 只写专用 `HOME`；这也意味着「仅挂 Stagent MCP」靠**配置目录隔离**而非 CLI 强约束（无 `--strict-mcp-config` 等价开关）。
+* **未宣称 / 不宣称端到端闭环**：
+  - **不宣称 cursor-agent 受控**：档位是结构性上界而非「还没测出来」——`GATEWAY_ENFORCED` 要求 `tool_interception_supported === true`（本进程无拦截点），`SANDBOX_ENFORCED` 要求派工经 `runInSandbox()` 并携 `SandboxWitness`（宿主进程不经该入口），故唯一合法档位是 `UNCONTROLLED_EXTERNAL`；**实测不改变档位**，只决定声明真实性与 Vibe 可用性。
+  - **不宣称 `stream-json` 契约已验证**：未接执行器，未解析过任何真实输出；`run()` 显式抛错而不是猜 schema。
+  - **不宣称「通过校验 = 够格标沙箱」**：`validateSandboxFenceTier()` 只查 `known_limitations` + 平台矩阵，宿主进程适配器也能过——这条陷阱已固化为断言。
+  - **不改变**：鉴权 / Demo Origin / 点亮三证 / 网关写范围（ADR-0001 纪律）；三档判据与 `resolveEvidenceControlMode()` 唯一强制点；`worker-probe.ts` 五类断言语义与 `target_mode` 类型；`UNCONTROLLED_EXTERNAL` 仍不得作为受控 / 可合并证据。
+* **关键文件**：`daemon/worker/cli-host/cursor-agent-adapter.ts`（新 · 393 行）、`daemon/worker/default-worker-registry.ts`（改 · 增 1 行登记）、`tests/unit/cursor-agent-adapter.test.ts`（新 · 33 用例）、`tests/e2e/cursor-agent-real.real.test.ts`（新 · 8 用例）、`tests/unit/adapter-registry-dispatch.test.ts`（改 · 项数断言 4 → 5）；**只读复用**：`daemon/worker/cli-host/claude-code-adapter.ts`、`daemon/worker/verify/worker-probe.ts`、`daemon/worker/adapter-registry.ts`、`daemon/worker/key-store.ts`（核对无 cursor 通道，未改）。
