@@ -249,8 +249,12 @@ export type RuntimeKind = z.infer<typeof runtimeKindSchema>;
  *
  * TASK-W.5c-i：`SANDBOX_ENFORCED` 为容器隔离档位，与
  * `daemon/worker/worker-adapter.interface.ts::AdapterControlMode` **必须同改**
- * （漏改单边即 FAIL）。窗口期语义：`SANDBOX_ENFORCED` 登记面接受，但派工门禁
- * `requireControlledDispatch()` 显式拒绝，待 `W.5c-ii` `container-host` 落地解锁。
+ * （漏改单边即 FAIL）。
+ *
+ * TASK-W.5c-ii：窗口期「永远拒绝」已解除，派工门禁 `requireControlledDispatch()`
+ * 改为**按容器宿主可用性判定**——未注入 `ContainerHostPort` 或宿主不可用 →
+ * `E_ADAPTER_SANDBOX_LOCKED`；宿主可用 → 放行。该档位属**受控**档位，Evidence /
+ * 运行时拦截器如实记 `SANDBOX_ENFORCED`，不再收窄为 `UNCONTROLLED_EXTERNAL`。
  */
 export const workerControlModeSchema = z.enum([
   "GATEWAY_ENFORCED",
