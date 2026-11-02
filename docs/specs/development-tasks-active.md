@@ -314,14 +314,16 @@
 
 <a id="task-w.7"></a>
 
-#### 【Task W.7】Worker 自助注册与自动验证 `[NEW_TASK]` · **NON_BLOCKER**
+#### 【Task W.7】Worker 自助注册与自动验证 `[COMPLETED]` · **NON_BLOCKER**
+
+> **归档注记（2026-11-02 · P-123）**：本卡已 **COMPLETED**（[#89](https://github.com/he18718143986-design/IDE/pull/89)/`be480bb`，squash merge）。卡正文与施工期状态**保留原文作溯源**；交付内容、验收逐条明细（含 **PASS 3 未达成**）、6 条挂账与「不宣称」边界见 [`development-tasks-completed.md`](./development-tasks-completed.md#task-w.7) §3.4l。**读本卡注意**：正文所述「升格 `GATEWAY_ENFORCED`」与实际交付（升格到 `SANDBOX_ENFORCED`、且无执行器故 `dispatchable:false`）的差异已在 completed 挂账 1 如实登记，属**结构性边界**而非缺陷。
 
 * **任务编号**：`TASK-W.7`
 * **任务名称**：前端自助注册任意 Worker；默认 `UNCONTROLLED_EXTERNAL`；自动探测通过后升格 `GATEWAY_ENFORCED`
 * **对应规格**：架构 / W.1 适配器抽象；`daemon/worker/worker-adapter.interface.ts`；`src/lib/contract.schema.ts::workerSpecSchema`；先例 W.5b/c 人工实测 → 本卡产品化
 * **前置依赖**：**硬** `TASK-W.6`（Registry 进派工，否则测完无池可进；**W.6 已于 2026-11-02 COMPLETED（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`），硬前置已解除**）；**软** `TASK-W.5c`（探测沙箱复用/对齐其容器隔离基建；**排程上 W.5c 为下一张，优先于本卡**）
 * **优先级**：P3 · **NON_BLOCKER**（**不阻断** `TASK-L.16`；**不抢** W.5b/c 实测窗口；与 W.5b/c **不互斥**——本卡落地后 W.5b/c 可作为首批真实用例回归基准）
-* **状态**：`[NEW_TASK]`（硬前置 W.6 已 COMPLETED，就绪障碍解除；排程上 `TASK-W.5c` 系列为前序——三张子卡已于 2026-11-02 **全部 COMPLETED**（#81 / #85 / #87），**本卡即 Sprint 首要**，尚未开工、不宣称就绪以外的东西）。**邻卡 DoR / 状态（2026-11-02 · P-122 同步）**：`W.5c` 已于 P-115 按 DoR 重写达标、并经 P-118 授权拆为 `W.5c-i`（**`[COMPLETED]`** · #81/`c3e75cc`）/ `W.5c-ii`（**`[COMPLETED]`** · #85/`648be31`）/ `W.5c-iii`（**`[COMPLETED]`** · [#87](https://github.com/he18718143986-design/IDE/pull/87)/`2313597a`，见 completed §3.4k）三张子卡，母卡标 `[SPLIT]` 保留追溯；`W.5b` 的 DOR-3 正文重写债仍在。
+* **状态**：`[COMPLETED]`（状态轨迹：`[NEW_TASK]` → 施工（纯代码 PR，readiness review 报三处卡正文与代码脱节并按代码事实校正）→ **完成**（[#89](https://github.com/he18718143986-design/IDE/pull/89)/`be480bb`，2026-11-02；见 completed §3.4l）。**以下为施工期状态记录，保留原文作溯源**（硬前置 W.6 已 COMPLETED，就绪障碍解除；排程上 `TASK-W.5c` 系列为前序——三张子卡已于 2026-11-02 **全部 COMPLETED**（#81 / #85 / #87），**本卡即 Sprint 首要**，尚未开工、不宣称就绪以外的东西）。**邻卡 DoR / 状态（2026-11-02 · P-122 同步）**：`W.5c` 已于 P-115 按 DoR 重写达标、并经 P-118 授权拆为 `W.5c-i`（**`[COMPLETED]`** · #81/`c3e75cc`）/ `W.5c-ii`（**`[COMPLETED]`** · #85/`648be31`）/ `W.5c-iii`（**`[COMPLETED]`** · [#87](https://github.com/he18718143986-design/IDE/pull/87)/`2313597a`，见 completed §3.4k）三张子卡，母卡标 `[SPLIT]` 保留追溯；`W.5b` 的 DOR-3 正文重写债仍在。
 * **对照痛点（代码事实）**：
   1. 三层可扩展接口已在：`daemon/worker/worker-adapter.interface.ts::CodingWorkerAdapter`（`AdapterCapabilityDeclaration` 9 项 + `AdapterRejectionCode`）、`daemon/worker/adapter-registry.ts::AdapterRegistry`（`register` / `get` / `requireControlled`）、`src/lib/contract.schema.ts::workerSpecSchema`（`adapter_id` + `control_mode`；**三值** `GATEWAY_ENFORCED|SANDBOX_ENFORCED|UNCONTROLLED_EXTERNAL`，P-121 同步：原二值经 `W.5c-i` 扩三值、`W.5c-ii` 起派工门禁按容器宿主可用性判定）。
   2. ~~派工仍硬编码 `new AiWorker(...)`（`daemon/pipeline/orchestrator.ts`）~~ —— **已由 W.6（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`）改造为经 `AdapterRegistry` → `requireControlledDispatch` 派工工厂接线，本痛点已消除**；本卡不代替 W.6。

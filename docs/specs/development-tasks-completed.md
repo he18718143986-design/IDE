@@ -3819,3 +3819,58 @@
   - **不宣称跨平台**：仅 `darwin-arm64` + Docker Desktop 实测；其他平台未实测、**不写入**平台矩阵（宁缺不虚报）。
   - **不改变**：鉴权 / Demo Origin / 点亮三证 / 网关写范围（ADR-0001 纪律）；右栏 `role:"partner"` 只读白名单未动（J.1）；`SANDBOX_ENFORCED` 不放宽 `GATEWAY_ENFORCED` 既有门禁；`UNCONTROLLED_EXTERNAL` 仍不得作为受控 / 可合并证据。
 * **关键文件**：`daemon/worker/cli-host/openhands-adapter.ts`（新）、`daemon/worker/cli-host/docker-container-host.ts`（新）、`daemon/worker/sandbox/container-host.ts`（改 · `SandboxWitness` + `HOST_UNAVAILABLE`）、`daemon/worker/worker-adapter.interface.ts`（改 · 围栏档 + `resolveEvidenceControlMode`）、`daemon/worker/default-worker-registry.ts`（改 · OpenHands 登记 + 沙箱派工工厂）、`daemon/worker/worker-dispatch.ts`（改 · `WorkerDispatchContext.worktreeRoot`）、`daemon/worker/ai-worker.ts`（改 · `WorkerRunResult.sandbox`）、`daemon/pipeline/orchestrator.ts`（改 · 见证 Map + 证据面校正）、`tests/unit/openhands-sandbox.test.ts`（新）、`tests/e2e/openhands-isolation.real.test.ts`（新）、`tests/unit/adapter-registry-dispatch.test.ts`（改）、`docs/reports/W5c-iii-真实容器实测-2026-11-02.md`（新 · 实测证据）。
+
+---
+
+### 3.4l Worker 自助注册与自动探测升格（W.7 · 五类断言 + 两级注册语义）
+
+<a id="task-w.7"></a>
+
+#### 【Task W.7】Worker 自助注册与自动验证 `[COMPLETED]`
+* **任务编号**：`TASK-W.7`
+* **状态与证据**：`[COMPLETED]`（[#89](https://github.com/he18718143986-design/IDE/pull/89)/`be480bb`，squash merge；分支 `feat/w7-worker-self-serve-verify`，本地单提交 `63ee74a`；parent `5dccebdd`（#88 P-122 docs 回写），链序核实无旁支）。**纯代码 PR，未改 `docs/`**——文档回写由本条（P-123）承接。
+* **对应规格**：[`system-architecture.md`](./system-architecture.md) §9.1（`worker_spec` 三值 `control_mode` + `verified_on`）、§4.2.3 P-17（「沙箱」仅用于 OS 级隔离，`普通本地子进程严禁自称沙箱`）；[`../scheme.md`](../scheme.md) §10 **REJ-010**（能力声明不得按宿主侧修辞口径造假——本卡为其下游执行面）；[`task-card-standard.md`](./task-card-standard.md) R-1～R-12；先例 §3.4k `TASK-W.5c-iii`（`SandboxWitness` / `resolveEvidenceControlMode` / `DockerContainerHost`）
+* **前置依赖**：`TASK-W.6`（**COMPLETED** · [#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`，Registry 进派工，硬前置已解除）；`TASK-W.5c` 三张子卡全部 **COMPLETED**（#81 / #85 / #87，探测沙箱地基与见证机制就位）
+* **开工前 readiness review（按纪律先做，结论已报）**：三处「卡正文 vs 代码事实」脱节，均按代码事实校正后再施工——
+  1. 范围 3「把 `SANDBOX_ENFORCED` 扩进两处枚举，漏改即 FAIL」被当作待做前置，**实际 `W.5c-i` 已完成双扩三值、`validateAdapterCapability()` 已按三档分派** → 改为**源码回归断言**（两处枚举 + 三档分派 + P5 复用点），防的是将来只在单边加档位；
+  2. 范围 1「探测通过后升格」被当作既有能力，**实际 `AdapterRegistry.register()` 遇同 id 抛 `ADAPTER_ID_DUPLICATED`，注册中心无升格亦无注销 API**——「升格」这个动作在 W.7 之前**根本不存在** → 新增 `promoteControlMode()`（唯一入口，单向守卫）；
+  3. 范围 2 的四类断言默认候选是「经 Gateway 的 CLI」，**实际今日无通用 Gateway CLI 适配器、`DockerContainerHost` 生产侧从未被 `new`** → 探测执行面做成注入端口，默认只实装容器目标，GATEWAY 目标**如实报未实现**（不拿 mock 冒充生产）。
+* **交付内容**：
+  1. **两级注册语义（红线：填表不等于受控）**：新建 `daemon/worker/verify/worker-registration.ts`（401 行，纯函数零 I/O）。`normalizeRegistration()` 产出的记录档位**恒为** `UNCONTROLLED_EXTERNAL`；请求体出现 `control_mode` / `worker_control_mode` / `verified_on` / `verified` / `promoted` / `promotion` / `probe` / `probe_report` / `report` 九类字段**直接拒绝**（`E_WORKER_FORBIDDEN_FIELD`），**不是忽略**——忽略会让调用方以为它生效了。启动命令走**结构化 argv**（`command` 拒空格与 shell 元字符 `;` `&` `|` 反引号 `$` `>` `<` 换行回车），不接受 shell 字符串，因为这道门本身就是注入面。`declaration.adapter_id` 强制等于顶层 `adapter_id`，避免「探测结论绑定的对象」与「注册的对象」错位。
+  2. **档位变更的唯一入口 `promoteControlMode()`（`adapter-registry.ts`）**：降级（→ `UNCONTROLLED_EXTERNAL`）**恒允许**、不需要证据；升格（目标为受控档）必须 ① 附 `report_fingerprint`，② **重新跑** `validateAdapterCapability(declaration, next)`（注册期只按标识档校验过，结论**不得**复用为升格依据）；同档位重复调用幂等；幽灵 id → `ADAPTER_ID_INVALID`；缺指纹 → 新增拒绝码 `ADAPTER_PROMOTION_REFUSED`。变更记 `last_transition`（`from` / `to` / `report_fingerprint` / `reason` / `decided_at`）。
+  3. **探测包五类断言**（`daemon/worker/verify/worker-probe.ts`，338 行）：
+     - `filesystem_fence`（容器执行面）：工作区内写在宿主侧可见且内容一致 **+** 容器内写 `/tmp` 的文件**不得**出现在宿主 `/tmp`；
+     - `command_fence`（容器执行面）：docker socket 不可见、网络仅 `lo`、`CapEff ∈ {0x0, 0x2}`；
+     - `evidence_integrity`（容器执行面）：两次写操作在宿主侧逐条可读、内容可分（直连写与受控写可区分）；
+     - `capability_declaration`（`validateAdapterCapability`）：声明与目标档位口径对账；
+     - `dispatch_witness`（**`resolveEvidenceControlMode`**）：`SANDBOX_ENFORCED` 派工是否带 `SandboxWitness`。
+     **P5 严格复用**：只调 `resolveEvidenceControlMode("SANDBOX_ENFORCED", witness)`，本文件**不**自己判 `witness === undefined`——否则两处口径将来一分叉，就会出现「探测说受控、证据说不受控」的自相矛盾；测试另做交叉断言（探测判 pass ⇔ 证据面校正后仍为 `SANDBOX_ENFORCED`）。GATEWAY 目标下 P5 记 `not_verified` + `required:false`（本就不进容器，既不算通过也不算失败）。执行面漏项按 `not_verified` 处理，**不补假通过**。
+  4. **容器探测执行面**（`daemon/worker/verify/probe-execution-sandbox.ts`，329 行）：**不启动任何进程**，全部经 `runInSandbox(host, …)` 交宿主执行（故无需落 `cli-host/`，静态闸门照常成立）。探测工作区是 `mkdtemp` 的独立临时目录，**绝不挂载仓库主树**；`networkPolicy: DENY`；不传 `cwd`（`SandboxRunInput.cwd` 是**宿主侧**语义，传容器路径 `/work` 会被围栏判 `CWD_OUTSIDE_WORKTREE`——施工期真踩过）。见证 `getWitness()` 只能取自宿主实际返回的 `SandboxRunOutcome`（`sandboxWitness()` 唯一产出点），探测包不提供「补见证」路径。
+  5. **无沙箱即拒绝探测**：`runProbePack()` 首行判 `port.isAvailable() !== true` → 抛 `E_PROBE_SANDBOX_UNAVAILABLE`、**不产报告**。测试断言「执行面不可用时**一次容器调用都不发生**」——这是卡正文 FAIL「探测无沙箱直接跑主树」的机制防线，不靠注释约束。
+  6. **指纹绑定与读侧降级**：`workerFingerprint()` 对 `adapter_id` / `adapter_version` / `launch` / `declaration` 做**键序无关**稳定序列化后取 sha256 前 32 位；`effectiveControlMode()` **每次读时重算**——指纹不一致或缺 `verified_on` → 降级 `UNCONTROLLED_EXTERNAL` 并附 `demoted_reason`。刻意不在写入时判定：`.stagent/workers.json` 就是本机文件，只在写入时判等于允许手改绕过。
+  7. **持久化与编排**：`worker-store.ts`（147 行）落 `.stagent/workers.json`（复用 `writeJsonAtomic()`：tmp + fsync + rename + 目录 fsync；内容损坏抛 `E_WORKER_STORE_CORRUPT`，**不静默重置**——静默重置会让档位记录无声消失）；`worker-registration-service.ts`（390 行）编排「登记 → 探测 → 升格」，并做存储与注册表**双写**（注册表那份是 `declarationOnlyAdapter()`，`run()` 只抛 `E_WORKER_NO_EXECUTOR`——**不伪造执行器**）。
+  8. **路由与 UI**：`GET /api/workers`、`POST /api/workers`、`GET /api/workers/:id`、`POST /api/workers/:id/verify`（沿用既有 `isAuthorized`，**不新增豁免**）；错误码映射 400 / 403（内建锁定）/ 404 / 409（重复 / 升格被拒）/ **503**（沙箱不可用）/ **501**（执行器未实现）——把 501 混进 400 会让界面显示成「你的输入有问题」，而真相是能力缺口。前端 `WorkerRegistrationPanel.tsx`（330 行）挂在「设置 → 高级 → Worker 自助注册」，报告结语**原样展示**，不可派工时显式标注。
+  9. **报告措辞机制闸门**：`assertReportWording()` 拦 `/绝对受控/`、`/绝对安全/`、`/完全安全/`、`/100\s*%\s*(安全|受控)/`、`/零风险/`，对**注入执行面返回的 `detail`** 一视同仁（执行面可能是第三方实现，一句「本适配器绝对受控」会原样进报告、进而成为升格依据的注脚）。
+* **验收（PASS）**：
+  1. **注册默认且仅能落 `UNCONTROLLED_EXTERNAL`**：`normalizeRegistration()` 恒产出该档；携带 `control_mode` / `verified_on` / `probe_report` / `report` 四类字段均被拒（逐字段断言）。
+  2. **五类断言在（注入的）沙箱执行面上跑通，正负例俱在**：正向——三项全 pass → 升格；负向——容器写宿主 `/tmp` 可见 → 文件围栏 fail、docker socket 可见 / 多网卡 / `CapEff` 未收敛 → 命令围栏 fail、执行面漏项 → `not_verified` 且不许升格。
+  3. **PASS 3 未达成（如实标注，见挂账 1）**：升格目标是 `SANDBOX_ENFORCED`，`requireControlled()` 只放行 `GATEWAY_ENFORCED`，且自注册 worker 无 `run()` / 派工工厂 → `dispatchable: false`。**「升格」只到档位记录层，未到派工层**。
+  4. **失败者留 `UNCONTROLLED_EXTERNAL` 且附探测报告**：`verify()` 失败路径同样落盘 `last_report`（`status: "failed"` + 逐条 `refusals`），档位不升——「探测失败但档位升了」这个状态在本流程里不存在。
+  5. **指纹变更后自动降级**：版本变更 / 启动命令替换 / 缺 `verified_on` 三种情形均降级并给出 `demoted_reason`。
+  6. **P5 派工见证校验**：缺 `SandboxWitness` → 其余四项全绿也**不升格**，`refusals` 含 `dispatch_witness`；判定与 `resolveEvidenceControlMode` 结论一致（交叉断言）。
+  - **测试**：`tests/unit/worker-self-serve-verify.test.ts`（790 行）**34 passed**，覆盖 6 组正例 + 4 类负例（表单直进受控 / 无沙箱探测 / 报告「绝对受控」/ 枚举单边） + 枚举双扩回归 4 条。复跑：`npx vitest run tests/unit/worker-self-serve-verify.test.ts tests/unit/openhands-sandbox.test.ts` → **69 passed (69)**。
+  - `npx tsc --noEmit` 全仓 **57 个 `error TS`，与 clean `main` 基线一致**（零新增）。
+  - 全量 `vitest run`：**270 passed files / 9 failed / 2 skipped（281）**；把 9 个失败文件单独复跑，**改动树与 `main` 基线均为「8 失败文件 / 7 失败用例」且逐文件一致**——差额为 `supervisor-session` 的计时型 flaky（全量并发下失败、单跑通过），属既有 flaky 集合；`spawn-whitelist` 的 24 处 `.exec(` 命中在 `5dccebd` 基线上 stash 复跑同样失败，且违规清单**不含任何新增文件**。**零新增失败**。
+* **残余边界 / 后续挂账（P-123 归拢，共 6 条）**：
+  1. **PASS 3 的「升格 ≠ 可派工」是结构性边界，不是缺陷**：自注册 worker 只有 `declaration` + `launch`，**没有 `CodingWorkerAdapter.run()` 实现、也没有派工工厂**；而 `requireControlled()` 只放行 `GATEWAY_ENFORCED`、`requireControlledDispatch()` 对 `SANDBOX_ENFORCED` 还要求工厂。故档位升到 `SANDBOX_ENFORCED` 后视图恒 `dispatchable: false`（附 `dispatch_blocked_reason`），`declarationOnlyAdapter.run()` 只抛 `E_WORKER_NO_EXECUTOR`——**刻意不造一个假执行器来「看起来闭环」**。真正接通需另卡：「按 `launch` 起 CLI 并注入 Gateway / 容器」的执行器 + 派工工厂。**读本卡时不得把「升格」理解为 W.7 闭合了派工环路**。
+  2. **无真实容器实测**：本卡容器执行面只在**桩宿主**上做确定性断言（`runInSandbox()` 的围栏校验是真跑，容器内执行是模拟），没有 `STAGENT_REAL_OPENHANDS=1` 级别的实测。与 §3.4k 的量级不同，**不得**按「已验证真实隔离」引用；真机复核宜与挂账 1 的执行器同批做。
+  3. **命令围栏只兑现 3 项可确定性观测**：`docker socket 不可见` / `网络仅环回` / `CapEff` 收敛；卡正文「白名单外命令须被拒」的**逐命令枚举未做**——它依赖具体 CLI 的命令面，属被测对象而非执行环境，本卡不做。
+  4. **文件围栏改为等价断言**：卡原话是「诱导越权写、扫主树与 `.stagent/records/`」，实际实现为「容器内写 `/tmp` 的文件不得出现在宿主 `/tmp`」+「工作区内写在宿主侧可见且一致」。意图等价（证明唯一可见挂载点就是工作区），但**不是卡正文写的那个动作**，不得按原话引用。
+  5. **两处形态差异**：报告查询走 `GET /api/workers/:id`（返回体含 `last_report`），**未单开** `GET /api/workers/:id/verify`；范围 4 的「定期重测机制留接口」只兑现了指纹机制，**未留调度器 hook / 类型**。
+  6. **`W.5c-iii` 遗留未动**：`ContainerHostPort` 仍未注入派工路径（本卡只在 verify 时按需 `new DockerContainerHost()`）、`EXPLICIT_TARGETS` 逐目标出站仍未实现（需 netns / iptables 级），沿用 §3.4k 挂账 3。
+* **未宣称 / 不宣称端到端闭环**：
+  - **不宣称注册即受控 / 探测即安全**：报告结语固定为「通过已知探测集（仅覆盖上述探测项）」，且闸门对「绝对受控」类措辞做机制性拦截；施工期该闸门逮到过自己写的固定结语（结语里含「不等于『绝对受控』」的否定式引用），已改为不含禁用短语的表述，并在代码里写明「闸门不做语义判断，否定式引用同样不放行」——**否定句放行本身就会成为可绕过的口子**。
+  - **不宣称探测覆盖第三方 CLI 全部行为**：探测对象是「目标档位提供的执行环境是否兑现围栏」，CLI 本体的实测仍走适配器 `verified_on`（§3.4k），两者不互相冒充。
+  - **不宣称多平台**：平台矩阵只是声明结构校验，本卡未在任何平台做真实容器实测（见挂账 2）。
+  - **不改变**：鉴权 / Demo Origin / 点亮三证 / 网关写范围（ADR-0001 纪律）；`UNCONTROLLED_EXTERNAL` 仍不得作为受控 / 可合并证据；`requireControlled()` 的放行口径未放宽。
+* **关键文件**：`daemon/worker/verify/worker-registration.ts`（新）、`daemon/worker/verify/worker-probe.ts`（新）、`daemon/worker/verify/worker-store.ts`（新）、`daemon/worker/verify/probe-execution-sandbox.ts`（新）、`daemon/worker/verify/worker-registration-service.ts`（新）、`daemon/worker/adapter-registry.ts`（改 · `promoteControlMode()` + `ADAPTER_PROMOTION_REFUSED`）、`daemon/server.ts`（改 · `/api/workers*` 四路由 + 错误码映射）、`src/lib/daemon-api.ts`（改 · 四个客户端方法与类型）、`src/components/settings/WorkerRegistrationPanel.tsx`（新）、`src/components/settings/SettingsTab.tsx`（改 · 挂载入口）、`tests/unit/worker-self-serve-verify.test.ts`（新 · 34 用例）。
