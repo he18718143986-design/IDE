@@ -72,7 +72,7 @@
 | SA-1 | ADR-0014 敏感项授权已选定开工一并授权机制（dec-8） | **RESOLVED** | 用户（q22） | [`../specs/delivery-lifecycle.md`](../specs/delivery-lifecycle.md) §5 |
 | DLV-1 | ADR-0015～0017 均已由用户原话 q22 明确授权生效（DEC-006～008） | **RESOLVED** | 用户（q22） | [`../scheme.md`](../scheme.md) §6 |
 | DLV-2 | PR #3 已由用户批准并执行物理关闭 | **RESOLVED** | 用户 | PR #3 已关闭 |
-| DLV-3 | ~~`AdapterRegistry` 未接线，Worker 只有 OpenAI `AiWorker`；Claude Code 作 Worker 未接入派工~~ | **RESOLVED**（原 NON_BLOCKER · M2 不依赖） | 卡 owner | **`TASK-W.6` COMPLETED**（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`）：Registry 挂派工工厂、双内置 id 受控派工、缺注册/非受控显式错误码不静默降级；Claude Code worker 仅登记 `UNCONTROLLED_EXTERNAL`（红线，不作受控执行器）；能力载体 `run()` 显式抛错。见 completed §3.4g。**自助注册/自动验证 `TASK-W.7`** 硬前置已解除（仍 `[NEW_TASK]`，排程在 W.5c 之后）；落地后 W.5b/c 可作回归用例 |
+| DLV-3 | ~~`AdapterRegistry` 未接线，Worker 只有 OpenAI `AiWorker`；Claude Code 作 Worker 未接入派工~~ | **RESOLVED**（原 NON_BLOCKER · M2 不依赖） | 卡 owner | **`TASK-W.6` COMPLETED**（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`）：Registry 挂派工工厂、双内置 id 受控派工、缺注册/非受控显式错误码不静默降级；Claude Code worker 仅登记 `UNCONTROLLED_EXTERNAL`（红线，不作受控执行器）；能力载体 `run()` 显式抛错。见 completed §3.4g。**自助注册/自动验证 `TASK-W.7`** 后续派工闭环已另立 `TASK-W.9` `[NEW_TASK]`（P-127，L 级拆分建议待 DoR/Tina 授权）；DLV-3 保持 RESOLVED，不回开原债。 |
 | DLV-4 | `.stagent/metadata/` 写入与 ADR-0011 冲突 → **已迁 records** | **RESOLVED** | 卡 owner | **`TASK-H.9` COMPLETED**（[#50](https://github.com/he18718143986-design/IDE/pull/50)/`34213c8`）；legacy 只读迁移 |
 | DLV-5 | 系统地图 UI（项目视图第二页）与「改这里会影响什么」入口 | **RESOLVED** | 卡 owner | **`TASK-L.18` COMPLETED**（[#54](https://github.com/he18718143986-design/IDE/pull/54)/`c8e6a81`）；interfaces consumers 行依赖见 completed 挂账 |
 | DLV-6 | L.11 DN-2「可以」HTTP / 画布入口 | **RESOLVED** | 卡 owner | **`TASK-J.19` COMPLETED**（[#55](https://github.com/he18718143986-design/IDE/pull/55)/`4bae423`）；`/api/design/*` + 画布卡；resume 不误路由 |
@@ -117,3 +117,10 @@
 | DOR-1 | ~~`TASK-J.18c` / `J.18d`：矩阵与卡内仍 `NEW_TASK`，但代码已合入 `a2fa7df`（#27）~~ → **已关闭（2026-10-31）**：随 [#28](https://github.com/he18718143986-design/IDE/pull/28)/`e7ac058` 回写为 `[COMPLETED]`；main tip 含 J.18c/d 文档闭环 | NON_BLOCKER（文档真相） | 卡 owner | **RESOLVED**：#28 合入；本行保留作审计溯源 |
 | DOR-2 | §1.1 矩阵有 `TASK-0.1`、`TASK-A.1`～`A.6`，但 `development-tasks.md` §3.4 无对应 `#### 【Task …】` 详细正文 → 无法按 R-1～R-12 举证 | NON_BLOCKER · **`[NEEDS_RECHECK]`**（2026-11-01 第 0 波：历史技术债，**不阻断**现行 J/L 链路施工；本波不重写历史卡正文） | 卡 owner / 文档治理 | 补历史正文指针，或矩阵改注「正文见 Git 历史 / 已归档」 |
 | DOR-3 | `TASK-W.5b` / `W.5c` 正文远低于现行 DoR（缺范围路径与签名、独立 PASS 清单、估算、代码事实锚点等），却仍挂在矩阵 `NEW_TASK` | NON_BLOCKER（未排入 M2～M4 关键路径）· **`[NEEDS_RECHECK]`**（2026-11-01 第 0 波：历史技术债，**不阻断**现行 J/L 链路施工；本波不重写历史卡正文） | 卡 owner | 按 `task-card-standard.md` 重写后再进入可开工队列；**注**：`TASK-W.7` 落地后 W.5b/c 转为回归用例基准（不解除本行重写债）。**→ 2026-11-02 · P-124 复核：两卡正文均已按 R-1～R-12 重写、本行「重写债」已偿**（`W.5c` = P-115，母卡 `[SPLIT]` 属拆分追溯、非 DoR 债；`W.5b` = P-124，双重身份 + 五类断言适用性写死，状态仍 `[NEW_TASK]` 待授权开工）。 |
+
+
+### TASK-W.9（2026-11-02 · P-127 · 新立卡注记，非 OP）
+
+- **事项**：自注册/外部 Worker 缺少可执行 `run()` 与派工工厂；`promoteControlMode()` 的非空指纹形态校验未消费真实探测报告/见证，另有 `buildLaunch()` 对 MCP endpoint 的硬依赖。
+- **处理**：新立 `TASK-W.9` `[NEW_TASK]`，覆盖 Gateway 会话注入与容器 CLI 执行器方案对比、工厂接线、报告/见证消费及缺端点降级。估算 **L**；按 R-11 建议拆为 `W.9a/b/c`，**拆分与开工均待 DoR 过审及 Tina 授权，本轮不执行**。
+- **口径**：DLV-3 的 W.6 交付仍为 RESOLVED；W.9 是 W.7/W.5b 后续边界的独立新任务，不新增 OP 号、不改历史记录。

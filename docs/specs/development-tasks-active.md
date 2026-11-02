@@ -421,6 +421,118 @@
 ---
 
 
+<a id="task-w.9"></a>
+#### 【Task W.9】自注册/外部 Worker 执行器接线 `[NEW_TASK]`
+
+* **任务编号**：`TASK-W.9`
+* **任务名称**：自注册/外部 Worker 执行器接线
+* **对应规格（R-1）**：
+  * 架构规范 [`system-architecture.md`](../system-architecture.md) §9.1（`worker_spec` 目标数据模型与受控派工机制）、§4.2.3 P-17（沙箱与外部 CLI 隔离）、§0.6.1（执行模式）；
+  * 核心接口 [`daemon/worker/worker-adapter.interface.ts`](../../daemon/worker/worker-adapter.interface.ts)（`CodingWorkerAdapter` 规范、`resolveEvidenceControlMode`）；
+  * 注册与门禁 [`daemon/worker/adapter-registry.ts`](../../daemon/worker/adapter-registry.ts)（`AdapterRegistry`、`promoteControlMode`）；
+  * 派工中枢 [`daemon/worker/worker-dispatch.ts`](../../daemon/worker/worker-dispatch.ts)（`requireControlledDispatch`、`WorkerDispatchFactory`、`WorkerDispatchContext`）；
+  * 历史先例与挂账闭环：
+    * `TASK-W.6`（completed §3.4g）：Registry 挂派工工厂与 `requireControlledDispatch()` 门禁；
+    * `TASK-W.7`（completed §3.4l 挂账 1）：PASS 3 未达成——「升格 ≠ 可派工」结构性边界（自注册 worker 无 `run()` / 派工工厂导致 `dispatchable:false`）；
+    * `TASK-W.5b`（completed §3.4m 挂账与 P-125 注记）：`promoteControlMode` 仅校验指纹非空字符串形态、自造指纹可升格，以及 `buildLaunch` 强依赖 `STAGENT_MCP_URL` 强抛硬绑定；
+    * `TASK-W.5c-iii`（completed §3.4k）：`DockerContainerHost`、`SandboxWitness` 与 `resolveEvidenceControlMode` 记实不记名强制执行点；
+    * ADR-0001 / ADR-0003 / ADR-0014。
+* **前置依赖（R-3）**：
+  * `TASK-W.6`（COMPLETED · #74/`b5d8c53`，Registry 挂派工工厂与门禁架构在位）；
+  * `TASK-W.7`（COMPLETED · #89/`be480bb`，Worker 自助注册、五类探测包与 `promoteControlMode` 基础在位）；
+  * `TASK-W.5b`（COMPLETED · #92/`bdac805`，cursor-agent 声明与 `buildLaunch()` 契约面在位）；
+  * `TASK-W.5c-iii`（COMPLETED · #87/`2313597a`，`DockerContainerHost`、OpenHands 适配器与 `SandboxWitness` 链路在位）；
+  * **全前置均为 COMPLETED**。
+* **优先级**：待 Tina 裁定；本轮不指定 Sprint 首要
+* **状态**：**`[NEW_TASK]`**（待 DoR 过审后 Tina 授权开工）
+* **对照痛点（代码事实，R-4）**：
+  1. `daemon/worker/adapter-registry.ts::promoteControlMode()`（`:176-193`）：只校验 `typeof request.report_fingerprint === "string" && fingerprint.trim().length > 0`。只要调用方传入非空伪造指纹字符串，且 `declaration` 满足校验，即可将外部适配器强行升格，完全未校验该指纹是否对应已落盘、通过验收的真实探测报告，**自造指纹即可升格（W.5b 挂账）**；
+  2. `daemon/worker/verify/worker-registration-service.ts` 与 `daemon/worker/verify/worker-registration.ts`：自注册 Worker 只写入 `.stagent/workers.json`，在 `createDefaultWorkerRegistry()` 与派工链路中没有对应的适配器实例与工厂挂接机制（`registry.registerDispatchFactory` 零调用），且自注册对象的 `run()` 缺失，导致升格后 `requireControlledDispatch()` 恒抛 `E_ADAPTER_NO_DISPATCH_FACTORY`，前端展示 `dispatchable: false`（**W.7 挂账 1**）；
+  3. `daemon/worker/cli-host/claude-code-adapter.ts::buildLaunch()`（`:247-251`）：当 `mcpServerUrl` / `STAGENT_MCP_URL` / `STAGENT_DAEMON_PORT` 不可用时，直接硬抛 `Error("Worker MCP endpoint URL is required under --strict-mcp-config...")`，导致仅需要纯 launch 契约（预览、离线构建、探测阶段参数校验）的调用方被意外卡死（**W.5b 挂账**）；
+  4. `daemon/worker/cli-host/cursor-agent-adapter.ts::run()`（`:359-373`）：两段式直接抛错（先凭证 `Authentication required`，后 `cursor-agent adapter is not yet wired to an execution runtime`），无受控执行与产物收集闭环；
+  5. `daemon/worker/default-worker-registry.ts::createDefaultWorkerRegistry()`（`:173-195`）：Claude Code 与 cursor-agent 仅作为能力载体登记为 `UNCONTROLLED_EXTERNAL` 且不挂派工工厂，缺少统一的外部 CLI 派工执行器桥接抽象。
+* **一句话目标（R-2）**：自注册 Worker 与已登记外部适配器在通过探测升格后，编排器与注册中心能获取其真实的受控派工工厂与执行器（不再误判或抛 `E_ADAPTER_NO_DISPATCH_FACTORY`），外部 CLI 执行被约束在 Gateway 会话或容器沙箱内并产出见证，且无探测报告见证的伪造指纹无法升格受控。
+* **ADR 修订（R-9）**：无冲突。严格遵守 ADR-0001（底层强隔离与防越权控制面不变）、ADR-0003（Worktree 能力边界）、ADR-0014（凭据隔离与绝不进日志/合同）。
+* **采用的默认值（R-10）**：
+  * dec-10（授权清单洗白拦截）、dec-12（试玩北极星人眼对照）、REJ-010（能力声明不得按宿主侧修辞口径造假）；
+  * 缺少端点时的 `buildLaunch` 默认行为：标记 `mcp_status: "ENDPOINT_MISSING_PREVIEW_ONLY"` 并放行 launch 构建，不抛异常。
+* **范围（R-5）**：
+  1. **执行器接线与两类执行器抽象方案对比（卡内难点设计）**：
+     * **形态 A（Gateway 会话注入型，如 claude-code / 内置 Managed AI）**：
+       * *机制*：Worker 进程通过标准输入输出或 HTTP 与 Scoped Gateway MCP 工具集交互，文件读写与命令执行由 Gateway 内部拦截；
+       * *优势*：细粒度工具级拦截（`WORKER_MCP_TOOLS`），严格对齐合同范围；
+       * *约束*：必须有守护进程 MCP 端点或会话注入，无法直接约束无 MCP 协议能力的黑盒 CLI。
+     * **形态 B（外部 CLI / 容器围栏型，如 cursor-agent / OpenHands / 外部 CLI）**：
+       * *机制*：由 `buildLaunch(contract, options)` 组装 `argv`/`env`/工作区挂载目录，在独立容器（`runInSandbox` / `DockerContainerHost`）中运行，由宿主收集产物；
+       * *优势*：可利用既有容器运行时的挂载/网络/资源边界隔离执行，与 Gateway 工具级拦截形成不同控制面；具体保障受宿主实现与策略覆盖范围限制，不宣称绝对隔离；
+       * *约束*：无法进行工具级细粒度语义拦截，需在运行后做 diff 与产物对账，且必须出具 `SandboxWitness`。
+     * *统一抽象方案选择*：提炼统一派工适配接口（`WorkerExecutionEngine`），内置 `GatewaySessionExecutor` 与 `SandboxedCliExecutor` 两种执行策略，适配器根据自身 `AdapterControlMode`（`GATEWAY_ENFORCED` vs `SANDBOX_ENFORCED`）分流绑定。
+  2. **指纹边界重估（兑现 W.5b 挂账）**：
+     * 重构 `AdapterRegistry.promoteControlMode()`，升格判定不再只检查非空字符串，而改为查询 `WorkerStore` 对应记录的真实探测报告；
+     * 校验报告 `summary.passed === true`、报告中的 `target_mode` 与目标档一致，且报告记录中的指纹与当前适配器/版本真实匹配；
+     * 凡缺少真实有效探测报告或未包含必需见证的，一律拒绝升格并抛出明确错误码（如 `E_PROBE_REPORT_NOT_FOUND` / `E_PROBE_REPORT_FAILED`）。
+  3. **`buildLaunch` 端点依赖解耦（兑现 W.5b 挂账）**：
+     * 修改 `claude-code-adapter.ts`（及相关外部适配器）的 `buildLaunch()`；
+     * 当未提供 `mcpServerUrl` 且环境变量缺少 `STAGENT_MCP_URL` / `STAGENT_DAEMON_PORT` 时，不得直接抛错；
+     * 降级行为：以 `mcp_status: "ENDPOINT_MISSING_PREVIEW_ONLY"` 构建离线/预览启动契约，在返回值元数据中明确标注，仅在真正尝试执行时才做严格校验。
+  4. **证据面闭环与 `SandboxWitness` 消费**：
+     * 执行器产物必须严格通过 `SandboxWitness` / `resolveEvidenceControlMode` 链路；
+     * 即使声明档或注册档为 `SANDBOX_ENFORCED`，若执行时未产出合法有效的容器见证，最终证据一律记为 `UNCONTROLLED_EXTERNAL`；
+     * 严防「声明档 vs 实录档」分叉。
+  5. **Registry 派工工厂与 `requireControlledDispatch` 闭环**：
+     * 为已注册但未挂工厂的外部适配器（如配置了沙箱宿主的 cursor-agent）或自注册 Worker 补齐执行工厂接入能力；
+     * 确保升格成功的受控 Worker 在 `requireControlledDispatch()` 路径上可派工，消除 `dispatchable: false` 假象；
+     * 无工厂的适配器依然严禁标记 `dispatchable: true`。
+* **非目标（R-6）**：
+  * 不做多 Agent DAG 协作与编排调度；
+  * 不改右栏 AI 搭档（`role: "partner"`）的只读白名单（ADR-0001 / TASK-J.1）；
+  * 不替外部 CLI 的实测 `verified_on` 造假（无真实凭证与通过负例时恒保持空）。
+* **不变声明（R-12）**：
+  * 鉴权：不变（D.1 loopback + #token 鉴权不变）；
+  * Demo Origin：不变（4100~4110 独立 Origin 不变）；
+  * 点亮三证：不变（物理证据点亮原则不变）；
+  * 网关写范围：不变（严禁绕过 Gateway 或容器直接写入主工作区）。
+* **验收（PASS，R-7）**：
+  1. `EW-01`：`promoteControlMode` 传入伪造/不存在的 `report_fingerprint` 时抛出拒绝码，无法升格；
+  2. `EW-02`：`promoteControlMode` 只有关联到已通过、指纹匹配且含必需见证的真实探测报告时，才允许升格；
+  3. `EW-03`：`claude-code-adapter.ts::buildLaunch()` 在缺少 MCP 端点配置时不再抛错崩溃，而是安全降级并输出显式标注的预览 launch 契约；
+  4. `EW-04`：在已注入容器宿主的前提下，外部 CLI 适配器通过沙箱执行器运行并产出标准 `SandboxRunOutcome`；
+  5. `EW-05`：外部 CLI 沙箱执行产出合法的 `SandboxWitness`，证据面正确记录 `SANDBOX_ENFORCED`；
+  6. `EW-06`：外部 CLI 若未走沙箱宿主执行，或执行中未产出有效见证，`resolveEvidenceControlMode` 强制将证据记录为 `UNCONTROLLED_EXTERNAL`；
+  7. `EW-07`：自注册 Worker 升格受控后，若注册了对应执行器工厂，`requireControlledDispatch` 可成功获取派工实例；
+  8. `EW-08`：未注册执行器工厂的自注册 Worker，即使处于升格档位，`dispatchable` 仍为 `false`，派工时抛出 `E_ADAPTER_NO_DISPATCH_FACTORY` 而非假成功；
+  9. `EW-09`：严禁出现裸 `child_process.spawn` 绕过网关或容器围栏执行外部 CLI 的路径；
+  10. `EW-10`：回归验证：所有既有注册表与派工测试全绿，类型检查零新增错误。
+* **FAIL（R-8）**：
+  * 执行器绕过 Gateway/容器围栏直接 spawn 外部 CLI → **FAIL**；
+  * 指纹伪造升格在接执行面后仍可达 → **FAIL**（挂账未兑现即 FAIL）；
+  * 无 `run()` / 工厂的适配器被当可派工（`dispatchable: true` 误判）→ **FAIL**；
+  * 声明档 vs 实录档分叉（witness 缺口，`SANDBOX_ENFORCED` 无见证被标受控）→ **FAIL**。
+* **范围文件与导出签名（R-5；签名为 DoR 目标，不代表已存在）**：
+  * `daemon/worker/adapter-registry.ts`（修改）：保留现有 `AdapterRegistry.registerDispatchFactory(adapterId: string, factory: WorkerDispatchFactory): void`、`getDispatchFactory(adapterId: string): WorkerDispatchFactory | undefined`；重构现有 `promoteControlMode(adapterId: string, next: AdapterControlMode, request?: AdapterModeChangeRequest): RegisteredAdapter`，使升格消费并核验真实报告记录与见证，不能仅依赖形态指纹。
+  * `daemon/worker/worker-dispatch.ts`（修改）：保留 `requireControlledDispatch(registry: AdapterRegistry, adapterId: string, options?: ControlledDispatchOptions): WorkerDispatchFactory`；仅绑定有效派工工厂且其适配器实际实现 `run()` 时，才报告 `dispatchable: true`。
+  * `daemon/worker/worker-adapter.interface.ts`（修改）：保留 `CodingWorkerAdapter.run(input: AdapterTaskInput, signal?: AbortSignal): Promise<AdapterRunOutcome>` 与 `resolveEvidenceControlMode(declaredControlMode: AdapterControlMode, sandboxWitness: SandboxWitness | undefined): AdapterControlMode`，确保产物路径统一经过真实见证解析。
+  * `daemon/worker/cli-host/claude-code-adapter.ts`（修改）：保留 `ClaudeCodeAdapter.buildLaunch(input: Pick<AdapterRunInput, "prompt" | "cwd" | "nativeSessionId">): BuiltLaunch`；扩展 `BuiltLaunch` 的可选 MCP 状态字段，缺端点时标记 `ENDPOINT_MISSING_PREVIEW_ONLY`，仅构建预览、不允许启动真实执行。
+  * `daemon/worker/cli-host/cursor-agent-adapter.ts`（修改）：保留 `CursorAgentAdapter.buildLaunch(input: Pick<AdapterRunInput, "prompt" | "cwd" | "nativeSessionId">): CursorAgentBuiltLaunch` 与 `run(input: AdapterTaskInput, signal?: AbortSignal): Promise<AdapterRunOutcome>`；任何新增外部 CLI 执行都必须经 Gateway 或 `ContainerHostPort.runInSandbox()`，不得增加未围栏的本地 spawn。
+  * `daemon/worker/verify/worker-registration.ts`（修改）：保留 `effectiveControlMode(record: WorkerRecord): { mode: WorkerRecord["control_mode"]; demoted_reason?: string }` 读侧复算与降级职责，接入真实报告/见证的有效性判断。
+  * `daemon/worker/verify/worker-registration-service.ts`（修改）：扩展现有 `WorkerRegistrationService` 注册/升格路径（包括现有 `promoteControlMode(adapterId, targetMode, ...)` 调用），使被接受的报告记录绑定 adapter id、探测目标档、版本指纹及 witness 结果；禁止请求方直接指定受控档位或伪造报告。
+  * 新建 `daemon/worker/execution/worker-execution-engine.ts`：设计接口候选 `WorkerExecutionEngine.execute(input: WorkerExecutionInput, signal?: AbortSignal): Promise<AdapterRunOutcome>`、`WorkerExecutionInput`（launch 契约 + Worktree + expected artifacts），并对比 Gateway 会话执行与容器执行实现方案。`GatewaySessionExecutor` / `SandboxedCliExecutor` 仅为候选名称，待 DoR 评审定案，不预先强制统一抽象。
+  * `tests/unit/worker-executor-wiring.test.ts`（新建）：`EW-01`–`EW-10` 测试，覆盖真实报告绑定、缺端点预览降级、受控执行器派工、witness 缺失降档、无工厂不派工及禁止裸 spawn。
+  * `tests/unit/adapter-registry-dispatch.test.ts`、`tests/unit/worker-self-serve-verify.test.ts`、`tests/unit/openhands-sandbox.test.ts`、`tests/unit/cli-host-claude-code.test.ts`（修改/回归）：锁定注册表门禁、升格报告消费、SandboxWitness 记实与缺 MCP endpoint 行为。
+* **估算（R-11）**：
+  * **判 L**（跨 launch 契约解耦、AdapterRegistry 升格报告链重构、两类执行器抽象与派工工厂接线、容器见证与证据面消费四层联动，断言超 10 项）。
+  * **按 R-11「L 卡不得开工、必须拆分」，本卡仅立卡、待 DoR 过审后由 Tina 授权拆分为子卡，待授权不擅动。**
+  * **拆分建议（参照 W.5c 先例）**：
+    * `TASK-W.9a`（launch 契约解耦与真实报告指纹升格，M）：`buildLaunch()` 缺端点降级预览 + `promoteControlMode()` 依赖真实探测报告消费链；
+    * `TASK-W.9b`（外部 CLI 执行器抽象与容器受控执行，M）：执行器统一抽象（Gateway 注入 vs 容器围栏方案对比落盘）+ 沙箱执行产物收集与 `SandboxWitness` 闭环；
+    * `TASK-W.9c`（自注册 Worker 派工工厂与 Registry 闭环，M）：自注册 Worker 派工工厂挂接机制、`requireControlledDispatch` 端到端打通与 dispatchable 状态准确对账。
+* **台账**：
+  * ledger **DLV-3** / **W.5b 挂账**：兑现「自造指纹升格重构」与「`buildLaunch` MCP 端点解耦」；
+  * ledger **W.7 挂账 1**：解决「升格 ≠ 可派工」结构性边界，打通自注册 Worker 派工工厂与执行器接线。
+
+---
+
+
 ### 3.4c 闭环旅程 v2.1 第一批（Journey · 规格 `supervisor.md` 第三部分 §13～§20；对应 §19 落差 L-01～L-10）
 
 <a id="task-j.18"></a>
