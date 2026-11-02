@@ -124,7 +124,7 @@
   7. `OS-07`：能力声明对账——`known_limitations` 非空且如实，`filesystem_permissions` / `command_permissions` 与容器实测一致。
 * **FAIL**（R-8）：`SANDBOX_ENFORCED` 只改 `worker-adapter.interface.ts` 或只改 `contract.schema.ts` 单边；普通本地子进程自称沙箱（违反 §4.2.3 P-17）；任一越界挂载 / 逃逸负例可用；未实测即填 `verified_on` 或标受控；凭证走官方登录 / 订阅会话；为达成实测放宽鉴权 / Demo Origin / 网关写范围；本卡估算判 L 却未拆分子卡即开工或标本卡完成。
 * **关键文件**：`src/lib/contract.schema.ts`（改）、`daemon/worker/worker-adapter.interface.ts`（改）、`tests/unit/contract-schema-v12.test.ts`（改）、`daemon/worker/sandbox/container-host.ts`（新）、`daemon/worker/cli-host/openhands-adapter.ts`（新）、`daemon/worker/default-worker-registry.ts`（改）、`tests/unit/openhands-sandbox.test.ts`（新）、`tests/e2e/openhands-isolation.real.test.ts`（新）、`src/lib/chat-events.ts`（只读核对）、`daemon/worker/cli-host/claude-code-adapter.ts`（只读复用 env 白名单纪律）
-* **估算**（R-11）：**L**（跨「Schema / 类型层 + 容器运行时层 + 适配器 + 黑盒实测」多层，PASS 断言 7 条且含真实容器实测，超过 §4「一张卡只碰一个层」）。按 R-11「L 卡不得开工，必须拆分」，建议拆为 ① `W.5c-i` 双枚举 + `workerSpecSchema` 目标字段（S/M）② `W.5c-ii` 容器运行时 `runInSandbox`（M）③ `W.5c-iii` OpenHands 适配器 + 真实容器实测与 `verified_on`（M）。**拆分授权已给（2026-11-02 · Tina · P-118）**：按本规划落 `W.5c-i`（双枚举 + 目标字段，S/M，`[READY]`）/ `W.5c-ii`（容器运行时 `runInSandbox`，M，`[READY（跟随 i）]`）/ `W.5c-iii`（OpenHands 适配器 + 真实容器实测 + `verified_on`，M，`[BLOCKED · 等容器环境]`），DAG 增 `i→iii`、`ii→iii` 两条边；母卡标 `[SPLIT]` 保留追溯。`W.5c-iii` 硬前置为本机容器运行时可用 + `STAGENT_REAL_OPENHANDS=1`（P-116 已坐实本机仅 Docker 客户端、无守护进程）。`TASK-W.5b` 的 DOR-3 债保留挂账、本轮不动。
+* **估算**（R-11）：**L**（跨「Schema / 类型层 + 容器运行时层 + 适配器 + 黑盒实测」多层，PASS 断言 7 条且含真实容器实测，超过 §4「一张卡只碰一个层」）。按 R-11「L 卡不得开工，必须拆分」，建议拆为 ① `W.5c-i` 双枚举 + `workerSpecSchema` 目标字段（S/M）② `W.5c-ii` 容器运行时 `runInSandbox`（M）③ `W.5c-iii` OpenHands 适配器 + 真实容器实测与 `verified_on`（M）。**拆分授权已给（2026-11-02 · Tina · P-118）**：按本规划落 `W.5c-i`（双枚举 + 目标字段，S/M，`[READY]`）/ `W.5c-ii`（容器运行时 `runInSandbox`，M，`[READY（跟随 i）]`）/ `W.5c-iii`（OpenHands 适配器 + 真实容器实测 + `verified_on`，M，`[BLOCKED · 等容器环境]`），DAG 增 `i→iii`、`ii→iii` 两条边；母卡标 `[SPLIT]` 保留追溯。**（P-122 现行口径：三张子卡均已 COMPLETED——`W.5c-i` #81/`c3e75cc`、`W.5c-ii` #85/`648be31`、`W.5c-iii` #87/`2313597a`；上句 `[BLOCKED]` 为立卡当日状态，保留原文作溯源。）**`W.5c-iii` 硬前置为本机容器运行时可用 + `STAGENT_REAL_OPENHANDS=1`（P-116 已坐实本机仅 Docker 客户端、无守护进程）。`TASK-W.5b` 的 DOR-3 债保留挂账、本轮不动。
 
 ---
 
@@ -209,18 +209,20 @@
 
 <a id="task-w.5c-iii"></a>
 
-#### 【Task W.5c-iii】OpenHands 适配器 + 真实容器实测 + `verified_on` `[IN_PROGRESS · 施工中]`
+#### 【Task W.5c-iii】OpenHands 适配器 + 真实容器实测 + `verified_on` `[COMPLETED]`
 
-> **开工声明（2026-11-02 · 施工中，**非**完成回写；回写另见 P-122）**：环境硬前置已满足并经实测坐实——Docker Desktop **29.6.1 / Engine 29.6.1 / containerd v2.2.5 / runc 1.3.6**，`docker info` 服务端可达（非仅客户端），OpenHands 镜像 `ghcr.io/all-hands-ai/openhands@sha256:00968de7…fa6`（1.83GB）已拉取，容器内 `openhands 0.59.0` / `python 3.13.7`、headless CLI `python -m openhands.core.main --help` 可用。施工分支 `feat/w5ciii-openhands-real`。实测证据见 [`../reports/W5c-iii-真实容器实测-2026-11-02.md`](../reports/W5c-iii-真实容器实测-2026-11-02.md)。**矩阵 / index 仍停留在 `[BLOCKED]` 属回写前状态**，待本卡完成时按 P-12x 统一同步，不在施工期半同步。
+> **归档注记（2026-11-02 · P-122）**：本卡已 COMPLETED（[#87](https://github.com/he18718143986-design/IDE/pull/87)/`2313597a`，squash merge；分支 `feat/w5ciii-openhands-real`，本地三提交 `d23b185` 主体 + `00c0494` 证据面消费见证 + docs 开工声明）。完整交付记录（围栏档 ruling A / `DockerContainerHost` / OpenHands 适配器注册 / 派工即入沙箱 / `SandboxWitness` + `resolveEvidenceControlMode` 证据面消费）、环境自证、验收数据、**4 条挂账**（`openhandsControlMode` 降级分支是防呆非废码、`durationMs ??` 死代码、`EXPLICIT_TARGETS` 逐目标出站需 netns/iptables 级实现、**`runWorker` outcome 的 `worker_control_mode` 仍为声明档未校正——两个记录点只有证据面被校正**）与「不宣称端到端闭环」见 [`development-tasks-completed.md`](./development-tasks-completed.md) §3.4k（锚点 `#task-w.5c-iii`）。本处保留原始卡文与施工期「开工声明」以存追溯，**均不再作为施工依据**。**环境前置已解除**：下引开工声明中 P-116「仅 Docker 客户端、无守护进程」为 2026-11-01 状态；2026-11-02 环境验证全绿（Docker Desktop 29.6.1 daemon 可达 + 镜像按摘要固定拉取 + `STAGENT_REAL_OPENHANDS=1` 实测 11/11），本卡已走完 `[BLOCKED] → 施工 → COMPLETED` 全段。**`W.5c` 容器隔离链路（档位 → 运行时围栏 → 真实宿主 + 实测）至此三段贯通。**
 
-> **拆卡立卡（2026-11-02 · P-118 · 经 Tina 授权）**：母卡 `TASK-W.5c` 第三张。**`[BLOCKED · 等容器环境]`**：硬前置为本机容器运行时可用 + `STAGENT_REAL_OPENHANDS=1`。P-116 只读核查已坐实本机**仅装 Docker CLI 29.6.1、无守护进程**（`~/.docker/run/docker.sock` 与 `/var/run/docker.sock` 均不存在，无 `dockerd` / `containerd` / `colima` / `lima` 进程，`podman` / `nerdctl` / `colima` / `lima` 未装，环境变量未设置）——**此时开工 `OS-06` 真实实测会空转**，须先备妥容器运行时并确认 daemon 可达。
+> **开工声明（2026-11-02 · 施工期状态，**非**完成回写；保留原文作溯源，完成回写见上方归档注记与 P-122）**：环境硬前置已满足并经实测坐实——Docker Desktop **29.6.1 / Engine 29.6.1 / containerd v2.2.5 / runc 1.3.6**，`docker info` 服务端可达（非仅客户端），OpenHands 镜像 `ghcr.io/all-hands-ai/openhands@sha256:00968de7…fa6`（1.83GB）已拉取，容器内 `openhands 0.59.0` / `python 3.13.7`、headless CLI `python -m openhands.core.main --help` 可用。施工分支 `feat/w5ciii-openhands-real`。实测证据见 [`../reports/W5c-iii-真实容器实测-2026-11-02.md`](../reports/W5c-iii-真实容器实测-2026-11-02.md)。**矩阵 / index 仍停留在 `[BLOCKED]` 属回写前状态**，待本卡完成时按 P-12x 统一同步，不在施工期半同步。
+
+> **拆卡立卡（2026-11-02 · P-118 · 经 Tina 授权）**：母卡 `TASK-W.5c` 第三张。**`[BLOCKED · 等容器环境]`**：硬前置为本机容器运行时可用 + `STAGENT_REAL_OPENHANDS=1`。P-116 只读核查已坐实本机**仅装 Docker CLI 29.6.1、无守护进程**（`~/.docker/run/docker.sock` 与 `/var/run/docker.sock` 均不存在，无 `dockerd` / `containerd` / `colima` / `lima` 进程，`podman` / `nerdctl` / `colima` / `lima` 未装，环境变量未设置）——**此时开工 `OS-06` 真实实测会空转**，须先备妥容器运行时并确认 daemon 可达。**（P-122 现行口径：容器运行时已于 2026-11-02 备妥并验证通过——Docker Desktop 29.6.1 daemon 可达、镜像按摘要固定拉取、`STAGENT_REAL_OPENHANDS=1` 实测 11/11；本卡已 COMPLETED（#87/`2313597a`），上句 `[BLOCKED]` 为立卡当日状态，保留原文作溯源。）**
 
 * **任务编号**：`TASK-W.5c-iii`
 * **任务名称**：OpenHands 适配器、真实容器隔离实测与 `verified_on` 绑定
 * **对应规格**（R-1）：[`system-architecture.md`](./system-architecture.md) §9.1、§4.2.3 P-17、§2.7；[`../adr/0001-target-user-positioning.md`](../adr/0001-target-user-positioning.md) **ADR-0001**、[`../adr/0003-worktree-capability-boundary.md`](../adr/0003-worktree-capability-boundary.md) **ADR-0003**；母卡 `TASK-W.5c` 范围第 4/5/6 条与 PASS `OS-06` / `OS-07`；先例 [`development-tasks-completed.md`](./development-tasks-completed.md) §3.4a `TASK-W.5a` 黑盒实测纪律
-* **前置依赖**（R-3）：**硬** `TASK-W.5c-i`（**`[COMPLETED]`** · #81/`c3e75cc`）、`TASK-W.5c-ii`（**`[COMPLETED]`** · #85/`648be31`，围栏逻辑与 `ContainerHostPort` 端口已就位，本卡只绑真实宿主并**把 `runInSandbox` 接进执行面**）——DAG 边 `i→iii`、`ii→iii`；**环境硬前置**：本机容器运行时可用（daemon 可达）+ `STAGENT_REAL_OPENHANDS=1`（**P-116 已坐实当前不满足，故本卡 `[BLOCKED]`**）；`TASK-W.6`（**COMPLETED**）
+* **前置依赖**（R-3）：**硬** `TASK-W.5c-i`（**`[COMPLETED]`** · #81/`c3e75cc`）、`TASK-W.5c-ii`（**`[COMPLETED]`** · #85/`648be31`，围栏逻辑与 `ContainerHostPort` 端口已就位，本卡只绑真实宿主并**把 `runInSandbox` 接进执行面**）——DAG 边 `i→iii`、`ii→iii`；**环境硬前置**：本机容器运行时可用（daemon 可达）+ `STAGENT_REAL_OPENHANDS=1`（**P-116 曾坐实不满足，故本卡一度 `[BLOCKED]`；P-122 现行口径：2026-11-02 已满足并实测通过，见归档注记**）；`TASK-W.6`（**COMPLETED** · [#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`）
 * **优先级**：P3 · **NON_BLOCKER**
-* **状态**：`[IN_PROGRESS · 施工中]`（2026-11-02 开工：环境前置已满足，Tina 已解除阻断；施工分支 `feat/w5ciii-openhands-real`。**未完成、未宣称端到端闭环**，完成回写见 P-122）
+* **状态**：`[COMPLETED]`（2026-11-02 · [#87](https://github.com/he18718143986-design/IDE/pull/87)/`2313597a`；状态轨迹 `[BLOCKED · 等容器环境]` → `[IN_PROGRESS · 施工中]`（Tina 解除阻断）→ 完成。**完成 ≠ 端到端闭环**：模型驱动链路因出站 `DENY` 未实测，见 completed §3.4k「未宣称」）
 * **对照痛点（代码事实）**（R-4）：`daemon/worker/cli-host/openhands-adapter.ts` 与 `tests/e2e/openhands-isolation.real.test.ts` **均尚不存在**；`daemon/worker/default-worker-registry.ts::createDefaultWorkerRegistry()` 当前仅登记内置 Managed AI（`GATEWAY_ENFORCED`）与 Claude Code worker（`UNCONTROLLED_EXTERNAL`），无 OpenHands 登记；`verified_on` 字段由 `W.5c-i` 落地但今日无任何实测值可填（`src/lib/chat-events.ts::ChatAdapterInfo.verified_on` 空串语义 = 未实测）。
 * **一句话目标**（R-2）：OpenHands Worker 在真实容器内跑通越界挂载 / 逃逸负例并失败关闭后，`verified_on` 按实测版本与日期填写、登记为 `SANDBOX_ENFORCED`；未通过者仅登记 `UNCONTROLLED_EXTERNAL`（仅 Vibe、UI 显示「未受控」）。
 * **ADR 修订**（R-9）：**无冲突、不修订**。强化 ADR-0001 强隔离控制面；须满足 §4.2.3 P-17 与 ADR-0003 边界，不宣称「绝对受控」。
@@ -319,7 +321,7 @@
 * **对应规格**：架构 / W.1 适配器抽象；`daemon/worker/worker-adapter.interface.ts`；`src/lib/contract.schema.ts::workerSpecSchema`；先例 W.5b/c 人工实测 → 本卡产品化
 * **前置依赖**：**硬** `TASK-W.6`（Registry 进派工，否则测完无池可进；**W.6 已于 2026-11-02 COMPLETED（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`），硬前置已解除**）；**软** `TASK-W.5c`（探测沙箱复用/对齐其容器隔离基建；**排程上 W.5c 为下一张，优先于本卡**）
 * **优先级**：P3 · **NON_BLOCKER**（**不阻断** `TASK-L.16`；**不抢** W.5b/c 实测窗口；与 W.5b/c **不互斥**——本卡落地后 W.5b/c 可作为首批真实用例回归基准）
-* **状态**：`[NEW_TASK]`（硬前置 W.6 已 COMPLETED，就绪障碍解除；但排程上 `TASK-W.5c` 系列为下一张，本卡不抢位、尚未开工）。**邻卡 DoR 正文状态**（2026-11-02 · P-119 同步）：`W.5c` 已于 P-115 按 DoR 重写达标、并经 P-118 授权拆为 `W.5c-i`（**`[COMPLETED]`** · #81/`c3e75cc`）/ `W.5c-ii`（**`[COMPLETED]`** · #85/`648be31`，P-121 同步）/ `W.5c-iii`（`[BLOCKED · 等容器环境]`，**Sprint 首要（阻断中）**）三张子卡，母卡标 `[SPLIT]` 保留追溯；`W.5b` 的 DOR-3 正文重写债仍在。
+* **状态**：`[NEW_TASK]`（硬前置 W.6 已 COMPLETED，就绪障碍解除；排程上 `TASK-W.5c` 系列为前序——三张子卡已于 2026-11-02 **全部 COMPLETED**（#81 / #85 / #87），**本卡即 Sprint 首要**，尚未开工、不宣称就绪以外的东西）。**邻卡 DoR / 状态（2026-11-02 · P-122 同步）**：`W.5c` 已于 P-115 按 DoR 重写达标、并经 P-118 授权拆为 `W.5c-i`（**`[COMPLETED]`** · #81/`c3e75cc`）/ `W.5c-ii`（**`[COMPLETED]`** · #85/`648be31`）/ `W.5c-iii`（**`[COMPLETED]`** · [#87](https://github.com/he18718143986-design/IDE/pull/87)/`2313597a`，见 completed §3.4k）三张子卡，母卡标 `[SPLIT]` 保留追溯；`W.5b` 的 DOR-3 正文重写债仍在。
 * **对照痛点（代码事实）**：
   1. 三层可扩展接口已在：`daemon/worker/worker-adapter.interface.ts::CodingWorkerAdapter`（`AdapterCapabilityDeclaration` 9 项 + `AdapterRejectionCode`）、`daemon/worker/adapter-registry.ts::AdapterRegistry`（`register` / `get` / `requireControlled`）、`src/lib/contract.schema.ts::workerSpecSchema`（`adapter_id` + `control_mode`；**三值** `GATEWAY_ENFORCED|SANDBOX_ENFORCED|UNCONTROLLED_EXTERNAL`，P-121 同步：原二值经 `W.5c-i` 扩三值、`W.5c-ii` 起派工门禁按容器宿主可用性判定）。
   2. ~~派工仍硬编码 `new AiWorker(...)`（`daemon/pipeline/orchestrator.ts`）~~ —— **已由 W.6（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`）改造为经 `AdapterRegistry` → `requireControlledDispatch` 派工工厂接线，本痛点已消除**；本卡不代替 W.6。
@@ -327,11 +329,12 @@
 * **一句话目标**：用户可在设置页添加任意 Worker；默认只能当未受控参考；只有通过内置探测包的才升格受控并被 `requireControlled` 命中。
 * **范围**：
   1. **两级注册语义**：`POST /api/workers` 接受 `adapter_id` + 启动命令 + 能力声明；**默认且唯一可直写档**为 `UNCONTROLLED_EXTERNAL`（仅 Vibe/参考，**不得**产出合同证据）。升格 `GATEWAY_ENFORCED` **必须**经自动探测通过；**禁止「填表即受控」**。
-  2. **自动探测任务包**（daemon 内置 fixture，四类确定性断言）：
+  2. **自动探测任务包**（daemon 内置 fixture，四类确定性断言 + 一条派工见证校验）：
      - 文件围栏：诱导越权写；扫主树与 `.stagent/records/`，越权须失败关闭。
      - 命令围栏：白名单外命令须被拒。
      - 证据完整性：diff / 写操作必须经 Gateway 工具集，绕过即失败。
      - 能力声明对账：声明 `TOOL_INTERCEPTION_SUPPORTED` 等须实测命中，声明未兑现 → 不得升格。
+     - **派工见证校验（P-122 新增 · 由 `W.5c-iii` 衍生）**：`SANDBOX_ENFORCED` 派工**是否带 `SandboxWitness`**（`host_kind` / `via` / `exit_code` / `duration_ms` / `worktree_root`）。**缺见证 = 未入箱 = 不得升格、不得记受控档**。判定**直接复用** `daemon/worker/worker-adapter.interface.ts::resolveEvidenceControlMode(declared, witness)`（声明 `SANDBOX_ENFORCED` + 无见证 → `UNCONTROLLED_EXTERNAL`；其余档位原样），**不要另造判据**——该函数已是「记实不记名」的唯一强制点，另造口径会分叉。
      - 输出报告：探测项清单 + 结论；措辞限定为「**通过已知探测集**」，**不得**写「绝对受控」。
   3. **探测沙箱前置**：探测在隔离环境执行（临时 worktree + 无网络 + 超时）；复用/对齐 W.5c 容器隔离基建。**显式前置说明（实现时必做，漏改即 FAIL）**：把 `SANDBOX_ENFORCED` 扩进 **两处**枚举——`daemon/worker/worker-adapter.interface.ts` 与 `src/lib/contract.schema.ts` 各一处；只改单边 → schema 与注册侧不一致。
   4. **验证结果绑定版本**：`verified_on` 绑定适配器版本号/命令指纹；版本或指纹变更 → **自动降级**回 `UNCONTROLLED_EXTERNAL` 待重验；定期重测机制留接口（本卡可只留 hook/类型，不实现调度器）。
@@ -349,7 +352,8 @@
   3. 通过者升格 `GATEWAY_ENFORCED` 并被 `AdapterRegistry.requireControlled` 命中。
   4. 失败者留 `UNCONTROLLED_EXTERNAL` 且附探测报告。
   5. `verified_on` 版本/指纹变更后自动降级待重验。
-* **FAIL**：表单/API 直进受控档；探测无沙箱直接跑主树；报告宣称「绝对受控」；`SANDBOX_ENFORCED` 只改 `worker-adapter.interface.ts` 或只改 `contract.schema.ts` 单边；未满足就绪条件（硬前置 `W.6` 未 COMPLETED / DoR 未达标）却标本卡完成。
+  6. **（P-122 追加）派工见证校验**：`SANDBOX_ENFORCED` 派工缺 `SandboxWitness` → 证据与探测结论一律记 `UNCONTROLLED_EXTERNAL`（复用 `resolveEvidenceControlMode`），升格判定不成立；带见证（`via: "exit"` 且 `exit_code === 0`）才可进升格链路。
+* **FAIL**：表单/API 直进受控档；探测无沙箱直接跑主树；报告宣称「绝对受控」；`SANDBOX_ENFORCED` 只改 `worker-adapter.interface.ts` 或只改 `contract.schema.ts` 单边；**探测包不看 `SandboxWitness` 就把 `SANDBOX_ENFORCED` 判为受控（P-122 追加）**；未满足就绪条件（硬前置 `W.6` 未 COMPLETED / DoR 未达标）却标本卡完成。
 * **关键文件**：`daemon/worker/worker-adapter.interface.ts`、`daemon/worker/adapter-registry.ts`、`src/lib/contract.schema.ts`、`daemon/server.ts`（`/api/workers*` 注册）、新 `daemon/worker/verify/*`（探测包+沙箱）、前端 Worker 设置页组件、新测
 * **估算**：L（实现时宜再拆：枚举扩面 / 探测包 / API+UI；本卡先立产品口径）
 * **台账**：ledger **DLV-3** 加注「自助注册/自动验证已立卡 W.7」；W.5b/c 挂账讨论处注明「W.7 落地后可作回归用例」。
