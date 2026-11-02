@@ -19,8 +19,8 @@
 | `TASK-W.5b` | `NEW_TASK` | cursor-agent 适配器黑盒实测 (v1.3.3 新增) | [打开](./development-tasks-active.md#task-w.5b) |
 | `TASK-W.5c` | `SPLIT` | OpenHands 适配器（容器隔离）· 拆分母卡（P-118 经授权拆为 i/ii/iii，保留追溯） | [打开](./development-tasks-active.md#task-w.5c) |
 | `TASK-W.5c-i` | `COMPLETED` | 双枚举 `SANDBOX_ENFORCED` + `workerSpec` 目标字段（[#81](https://github.com/he18718143986-design/IDE/pull/81)/`c3e75cc` · S/M） | [打开](./development-tasks-completed.md#task-w.5c-i) |
-| `TASK-W.5c-ii` | `READY（跟随 i）` | 容器运行时 `runInSandbox`（M · **Sprint 首要** · mock/stub 可测，不依赖真实容器） | [打开](./development-tasks-active.md#task-w.5c-ii) |
-| `TASK-W.5c-iii` | `BLOCKED · 等容器环境` | OpenHands 适配器 + 真实容器实测 + `verified_on`（M · 硬前置容器运行时 + `STAGENT_REAL_OPENHANDS=1`） | [打开](./development-tasks-active.md#task-w.5c-iii) |
+| `TASK-W.5c-ii` | `COMPLETED` | 容器运行时 `runInSandbox` + 派工门禁按宿主可用性解锁（[#85](https://github.com/he18718143986-design/IDE/pull/85)/`648be31` · M · mock/stub 可测；`runInSandbox` 尚未接入执行面） | [打开](./development-tasks-completed.md#task-w.5c-ii) |
+| `TASK-W.5c-iii` | `BLOCKED · 等容器环境` | OpenHands 适配器 + 真实容器实测 + `verified_on`（M · **Sprint 首要（阻断中）** · 硬前置容器运行时 + `STAGENT_REAL_OPENHANDS=1`；FAIL 含「派工未走 `runInSandbox`」） | [打开](./development-tasks-active.md#task-w.5c-iii) |
 | `TASK-W.6` | `COMPLETED` | 受控派工接线与默认适配器注册（DLV-3 · #74/`b5d8c53`）· NON_BLOCKER | [打开](./development-tasks-completed.md#task-w.6) |
 | `TASK-W.7` | `NEW_TASK` | Worker 自助注册与自动验证（默认 `UNCONTROLLED_EXTERNAL`；探测升格 `GATEWAY_ENFORCED`）· NON_BLOCKER | [打开](./development-tasks-active.md#task-w.7) |
 | `TASK-W.8` | `COMPLETED` | Worker 侧 Stagent MCP HTTP 端点 | [打开](./development-tasks-completed.md#task-w.8) |

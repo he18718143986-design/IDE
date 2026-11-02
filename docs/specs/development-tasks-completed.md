@@ -3716,7 +3716,8 @@
   2. **下游收窄登记为设计决策（防回潮）**：`toRuntimeControlMode()` 的收窄是**窗口期**语义；`W.5c-ii` 解锁后应改为按容器宿主可用性判定，而非继续按 `UNCONTROLLED_EXTERNAL` 记档。
   3. **五键测试文件名的指令误传已按代码事实修正**：施工指令写「`tests/unit/worker-mcp-tools.test.ts` 五键锁定测试」；代码事实为该文件是 **TASK-W.2「五大受控 MCP 工具」**测试（`WORKER_MCP_TOOLS`），对 `worker_spec` / `control_mode` / `adapter_id` **零断言**；真正的五键锁定断言在 `tests/unit/contract-schema-v12.test.ts:199`（与卡正文一致）。按代码事实更新后者，前者无需改动。
   4. **容器运行时未实现**：`runInSandbox` 归 `W.5c-ii`；`verified_on` 实测值与 OpenHands 适配器归 `W.5c-iii`。
-* **未宣称 / 未接线（不宣称端到端闭环）**：`SANDBOX_ENFORCED` 今日仍是「**有档位、无运行时**」——可登记、可写进合同、派工被显式拒绝，但没有任何容器隔离执行能力。本卡交付枚举 / schema / 门禁 / 测试，**容器隔离执行面属 `W.5c-ii`**。
+* **P-121 回写（2026-11-02 · 现行口径）**：上述挂账 1 / 挂账 2 已于 `TASK-W.5c-ii`（[#85](https://github.com/he18718143986-design/IDE/pull/85)/`648be31`）**兑现**——`evidence.schema.ts::worker_control_mode` 由二值扩三值、`toRuntimeControlMode()` 窗口期收窄已移除、Evidence 与 `RuntimeInterceptor` 如实记三值；挂账 4 的「容器运行时未实现」亦**部分消解**（围栏逻辑与 `ContainerHostPort` 注入端口就位，但 `runInSandbox` 尚未接入执行面）。原文保留作溯源，现行口径见 §3.4j。
+* **未宣称 / 未接线（不宣称端到端闭环）**：`SANDBOX_ENFORCED` 今日仍是「**有档位、无运行时**」——可登记、可写进合同、派工被显式拒绝，但没有任何容器隔离执行能力。本卡交付枚举 / schema / 门禁 / 测试，**容器隔离执行面属 `W.5c-ii`**。（P-121 注：本句为 `W.5c-i` 归档当日状态；`W.5c-ii` 落地后已变为「有门禁、有围栏逻辑、无真实容器执行」，见 §3.4j。）
 * **关键文件**：`daemon/worker/worker-adapter.interface.ts`、`src/lib/contract.schema.ts`、`daemon/worker/worker-dispatch.ts`、`daemon/pipeline/orchestrator.ts`、`src/components/workspace-types.ts`、`tests/unit/worker-spec-schema.test.ts`（新）、`tests/unit/contract-schema-v12.test.ts`。
 
 ---
@@ -3747,3 +3748,39 @@
   3. **不宣称端到端闭环**：`check playtest` 判定源由 L.17b 交付、本卡只做装配接线；`CompareView` UI 路由挂载与用户原话采集 UI 仍属后续（L.17b 已声明未接线）。
 * **未宣称 / 未接线（不宣称端到端闭环）**：本卡交付「合同装配时自动带验收命令」，**未**验证真实 `check playtest` 在门禁链路上的端到端执行；装配出的命令是否真被执行、执行结果如何回写，属门禁执行链路（后续）。
 * **关键文件**：`src/lib/contract.schema.ts`、`src/lib/journey/confirm-scheme-contract.ts`、`tests/unit/contract-playtest-wiring.test.ts`（新）；只读复用 `bin/stagent.ts`、`daemon/supervisor/preview/playtest-guard.ts`。
+
+---
+
+### 3.4j 容器运行时 `runInSandbox` 与派工门禁按宿主可用性解锁（W.5c-ii · 容器隔离第二张子卡）
+
+<a id="task-w.5c-ii"></a>
+
+#### 【Task W.5c-ii】`daemon/worker/sandbox/container-host.ts` 容器运行时 `runInSandbox` `[COMPLETED]`
+* **任务编号**：`TASK-W.5c-ii`
+* **状态与证据**：`[COMPLETED]`（[#85](https://github.com/he18718143986-design/IDE/pull/85)/`648be31`，squash merge；分支 `feat/w5cii-container-host`，本地两提交 `5be9569` 主体 + `e3345b9` `workerControlModeSchema` 注释与已解锁语义对齐）。母卡 `TASK-W.5c` 已于 P-118 经授权拆为 `i`/`ii`/`iii`，本卡为**第二张子卡**（容器运行时逻辑层，mock / stub 可测，**不依赖真实容器环境**）。
+* **对应规格**：[`system-architecture.md`](./system-architecture.md) §4.2.3 P-17（「沙箱」仅用于 OS 级命名空间 / cgroups / MicroVM / 专用容器隔离，**普通本地子进程严禁自称沙箱**）、§2.7 Git Worktree Engine (Isolation Guard)、§9.1；[`../adr/0001-target-user-positioning.md`](../adr/0001-target-user-positioning.md) **ADR-0001**、[`../adr/0003-worktree-capability-boundary.md`](../adr/0003-worktree-capability-boundary.md) **ADR-0003**；[`task-card-standard.md`](./task-card-standard.md) R-1～R-12；母卡 `TASK-W.5c` 范围第 3/4/5 条
+* **前置依赖**：`TASK-W.5c-i`（COMPLETED · #81/`c3e75cc`，`SANDBOX_ENFORCED` 枚举与 `workerSpecSchema` 目标字段复用）；`TASK-W.6`（COMPLETED · #74/`b5d8c53`，派工门禁语义就位）
+* **交付内容**：
+  1. **新建 `daemon/worker/sandbox/container-host.ts`**（222 行）：`ContainerHostPort` 注入端口（`isAvailable(): boolean` **同步**判定以保持派工门禁同步语义 + `run(input, signal)` 执行）、`SandboxRunInput`（`worktreeRoot` / `cwd?` / `argv` / `mounts?` / `networkPolicy?` / `allowedTargets?` / `timeoutMs?` / `env?`）、`SandboxRunOutcome`（`exitCode` / `stdout` / `stderr` / `via: "exit" | "timeout" | "SIGKILL" | "rejected"` / `rejection?` / `durationMs`）、唯一执行入口 `runInSandbox(host, input, signal?)`，以及三个**纯逻辑**围栏函数 `assertMountAllowed` / `assertNetworkAllowed` / `validateSandboxInput`（无容器环境亦可确定性断言）。
+  2. **挂载围栏（失败关闭，不降级到「照常挂载」）**：字面 `..` → `MOUNT_PATH_TRAVERSAL`（先于归一化判定，保住穿越语义）；归一化后越出任务 Worktree → `MOUNT_OUTSIDE_WORKTREE`；路径段命中保护区（`.git` / `.stagent`）→ `MOUNT_PROTECTED_PATH`；`cwd` 越出 Worktree（绝对 / 相对两种写法均归一后判定）→ `CWD_OUTSIDE_WORKTREE`；空 `argv` → `EMPTY_ARGV`。全部抛 `SandboxRejectedError`（带 `.code`）。
+  3. **网络围栏**：`DENY` 携带任何出口目标 → `NETWORK_TARGET_NOT_ALLOWED`；`EXPLICIT_TARGETS` 未给白名单（缺省 / 空数组）→ 同码；`USER_APPROVED` 与 `DENY`（无目标）放行。缺省策略按 `DENY`。
+  4. **派工门禁切换 `daemon/worker/worker-dispatch.ts::requireControlledDispatch(registry, adapterId, options?)`**：`W.5c-i` 的**窗口期「永远拒绝」语义解除**，改按**容器宿主可用性**判定——已注册 + `SANDBOX_ENFORCED` → 未注入 `ContainerHostPort` 或 `isAvailable()` 为 false 时抛 `E_ADAPTER_SANDBOX_LOCKED`；宿主可用则放行。**关键实现约束**：沙箱档放行后**不再调用** `registry.requireControlled()`（该方法只放行 `GATEWAY_ENFORCED`，沙箱档过它会被误判为 `E_ADAPTER_NOT_CONTROLLED`），故 `SANDBOX_ENFORCED` 分支**自足**。未注册 → `E_ADAPTER_NOT_REGISTERED`、`UNCONTROLLED_EXTERNAL` → `E_ADAPTER_NOT_CONTROLLED` 两个分支显式化（**即便注入可用宿主，非受控档位也不得借沙箱宿主洗白为受控执行**）；`GATEWAY_ENFORCED` 仍走 `registry.requireControlled()`，既有三码语义不变、不静默降级到无网关执行。
+  5. **三值如实记档（`W.5c-i` 挂账 1/2 的兑现与裁决）**：移除 `toRuntimeControlMode()` 收窄（W.5c-i 窗口期产物，`5be9569` 删除该导出），`src/lib/evidence.schema.ts::worker_control_mode`、`daemon/worker/runtime-interceptor.ts::AdapterSnapshot.control_mode` / `getControlMode()`、`orchestrator.ts` 三处赋值（`:1184` 证据写入 / `:1849` 拦截器装配 / `:2253` 证据装配）**如实记三值**。原收窄会让「受控派工成功」产出 `UNCONTROLLED_EXTERNAL` 证据 → 产物不可合并，属自相矛盾。此裁决经 Tina 确认（**「本卡同步扩三值」**）。
+  6. **`OrchestratorOptions.containerHost` + 单次派工覆盖**：构造器持有宿主端口，`runWorker` / `runWorkerInternal` 的 `options.containerHost` 可单次覆盖，`requireControlledDispatch(..., { containerHost })` 透传；未注入即拒绝派工（不静默降级）。真实宿主（Docker / Podman）绑定归 `W.5c-iii`。
+* **证据面裁决注记（记实不记名 · 2026-11-02 · 经 Tina 裁决）**：`worker_control_mode` 记的是**实际执行面**，不是合同声明档位——**容器路径未实际执行时一律记 `UNCONTROLLED_EXTERNAL`**（沿用 `TASK-W.4` 运行时降级「记实」惯例，`:1184` 的 `interceptorBlocked → UNCONTROLLED_EXTERNAL` 即同一口径），不得因「合同写了 `SANDBOX_ENFORCED` 且门禁放行」就记成受控档。**与现码的差距（显式登记，不静默）**：本卡只做到「门禁按宿主可用性放行 + 档位如实记三值 + 拦截器降级仍走 `UNCONTROLLED_EXTERNAL`」，系统内**尚无**「本次执行是否真经 `runInSandbox`」的信号（`runInSandbox` 生产代码零调用，见挂账 1），故该裁决在**执行面接线前不可强制执行**；强制执行随 `W.5c-iii` 绑定真实宿主一并落地。
+* **不变声明**：鉴权 / Demo Origin / 点亮三证 / 网关写范围**不变**（ADR-0001 纪律）。`SANDBOX_ENFORCED` 为新增**更严**档位，**不放宽** `GATEWAY_ENFORCED` 既有门禁；`UNCONTROLLED_EXTERNAL` 仍不得作为受控 / 可合并证据；`runInSandbox` 自身**不启动任何进程**，故**不声称**回收进程树（见挂账 2/3 与「未宣称」）。
+* **验收（PASS）**：新建 `tests/unit/container-host.test.ts` **18 passed**（全 mock 宿主，不要求本机容器运行时）——
+  - `CH-01`（4 例）：Worktree 内路径放行；诱导挂载宿主根 / `.git` / `.stagent` → `SandboxRejectedError`。
+  - `CH-02`（4 例 + 空 argv 1 例）：字面 `..` 得 `MOUNT_PATH_TRAVERSAL`、`path.join` 归一化后的等价逃逸得 `MOUNT_OUTSIDE_WORKTREE`（两条分支分别覆盖，避免「归一化吃掉穿越语义」漏测）；`cwd` 逃出 → `CWD_OUTSIDE_WORKTREE`；`DENY` 带目标与 `EXPLICIT_TARGETS` 空白名单 → `NETWORK_TARGET_NOT_ALLOWED`。
+  - `CH-03`（3 例）：宿主 `timeout` 终止态原样透出；`signal` 启动前已取消 → 返回 `SIGKILL` 且**不进入宿主执行**（`host.calls` 长度 0，无孤儿）；宿主 `SIGKILL` 终止态透出。
+  - `CH-04`（7 例）：mock 宿主跑通并校验交给宿主的 `worktreeRoot` 已归一化；**未注入宿主 → `E_ADAPTER_SANDBOX_LOCKED`**（消息含 `ContainerHostPort`）；`isAvailable() === false` → 同码；`isAvailable() === true` → 返回注册的工厂（窗口期「永远拒绝」确已解除）；未注册 → `E_ADAPTER_NOT_REGISTERED`；`UNCONTROLLED_EXTERNAL` + 可用宿主 → 仍 `E_ADAPTER_NOT_CONTROLLED`（不得借宿主洗白）；`GATEWAY_ENFORCED` 不回归。
+  - 配套：`tests/unit/worker-spec-schema.test.ts` **14 passed**（`SE-03` 由「窗口期永远拒绝」改为「未注入宿主即拒绝」、消息断言改 `ContainerHostPort`；`SE-05` 由「收窄断言」改为「三值如实记档 + `evidence.schema.ts` 源码正则断言」）。`tests/unit/contract-schema-v12.test.ts` 等 3 文件合计 **52 passed**。
+  - `npx tsc --noEmit` 全仓 **57 个 `error TS` 与 clean `main` 基线一致**（收窄移除 + 三值扩列后新增 3 处 TS 错误已在本卡内修净：`workerControlMode?` 扩三值、`runWorker` / `runWorkerInternal` options 补 `containerHost`）。全量 `vitest run` **2585 passed / 10 failed / 10 skipped（278 文件）**；在 `64b737f` 独立 worktree 复跑同一批 9 个失败文件得 7 failed + 1 suite failed（`cli-host-claude-code`），与分支逐条一致，分支多出的仅 `tmp-helper` ×3（并发磁盘探测 flaky，单跑 8/8 全绿），**本卡零新增失败**。`prettier` / `eslint` 新增与改动行全合规（仅余 2 处基线遗留：`worker-dispatch.ts:31`、`worker-spec-schema.test.ts:128`，均 `W.5c-i` 引入、为保持 diff 聚焦未顺手改）。
+* **残余边界 / 后续挂账（P-121 归拢，共 3 条 + 1 条兼容性注记 + 1 条指令误传校正）**：
+  1. **`ContainerHostPort` 是「给工厂用」的注入端口，执行面无法外部强制走 `runInSandbox`**：`runInSandbox` 在**生产代码中零调用**（仅本模块定义 + 测试调用），门禁只验 `isAvailable()` 这一布尔，**不验本次执行是否真进了容器**——`SANDBOX_ENFORCED` 派工仍可能绕过容器走本地执行。→ **`W.5c-iii` 的 FAIL 判据应含「`SANDBOX_ENFORCED` 派工未走 `runInSandbox` → FAIL」**；`W.7` 自助注册的探测包可将其作为验证项（探测在沙箱执行，天然覆盖此路径）。
+  2. **`runInSandbox` 内 `durationMs ?? Date.now() - started` 属死代码**：`SandboxRunOutcome.durationMs` 为**必填** `number`（`container-host.ts:71`），`??` 分支永不命中。不构成缺陷（保留它与宿主契约「必填」一致、且对 JS 调用方宽容），本轮**未静默清理**，登记备改。
+  3. **取消前置返回 `via: "SIGKILL"` 语义偏移**：`signal` 在启动前已取消时返回 `via: "SIGKILL"` + `stderr: "aborted before start"`，而 `abort` ≠ 实际发送 `SIGKILL`。**枚举内可接受**（`SandboxRunOutcome.via` 未设「未启动」值；新增枚举值会破坏宿主契约），登记待 `W.5c-iii` 绑定真实宿主时按「未启动 / 已杀」细分。
+  4. **`evidence.schema.ts` 扩三值的跨版本可读性（兼容性注记）**：`worker_control_mode` 由二值扩为三值后，**旧读者**（按 v1.1 二值集合做白名单校验的外部消费方 / 归档回放工具）读到 `SANDBOX_ENFORCED` 会判为非法值。zod 侧为**放宽**（`enum` 增项）、既有二值证据不受影响；但历史证据与外部消费方**须同步升级枚举**，否则跨版本回放报校验失败。本卡不改证据模型版本号，登记为兼容性注意项（与 W.5c-i 挂账 1「二值有意未扩」互为续：扩列时机与版本语义由本卡兑现）。
+  5. **施工指令误传的错误码已按代码事实处理**：施工清单写「`E_ADAPTER_SANDBOX_AVAILABLE` / `E_ADAPTER_SANDBOX_FAILED` 路径」；代码事实为 `daemon/worker/worker-dispatch.ts` **仅有 `E_ADAPTER_SANDBOX_LOCKED` 一个**（连同既有 `E_ADAPTER_NOT_REGISTERED` / `E_ADAPTER_NOT_CONTROLLED` / `E_ADAPTER_NO_DISPATCH_FACTORY` 共四码），全仓 `grep` 无 `E_ADAPTER_SANDBOX_AVAILABLE` / `E_ADAPTER_SANDBOX_FAILED`。按代码事实记录，**未虚构两个错误码**；`E_ADAPTER_SANDBOX_LOCKED` 的语义已随本卡由「窗口期永远拒绝」改为「未注入宿主 / 宿主不可用」。
+* **未宣称 / 未接线（不宣称端到端闭环）**：本卡交付**围栏逻辑 + 终止态契约 + 门禁切换**，`runInSandbox` **未接入编排器执行面**，真实容器宿主**未绑定**（`W.5c-iii`）；`known_limitations` / `verified_on` 未填、OpenHands 适配器未实现、`default-worker-registry` 未登记 OpenHands。**不宣称**「`SANDBOX_ENFORCED` 已能在容器内执行」、**不宣称**「越界挂载 / 逃逸在真实容器里实测失败关闭」（本卡只在逻辑层断言围栏函数拒绝，未触真实容器）。
+* **关键文件**：`daemon/worker/sandbox/container-host.ts`（新）、`daemon/worker/worker-dispatch.ts`、`daemon/worker/runtime-interceptor.ts`、`daemon/pipeline/orchestrator.ts`、`src/lib/evidence.schema.ts`、`src/lib/contract.schema.ts`（注释同步）、`tests/unit/container-host.test.ts`（新）、`tests/unit/worker-spec-schema.test.ts`（改）。
