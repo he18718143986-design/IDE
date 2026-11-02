@@ -274,3 +274,5 @@
 3. **否决的进墓地**：写清谁否决、为什么，防止下一轮悄悄复活。
 
 传统模板的对应关系见 [`templates/00-filling-guide.md`](./templates/00-filling-guide.md) 与 [`specs/supervisor.md`](./specs/supervisor.md) §14.11 小节 3（`goals` ↔ REQ，`acceptance` ↔ AC，`decisions` ↔ ADR，证据 ↔ EVID）。
+
+> **P-130 现行物理指针（2026-11-02）**：main@`22168ee62c62c674bc526df7254850487c068033`（PR #99，W.9a squash）。W.9a COMPLETED；W.9b 经 Tina 授权进入施工；W.9c 仍待 a+b。

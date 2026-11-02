@@ -2258,6 +2258,20 @@
 
 ---
 
+### 3.4n Worker 执行器链路（W.9a）
+
+<a id="task-w.9a"></a>
+
+#### 【Task W.9a】探测报告指纹升格 + launch 解耦 `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#99](https://github.com/he18718143986-design/IDE/pull/99)/`22168ee`，squash；基线 #98）。
+- **交付**：升格只消费服务端 `.stagent/workers.json` 权威 `last_report`，按 report id + fingerprint 查找并绑定 adapter/target/version/witness；错误分别区分报告不存在、指纹不匹配与报告绑定事实无效。cursor-agent / Claude Code 缺 MCP endpoint 返回显式 `preview_only` / degraded 状态，执行入口 fail-closed。
+- **测试与门禁**：定向 4 文件 116 项通过；全量测试相对 baseline 零新增失败（基线原有失败保留）；全仓 TypeScript 54 条诊断，与 baseline 数量相同，改动文件零新增；`git diff --check` 通过。PR 描述须注明 `cli-host-claude-code.test.ts` 的 spawn 静态禁令 LEGACY 白名单新增四文件仅为既有 `child_process` 使用补登记，非本卡新增执行面或放松 spawn 禁令。
+- **后续挂账（两项）**：① 清理未再使用的 `E_CURSOR_AGENT_MCP_ENDPOINT_MISSING` 导出；② W.9c 接执行面时重新评估 `bindProbeReportAuthority` 作为公开方法可被进程内重绑的信任边界。
+- **边界**：不宣称端到端闭环；W.9b 执行器抽象与见证接线另行施工，W.9c 自注册工厂闭环仍待 W.9a+b 完成。
+
+---
+
 ### 3.4c 闭环旅程 v2.1 第一批（Journey · 规格 `supervisor.md` 第三部分 §13～§20；对应 §19 落差 L-01～L-10）
 
 <a id="task-j.1"></a>

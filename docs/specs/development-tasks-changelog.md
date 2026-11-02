@@ -134,3 +134,7 @@
 - **P-128（W.9 经授权拆分，2026-11-02）**：按 Tina 决策将 `TASK-W.9` 母卡标 `[SPLIT]` 并保留原文，新增按 R-1～R-12 完整的 `W.9a`（S/M，`[READY]`）、`W.9b`（M，`[READY]`）、`W.9c`（M，`[BLOCKED · 待 a+b]`）。同步矩阵、index、active、DAG `W.9a→W.9c` / `W.9b→W.9c`、版本头 #128、ledger 两处。Sprint 首要为 `W.9a`，`W.9b` 可并行；`W.9c` 等 a+b。READY 仅代表 DoR 完备，开工仍由 Tina 逐卡授权；本轮纯 docs，不新增 OP、不改产品代码。
 
 - **P-129（P-128 合入 tip 同步，2026-11-02）**：`docs/w9-split` 经 Tina 告知已合入 **[#97](https://github.com/he18718143986-design/IDE/pull/97)/`332828f4`**（squash；全 SHA `332828f4daefb534f8e52c7450e3a4bc8d11fbc1`，父 #96 `c999253`）。Sprint「当前工程物理起点」与 `scheme.md` 现行物理 tip 由 `1a50cb15` → `332828f4`；P-128 的 W.9 拆分状态与排程继续有效（W.9a 首要、W.9b 可并行、W.9c 待 a+b）。版本头与流水 P-125～P-128、ledger 既有注记保留原文作溯源。本轮仅 tip 指针同步，矩阵 / 卡状态 / 排程 / DAG 与代码均未改；不新增 OP 号。main tip 对齐 `332828f4`。
+
+- **P-130（W.9a 合入回写 + W.9b 开工，2026-11-02）**：W.9a → `[COMPLETED]`（[#99](https://github.com/he18718143986-design/IDE/pull/99)/`22168ee`）；W.9b 经 Tina 授权进入施工，W.9c 仍待 a+b。同步矩阵、Sprint、active/archive、completed §3.4n、index、ledger 与 `scheme.md` tip。PR #99 审查注记：spawn LEGACY 白名单四文件是既有 `child_process` 使用补登记，非新增执行面。归拢两条挂账：清理 `E_CURSOR_AGENT_MCP_ENDPOINT_MISSING` 导出；W.9c 重新评估 `bindProbeReportAuthority` 公开重绑边界。不宣称端到端闭环。
+
+- **P-130 状态注记**：W.9a 已完成后，W.9c 当前唯一未满足的代码前置为 W.9b；因此活动卡/当前矩阵显示 `[BLOCKED · 待 b]`，历史拆分记录保留立卡时的「待 a+b」口径。

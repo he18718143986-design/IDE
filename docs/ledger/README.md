@@ -136,3 +136,11 @@
 - **合入**：`docs/w9-split` 以 [#97](https://github.com/he18718143986-design/IDE/pull/97)/`332828f4` squash 合入 main（父 #96 `c999253`）。
 - **指针**：当前物理 tip 更新为 `332828f4`；P-128 W.9 拆分状态照旧。既有 P-125～P-128 历史注记不改写。
 - **范围**：仅 docs tip 同步；不新增 OP，不改产品代码或任务判定。
+
+
+### TASK-W.9（P-130 · 2026-11-02 · 非 OP）
+
+- **状态回写**：W.9a 已 COMPLETED（PR #99 / `22168ee`），W.9b 经 Tina 授权进入施工，W.9c 等待 W.9b。
+- **后续挂账**（归档见 [`development-tasks-completed.md` §3.4n](../specs/development-tasks-completed.md#task-w.9a)，不新增 OP）：清理死码导出 `E_CURSOR_AGENT_MCP_ENDPOINT_MISSING`；W.9c 接执行面时重估 `bindProbeReportAuthority` 公开重绑边界。
+- **审查说明**：PR #99 的 Claude spawn LEGACY 白名单新增四文件是既有 `child_process` import 补登记，非 W.9a 新增执行面。
+- **开工边界**：W.9b 当前选容器路径，Gateway capability 不可用且不冒称 `GATEWAY_ENFORCED`；仅容器成功并产 witness 才可标 `SANDBOX_ENFORCED`。
