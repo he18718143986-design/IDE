@@ -17,6 +17,10 @@ import {
   OPENHANDS_VERIFIED_ON,
   OpenHandsSandboxAdapter,
 } from "./cli-host/openhands-adapter";
+import {
+  CURSOR_AGENT_WORKER_ADAPTER_ID,
+  CursorAgentAdapter,
+} from "./cli-host/cursor-agent-adapter";
 import { buildWorkerTaskInstruction } from "./session-task-injector";
 
 /**
@@ -35,7 +39,10 @@ import { buildWorkerTaskInstruction } from "./session-task-injector";
  *   ScopedWorktreeGateway 约束写范围，任何指向它的派工都会被门禁显式拒绝；
  * - OpenHands 容器 worker（W.5c-iii）以 `SANDBOX_ENFORCED` 注册并挂派工工厂，
  *   执行必经 `runInSandbox()` 进入容器（无本地降级）；未实测则降为
- *   `UNCONTROLLED_EXTERNAL` 且不挂工厂。
+ *   `UNCONTROLLED_EXTERNAL` 且不挂工厂；
+ * - cursor-agent worker（W.5b）只以 `UNCONTROLLED_EXTERNAL` 登记、不挂派工工厂——
+ *   它同样是宿主进程外部 CLI，且 `tool_interception_supported === false`，
+ *   两档受控都够不上（详见 `cli-host/cursor-agent-adapter.ts` 文件头）。
  */
 
 /** 合同默认 worker_spec.adapter_id（见 contract.schema DEFAULT_WORKER_SPEC） */
@@ -254,6 +261,12 @@ export function createDefaultWorkerRegistry(): AdapterRegistry {
 
   // 登记 Claude Code worker，但明确标为非受控、不挂派工工厂（红线）
   registry.register(claudeCodeWorkerRegistration(), "UNCONTROLLED_EXTERNAL");
+
+  // TASK-W.5b：登记 cursor-agent worker。档位是**结构性上界**而不是「还没测出来」：
+  // 严格档要求 tool_interception_supported === true（本进程无拦截点），沙箱档要求
+  // 派工经 runInSandbox() 并携 SandboxWitness（宿主进程不经该入口）——故唯一合法
+  // 档位是 UNCONTROLLED_EXTERNAL，且不挂派工工厂（派工恒被门禁拒绝）。
+  registry.register(new CursorAgentAdapter(), "UNCONTROLLED_EXTERNAL");
 
   // TASK-W.5c-iii：登记 OpenHands 容器 Worker。档位按「是否已有实测记录」判定：
   // 有实测 → SANDBOX_ENFORCED 并挂沙箱派工工厂（执行必经 runInSandbox）；

@@ -198,9 +198,10 @@ describe("B. createDefaultWorkerRegistry 默认注册", () => {
     const a = createDefaultWorkerRegistry();
     const b = createDefaultWorkerRegistry();
     expect(a).not.toBe(b);
-    // 4 项 = 内置 ai-sdk + managed-ai + Claude Code（UNCONTROLLED_EXTERNAL）
+    // 5 项 = 内置 ai-sdk + managed-ai + Claude Code（UNCONTROLLED_EXTERNAL）
     //      + OpenHands（SANDBOX_ENFORCED，TASK-W.5c-iii 新增登记）
-    expect(a.list()).toHaveLength(4);
+    //      + cursor-agent（UNCONTROLLED_EXTERNAL，TASK-W.5b 新增登记）
+    expect(a.list()).toHaveLength(5);
   });
 
   it("能力载体 run() 显式抛错，不返回「成功但空转」的假结果", async () => {
