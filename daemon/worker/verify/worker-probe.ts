@@ -29,6 +29,7 @@
  * （`assertReportWording`）——报告文本由代码生成，任何一方（含注入的执行面）
  * 写出该措辞都会抛错，而不是悄悄落盘。
  */
+import crypto from "node:crypto";
 import {
   resolveEvidenceControlMode,
   validateAdapterCapability,
@@ -321,6 +322,11 @@ export async function runProbePack(
   };
 
   const report: WorkerProbeReportSummary = {
+    report_id: crypto.randomUUID(),
+    adapter_id: record.adapter_id,
+    target_mode: targetMode,
+    version_fingerprint: fingerprintOf(record),
+    witness: targetMode === "SANDBOX_ENFORCED" ? witness : undefined,
     verified_at: input.now,
     // 绑定「这次探测对应的适配器版本 / 命令 / 声明」：指纹变了报告即失效
     fingerprint: fingerprintOf(record),

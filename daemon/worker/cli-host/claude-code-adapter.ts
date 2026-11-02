@@ -132,6 +132,9 @@ export interface BuiltLaunch {
   env: NodeJS.ProcessEnv;
   settingsPath: string;
   mcpPath: string;
+  mcp_status:
+    "INJECTED" | "ENDPOINT_MISSING_PREVIEW_ONLY" | "NOT_REQUIRED_PARTNER";
+  degraded_reason?: string | undefined;
 }
 
 export class ClaudeCodeAdapter implements ChatAdapter {
@@ -219,6 +222,10 @@ export class ClaudeCodeAdapter implements ChatAdapter {
     // TASK-W.8：Stagent Gateway 的受管 MCP HTTP 端点在 W.8 落地；Worker 经 --strict-mcp-config 挂接真实端点，严禁静默降级为空集合
     // （注：此前注释误指 W.4，W.4 实为 threat-guard，已在 W.8 纠正）
     let mcpServers: Record<string, unknown> = {};
+    let mcpStatus: BuiltLaunch["mcp_status"] = partner
+      ? "NOT_REQUIRED_PARTNER"
+      : "INJECTED";
+    let degradedReason: string | undefined;
     if (partner) {
       // partner 恒为右栏只读搭档，只读白名单保持不变，不挂外部 MCP 端点
       mcpServers = {};
@@ -243,7 +250,10 @@ export class ClaudeCodeAdapter implements ChatAdapter {
         } else if (typeof this.opts.mcpPort === "number") {
           port = this.opts.mcpPort;
         } else if (process.env["STAGENT_DAEMON_PORT"]) {
-          const parsed = Number.parseInt(process.env["STAGENT_DAEMON_PORT"], 10);
+          const parsed = Number.parseInt(
+            process.env["STAGENT_DAEMON_PORT"],
+            10,
+          );
           if (!Number.isNaN(parsed) && parsed > 0) {
             port = parsed;
           }
@@ -253,39 +263,46 @@ export class ClaudeCodeAdapter implements ChatAdapter {
         }
       }
 
-      if (!resolvedUrl || typeof resolvedUrl !== "string" || resolvedUrl.trim().length === 0) {
-        throw new Error(
-          "Worker MCP endpoint URL is required under --strict-mcp-config; silent fallback to empty mcpServers is prohibited (TASK-W.8)",
-        );
+      if (
+        !resolvedUrl ||
+        typeof resolvedUrl !== "string" ||
+        resolvedUrl.trim().length === 0
+      ) {
+        mcpStatus = "ENDPOINT_MISSING_PREVIEW_ONLY";
+        degradedReason =
+          "STAGENT_MCP_URL and STAGENT_DAEMON_PORT are unavailable; launch is preview-only and must not execute";
       }
 
-      const mcpUrl = resolvedUrl.trim();
+      const mcpUrl = resolvedUrl?.trim();
+      if (!mcpUrl) {
+        mcpServers = {};
+      } else {
+        let token: string | undefined = undefined;
+        if (typeof this.opts.authToken === "function") {
+          token = this.opts.authToken();
+        } else if (typeof this.opts.authToken === "string") {
+          token = this.opts.authToken;
+        } else if (process.env["STAGENT_MCP_TOKEN"]) {
+          token = process.env["STAGENT_MCP_TOKEN"];
+        } else if (process.env["STAGENT_SESSION_TOKEN"]) {
+          token = process.env["STAGENT_SESSION_TOKEN"];
+        }
 
-      let token: string | undefined = undefined;
-      if (typeof this.opts.authToken === "function") {
-        token = this.opts.authToken();
-      } else if (typeof this.opts.authToken === "string") {
-        token = this.opts.authToken;
-      } else if (process.env["STAGENT_MCP_TOKEN"]) {
-        token = process.env["STAGENT_MCP_TOKEN"];
-      } else if (process.env["STAGENT_SESSION_TOKEN"]) {
-        token = process.env["STAGENT_SESSION_TOKEN"];
-      }
+        const stagentConfig: Record<string, unknown> = {
+          type: "http",
+          url: mcpUrl,
+        };
 
-      const stagentConfig: Record<string, unknown> = {
-        type: "http",
-        url: mcpUrl,
-      };
+        if (token && token.trim().length > 0) {
+          stagentConfig["headers"] = {
+            Authorization: `Bearer ${token.trim()}`,
+          };
+        }
 
-      if (token && token.trim().length > 0) {
-        stagentConfig["headers"] = {
-          Authorization: `Bearer ${token.trim()}`,
+        mcpServers = {
+          stagent: stagentConfig,
         };
       }
-
-      mcpServers = {
-        stagent: stagentConfig,
-      };
     }
     fs.writeFileSync(mcpPath, JSON.stringify({ mcpServers }, null, 2));
 
@@ -346,6 +363,8 @@ export class ClaudeCodeAdapter implements ChatAdapter {
       env,
       settingsPath,
       mcpPath,
+      mcp_status: mcpStatus,
+      ...(degradedReason ? { degraded_reason: degradedReason } : {}),
     };
   }
 
@@ -353,6 +372,11 @@ export class ClaudeCodeAdapter implements ChatAdapter {
     const key = this.key();
     if (!key) throw new Error("还差一步：请到设置 → 模型钥匙里配置后再试");
     const launch = this.buildLaunch(input);
+    if (launch.mcp_status === "ENDPOINT_MISSING_PREVIEW_ONLY") {
+      throw new Error(
+        `E_MCP_PREVIEW_ONLY: ${launch.degraded_reason ?? "MCP endpoint missing"}`,
+      );
+    }
     const proc: ManagedProcess = (this.opts.spawn ?? spawnManaged)({
       command: launch.command,
       args: launch.args,

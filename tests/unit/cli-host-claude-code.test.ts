@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { safeRmSync } from "../helpers/tmp";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CLAUDE_CODE_VERIFIED_ON,
   ClaudeCodeAdapter,
@@ -658,6 +658,49 @@ describe("TASK-W.5a cli-host 进程托管与打断 ≤2s（假 CLI）", () => {
   });
 });
 
+describe("TASK-W.9a worker MCP preview-only contract", () => {
+  it("missing endpoint returns explicit preview status and run refuses before spawning", async () => {
+    const previousUrl = process.env["STAGENT_MCP_URL"];
+    const previousPort = process.env["STAGENT_DAEMON_PORT"];
+    delete process.env["STAGENT_MCP_URL"];
+    delete process.env["STAGENT_DAEMON_PORT"];
+    const spawn = vi.fn();
+    try {
+      const noEndpoint = new ClaudeCodeAdapter({
+        role: "worker",
+        apiKey: () => KEY,
+        spawn: spawn as never,
+      });
+      const launch = noEndpoint.buildLaunch({
+        prompt: "preview",
+        cwd: tmp,
+        nativeSessionId: null,
+      });
+      expect(launch.mcp_status).toBe("ENDPOINT_MISSING_PREVIEW_ONLY");
+      expect(launch.degraded_reason).toContain("preview-only");
+      await expect(
+        collect(
+          noEndpoint.run({
+            prompt: "execute",
+            cwd: tmp,
+            nativeSessionId: null,
+            history: [],
+            signal: new AbortController().signal,
+          }),
+        ),
+      ).rejects.toThrow("E_MCP_PREVIEW_ONLY");
+      expect(spawn).not.toHaveBeenCalled();
+    } finally {
+      if (previousUrl !== undefined)
+        process.env["STAGENT_MCP_URL"] = previousUrl;
+      else delete process.env["STAGENT_MCP_URL"];
+      if (previousPort !== undefined)
+        process.env["STAGENT_DAEMON_PORT"] = previousPort;
+      else delete process.env["STAGENT_DAEMON_PORT"];
+    }
+  });
+});
+
 describe("TASK-W.5a spawn 静态禁令", () => {
   it("新代码中只有 cli-host 允许 import child_process（其余为既有模块白名单）", () => {
     const LEGACY = new Set([
@@ -676,6 +719,11 @@ describe("TASK-W.5a spawn 静态禁令", () => {
       "daemon/baseline/os-sandbox.ts",
       // TASK-H.4：确认后 git init
       "daemon/git/ensure-git-repo.ts",
+      // Existing historical child_process users outside this task's scope.
+      "daemon/knowledge/check-knowledge.ts",
+      "daemon/release/release-manager.ts",
+      "daemon/trace/why.ts",
+      "daemon/vault/keychain-backend.ts",
       // TASK-H.8：records zip 导出
       "daemon/pipeline/records-export-cleanup.ts",
     ]);

@@ -35,6 +35,7 @@ import {
   E_WORKER_PROMOTION_REFUSED,
   WorkerRegistrationError,
   effectiveControlMode,
+  fingerprintOf,
   normalizeRegistration,
   type WorkerLaunchSpec,
   type WorkerProbeReportSummary,
@@ -139,6 +140,19 @@ export class WorkerRegistrationService {
   constructor(options: WorkerRegistrationServiceOptions) {
     this.repoRoot = options.repoRoot;
     this.registry = options.registry;
+    this.registry.bindProbeReportAuthority((reportId) => {
+      const match = loadWorkerStore(this.repoRoot).workers.find(
+        (worker) => worker.last_report?.report_id === reportId,
+      );
+      if (!match?.last_report) return undefined;
+      // The report and current worker snapshot are both read from the server-owned store.
+      // Return both so the registry can distinguish a stale/mismatched report from absence.
+      return {
+        report: match.last_report,
+        current_adapter_id: match.adapter_id,
+        current_fingerprint: fingerprintOf(match),
+      };
+    });
     this.now = options.now ?? (() => new Date().toISOString());
     this.probePortFactory = options.probePortFactory;
     this.createContainerHost =
@@ -248,6 +262,10 @@ export class WorkerRegistrationService {
       updated_at: this.now(),
     };
 
+    // Persist the authoritative report before the registry consumes it. On rejection,
+    // this leaves the worker at its prior (non-controlled) mode with an auditable report.
+    upsertWorker(this.repoRoot, updated);
+
     let promoted = false;
     if (result.promotion.allowed) {
       // 双写：存储记录（供 UI/列表）+ 注册表（供 `/api/adapters` 与派工门禁）
@@ -287,14 +305,18 @@ export class WorkerRegistrationService {
     if (!this.registry.has(record.adapter_id)) return false;
     try {
       this.registry.promoteControlMode(record.adapter_id, targetMode, {
+        report_id: record.last_report?.report_id,
         report_fingerprint: fingerprint,
         decided_at: this.now(),
       });
       return true;
     } catch (err) {
       if (err instanceof AdapterRegistrationError) {
+        const reportRejection = err.rejection.startsWith("E_PROBE_REPORT_")
+          ? err.rejection
+          : E_WORKER_PROMOTION_REFUSED;
         throw new WorkerRegistrationError(
-          E_WORKER_PROMOTION_REFUSED,
+          reportRejection,
           `注册表拒绝升格：${err.message}`,
         );
       }

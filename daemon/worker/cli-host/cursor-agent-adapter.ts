@@ -180,6 +180,8 @@ export interface CursorAgentAdapterOptions {
   tmpRoot?: string;
   /** Stagent 受管 MCP 端点 URL 或其解析器 */
   mcpServerUrl?: string | (() => string | undefined);
+  /** Daemon 端口或其解析器；未提供 URL 时用于构造本机 MCP URL */
+  mcpPort?: number | (() => number | undefined);
   /** MCP 认证 token（写入 `mcpServers.stagent.headers.Authorization`） */
   authToken?: string | (() => string | undefined);
 }
@@ -192,6 +194,8 @@ export interface CursorAgentBuiltLaunch {
   configDir: string;
   /** MCP 配置落点（实测：`$HOME/.cursor/mcp.json` 会被 CLI 加载） */
   mcpPath: string;
+  mcp_status: "INJECTED" | "ENDPOINT_MISSING_PREVIEW_ONLY";
+  degraded_reason?: string | undefined;
 }
 
 /** 本适配器特有的失败码（便于测试与排障，不复用 WorkerDispatchError 的码空间） */
@@ -275,17 +279,20 @@ export class CursorAgentAdapter implements CodingWorkerAdapter {
     return this.opts.mode ?? "plan";
   }
 
-  /** 受管 MCP 端点：显式注入 > `STAGENT_MCP_URL`；缺失即抛错（不静默空集合） */
-  private mcpUrl(): string {
+  /** 受管 MCP 端点：显式 URL > `STAGENT_MCP_URL` > Daemon 端口。 */
+  private mcpUrl(): string | undefined {
     const explicit = resolveStringOrFn(this.opts.mcpServerUrl);
     const url = explicit ?? process.env["STAGENT_MCP_URL"];
-    if (url === undefined || url.trim().length === 0) {
-      throw new CursorAgentAdapterError(
-        E_CURSOR_AGENT_MCP_ENDPOINT_MISSING,
-        "cursor-agent 必须挂接 Stagent 受管 MCP 端点：未提供 mcpServerUrl 且 STAGENT_MCP_URL 为空；不静默降级为无 MCP（否则「仅挂 Stagent MCP」不成立）",
-      );
-    }
-    return url.trim();
+    if (url?.trim()) return url.trim();
+    const configuredPort = this.opts.mcpPort;
+    const port =
+      typeof configuredPort === "function"
+        ? configuredPort()
+        : (configuredPort ??
+          Number.parseInt(process.env["STAGENT_DAEMON_PORT"] ?? "", 10));
+    return typeof port === "number" && Number.isInteger(port) && port > 0
+      ? `http://127.0.0.1:${port}/api/mcp`
+      : undefined;
   }
 
   /**
@@ -314,18 +321,20 @@ export class CursorAgentAdapter implements CodingWorkerAdapter {
     // 「仅挂 Stagent MCP」：只写一个 stagent 条目，不合并任何既有条目
     const mcpUrl = this.mcpUrl();
     const token = resolveStringOrFn(this.opts.authToken)?.trim();
-    const stagentConfig: Record<string, unknown> = {
-      type: "http",
-      url: mcpUrl,
-    };
-    if (token !== undefined && token.length > 0) {
-      stagentConfig["headers"] = { Authorization: `Bearer ${token}` };
-    }
+    const stagentConfig: Record<string, unknown> | undefined = mcpUrl
+      ? {
+          type: "http",
+          url: mcpUrl,
+          ...(token !== undefined && token.length > 0
+            ? { headers: { Authorization: `Bearer ${token}` } }
+            : {}),
+        }
+      : undefined;
     const mcpPath = path.join(configDir, ".cursor", "mcp.json");
     fs.mkdirSync(path.dirname(mcpPath), { recursive: true, mode: 0o700 });
     fs.writeFileSync(
       mcpPath,
-      `${JSON.stringify({ mcpServers: { stagent: stagentConfig } }, null, 2)}\n`,
+      `${JSON.stringify({ mcpServers: stagentConfig ? { stagent: stagentConfig } : {} }, null, 2)}\n`,
       { mode: 0o600 },
     );
 
@@ -364,6 +373,13 @@ export class CursorAgentAdapter implements CodingWorkerAdapter {
       env,
       configDir,
       mcpPath,
+      mcp_status: mcpUrl ? "INJECTED" : "ENDPOINT_MISSING_PREVIEW_ONLY",
+      ...(mcpUrl
+        ? {}
+        : {
+            degraded_reason:
+              "STAGENT_MCP_URL and STAGENT_DAEMON_PORT are unavailable; launch is preview-only and must not execute",
+          }),
     };
   }
 

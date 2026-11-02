@@ -55,7 +55,9 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
     fs.rmSync(tempRepo, { recursive: true, force: true });
   });
 
-  async function postMcp(body: unknown): Promise<{ status: number; body: any }> {
+  async function postMcp(
+    body: unknown,
+  ): Promise<{ status: number; body: any }> {
     const res = await fetch(`http://127.0.0.1:${port}/api/mcp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -169,16 +171,16 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
     };
 
     const mockFetch = vi.fn().mockResolvedValue(
-      new Response("<html><head><title>Spec V1</title></head><body><h1>API Spec</h1><p>Doc content</p></body></html>", {
-        status: 200,
-        headers: { "Content-Type": "text/html" },
-      }),
+      new Response(
+        "<html><head><title>Spec V1</title></head><body><h1>API Spec</h1><p>Doc content</p></body></html>",
+        {
+          status: 200,
+          headers: { "Content-Type": "text/html" },
+        },
+      ),
     );
     const proxy = new WebIngestProxy({
-      allowedDomains: [
-        "allowed.partner.com",
-        "docs.github.com",
-      ],
+      allowedDomains: ["allowed.partner.com", "docs.github.com"],
       fetchFn: mockFetch as any,
     });
 
@@ -234,9 +236,7 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
     expect(blockedLog).toBeDefined();
     expect(blockedLog?.outcome).toBe("BLOCKED");
 
-    const successLog = logs.find(
-      (l) => l.outcome === "SUCCESS",
-    );
+    const successLog = logs.find((l) => l.outcome === "SUCCESS");
     expect(successLog).toBeDefined();
     expect(successLog?.details).toContain("Successfully ingested");
   });
@@ -338,7 +338,11 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
     expect(partnerConfig.mcpServers).toEqual({});
   });
 
-  it("dynamically resolves port and auth token from options or environment for worker and throws when unconfigured", () => {
+  it("dynamically resolves port and token, and marks missing endpoint preview-only", () => {
+    const previousUrl = process.env["STAGENT_MCP_URL"];
+    const previousPort = process.env["STAGENT_DAEMON_PORT"];
+    delete process.env["STAGENT_MCP_URL"];
+    delete process.env["STAGENT_DAEMON_PORT"];
     // 1. Dynamic port getter and token getter
     const dynamicAdapter = new ClaudeCodeAdapter({
       role: "worker",
@@ -359,17 +363,27 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
       },
     });
 
-    // 2. Throws when no URL, port, or environment variable is set (no hardcoded 4000 fallback)
-    const noConfigAdapter = new ClaudeCodeAdapter({
-      role: "worker",
-    });
-    expect(() => {
-      noConfigAdapter.buildLaunch({
+    // 2. Missing endpoint is explicitly preview-only, never an executable empty-MCP launch.
+    try {
+      const noConfigAdapter = new ClaudeCodeAdapter({ role: "worker" });
+      const preview = noConfigAdapter.buildLaunch({
         prompt: "do work",
         cwd: tempRepo,
         nativeSessionId: null,
       });
-    }).toThrow(/Worker MCP endpoint URL is required under --strict-mcp-config/);
+      expect(preview.mcp_status).toBe("ENDPOINT_MISSING_PREVIEW_ONLY");
+      expect(preview.degraded_reason).toContain("preview-only");
+      expect(
+        JSON.parse(fs.readFileSync(preview.mcpPath, "utf8")).mcpServers,
+      ).toEqual({});
+    } finally {
+      if (previousUrl !== undefined)
+        process.env["STAGENT_MCP_URL"] = previousUrl;
+      else delete process.env["STAGENT_MCP_URL"];
+      if (previousPort !== undefined)
+        process.env["STAGENT_DAEMON_PORT"] = previousPort;
+      else delete process.env["STAGENT_DAEMON_PORT"];
+    }
   });
 
   it("serves GET /api/mcp for status discovery and SSE transport", async () => {
@@ -409,14 +423,23 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
         return;
       }
 
-      if (req.url === "/api/shutdown" || req.url === "/api/contracts" || req.url === "/api/vault") {
+      if (
+        req.url === "/api/shutdown" ||
+        req.url === "/api/contracts" ||
+        req.url === "/api/vault"
+      ) {
         // General admin route: ONLY sessionToken allowed; mcpToken must be strictly rejected
         if (tok === sessionToken) {
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: true, endpoint: req.url }));
         } else {
           res.writeHead(401, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: "Unauthorized", message: "Bearer session token required" }));
+          res.end(
+            JSON.stringify({
+              error: "Unauthorized",
+              message: "Bearer session token required",
+            }),
+          );
         }
         return;
       }
@@ -447,9 +470,12 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
       expect(adminMcpRes.status).toBe(200);
 
       // 3. Worker mcpToken is strictly blocked from general admin routes (401)
-      const blockedShutdown = await fetch(`http://127.0.0.1:${dPort}/api/shutdown`, {
-        headers: { Authorization: `Bearer ${mcpToken}` },
-      });
+      const blockedShutdown = await fetch(
+        `http://127.0.0.1:${dPort}/api/shutdown`,
+        {
+          headers: { Authorization: `Bearer ${mcpToken}` },
+        },
+      );
       expect(blockedShutdown.status).toBe(401);
 
       const blockedVault = await fetch(`http://127.0.0.1:${dPort}/api/vault`, {
@@ -458,9 +484,12 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
       expect(blockedVault.status).toBe(401);
 
       // 4. Admin sessionToken accesses general routes
-      const adminShutdown = await fetch(`http://127.0.0.1:${dPort}/api/shutdown`, {
-        headers: { Authorization: `Bearer ${sessionToken}` },
-      });
+      const adminShutdown = await fetch(
+        `http://127.0.0.1:${dPort}/api/shutdown`,
+        {
+          headers: { Authorization: `Bearer ${sessionToken}` },
+        },
+      );
       expect(adminShutdown.status).toBe(200);
     } finally {
       await new Promise<void>((resolve) => mockDaemon.close(() => resolve()));

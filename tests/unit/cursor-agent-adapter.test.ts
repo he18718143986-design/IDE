@@ -36,7 +36,6 @@ import {
   CursorAgentAdapter,
   CursorAgentAdapterError,
   E_CURSOR_AGENT_FORBIDDEN_FLAG,
-  E_CURSOR_AGENT_MCP_ENDPOINT_MISSING,
   E_CURSOR_AGENT_NO_API_KEY,
   E_CURSOR_AGENT_NO_EXECUTOR,
   assertNoForbiddenFlags,
@@ -422,24 +421,48 @@ describe("CA-04 env 白名单与凭证前置（含执行器缺位）", () => {
 // ---------------------------------------------------------------------------
 
 describe("CA-05 MCP 面：仅挂 stagent，落点是专用 HOME", () => {
-  it("端点缺失即抛错，不静默落空 mcpServers", () => {
-    const previous = process.env["STAGENT_MCP_URL"];
+  it("端点缺失构建显式仅预览契约，MCP 配置为空且不硬抛", () => {
+    const previousUrl = process.env["STAGENT_MCP_URL"];
+    const previousPort = process.env["STAGENT_DAEMON_PORT"];
     delete process.env["STAGENT_MCP_URL"];
+    delete process.env["STAGENT_DAEMON_PORT"];
     try {
-      const caught = (() => {
-        try {
-          launchOf({ mcpServerUrl: undefined });
-          return null;
-        } catch (error) {
-          return error;
-        }
-      })();
-      expect(caught).toBeInstanceOf(CursorAgentAdapterError);
-      expect((caught as CursorAgentAdapterError).code).toBe(
-        E_CURSOR_AGENT_MCP_ENDPOINT_MISSING,
-      );
+      const launch = launchOf({ mcpServerUrl: undefined });
+      expect(launch.mcp_status).toBe("ENDPOINT_MISSING_PREVIEW_ONLY");
+      expect(launch.degraded_reason).toContain("preview-only");
+      expect(JSON.parse(fs.readFileSync(launch.mcpPath, "utf8"))).toEqual({
+        mcpServers: {},
+      });
     } finally {
-      if (previous !== undefined) process.env["STAGENT_MCP_URL"] = previous;
+      if (previousUrl !== undefined)
+        process.env["STAGENT_MCP_URL"] = previousUrl;
+      else delete process.env["STAGENT_MCP_URL"];
+      if (previousPort !== undefined)
+        process.env["STAGENT_DAEMON_PORT"] = previousPort;
+      else delete process.env["STAGENT_DAEMON_PORT"];
+    }
+  });
+
+  it("缺 URL 时可从 Daemon 端口构建受管端点", () => {
+    const previousUrl = process.env["STAGENT_MCP_URL"];
+    const previousPort = process.env["STAGENT_DAEMON_PORT"];
+    delete process.env["STAGENT_MCP_URL"];
+    process.env["STAGENT_DAEMON_PORT"] = "4312";
+    try {
+      const launch = launchOf({ mcpServerUrl: undefined });
+      expect(launch.mcp_status).toBe("INJECTED");
+      expect(JSON.parse(fs.readFileSync(launch.mcpPath, "utf8"))).toEqual({
+        mcpServers: {
+          stagent: { type: "http", url: "http://127.0.0.1:4312/api/mcp" },
+        },
+      });
+    } finally {
+      if (previousUrl !== undefined)
+        process.env["STAGENT_MCP_URL"] = previousUrl;
+      else delete process.env["STAGENT_MCP_URL"];
+      if (previousPort !== undefined)
+        process.env["STAGENT_DAEMON_PORT"] = previousPort;
+      else delete process.env["STAGENT_DAEMON_PORT"];
     }
   });
 
@@ -448,6 +471,7 @@ describe("CA-05 MCP 面：仅挂 stagent，落点是专用 HOME", () => {
     const launch = launchOf({ configDir });
     expect(launch.mcpPath).toBe(path.join(configDir, ".cursor", "mcp.json"));
     expect(fs.existsSync(launch.mcpPath)).toBe(true);
+    expect(launch.mcp_status).toBe("INJECTED");
   });
 
   it("mcp.json 内只有 stagent 一项，url 与受管端点一致，token 走 Authorization", () => {
@@ -619,10 +643,9 @@ describe("CA-08 verified_on 不虚填，升格被拒", () => {
       caught = error;
     }
     expect(caught).toBeInstanceOf(AdapterRegistrationError);
-    expect(
-      (caught as AdapterRegistrationError).rejection,
-      "严格档拒因应是能力声明不达标（不是「缺指纹」）",
-    ).toBe("FILESYSTEM_DIRECT_UNCONTROLLED");
+    expect((caught as AdapterRegistrationError).rejection).toBe(
+      "E_PROBE_REPORT_NOT_FOUND",
+    );
   });
 
   it("无报告指纹的升格一律被拒（ADAPTER_PROMOTION_REFUSED）", () => {
@@ -637,31 +660,23 @@ describe("CA-08 verified_on 不虚填，升格被拒", () => {
       caught = error;
     }
     expect((caught as AdapterRegistrationError).rejection).toBe(
-      "ADAPTER_PROMOTION_REFUSED",
+      "E_PROBE_REPORT_NOT_FOUND",
     );
   });
 
-  it("边界登记：伪造指纹能改注册表档位——挡住它的是「探测包产不出报告」，不是注册表", () => {
-    // 这条是**残余边界**的特征化断言，不是背书：
-    // AdapterRegistry 只校验指纹「形态」（非空字符串），不校验来源；围栏档校验
-    // 又只查 known_limitations + 平台矩阵，所以宿主进程适配器能靠自造指纹改档位。
-    // 真正的防线在服务层：升格附的指纹必须由 runProbePack 的报告产出，而该报告
-    // 对宿主进程适配器在第一行就抛 E_PROBE_SANDBOX_UNAVAILABLE（见 CA-07）。
-    // 本卡不改注册表语义（卡内非目标），此处如实记录。
+  it("自造合法形态指纹被拒绝，不会改注册表档位", () => {
     const registry = createDefaultWorkerRegistry();
-    const promoted = registry.promoteControlMode(
-      CURSOR_AGENT_WORKER_ADAPTER_ID,
-      "SANDBOX_ENFORCED",
-      { report_fingerprint: "deadbeef".repeat(4) },
+    expect(() =>
+      registry.promoteControlMode(
+        CURSOR_AGENT_WORKER_ADAPTER_ID,
+        "SANDBOX_ENFORCED",
+        { report_id: "made-up", report_fingerprint: "deadbeef".repeat(4) },
+      ),
+    ).toThrowError(
+      expect.objectContaining({ rejection: "E_PROBE_REPORT_NOT_FOUND" }),
     );
-    expect(promoted.control_mode).toBe("SANDBOX_ENFORCED");
-    // 但派工仍然不通：没有容器宿主 → E_ADAPTER_SANDBOX_LOCKED（不是静默降级）
-    let caught: unknown;
-    try {
-      requireControlledDispatch(registry, CURSOR_AGENT_WORKER_ADAPTER_ID);
-    } catch (error) {
-      caught = error;
-    }
-    expect((caught as WorkerDispatchError).code).toBe(E_ADAPTER_SANDBOX_LOCKED);
+    expect(registry.get(CURSOR_AGENT_WORKER_ADAPTER_ID)?.control_mode).toBe(
+      "UNCONTROLLED_EXTERNAL",
+    );
   });
 });

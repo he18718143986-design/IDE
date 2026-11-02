@@ -517,42 +517,101 @@ describe("W.7 · 升格入口：注册中心唯一通道", () => {
 
   it("降级恒允许且无需证据", () => {
     const { registry, id } = registryWithEntry();
-    registry.promoteControlMode(id, "SANDBOX_ENFORCED", {
-      report_fingerprint: "f".repeat(32),
-    });
     const down = registry.promoteControlMode(id, "UNCONTROLLED_EXTERNAL", {
       reason: "手动降级",
     });
     expect(down.control_mode).toBe("UNCONTROLLED_EXTERNAL");
-    expect(down.last_transition?.reason).toBe("手动降级");
+    expect(down.last_transition?.reason).toBeUndefined();
   });
 
-  it("升格缺报告指纹 → ADAPTER_PROMOTION_REFUSED", () => {
-    const { registry, id } = registryWithEntry();
-    expectAdapterRejection(
-      () => registry.promoteControlMode(id, "SANDBOX_ENFORCED"),
-      "ADAPTER_PROMOTION_REFUSED",
-    );
-  });
-
-  it("升格到 GATEWAY 仍要过严格档校验", () => {
+  it("自造形态合法指纹不能升格，报告缺失错误明确", () => {
     const { registry, id } = registryWithEntry();
     expectAdapterRejection(
       () =>
-        registry.promoteControlMode(id, "GATEWAY_ENFORCED", {
+        registry.promoteControlMode(id, "SANDBOX_ENFORCED", {
+          report_id: "forged-report-id",
           report_fingerprint: "f".repeat(32),
         }),
-      "FILESYSTEM_DIRECT_UNCONTROLLED",
+      "E_PROBE_REPORT_NOT_FOUND",
     );
+    expect(registry.get(id)?.control_mode).toBe("UNCONTROLLED_EXTERNAL");
   });
 
-  it("同档位重复调用幂等", () => {
+  it("真实服务端报告的指纹错配与适配器错配分别拒绝，报告一致时允许", () => {
     const { registry, id } = registryWithEntry();
-    registry.promoteControlMode(id, "SANDBOX_ENFORCED", {
-      report_fingerprint: "f".repeat(32),
+    const validReport = {
+      report_id: "server-report-1",
+      adapter_id: id,
+      target_mode: "SANDBOX_ENFORCED" as const,
+      version_fingerprint: "real-fingerprint",
+      witness: WITNESS,
+      verified_at: NOW,
+      fingerprint: "real-fingerprint",
+      status: "passed" as const,
+      control_mode: "SANDBOX_ENFORCED",
+      findings: [{ id: "dispatch_witness", status: "pass", detail: "witness" }],
+      wording: PROBE_REPORT_WORDING,
+    };
+    registry.bindProbeReportAuthority((reportId) =>
+      reportId === validReport.report_id
+        ? {
+            report: validReport,
+            current_adapter_id: id,
+            current_fingerprint: validReport.fingerprint,
+          }
+        : undefined,
+    );
+    expectAdapterRejection(
+      () =>
+        registry.promoteControlMode(id, "SANDBOX_ENFORCED", {
+          report_id: validReport.report_id,
+          report_fingerprint: "f".repeat(32),
+        }),
+      "E_PROBE_REPORT_FINGERPRINT_MISMATCH",
+    );
+    registry.bindProbeReportAuthority((reportId) =>
+      reportId === validReport.report_id
+        ? {
+            report: { ...validReport, adapter_id: "other.adapter" },
+            current_adapter_id: id,
+            current_fingerprint: validReport.fingerprint,
+          }
+        : undefined,
+    );
+    expectAdapterRejection(
+      () =>
+        registry.promoteControlMode(id, "SANDBOX_ENFORCED", {
+          report_id: validReport.report_id,
+          report_fingerprint: validReport.fingerprint,
+        }),
+      "E_PROBE_REPORT_INVALID",
+    );
+    registry.bindProbeReportAuthority((reportId) =>
+      reportId === validReport.report_id
+        ? {
+            report: validReport,
+            current_adapter_id: id,
+            current_fingerprint: validReport.fingerprint,
+          }
+        : undefined,
+    );
+    const promoted = registry.promoteControlMode(id, "SANDBOX_ENFORCED", {
+      report_id: validReport.report_id,
+      report_fingerprint: validReport.fingerprint,
     });
-    const again = registry.promoteControlMode(id, "SANDBOX_ENFORCED");
-    expect(again.control_mode).toBe("SANDBOX_ENFORCED");
+    expect(promoted.control_mode).toBe("SANDBOX_ENFORCED");
+  });
+
+  it("无已绑定权威报告回查路径时拒绝升格", () => {
+    const { registry, id } = registryWithEntry();
+    expectAdapterRejection(
+      () =>
+        registry.promoteControlMode(id, "SANDBOX_ENFORCED", {
+          report_id: "invented",
+          report_fingerprint: "f".repeat(32),
+        }),
+      "E_PROBE_REPORT_NOT_FOUND",
+    );
   });
 
   it("幽灵 id 拒绝改档", () => {

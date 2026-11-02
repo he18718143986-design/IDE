@@ -82,6 +82,14 @@ export const FORBIDDEN_REGISTRATION_FIELDS = [
 
 /** 探测报告摘要（存在 WorkerRecord 上，供列表与详情查询） */
 export interface WorkerProbeReportSummary {
+  /** 服务端生成的不可由注册请求方指定的报告标识 */
+  report_id: string;
+  adapter_id: string;
+  target_mode: "GATEWAY_ENFORCED" | "SANDBOX_ENFORCED";
+  /** 被测 worker 的版本/命令/声明指纹；报告消费时由服务端重算 */
+  version_fingerprint: string;
+  /** SANDBOX_ENFORCED 必须绑定本次真实探测见证 */
+  witness?: import("../sandbox/container-host").SandboxWitness | undefined;
   verified_at: string;
   /** 探测所依据的指纹；与当前指纹不一致即视为过期 */
   fingerprint: string;

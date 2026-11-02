@@ -6,6 +6,7 @@ import {
   type CodingWorkerAdapter,
 } from "./worker-adapter.interface";
 import type { WorkerDispatchFactory } from "./worker-dispatch";
+import type { WorkerProbeReportSummary } from "./verify/worker-registration";
 
 /**
  * 适配器注册中心（TASK-W.1 目标 4 / B PASS 判据）。
@@ -24,7 +25,10 @@ export type AdapterRegistrationRejection =
   | AdapterRejectionCode
   | "ADAPTER_ID_DUPLICATED"
   /** TASK-W.7：升格被拒（未附探测报告 / 目标档位能力不达标） */
-  | "ADAPTER_PROMOTION_REFUSED";
+  | "ADAPTER_PROMOTION_REFUSED"
+  | "E_PROBE_REPORT_NOT_FOUND"
+  | "E_PROBE_REPORT_FINGERPRINT_MISMATCH"
+  | "E_PROBE_REPORT_INVALID";
 
 export class AdapterRegistrationError extends Error {
   readonly rejection: AdapterRegistrationRejection;
@@ -48,6 +52,7 @@ export interface AdapterModeTransition {
   from: AdapterControlMode;
   to: AdapterControlMode;
   /** 升格时为探测报告指纹；降级时为 undefined */
+  report_id?: string | undefined;
   report_fingerprint?: string | undefined;
   /** 降级原因 */
   reason?: string | undefined;
@@ -61,6 +66,7 @@ export interface AdapterModeChangeRequest {
    * 探测报告指纹（卡正文范围 1「升格唯一的入口是探测通过」）。
    * **升格到受控档位时必填**；降级不需要。
    */
+  report_id?: string | undefined;
   report_fingerprint?: string | undefined;
   /** 降级原因（升格时忽略） */
   reason?: string | undefined;
@@ -71,6 +77,32 @@ export class AdapterRegistry {
   private readonly entries = new Map<string, RegisteredAdapter>();
   /** TASK-W.6：adapter_id → 派工工厂（与 entries 分离，避免改动既有注册项结构） */
   private readonly dispatchFactories = new Map<string, WorkerDispatchFactory>();
+  /** 由 WorkerRegistrationService 绑定的服务端持久层查询，不接受调用方传入报告对象。 */
+  private probeReportLookup:
+    | ((
+        reportId: string,
+      ) =>
+        | {
+            report: WorkerProbeReportSummary;
+            current_adapter_id: string;
+            current_fingerprint: string;
+          }
+        | undefined)
+    | undefined;
+
+  bindProbeReportAuthority(
+    lookup: (
+      reportId: string,
+    ) =>
+      | {
+          report: WorkerProbeReportSummary;
+          current_adapter_id: string;
+          current_fingerprint: string;
+        }
+      | undefined,
+  ): void {
+    this.probeReportLookup = lookup;
+  }
 
   /**
    * 注册适配器。
@@ -188,11 +220,44 @@ export class AdapterRegistry {
     if (previous === next) return entry;
 
     if (next !== "UNCONTROLLED_EXTERNAL") {
+      const reportId = request.report_id;
       const fingerprint = request.report_fingerprint;
-      if (typeof fingerprint !== "string" || fingerprint.trim().length === 0) {
+      const authority = reportId && this.probeReportLookup?.(reportId);
+      if (!authority) {
         throw new AdapterRegistrationError(
-          "ADAPTER_PROMOTION_REFUSED",
-          `refusing to promote ${adapterId} (${previous} → ${next}) without a probe report fingerprint; promotion requires a passed probe pack`,
+          "E_PROBE_REPORT_NOT_FOUND",
+          `probe report ${reportId ?? "<missing>"} is not present in the server-side worker store`,
+        );
+      }
+      const { report, current_adapter_id, current_fingerprint } = authority;
+      if (
+        typeof fingerprint !== "string" ||
+        fingerprint.trim().length === 0 ||
+        report.fingerprint !== fingerprint
+      ) {
+        throw new AdapterRegistrationError(
+          "E_PROBE_REPORT_FINGERPRINT_MISMATCH",
+          `probe report fingerprint does not match the server-side report for ${adapterId}`,
+        );
+      }
+      if (
+        current_adapter_id !== adapterId ||
+        report.adapter_id !== adapterId ||
+        report.target_mode !== next ||
+        report.status !== "passed" ||
+        report.control_mode !== next ||
+        report.version_fingerprint !== report.fingerprint ||
+        current_fingerprint !== report.fingerprint ||
+        (next === "SANDBOX_ENFORCED" &&
+          (report.witness === undefined ||
+            !report.findings.some(
+              (finding) =>
+                finding.id === "dispatch_witness" && finding.status === "pass",
+            )))
+      ) {
+        throw new AdapterRegistrationError(
+          "E_PROBE_REPORT_INVALID",
+          `server-side probe report is failed, stale, mismatched, or missing its required witness for ${adapterId} → ${next}`,
         );
       }
       const validation = validateAdapterCapability(entry.declaration, next);
@@ -208,8 +273,12 @@ export class AdapterRegistry {
     entry.last_transition = {
       from: previous,
       to: next,
+      report_id:
+        next === "UNCONTROLLED_EXTERNAL" ? undefined : request.report_id,
       report_fingerprint:
-        next === "UNCONTROLLED_EXTERNAL" ? undefined : request.report_fingerprint,
+        next === "UNCONTROLLED_EXTERNAL"
+          ? undefined
+          : request.report_fingerprint,
       reason: request.reason,
       decided_at: request.decided_at,
     };
