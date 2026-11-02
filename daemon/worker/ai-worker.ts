@@ -19,6 +19,7 @@ import {
   type LineVerdict,
 } from "../guard/worker-graveyard-gate";
 import { artifactChangesFromProposedWrites } from "../guard/graveyard-wiring";
+import type { SandboxWitness } from "./sandbox/container-host";
 
 /**
  * 受控 AI Worker（Daemon 侧，替代已删除的浏览器 Worker）。
@@ -87,6 +88,12 @@ export interface WorkerRunResult {
   log: string[];
   usage: WorkerUsage;
   blockers: Array<{ code: string; message: string }>;
+  /**
+   * TASK-W.5c-iii：沙箱执行见证。**仅当**本次执行确实经 `runInSandbox()` 进入容器
+   * 时出现；`SANDBOX_ENFORCED` 派工若缺该字段，即视为「有档位、无执行」，不得
+   * 记为受控证据。`GATEWAY_ENFORCED` 执行恒不携带。
+   */
+  sandbox?: SandboxWitness | undefined;
 }
 
 export class WorkerScopeError extends Error {

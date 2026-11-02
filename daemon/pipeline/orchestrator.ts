@@ -78,7 +78,11 @@ import {
   type WorkerDispatchContext,
 } from "../worker/worker-dispatch";
 import { createDefaultWorkerRegistry } from "../worker/default-worker-registry";
-import type { ContainerHostPort } from "../worker/sandbox/container-host";
+import { resolveEvidenceControlMode } from "../worker/worker-adapter.interface";
+import type {
+  ContainerHostPort,
+  SandboxWitness,
+} from "../worker/sandbox/container-host";
 import {
   RuntimeInterceptor,
   type GatewayViolation,
@@ -297,6 +301,15 @@ export class ContractOrchestrator {
   private readonly workerRegistry: AdapterRegistry;
   /** TASK-W.5c-ii：容器宿主端口（未注入 → SANDBOX_ENFORCED 拒绝派工） */
   private readonly containerHost: ContainerHostPort | undefined;
+  /**
+   * TASK-W.5c-iii：合同 → 最近一次派工的沙箱执行见证。
+   *
+   * 为什么用实例态而不是返回值：派工（`runWorker`）与验证 / 证据（`execute`）是两个
+   * 独立入口（server 侧分两次调用），见证必须跨调用留存才能进到证据面。
+   * 每轮派工开始时**先清空**，避免上一轮见证给本轮「冒认」。
+   * 条目按合同去重、每轮覆盖（单条仅 5 个字段），长驻不构成内存问题。
+   */
+  private readonly sandboxWitnesses = new Map<string, SandboxWitness>();
 
   constructor(options: OrchestratorOptions) {
     this.repoRoot = path.resolve(options.repoRoot);
@@ -930,6 +943,18 @@ export class ContractOrchestrator {
   }
 
   /**
+   * 记录本轮派工的沙箱执行见证（TASK-W.5c-iii）。
+   * `undefined` 表示本轮**没有**入箱证据 → 清掉旧值，不留可冒认的残留。
+   */
+  private recordSandboxWitness(
+    contractId: string,
+    witness: SandboxWitness | undefined,
+  ): void {
+    if (witness === undefined) this.sandboxWitnesses.delete(contractId);
+    else this.sandboxWitnesses.set(contractId, witness);
+  }
+
+  /**
    * 执行合同验证命令并生成 Evidence。
    * 合同排他锁 + 锁内重读状态：并发的第二次 execute 会看到 VERIFYING/AUDITED，
    * 抛 E_INVALID_STATE_TRANSITION，不会产生两份 Evidence 或重复提交。
@@ -1186,6 +1211,8 @@ export class ContractOrchestrator {
         ...(reasonCode === undefined ? {} : { reasonCode }),
         // TASK-W.5c-ii：档位如实记三值（SANDBOX_ENFORCED 是受控档位，不再收窄为
         // UNCONTROLLED_EXTERNAL——收窄会让「受控派工成功」产出「不可合并证据」）。
+        // TASK-W.5c-iii：声明档还要经执行面校正（见 writeEvidence 里的
+        // resolveEvidenceControlMode：无沙箱见证 → 降记 UNCONTROLLED_EXTERNAL）。
         workerControlMode: interceptorBlocked
           ? "UNCONTROLLED_EXTERNAL"
           : current.worker_spec.control_mode,
@@ -1464,6 +1491,8 @@ export class ContractOrchestrator {
   > {
     const signal = this.beginAbortable(contractId);
     try {
+      // TASK-W.5c-iii：新的一轮派工，先清掉上一轮的沙箱见证——证据面只认本轮实况
+      this.sandboxWitnesses.delete(contractId);
       const current = this.store.get(contractId);
       if (!current) throw new Error(`Contract not found: ${contractId}`);
       if (current.lifecycle_state !== "EXECUTING") {
@@ -1529,11 +1558,15 @@ export class ContractOrchestrator {
       const registry = options.registry ?? this.workerRegistry;
       // TASK-W.5c-ii：容器宿主经编排器注入（`SANDBOX_ENFORCED` 门禁按宿主可用性
       // 判定放行；未注入即拒绝，不静默降级）。真实宿主绑定归 W.5c-iii。
+      const containerHost = options.containerHost ?? this.containerHost;
       const dispatchFactory = requireControlledDispatch(
         registry,
         current.worker_spec.adapter_id,
-        { containerHost: options.containerHost ?? this.containerHost },
+        { containerHost },
       );
+      // TASK-W.5c-iii：派工上下文必须带上**任务 Worktree**（沙箱唯一挂载根）。
+      // 与 repoRoot 严格区分——宿主仓库根绝不可作为容器挂载点。
+      const worktreeRoot = getWorktreePath(this.repoRoot, contractId);
 
       const derived =
         userHooks.obligations !== undefined
@@ -1552,6 +1585,8 @@ export class ContractOrchestrator {
           costMonitor,
           modelClient,
           repoRoot: this.repoRoot,
+          worktreeRoot,
+          ...(containerHost === undefined ? {} : { containerHost }),
           ...(activeDesignNote
             ? { designNote: activeDesignNote }
             : {}),
@@ -1561,6 +1596,8 @@ export class ContractOrchestrator {
 
         try {
           const result = await worker.run(signal);
+          // TASK-W.5c-iii：记下本轮沙箱见证（无见证 = 没走 runInSandbox，证据面据此降级）
+          this.recordSandboxWitness(contractId, result.sandbox);
           return {
             ...result,
             two_phase: {
@@ -1674,7 +1711,9 @@ export class ContractOrchestrator {
           costMonitor,
           modelClient,
           repoRoot: this.repoRoot,
+          worktreeRoot,
           checksExtras: extras,
+          ...(containerHost === undefined ? {} : { containerHost }),
           ...(activeDesignNote
             ? { designNote: activeDesignNote }
             : {}),
@@ -1682,6 +1721,8 @@ export class ContractOrchestrator {
         // TASK-W.6：两段式 T/I 段同样经 Registry 解析出的工厂派工
         const worker = dispatchFactory(context);
         const result = await worker.run(signal);
+        // TASK-W.5c-iii：两段式每段都记（两段都在容器里跑，取最近一次为如实实况）
+        this.recordSandboxWitness(contractId, result.sandbox);
         bag.changes.push(...result.changes);
         bag.log.push(...result.log);
         bag.usage.inputTokens += result.usage.inputTokens;
@@ -1730,6 +1771,7 @@ export class ContractOrchestrator {
       };
 
       const twoPhase = await this.runTwoPhase(contractId, hooks, signal);
+      const sandboxWitness = this.sandboxWitnesses.get(contractId);
 
       return {
         applied: bag.applied,
@@ -1738,6 +1780,8 @@ export class ContractOrchestrator {
         usage: bag.usage,
         blockers: [],
         two_phase: twoPhase,
+        // TASK-W.5c-iii：两段式同样带出见证（缺见证即未入箱）
+        ...(sandboxWitness === undefined ? {} : { sandbox: sandboxWitness }),
         ...(designInfo ? { design: designInfo } : {}),
       };
     } finally {
@@ -2253,9 +2297,14 @@ export class ContractOrchestrator {
       evidence_id: evidenceId,
       contract_id: contract.contract_id,
       generated_at: new Date().toISOString(),
-      // TASK-W.5c-ii：同上，如实记三值档位。
-      worker_control_mode:
+      // TASK-W.5c-ii：如实记三值档位。
+      // TASK-W.5c-iii：**记实不记名**——声明 `SANDBOX_ENFORCED` 只是「声称」，
+      // 证据只认执行面实况：本轮派工没带 `SandboxWitness`（即没走 runInSandbox）
+      // 就降记为 `UNCONTROLLED_EXTERNAL`，不允许「标了沙箱档」本身充当受控证据。
+      worker_control_mode: resolveEvidenceControlMode(
         input.workerControlMode ?? contract.worker_spec.control_mode,
+        this.sandboxWitnesses.get(contract.contract_id),
+      ),
       usage:
         totals && totals.totalTokens > 0
           ? {

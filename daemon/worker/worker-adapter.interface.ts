@@ -1,4 +1,5 @@
 import type { SoftwareContract } from "../../src/lib/contract.schema";
+import type { SandboxWitness } from "./sandbox/container-host";
 
 /**
  * Coding Worker 适配器能力契约（TASK-W.1 / 规范 A §2.7 / B G-10）。
@@ -49,17 +50,15 @@ export type WorkerAdapterKind = "MANAGED_AI" | "CLI";
 /**
  * 注册模式：
  * - `GATEWAY_ENFORCED`：受控模式，全部文件/命令操作经受管 Gateway；
- * - `SANDBOX_ENFORCED`：容器隔离受控模式（TASK-W.5c-i 新增档位）。能力声明按
- *   受控严格模式校验（与 `GATEWAY_ENFORCED` 同），**登记面接受注册**；但容器
- *   运行时 `container-host` 尚未落地（TASK-W.5c-ii），**窗口期内不得派工**——
- *   派工门禁 `requireControlledDispatch()` 对其显式拒绝，避免「标了沙箱档却没有
- *   沙箱」的假受控状态。解锁条件：`W.5c-ii` `container-host` 落地。
+ * - `SANDBOX_ENFORCED`：容器隔离受控模式（TASK-W.5c-i 新增档位）。隔离由**运行时
+ *   围栏**保证，而非能力声明：派工门禁 `requireControlledDispatch()` 按容器宿主
+ *   可用性判定（W.5c-ii），执行面必须经 `runInSandbox()` 进入容器（W.5c-iii），
+ *   证据面如实记 `SANDBOX_ENFORCED`。能力声明按**围栏档**校验（见
+ *   `validateSandboxFenceTier()`，W.5c-iii ruling A）。
  * - `UNCONTROLLED_EXTERNAL`：用户自管的外部编辑器/助手，**不得**作为执行证据。
  */
 export type AdapterControlMode =
-  | "GATEWAY_ENFORCED"
-  | "SANDBOX_ENFORCED"
-  | "UNCONTROLLED_EXTERNAL";
+  "GATEWAY_ENFORCED" | "SANDBOX_ENFORCED" | "UNCONTROLLED_EXTERNAL";
 
 export type AdapterRejectionCode =
   | "ADAPTER_ID_INVALID"
@@ -90,6 +89,12 @@ export interface AdapterRunOutcome {
   changes: Array<{ path: string; content: string }>;
   log: string[];
   usage: { inputTokens: number; outputTokens: number };
+  /**
+   * 沙箱执行见证（TASK-W.5c-iii）。**仅当**本次执行确实经 `runInSandbox()` 进入
+   * 容器时出现——适配器不得自行伪造，见 `sandbox/container-host.ts::sandboxWitness()`。
+   * `GATEWAY_ENFORCED` 适配器恒不携带该字段。
+   */
+  sandbox?: SandboxWitness | undefined;
 }
 
 /** 统一适配器接口：Managed AI 与 CLI 均实现该契约 */
@@ -107,19 +112,88 @@ function isNonEmptyString(value: unknown): value is string {
 }
 
 /**
- * 能力声明校验（受控模式为严格模式）。
+ * 围栏档校验（TASK-W.5c-iii · ruling A）。
  *
- * 严格模式适用于 `GATEWAY_ENFORCED` 与 `SANDBOX_ENFORCED`（TASK-W.5c-i）：后者是
- * **更严**的容器隔离档位，能力声明不得比 `GATEWAY_ENFORCED` 宽松，故同走严格校验。
+ * 只校验两条可核查事实：`known_limitations` 非空、平台矩阵非空。**不**要求
+ * `GATEWAY_ONLY` / `WHITELIST_ONLY` / `tool_interception_supported === true`——
+ * 容器档位的隔离由运行时围栏负责，声明只负责「如实」。
  *
- * 严格模式的拒绝条件（任一命中即拒绝）：
+ * 与严格档对齐的两条拒绝码不变：`KNOWN_LIMITATIONS_UNDECLARED` /
+ * `PLATFORM_MATRIX_EMPTY`（不新增拒绝码，旧读者不受影响）。
+ */
+export function validateSandboxFenceTier(
+  declaration: AdapterCapabilityDeclaration,
+): AdapterCapabilityValidation {
+  if (
+    !Array.isArray(declaration.known_limitations) ||
+    declaration.known_limitations.length === 0
+  ) {
+    return {
+      ok: false,
+      code: "KNOWN_LIMITATIONS_UNDECLARED",
+      reason:
+        "known_limitations must declare at least one limitation (G-10); a SANDBOX_ENFORCED adapter must state its container boundary truthfully",
+    };
+  }
+  if (
+    !Array.isArray(declaration.platform_support) ||
+    declaration.platform_support.length === 0
+  ) {
+    return {
+      ok: false,
+      code: "PLATFORM_MATRIX_EMPTY",
+      reason:
+        "platform_support must declare at least one platform; an unverified platform matrix cannot back a SANDBOX_ENFORCED registration",
+    };
+  }
+  return { ok: true };
+}
+
+/**
+ * 记实不记名：证据面记录的控制模式 = 「声明档」经「执行面实况」校正后的结果。
+ *
+ * TASK-W.5c-iii 的闭环点。此前证据直接记 `contract.worker_spec.control_mode`（声明档），
+ * 于是「标了 `SANDBOX_ENFORCED`」本身就能充当受控证据——把隔离写在了纸上。
+ * 沙箱档必须有**执行面信号**：本次派工是否真的经 `runInSandbox()` 进入容器，由
+ * `SandboxWitness` 作证（见 `sandbox/container-host.ts::sandboxWitness()`）。
+ *
+ * 规则（P-121 登记的「记实不记名」裁决在此强制执行）：
+ * - 声明档不是 `SANDBOX_ENFORCED` → 原样返回（`GATEWAY_ENFORCED` 语义不变）；
+ * - 声明档是 `SANDBOX_ENFORCED` 且有见证 → `SANDBOX_ENFORCED`（如实记档）；
+ * - 声明档是 `SANDBOX_ENFORCED` 但**无见证** → `UNCONTROLLED_EXTERNAL`
+ *   （没入过箱就没有受控证据，宁可降级也不冒认）。
+ */
+export function resolveEvidenceControlMode(
+  declaredControlMode: AdapterControlMode,
+  sandboxWitness: SandboxWitness | undefined,
+): AdapterControlMode {
+  if (declaredControlMode !== "SANDBOX_ENFORCED") return declaredControlMode;
+  return sandboxWitness === undefined
+    ? "UNCONTROLLED_EXTERNAL"
+    : "SANDBOX_ENFORCED";
+}
+
+/**
+ * 能力声明校验（按档位分三套口径）。
+ *
+ * **严格档** `GATEWAY_ENFORCED`：文件/命令/工具拦截全部必经 Gateway，故声明不得
+ * 宽松。拒绝条件（任一命中即拒绝）：
  * 1. `known_limitations` 未声明或为空——不允许「宣称零限制」的黑盒适配器；
  * 2. `filesystem_permissions !== "GATEWAY_ONLY"`——直连文件系统不可受控；
  * 3. `command_permissions !== "WHITELIST_ONLY"`——无限制 Shell 不可受控；
  * 4. `tool_interception_supported !== true`——无法拦截工具调用即无法审计；
  * 5. 平台矩阵为空——无法证明支持边界。
  *
- * `UNCONTROLLED_EXTERNAL` 只做标识校验：它本就不进入受控执行面，
+ * **围栏档** `SANDBOX_ENFORCED`（TASK-W.5c-iii · ruling A）：容器内本来就是「直连
+ * 文件系统 + 无限制 Shell + 工具调用不经 Gateway」，把这些如实写进声明是**正确
+ * 的事实**，不是风险敞口——真正的隔离来自运行时：宿主可用性门禁
+ * （`E_ADAPTER_SANDBOX_LOCKED`）、唯一挂载点＝任务 Worktree 的围栏
+ * （`assertMountAllowed` / `validateSandboxInput`）、以及「派工即入沙箱」断言。
+ * 因此只校验两条**可核查的事实边界**：`known_limitations` 非空、平台矩阵非空。
+ * 若仍套严格档，容器档位将只能靠「声明造假」才注册得进去，反而把诚实适配器
+ * 挤出受控面——这正是 ruling A 要修的反向激励。
+ *
+ * **标识档** `UNCONTROLLED_EXTERNAL`：只做 id / 版本校验。它本就不进入受控执行面，
  * 允许用户以非受控方式接入，但不得作为合并证据。
  */
 export function validateAdapterCapability(
@@ -141,6 +215,8 @@ export function validateAdapterCapability(
     };
   }
   if (controlMode === "UNCONTROLLED_EXTERNAL") return { ok: true };
+  if (controlMode === "SANDBOX_ENFORCED")
+    return validateSandboxFenceTier(declaration);
 
   if (
     !Array.isArray(declaration.known_limitations) ||

@@ -209,7 +209,9 @@
 
 <a id="task-w.5c-iii"></a>
 
-#### 【Task W.5c-iii】OpenHands 适配器 + 真实容器实测 + `verified_on` `[BLOCKED · 等容器环境]`
+#### 【Task W.5c-iii】OpenHands 适配器 + 真实容器实测 + `verified_on` `[IN_PROGRESS · 施工中]`
+
+> **开工声明（2026-11-02 · 施工中，**非**完成回写；回写另见 P-122）**：环境硬前置已满足并经实测坐实——Docker Desktop **29.6.1 / Engine 29.6.1 / containerd v2.2.5 / runc 1.3.6**，`docker info` 服务端可达（非仅客户端），OpenHands 镜像 `ghcr.io/all-hands-ai/openhands@sha256:00968de7…fa6`（1.83GB）已拉取，容器内 `openhands 0.59.0` / `python 3.13.7`、headless CLI `python -m openhands.core.main --help` 可用。施工分支 `feat/w5ciii-openhands-real`。实测证据见 [`../reports/W5c-iii-真实容器实测-2026-11-02.md`](../reports/W5c-iii-真实容器实测-2026-11-02.md)。**矩阵 / index 仍停留在 `[BLOCKED]` 属回写前状态**，待本卡完成时按 P-12x 统一同步，不在施工期半同步。
 
 > **拆卡立卡（2026-11-02 · P-118 · 经 Tina 授权）**：母卡 `TASK-W.5c` 第三张。**`[BLOCKED · 等容器环境]`**：硬前置为本机容器运行时可用 + `STAGENT_REAL_OPENHANDS=1`。P-116 只读核查已坐实本机**仅装 Docker CLI 29.6.1、无守护进程**（`~/.docker/run/docker.sock` 与 `/var/run/docker.sock` 均不存在，无 `dockerd` / `containerd` / `colima` / `lima` 进程，`podman` / `nerdctl` / `colima` / `lima` 未装，环境变量未设置）——**此时开工 `OS-06` 真实实测会空转**，须先备妥容器运行时并确认 daemon 可达。
 
@@ -218,7 +220,7 @@
 * **对应规格**（R-1）：[`system-architecture.md`](./system-architecture.md) §9.1、§4.2.3 P-17、§2.7；[`../adr/0001-target-user-positioning.md`](../adr/0001-target-user-positioning.md) **ADR-0001**、[`../adr/0003-worktree-capability-boundary.md`](../adr/0003-worktree-capability-boundary.md) **ADR-0003**；母卡 `TASK-W.5c` 范围第 4/5/6 条与 PASS `OS-06` / `OS-07`；先例 [`development-tasks-completed.md`](./development-tasks-completed.md) §3.4a `TASK-W.5a` 黑盒实测纪律
 * **前置依赖**（R-3）：**硬** `TASK-W.5c-i`（**`[COMPLETED]`** · #81/`c3e75cc`）、`TASK-W.5c-ii`（**`[COMPLETED]`** · #85/`648be31`，围栏逻辑与 `ContainerHostPort` 端口已就位，本卡只绑真实宿主并**把 `runInSandbox` 接进执行面**）——DAG 边 `i→iii`、`ii→iii`；**环境硬前置**：本机容器运行时可用（daemon 可达）+ `STAGENT_REAL_OPENHANDS=1`（**P-116 已坐实当前不满足，故本卡 `[BLOCKED]`**）；`TASK-W.6`（**COMPLETED**）
 * **优先级**：P3 · **NON_BLOCKER**
-* **状态**：`[BLOCKED · 等容器环境]`（环境前置未满足前**不得开工**；满足后须由 Tina 解除阻断再施工）
+* **状态**：`[IN_PROGRESS · 施工中]`（2026-11-02 开工：环境前置已满足，Tina 已解除阻断；施工分支 `feat/w5ciii-openhands-real`。**未完成、未宣称端到端闭环**，完成回写见 P-122）
 * **对照痛点（代码事实）**（R-4）：`daemon/worker/cli-host/openhands-adapter.ts` 与 `tests/e2e/openhands-isolation.real.test.ts` **均尚不存在**；`daemon/worker/default-worker-registry.ts::createDefaultWorkerRegistry()` 当前仅登记内置 Managed AI（`GATEWAY_ENFORCED`）与 Claude Code worker（`UNCONTROLLED_EXTERNAL`），无 OpenHands 登记；`verified_on` 字段由 `W.5c-i` 落地但今日无任何实测值可填（`src/lib/chat-events.ts::ChatAdapterInfo.verified_on` 空串语义 = 未实测）。
 * **一句话目标**（R-2）：OpenHands Worker 在真实容器内跑通越界挂载 / 逃逸负例并失败关闭后，`verified_on` 按实测版本与日期填写、登记为 `SANDBOX_ENFORCED`；未通过者仅登记 `UNCONTROLLED_EXTERNAL`（仅 Vibe、UI 显示「未受控」）。
 * **ADR 修订**（R-9）：**无冲突、不修订**。强化 ADR-0001 强隔离控制面；须满足 §4.2.3 P-17 与 ADR-0003 边界，不宣称「绝对受控」。
