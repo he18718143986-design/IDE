@@ -150,6 +150,30 @@ export function validateSandboxFenceTier(
 }
 
 /**
+ * 记实不记名：证据面记录的控制模式 = 「声明档」经「执行面实况」校正后的结果。
+ *
+ * TASK-W.5c-iii 的闭环点。此前证据直接记 `contract.worker_spec.control_mode`（声明档），
+ * 于是「标了 `SANDBOX_ENFORCED`」本身就能充当受控证据——把隔离写在了纸上。
+ * 沙箱档必须有**执行面信号**：本次派工是否真的经 `runInSandbox()` 进入容器，由
+ * `SandboxWitness` 作证（见 `sandbox/container-host.ts::sandboxWitness()`）。
+ *
+ * 规则（P-121 登记的「记实不记名」裁决在此强制执行）：
+ * - 声明档不是 `SANDBOX_ENFORCED` → 原样返回（`GATEWAY_ENFORCED` 语义不变）；
+ * - 声明档是 `SANDBOX_ENFORCED` 且有见证 → `SANDBOX_ENFORCED`（如实记档）；
+ * - 声明档是 `SANDBOX_ENFORCED` 但**无见证** → `UNCONTROLLED_EXTERNAL`
+ *   （没入过箱就没有受控证据，宁可降级也不冒认）。
+ */
+export function resolveEvidenceControlMode(
+  declaredControlMode: AdapterControlMode,
+  sandboxWitness: SandboxWitness | undefined,
+): AdapterControlMode {
+  if (declaredControlMode !== "SANDBOX_ENFORCED") return declaredControlMode;
+  return sandboxWitness === undefined
+    ? "UNCONTROLLED_EXTERNAL"
+    : "SANDBOX_ENFORCED";
+}
+
+/**
  * 能力声明校验（按档位分三套口径）。
  *
  * **严格档** `GATEWAY_ENFORCED`：文件/命令/工具拦截全部必经 Gateway，故声明不得

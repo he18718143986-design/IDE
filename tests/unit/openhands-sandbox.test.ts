@@ -27,6 +27,7 @@ import {
   type ContainerHostPort,
   type SandboxRunInput,
   type SandboxRunOutcome,
+  type SandboxWitness,
 } from "../../daemon/worker/sandbox/container-host";
 import {
   DockerContainerHost,
@@ -50,17 +51,24 @@ import {
 } from "../../daemon/worker/default-worker-registry";
 import {
   MANAGED_AI_CAPABILITY,
+  resolveEvidenceControlMode,
   validateAdapterCapability,
   validateSandboxFenceTier,
   type AdapterCapabilityDeclaration,
   type AdapterTaskInput,
+  type CodingWorkerAdapter,
 } from "../../daemon/worker/worker-adapter.interface";
+import { AdapterRegistry } from "../../daemon/worker/adapter-registry";
 import {
   E_ADAPTER_SANDBOX_LOCKED,
   WorkerDispatchError,
   requireControlledDispatch,
   type WorkerDispatchContext,
+  type WorkerDispatchFactory,
 } from "../../daemon/worker/worker-dispatch";
+import { ContractOrchestrator } from "../../daemon/pipeline/orchestrator";
+import { ContractStore } from "../../daemon/pipeline/contract-store";
+import { git } from "../helpers/git";
 import {
   createContractDraft,
   softwareContractSchema,
@@ -69,6 +77,15 @@ import {
 import { ScopedWorktreeGateway } from "../../daemon/mcp/gateway";
 import type { CostMonitor } from "../../daemon/guard/cost-monitor";
 import type { WorkerModelClient } from "../../daemon/worker/ai-worker";
+
+/** 不会被真实调用的模型客户端桩：沙箱派工由 fake 工厂接管，不触网 */
+const stubModelClient: WorkerModelClient = {
+  generateChanges: async () => ({
+    changes: [],
+    log: [],
+    usage: { inputTokens: 0, outputTokens: 0 },
+  }),
+};
 
 /** mock 容器宿主：记录真实传入的输入，可按脚本返回终止态 */
 function mockHost(
@@ -98,7 +115,9 @@ function mockHost(
   };
 }
 
-function makeContract(over: Partial<{ adapterId: string }> = {}) {
+function makeContract(
+  over: Partial<{ adapterId: string; pendingApproval: boolean }> = {},
+) {
   const draft = createContractDraft({
     title: "W.5c-iii 沙箱实测",
     description: "OpenHands 容器 Worker 在真实容器内跑越界负例",
@@ -118,6 +137,14 @@ function makeContract(over: Partial<{ adapterId: string }> = {}) {
       },
     ],
   });
+  // pendingApproval：交给编排器走 approve → EXECUTING 的正规流程（证据链测试用）
+  if (over.pendingApproval === true) {
+    return softwareContractSchema.parse({
+      ...draft,
+      lifecycle_state: "PENDING_APPROVAL",
+      approval: { status: "PENDING_REVIEW" },
+    });
+  }
   return softwareContractSchema.parse({
     ...draft,
     lifecycle_state: "EXECUTING",
@@ -586,4 +613,149 @@ describe("派工门禁错误码口径", () => {
     expect(err.code).toBe(E_ADAPTER_SANDBOX_LOCKED);
     expect(err.adapter_id).toBe(OPENHANDS_WORKER_ADAPTER_ID);
   });
+});
+
+/**
+ * 记实不记名（TASK-W.5c-iii 的闭环点，P-121 登记的裁决在此强制执行）。
+ *
+ * 光「产出见证」不算闭环——证据面必须**消费**它：
+ * 声明 `SANDBOX_ENFORCED` 只是声称，若本轮派工没有沙箱见证（没走 runInSandbox），
+ * 证据必须降记为 `UNCONTROLLED_EXTERNAL`，否则「标了沙箱档」本身就等于受控证据。
+ */
+describe("记实不记名：声明档经执行面校正（resolveEvidenceControlMode）", () => {
+  const witness: SandboxWitness = {
+    host_kind: "docker/29.6.1",
+    via: "exit",
+    exit_code: 0,
+    duration_ms: 12,
+    worktree_root: "/tmp/wt",
+  };
+
+  it("声明 SANDBOX_ENFORCED + 有见证 → 如实记 SANDBOX_ENFORCED", () => {
+    expect(resolveEvidenceControlMode("SANDBOX_ENFORCED", witness)).toBe(
+      "SANDBOX_ENFORCED",
+    );
+  });
+
+  it("声明 SANDBOX_ENFORCED + 无见证 → 降记 UNCONTROLLED_EXTERNAL（不得冒认）", () => {
+    expect(resolveEvidenceControlMode("SANDBOX_ENFORCED", undefined)).toBe(
+      "UNCONTROLLED_EXTERNAL",
+    );
+  });
+
+  it("GATEWAY_ENFORCED 语义不变（见证与否都不影响）", () => {
+    expect(resolveEvidenceControlMode("GATEWAY_ENFORCED", undefined)).toBe(
+      "GATEWAY_ENFORCED",
+    );
+    expect(resolveEvidenceControlMode("GATEWAY_ENFORCED", witness)).toBe(
+      "GATEWAY_ENFORCED",
+    );
+  });
+
+  it("UNCONTROLLED_EXTERNAL 不因有见证被「洗白」", () => {
+    expect(resolveEvidenceControlMode("UNCONTROLLED_EXTERNAL", witness)).toBe(
+      "UNCONTROLLED_EXTERNAL",
+    );
+  });
+});
+
+describe("记实不记名：编排器证据面真实消费见证", () => {
+  let repo: string;
+
+  beforeEach(() => {
+    repo = fs.mkdtempSync(path.join(os.tmpdir(), "stagent-oh-evidence-"));
+    git(repo, ["init", "-q", "-b", "main"]);
+    git(repo, ["config", "user.email", "t@example.com"]);
+    git(repo, ["config", "user.name", "T"]);
+    fs.mkdirSync(path.join(repo, "src"), { recursive: true });
+    fs.writeFileSync(path.join(repo, "src", "a.ts"), "export const a = 1;\n");
+    git(repo, ["add", "."]);
+    git(repo, ["commit", "-q", "-m", "init"]);
+  });
+
+  afterEach(() => safeRmSync(repo));
+
+  const SANDBOX_ADAPTER_ID = "test.sandbox-witness.v0";
+
+  /** 声明合法（围栏档）的沙箱适配器载体：只登记，不执行 */
+  function sandboxCarrier(): CodingWorkerAdapter {
+    return {
+      declaration: { ...OPENHANDS_CAPABILITY, adapter_id: SANDBOX_ADAPTER_ID },
+      kind: "CLI",
+      run: async () => {
+        throw new Error(
+          "capability carrier is not executable; dispatch via registry dispatchFactory",
+        );
+      },
+    };
+  }
+
+  function registryWith(factory: WorkerDispatchFactory): AdapterRegistry {
+    const registry = new AdapterRegistry();
+    registry.register(sandboxCarrier(), "SANDBOX_ENFORCED");
+    registry.registerDispatchFactory(SANDBOX_ADAPTER_ID, factory);
+    return registry;
+  }
+
+  function seedSandboxContract(): SoftwareContract {
+    const contract = makeContract({
+      adapterId: SANDBOX_ADAPTER_ID,
+      pendingApproval: true,
+    });
+    new ContractStore(repo).save(contract);
+    return contract;
+  }
+
+  function sandboxFactory(withWitness: boolean): WorkerDispatchFactory {
+    return () => ({
+      run: async () => ({
+        applied: true,
+        changes: [],
+        log: ["fake sandbox worker ran"],
+        usage: { inputTokens: 0, outputTokens: 0 },
+        blockers: [],
+        ...(withWitness
+          ? {
+              sandbox: {
+                host_kind: "mock/docker-29.6.1",
+                via: "exit" as const,
+                exit_code: 0,
+                duration_ms: 9,
+                worktree_root: "ignored-by-assertion",
+              },
+            }
+          : {}),
+      }),
+    });
+  }
+
+  async function runThenVerify(withWitness: boolean) {
+    const orchestrator = new ContractOrchestrator({
+      repoRoot: repo,
+      registry: registryWith(sandboxFactory(withWitness)),
+    });
+    const contract = seedSandboxContract();
+    await orchestrator.approve(contract.contract_id, "tina");
+    const result = await orchestrator.runWorker(contract.contract_id, {
+      modelClient: stubModelClient,
+      skipDesignStep: true,
+      twoPhase: { obligations: [], waived: [] },
+      containerHost: mockHost({ available: true }),
+    });
+    const outcome = await orchestrator.execute(contract.contract_id);
+    return { result, outcome };
+  }
+
+  it("派工带见证 → 证据记 SANDBOX_ENFORCED", async () => {
+    const { result, outcome } = await runThenVerify(true);
+    expect(result.sandbox).toBeDefined();
+    expect(outcome.evidence.worker_control_mode).toBe("SANDBOX_ENFORCED");
+  }, 60_000);
+
+  it("声明沙箱档但派工无见证 → 证据降记 UNCONTROLLED_EXTERNAL（不冒认受控）", async () => {
+    const { result, outcome } = await runThenVerify(false);
+    // 合同声明档仍是 SANDBOX_ENFORCED，但执行面拿不出入箱证据
+    expect(result.sandbox).toBeUndefined();
+    expect(outcome.evidence.worker_control_mode).toBe("UNCONTROLLED_EXTERNAL");
+  }, 60_000);
 });
