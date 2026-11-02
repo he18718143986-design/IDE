@@ -2082,3 +2082,122 @@ export async function getSupervisorPrototypeStatus(
     { method: "GET" },
   );
 }
+
+/* ------------------------------------------------------------------ *
+ * TASK-W.7：Worker 自助注册 / 探测升格
+ *
+ * 口径提醒（前端展示不要越过）：
+ * - `control_mode` 是**探测结论**，不是「已绝对受控」；
+ * - `dispatchable === false` 表示档位记录成立但无执行器，派工仍不可用；
+ * - 报告结语由服务端固定，前端原样展示，不要改写措辞。
+ * ------------------------------------------------------------------ */
+
+export type WorkerControlMode =
+  | "GATEWAY_ENFORCED"
+  | "SANDBOX_ENFORCED"
+  | "UNCONTROLLED_EXTERNAL";
+
+export interface WorkerProbeFindingView {
+  id: string;
+  status: string;
+  detail: string;
+}
+
+export interface WorkerProbeReportView {
+  verified_at: string;
+  fingerprint: string;
+  status: "passed" | "failed";
+  control_mode: string;
+  findings: WorkerProbeFindingView[];
+  wording: string;
+}
+
+export interface WorkerView {
+  adapter_id: string;
+  adapter_version: string;
+  control_mode: WorkerControlMode;
+  declared_control_mode: WorkerControlMode;
+  builtin: boolean;
+  kind?: string;
+  dispatchable: boolean;
+  dispatch_blocked_reason?: string;
+  demoted_reason?: string;
+  launch: { command: string; args: string[] };
+  verified_on?: {
+    cli_version: string;
+    verified_at: string;
+    fingerprint: string;
+  };
+  last_report?: WorkerProbeReportView;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkerVerifyResult {
+  worker: WorkerView;
+  report: WorkerProbeReportView;
+  control_mode: WorkerControlMode;
+  promoted: boolean;
+  refusals: string[];
+}
+
+/** 注册请求体：**不含**任何档位 / 实测字段（服务端会拒绝这类字段） */
+export interface WorkerRegistrationPayload {
+  adapter_id: string;
+  adapter_version: string;
+  launch: { command: string; args: string[] };
+  declaration: {
+    protocol_version?: string;
+    model_metering_source: string;
+    tool_interception_supported: boolean;
+    filesystem_permissions: string;
+    command_permissions: string;
+    cancellation_supported?: boolean;
+    session_recovery_supported?: boolean;
+    network_requirements: string;
+    platform_support: string[];
+    known_limitations: string[];
+  };
+}
+
+export async function fetchWorkers(
+  conn: DaemonConnection,
+): Promise<WorkerView[]> {
+  const body = await request<{ workers: WorkerView[] }>(conn, "/api/workers");
+  return body.workers ?? [];
+}
+
+export async function fetchWorker(
+  conn: DaemonConnection,
+  adapterId: string,
+): Promise<WorkerView> {
+  return request<WorkerView>(
+    conn,
+    `/api/workers/${encodeURIComponent(adapterId)}`,
+  );
+}
+
+export async function registerWorker(
+  conn: DaemonConnection,
+  payload: WorkerRegistrationPayload,
+): Promise<WorkerView> {
+  return request<WorkerView>(conn, "/api/workers", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function verifyWorker(
+  conn: DaemonConnection,
+  adapterId: string,
+  targetMode: "SANDBOX_ENFORCED" | "GATEWAY_ENFORCED" = "SANDBOX_ENFORCED",
+): Promise<WorkerVerifyResult> {
+  return request<WorkerVerifyResult>(
+    conn,
+    `/api/workers/${encodeURIComponent(adapterId)}/verify`,
+    {
+      method: "POST",
+      body: JSON.stringify({ target_mode: targetMode }),
+    },
+  );
+}

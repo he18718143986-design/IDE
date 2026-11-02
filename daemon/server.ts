@@ -228,6 +228,17 @@ import { getModelSettings, setRuntimeKey } from "./worker/key-store";
 import { createDefaultWorkerRegistry } from "./worker/default-worker-registry";
 import type { AdapterRegistry } from "./worker/adapter-registry";
 import {
+  E_PROBE_EXECUTOR_UNIMPLEMENTED,
+  E_PROBE_REPORT_WORDING,
+  E_PROBE_SANDBOX_UNAVAILABLE,
+  E_WORKER_BUILTIN_LOCKED,
+  E_WORKER_DUPLICATED,
+  E_WORKER_NOT_FOUND,
+  E_WORKER_PROMOTION_REFUSED,
+  WorkerRegistrationError,
+} from "./worker/verify/worker-registration";
+import { WorkerRegistrationService } from "./worker/verify/worker-registration-service";
+import {
   createVault,
   getActiveVault,
   setActiveVault,
@@ -372,6 +383,33 @@ export interface DaemonStatusResponse {
   activeContracts: string[];
 }
 
+/**
+ * TASK-W.7：自助注册错误码 → HTTP 状态码。
+ *
+ * 区分「用户填错」（400/409）、「权限不允许」（403）、「环境不具备」（503）与
+ * 「我们没做完」（501）：若把 501 混进 400，界面上会显示成「你的输入有问题」，
+ * 而真相是能力缺口。
+ */
+function workerRegistrationHttpStatus(code: string): number {
+  switch (code) {
+    case E_WORKER_NOT_FOUND:
+      return 404;
+    case E_WORKER_DUPLICATED:
+    case E_WORKER_PROMOTION_REFUSED:
+      return 409;
+    case E_WORKER_BUILTIN_LOCKED:
+      return 403;
+    case E_PROBE_SANDBOX_UNAVAILABLE:
+      return 503;
+    case E_PROBE_EXECUTOR_UNIMPLEMENTED:
+      return 501;
+    case E_PROBE_REPORT_WORDING:
+      return 500;
+    default:
+      return 400;
+  }
+}
+
 export class StagentDaemon {
   readonly repoRoot: string;
   /** TASK-L.14：进程级保险库（启动时 hydrate） */
@@ -408,6 +446,13 @@ export class StagentDaemon {
   private signalCleanupFn: (() => void) | null = null;
   private lastRecoveryReport: RecoveryReport | null = null;
   private readonly orchestrator: ContractOrchestrator;
+  /**
+   * TASK-W.7：受控 Worker 注册表句柄。
+   * 与构造时传给编排器的是**同一个对象**（不是拷贝），故升格 / 降级在两处同时生效。
+   */
+  private readonly workerRegistry: AdapterRegistry;
+  /** TASK-W.7：自助注册服务（懒建，避免无关启动路径触碰磁盘） */
+  private workerRegistration: WorkerRegistrationService | null = null;
   /** TASK-C.7：Task Graph 权威引擎（Daemon 独占，唯一写手） */
   private readonly graphEngine: TaskGraphEngine;
   /** TASK-S.5：需求规范快照（懒加载，避免无关启动路径创建 specs 目录） */
@@ -481,10 +526,12 @@ export class StagentDaemon {
     this.graphEngine.subscribe((payload) => {
       this.broadcast("TASK_GRAPH_UPDATED", payload);
     });
+    this.workerRegistry =
+      options.workerRegistry ?? createDefaultWorkerRegistry();
     this.orchestrator = new ContractOrchestrator({
       repoRoot: this.repoRoot,
       // TASK-W.6：注入默认受控 Worker 注册表（可被 options.workerRegistry 覆盖）
-      registry: options.workerRegistry ?? createDefaultWorkerRegistry(),
+      registry: this.workerRegistry,
       // TASK-C.5：验证命令的逐行输出实时推给页面（脱敏在 runner 内完成）
       onTerminalLine: (contractId, stream, line) => {
         this.broadcast("TERMINAL_STREAM", {
@@ -1923,6 +1970,83 @@ export class StagentDaemon {
       });
       req.on("error", reject);
     });
+  }
+
+  /** TASK-W.7：懒建自助注册服务（首次访问 `/api/workers*` 时才触碰 `.stagent/`） */
+  private workerRegistrationService(): WorkerRegistrationService {
+    if (this.workerRegistration === null) {
+      this.workerRegistration = new WorkerRegistrationService({
+        repoRoot: this.repoRoot,
+        registry: this.workerRegistry,
+      });
+    }
+    return this.workerRegistration;
+  }
+
+  /** TASK-W.7：Worker 自助注册 / 探测的 HTTP 入口 */
+  private async handleWorkers(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    method: string,
+    pathname: string,
+  ): Promise<void> {
+    const match = /^\/api\/workers(?:\/([^/]+))?(?:\/(verify))?$/.exec(pathname);
+    if (match === null) {
+      this.sendJson(res, 404, { error: "Not Found" });
+      return;
+    }
+    const rawId = match[1];
+    const adapterId = rawId === undefined ? null : decodeURIComponent(rawId);
+    const isVerify = match[2] === "verify";
+
+    try {
+      const service = this.workerRegistrationService();
+
+      if (method === "GET" && adapterId === null) {
+        this.sendJson(res, 200, { workers: service.list() });
+        return;
+      }
+      if (method === "GET" && adapterId !== null && !isVerify) {
+        this.sendJson(res, 200, service.get(adapterId));
+        return;
+      }
+      if (method === "POST" && adapterId === null) {
+        const body = await this.readJsonBody(req);
+        this.sendJson(res, 201, service.register(body));
+        return;
+      }
+      if (method === "POST" && adapterId !== null && isVerify) {
+        const body = (await this.readJsonBody(req)) as {
+          target_mode?: unknown;
+        };
+        const target = body.target_mode ?? "SANDBOX_ENFORCED";
+        if (target !== "SANDBOX_ENFORCED" && target !== "GATEWAY_ENFORCED") {
+          this.sendJson(res, 400, {
+            error: `target_mode 只能是 SANDBOX_ENFORCED / GATEWAY_ENFORCED（收到 ${String(target)}）`,
+            code: "E_PROBE_TARGET_INVALID",
+          });
+          return;
+        }
+        const outcome = await service.verify(adapterId, {
+          target_mode: target,
+        });
+        this.sendJson(res, 200, outcome);
+        return;
+      }
+      this.sendJson(res, 405, { error: "Method Not Allowed" });
+    } catch (err) {
+      if (err instanceof WorkerRegistrationError) {
+        this.sendJson(res, workerRegistrationHttpStatus(err.code), {
+          error: err.message,
+          code: err.code,
+          message: err.message,
+        });
+        return;
+      }
+      this.sendJson(res, 500, {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   private sendJson(
@@ -4326,6 +4450,17 @@ export class StagentDaemon {
         dispatchable: entry.control_mode === "GATEWAY_ENFORCED",
       }));
       this.sendJson(res, 200, { adapters });
+      return;
+    }
+
+    // TASK-W.7：Worker 自助注册 / 探测升格。
+    // 沿用既有鉴权（不新增豁免）：注册与探测都会落盘，必须与其它写接口同权限。
+    if (pathname === "/api/workers" || pathname.startsWith("/api/workers/")) {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      await this.handleWorkers(req, res, method, pathname);
       return;
     }
 

@@ -24,6 +24,7 @@ import {
   type SettingsDeepFocus,
 } from "@/lib/middle-yield";
 import type { ChatAdapterInfo, ChatSessionSummary } from "@/lib/chat-events";
+import { WorkerRegistrationPanel } from "@/components/settings/WorkerRegistrationPanel";
 import {
   pickPreferredAdapterId,
   rightPaneRejectionReason,
@@ -502,6 +503,14 @@ export function SettingsTab({
                 <RefreshCw className="h-3 w-3" /> 重新拉取状态
               </button>
             ) : null}
+          </Section>
+
+          <Section
+            title="Worker 自助注册"
+            icon={<Plug className="h-4 w-4" />}
+            testId="settings-worker-registration"
+          >
+            <WorkerRegistrationPanel conn={conn} connected={connected} />
           </Section>
 
           <Section

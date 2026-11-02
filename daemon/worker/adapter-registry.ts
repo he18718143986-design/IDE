@@ -21,7 +21,10 @@ import type { WorkerDispatchFactory } from "./worker-dispatch";
  */
 
 export type AdapterRegistrationRejection =
-  AdapterRejectionCode | "ADAPTER_ID_DUPLICATED";
+  | AdapterRejectionCode
+  | "ADAPTER_ID_DUPLICATED"
+  /** TASK-W.7：升格被拒（未附探测报告 / 目标档位能力不达标） */
+  | "ADAPTER_PROMOTION_REFUSED";
 
 export class AdapterRegistrationError extends Error {
   readonly rejection: AdapterRegistrationRejection;
@@ -36,6 +39,32 @@ export interface RegisteredAdapter {
   adapter: CodingWorkerAdapter;
   control_mode: AdapterControlMode;
   declaration: AdapterCapabilityDeclaration;
+  /** TASK-W.7：最近一次档位变更（升格需附探测报告指纹；降级记原因） */
+  last_transition?: AdapterModeTransition | undefined;
+}
+
+/** 档位变更记录（审计用；不参与任何判定） */
+export interface AdapterModeTransition {
+  from: AdapterControlMode;
+  to: AdapterControlMode;
+  /** 升格时为探测报告指纹；降级时为 undefined */
+  report_fingerprint?: string | undefined;
+  /** 降级原因 */
+  reason?: string | undefined;
+  /** 由调用方注入时间，便于测试确定性（缺省不填） */
+  decided_at?: string | undefined;
+}
+
+/** 升格 / 降级请求参数 */
+export interface AdapterModeChangeRequest {
+  /**
+   * 探测报告指纹（卡正文范围 1「升格唯一的入口是探测通过」）。
+   * **升格到受控档位时必填**；降级不需要。
+   */
+  report_fingerprint?: string | undefined;
+  /** 降级原因（升格时忽略） */
+  reason?: string | undefined;
+  decided_at?: string | undefined;
 }
 
 export class AdapterRegistry {
@@ -122,6 +151,69 @@ export class AdapterRegistry {
       );
     }
     return entry.adapter;
+  }
+
+  /**
+   * TASK-W.7：**唯一的档位变更入口**（升格 / 降级）。
+   *
+   * 为什么必须有这个入口而不是「再 register 一次」：`register()` 遇到同 id 直接抛
+   * `ADAPTER_ID_DUPLICATED`，注册中心既无升格也无注销 API，于是「探测通过后升格」
+   * 这个动作在 W.7 之前**根本不存在**（用户注册进来的适配器只能永远停在非受控档）。
+   * 但「能升格」正是「填表即受控」风险的入口，故按单向守卫实现：
+   *
+   * - 降级（→ `UNCONTROLLED_EXTERNAL`）：**恒允许**，不需要任何证据。安全方向不设闸。
+   * - 升格（目标为受控档）：必须同时满足
+   *   1. 附 `report_fingerprint`（探测确有报告，且由服务层绑定适配器指纹）；
+   *   2. 重新跑 `validateAdapterCapability(declaration, next)` ——注册时的校验结果
+   *      **不得**被复用为升格依据（注册期只按标识档校验过）。
+   * - 同档位重复调用：幂等返回，不抛错（避免重试导致状态机抖动）。
+   *
+   * 注意本方法**只改档位**，不校验探测内容真伪——"报告是否对应本次版本"由
+   * `worker-registration.ts::effectiveControlMode()` 在读侧重算指纹兜底，
+   * 两条防线分工不同：这里防「无报告就升格」，那里防「手改文件 / 换版本后仍记受控」。
+   */
+  promoteControlMode(
+    adapterId: string,
+    next: AdapterControlMode,
+    request: AdapterModeChangeRequest = {},
+  ): RegisteredAdapter {
+    const entry = this.entries.get(adapterId);
+    if (!entry) {
+      throw new AdapterRegistrationError(
+        "ADAPTER_ID_INVALID",
+        `cannot change control mode: adapter not registered: ${adapterId}`,
+      );
+    }
+    const previous = entry.control_mode;
+    if (previous === next) return entry;
+
+    if (next !== "UNCONTROLLED_EXTERNAL") {
+      const fingerprint = request.report_fingerprint;
+      if (typeof fingerprint !== "string" || fingerprint.trim().length === 0) {
+        throw new AdapterRegistrationError(
+          "ADAPTER_PROMOTION_REFUSED",
+          `refusing to promote ${adapterId} (${previous} → ${next}) without a probe report fingerprint; promotion requires a passed probe pack`,
+        );
+      }
+      const validation = validateAdapterCapability(entry.declaration, next);
+      if (!validation.ok) {
+        throw new AdapterRegistrationError(
+          validation.code,
+          `[${validation.code}] ${adapterId} cannot be promoted to ${next}: ${validation.reason}`,
+        );
+      }
+    }
+
+    entry.control_mode = next;
+    entry.last_transition = {
+      from: previous,
+      to: next,
+      report_fingerprint:
+        next === "UNCONTROLLED_EXTERNAL" ? undefined : request.report_fingerprint,
+      reason: request.reason,
+      decided_at: request.decided_at,
+    };
+    return entry;
   }
 
   list(): RegisteredAdapter[] {
