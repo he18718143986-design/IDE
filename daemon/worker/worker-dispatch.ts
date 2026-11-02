@@ -7,6 +7,7 @@ import {
   AdapterRegistrationError,
   type AdapterRegistry,
 } from "./adapter-registry";
+import type { ContainerHostPort } from "./sandbox/container-host";
 
 /**
  * TASK-W.6：受控 Worker 派工契约。
@@ -29,11 +30,13 @@ export const E_ADAPTER_NOT_REGISTERED = "E_ADAPTER_NOT_REGISTERED" as const;
 export const E_ADAPTER_NOT_CONTROLLED = "E_ADAPTER_NOT_CONTROLLED" as const;
 export const E_ADAPTER_NO_DISPATCH_FACTORY = "E_ADAPTER_NO_DISPATCH_FACTORY" as const;
 /**
- * TASK-W.5c-i 窗口期专用错误码：`SANDBOX_ENFORCED` 可登记、但容器运行时尚未落地，
- * 派工一律显式拒绝，**不静默降级**到无网关执行、也不复用 `E_ADAPTER_NOT_CONTROLLED`
- * （后者语义是「非受控适配器」，与本档位「受控档位待解锁」不同）。
+ * `SANDBOX_ENFORCED` 档位不可用时的错误码，**不静默降级**到无网关执行、也不复用
+ * `E_ADAPTER_NOT_CONTROLLED`（后者语义是「非受控适配器」，与本档位「受控档位但
+ * 容器宿主不可用」不同）。
  *
- * 解锁条件：`W.5c-ii` `container-host` 落地（届时改为按容器宿主可用性校验放行）。
+ * 语义（TASK-W.5c-ii 起）：派工是否放行**按容器宿主可用性判定**——
+ * 未注入 `ContainerHostPort`、或宿主 `isAvailable()` 为 false → 本码拒绝；
+ * 宿主可用 → 正常放行（窗口期「永远拒绝」的语义已随本卡解除）。
  */
 export const E_ADAPTER_SANDBOX_LOCKED = "E_ADAPTER_SANDBOX_LOCKED" as const;
 
@@ -74,6 +77,8 @@ export interface WorkerDispatchContext {
   designNote?: DesignNote | undefined;
   /** TASK-L.4：两段式本段义务清单（注入「你会被这样检查」） */
   checksExtras?: readonly string[] | undefined;
+  /** TASK-W.5c-ii：容器宿主端口（`SANDBOX_ENFORCED` 执行时取用；未注入则门禁已拒） */
+  containerHost?: ContainerHostPort | undefined;
 }
 
 /** 受控执行器：签名与既有 `AiWorker.run(signal)` 一致 */
@@ -86,29 +91,21 @@ export type WorkerDispatchFactory = (
   context: WorkerDispatchContext,
 ) => DispatchedWorker;
 
-/**
- * TASK-W.5c-i 窗口期档位窄化：把合同 / 适配器档位降为运行时二值档位。
- *
- * `SANDBOX_ENFORCED` 在 `W.5c-ii` `container-host` 落地前**不视为受控**——写入
- * Evidence、装配运行时拦截器时一律按 `UNCONTROLLED_EXTERNAL` 处理，杜绝
- * 「标了沙箱档却没有沙箱」的假受控证据；派工面另由 `requireControlledDispatch()`
- * 以 `E_ADAPTER_SANDBOX_LOCKED` 显式拒绝。本函数只收窄，不扩张可执行面。
- *
- * 解锁条件：`W.5c-ii` `container-host` 落地（届时改为按容器宿主可用性判定）。
- */
-export function toRuntimeControlMode(
-  mode: "GATEWAY_ENFORCED" | "SANDBOX_ENFORCED" | "UNCONTROLLED_EXTERNAL",
-): "GATEWAY_ENFORCED" | "UNCONTROLLED_EXTERNAL" {
-  return mode === "GATEWAY_ENFORCED"
-    ? "GATEWAY_ENFORCED"
-    : "UNCONTROLLED_EXTERNAL";
+/** `SANDBOX_ENFORCED` 派工的宿主注入选项（W.5c-ii 起） */
+export interface ControlledDispatchOptions {
+  /**
+   * 容器宿主端口。**未注入**时 `SANDBOX_ENFORCED` 一律拒绝派工
+   * （`E_ADAPTER_SANDBOX_LOCKED`），不静默降级到无网关执行。
+   */
+  containerHost?: ContainerHostPort | undefined;
 }
 
 /**
  * 单一判定源：解析受控派工工厂。
  *
- * 0. TASK-W.5c-i 窗口期：已登记为 `SANDBOX_ENFORCED` → `E_ADAPTER_SANDBOX_LOCKED`
- *    （登记面接受注册，但容器运行时待 `W.5c-ii` `container-host` 落地解锁）；
+ * 0. TASK-W.5c-ii：`SANDBOX_ENFORCED` **按容器宿主可用性判定**——
+ *    未注入 `ContainerHostPort` 或 `isAvailable()` 为 false → `E_ADAPTER_SANDBOX_LOCKED`；
+ *    宿主可用 → 放行并继续工厂校验（窗口期「永远拒绝」语义已解除）。
  * 1. 再调 `registry.requireControlled(adapterId)` —— 未注册 → `ADAPTER_ID_INVALID`、
  *    非 GATEWAY_ENFORCED（含 `UNCONTROLLED_EXTERNAL`）→ `TOOL_INTERCEPTION_UNSUPPORTED`；
  * 2. 把 `AdapterRegistrationError.rejection` 映射为带 `code` 的 `WorkerDispatchError`；
@@ -119,33 +116,61 @@ export function toRuntimeControlMode(
 export function requireControlledDispatch(
   registry: AdapterRegistry,
   adapterId: string,
+  options?: ControlledDispatchOptions,
 ): WorkerDispatchFactory {
-  // TASK-W.5c-i 窗口期门禁（先于既有受控判定）：`SANDBOX_ENFORCED` 是「受控档位但
-  // 容器运行时尚未落地」，登记面已接受注册，但派工必须显式拒绝 —— 绝不允许
-  // 「标了沙箱档却没有沙箱」的假受控执行，也不静默降级到无网关执行。
-  // 解锁条件：W.5c-ii `container-host` 落地（见 E_ADAPTER_SANDBOX_LOCKED 注释）。
-  const sandboxEntry = registry.get(adapterId);
-  if (sandboxEntry?.control_mode === "SANDBOX_ENFORCED") {
+  const entry = registry.get(adapterId);
+  if (entry === undefined) {
     throw new WorkerDispatchError(
-      E_ADAPTER_SANDBOX_LOCKED,
+      E_ADAPTER_NOT_REGISTERED,
       adapterId,
-      "适配器登记为 SANDBOX_ENFORCED（容器隔离档位），但容器运行时 container-host 尚未落地；待 W.5c-ii container-host 落地解锁后方可派工，窗口期内拒绝派工以免假受控",
+      `adapter not registered: ${adapterId}`,
     );
   }
 
-  try {
-    // 门禁：复用 Registry 的既有判定，不复制一份语义
-    registry.requireControlled(adapterId);
-  } catch (err) {
-    if (err instanceof AdapterRegistrationError) {
-      const code =
-        err.rejection === "ADAPTER_ID_INVALID"
-          ? E_ADAPTER_NOT_REGISTERED
-          : E_ADAPTER_NOT_CONTROLLED;
-      throw new WorkerDispatchError(code, adapterId, err.message);
-    }
-    throw err;
+  if (entry.control_mode === "UNCONTROLLED_EXTERNAL") {
+    // 非受控档位：不得作为受控 / 可合并证据，门禁先拒（与 W.6 语义一致）
+    throw new WorkerDispatchError(
+      E_ADAPTER_NOT_CONTROLLED,
+      adapterId,
+      `adapter ${adapterId} is registered as UNCONTROLLED_EXTERNAL; it cannot be used for controlled execution`,
+    );
   }
+
+  if (entry.control_mode === "SANDBOX_ENFORCED") {
+    // TASK-W.5c-ii：按容器宿主可用性判定放行与否（不再是窗口期「永远拒绝」）。
+    const host = options?.containerHost;
+    if (host === undefined) {
+      throw new WorkerDispatchError(
+        E_ADAPTER_SANDBOX_LOCKED,
+        adapterId,
+        "适配器登记为 SANDBOX_ENFORCED（容器隔离档位），但未注入容器宿主 ContainerHostPort；拒绝派工，不静默降级到无网关执行",
+      );
+    }
+    if (host.isAvailable() !== true) {
+      throw new WorkerDispatchError(
+        E_ADAPTER_SANDBOX_LOCKED,
+        adapterId,
+        "适配器登记为 SANDBOX_ENFORCED（容器隔离档位），但容器宿主不可用（isAvailable() 为 false）；拒绝派工，不静默降级到无网关执行",
+      );
+    }
+    // 宿主可用 → 门禁自足（`registry.requireControlled()` 只放行 `GATEWAY_ENFORCED`，
+    // 沙箱档不得再过它，否则会被误判为「非受控」）。
+  } else {
+    try {
+      // `GATEWAY_ENFORCED` 复用 Registry 的既有判定，不复制一份语义
+      registry.requireControlled(adapterId);
+    } catch (err) {
+      if (err instanceof AdapterRegistrationError) {
+        const code =
+          err.rejection === "ADAPTER_ID_INVALID"
+            ? E_ADAPTER_NOT_REGISTERED
+            : E_ADAPTER_NOT_CONTROLLED;
+        throw new WorkerDispatchError(code, adapterId, err.message);
+      }
+      throw err;
+    }
+  }
+
   const factory = registry.getDispatchFactory(adapterId);
   if (factory === undefined) {
     throw new WorkerDispatchError(

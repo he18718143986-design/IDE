@@ -75,10 +75,10 @@ import {
 import type { AdapterRegistry } from "../worker/adapter-registry";
 import {
   requireControlledDispatch,
-  toRuntimeControlMode,
   type WorkerDispatchContext,
 } from "../worker/worker-dispatch";
 import { createDefaultWorkerRegistry } from "../worker/default-worker-registry";
+import type { ContainerHostPort } from "../worker/sandbox/container-host";
 import {
   RuntimeInterceptor,
   type GatewayViolation,
@@ -162,6 +162,12 @@ export interface OrchestratorOptions {
    * 保证既有派工路径不变；测试可注入含 Fake 适配器的自定义 registry。
    */
   registry?: AdapterRegistry | undefined;
+  /**
+   * TASK-W.5c-ii：容器宿主端口（`SANDBOX_ENFORCED` 派工与执行用）。
+   * 未注入时 `SANDBOX_ENFORCED` 一律拒绝派工（不静默降级）；真实宿主绑定归
+   * `W.5c-iii`，本卡以 mock / stub 注入即可验收。
+   */
+  containerHost?: ContainerHostPort | undefined;
 }
 
 export interface ExecutionOutcome {
@@ -289,6 +295,8 @@ export class ContractOrchestrator {
   private readonly graveyardGates = new Map<string, GraveyardGateContext>();
   /** TASK-W.6：受控适配器注册表（默认内置 Managed AI） */
   private readonly workerRegistry: AdapterRegistry;
+  /** TASK-W.5c-ii：容器宿主端口（未注入 → SANDBOX_ENFORCED 拒绝派工） */
+  private readonly containerHost: ContainerHostPort | undefined;
 
   constructor(options: OrchestratorOptions) {
     this.repoRoot = path.resolve(options.repoRoot);
@@ -299,6 +307,7 @@ export class ContractOrchestrator {
     this.designNoteGenerator = options.designNoteGenerator;
     this.workerRegistry =
       options.registry ?? createDefaultWorkerRegistry();
+    this.containerHost = options.containerHost;
   }
 
   /** TASK-W.6：诊断 / 设置面可读取当前已注册适配器 id 列表 */
@@ -1175,11 +1184,11 @@ export class ContractOrchestrator {
       {
         status,
         ...(reasonCode === undefined ? {} : { reasonCode }),
-        // TASK-W.5c-i：窗口期 SANDBOX_ENFORCED 不视为受控，按 UNCONTROLLED_EXTERNAL
-        // 记入证据（待 W.5c-ii container-host 落地解锁）。
+        // TASK-W.5c-ii：档位如实记三值（SANDBOX_ENFORCED 是受控档位，不再收窄为
+        // UNCONTROLLED_EXTERNAL——收窄会让「受控派工成功」产出「不可合并证据」）。
         workerControlMode: interceptorBlocked
           ? "UNCONTROLLED_EXTERNAL"
-          : toRuntimeControlMode(current.worker_spec.control_mode),
+          : current.worker_spec.control_mode,
         summary: interceptorBlocked
           ? "运行时复检发现 Adapter 能力漂移或越权通道，已降级为 UNCONTROLLED_EXTERNAL 并停止受控执行"
           : threatBlocked
@@ -1292,6 +1301,11 @@ export class ContractOrchestrator {
        * 未传则用构造器上的默认 / 注入 registry；生产 HTTP 路径不传。
        */
       registry?: AdapterRegistry;
+      /**
+       * TASK-W.5c-ii：单次派工覆盖容器宿主（测试注入 mock / stub 用）。
+       * 未传则用构造器上的 `containerHost`；`SANDBOX_ENFORCED` 未注入宿主即拒绝派工。
+       */
+      containerHost?: ContainerHostPort;
     } = {},
   ): Promise<
     WorkerRunResult & { two_phase?: TwoPhaseResult; design?: DesignRunInfo }
@@ -1439,6 +1453,11 @@ export class ContractOrchestrator {
       designNoteGenerator?: DesignNoteGenerator;
       skipDesignStep?: boolean;
       registry?: AdapterRegistry;
+      /**
+       * TASK-W.5c-ii：容器宿主端口（`SANDBOX_ENFORCED` 派工按宿主可用性判定）。
+       * 未传则用构造器上的 `containerHost`；未注入宿主即拒绝派工。
+       */
+      containerHost?: ContainerHostPort;
     } = {},
   ): Promise<
     WorkerRunResult & { two_phase?: TwoPhaseResult; design?: DesignRunInfo }
@@ -1508,9 +1527,12 @@ export class ContractOrchestrator {
       // 缺注册 / UNCONTROLLED_EXTERNAL / 未挂工厂均抛带 code 的 WorkerDispatchError，
       // 绝不静默降级到「无网关执行」或写死 AiWorker。
       const registry = options.registry ?? this.workerRegistry;
+      // TASK-W.5c-ii：容器宿主经编排器注入（`SANDBOX_ENFORCED` 门禁按宿主可用性
+      // 判定放行；未注入即拒绝，不静默降级）。真实宿主绑定归 W.5c-iii。
       const dispatchFactory = requireControlledDispatch(
         registry,
         current.worker_spec.adapter_id,
+        { containerHost: options.containerHost ?? this.containerHost },
       );
 
       const derived =
@@ -1827,8 +1849,8 @@ export class ContractOrchestrator {
     const interceptor = new RuntimeInterceptor({
       snapshot: {
         adapter_id: contract.worker_spec.adapter_id,
-        // TASK-W.5c-i：同上，窗口期 SANDBOX_ENFORCED 按不受控装配拦截器。
-        control_mode: toRuntimeControlMode(contract.worker_spec.control_mode),
+        // TASK-W.5c-ii：同上，如实传三值（SANDBOX_ENFORCED 属受控档位）。
+        control_mode: contract.worker_spec.control_mode,
         tool_interception_supported: true,
         filesystem_permissions: "GATEWAY_ONLY",
         command_permissions: "WHITELIST_ONLY",
@@ -2196,8 +2218,14 @@ export class ContractOrchestrator {
       /** 本任务是否修改过测试文件（写入 Evidence 供核销人预警复核） */
       testsModified?: boolean;
       manualConfirmationRecord?: ManualConfirmationRecord;
-      /** TASK-W.4：运行时降级后 Evidence 记录实际控制模式 */
-      workerControlMode?: "GATEWAY_ENFORCED" | "UNCONTROLLED_EXTERNAL";
+      /**
+       * TASK-W.4：运行时降级后 Evidence 记录实际控制模式。
+       * TASK-W.5c-ii：扩三值（`SANDBOX_ENFORCED` 属受控档位，如实记档）。
+       */
+      workerControlMode?:
+        | "GATEWAY_ENFORCED"
+        | "SANDBOX_ENFORCED"
+        | "UNCONTROLLED_EXTERNAL";
       /** TASK-J.18d：墓地检查可用性 */
       graveyardCheck?: "snapshot" | "unavailable";
     },
@@ -2225,10 +2253,9 @@ export class ContractOrchestrator {
       evidence_id: evidenceId,
       contract_id: contract.contract_id,
       generated_at: new Date().toISOString(),
-      // TASK-W.5c-i：同上，窗口期 SANDBOX_ENFORCED 不产生受控证据。
-      worker_control_mode: toRuntimeControlMode(
+      // TASK-W.5c-ii：同上，如实记三值档位。
+      worker_control_mode:
         input.workerControlMode ?? contract.worker_spec.control_mode,
-      ),
       usage:
         totals && totals.totalTokens > 0
           ? {

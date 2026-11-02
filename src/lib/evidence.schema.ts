@@ -175,9 +175,14 @@ export const evidenceBundleSchema = z
     worker_session_id: z.string().min(1).optional(),
     /** v1.2.0 新增：建议溯源，不构成验收依据 */
     supervisor_suggestion_ids: z.array(z.string().min(1)).optional(),
-    /** TASK-W.4：运行时复检降级后记录实际控制模式（默认受控） */
+    /**
+     * TASK-W.4：运行时复检降级后记录实际控制模式（默认受控）。
+     * TASK-W.5c-ii：扩为三值——容器隔离档位 `SANDBOX_ENFORCED` 落地后如实记档
+     * （此前二值期间由 `toRuntimeControlMode()` 收窄为 `UNCONTROLLED_EXTERNAL`，
+     * 导致「受控派工成功却记不受控证据、产物不可合并」的矛盾，本卡一并解除）。
+     */
     worker_control_mode: z
-      .enum(["GATEWAY_ENFORCED", "UNCONTROLLED_EXTERNAL"])
+      .enum(["GATEWAY_ENFORCED", "SANDBOX_ENFORCED", "UNCONTROLLED_EXTERNAL"])
       .optional(),
     generated_at: z.string(),
     usage: usageSchema,
