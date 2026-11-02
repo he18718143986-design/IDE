@@ -164,3 +164,9 @@
 - **代码事实/风险**：自注册适配器尚无可消费的 `run()`/派工工厂；`promoteControlMode()` 只校验指纹非空形态，升格未绑定真实探测报告+见证；`buildLaunch()` 缺 MCP endpoint 时硬失败；必须防止执行声明档与证据实录档分叉。
 - **卡状态**：`TASK-W.9` 已以 `[NEW_TASK]` 立卡，估算 **L**。依据 R-11，拆分建议 `W.9a`（报告指纹与 launch 降级）、`W.9b`（执行器抽象/容器围栏/见证）、`W.9c`（自注册派工工厂闭环）仅供审阅；**待 DoR 过审与 Tina 授权，不拆、不施工**。
 - **红线**：禁止直接 spawn 绕过 Gateway/容器；无真实 `SandboxWitness` 时必须记 `UNCONTROLLED_EXTERNAL`；无 `run()`/工厂不得显示 `dispatchable:true`。无新增 OP 号。
+
+### TASK-W.9 拆分（2026-11-02 · P-128 · DoR/边界注记，非 OP）
+
+- **状态更新**：Tina 授权拆分后，母卡 W.9 为 `[SPLIT]`；W.9a/b `[READY]`，W.9c `[BLOCKED · 待 a+b]`。原 P-127 注记保留历史，不改写。
+- **Sprint / DAG**：W.9a 为首要，W.9b 可并行；W.9c 依赖 `W.9a→W.9c` 与 `W.9b→W.9c`。
+- **开工边界**：DoR READY 不代表 Tina 已授权施工；逐卡拍板后才开工。不新增 OP。

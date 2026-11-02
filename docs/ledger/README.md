@@ -72,7 +72,7 @@
 | SA-1 | ADR-0014 敏感项授权已选定开工一并授权机制（dec-8） | **RESOLVED** | 用户（q22） | [`../specs/delivery-lifecycle.md`](../specs/delivery-lifecycle.md) §5 |
 | DLV-1 | ADR-0015～0017 均已由用户原话 q22 明确授权生效（DEC-006～008） | **RESOLVED** | 用户（q22） | [`../scheme.md`](../scheme.md) §6 |
 | DLV-2 | PR #3 已由用户批准并执行物理关闭 | **RESOLVED** | 用户 | PR #3 已关闭 |
-| DLV-3 | ~~`AdapterRegistry` 未接线，Worker 只有 OpenAI `AiWorker`；Claude Code 作 Worker 未接入派工~~ | **RESOLVED**（原 NON_BLOCKER · M2 不依赖） | 卡 owner | **`TASK-W.6` COMPLETED**（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`）：Registry 挂派工工厂、双内置 id 受控派工、缺注册/非受控显式错误码不静默降级；Claude Code worker 仅登记 `UNCONTROLLED_EXTERNAL`（红线，不作受控执行器）；能力载体 `run()` 显式抛错。见 completed §3.4g。**自助注册/自动验证 `TASK-W.7`** 后续派工闭环已另立 `TASK-W.9` `[NEW_TASK]`（P-127，L 级拆分建议待 DoR/Tina 授权）；DLV-3 保持 RESOLVED，不回开原债。 |
+| DLV-3 | ~~`AdapterRegistry` 未接线，Worker 只有 OpenAI `AiWorker`；Claude Code 作 Worker 未接入派工~~ | **RESOLVED**（原 NON_BLOCKER · M2 不依赖） | 卡 owner | **`TASK-W.6` COMPLETED**（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`）：Registry 挂派工工厂、双内置 id 受控派工、缺注册/非受控显式错误码不静默降级；Claude Code worker 仅登记 `UNCONTROLLED_EXTERNAL`（红线，不作受控执行器）；能力载体 `run()` 显式抛错。见 completed §3.4g。**自助注册/自动验证 `TASK-W.7`** 后续派工闭环由 `TASK-W.9` 承接；母卡现为 `[SPLIT]`，P-128 经授权拆为 W.9a/b/c；DLV-3 保持 RESOLVED，不回开原债。 |
 | DLV-4 | `.stagent/metadata/` 写入与 ADR-0011 冲突 → **已迁 records** | **RESOLVED** | 卡 owner | **`TASK-H.9` COMPLETED**（[#50](https://github.com/he18718143986-design/IDE/pull/50)/`34213c8`）；legacy 只读迁移 |
 | DLV-5 | 系统地图 UI（项目视图第二页）与「改这里会影响什么」入口 | **RESOLVED** | 卡 owner | **`TASK-L.18` COMPLETED**（[#54](https://github.com/he18718143986-design/IDE/pull/54)/`c8e6a81`）；interfaces consumers 行依赖见 completed 挂账 |
 | DLV-6 | L.11 DN-2「可以」HTTP / 画布入口 | **RESOLVED** | 卡 owner | **`TASK-J.19` COMPLETED**（[#55](https://github.com/he18718143986-design/IDE/pull/55)/`4bae423`）；`/api/design/*` + 画布卡；resume 不误路由 |
@@ -124,3 +124,9 @@
 - **事项**：自注册/外部 Worker 缺少可执行 `run()` 与派工工厂；`promoteControlMode()` 的非空指纹形态校验未消费真实探测报告/见证，另有 `buildLaunch()` 对 MCP endpoint 的硬依赖。
 - **处理**：新立 `TASK-W.9` `[NEW_TASK]`，覆盖 Gateway 会话注入与容器 CLI 执行器方案对比、工厂接线、报告/见证消费及缺端点降级。估算 **L**；按 R-11 建议拆为 `W.9a/b/c`，**拆分与开工均待 DoR 过审及 Tina 授权，本轮不执行**。
 - **口径**：DLV-3 的 W.6 交付仍为 RESOLVED；W.9 是 W.7/W.5b 后续边界的独立新任务，不新增 OP 号、不改历史记录。
+
+### TASK-W.9 拆分（2026-11-02 · P-128 · 非 OP）
+
+- **授权**：Tina 拍板 W.9 升为 Sprint 首要，并授权按原规划拆为 W.9a/b/c。
+- **处理**：母卡标 `[SPLIT]` 保留追溯；W.9a（S/M）与 W.9b（M）`[READY]`，W.9c（M）`[BLOCKED · 待 a+b]`。DAG 明确 `a→c`、`b→c`；Sprint 首要为 W.9a，W.9b 可并行。
+- **边界**：READY 不等同施工授权；Tina 逐卡授权开工。不新增 OP 号，DLV-3 仍 RESOLVED。

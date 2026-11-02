@@ -422,7 +422,7 @@
 
 
 <a id="task-w.9"></a>
-#### 【Task W.9】自注册/外部 Worker 执行器接线 `[NEW_TASK]`
+#### 【Task W.9】自注册/外部 Worker 执行器接线 `[SPLIT]`
 
 * **任务编号**：`TASK-W.9`
 * **任务名称**：自注册/外部 Worker 执行器接线
@@ -443,8 +443,8 @@
   * `TASK-W.5b`（COMPLETED · #92/`bdac805`，cursor-agent 声明与 `buildLaunch()` 契约面在位）；
   * `TASK-W.5c-iii`（COMPLETED · #87/`2313597a`，`DockerContainerHost`、OpenHands 适配器与 `SandboxWitness` 链路在位）；
   * **全前置均为 COMPLETED**。
-* **优先级**：待 Tina 裁定；本轮不指定 Sprint 首要
-* **状态**：**`[NEW_TASK]`**（待 DoR 过审后 Tina 授权开工）
+* **优先级**：拆分母卡；Sprint 首要为 `TASK-W.9a`，`W.9b` 可并行
+* **状态**：**`[SPLIT]`**（2026-11-02 · P-128 经 Tina 授权拆为 `W.9a` / `W.9b` / `W.9c`；本卡保留追溯，不再作为施工依据）
 * **对照痛点（代码事实，R-4）**：
   1. `daemon/worker/adapter-registry.ts::promoteControlMode()`（`:176-193`）：只校验 `typeof request.report_fingerprint === "string" && fingerprint.trim().length > 0`。只要调用方传入非空伪造指纹字符串，且 `declaration` 满足校验，即可将外部适配器强行升格，完全未校验该指纹是否对应已落盘、通过验收的真实探测报告，**自造指纹即可升格（W.5b 挂账）**；
   2. `daemon/worker/verify/worker-registration-service.ts` 与 `daemon/worker/verify/worker-registration.ts`：自注册 Worker 只写入 `.stagent/workers.json`，在 `createDefaultWorkerRegistry()` 与派工链路中没有对应的适配器实例与工厂挂接机制（`registry.registerDispatchFactory` 零调用），且自注册对象的 `run()` 缺失，导致升格后 `requireControlledDispatch()` 恒抛 `E_ADAPTER_NO_DISPATCH_FACTORY`，前端展示 `dispatchable: false`（**W.7 挂账 1**）；
@@ -522,18 +522,100 @@
 * **估算（R-11）**：
   * **判 L**（跨 launch 契约解耦、AdapterRegistry 升格报告链重构、两类执行器抽象与派工工厂接线、容器见证与证据面消费四层联动，断言超 10 项）。
   * **按 R-11「L 卡不得开工、必须拆分」，本卡仅立卡、待 DoR 过审后由 Tina 授权拆分为子卡，待授权不擅动。**
-  * **拆分建议（参照 W.5c 先例）**：
-    * `TASK-W.9a`（launch 契约解耦与真实报告指纹升格，M）：`buildLaunch()` 缺端点降级预览 + `promoteControlMode()` 依赖真实探测报告消费链；
-    * `TASK-W.9b`（外部 CLI 执行器抽象与容器受控执行，M）：执行器统一抽象（Gateway 注入 vs 容器围栏方案对比落盘）+ 沙箱执行产物收集与 `SandboxWitness` 闭环；
-    * `TASK-W.9c`（自注册 Worker 派工工厂与 Registry 闭环，M）：自注册 Worker 派工工厂挂接机制、`requireControlledDispatch` 端到端打通与 dispatchable 状态准确对账。
+  * **拆分落地（参照 W.5c 先例 · P-128 经授权）**：
+    * `TASK-W.9a`（探测报告指纹升格 + launch 解耦，S/M，`[READY]`）：`buildLaunch()` 缺端点降级预览 + `promoteControlMode()` 依赖真实探测报告消费链；
+    * `TASK-W.9b`（执行器抽象 + 容器见证接线，M，`[READY]`）：执行器统一抽象（Gateway 注入 vs 容器围栏方案对比落盘）+ 沙箱执行产物收集与 `SandboxWitness` 闭环；
+    * `TASK-W.9c`（自注册工厂闭环，M，`[BLOCKED · 待 a+b]`）：自注册 Worker 派工工厂挂接机制、`requireControlledDispatch` 端到端打通与 dispatchable 状态准确对账。
 * **台账**：
   * ledger **DLV-3** / **W.5b 挂账**：兑现「自造指纹升格重构」与「`buildLaunch` MCP 端点解耦」；
   * ledger **W.7 挂账 1**：解决「升格 ≠ 可派工」结构性边界，打通自注册 Worker 派工工厂与执行器接线。
 
 ---
 
+<a id="task-w.9a"></a>
+#### 【Task W.9a】探测报告指纹升格 + launch 解耦 `[READY]`
+
+> **拆卡立卡（2026-11-02 · P-128）**：母卡 W.9 子卡；与 W.9b 文件面正交，可并行。DoR READY 不构成施工授权，开工由 Tina 逐张拍板。
+
+* **任务编号**：`TASK-W.9a`
+* **任务名称**：探测报告指纹升格 + launch 解耦
+* **对应规格（R-1）**：`system-architecture.md` §9.1、§4.2.3 P-17、§0.6.1；`adapter-registry.ts::promoteControlMode()`；W.5b §3.4m 挂账；W.7 §3.4l 探测/升格链。
+* **前置依赖（R-3）**：W.7 COMPLETED（#89/`be480bb`）；W.5b COMPLETED（#92/`bdac805`）；母卡 W.9 SPLIT。W.9c 等待本卡完成。
+* **优先级**：P5 · Sprint 首要（本卡实现须另获 Tina 授权）
+* **状态**：`[READY]`
+* **对照痛点（R-4）**：`daemon/worker/adapter-registry.ts::promoteControlMode()`（W.9 母卡核验 `:176-193`）只校验报告指纹非空形态，不回查真实报告；自造指纹仍可能升格。`daemon/worker/cli-host/claude-code-adapter.ts::buildLaunch()`（母卡核验 `:247-251`）缺 `STAGENT_MCP_URL` 时硬抛，预览契约也无法构建。
+* **一句话目标（R-2）**：升格必须绑定可回查且通过的真实探测报告；缺 MCP endpoint 时生成显式仅预览契约，且不可执行。
+* **ADR 修订（R-9）**：无；遵守 ADR-0001/0003/0014 与 REJ-010。
+* **采用的默认值（R-10）**：报告 id/指纹及 adapter、目标档、版本、witness 由服务端报告记录权威回查，调用方自报不可信；缺 endpoint 返回明确 `preview_only` 状态，执行入口失败关闭。候选错误码须施工时核对现有码，不能当既有码引用。
+* **范围（R-5）**：
+  1. 修改 `daemon/worker/adapter-registry.ts::promoteControlMode()` 与报告消费路径：按 report id+fingerprint 回查记录，检查通过状态、adapter id、target mode、版本/声明指纹及所需 witness；缺失、失败、过期、错配一律拒绝，降级沿用既有安全语义。
+  2. 修改 `daemon/worker/verify/worker-registration-service.ts` 及报告模型/store，使通过报告绑定上述服务端事实，禁止请求体伪造。
+  3. 修改 `daemon/worker/cli-host/claude-code-adapter.ts::buildLaunch()`：端点缺失可构建显式仅预览结果；任何 run/执行路径拒绝该结果。
+  4. 补测试覆盖伪造/缺失/失败/错版本报告拒绝、有效报告通过、缺端点预览和执行拒绝。
+* **非目标（R-6）**：不实现外部 CLI 执行器、容器运行和自注册派工工厂；不改右栏只读白名单、verified_on 或控制模式政策。
+* **不变声明（R-12）**：鉴权、Demo Origin、点亮三证、网关写范围不变；无真实报告/witness 不升格；预览态不能执行。
+* **验收（PASS，R-7）**：`EW9A-01` 伪造/不存在报告拒绝；`EW9A-02` 失败或 adapter/target/version/witness 错配拒绝；`EW9A-03` 仅绑定一致的通过报告可升格；`EW9A-04` endpoint 缺失不硬抛而返回 preview-only；`EW9A-05` preview-only 不可执行；`EW9A-06` 错误码复用或明确定义，不将候选码误作既有码。
+* **FAIL（R-8）**：自造指纹可升格；错配报告可升格；仍只校验指纹形态；缺 endpoint 硬抛；预览态可执行；调用方可伪造报告/witness。
+* **关键文件**：`daemon/worker/adapter-registry.ts`、`daemon/worker/verify/worker-registration-service.ts`、报告 store/model、`daemon/worker/cli-host/claude-code-adapter.ts`；相关 unit tests。
+* **估算（R-11）**：S/M；若报告/执行面改造跨越本卡边界则先重估并拆分，不扩成 L 卡直接开工。
+
+<a id="task-w.9b"></a>
+#### 【Task W.9b】执行器抽象 + 容器见证接线 `[READY]`
+
+> **拆卡立卡（2026-11-02 · P-128）**：母卡 W.9 子卡；与 W.9a 文件面正交，可并行。Gateway 注入与容器 CLI 两形态施工前先作方案对比；READY 不构成施工授权。
+
+* **任务编号**：`TASK-W.9b`
+* **任务名称**：执行器抽象 + 容器见证接线
+* **对应规格（R-1）**：`system-architecture.md` §9.1、§4.2.3 P-17、§0.6.1；`CodingWorkerAdapter`、`runInSandbox()`、`SandboxWitness`、`resolveEvidenceControlMode()`；W.5b §3.4m 与 W.5c-iii §3.4k。
+* **前置依赖（R-3）**：W.5b COMPLETED（#92/`bdac805`）、W.5c-iii COMPLETED（#87/`2313597a`）、母卡 W.9 SPLIT；W.9c 等待本卡完成。与 W.9a 可并行。
+* **优先级**：P5 · Sprint 首要并行项（施工须另获 Tina 授权）
+* **状态**：`[READY]`
+* **对照痛点（R-4）**：`daemon/worker/cli-host/cursor-agent-adapter.ts::run()`（母卡核验 `:359-373`）仍分支失败，launch 结构未执行或收集产物；W.5c-iii 已有 `DockerContainerHost/runInSandbox/SandboxWitness`，但缺面向自注册/外部 CLI 的桥接。Gateway session/tool mediation 与容器执行的控制边界不同，不可用统一接口掩盖能力差异。
+* **一句话目标（R-2）**：外部 adapter 只经其真实可用的 Gateway 或容器执行路径运行并收集产物，证据档由执行事实和 witness 决定。
+* **ADR 修订（R-9）**：无；遵守 ADR-0001/0003/0014，不宣称容器绝对隔离。
+* **采用的默认值（R-10）**：形态 A：Gateway session/tool mediation；形态 B：`runInSandbox()` + 产物收集。先比较能力边界及平台限制，再选路径；无 Gateway capability 不得标 `GATEWAY_ENFORCED`。`SANDBOX_ENFORCED` 无有效 witness 一律经 `resolveEvidenceControlMode()` 记 `UNCONTROLLED_EXTERNAL`。
+* **范围（R-5）**：
+  1. 施工方案先比较 A/B 的适配器条件、权限与产物责任，确定不混淆的执行器契约。
+  2. 实现 adapter `run()` 契约（launch、worktree、expected artifacts、取消/超时），所有外部 CLI 执行必须经 Gateway 或 `ContainerHostPort.runInSandbox()`；无裸本地 spawn。
+  3. 产物仅从目标 Worktree/expected artifacts 收集并验证；只有本次成功容器执行可产生绑定的 SandboxWitness，失败/拒绝/超时无 witness。
+  4. 证据写入前调用 `resolveEvidenceControlMode(declaredMode, witness)`，声明档不得代替实录档。
+  5. 增单测覆盖两路径策略、边界、失败无 witness、无 witness 降档、禁止裸 spawn；fake host 与真实实测分开报告。
+* **非目标（R-6）**：不接最终自注册工厂/`requireControlledDispatch()` 闭环（W.9c）；不改右栏只读白名单；不伪造 verified_on；不做多 Agent DAG；不宣称绝对隔离/端到端闭环。
+* **不变声明（R-12）**：鉴权、Demo Origin、点亮三证、网关写范围不变；执行不绕 Gateway/容器；证据如实记档。
+* **验收（PASS，R-7）**：`EW9B-01` A/B 对比与选路依据；`EW9B-02` run 参数/取消/超时受控；`EW9B-03` 产物限定 Worktree/expected artifacts；`EW9B-04` 成功容器执行带 witness、失败不带；`EW9B-05` 无 witness 降为 `UNCONTROLLED_EXTERNAL`；`EW9B-06` 无 Gateway 能力不可标 Gateway；`EW9B-07` 无围栏外部 spawn 路径；`EW9B-08` fake 与真实宿主实测结果区分。
+* **FAIL（R-8）**：裸 spawn；SANDBOX_ENFORCED 无 witness 仍记受控；失败仍产 witness；产物越界；接口/声明冒充 Gateway；伪造 verified_on 或绝对受控声明。
+* **关键文件**：新增/修改 execution engine、外部 adapter、`docker-container-host.ts` 调用点、`worker-adapter.interface.ts`、orchestrator 证据消费路径；unit tests。
+* **估算（R-11）**：M；若需大规模跨 Gateway/容器/多 adapter 重构，停止并重估拆分。
+
+<a id="task-w.9c"></a>
+#### 【Task W.9c】自注册工厂闭环 `[BLOCKED · 待 a+b]`
+
+> **拆卡立卡（2026-11-02 · P-128）**：硬依赖 W.9a 与 W.9b 完成，且须 Tina 单张授权；此前不得抢跑派工接线。
+
+* **任务编号**：`TASK-W.9c`
+* **任务名称**：自注册工厂闭环
+* **对应规格（R-1）**：`AdapterRegistry::registerDispatchFactory/getDispatchFactory`、`requireControlledDispatch()`、`WorkerDispatchFactory`、自注册 worker store；W.6 §3.4g、W.7 §3.4l 挂账 1、W.9a/W.9b。
+* **前置依赖（R-3）**：W.9a AND W.9b COMPLETED（DAG 两条硬边）；W.6/W.7 COMPLETED；W.9 SPLIT。当前 BLOCKED。
+* **优先级**：P5 · 跟随 a+b，届时由 Tina 排程
+* **状态**：`[BLOCKED · 待 a+b]`
+* **对照痛点（R-4）**：自注册记录在 `.stagent/workers.json`，但未建 `CodingWorkerAdapter.run()` 或调用 `registerDispatchFactory()`；`requireControlledDispatch()` 对缺工厂会拒绝，升格与派工因此脱节。
+* **一句话目标（R-2）**：只有真实实现 run、工厂已注册且控制档/宿主门禁合格的 worker 才能派工，API/UI 与门禁共用同一 dispatchable 判据。
+* **ADR 修订（R-9）**：无；遵守 ADR-0001/0003/0014 与 REJ-010。
+* **采用的默认值（R-10）**：`dispatchable` 由有效 run、匹配当前 id/version 的已注册工厂及控制档/宿主可用性共同计算，调用方不能自报；升格不自动授予派工。
+* **范围（R-5）**：
+  1. 在 AdapterRegistry/自注册服务建立 id/version 绑定工厂，注册变更、撤销、改版使旧映射失效。
+  2. 接通 `requireControlledDispatch()`，检查控制档、factory 与实际 `run()` 合约；工厂失败或对象不合约均拒绝。
+  3. API/UI `dispatchable` 与派工门禁复用单一判据；无工厂/run 恒 false。
+  4. 增正反例：有效工厂可派工；升格无工厂、无 run、旧版本 factory/witness 均拒绝；状态投影与门禁一致。
+* **非目标（R-6）**：不重做 W.9a 报告/指纹校验或 W.9b 执行器抽象；不做多 Agent DAG；不改右栏只读白名单；不伪造 verified_on。
+* **不变声明（R-12）**：鉴权、Demo Origin、点亮三证、网关写范围不变；未通过门禁不派工；无 Gateway/容器绕行 fallback。
+* **验收（PASS，R-7）**：`EW9C-01` 有效工厂+run+合法档可派工；`EW9C-02` 升格无工厂仍不可派工并拒绝；`EW9C-03` 无 run 工厂拒绝；`EW9C-04` id/version 变化或撤销使旧 factory 失效；`EW9C-05` API/UI 与门禁判定一致；`EW9C-06` 代码与 DAG 均阻止 a/b 完成前抢跑。
+* **FAIL（R-8）**：无 run/工厂却 `dispatchable:true`；错版本工厂/witness 仍消费；升格等同自动派工；无 witness 仍记 SANDBOX_ENFORCED；存在绕过 Gateway/容器 fallback。
+* **关键文件**：`daemon/worker/adapter-registry.ts`、`worker-dispatch.ts`、`worker-registration-service.ts`、worker API/status projection；dispatch/registry unit tests。
+* **估算（R-11）**：M；若需引入执行器重构则退回重新估算，不混入本卡。
 
 ### 3.4c 闭环旅程 v2.1 第一批（Journey · 规格 `supervisor.md` 第三部分 §13～§20；对应 §19 落差 L-01～L-10）
+
 
 <a id="task-j.18"></a>
 
