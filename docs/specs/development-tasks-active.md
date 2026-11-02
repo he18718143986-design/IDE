@@ -76,12 +76,68 @@
 
 <a id="task-w.5b"></a>
 
-#### 【Task W.5b】cursor-agent 适配器黑盒实测 (v1.3.3 新增)
+#### 【Task W.5b】cursor-agent 适配器黑盒实测（外部适配器实测 + W.7 探测包非容器回归基准）(v1.3.3 新增)
+
+> **DoR 正文重写（2026-11-02 · P-124）**：原正文仅 5 行（任务编号 / 前置依赖 / 状态 / 核心目标 / Pass-Fail），经 [`task-card-standard.md`](./task-card-standard.md) R-1～R-12 复核**仅 R-3 达标**，即 ledger **DOR-3** 债（与 `W.5c` 当年同款处理）。本轮按 [`../templates/05-task-card.md`](../templates/05-task-card.md) 样板与 `W.5c` 重写范式逐条补齐 12 条，**仅重写卡正文、状态仍 `[NEW_TASK]`、不改产品代码、不开工、不动 Sprint 排程（`W.5b` 为现行首要）与 §1.1 矩阵语义**。**两处按事实纠正原卡**：① 原卡「注入规则见 架构 §0.6.6」——该节号**不存在**（`system-architecture.md` §0.6 下仅 0.6.1 执行模式 / 0.6.2 全局保护清单 / 0.6.3 冲突仲裁，见 `:261` / `:265` / `:269` / `:298`），本版改引真实节号并把凭证规则落到代码与 CLI 事实；② 原卡隐含「实测可能测出受控档」——按现行代码，`GATEWAY_ENFORCED` / `SANDBOX_ENFORCED` 两档对**宿主进程型**适配器**均不可达**，唯一合法档位是 `UNCONTROLLED_EXTERNAL`（判据见「可达档位」条），实测**不改变档位**，只决定能力声明的真实性与 Vibe 可用性。**本卡不实现宿主侧探测执行面**（见非目标第 1 条）。
+
 * **任务编号**：`TASK-W.5b`
-* **前置依赖**：`TASK-W.5a`
-* **任务状态**：**[NEW_TASK]**
-* **核心目标**：实测 cursor-agent 权限配置能否完全 deny shell/写文件并仅挂 Stagent MCP；凭证途径**仅限 API Key**（`[用户已确认 · 2026-10-20]` 所有 Worker 模式统一，不使用官方登录/订阅会话），注入规则见 架构 §0.6.6。**不能完全关闭原生写能力者只能登记为 `UNCONTROLLED_EXTERNAL`，仅 Vibe 模式可用，UI 显示"未受控"**。
-* **Pass/Fail 验收判定**：同 W.5a 的实测纪律；`verified_on` 按实测结果填写或明确标注"未通过，仅 Vibe"。
+* **任务名称**：cursor-agent 外部适配器黑盒实测（`UNCONTROLLED_EXTERNAL` 登记 + W.7 探测包非容器回归基准）
+* **对应规格**（R-1）：[`system-architecture.md`](./system-architecture.md) §2.3（`:393` Coding Worker Agent；`:394` 明文把 cursor-agent 列入 Worker 例）、§4.2.3 P-17（`:591` 术语纠偏：「沙箱」仅用于 OS 级命名空间 / cgroups / MicroVM / 专用容器隔离，**普通本地子进程严禁自称为沙箱**）、§0.6.1（`:265` 执行模式 VIBE vs PROTECTED —— 本卡「仅 Vibe 可用」的出典）、§9.1（`:937` `[待实现 - 目标数据模型]`：三值 `control_mode` + `verified_on`）、`:1374` **P5.5** 成熟 Agent 受控实测表行（「各 Adapter 记录真实 `verified_on`；4 类绕过负例在真实 CLI 上全部失败关闭」）；[`../adr/0001-target-user-positioning.md`](../adr/0001-target-user-positioning.md) **ADR-0001**（防越权控制面完全不变）、[`../adr/0003-worktree-capability-boundary.md`](../adr/0003-worktree-capability-boundary.md) **ADR-0003**（Worktree 能力边界 · 非对抗性沙箱）；[`task-card-standard.md`](./task-card-standard.md) R-1～R-12 / §4；先例 [`development-tasks-completed.md`](./development-tasks-completed.md) §3.4a `TASK-W.5a`（cli-host 黑盒实测纪律：`buildLaunch` argv / env 白名单、缺 MCP 端点即 throw）与 §3.4l `TASK-W.7`（探测包五类断言与 id）；ledger [`../ledger/README.md`](../ledger/README.md) **DOR-3**；[`../scheme.md`](../scheme.md) §10 墓地 **REJ-010**（能力声明不得按宿主侧修辞口径造假）
+* **前置依赖**（R-3）：`TASK-W.5a`（**COMPLETED** · cli-host 黑盒实测先例与环境白名单纪律）；`TASK-W.6`（**COMPLETED** · [#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53` · `AdapterRegistry` 派工门禁四码，否则登记后无门禁可断言）；`TASK-W.7`（**COMPLETED** · [#89](https://github.com/he18718143986-design/IDE/pull/89)/`be480bb` · 探测包五类断言 + `promoteControlMode()` 唯一升格入口 —— 本卡身份 ② 的被测对象）。**环境前置已核查**（只读，见文末「开工前置」）：`cursor-agent` 可执行且版本已锁定，**但凭证前置未满足**（当前为订阅登录态），须先隔离后方可实测
+* **优先级**：P3 · **NON_BLOCKER**（M2 不依赖；不阻断任何主序卡）
+* **任务状态**：**[NEW_TASK]**（DoR 已达标，**开工须 Tina 授权**；授权前不动代码）
+* **双重身份（读卡先读这条）**：
+  1. **身份 ①（本卡原始用途）**：cursor-agent 外部适配器黑盒实测 —— 能力声明逐项按实测事实填、`verified_on` 真实填（或明确标注「未通过，仅 Vibe」）。
+  2. **身份 ②（P-123 追加）**：W.7 探测包对「**非容器外部适配器**」的**回归基准** —— 被测对象是**探测包本身**，断言方向是**负向**：探测包必须**拒绝**这一类适配器。若某类适配器能让探测包产出 `pass`，那才是缺陷。
+  3. 两重身份共用**一次**实测，但**判定分开**：身份 ① 看「实测与声明是否一致」，身份 ② 看「探测包是否拒绝该类适配器」。二者都不得互相顶替。
+* **可达档位（实测不改变档位）**：
+  1. `GATEWAY_ENFORCED` —— **不可达**。严格档校验要求 `tool_interception_supported === true`（`worker-adapter.interface.ts::validateAdapterCapability` `:199`，判据在 `:248-253`）；cursor-agent 的工具调用由 CLI 侧发起、本进程无拦截点，声明 `true` 即造假（触 REJ-010）。
+  2. `SANDBOX_ENFORCED` —— **当前不可达**。判据是**运行路径**而非校验函数：该档派工必须经 `runInSandbox()` 并返回 `SandboxWitness`，`resolveEvidenceControlMode()` 缺见证即校正为 `UNCONTROLLED_EXTERNAL`；cursor-agent 是宿主进程、不经该入口。**陷阱须写明**：围栏档校验 `validateSandboxFenceTier()` 只查 `known_limitations` 非空 + 平台矩阵非空，故它**能通过校验** —— 「通过校验」≠「够格标沙箱」，按 REJ-010 不得据此标该档。
+  3. `UNCONTROLLED_EXTERNAL` —— **唯一合法档位**。登记后 `requireControlled()` 不放行、`requireControlledDispatch()` 抛 `E_ADAPTER_NOT_CONTROLLED`、**不挂**派工工厂（与 `default-worker-registry.ts::claudeCodeWorkerRegistration()` `:96` / 登记点 `:256` 同款）。
+  4. 若实测证明其 `--sandbox enabled` 提供 §4.2.3 P-17 定义的 OS 级隔离，**是否**为其新开宿主侧围栏执行面属**架构决策、另卡立**；本卡只如实登记实测事实，**不改判据**。
+* **W.7 探测包五类断言在本类适配器上的适用性（写死，不由施工者临场判断）**：
+  1. `filesystem_fence` —— **不可执行（不适用）**。依据 `worker-probe.ts::runProbePack()` `:270-275`：执行面 `isAvailable() !== true` 即抛 `E_PROBE_SANDBOX_UNAVAILABLE`，**拒绝退回主树执行**；现有唯一实现 `SandboxProbeExecutionPort` 经 `runInSandbox()` 入容器（`probe-execution-sandbox.ts`）。宿主进程适配器无容器执行面 → 本项不可执行，**不得伪造 pass、不得降级为宿主执行**。
+  2. `command_fence` —— **不可执行（不适用）**，同上（同一执行面依赖）。
+  3. `evidence_integrity` —— **不可执行（不适用）**，同上（同一执行面依赖）。
+  4. `capability_declaration` —— **适用**。`probeCapabilityDeclaration()` `:173` 是纯函数、不依赖执行面；对 cursor-agent 取目标档 `GATEWAY_ENFORCED` 应判 **fail** —— 这是身份 ② 的**负向断言**，出现 `pass` 即说明声明被美化或校验被绕过。
+  5. `dispatch_witness` —— **N/A（`required:false`）**。`probeDispatchWitness()` `:206-212` 对非 `SANDBOX_ENFORCED` 目标硬编码返回 `not_verified` + `required:false`；且 `FenceProbeInput.target_mode` 类型（`:78`）只接受 `GATEWAY_ENFORCED | SANDBOX_ENFORCED`，**不含** `UNCONTROLLED_EXTERNAL` —— 探测包的用途是「升格判定」，不是「未受控档复核」，类型上就不给这个入口。
+  6. 汇总：五类中 **1 类适用且应判 fail、1 类 N/A-by-design、3 类不可执行**。本卡只把这张判定表写死并落回归断言（`CA-07`），**不实现**宿主侧执行面（非目标第 1 条）。
+* **一句话目标**（R-2）：cursor-agent 以 `UNCONTROLLED_EXTERNAL` 登记进默认注册表（不挂派工工厂、不可派工、产物不得作为可合并证据），能力声明与 `verified_on` 按真实 CLI 实测如实填写；同一份声明同时充当 W.7 探测包对「非容器外部适配器」的负向回归基准 —— 探测包必须判 `capability_declaration` = fail、`dispatch_witness` = N/A，**绝不产出 pass**。
+* **对照痛点（代码与 CLI 事实）**（R-4）：
+  1. **生产代码零实现**：全仓 `cursor-agent` / `CURSOR_API_KEY` 仅出现在注释、报告与任务卡，**无任何适配器实现** —— 本卡是**新建**，不是改造既有代码。
+  2. `daemon/worker/key-store.ts` 只有 OpenAI 兼容通道（`OPENAI_API_KEY` / `STAGENT_MODEL`），**无 cursor-agent 专用 key 通道**；Claude Code 侧 key 走 `claude-code-adapter.ts:141` 的 `opts.apiKey ?? process.env["ANTHROPIC_API_KEY"]`。故本卡**按需直接读 `CURSOR_API_KEY`**（CLI 原生支持），**不动** `key-store.ts`（见非目标第 3 条）。
+  3. `claude-code-adapter.ts::buildLaunch()`（`:165`）是「纯构建便于断言」的先例，env 白名单在 `:327-342`（`PATH` / `HOME` / `LANG` / `STAGENT_HOOK_*` / `ANTHROPIC_API_KEY` / `FORWARD_ENV` 白名单 / `CLAUDE_CONFIG_DIR`），缺 MCP 端点即 throw（`:256-260`，属 TASK-W.8 行为）—— 本卡**只读复用**该纪律。
+  4. **本机 CLI 实测事实**（`cursor-agent --help`，版本 `2026.10.01-e373342`）：原生支持 `--api-key <key>` 与 `CURSOR_API_KEY`；有 `--mode plan|ask`（只读档）；有 `--sandbox enabled|disabled`；有 `--print`（帮助原文：has access to all tools, **including write and shell**）；危险开关 `-f/--force`、`--yolo`、`--auto-review`、`--approve-mcps`、`--trust`、`--add-dir`、`-w/--worktree` 全部存在；**无** `--strict-mcp-config` 等价开关（MCP 配置只经配置文件）。
+  5. `default-worker-registry.ts::createDefaultWorkerRegistry()`（`:242-271`）当前登记 4 项：内置 Managed AI 双 id（`GATEWAY_ENFORCED` + 工厂）、Claude Code（`UNCONTROLLED_EXTERNAL`、**不挂工厂**）、OpenHands（按 `openhandsControlMode()` 判定）。本卡在其后追加第 5 项。
+* **ADR 修订**（R-9）：**无冲突、不修订**。把 cursor-agent 登记为 `UNCONTROLLED_EXTERNAL` 且不挂派工工厂，正是 ADR-0001「防越权控制面完全不变」与 ADR-0003「Worktree 非对抗性沙箱」的**保守侧**执行；不新增档位、不放宽任何判据。
+* **采用的默认值**（R-10）：凭证途径**仅限 API Key**（`[用户已确认 · 2026-10-20]` 所有 Worker 模式统一，不使用官方登录 / 订阅会话）；未通过实测者默认 `UNCONTROLLED_EXTERNAL`、仅 Vibe 可用、UI 显示「未受控」。**原卡所引「架构 §0.6.6」节号不存在**（§0.6 下仅 0.6.1 / 0.6.2 / 0.6.3），本版不沿用；凭证注入规则改由本卡范围第 2～4 条与代码事实共同钉死。依赖的 `scheme.md` 冲突卡与 OQ（oq-2 dec-12 / oq-3 dec-13）均已裁决，**无未决产品问题**。
+* **范围**（R-5）：
+  1. 新建 `daemon/worker/cli-host/cursor-agent-adapter.ts`：导出 `CURSOR_AGENT_WORKER_ADAPTER_ID`（`stagent.cursor-agent.v0`）、`CURSOR_AGENT_CAPABILITY: AdapterCapabilityDeclaration`（9 项按实测事实填，`known_limitations` 逐条对应实测发现）、`CursorAgentAdapter`，以及**纯构建**方法 `buildLaunch(input: Pick<AdapterRunInput, "prompt" | "cwd" | "nativeSessionId">): BuiltLaunch`（argv / env 可逐字断言，仿 `claude-code-adapter.ts:165`）。
+  2. `buildLaunch()` 的 argv 白名单（按本机 CLI 实测参数写死，**只准**出现）：`--print` / `--output-format stream-json` / `--mode plan`（只读档；若实测需放开写须在证据文件写明理由与范围）/ `--model <model>` / `--workspace <worktree_root>`；**禁止** `--force` / `--yolo` / `--auto-review` / `--approve-mcps` / `--trust` / `--add-dir` / `-w|--worktree`（任一出现即 FAIL）。
+  3. env 白名单（仿 `claude-code-adapter.ts:327-342` 纪律）：仅 `PATH` / `HOME`（指向**专用配置目录**，用于隔离既有登录态）/ `LANG` / `CURSOR_API_KEY` / `STAGENT_*` 观测变量；**不得**透传任意 `process.env`。
+  4. MCP 挂接：**仅挂** Stagent 受管端点（`mcpServers.stagent = { type:"http", url, headers }` 形态沿用 `claude-code-adapter.ts:275-289`）；cursor-agent 无 `--strict-mcp-config` 等价开关 → 配置文件落点以实测为准并写入证据文件；端点缺失时**抛错而非静默空集合**（同 W.5a 纪律）。
+  5. `daemon/worker/default-worker-registry.ts::createDefaultWorkerRegistry()` 增一行 `registry.register(cursorAgentRegistration(), "UNCONTROLLED_EXTERNAL")`，**不挂** `registerDispatchFactory`；注册表项数 4 → 5。
+  6. 新建 `tests/unit/cursor-agent-adapter.test.ts`（确定性：argv / env 白名单、声明对账、档位与门禁、探测包负向回归）与 `tests/e2e/cursor-agent-real.real.test.ts`（真实 CLI，`STAGENT_REAL_CURSOR=1` 时运行）；实测证据归档 `docs/reports/`。
+  7. 实测纪律（沿用 W.5a）：负例 ≥4 类（Worktree 外写 / 保护区写 / 白名单外命令 / MCP 面越权），真实 CLI 全部失败关闭后 `verified_on` 才非空。
+* **非目标**（R-6）：**不实现宿主侧 `ProbeExecutionPort`**（本卡只把五类断言的适用性判定写死并落回归断言，不做宿主侧围栏探测执行面 —— 另卡）；**不改** `worker-probe.ts` 五类断言语义、**不改** `FenceProbeInput.target_mode` 类型（不得为「让探测能跑」而扩成三值）；不做 `key-store.ts` 的 cursor 专用 key 通道、不改设置页「模型钥匙」UI（若实测证明必须，按 R-11 升 L 另议，不在本卡偷做）；不改 OpenHands / Claude Code 适配器、不改 `container-host.ts`、不改 `promoteControlMode()` 语义；不做 Vibe 模式 UI 文案改造（沿用现有「未受控」显示）；不宣称「绝对受控」、不做多 Agent 并行 DAG（v0.2 RFC）。
+* **不变声明**（R-12）：**不改变**：鉴权 / Demo Origin / 点亮三证 / 网关写范围（ADR-0001 纪律）；不改变 `GATEWAY_ENFORCED` / `SANDBOX_ENFORCED` / `UNCONTROLLED_EXTERNAL` 三档判据与 `resolveEvidenceControlMode()`「记实不记名」唯一强制点；不改变 `worker-probe.ts` 五类断言语义与 `target_mode` 类型；`UNCONTROLLED_EXTERNAL` 仍不得作为受控 / 可合并证据。
+* **验收（PASS）**（R-7）：新增 `tests/unit/cursor-agent-adapter.test.ts` 与 `tests/e2e/cursor-agent-real.real.test.ts`，逐条可译为 `it(...)`：
+  1. `CA-01` 声明如实且严格档必拒：`CURSOR_AGENT_CAPABILITY.known_limitations` 非空且逐条可对应实测；`validateAdapterCapability(CURSOR_AGENT_CAPABILITY, "GATEWAY_ENFORCED").ok === false`（拒绝码 ∈ `FILESYSTEM_DIRECT_UNCONTROLLED` / `TOOL_INTERCEPTION_UNSUPPORTED`）。**反向断言**：若把声明美化成能过严格档，本用例必须失败。
+  2. `CA-02` 档位与门禁：`createDefaultWorkerRegistry().get(CURSOR_AGENT_WORKER_ADAPTER_ID)?.control_mode === "UNCONTROLLED_EXTERNAL"`；`requireControlledDispatch(registry, id)` 抛 `E_ADAPTER_NOT_CONTROLLED`；`registry.list().length` 由 4 → 5 且该 id **无**派工工厂。
+  3. `CA-03` argv 白名单：`buildLaunch({ prompt:"x", cwd:"/tmp/w" })` 的 `args` **不含** `--force` / `--yolo` / `--auto-review` / `--approve-mcps` / `--trust` / `--add-dir` / `--worktree`，**含** `--print` 与 `--output-format stream-json`。
+  4. `CA-04` env 白名单与凭证前置：`buildLaunch().env` 键集合 ⊆ {`PATH`, `HOME`, `LANG`, `CURSOR_API_KEY`, `STAGENT_*`}；夹具注入哨兵环境变量后断言其**不出现**在 `env`；`CURSOR_API_KEY` 缺失时 `run()` 先抛且 **spawn 零调用**（spy 断言）。
+  5. `CA-05` MCP 面：端点缺失 → `buildLaunch()` 显式抛错（不得静默落空 `mcpServers`）；`mcpServers.stagent.url` 与受管端点一致；`mcpServers` 内**不含**任何非 `stagent` 项。
+  6. `CA-06` 真实 CLI 负例（`STAGENT_REAL_CURSOR=1`）：Worktree 外写 / 保护区写（`.git`、`.stagent`）/ 白名单外命令 / MCP 面越权 **四类全部失败关闭**；任一类可通过即 FAIL。
+  7. `CA-07` 探测包负向回归（身份 ②）：`probeCapabilityDeclaration(CURSOR_AGENT_CAPABILITY, "GATEWAY_ENFORCED").status === "fail"`；`probeDispatchWitness("GATEWAY_ENFORCED", undefined)` 返回 `status === "not_verified" && required === false`；执行面不可用时 `runProbePack()` 抛 `E_PROBE_SANDBOX_UNAVAILABLE` 且「一次容器调用都不发生」。三者任一为 `pass` → FAIL（即探测包被绕过）。
+  8. `CA-08` `verified_on` 与升格拒绝：`CA-06` 通过前 `verified_on` 恒空、呈现标「未通过，仅 Vibe」；通过后 `cli_version` 为实测 `cursor-agent --version` 原样、`verified_at` 为实测日期；`promoteControlMode(id, "SANDBOX_ENFORCED" | "GATEWAY_ENFORCED", { report_fingerprint })` 必须被拒（`ADAPTER_PROMOTION_REFUSED`）。
+* **FAIL**（R-8）：为让 `validateAdapterCapability` 通过而美化声明（`tool_interception_supported: true` 而无拦截实现，或 `filesystem_permissions` 写成 `GATEWAY_ONLY` 却实测可直写）；把 cursor-agent 登记为 `GATEWAY_ENFORCED` 或 `SANDBOX_ENFORCED`（后者需经 `runInSandbox()` 并携 `SandboxWitness`，宿主进程无此路径 → 触 **REJ-010**）；未实测即填 `verified_on`，或实测未过仍填；**凭证走官方登录 / 订阅会话 / cookie**（本机 `cursor-agent status` 当前即订阅登录态，未隔离直接实测 = FAIL）；传 `--force` / `--yolo` / `--auto-review` / `--approve-mcps` / `--trust` / `--add-dir` / `-w` 中任一（即绕过「仅挂 Stagent MCP / 写范围」前提）；为让探测包出 `pass` 而伪造 `ProbeExecutionPort`（把宿主主树当执行面）或把 `target_mode` 类型扩成三值；把 cursor-agent 自带 `--sandbox enabled` 直接当作 §4.2.3 P-17 意义上的「沙箱」并据此标 `SANDBOX_ENFORCED`；为达成实测放宽鉴权 / Demo Origin / 网关写范围；若实测证明必须动 `key-store` + 设置页 UI 却不升 L、不拆即继续开工。
+* **关键文件**：`daemon/worker/cli-host/cursor-agent-adapter.ts`（新）、`daemon/worker/default-worker-registry.ts`（改，增一行登记）、`tests/unit/cursor-agent-adapter.test.ts`（新）、`tests/e2e/cursor-agent-real.real.test.ts`（新）、`docs/reports/`（实测证据归档）；**只读复用**：`daemon/worker/cli-host/claude-code-adapter.ts`（env 白名单与 `buildLaunch` 纪律）、`daemon/worker/verify/worker-probe.ts`（五类断言与 `PROBE_IDS`）、`daemon/worker/adapter-registry.ts`（门禁四码）、`daemon/worker/key-store.ts`（核对无 cursor 通道，**本卡不改**）
+* **估算**（R-11）：**M**（单层：`cli-host` 适配器 + 一行登记 + 两个测试文件；无容器依赖、无跨层 schema 改动；对照 `W.5c-iii`（M）与 `W.5a`（同类实测）；PASS 8 条未超 §4「PASS 不超过 12 条」，且不越「一张卡只碰一个层」）。**升 L 条件写死**：若实测证明必须新增 `key-store.ts` 的 cursor 专用通道与设置页 UI（跨到配置面 + UI 层），则本卡升 **L**、须按 R-11 拆分（适配器与测试 | 凭证通道与设置页）并另行授权，**不得**在 M 估算下顺手扩层。
+* **开工前置（本轮只读核查 · 2026-11-02）**：
+  1. ✅ **CLI 可用**：`~/.local/bin/cursor-agent`，`--version` → `2026.10.01-e373342`；`--help` 已逐项核对（`--api-key` / `CURSOR_API_KEY` / `--mode plan|ask` / `--sandbox` / `--print` / `--force|--yolo` / `--approve-mcps` / `--trust` / `--add-dir` / `-w|--worktree` 均在列）。
+  2. ⚠️ **凭证前置未满足**：`CURSOR_API_KEY` 未设置；`cursor-agent status` 返回 `✓ Logged in as …`（**订阅登录态**，账号已脱敏、不落文档）。按「凭证仅限 API Key」裁决，**开工第一步**是隔离环境（专用 `HOME` / 配置目录）并断言 `cursor-agent status` 显示未登录，再以 `CURSOR_API_KEY` 实测；否则实测会静默走订阅会话、直接触 FAIL 条件。
+  3. ⚠️ **MCP 配置落点与「仅挂 Stagent MCP」的兑现方式尚未实测**（无 `--strict-mcp-config` 等价开关）—— 属本卡实测项，非前置阻断。
+  4. 结论：**代码侧可开工；实测侧须先解凭证隔离**。本卡状态保持 `[NEW_TASK]`，开工须 Tina 授权。
 
 ---
 

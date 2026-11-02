@@ -16,7 +16,7 @@
 | `TASK-S.6b` | `COMPLETED` | 真机试玩收口（S.6 降级项；无独立详细卡，见矩阵 S.6 行与 changelog P-22） | [矩阵/流水](./development-tasks.md)（无独立详细卡） |
 | `TASK-D.1e` | `DEFERRED` | 桌面壳 / 本机助手：真·选文件夹（Import 与工作台同壳） | [打开](./development-tasks-active.md#task-d.1e) |
 | `TASK-S.3` | `DEFERRED` | Supervisor HUD 建议流与 WebSocket 广播 | [打开](./development-tasks-active.md#task-s.3) |
-| `TASK-W.5b` | `NEW_TASK` | cursor-agent 适配器黑盒实测 (v1.3.3 新增) · **Sprint 首要（P-123）**；**DOR-3 债未偿，卡正文须先按 DoR 重写才能施工** | [打开](./development-tasks-active.md#task-w.5b) |
+| `TASK-W.5b` | `NEW_TASK` | cursor-agent 适配器黑盒实测 (v1.3.3 新增) · **Sprint 首要（P-124）**；**DoR 已达标**（P-124 按 R-1～R-12 重写，DOR-3 债已偿）；双重身份含 `W.7` 探测包非容器回归基准；开工须授权、实测前须先解凭证隔离 | [打开](./development-tasks-active.md#task-w.5b) |
 | `TASK-W.5c` | `SPLIT` | OpenHands 适配器（容器隔离）· 拆分母卡（P-118 经授权拆为 i/ii/iii，保留追溯） | [打开](./development-tasks-active.md#task-w.5c) |
 | `TASK-W.5c-i` | `COMPLETED` | 双枚举 `SANDBOX_ENFORCED` + `workerSpec` 目标字段（[#81](https://github.com/he18718143986-design/IDE/pull/81)/`c3e75cc` · S/M） | [打开](./development-tasks-completed.md#task-w.5c-i) |
 | `TASK-W.5c-ii` | `COMPLETED` | 容器运行时 `runInSandbox` + 派工门禁按宿主可用性解锁（[#85](https://github.com/he18718143986-design/IDE/pull/85)/`648be31` · M · mock/stub 可测；`runInSandbox` 尚未接入执行面） | [打开](./development-tasks-completed.md#task-w.5c-ii) |
