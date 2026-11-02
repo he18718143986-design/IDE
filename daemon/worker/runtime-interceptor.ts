@@ -29,7 +29,13 @@ export type GatewayViolationCode =
 
 export interface AdapterSnapshot {
   adapter_id: string;
-  control_mode: "GATEWAY_ENFORCED" | "UNCONTROLLED_EXTERNAL";
+  /**
+   * TASK-W.5c-ii：扩为三值。`SANDBOX_ENFORCED` 是**受控**档位（容器隔离），
+   * 降级路径仍统一置 `UNCONTROLLED_EXTERNAL`——不得把沙箱档误判为不受控，
+   * 否则拦截器会放行本应拦截的操作。
+   */
+  control_mode:
+    "GATEWAY_ENFORCED" | "SANDBOX_ENFORCED" | "UNCONTROLLED_EXTERNAL";
   tool_interception_supported: boolean;
   filesystem_permissions: "GATEWAY_ONLY" | "DIRECT_UNCONTROLLED";
   command_permissions: "WHITELIST_ONLY" | "UNRESTRICTED_SHELL";
@@ -81,7 +87,8 @@ export class RuntimeInterceptor {
 
   private stopped = false;
   private canEvidence = true;
-  private controlMode: "GATEWAY_ENFORCED" | "UNCONTROLLED_EXTERNAL";
+  private controlMode:
+    "GATEWAY_ENFORCED" | "SANDBOX_ENFORCED" | "UNCONTROLLED_EXTERNAL";
   private violation: GatewayViolation | null = null;
 
   constructor(options: RuntimeInterceptorOptions) {
@@ -94,7 +101,8 @@ export class RuntimeInterceptor {
     this.controlMode = options.snapshot.control_mode;
   }
 
-  getControlMode(): "GATEWAY_ENFORCED" | "UNCONTROLLED_EXTERNAL" {
+  getControlMode():
+    "GATEWAY_ENFORCED" | "SANDBOX_ENFORCED" | "UNCONTROLLED_EXTERNAL" {
     return this.controlMode;
   }
 

@@ -31,7 +31,6 @@ import {
   E_ADAPTER_SANDBOX_LOCKED,
   WorkerDispatchError,
   requireControlledDispatch,
-  toRuntimeControlMode,
   type WorkerDispatchFactory,
 } from "../../daemon/worker/worker-dispatch";
 
@@ -123,7 +122,7 @@ describe("SE-02：workerSpecSchema 目标字段（可选，缺省不写）", () 
   });
 });
 
-describe("SE-03：窗口期语义——注册接受、派工显式拒绝", () => {
+describe("SE-03：注册接受、未注入宿主时派工显式拒绝（W.5c-ii 起按宿主可用性判定）", () => {
   it("SANDBOX_ENFORCED 适配器注册成功（登记面接受）", () => {
     const registry = new AdapterRegistry();
     const entry = registry.register(fakeAdapter(SANDBOX_ID), "SANDBOX_ENFORCED");
@@ -158,9 +157,8 @@ describe("SE-03：窗口期语义——注册接受、派工显式拒绝", () =>
     const dispatchErr = err as WorkerDispatchError;
     expect(dispatchErr.code).toBe(E_ADAPTER_SANDBOX_LOCKED);
     expect(dispatchErr.adapter_id).toBe(SANDBOX_ID);
-    // 消息须注明「待 W.5c-ii container-host 落地解锁」语义
-    expect(dispatchErr.message).toContain("W.5c-ii");
-    expect(dispatchErr.message).toContain("container-host");
+    // W.5c-ii 起：未注入容器宿主 → 拒绝（语义由「窗口期永远拒绝」改为宿主可用性判定）
+    expect(dispatchErr.message).toContain("ContainerHostPort");
     // 不得复用既有「非受控」错误码
     expect(dispatchErr.code).not.toBe("E_ADAPTER_NOT_CONTROLLED");
   });
@@ -182,15 +180,26 @@ describe("SE-03：窗口期语义——注册接受、派工显式拒绝", () =>
   });
 });
 
-describe("SE-05：窗口期档位窄化（下游收尾，不得产生假受控证据）", () => {
-  it("SANDBOX_ENFORCED 记入运行时 / 证据时按 UNCONTROLLED_EXTERNAL 处理", () => {
-    expect(toRuntimeControlMode("SANDBOX_ENFORCED")).toBe(
-      "UNCONTROLLED_EXTERNAL",
+describe("SE-05：档位如实记三值（W.5c-ii 解锁后，窗口期收窄已解除）", () => {
+  it("SANDBOX_ENFORCED 记入证据时如实记为该档位（不再收窄为 UNCONTROLLED_EXTERNAL）", () => {
+    // 收窄会让「受控派工成功」产出「不可合并证据」，解锁后如实记档。
+    expect(workerControlModeSchema.options).toContain("SANDBOX_ENFORCED");
+    expect(workerControlModeSchema.safeParse("SANDBOX_ENFORCED").success).toBe(
+      true,
     );
-    expect(toRuntimeControlMode("UNCONTROLLED_EXTERNAL")).toBe(
-      "UNCONTROLLED_EXTERNAL",
+    expect(
+      workerControlModeSchema.safeParse("UNCONTROLLED_EXTERNAL").success,
+    ).toBe(true);
+    expect(workerControlModeSchema.safeParse("GATEWAY_ENFORCED").success).toBe(
+      true,
     );
-    expect(toRuntimeControlMode("GATEWAY_ENFORCED")).toBe("GATEWAY_ENFORCED");
+  });
+
+  it("证据 schema 的 worker_control_mode 同步为三值（源码断言）", () => {
+    const source = readSource("src", "lib", "evidence.schema.ts");
+    expect(source).toMatch(
+      /worker_control_mode:[\s\S]{0,200}?"SANDBOX_ENFORCED"/,
+    );
   });
 });
 
