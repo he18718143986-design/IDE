@@ -104,6 +104,8 @@
 
 > **W.5b 交付（2026-11-02 · P-125 · cursor-agent 外部适配器销项 · 在队实现卡清零）**：`TASK-W.5b` → **`[COMPLETED]`**（[#92](https://github.com/he18718143986-design/IDE/pull/92)/`bdac805`，squash；本地 `33cf6c2`，parent `b8d53c5`）。**完成口径（Tina 2026-11-02 裁决）**：代码侧闭环即标完成，**PASS 8 条中 `CA-06`（真实 CLI 四类越权负例）未执行**入挂账 1——本机无有效 `CURSOR_API_KEY`、卡内 FAIL 禁止用订阅登录态凑数，故 `CURSOR_AGENT_VERIFIED_ON` 恒空，该卡**不产出任何受控证据**；`CA-01`～`CA-05` / `CA-07` / `CA-08` 达成。**档位是结构性上界，不是「没测出来」**：`GATEWAY_ENFORCED` 要求 `tool_interception_supported === true`（本进程无拦截点）、`SANDBOX_ENFORCED` 要求派工经 `runInSandbox()` 并携 `SandboxWitness`（宿主进程不经该入口）→ 唯一合法档位 `UNCONTROLLED_EXTERNAL`，**实测不改变档位**。**探测包非容器负向回归**：`capability_declaration` 应判 `fail`、`dispatch_witness` N/A-by-design、其余三类不可执行（`E_PROBE_SANDBOX_UNAVAILABLE` 拒绝退回主树）；适用性表覆盖 `PROBE_IDS` 全量。**实测发现并修掉**：不带 `--` 时 prompt 里的 `--yolo` 会被当成真旗标 → argv 已插入 `--` 终止符。**残余边界**：`AdapterRegistry.promoteControlMode()` 只校验指纹形态（自造指纹可改档位，但派工仍被 `E_ADAPTER_SANDBOX_LOCKED` 拒）、项目级 `.cursor/mcp.json` 需人工批准故 MCP 只写专用 `HOME`。**在队清零**：矩阵已无 `[NEW_TASK]` 实现卡（余 3 张 `[SPLIT]`、5 张 `[DEFERRED → v0.2+]`），下一张卡待 Tina 指定。本条仅 docs 回写；不改产品代码；不新增 OP 号；不宣称 cursor-agent 受控或端到端闭环。
 
+> **P-125 合入 tip 同步（2026-11-02 · P-126）**：`docs/p125-w5b-complete`（`cedd5a6`）经 Tina 告知已合入 **#93/`1a50cb15`**（squash）。**指针推进**：物理起点与 `scheme.md` 现行指针由 `bdac805` → `1a50cb15`；本文件 P-125 注记里的 `bdac805` 按「保留原文作溯源」惯例**不改写**。**账目未变**：DOR-3 重写债已于 P-124 偿还、`TASK-W.5b` 已于 P-125 标 `[COMPLETED]` 且 `CA-06` 留在挂账（`CURSOR_AGENT_VERIFIED_ON` 恒空、**不产出任何受控证据**）；矩阵内仍无 `[NEW_TASK]` 实现卡、下一张卡待 Tina 指定。**口径不变**：档位是结构性上界（`UNCONTROLLED_EXTERNAL` 唯一合法），不因 tip 推进改变。本条仅 docs 回写；不改产品代码；不新增 OP 号。
+
 ## DoR 全量审计挂账（2026-10-31 新增）
 
 来源：[`../reports/dor-readiness-audit-2026-10-31.md`](../reports/dor-readiness-audit-2026-10-31.md)（L4 证据；本表只登记结构/状态问题，不改卡条款）。
