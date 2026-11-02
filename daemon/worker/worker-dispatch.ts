@@ -189,3 +189,26 @@ export function requireControlledDispatch(
   }
   return factory;
 }
+
+/**
+ * TASK-W.9b：单一判定源复用——判定适配器当前是否满足受控派工门禁。
+ *
+ * 与 requireControlledDispatch 判定严格同源：
+ * - 未注册 / UNCONTROLLED_EXTERNAL → false
+ * - SANDBOX_ENFORCED 且缺少可用 ContainerHostPort → false
+ * - GATEWAY_ENFORCED 但未满足受控声明 → false
+ * - 未挂接 dispatchFactory → false
+ * - 满足门禁且有工厂 → true
+ */
+export function isControlledDispatchable(
+  registry: AdapterRegistry,
+  adapterId: string,
+  options?: ControlledDispatchOptions,
+): boolean {
+  try {
+    requireControlledDispatch(registry, adapterId, options);
+    return true;
+  } catch {
+    return false;
+  }
+}

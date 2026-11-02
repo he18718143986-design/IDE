@@ -74,6 +74,7 @@ import {
 // 内置 Managed AI 工厂由 default-worker-registry 模块持有，经 Registry 注入。
 import type { AdapterRegistry } from "../worker/adapter-registry";
 import {
+  isControlledDispatchable,
   requireControlledDispatch,
   type WorkerDispatchContext,
 } from "../worker/worker-dispatch";
@@ -326,6 +327,17 @@ export class ContractOrchestrator {
   /** TASK-W.6：诊断 / 设置面可读取当前已注册适配器 id 列表 */
   listRegisteredAdapters(): ReturnType<AdapterRegistry["list"]> {
     return this.workerRegistry.list();
+  }
+
+  /** TASK-W.9b：判定适配器是否满足受控派工门禁（与 requireControlledDispatch 判定严格同源） */
+  isAdapterDispatchable(
+    adapterId: string,
+    options?: { containerHost?: ContainerHostPort },
+  ): boolean {
+    const containerHost = options?.containerHost ?? this.containerHost;
+    return isControlledDispatchable(this.workerRegistry, adapterId, {
+      containerHost,
+    });
   }
 
   /** 测试/诊断：当前合同是否持有有效 exec_token */

@@ -4438,6 +4438,8 @@ export class StagentDaemon {
 
     // TASK-W.6：配置面只读诊断——列出已注册 Worker 适配器。
     // 沿用既有鉴权，不新增豁免、不削弱任何既有端点。
+    // TASK-W.9b：dispatchable 与 requireControlledDispatch 门禁判定严格同源，
+    // 不再硬编码 GATEWAY_ENFORCED，解决 W.7 挂账中的口径分叉。
     if (method === "GET" && pathname === "/api/adapters") {
       if (!this.isAuthorized(req)) {
         this.sendJson(res, 401, { error: "Unauthorized" });
@@ -4447,7 +4449,7 @@ export class StagentDaemon {
         adapter_id: entry.declaration.adapter_id,
         control_mode: entry.control_mode,
         kind: entry.adapter.kind,
-        dispatchable: entry.control_mode === "GATEWAY_ENFORCED",
+        dispatchable: this.orchestrator.isAdapterDispatchable(entry.declaration.adapter_id),
       }));
       this.sendJson(res, 200, { adapters });
       return;

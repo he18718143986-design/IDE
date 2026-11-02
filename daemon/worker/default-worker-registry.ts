@@ -54,6 +54,7 @@ export const CLAUDE_CODE_WORKER_ADAPTER_ID =
   "stagent.claude-code.worker.v0" as const;
 /** TASK-W.5c-iii：OpenHands 容器 Worker 的登记 id（与能力声明同源） */
 export const OPENHANDS_WORKER_ADAPTER_ID = OPENHANDS_ADAPTER_ID;
+export { CURSOR_AGENT_WORKER_ADAPTER_ID } from "./cli-host/cursor-agent-adapter";
 
 /**
  * 内置 Managed AI 派工工厂：完整复用 `AiWorker` 的 Gateway 写入 / 越界拦截 /

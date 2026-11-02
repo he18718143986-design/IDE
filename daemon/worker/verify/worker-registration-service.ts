@@ -17,6 +17,7 @@
  */
 
 import { AdapterRegistry, AdapterRegistrationError } from "../adapter-registry";
+import { isControlledDispatchable } from "../worker-dispatch";
 import {
   validateAdapterCapability,
   type AdapterCapabilityDeclaration,
@@ -369,6 +370,17 @@ export class WorkerRegistrationService {
     control_mode: AdapterControlMode;
     declaration: AdapterCapabilityDeclaration;
   }): WorkerView {
+    let host: ContainerHostPort | undefined;
+    try {
+      host = this.createContainerHost();
+    } catch {
+      host = undefined;
+    }
+    const dispatchable = isControlledDispatchable(
+      this.registry,
+      entry.declaration.adapter_id,
+      { containerHost: host },
+    );
     return {
       adapter_id: entry.declaration.adapter_id,
       adapter_version: entry.declaration.protocol_version,
@@ -376,12 +388,10 @@ export class WorkerRegistrationService {
       declared_control_mode: entry.control_mode,
       builtin: true,
       kind: entry.adapter.kind,
-      // 只有 GATEWAY_ENFORCED 有派工门禁放行（`requireControlled` 只放行该档）
-      dispatchable: entry.control_mode === "GATEWAY_ENFORCED",
-      dispatch_blocked_reason:
-        entry.control_mode === "GATEWAY_ENFORCED"
-          ? undefined
-          : `档位为 ${entry.control_mode}，派工门禁只放行 GATEWAY_ENFORCED`,
+      dispatchable,
+      dispatch_blocked_reason: dispatchable
+        ? undefined
+        : `档位为 ${entry.control_mode}，未通过派工门禁（门禁仅放行 GATEWAY_ENFORCED 或宿主可用的 SANDBOX_ENFORCED 且已挂接工厂）`,
       launch: BUILTIN_LAUNCH,
       created_at: "",
       updated_at: "",
