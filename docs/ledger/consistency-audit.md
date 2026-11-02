@@ -170,3 +170,8 @@
 - **状态更新**：Tina 授权拆分后，母卡 W.9 为 `[SPLIT]`；W.9a/b `[READY]`，W.9c `[BLOCKED · 待 a+b]`。原 P-127 注记保留历史，不改写。
 - **Sprint / DAG**：W.9a 为首要，W.9b 可并行；W.9c 依赖 `W.9a→W.9c` 与 `W.9b→W.9c`。
 - **开工边界**：DoR READY 不代表 Tina 已授权施工；逐卡拍板后才开工。不新增 OP。
+
+### P-129 · P-128 合入 tip 同步（2026-11-02）
+
+- **物理 tip**：main@`332828f4`（[#97](https://github.com/he18718143986-design/IDE/pull/97)，父 #96 `c999253`）；P-128 的 W.9 `[SPLIT]` / a,b `[READY]` / c `[BLOCKED · 待 a+b]` 现行状态不变。
+- **一致性**：只推进 tip 指针；矩阵、DAG、卡状态与施工授权边界无变化。P-125～P-128 既有记录保留原文，不新增 OP。

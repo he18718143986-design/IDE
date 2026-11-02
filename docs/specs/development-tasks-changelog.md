@@ -132,3 +132,5 @@
 
 - **P-127（W.9 立卡，2026-11-02）**：基于最新 `main` 新立 `TASK-W.9`「自注册/外部 Worker 执行器接线」`[NEW_TASK]`，同步 §1.1 矩阵、索引与 active 卡；估算 **L**，按 R-11 仅提出 `W.9a/b/c` 拆分建议，**待 DoR 过审与 Tina 授权，不拆、不实施**。卡内覆盖 Gateway 会话注入与容器 CLI 执行器方案对比、真实探测报告/见证消费、`buildLaunch` 缺端点降级、Registry 派工工厂与 `SandboxWitness` 证据闭环。Sprint 首要栏写「W.9 立卡待审」，是否升为首要由 Tina 决定；不改历史条目、不新增 OP 号、不改产品代码。
 - **P-128（W.9 经授权拆分，2026-11-02）**：按 Tina 决策将 `TASK-W.9` 母卡标 `[SPLIT]` 并保留原文，新增按 R-1～R-12 完整的 `W.9a`（S/M，`[READY]`）、`W.9b`（M，`[READY]`）、`W.9c`（M，`[BLOCKED · 待 a+b]`）。同步矩阵、index、active、DAG `W.9a→W.9c` / `W.9b→W.9c`、版本头 #128、ledger 两处。Sprint 首要为 `W.9a`，`W.9b` 可并行；`W.9c` 等 a+b。READY 仅代表 DoR 完备，开工仍由 Tina 逐卡授权；本轮纯 docs，不新增 OP、不改产品代码。
+
+- **P-129（P-128 合入 tip 同步，2026-11-02）**：`docs/w9-split` 经 Tina 告知已合入 **[#97](https://github.com/he18718143986-design/IDE/pull/97)/`332828f4`**（squash；全 SHA `332828f4daefb534f8e52c7450e3a4bc8d11fbc1`，父 #96 `c999253`）。Sprint「当前工程物理起点」与 `scheme.md` 现行物理 tip 由 `1a50cb15` → `332828f4`；P-128 的 W.9 拆分状态与排程继续有效（W.9a 首要、W.9b 可并行、W.9c 待 a+b）。版本头与流水 P-125～P-128、ledger 既有注记保留原文作溯源。本轮仅 tip 指针同步，矩阵 / 卡状态 / 排程 / DAG 与代码均未改；不新增 OP 号。main tip 对齐 `332828f4`。

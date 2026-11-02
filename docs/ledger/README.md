@@ -130,3 +130,9 @@
 - **授权**：Tina 拍板 W.9 升为 Sprint 首要，并授权按原规划拆为 W.9a/b/c。
 - **处理**：母卡标 `[SPLIT]` 保留追溯；W.9a（S/M）与 W.9b（M）`[READY]`，W.9c（M）`[BLOCKED · 待 a+b]`。DAG 明确 `a→c`、`b→c`；Sprint 首要为 W.9a，W.9b 可并行。
 - **边界**：READY 不等同施工授权；Tina 逐卡授权开工。不新增 OP 号，DLV-3 仍 RESOLVED。
+
+### P-129（2026-11-02 · P-128 合入 tip 同步）
+
+- **合入**：`docs/w9-split` 以 [#97](https://github.com/he18718143986-design/IDE/pull/97)/`332828f4` squash 合入 main（父 #96 `c999253`）。
+- **指针**：当前物理 tip 更新为 `332828f4`；P-128 W.9 拆分状态照旧。既有 P-125～P-128 历史注记不改写。
+- **范围**：仅 docs tip 同步；不新增 OP，不改产品代码或任务判定。
