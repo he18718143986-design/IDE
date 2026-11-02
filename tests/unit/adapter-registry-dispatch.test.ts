@@ -46,6 +46,7 @@ import {
   BUILTIN_AI_SDK_ADAPTER_ID,
   MANAGED_AI_ADAPTER_ID,
   CLAUDE_CODE_WORKER_ADAPTER_ID,
+  OPENHANDS_WORKER_ADAPTER_ID,
 } from "../../daemon/worker/default-worker-registry";
 import type {
   WorkerChange,
@@ -197,7 +198,9 @@ describe("B. createDefaultWorkerRegistry 默认注册", () => {
     const a = createDefaultWorkerRegistry();
     const b = createDefaultWorkerRegistry();
     expect(a).not.toBe(b);
-    expect(a.list()).toHaveLength(3);
+    // 4 项 = 内置 ai-sdk + managed-ai + Claude Code（UNCONTROLLED_EXTERNAL）
+    //      + OpenHands（SANDBOX_ENFORCED，TASK-W.5c-iii 新增登记）
+    expect(a.list()).toHaveLength(4);
   });
 
   it("能力载体 run() 显式抛错，不返回「成功但空转」的假结果", async () => {
@@ -206,6 +209,8 @@ describe("B. createDefaultWorkerRegistry 默认注册", () => {
       BUILTIN_AI_SDK_ADAPTER_ID,
       MANAGED_AI_ADAPTER_ID,
       CLAUDE_CODE_WORKER_ADAPTER_ID,
+      // TASK-W.5c-iii：容器档登记载体同样不可执行（执行必经 runInSandbox）
+      OPENHANDS_WORKER_ADAPTER_ID,
     ];
     const dummy = {} as AdapterTaskInput;
     for (const id of ids) {

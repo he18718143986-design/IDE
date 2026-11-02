@@ -28,7 +28,8 @@ import type { ContainerHostPort } from "./sandbox/container-host";
 /** 明确错误码：缺注册 / 非受控 / 已注册但未挂派工工厂，均不得静默降级 */
 export const E_ADAPTER_NOT_REGISTERED = "E_ADAPTER_NOT_REGISTERED" as const;
 export const E_ADAPTER_NOT_CONTROLLED = "E_ADAPTER_NOT_CONTROLLED" as const;
-export const E_ADAPTER_NO_DISPATCH_FACTORY = "E_ADAPTER_NO_DISPATCH_FACTORY" as const;
+export const E_ADAPTER_NO_DISPATCH_FACTORY =
+  "E_ADAPTER_NO_DISPATCH_FACTORY" as const;
 /**
  * `SANDBOX_ENFORCED` 档位不可用时的错误码，**不静默降级**到无网关执行、也不复用
  * `E_ADAPTER_NOT_CONTROLLED`（后者语义是「非受控适配器」，与本档位「受控档位但
@@ -72,7 +73,14 @@ export interface WorkerDispatchContext {
   gateway: ScopedWorktreeGateway;
   costMonitor: CostMonitor;
   modelClient: WorkerModelClient;
+  /** 宿主仓库根（`.stagent/worktrees` 的所在仓库） */
   repoRoot: string;
+  /**
+   * TASK-W.5c-iii：本次任务 Worktree 的绝对路径——`SANDBOX_ENFORCED` 派工的**唯一**
+   * 容器挂载根。与 `repoRoot` 严格区分：宿主仓库根**不得**挂进容器（挂了就等于
+   * 把整个仓库交给容器内 Agent）。
+   */
+  worktreeRoot: string;
   /** TASK-L.11：已校验的设计说明 */
   designNote?: DesignNote | undefined;
   /** TASK-L.4：两段式本段义务清单（注入「你会被这样检查」） */

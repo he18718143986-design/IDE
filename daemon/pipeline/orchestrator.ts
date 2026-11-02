@@ -1529,11 +1529,15 @@ export class ContractOrchestrator {
       const registry = options.registry ?? this.workerRegistry;
       // TASK-W.5c-ii：容器宿主经编排器注入（`SANDBOX_ENFORCED` 门禁按宿主可用性
       // 判定放行；未注入即拒绝，不静默降级）。真实宿主绑定归 W.5c-iii。
+      const containerHost = options.containerHost ?? this.containerHost;
       const dispatchFactory = requireControlledDispatch(
         registry,
         current.worker_spec.adapter_id,
-        { containerHost: options.containerHost ?? this.containerHost },
+        { containerHost },
       );
+      // TASK-W.5c-iii：派工上下文必须带上**任务 Worktree**（沙箱唯一挂载根）。
+      // 与 repoRoot 严格区分——宿主仓库根绝不可作为容器挂载点。
+      const worktreeRoot = getWorktreePath(this.repoRoot, contractId);
 
       const derived =
         userHooks.obligations !== undefined
@@ -1552,6 +1556,8 @@ export class ContractOrchestrator {
           costMonitor,
           modelClient,
           repoRoot: this.repoRoot,
+          worktreeRoot,
+          ...(containerHost === undefined ? {} : { containerHost }),
           ...(activeDesignNote
             ? { designNote: activeDesignNote }
             : {}),
@@ -1674,7 +1680,9 @@ export class ContractOrchestrator {
           costMonitor,
           modelClient,
           repoRoot: this.repoRoot,
+          worktreeRoot,
           checksExtras: extras,
+          ...(containerHost === undefined ? {} : { containerHost }),
           ...(activeDesignNote
             ? { designNote: activeDesignNote }
             : {}),

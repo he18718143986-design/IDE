@@ -21,7 +21,13 @@ export type SandboxRejectionCode =
   | "MOUNT_PATH_TRAVERSAL"
   | "CWD_OUTSIDE_WORKTREE"
   | "NETWORK_TARGET_NOT_ALLOWED"
-  | "EMPTY_ARGV";
+  | "EMPTY_ARGV"
+  /**
+   * TASK-W.5c-iii：宿主自报不可用（探测失败 / 守护式复查失败）。
+   * 与门禁的 `E_ADAPTER_SANDBOX_LOCKED` 互补：门禁在派工前拒，本码在执行时拒；
+   * 两者都失败关闭，任何一方都不得降级为「本地照常执行」。
+   */
+  | "HOST_UNAVAILABLE";
 
 export class SandboxRejectedError extends Error {
   readonly code: SandboxRejectionCode;
@@ -77,6 +83,8 @@ export interface SandboxRunOutcome {
  * 编排器持有并注入；`AdapterRegistry` 不持有执行能力（W.6 约束不变）。
  */
 export interface ContainerHostPort {
+  /** 宿主自报标识（如 `docker/29.6.1`）；能力有限、缺省视为 `unknown` */
+  readonly kind?: string;
   /**
    * 宿主可用性（**同步**判定，保持派工门禁的同步语义）。
    * mock/stub 可确定性返回；真实宿主（`W.5c-iii`）在构造/注入前完成探测并缓存结果。
@@ -84,6 +92,42 @@ export interface ContainerHostPort {
   isAvailable(): boolean;
   /** 在隔离环境执行一次命令 */
   run(input: SandboxRunInput, signal?: AbortSignal): Promise<SandboxRunOutcome>;
+}
+
+/**
+ * 沙箱执行见证（TASK-W.5c-iii）。
+ *
+ * 目的：让「`SANDBOX_ENFORCED` 派工未走 `runInSandbox`」**可被断言**，而不是靠
+ * 代码评审的口头承诺。见证只能由 `sandboxWitness()` 依据「宿主实际返回的
+ * `SandboxRunOutcome`」产出：没有宿主执行就没有 outcome，也就造不出见证。
+ *
+ * 局限（不虚报）：进程内无法做到密码学意义上的不可伪造；本见证是**结构性**约束
+ * ——派工结果携带它、测试断言它、缺它即视为未入沙箱，配合「适配器无本地执行路径」
+ * 共同封住「绕过容器本地执行」的口子。
+ */
+export interface SandboxWitness {
+  /** 宿主自报标识（`unknown` = 宿主持有者未报告，不得据此宣称具体运行时） */
+  readonly host_kind: string;
+  readonly via: SandboxRunOutcome["via"];
+  readonly exit_code: number | null;
+  readonly duration_ms: number;
+  /** 实际挂载进容器的唯一宿主根 */
+  readonly worktree_root: string;
+}
+
+/** 依据宿主实际执行结果产出见证（唯一产出点） */
+export function sandboxWitness(
+  host: ContainerHostPort,
+  input: SandboxRunInput,
+  outcome: SandboxRunOutcome,
+): SandboxWitness {
+  return {
+    host_kind: host.kind ?? "unknown",
+    via: outcome.via,
+    exit_code: outcome.exitCode,
+    duration_ms: outcome.durationMs,
+    worktree_root: input.worktreeRoot,
+  };
 }
 
 /** 保护区：宿主这些路径一律不得挂载进容器 */
