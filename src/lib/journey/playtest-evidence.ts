@@ -73,3 +73,45 @@ export async function submitPlaytestEvidence(
     },
   );
 }
+
+/**
+ * TASK-L.17c：试玩门禁读侧视图（与 evaluatePlaytestGuard 判定字段对齐）。
+ * 仅消费，不在此重写判定逻辑。
+ */
+export interface PlaytestStatusView {
+  ok: boolean;
+  status:
+    | "APPROVED"
+    | "UNCONFIRMED"
+    | "STALE_VERSION"
+    | "EVIDENCE_INVALID"
+    | "NOT_NORTHSTAR_SCENARIO"
+    | "CONTRACT_NOT_FOUND"
+    | string;
+  code: string;
+  message: string;
+  contract_id: string;
+  evidence_release_id: string | null;
+  current_release_id: string | null;
+  reset_approval: boolean;
+}
+
+/**
+ * 读侧：GET /api/playtest/status?contract_id=
+ * Daemon 薄路由委托 evaluatePlaytestGuard，前端不直连 .stagent/。
+ */
+export async function fetchPlaytestStatus(
+  conn: DaemonConnection,
+  contractId: string,
+): Promise<PlaytestStatusView> {
+  const id = contractId.trim();
+  if (id.length === 0) {
+    throw new Error("contract_id 不能为空");
+  }
+  const q = encodeURIComponent(id);
+  return request<PlaytestStatusView>(
+    conn,
+    `/api/playtest/status?contract_id=${q}`,
+    { method: "GET" },
+  );
+}

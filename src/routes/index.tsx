@@ -3568,6 +3568,14 @@ ${trimmed}`
                     onProjectMapReorderForward={(stubId) => {
                       void handleProjectMapReorderForward(stubId);
                     }}
+                    playtest={{
+                      contractId: selectedId,
+                      references: selected?.references,
+                      previewUrl: realPlaytest?.url ?? null,
+                      previewStatus: realPlaytest?.status ?? null,
+                      previewError: realPlaytestError,
+                      conn: connected ? conn : null,
+                    }}
                   />
                 </div>
               }

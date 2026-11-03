@@ -155,6 +155,7 @@ import { orchestrateJourney } from "./supervisor/journey/orchestrate";
 import { buildJourneyLiveIncidentContext } from "../src/lib/journey/live-incident-context";
 import { findTarget, loadReleaseTargets } from "./release/targets-store";
 import { handlePlaytestEvidenceRequest } from "./playtest/evidence";
+import { evaluatePlaytestGuard } from "./supervisor/preview/playtest-guard";
 import {
   exportRedactedRecordsZip,
   cleanupProjectRecords,
@@ -5066,6 +5067,35 @@ export class StagentDaemon {
         return;
       }
       await this.handleReleases(req, res, method, pathname);
+      return;
+    }
+
+    // TASK-L.17c：试玩门禁读侧（薄路由）。只委托 evaluatePlaytestGuard，零改判定逻辑。
+    if (pathname === "/api/playtest/status") {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      if (method !== "GET") {
+        this.sendJson(res, 405, { error: "Method not allowed" });
+        return;
+      }
+      const contractId = (
+        parsedUrl.searchParams.get("contract_id") ?? ""
+      ).trim();
+      if (!contractId) {
+        this.sendJson(res, 400, {
+          error: "contract_id_required",
+          code: "E_PLAYTEST_CONTRACT_REQUIRED",
+          message: "需要 contract_id",
+        });
+        return;
+      }
+      const verdict = evaluatePlaytestGuard({
+        repoRoot: this.repoRoot,
+        contractId,
+      });
+      this.sendJson(res, 200, verdict);
       return;
     }
 

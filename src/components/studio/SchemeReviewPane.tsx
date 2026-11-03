@@ -31,6 +31,10 @@ import {
 } from "@/components/studio/ScopeAcceptanceBlock";
 import { ProjectMapPane } from "@/components/project/ProjectMapPane";
 import { SystemMapPane } from "@/components/project/SystemMapPane";
+import {
+  PlaytestAcceptBlock,
+  type PlaytestAcceptBlockProps,
+} from "@/components/studio/PlaytestAcceptBlock";
 import type { ProjectPlan } from "@/lib/project/project-plan";
 
 export interface SchemeReviewPaneProps {
@@ -78,6 +82,8 @@ export interface SchemeReviewPaneProps {
   onProjectMapConfirmStart?: ((stubId: string) => void) | undefined;
   onProjectMapDefer?: ((stubId: string) => void) | undefined;
   onProjectMapReorderForward?: ((stubId: string) => void) | undefined;
+  /** TASK-L.17c：中栏同页对照试玩 + 原话认可（可选；缺省不渲染提交能力） */
+  playtest?: PlaytestAcceptBlockProps | null | undefined;
 }
 
 function MermaidCard(props: { title: string; source: string; testId: string }) {
@@ -157,6 +163,11 @@ export function SchemeReviewPane(props: SchemeReviewPaneProps) {
           在右侧自由聊需求。Supervisor
           旁观足够后，这里会陆续出现架构图、流程、模块脑图和待你拍板的决策——不用做选择题剧本。
         </p>
+        {props.playtest ? (
+          <div className="mt-4">
+            <PlaytestAcceptBlock {...props.playtest} />
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -197,6 +208,9 @@ export function SchemeReviewPane(props: SchemeReviewPaneProps) {
 
       {/* TASK-L.18：同页嵌系统地图（禁止另开 ActivityBar Tab） */}
       <SystemMapPane />
+
+      {/* TASK-L.17c：同页嵌对照试玩 + 原话「认可完成」（不另开 Tab / 右栏） */}
+      {props.playtest ? <PlaytestAcceptBlock {...props.playtest} /> : null}
 
       <section className="mb-3 rounded border border-border p-3">
         <h3
