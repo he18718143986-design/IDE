@@ -49,13 +49,32 @@ export function evidenceDir(repoRoot: string): string {
   return path.join(path.resolve(repoRoot), EVIDENCE_DIR_REL);
 }
 
+/**
+ * 合同 ID 路径安全归一函数（防目录穿越与特殊字符破损）。
+ *
+ * 读侧（`readContractReferences`）与写侧（`playtestEvidencePath` / `playtestHistoryPath`）
+ * 严格共用此归一函数，消除两套口径，保证含特殊字符 ID 的读写一致性（OP-37）。
+ */
+export function normalizeContractId(contractId: string): string {
+  return contractId.replace(/[^A-Za-z0-9._-]/g, "_");
+}
+
 /** 证据文件路径；对 contract_id 做路径安全归一，防目录穿越 */
 export function playtestEvidencePath(
   repoRoot: string,
   contractId: string,
 ): string {
-  const safe = contractId.replace(/[^A-Za-z0-9._-]/g, "_");
+  const safe = normalizeContractId(contractId);
   return path.join(evidenceDir(repoRoot), `playtest-${safe}.json`);
+}
+
+/** 证据历史追加文件路径（OP-38）；与主文件保持相同归一口径 */
+export function playtestHistoryPath(
+  repoRoot: string,
+  contractId: string,
+): string {
+  const safe = normalizeContractId(contractId);
+  return path.join(evidenceDir(repoRoot), `playtest-${safe}.history.jsonl`);
 }
 
 export interface PlaytestEvidenceRequestBody {
@@ -147,7 +166,62 @@ export function assembleAndStorePlaytestEvidence(input: {
     playtestEvidencePath(input.repoRoot, input.contract_id),
     validated,
   );
+
+  /**
+   * OP-38 历史链增强：追加写 .history.jsonl。
+   *
+   * 一致性边界说明（审计面 vs 权威面）：
+   * 1. 权威性（SSOT）：主证据文件（playtest-{id}.json）是当前有效认可的唯一事实源。
+   *    门禁判定（`evaluatePlaytestGuard`）及核心业务状态流转只读主证据文件。
+   * 2. 两步落盘一致性：先通过 writeJsonAtomic 原子覆盖主文件，后追加写入 history 文件。
+   *    若两步之间发生掉电/进程崩溃，可能出现「主文件已更新但 history 缺少末次记录」的极端情况；
+   *    history 仅作为审计追踪增强面，非阻断性权威面，接受此最终一致性边界。
+   * 3. 并发原子追加：落盘内容强制为单行 JSON（无未转义内嵌换行），末尾追加单个 \n。
+   *    单行紧凑写入保证在 POSIX / 单进程追加场景下的完整性。
+   */
+  const historyFile = playtestHistoryPath(input.repoRoot, input.contract_id);
+  const singleLineJson = JSON.stringify(validated);
+  if (singleLineJson.includes("\n") || singleLineJson.includes("\r")) {
+    throw new Error(
+      "Serialized evidence must be a single line JSON without raw newlines",
+    );
+  }
+  fs.mkdirSync(path.dirname(historyFile), { recursive: true });
+  fs.appendFileSync(historyFile, `${singleLineJson}\n`, "utf-8");
+
   return validated;
+}
+
+/**
+ * OP-38：读取指定合同的历史认可记录序列（按写入先后顺序，由旧到新）。
+ * 损坏的单行记录会被跳过；文件不存在返回空数组。
+ */
+export function readPlaytestEvidenceHistory(
+  repoRoot: string,
+  contractId: string,
+): PlaytestEvidence[] {
+  const file = playtestHistoryPath(repoRoot, contractId);
+  if (!fs.existsSync(file)) return [];
+  try {
+    const content = fs.readFileSync(file, "utf-8");
+    const records: PlaytestEvidence[] = [];
+    for (const line of content.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        const raw = JSON.parse(trimmed) as unknown;
+        const parsed = playtestEvidenceSchema.safeParse(raw);
+        if (parsed.success) {
+          records.push(parsed.data);
+        }
+      } catch {
+        // 忽略单行损坏内容
+      }
+    }
+    return records;
+  } catch {
+    return [];
+  }
 }
 
 /** 读原始证据（不存在 / 损坏时 value=null，交由门禁区分 UNCONFIRMED / INVALID） */

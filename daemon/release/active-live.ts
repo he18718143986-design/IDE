@@ -44,9 +44,9 @@ export function listLiveReleases(repoRoot: string): ReleaseRecord[] {
 /**
  * 解析「当前活跃版本」`release_id`。
  *
- * - 优先取 `contract_ids` 含该合同的 LIVE 记录（合同 → 发布精确绑定）；
- * - 无匹配时回退到最近一条 LIVE（兼容 contract_ids 尚未回填的场景）；
- * - 无任何 LIVE → `null`（服务端无法装配 release_id，须显式报错，不得静默放过）。
+ * - 仅取 `contract_ids` 显式包含该合同的 LIVE 记录（合同 → 发布精确绑定）；
+ * - 无匹配时返回 `null`（OP-36：显式未绑定，不再粗粒度回退到其它合同的 LIVE，防止多合同仓串绑）；
+ * - 无任何 LIVE → `null`（服务端无法装配 release_id，调用方按「无 LIVE」保守处理，宁可误拒不可误放）。
  */
 export function resolveCurrentLiveReleaseId(
   repoRoot: string,
@@ -57,8 +57,8 @@ export function resolveCurrentLiveReleaseId(
   const matching = lives.filter(
     (r) => Array.isArray(r.contract_ids) && r.contract_ids.includes(contractId),
   );
-  const pool = matching.length > 0 ? matching : lives;
-  const sorted = [...pool].sort((a, b) =>
+  if (matching.length === 0) return null;
+  const sorted = [...matching].sort((a, b) =>
     a.created_at.localeCompare(b.created_at),
   );
   return sorted[sorted.length - 1]?.release_id ?? null;

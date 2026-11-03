@@ -65,6 +65,27 @@ function nextFrame(ws: WebSocket, timeoutMs = 2_000): Promise<IpcFrame> {
   });
 }
 
+function nextFrameOfType(
+  ws: WebSocket,
+  type: IpcFrame["type"],
+  timeoutMs = 2_000,
+): Promise<IpcFrame> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      ws.off("message", onMessage);
+      reject(new Error(`timeout waiting for frame ${type}`));
+    }, timeoutMs);
+    const onMessage = (raw: Buffer) => {
+      const frame = JSON.parse(raw.toString()) as IpcFrame;
+      if (frame.type !== type) return; // 忽略无关全局广播（如 BASELINE_PROGRESS）
+      clearTimeout(timer);
+      ws.off("message", onMessage);
+      resolve(frame);
+    };
+    ws.on("message", onMessage);
+  });
+}
+
 async function openAuthed(port: number, token: string): Promise<WebSocket> {
   const ws = await openRaw(port);
   sendAuth(ws, token);
@@ -144,7 +165,7 @@ describe("TASK-D.1 WebSocket 安全边界", () => {
       ws.send(
         JSON.stringify({ type: "PONG", timestamp: new Date().toISOString() }),
       );
-      const errFrame = await nextFrame(ws);
+      const errFrame = await nextFrameOfType(ws, "ERROR");
       expect(errFrame.type).toBe("ERROR");
       expect((errFrame.payload as { code: string }).code).toBe(
         "FRAME_DIRECTION_FORBIDDEN",
@@ -153,7 +174,7 @@ describe("TASK-D.1 WebSocket 安全边界", () => {
       ws.send(
         JSON.stringify({ type: "PING", timestamp: new Date().toISOString() }),
       );
-      const pong = await nextFrame(ws);
+      const pong = await nextFrameOfType(ws, "PONG");
       expect(pong.type).toBe("PONG");
     } finally {
       ws.close();

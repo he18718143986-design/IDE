@@ -31,10 +31,13 @@ function newRoot(): string {
 
 /**
  * 只读目录只能靠 POSIX 权限位造（`chmod 0o500`）。Windows 上 chmod 只翻转
- * 只读属性、不阻止 mkdir/unlink，产不出 EACCES，也就无从验证「写不进去要降级」。
- * 所以依赖它的用例在 win32 上跳过——不是掩盖失败，而是该机制在平台层不存在。
+ * 只读属性、不阻止 mkdir/unlink，产不出 EACCES，也就无从验证「写不进去要降级」；
+ * Linux/POSIX 下若以 root（uid 0）运行，DAC 权限检查亦会被内核旁路。
+ * 所以依赖它的用例在 win32 及 root 环境下跳过——不是掩盖失败，而是该机制在环境层不存在。
  */
-const POSIX_ONLY = process.platform === "win32";
+const POSIX_NON_ROOT =
+  process.platform !== "win32" &&
+  (typeof process.getuid !== "function" || process.getuid() !== 0);
 
 /** 造一个只读目录（含一个已存在的文件），返回 [目录, 文件] */
 function newReadOnlyDir(): [string, string] {
@@ -70,7 +73,7 @@ describe("safeRmSync：只吞环境拒绝", () => {
     expect(safeRmSync(missing)).toBe(true);
   });
 
-  it.skipIf(POSIX_ONLY)("非 safe-delete 的删除失败不得被当成成功", () => {
+  it.skipIf(!POSIX_NON_ROOT)("非 safe-delete 的删除失败不得被当成成功", () => {
     const [, file] = newReadOnlyDir();
     let claimed = false;
     try {
@@ -89,7 +92,7 @@ describe("diskDeleteBlocked：探测写不进去时降级而不是抛错", () =>
     expect(diskDeleteBlockedIn([newRoot()])).toBe(false);
   });
 
-  it.skipIf(POSIX_ONLY)(
+  it.skipIf(!POSIX_NON_ROOT)(
     "只读目录探针写不进去 → 按不可观测处理，且不抛错",
     () => {
       const [readOnly] = newReadOnlyDir();
@@ -98,7 +101,7 @@ describe("diskDeleteBlocked：探测写不进去时降级而不是抛错", () =>
     },
   );
 
-  it.skipIf(POSIX_ONLY)(
+  it.skipIf(!POSIX_NON_ROOT)(
     "前一处不可用不会短路，后面可用的位置仍能给出结论",
     () => {
       const [readOnly] = newReadOnlyDir();

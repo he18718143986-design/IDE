@@ -14,9 +14,16 @@ const SAFE_DELETE_MARKER = "SAFE_DELETE_";
 
 /**
  * 清理时偶尔会撞上「目录刚被删一半、子进程还在收尾」的瞬时错误（全量跑偶发）。
- * 这类不是环境配额，也不是代码 bug：短暂等待后重试即可；仍然失败就照常抛出。
+ * Windows 上杀毒/索引服务持锁可能更久（EBUSY / EPERM），
+ * 重试上限提升至 15 次（总退避 ~4.5-5s）；重试耗尽时把 EBUSY 等瞬时持锁降级为 warn 而非 throw。
  */
-const TRANSIENT_RM_CODES = new Set(["EBUSY", "ENOTEMPTY"]);
+const TRANSIENT_RM_CODES = new Set(
+  process.platform === "win32"
+    ? ["EBUSY", "ENOTEMPTY", "EPERM"]
+    : ["EBUSY", "ENOTEMPTY"],
+);
+
+const MAX_TRANSIENT_RETRIES = 15;
 
 /**
  * 环境拒绝「写」的错误码。全盘只读 / 配额耗尽时，探针连落盘都做不到：
@@ -72,9 +79,16 @@ export function safeRmSync(target: string): boolean {
       // 说明真出了问题（路径拼错、文件不在预期位置），不该被静默吞掉。
       if (errorMessage(error).includes(SAFE_DELETE_MARKER)) return false;
       const code = errorCode(error);
-      if (attempt < 2 && code !== undefined && TRANSIENT_RM_CODES.has(code)) {
-        sleepSync(20 * (attempt + 1));
-        continue;
+      if (code !== undefined && TRANSIENT_RM_CODES.has(code)) {
+        if (attempt < MAX_TRANSIENT_RETRIES) {
+          sleepSync(Math.min(40 * (attempt + 1), 400));
+          continue;
+        }
+        // 重试耗尽：降级为 warn，不让临时目录清理失败红了测试（残留目录由 runner 销毁兜底）
+        console.warn(
+          `[safeRmSync] 临时目录清理重试耗尽（已尝试 ${attempt + 1} 次，错误码 ${code}）：${errorMessage(error)}。目标：${target}。降级为跳过清理，由 runner 销毁兜底。`,
+        );
+        return false;
       }
       throw error;
     }
