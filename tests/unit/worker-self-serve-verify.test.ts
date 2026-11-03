@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { AdapterRegistry } from "../../daemon/worker/adapter-registry";
+import { requireControlledDispatch } from "../../daemon/worker/worker-dispatch";
 import {
   resolveEvidenceControlMode,
   type AdapterCapabilityDeclaration,
@@ -777,6 +778,56 @@ describe("W.7 · 服务层：登记 → 探测 → 升格", () => {
       service.verify("stagent.builtin.v0", { target_mode: "SANDBOX_ENFORCED" }),
     ).rejects.toMatchObject({ code: E_WORKER_BUILTIN_LOCKED });
   });
+
+  it("W.9c: 升格后无工厂仍不可派工；接入真实容器执行面后 dispatchable 变为 true，撤销后立即归零", async () => {
+    const repoRoot = tmpRepoRoot();
+    const host = fakeContainerHost();
+    const { service, registry } = makeService(repoRoot, host);
+
+    // 1. 登记 worker
+    const reg = service.register(registrationBody());
+    const adapterId = reg.adapter_id;
+    expect(reg.control_mode).toBe("UNCONTROLLED_EXTERNAL");
+    expect(reg.dispatchable).toBe(false);
+
+    // 2. 探测并升格为 SANDBOX_ENFORCED
+    const verifyRes = await service.verify(adapterId, { target_mode: "SANDBOX_ENFORCED" });
+    expect(verifyRes.promoted).toBe(true);
+    expect(verifyRes.control_mode).toBe("SANDBOX_ENFORCED");
+
+    // 此时虽然已升格，但尚未接入派工工厂与真实执行面 → dispatchable 恒为 false！
+    const promotedView = service.get(adapterId);
+    expect(promotedView?.control_mode).toBe("SANDBOX_ENFORCED");
+    expect(promotedView?.dispatchable).toBe(false);
+    expect(promotedView?.dispatch_blocked_reason).toContain("派工工厂");
+
+    // 3. 接入真实容器执行面（复用 ContainerCliAdapter 桥）
+    service.attachContainerCliExecutor(adapterId);
+
+    // 视图单一判定源与门禁同步放行
+    const readyView = service.get(adapterId);
+    expect(readyView?.dispatchable).toBe(true);
+    expect(readyView?.dispatch_blocked_reason).toBeUndefined();
+
+    // 门禁解析并验证执行契约
+    const factory = requireControlledDispatch(registry, adapterId, { containerHost: host });
+    expect(factory).toBeDefined();
+
+    // 4. 撤销自注册项
+    expect(service.revoke(adapterId)).toBe(true);
+
+    // 撤销后立即同步清除存储与注册表，无窗口期
+    expect(() => service.get(adapterId)).toThrowError(WorkerRegistrationError);
+    expect(service.list().find((w) => w.adapter_id === adapterId)).toBeUndefined();
+    expect(registry.has(adapterId)).toBe(false);
+    expect(registry.getDispatchFactory(adapterId)).toBeUndefined();
+
+    // 5. 重新注册同名 adapterId → 撤销归零，不继承旧升格结论
+    const reReg = service.register(registrationBody());
+    expect(reReg.control_mode).toBe("UNCONTROLLED_EXTERNAL");
+    expect(reReg.dispatchable).toBe(false);
+  });
+
 });
 
 /**

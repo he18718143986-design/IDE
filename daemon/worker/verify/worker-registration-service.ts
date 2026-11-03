@@ -17,7 +17,17 @@
  */
 
 import { AdapterRegistry, AdapterRegistrationError } from "../adapter-registry";
-import { isControlledDispatchable } from "../worker-dispatch";
+import {
+  isControlledDispatchable,
+  isAdapterExecutable,
+  requireControlledDispatch,
+  WorkerDispatchError,
+  E_ADAPTER_SANDBOX_LOCKED,
+  type WorkerDispatchFactory,
+  type WorkerDispatchContext,
+  type DispatchedWorker,
+} from "../worker-dispatch";
+import { ContainerCliAdapter } from "../sandbox/container-cli-executor";
 import {
   validateAdapterCapability,
   type AdapterCapabilityDeclaration,
@@ -48,7 +58,7 @@ import {
   type ProbePackResult,
 } from "./worker-probe";
 import { SandboxProbeExecutionPort } from "./probe-execution-sandbox";
-import { loadWorkerStore, upsertWorker } from "./worker-store";
+import { loadWorkerStore, upsertWorker, deleteWorker } from "./worker-store";
 
 /** 可升格的目标档位（`UNCONTROLLED_EXTERNAL` 不是「目标」，降级不需要探测） */
 export type ProbeTargetMode = "GATEWAY_ENFORCED" | "SANDBOX_ENFORCED";
@@ -114,10 +124,11 @@ const BUILTIN_LAUNCH: WorkerLaunchSpec = { command: "<builtin>", args: [] };
 function declarationOnlyAdapter(
   adapterId: string,
   declaration: AdapterCapabilityDeclaration,
-): CodingWorkerAdapter {
+): CodingWorkerAdapter & { has_executor: false } {
   return {
     kind: "CLI",
     declaration,
+    has_executor: false,
     async run(
       _input: AdapterTaskInput,
       _signal?: AbortSignal,
@@ -161,6 +172,152 @@ export class WorkerRegistrationService {
   }
 
   /** 列表：内建（来自注册表）+ 自注册（来自 `.stagent/workers.json`） */
+  /**
+   * TASK-W.9c：注销 / 撤销自注册 Worker。
+   * - 从持久化存储删除记录；
+   * - 同步从注册中心注销，并吊销其已绑定的派工工厂与受控控制档（撤销归零）。
+   */
+  unregister(adapterId: string): boolean {
+    const deletedFromStore = deleteWorker(this.repoRoot, adapterId);
+    const deletedFromRegistry = this.registry.unregister(adapterId);
+    return deletedFromStore || deletedFromRegistry;
+  }
+
+  /** TASK-W.9c：撤销注册（unregister 别名） */
+  revoke(adapterId: string): boolean {
+    return this.unregister(adapterId);
+  }
+
+  /**
+   * TASK-W.9c：为自注册 Worker 挂接派工工厂，强绑定协议版本。
+   */
+  registerDispatchFactory(
+    adapterId: string,
+    factory: WorkerDispatchFactory,
+    expectedVersion?: string,
+  ): void {
+    this.registry.registerDispatchFactory(adapterId, factory, expectedVersion);
+  }
+
+  /**
+   * TASK-W.9c：为已通过探测升格的自注册 Worker 构造标准容器沙箱派工工厂。
+   * 严格复用 W.9b 的 ContainerCliAdapter + executeContainerCli 桥，产出合法 SandboxWitness。
+   */
+  createContainerCliDispatchFactory(
+    record: WorkerRecord,
+    options?: {
+      expectedArtifacts?: (input: AdapterTaskInput) => readonly string[];
+      env?: Record<string, string>;
+    },
+  ): WorkerDispatchFactory {
+    return (context: WorkerDispatchContext): DispatchedWorker => {
+      const host = context.containerHost;
+      if (!host || host.isAvailable() !== true) {
+        throw new WorkerDispatchError(
+          E_ADAPTER_SANDBOX_LOCKED,
+          record.adapter_id,
+          "未注入可用容器宿主 ContainerHostPort",
+        );
+      }
+      const adapter = new ContainerCliAdapter({
+        host,
+        declaration: record.declaration,
+        declaredControlMode: "SANDBOX_ENFORCED",
+        buildArgv: (_taskInput) => [
+          record.launch.command,
+          ...record.launch.args,
+        ],
+        ...(options?.env === undefined ? {} : { env: options.env }),
+        ...(options?.expectedArtifacts === undefined
+          ? {}
+          : { expectedArtifacts: options.expectedArtifacts }),
+      });
+      return {
+        run: async (signal?: AbortSignal) => {
+          const outcome = await adapter.run(
+            {
+              contract: context.contract,
+              contract_revision: context.contract.contract_revision,
+              worktree_root: context.worktreeRoot,
+              system_prompt: "",
+              exposed_tools: [],
+            },
+            signal,
+          );
+          return {
+            applied: outcome.changes.length > 0,
+            changes: outcome.changes,
+            log: outcome.log,
+            usage: outcome.usage,
+            blockers: [],
+            sandbox: outcome.sandbox,
+          };
+        },
+      };
+    };
+  }
+
+  /**
+   * TASK-W.9c：为已通过探测升格的自注册 Worker 接入真实容器执行面与派工工厂。
+   * 严格复用 W.9b 的 ContainerCliAdapter + executeContainerCli 桥，产出合法 SandboxWitness。
+   */
+  attachContainerCliExecutor(
+    adapterId: string,
+    options?: {
+      expectedArtifacts?: (input: AdapterTaskInput) => readonly string[];
+      env?: Record<string, string>;
+    },
+  ): void {
+    const record = loadWorkerStore(this.repoRoot).workers.find(
+      (w) => w.adapter_id === adapterId,
+    );
+    if (!record) {
+      throw new WorkerRegistrationError(
+        E_WORKER_NOT_FOUND,
+        `worker not found: ${adapterId}`,
+      );
+    }
+    const effective = effectiveControlMode(record);
+    if (effective.mode !== "SANDBOX_ENFORCED") {
+      throw new WorkerRegistrationError(
+        E_WORKER_PROMOTION_REFUSED,
+        `worker ${adapterId} 当前档位为 ${effective.mode}，只有 SANDBOX_ENFORCED 档位允许挂接容器执行面`,
+      );
+    }
+    let host: ContainerHostPort;
+    try {
+      host = this.createContainerHost();
+    } catch (err) {
+      throw new WorkerDispatchError(
+        E_ADAPTER_SANDBOX_LOCKED,
+        adapterId,
+        `容器宿主不可用: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+    const adapter = new ContainerCliAdapter({
+      host,
+      declaration: record.declaration,
+      declaredControlMode: "SANDBOX_ENFORCED",
+      buildArgv: (_taskInput) => [
+        record.launch.command,
+        ...record.launch.args,
+      ],
+      ...(options?.env === undefined ? {} : { env: options.env }),
+      ...(options?.expectedArtifacts === undefined
+        ? {}
+        : { expectedArtifacts: options.expectedArtifacts }),
+    });
+
+    this.registry.attachExecutableAdapter(adapterId, adapter);
+
+    const factory = this.createContainerCliDispatchFactory(record, options);
+    this.registry.registerDispatchFactory(
+      adapterId,
+      factory,
+      record.declaration?.protocol_version,
+    );
+  }
+
   list(): WorkerView[] {
     const store = loadWorkerStore(this.repoRoot).workers;
     // 自注册项在注册时也会挂进注册表（升格需要同一对象），故这里按**存储**判定归属：
@@ -400,6 +557,48 @@ export class WorkerRegistrationService {
 
   private storedView(record: WorkerRecord): WorkerView {
     const effective = effectiveControlMode(record);
+    let host: ContainerHostPort | undefined;
+    try {
+      host = this.createContainerHost();
+    } catch {
+      host = undefined;
+    }
+    const dispatchable = isControlledDispatchable(
+      this.registry,
+      record.adapter_id,
+      { containerHost: host },
+    );
+    let dispatchBlockedReason: string | undefined;
+    if (!dispatchable) {
+      const entry = this.registry.get(record.adapter_id);
+      const factory = entry
+        ? this.registry.getDispatchFactory(
+            record.adapter_id,
+            entry.declaration?.protocol_version,
+          )
+        : undefined;
+      const isExec = entry ? isAdapterExecutable(entry.adapter) : false;
+
+      if (effective.mode === "UNCONTROLLED_EXTERNAL") {
+        dispatchBlockedReason =
+          "自注册 worker 未接入派工工厂（UNCONTROLLED_EXTERNAL 且无 CodingWorkerAdapter.run 实现），档位记录不代表可派工";
+      } else if (!factory) {
+        dispatchBlockedReason =
+          "自注册 worker 未接入派工工厂（dispatchFactory）；档位记录不代表可派工";
+      } else if (!isExec) {
+        dispatchBlockedReason =
+          "自注册 worker 缺少合规执行面（无真实 run() 实现，仅有能力声明）；不可派工";
+      } else {
+        try {
+          requireControlledDispatch(this.registry, record.adapter_id, {
+            containerHost: host,
+          });
+        } catch (err) {
+          dispatchBlockedReason =
+            err instanceof Error ? err.message : String(err);
+        }
+      }
+    }
     return {
       adapter_id: record.adapter_id,
       adapter_version: record.adapter_version,
@@ -407,10 +606,8 @@ export class WorkerRegistrationService {
       declared_control_mode: record.control_mode,
       builtin: record.builtin,
       kind: "CLI",
-      // 无派工工厂 ⇒ 不可派工（不假装闭环）
-      dispatchable: false,
-      dispatch_blocked_reason:
-        "自注册 worker 未接入派工工厂（无 CodingWorkerAdapter.run 实现），档位记录不代表可派工",
+      dispatchable,
+      dispatch_blocked_reason: dispatchBlockedReason,
       demoted_reason: effective.demoted_reason,
       launch: record.launch,
       verified_on: record.verified_on,

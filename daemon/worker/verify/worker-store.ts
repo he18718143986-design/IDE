@@ -145,3 +145,20 @@ export function upsertWorker(
   saveWorkerStore(repoRoot, store);
   return record;
 }
+
+/** TASK-W.9c：删除自注册 Worker（撤销 / 注销） */
+export function deleteWorker(
+  repoRoot: string,
+  adapterId: string,
+): boolean {
+  const store = loadWorkerStore(repoRoot);
+  const before = store.workers.length;
+  store.workers = store.workers.filter(
+    (worker) => worker.adapter_id !== adapterId,
+  );
+  if (store.workers.length !== before) {
+    saveWorkerStore(repoRoot, store);
+    return true;
+  }
+  return false;
+}

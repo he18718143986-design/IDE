@@ -101,6 +101,8 @@ export interface AdapterRunOutcome {
 export interface CodingWorkerAdapter {
   readonly declaration: AdapterCapabilityDeclaration;
   readonly kind: WorkerAdapterKind;
+  /** TASK-W.9c：执行器能力标记（false 表示纯声明桩，不具备执行面） */
+  readonly has_executor?: boolean | undefined;
   run(
     input: AdapterTaskInput,
     signal?: AbortSignal,

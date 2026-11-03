@@ -39,6 +39,11 @@ export class AdapterRegistrationError extends Error {
   }
 }
 
+export interface DispatchFactoryBinding {
+  factory: WorkerDispatchFactory;
+  protocol_version?: string | undefined;
+}
+
 export interface RegisteredAdapter {
   adapter: CodingWorkerAdapter;
   control_mode: AdapterControlMode;
@@ -76,7 +81,7 @@ export interface AdapterModeChangeRequest {
 export class AdapterRegistry {
   private readonly entries = new Map<string, RegisteredAdapter>();
   /** TASK-W.6：adapter_id → 派工工厂（与 entries 分离，避免改动既有注册项结构） */
-  private readonly dispatchFactories = new Map<string, WorkerDispatchFactory>();
+  private readonly dispatchFactories = new Map<string, DispatchFactoryBinding>();
   /** 由 WorkerRegistrationService 绑定的服务端持久层查询，不接受调用方传入报告对象。 */
   private probeReportLookup:
     | ((
@@ -141,30 +146,113 @@ export class AdapterRegistry {
     return entry;
   }
 
+  /**
+   * TASK-W.9c：为已注册项挂接或替换真实执行器（要求与当前注册声明协议版本一致）。
+   */
+  attachExecutableAdapter(
+    adapterId: string,
+    adapter: CodingWorkerAdapter,
+  ): void {
+    const entry = this.entries.get(adapterId);
+    if (!entry) {
+      throw new AdapterRegistrationError(
+        "ADAPTER_ID_INVALID",
+        `cannot attach executable adapter: adapter not registered: ${adapterId}`,
+      );
+    }
+    const currentVersion = entry.declaration?.protocol_version;
+    const adapterVersion = adapter.declaration?.protocol_version;
+    if (
+      currentVersion !== undefined &&
+      adapterVersion !== undefined &&
+      currentVersion !== adapterVersion
+    ) {
+      throw new AdapterRegistrationError(
+        "ADAPTER_PROMOTION_REFUSED",
+        `adapter version mismatch for ${adapterId}: expected ${currentVersion} but adapter version is ${adapterVersion}`,
+      );
+    }
+    entry.adapter = adapter;
+    if (adapter.declaration) {
+      entry.declaration = adapter.declaration;
+    }
+  }
+
   get(adapterId: string): RegisteredAdapter | undefined {
     return this.entries.get(adapterId);
   }
 
   /**
-   * TASK-W.6：为已注册适配器挂接派工工厂。
-   * 要求该 adapterId 已登记，否则抛 `ADAPTER_ID_INVALID`——不允许给「幽灵 id」挂工厂。
+   * TASK-W.6 / W.9c：为已注册适配器挂接派工工厂，并强绑定当前协议版本。
+   * 要求该 adapterId 已登记，否则抛 `ADAPTER_ID_INVALID`。
+   * 若指定了 expectedVersion，要求与当前注册版本的 protocol_version 一致，否则拒绝挂接。
    */
   registerDispatchFactory(
     adapterId: string,
     factory: WorkerDispatchFactory,
+    expectedVersion?: string,
   ): void {
-    if (!this.entries.has(adapterId)) {
+    const entry = this.entries.get(adapterId);
+    if (!entry) {
       throw new AdapterRegistrationError(
         "ADAPTER_ID_INVALID",
         `cannot attach dispatch factory: adapter not registered: ${adapterId}`,
       );
     }
-    this.dispatchFactories.set(adapterId, factory);
+    const currentVersion = entry.declaration?.protocol_version;
+    if (
+      expectedVersion !== undefined &&
+      currentVersion !== undefined &&
+      expectedVersion !== currentVersion
+    ) {
+      throw new AdapterRegistrationError(
+        "ADAPTER_PROMOTION_REFUSED",
+        `dispatch factory version mismatch for ${adapterId}: expected ${expectedVersion} but registered version is ${currentVersion}`,
+      );
+    }
+    this.dispatchFactories.set(adapterId, {
+      factory,
+      protocol_version: expectedVersion ?? currentVersion,
+    });
   }
 
-  /** TASK-W.6：读取派工工厂；未登记返回 undefined，由 `requireControlledDispatch` 决定错误码 */
-  getDispatchFactory(adapterId: string): WorkerDispatchFactory | undefined {
-    return this.dispatchFactories.get(adapterId);
+  /**
+   * TASK-W.6 / W.9c：读取派工工厂；未登记返回 undefined。
+   * 若提供 currentVersion 且绑定记录的版本与当前版本不一致，视为已失效，
+   * 立即同步清除旧映射（消除窗口期风险）并返回 undefined。
+   */
+  getDispatchFactory(
+    adapterId: string,
+    currentVersion?: string,
+  ): WorkerDispatchFactory | undefined {
+    const binding = this.dispatchFactories.get(adapterId);
+    if (!binding) return undefined;
+    if (
+      currentVersion !== undefined &&
+      binding.protocol_version !== undefined &&
+      binding.protocol_version !== currentVersion
+    ) {
+      this.dispatchFactories.delete(adapterId);
+      return undefined;
+    }
+    return binding.factory;
+  }
+
+  /**
+   * TASK-W.9c：注销适配器，立即同步清除其注册条目与已绑定的派工工厂。
+   * 撤销后重新注册时不会继承原有的受控档位（撤销归零）。
+   */
+  unregister(adapterId: string): boolean {
+    const existed =
+      this.entries.has(adapterId) || this.dispatchFactories.has(adapterId);
+    this.entries.delete(adapterId);
+    this.dispatchFactories.delete(adapterId);
+    return existed;
+  }
+
+  /** TASK-W.9c：撤销注册（unregister 别名，显式表达撤销语义） */
+  revoke(adapterId: string): boolean {
+    return this.unregister(adapterId);
   }
 
   /** 取受控适配器；非受控或不存在时抛错，避免误把外部助手当执行者 */
@@ -217,6 +305,10 @@ export class AdapterRegistry {
       );
     }
     const previous = entry.control_mode;
+    if (next === "UNCONTROLLED_EXTERNAL") {
+      // 降级为非受控档位时，立即同步清理已绑定的受控派工工厂，消除旧工厂残留
+      this.dispatchFactories.delete(adapterId);
+    }
     if (previous === next) return entry;
 
     if (next !== "UNCONTROLLED_EXTERNAL") {

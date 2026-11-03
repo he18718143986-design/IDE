@@ -268,6 +268,7 @@ export function assertNoForbiddenFlags(args: readonly string[]): void {
 export class CursorAgentAdapter implements CodingWorkerAdapter {
   readonly kind = "CLI" as const;
   readonly declaration = CURSOR_AGENT_CAPABILITY;
+  readonly has_executor = false as const;
 
   constructor(private readonly opts: CursorAgentAdapterOptions = {}) {}
 

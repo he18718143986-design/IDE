@@ -3,6 +3,7 @@ import type { DesignNote } from "../../src/lib/design/design-note";
 import type { ScopedWorktreeGateway } from "../mcp/gateway";
 import type { CostMonitor } from "../guard/cost-monitor";
 import type { WorkerModelClient, WorkerRunResult } from "./ai-worker";
+import type { CodingWorkerAdapter } from "./worker-adapter.interface";
 import {
   AdapterRegistrationError,
   type AdapterRegistry,
@@ -40,12 +41,42 @@ export const E_ADAPTER_NO_DISPATCH_FACTORY =
  * 宿主可用 → 正常放行（窗口期「永远拒绝」的语义已随本卡解除）。
  */
 export const E_ADAPTER_SANDBOX_LOCKED = "E_ADAPTER_SANDBOX_LOCKED" as const;
+/**
+ * TASK-W.9c：已升格且有工厂但无实际执行面时的明确错误码。
+ * 区别于「档位不够」（NOT_CONTROLLED/SANDBOX_LOCKED）与「工厂未注册」（NO_DISPATCH_FACTORY）。
+ */
+export const E_WORKER_NO_EXECUTOR = "E_WORKER_NO_EXECUTOR" as const;
 
 export type WorkerDispatchErrorCode =
   | typeof E_ADAPTER_NOT_REGISTERED
   | typeof E_ADAPTER_NOT_CONTROLLED
   | typeof E_ADAPTER_NO_DISPATCH_FACTORY
-  | typeof E_ADAPTER_SANDBOX_LOCKED;
+  | typeof E_ADAPTER_SANDBOX_LOCKED
+  | typeof E_WORKER_NO_EXECUTOR;
+
+/**
+ * TASK-W.9c：核验适配器是否持有真实的 run() 执行实现。
+ * 纯声明桩、标记无执行器或只抛 E_*_NO_EXECUTOR 的适配器均判定为 false。
+ */
+export function isAdapterExecutable(adapter: CodingWorkerAdapter): boolean {
+  if ((adapter as { has_executor?: boolean }).has_executor === false) {
+    return false;
+  }
+  if ((adapter as { is_declaration_only?: boolean }).is_declaration_only === true) {
+    return false;
+  }
+  if (typeof adapter.run !== "function") {
+    return false;
+  }
+  const runCode = String(adapter.run);
+  if (
+    runCode.includes("E_WORKER_NO_EXECUTOR") ||
+    runCode.includes("E_CURSOR_AGENT_NO_EXECUTOR")
+  ) {
+    return false;
+  }
+  return true;
+}
 
 /** 带 `code` 字段，供 `sendActionError` 透出；不静默降级到无网关执行 */
 export class WorkerDispatchError extends Error {
@@ -179,14 +210,27 @@ export function requireControlledDispatch(
     }
   }
 
-  const factory = registry.getDispatchFactory(adapterId);
+  const factory = registry.getDispatchFactory(
+    adapterId,
+    entry.declaration?.protocol_version,
+  );
   if (factory === undefined) {
     throw new WorkerDispatchError(
       E_ADAPTER_NO_DISPATCH_FACTORY,
       adapterId,
-      "已注册为受控适配器，但未挂接派工工厂（dispatchFactory）；拒绝派工以免绕过 Gateway",
+      "已注册为受控适配器，但未挂接派工工厂（或工厂版本失配）；拒绝派工以免绕过 Gateway",
     );
   }
+
+  // TASK-W.9c：核验真实 CodingWorkerAdapter.run() 契约（升格不等于自动派工）
+  if (!isAdapterExecutable(entry.adapter)) {
+    throw new WorkerDispatchError(
+      E_WORKER_NO_EXECUTOR,
+      adapterId,
+      `适配器 ${adapterId} 缺少合规执行器（无真实 run() 实现，仅有能力声明）；拒绝派工`,
+    );
+  }
+
   return factory;
 }
 
