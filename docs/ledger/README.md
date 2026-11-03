@@ -10,7 +10,7 @@
 
 | 文件 | 内容 | 状态 |
 | :--- | :--- | :--- |
-| [`consistency-audit.md`](./consistency-audit.md) | 规格一致性审计台账：`C-` 待裁决矛盾、`M-` 机械修复、`OP-` 挂账项（OP-1～OP-38）、权威分层表 | 持续追加；**OP-1 / OP-13 / oq-2 / oq-3 已于 2026-11-01 销项**（见 consistency-audit「一之二」）；**2026-11-02 P-112 新增 OP-36～OP-38**（L.17b 三条边界，见 completed §3.4f）；**P-113 W.6 两条边界沿用 P-112 先例仅归拢至 completed §3.4g、不另立 OP 号**；**2026-11-02 P-121 W.5c-ii 挂账同理归拢至 completed §3.4j（含「派工未走 `runInSandbox`」这条 W.5c-iii 必收边界）**；**P-122 W.5c-iii 已 COMPLETED（#87/`2313597a`）——挂账 4 条归拢至 completed §3.4k、不另立 OP 号；`REJ-010` 已进 `scheme.md` §10 墓地** |
+| [`consistency-audit.md`](./consistency-audit.md) | 规格一致性审计台账：`C-` 待裁决矛盾、`M-` 机械修复、`OP-` 挂账项（OP-1～OP-38）、权威分层表 | 持续追加；**OP-1 / OP-13 / oq-2 / oq-3 已于 2026-11-01 销项**（见 consistency-audit「一之二」）；**2026-11-02 P-112 新增 OP-36～OP-38**（L.17b 三条边界，见 completed §3.4f）；**P-113 W.6 两条边界沿用 P-112 先例仅归拢至 completed §3.4g、不另立 OP 号**；**2026-11-02 P-121 W.5c-ii 挂账同理归拢至 completed §3.4j（含「派工未走 `runInSandbox`」这条 W.5c-iii 必收边界）**；**P-122 W.5c-iii 已 COMPLETED（#87/`2313597a`）——挂账 4 条归拢至 completed §3.4k、不另立 OP 号；`REJ-010` 已进 `scheme.md` §10 墓地**；**2026-11-03 P-138 OP-33～38 挂账清扫销项（#118/96225df）**：OP-33 部分销项/改定性平台侧不可修，OP-34 改定性平台侧持续观察不销项，OP-35①/35②/36/37/38 销项，新增两条边界挂账（归一化多对一碰撞未区分、.history.jsonl 无界增长） |
 | [`w3-known-gaps.md`](./w3-known-gaps.md) | W.3 环境 / 秘密 / 网络守卫的已知缺口 | 7 项中 2 项未修（`tmpRoot` GC、`splitShellSegments` 引号边界） |
 
 ## 文档治理挂账（2026-10-29 新增）
@@ -172,3 +172,5 @@
 
 > **P-136（2026-11-03 · P-135 合入 tip 同步）**：`docs/p135-gate-green` 以 [#114](https://github.com/he18718143986-design/IDE/pull/114)/`de50d38` squash 合入 main（父 #113 `2559f5c3`）。当前物理 tip 更新为 `de50d38`；P-135 清扫成果与挂账状态照旧。既有 P-135 历史注记不改写。仅 docs tip 同步；不新增 OP，不改产品代码或任务判定。
 > **P-137（2026-11-03 · P-136 合入 tip 同步与门禁留痕）**：`docs/p136-tip-sync` 以 [#115](https://github.com/he18718143986-design/IDE/pull/115)/`08e1a60` squash 合入 main（父 #114 `de50d38`）。当前物理 tip 更新为 `08e1a60`。**门禁状态变更留痕**：GitHub Branch Ruleset `main`（ID 26435584）已激活生效，开启 required status checks（ubuntu/macos，排除 Windows）与防 force push / 删分支 / 非线性历史；「全绿才准合」正式由惯例升格为物理强制门禁。清扫成果、挂账与在队清零状态照旧；既有历史注记保留原文作溯源。仅 docs 回写；不新增 OP，不改产品代码或任务判定。
+
+> **P-138（2026-11-03 · OP-33～38 挂账清扫销项与新增边界挂账）**：基于最新 `main`（[#118](https://github.com/he18718143986-design/IDE/pull/118)/`96225dfdafbba04b813da63c8e524cd22bbcc087`，squash）完成台账回写。对 consistency-audit.md 六条账逐条处理：OP-33 部分销项（CRLF / path.sep / safeRmSync 退避重试在 #118/96225df 已修，symlink 权限类系统限制保留挂账改定性「平台侧不可修」）；OP-34 改定性「平台侧、代码不可修、持续观察」不销项；OP-35① 销项（定向帧等待全仓替换）；OP-35② 销项（#113 已修不重复改）；OP-36 销项（回退已删、无匹配返回 null、调用方收敛保守拒绝）；OP-37 销项（normalizeContractId 读写共用 + 读侧原始名兜底）；OP-38 销项（.history.jsonl 单行追加 + readPlaytestEvidenceHistory）。新增两条边界挂账（多对一映射碰撞未区分、.history.jsonl 无界增长边界）；不新增 OP 号（OP 范围仍 OP-1～OP-38）；不宣称 OP 挂账区清零（OP-1～32 及其他卡内挂账仍在）。Sprint 物理起点推进至 `96225df`（首要仍「在队清零」）。仅 docs 回写，不改产品代码。

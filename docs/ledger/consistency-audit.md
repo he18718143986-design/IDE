@@ -110,12 +110,12 @@
 | OP-30 | J.1 "无 tool_use 不算通过"裁决先例（事件：声称在真实 Claude CLI 执行的验证，无 tool_use 记录不予通过） | — | 已裁决-入标准 | docs/specs/evidence-and-acceptance-criteria.md §3.2 |
 | OP-31 | J.1 沙箱 root 全绿不具真机外推效力的判例（事件：沙箱 root 权限可绕过权限类测试，须真实用户环境验证；关联 PR #3 分支真机 Glob 条款） | — | 已裁决-入标准 | docs/specs/evidence-and-acceptance-criteria.md §3.2 |
 | OP-32 | 验证证据升级为实测/可信证据（exit_code 实采 + API 级确认防伪造） | 待指定 | 已裁决-A 已实现(PR #19)/B 缓议 | 关联 OP-27；设计先决：执行环境/超时/白名单边界；SYNTAX_CHECK/IMPLICIT_SIDE_EFFECT 实采通道待补 |
-| OP-33 | Windows 单测既有红（main 基线 45 项/20 文件；每次都失败的稳定层 26 项：spawn/信号、符号链接、合并、迁移、worktree 等；WS/auth/Origin/端口类为抖动层） | 待指定 | 已登记-挂账 | 关联 PR #19 合并；基线 run 40821117113；PR 重跑 run 40838762021 |
-| OP-34 | macOS CI runner 不稳定（多次出现 job 排队后零步骤取消，PR #28/#29/#30 均发生，判定为 GitHub 平台侧问题非测试失败；main 同 job 在 95c6698/4144a201 为绿） | 待指定 | 已登记-挂账 | 与 OP-33 Windows 债并列独立；关联 PR #28/#29/#30 判定声明 |
-| OP-35 | 跨平台测试偶发抖动（① ipc-stream.test.ts 期望 ERROR 帧先收到 BASELINE_PROGRESS 帧的 WS 竞态，Ubuntu 与 macOS 均有发生，重跑即转绿；② scheme-confirm-scope-drift.test.ts 的 git index.lock 并发竞态，全量跑 2 条失败、单文件复跑 4/4 通过） | 待指定 | 已登记-挂账 | 与 OP-33/OP-34 分开登记；见 PR #28/#29/#30 CI 记录与 e7f57b4 本地实机基线验证 |
-| OP-36 | L.17b 证据绑定粒度：`resolveCurrentLiveReleaseId` 在合同 `contract_ids` 无匹配时回退「最近一条 LIVE」，多合同仓里合同 A 的认可可能绑到合同 B 的发布（方向保守：版本变更照样 STALE，逼重新认可而非误放行） | 待指定 | 已登记-挂账（P-112） | #72/`d26def6`；`daemon/release/active-live.ts`；语义是「最新 LIVE 即当前版本」而非「本合同的 LIVE」 |
-| OP-37 | L.17b 合同文件名两套口径：`readContractReferences` 用原始 `contractId + ".json"`（不做别名归一），`playtestEvidencePath` 对 `contract_id` 做字符归一；含特殊字符的 id 会读不到合同文件但写得了证据（实际 id 受控生成，风险低） | 待指定 | 已登记-挂账（P-112） | #72/`d26def6`；`playtest-guard.ts` / `daemon/playtest/evidence.ts` |
-| OP-38 | L.17b 证据无历史链：`playtest-{contract_id}.json` 覆盖写，重新认可后旧证据丢失，审计只有「当前认可」无「认可历史」（dec-12 未要求历史） | 待指定 | 已登记-挂账（P-112） | #72/`d26def6`；`daemon/playtest/evidence.ts`；与 W.8 两条（`STAGENT_SESSION_TOKEN` 回退、`/api/shutdown` 手写 mock）、L.17a `request.headers` 一条同批归拢，详见 `development-tasks-completed.md` §3.4f |
+| OP-33 | Windows 单测既有红（main 基线 45 项/20 文件；每次都失败的稳定层 26 项：spawn/信号、符号链接、合并、迁移、worktree 等；WS/auth/Origin/端口类为抖动层） | 待指定 | 部分销项 / 改定性保留挂账（P-138） | 关联 PR #19 合并；基线 run 40821117113；PR 重跑 run 40838762021；部分销项（[#118](https://github.com/he18718143986-design/IDE/pull/118)/`96225df`）：CRLF 归一 / path.sep / safeRmSync 退避重试已修；symlink 权限类系统限制保留挂账，改定性「平台侧不可修」 |
+| OP-34 | macOS CI runner 不稳定（多次出现 job 排队后零步骤取消，PR #28/#29/#30 均发生，判定为 GitHub 平台侧问题非测试失败；main 同 job 在 95c6698/4144a201 为绿） | 待指定 | 改定性保留挂账（不销项 · P-138） | 与 OP-33 Windows 债并列独立；关联 PR #28/#29/#30 判定声明；改定性「平台侧、代码不可修、持续观察」，不销项 |
+| OP-35 | 跨平台测试偶发抖动（① ipc-stream.test.ts 期望 ERROR 帧先收到 BASELINE_PROGRESS 帧的 WS 竞态，Ubuntu 与 macOS 均有发生，重跑即转绿；② scheme-confirm-scope-drift.test.ts 的 git index.lock 并发竞态，全量跑 2 条失败、单文件复跑 4/4 通过） | 待指定 | 已销项（P-138） | 与 OP-33/OP-34 分开登记；见 PR #28/#29/#30 CI 记录与 e7f57b4 本地实机基线验证；已销项（[#118](https://github.com/he18718143986-design/IDE/pull/118)/`96225df`）：① nextFrameOfType / waitForFrameType 定向帧等待全仓替换；② git index.lock 假漂移已由 [#113](https://github.com/he18718143986-design/IDE/pull/113)/`2559f5c` 修复，对账不重复改 |
+| OP-36 | L.17b 证据绑定粒度：`resolveCurrentLiveReleaseId` 在合同 `contract_ids` 无匹配时回退「最近一条 LIVE」，多合同仓里合同 A 的认可可能绑到合同 B 的发布（方向保守：版本变更照样 STALE，逼重新认可而非误放行） | 待指定 | 已销项（P-138） | #72/`d26def6`；`daemon/release/active-live.ts`；语义是「最新 LIVE 即当前版本」而非「本合同的 LIVE」；已销项（[#118](https://github.com/he18718143986-design/IDE/pull/118)/`96225df`）：回退逻辑已删，无匹配返回 null，调用方收敛保守拒绝 |
+| OP-37 | L.17b 合同文件名两套口径：`readContractReferences` 用原始 `contractId + ".json"`（不做别名归一），`playtestEvidencePath` 对 `contract_id` 做字符归一；含特殊字符的 id 会读不到合同文件但写得了证据（实际 id 受控生成，风险低） | 待指定 | 已销项（P-138） | #72/`d26def6`；`playtest-guard.ts` / `daemon/playtest/evidence.ts`；已销项（[#118](https://github.com/he18718143986-design/IDE/pull/118)/`96225df`）：normalizeContractId 读写共用 + 读侧原始名兜底 |
+| OP-38 | L.17b 证据无历史链：`playtest-{contract_id}.json` 覆盖写，重新认可后旧证据丢失，审计只有「当前认可」无「认可历史」（dec-12 未要求历史） | 待指定 | 已销项（P-138） | #72/`d26def6`；`daemon/playtest/evidence.ts`；与 W.8 两条（`STAGENT_SESSION_TOKEN` 回退、`/api/shutdown` 手写 mock）、L.17a `request.headers` 一条同批归拢，详见 `development-tasks-completed.md` §3.4f；已销项（[#118](https://github.com/he18718143986-design/IDE/pull/118)/`96225df`）：`.history.jsonl` 单行追加 + readPlaytestEvidenceHistory |
 
 ## 四、三层皮权威表
 
@@ -196,3 +196,16 @@
 
 > **P-136 · P-135 合入 tip 同步（2026-11-03）**：物理 tip 推进至 main@`de50d38`（[#114](https://github.com/he18718143986-design/IDE/pull/114)，父 #113 `2559f5c3`）；P-135 清扫成果（typecheck 54→0、Unit tests 7 项红销项、假漂移与续租修复）与两项挂账现行有效。只推进 tip 指针；矩阵、卡状态、在队清零首要无变化。既有 P-135 记录保留原文作溯源，不新增 OP。
 > **P-137 · P-136 合入 tip 同步与门禁留痕（2026-11-03）**：物理 tip 推进至 main@`08e1a60`（[#115](https://github.com/he18718143986-design/IDE/pull/115)，父 #114 `de50d38`）。**门禁状态留痕**：Branch Ruleset `main`（ID 26435584）已激活启用 required status checks（ubuntu/macos，严格分支最新要求，排除 Windows）与安全防线，门禁由惯例升格为物理强制。只推进 tip 指针与留存门禁变更记录；矩阵、卡状态、在队清零首要无变化。既有历史记录保留原文作溯源，不新增 OP。
+
+> **P-138 · OP-33～38 挂账清扫销项与新增边界挂账（2026-11-03）**：基于最新 `main`@`96225dfdafbba04b813da63c8e524cd22bbcc087`（[#118](https://github.com/he18718143986-design/IDE/pull/118) squash）。对本表 OP-33～38 六条账逐条对账处理（历史条目保留原文作溯源，销项不改 OP 编号，只改状态标注）：
+> - **OP-33（Windows 单测红）**：部分销项（[#118](https://github.com/he18718143986-design/IDE/pull/118)/`96225df`）：CRLF 归一 / path.sep / safeRmSync 退避重试已修；symlink 权限类系统限制保留挂账，改定性「平台侧不可修」。
+> - **OP-34（macOS CI runner 平台差异）**：改定性「平台侧、代码不可修、持续观察」，不销项。
+> - **OP-35①（WS 测试盲取首帧 flaky）**：已销项（[#118](https://github.com/he18718143986-design/IDE/pull/118)/`96225df`）：nextFrameOfType / waitForFrameType 定向帧等待全仓替换。
+> - **OP-35②（git index.lock 假漂移）**：已销项（[#113](https://github.com/he18718143986-design/IDE/pull/113)/`2559f5c`）：preflight 与 freeze 均等待 `ensureBaselineScan()` 修复，对账不重复改。
+> - **OP-36（resolveCurrentLiveReleaseId 回退粒度）**：已销项（[#118](https://github.com/he18718143986-design/IDE/pull/118)/`96225df`）：回退已删、无匹配返回 null、调用方收敛保守拒绝。
+> - **OP-37（合同文件名两套口径）**：已销项（[#118](https://github.com/he18718143986-design/IDE/pull/118)/`96225df`）：normalizeContractId 读写共用 + 读侧原始名兜底。
+> - **OP-38（证据覆盖写无历史链）**：已销项（[#118](https://github.com/he18718143986-design/IDE/pull/118)/`96225df`）：`.history.jsonl` 单行追加 + readPlaytestEvidenceHistory。
+>
+> **新增两条边界挂账（记入 ledger，不新增 OP 编号，OP 范围仍 OP-1～OP-38；不宣称 OP 挂账区清零，OP-1～32 及其他卡内挂账仍在）**：
+> 1. **normalizeContractId 归一化多对一映射**：`"a:b"` 与 `"a/b"` 替换后撞同一文件名（`"playtest-a_b.json"`），碰撞未做区分；此属 evidence 路径既有字符归一行为延续，记为边界挂账。
+> 2. **`.history.jsonl` 无界增长**：历史链采用单行追加模式，目前只追加不轮转；因试玩认可动作频率低，实际无害，记为边界挂账。

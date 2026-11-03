@@ -288,3 +288,5 @@
 
 > **P-136 现行物理指针（2026-11-03）**：main@`de50d38de3089dc17d601627a35b4096609fb706`（#114 为 P-135 docs 回写 squash；其下 #113 `2559f5c3` 为无卡基建清扫代码 squash）。P-135 清扫成果（typecheck 54→0、Unit tests 7 项红销项、假漂移与续租修复）与两项挂账现行有效；completed §3.4q 唯一锚点已落定。Sprint 首要仍为「在队清零」，下一张卡待 Tina 指定。
 > **P-137 现行物理指针（2026-11-03）**：main@`08e1a60258f9d7225cf718ab99045711a0150bf8`（#115 为 P-136 docs 回写 squash；其下 #114 `de50d38` 为 P-135 docs 回写 squash，#113 `2559f5c3` 为无卡基建清扫代码 squash）。GitHub Branch Ruleset `main`（ID 26435584）已激活启用 required checks，门禁由惯例升格为物理强制。P-135 清扫成果与两项挂账现行有效；Sprint 首要仍为「在队清零」，下一张卡待 Tina 指定。
+
+> **P-138 现行物理指针（2026-11-03）**：main@`96225dfdafbba04b813da63c8e524cd22bbcc087`（[#118](https://github.com/he18718143986-design/IDE/pull/118) 为 OP-33~38 挂账清扫代码 squash；其下 #117 `41029dc` 为 CA-06 CI 工作流，#116 `e695649` 为 P-137 门禁强制化文档注记）。完成 OP-33（部分销项 / 平台侧限制改定性）、OP-34（改定性平台侧持续观察）、OP-35①、OP-35②、OP-36、OP-37、OP-38 逐条对账销项，新增两条边界挂账；Sprint 首要仍为「在队清零」，下一张卡待 Tina 指定。
