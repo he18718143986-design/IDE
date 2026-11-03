@@ -64,7 +64,8 @@ export {
   tryReuseRunningDaemon,
 };
 
-export type CliCommand = "open" | "start" | "status" | "help" | "version" | "check";
+export type CliCommand =
+  "open" | "start" | "status" | "help" | "version" | "check";
 
 export interface CliOptions {
   command: CliCommand;
@@ -400,15 +401,7 @@ async function runOpenOrStart(
   process.once("SIGTERM", shutdown);
 }
 
-const CHECK_LANGS = new Set([
-  "ts",
-  "js",
-  "tsx",
-  "jsx",
-  "py",
-  "go",
-  "rs",
-]);
+const CHECK_LANGS = new Set(["ts", "js", "tsx", "jsx", "py", "go", "rs"]);
 
 function readJsonFile(filePath: string): unknown {
   const raw = fs.readFileSync(filePath, "utf8");
@@ -444,11 +437,7 @@ export function runCheckCommand(checkArgv: readonly string[]): {
       });
       return { exitCode: 1, stdout };
     }
-    if (
-      phaseRaw !== undefined &&
-      phaseRaw !== "t" &&
-      phaseRaw !== "i"
-    ) {
+    if (phaseRaw !== undefined && phaseRaw !== "t" && phaseRaw !== "i") {
       const stdout = JSON.stringify({
         ok: false,
         error: 'invalid --phase; use "t" or "i"',
@@ -601,9 +590,7 @@ export function runCheckCommand(checkArgv: readonly string[]): {
       });
       const stdout = JSON.stringify({
         ok: result.ok,
-        ...(result.ok
-          ? {}
-          : { reason_code: "KNOWLEDGE_DRIFT" as const }),
+        ...(result.ok ? {} : { reason_code: "KNOWLEDGE_DRIFT" as const }),
         failures: result.failures,
       });
       return { exitCode: result.ok ? 0 : 1, stdout };
