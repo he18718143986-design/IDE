@@ -191,3 +191,5 @@
 - **状态**：W.9c → COMPLETED（PR [#107](https://github.com/he18718143986-design/IDE/pull/107)/`d3397a6`）；W.9a/b/c 均完成，W.9 母卡实质闭合，拆分标记 `[SPLIT]` 保留追溯。
 - **四项 W.9b 挂账**：搬入 completed §3.4q 并保留未销项状态：Docker host probe 放大、具体门禁拒绝原因诊断收窄、容器 env 内 API key 可读、Cursor 容器协议未实证。特别是 Cursor 仍 `E_CURSOR_AGENT_NO_EXECUTOR`；不因 W.9c 完成而推断其执行能力已实证。
 - **Sprint**：首要回到「在队清零」；矩阵无 `[NEW_TASK]` 实现卡，下一张由 Tina 指定。仅 docs 回写、不新增 OP、不宣称整体端到端闭环。
+
+> **P-135 清扫成果入账与挂账（2026-11-03）**：基线 `main`@`2559f5c3`（#113 squash）。无任务卡基建修正留痕：typecheck 54→0（`CompilerCasWriteInput` journal/promptVersion nullable 与 graveyard lock 收窄至 `security/user`）；Unit tests 7 项既有基线红销项（Supervisor 依赖闭包拆分、spawn 白名单 4 例外登记、test-port-map 27 条迁至 4210–4778、原因码/工具数/Activity Bar 断言同步）；`E_SCOPE_PLAN_DRIFT` 假漂移修复为 preflight/freeze 均等待 `ensureBaselineScan()`；macOS 续租 flake 改为事件等待；#109 CI 启用/三 job、#111 Prettier 1366 条、#112 lint 29 条与 #113 清扫记为无卡基建修正。挂账：手工植入路径审计语义未定义；Windows CRLF、`path.sep`、临时目录 `EBUSY` 重试债（建议 TASK-CI.1 `[DEFERRED]` 或待立卡）；§3.4q 重复锚点清理。Sprint 首要仍「在队清零」；不新增 OP、不改产品代码，历史条目保留原文。

@@ -2286,7 +2286,7 @@
 ---
 
 
-<a id="task-w.9c"></a>
+
 #### 【Task W.9c】自注册工厂闭环 `[COMPLETED]`
 
 > **归档注记（2026-11-03 · P-134）**：本卡已完成（[#107](https://github.com/he18718143986-design/IDE/pull/107)/`d3397a6`）；交付、验证与未宣称边界见 [`development-tasks-completed.md` §3.4q](./development-tasks-completed.md#task-w.9c)。
