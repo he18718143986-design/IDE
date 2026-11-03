@@ -25,8 +25,8 @@ describe("TASK-L.17a: Web Ingest Vault Auth and Worker Redaction", () => {
       credentialName: mockSecretName,
       loginHandler: async (creds, _fetchFn) => {
         loginCalled = true;
-        expect(creds.username).toBe("stagent_crawler");
-        expect(creds.password).toBe("SuperSecretPassword123!");
+        expect(creds["username"]).toBe("stagent_crawler");
+        expect(creds["password"]).toBe("SuperSecretPassword123!");
         return {
           cookie: "auth_session=abcdef123456789; Path=/",
           expiresAt: Date.now() + 3600 * 1000,
@@ -67,16 +67,19 @@ describe("TASK-L.17a: Web Ingest Vault Auth and Worker Redaction", () => {
       </html>
     `;
 
-    const mockFetch = vi.fn().mockImplementation((url: string, opts: any) => {
-      // Verify request header had the cookie injected by Daemon
-      expect(opts.headers["Cookie"]).toBe("session_token_xyz987654321");
-      return new Response(leakingHtml, { status: 200 });
-    });
+    const mockFetch = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async (_url, opts) => {
+        // Verify request header had the cookie injected by Daemon
+        const headers = opts?.headers as Record<string, string>;
+        expect(headers["Cookie"]).toBe("session_token_xyz987654321");
+        return new Response(leakingHtml, { status: 200 });
+      });
 
     const proxy = new WebIngestProxy({
       allowedDomains: ["https://secure.partner.com"],
       authSessionManager: authManager,
-      fetchFn: mockFetch as any,
+      fetchFn: mockFetch,
     });
 
     const result = await proxy.fetch({
@@ -120,7 +123,7 @@ describe("TASK-L.17a: Web Ingest Vault Auth and Worker Redaction", () => {
       loginUrl: "https://login-nocookie.partner.com/api/login",
     });
 
-    const mockFetchNoCookie = vi.fn().mockResolvedValue(
+    const mockFetchNoCookie = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -129,7 +132,7 @@ describe("TASK-L.17a: Web Ingest Vault Auth and Worker Redaction", () => {
 
     await expect(
       authManager.authenticate("login-nocookie.partner.com", {
-        fetchFn: mockFetchNoCookie as any,
+        fetchFn: mockFetchNoCookie,
       }),
     ).rejects.toMatchObject({
       code: "E_WEB_INGEST_AUTH_FAILED",
@@ -144,12 +147,12 @@ describe("TASK-L.17a: Web Ingest Vault Auth and Worker Redaction", () => {
     });
 
     const mockFetchFail = vi
-      .fn()
+      .fn<typeof fetch>()
       .mockResolvedValue(new Response("Invalid credentials", { status: 401 }));
 
     await expect(
       authManager.authenticate("login-fail.partner.com", {
-        fetchFn: mockFetchFail as any,
+        fetchFn: mockFetchFail,
       }),
     ).rejects.toMatchObject({
       code: "E_WEB_INGEST_AUTH_FAILED",

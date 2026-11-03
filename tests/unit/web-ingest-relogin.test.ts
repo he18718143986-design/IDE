@@ -26,35 +26,39 @@ describe("TASK-L.17a: Silent Cookie Expiry Relogin (dec-13)", () => {
     });
 
     let upstreamAttempts = 0;
-    const mockFetch = vi.fn().mockImplementation((url: string, opts: any) => {
-      upstreamAttempts++;
-      const cookieHeader = opts.headers["Cookie"];
+    const mockFetch = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async (_url, opts) => {
+        upstreamAttempts++;
+        const cookieHeader = (opts?.headers as Record<string, string>)[
+          "Cookie"
+        ];
 
-      // First attempt: simulate that the first session cookie has expired on upstream server
-      if (upstreamAttempts === 1) {
-        expect(cookieHeader).toBe("session_token=gen_1");
-        return new Response("Unauthorized Session", { status: 401 });
-      }
+        // First attempt: simulate that the first session cookie has expired on upstream server
+        if (upstreamAttempts === 1) {
+          expect(cookieHeader).toBe("session_token=gen_1");
+          return new Response("Unauthorized Session", { status: 401 });
+        }
 
-      // Second attempt: Daemon has silently refreshed the cookie using Vault credentials
-      if (upstreamAttempts === 2) {
-        expect(cookieHeader).toBe("session_token=gen_2");
-        return new Response(
-          "<html><body><h1>Dashboard</h1><p>Secret content</p></body></html>",
-          {
-            status: 200,
-            headers: { "Content-Type": "text/html" },
-          },
-        );
-      }
+        // Second attempt: Daemon has silently refreshed the cookie using Vault credentials
+        if (upstreamAttempts === 2) {
+          expect(cookieHeader).toBe("session_token=gen_2");
+          return new Response(
+            "<html><body><h1>Dashboard</h1><p>Secret content</p></body></html>",
+            {
+              status: 200,
+              headers: { "Content-Type": "text/html" },
+            },
+          );
+        }
 
-      return new Response("Error", { status: 500 });
-    });
+        return new Response("Error", { status: 500 });
+      });
 
     const proxy = new WebIngestProxy({
       allowedDomains: ["https://protected.partner.com"],
       authSessionManager: authManager,
-      fetchFn: mockFetch as any,
+      fetchFn: mockFetch,
     });
 
     // Worker calls fetch. Notice Worker does NOT know about the 401 or the relogin!
@@ -75,7 +79,7 @@ describe("TASK-L.17a: Silent Cookie Expiry Relogin (dec-13)", () => {
     expect(result.content).not.toContain("session_token=gen_");
     expect(result.content).not.toContain("secret123");
     expect(result.content).not.toContain("401");
-    expect((result as any).error).toBeUndefined();
+    expect((result as { error?: unknown }).error).toBeUndefined();
   });
 
   it("silently refreshes cookie when in-memory session expires by timestamp", async () => {
@@ -98,14 +102,17 @@ describe("TASK-L.17a: Silent Cookie Expiry Relogin (dec-13)", () => {
       },
     });
 
-    const mockFetch = vi.fn().mockImplementation((_url, opts) => {
-      return new Response(`OK with ${opts.headers["Cookie"]}`, { status: 200 });
-    });
+    const mockFetch = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async (_url, opts) => {
+        const headers = opts?.headers as Record<string, string>;
+        return new Response(`OK with ${headers["Cookie"]}`, { status: 200 });
+      });
 
     const proxy = new WebIngestProxy({
       allowedDomains: ["https://expiring.partner.com"],
       authSessionManager: authManager,
-      fetchFn: mockFetch as any,
+      fetchFn: mockFetch,
     });
 
     // First call logs in (sess_1)

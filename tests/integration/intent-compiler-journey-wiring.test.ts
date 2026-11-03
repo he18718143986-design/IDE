@@ -76,8 +76,7 @@ describe("J.10 用户消息 → 方案补丁落盘（生产接线）", () => {
       enableCrashRecovery: false,
       intentCompilerModelClient: stub,
       // 只登记回调，由 flushIntentCompilerForTest 触发（跳过 1.2s 墙钟）
-      intentCompilerSetTimeout: (fn) => {
-        fn as () => void;
+      intentCompilerSetTimeout: () => {
         // 由 Host.pendingTimers 跟踪；此处返回句柄即可
         return 1;
       },

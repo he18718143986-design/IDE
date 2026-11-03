@@ -3,6 +3,7 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import type { AddressInfo } from "node:net";
 import {
   McpHttpServer,
   STAGENT_WEB_INGEST_TOOL_NAME,
@@ -19,6 +20,32 @@ import {
 import { createContractDraft } from "../../src/lib/contract.schema";
 import { ClaudeCodeAdapter } from "../../daemon/worker/cli-host/claude-code-adapter";
 import { StagentDaemon } from "../../daemon/server";
+
+/** tools/list 返回的工具描述符，只声明本文件断言用到的字段。 */
+type McpToolDescriptor = {
+  name: string;
+  inputSchema?: { required?: string[] };
+};
+
+/** 本文件按 JSON-RPC 报文断言，只声明实际读取的字段。 */
+type McpJsonRpcBody = {
+  jsonrpc?: string;
+  id?: number | string | null;
+  result?: {
+    capabilities?: { tools?: unknown };
+    serverInfo?: { name?: string };
+    tools?: McpToolDescriptor[];
+  };
+  error?: { code?: number; message?: string };
+};
+
+/** tools/call 的 result 载荷。 */
+type McpToolCallResult = {
+  isError?: boolean;
+  error?: { code?: string };
+  content?: { text?: string }[];
+  data?: { status?: number; url?: string };
+};
 
 describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
   let tempRepo: string;
@@ -57,18 +84,19 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
 
   async function postMcp(
     body: unknown,
-  ): Promise<{ status: number; body: any }> {
+  ): Promise<{ status: number; body: McpJsonRpcBody }> {
     const res = await fetch(`http://127.0.0.1:${port}/api/mcp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     const text = await res.text();
-    let parsed: any;
+    let parsed: McpJsonRpcBody;
     try {
-      parsed = JSON.parse(text);
+      parsed = JSON.parse(text) as McpJsonRpcBody;
     } catch {
-      parsed = text;
+      // 非 JSON 响应：保留原始文本，方便断言失败时看到真实报文
+      parsed = { error: { message: text } };
     }
     return { status: res.status, body: parsed };
   }
@@ -106,11 +134,11 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
     expect(listRes.status).toBe(200);
     const tools = listRes.body.result?.tools;
     expect(Array.isArray(tools)).toBe(true);
-    const ingestTool = tools.find(
-      (t: any) => t.name === STAGENT_WEB_INGEST_TOOL_NAME,
+    const ingestTool = tools?.find(
+      (t) => t.name === STAGENT_WEB_INGEST_TOOL_NAME,
     );
     expect(ingestTool).toBeDefined();
-    expect(ingestTool.inputSchema.required).toContain("url");
+    expect(ingestTool?.inputSchema?.required).toContain("url");
   });
 
   it("rejects unauthorized and unknown tools with JSON-RPC error", async () => {
@@ -170,7 +198,7 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
       ],
     };
 
-    const mockFetch = vi.fn().mockResolvedValue(
+    const mockFetch = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(
         "<html><head><title>Spec V1</title></head><body><h1>API Spec</h1><p>Doc content</p></body></html>",
         {
@@ -181,7 +209,7 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
     );
     const proxy = new WebIngestProxy({
       allowedDomains: ["allowed.partner.com", "docs.github.com"],
-      fetchFn: mockFetch as any,
+      fetchFn: mockFetch,
     });
 
     const gateway = new ScopedWorktreeGateway(tempRepo, contract, {
@@ -201,7 +229,7 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
     });
 
     expect(blockedCall.result).toBeDefined();
-    const blockedResult = blockedCall.result as any;
+    const blockedResult = blockedCall.result as McpToolCallResult;
     expect(blockedResult.isError).toBe(true);
     expect(blockedResult.error?.code).toBe(E_WEB_INGEST_FORBIDDEN_DOMAIN);
     expect(mockFetch).not.toHaveBeenCalled();
@@ -221,11 +249,11 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
     });
 
     expect(allowedCall.result).toBeDefined();
-    const allowedResult = allowedCall.result as any;
+    const allowedResult = allowedCall.result as McpToolCallResult;
     expect(allowedResult.isError).toBe(false);
-    expect(allowedResult.content[0].text).toContain("Doc content");
-    expect(allowedResult.data.status).toBe(200);
-    expect(allowedResult.data.url).toBe("https://allowed.partner.com/spec/v1");
+    expect(allowedResult.content?.[0]?.text).toContain("Doc content");
+    expect(allowedResult.data?.status).toBe(200);
+    expect(allowedResult.data?.url).toBe("https://allowed.partner.com/spec/v1");
     expect(mockFetch).toHaveBeenCalledTimes(1);
 
     // 3. Gateway audit log records both calls
@@ -254,7 +282,7 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
 
     await new Promise<void>((resolve) => {
       authServer.listen(0, "127.0.0.1", () => {
-        authPort = (authServer.address() as any).port;
+        authPort = (authServer.address() as AddressInfo).port;
         resolve();
       });
     });
@@ -451,7 +479,7 @@ describe("TASK-W.8: Daemon MCP HTTP endpoint and worker integration", () => {
     let dPort = 0;
     await new Promise<void>((resolve) => {
       mockDaemon.listen(0, "127.0.0.1", () => {
-        dPort = (mockDaemon.address() as any).port;
+        dPort = (mockDaemon.address() as AddressInfo).port;
         resolve();
       });
     });

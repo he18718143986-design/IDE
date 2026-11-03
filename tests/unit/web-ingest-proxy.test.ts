@@ -33,8 +33,8 @@ describe("TASK-L.17a: Daemon Web Ingest Proxy", () => {
       </html>
     `;
 
-    const mockFetch = vi.fn().mockImplementation(
-      () =>
+    const mockFetch = vi.fn<typeof fetch>().mockImplementation(
+      async () =>
         new Response(htmlSample, {
           status: 200,
           headers: { "Content-Type": "text/html" },
@@ -43,7 +43,7 @@ describe("TASK-L.17a: Daemon Web Ingest Proxy", () => {
 
     const proxy = new WebIngestProxy({
       allowedDomains: allowedReferences,
-      fetchFn: mockFetch as any,
+      fetchFn: mockFetch,
     });
 
     // 1. Format: html
@@ -83,10 +83,10 @@ describe("TASK-L.17a: Daemon Web Ingest Proxy", () => {
   });
 
   it("blocks requests to domains not in references[] whitelist with 403 E_WEB_INGEST_FORBIDDEN_DOMAIN", async () => {
-    const mockFetch = vi.fn();
+    const mockFetch = vi.fn<typeof fetch>();
     const proxy = new WebIngestProxy({
       allowedDomains: allowedReferences,
-      fetchFn: mockFetch as any,
+      fetchFn: mockFetch,
     });
 
     await expect(
@@ -100,10 +100,10 @@ describe("TASK-L.17a: Daemon Web Ingest Proxy", () => {
   });
 
   it("blocks non-GET requests with 405 E_WEB_INGEST_METHOD_NOT_ALLOWED", async () => {
-    const mockFetch = vi.fn();
+    const mockFetch = vi.fn<typeof fetch>();
     const proxy = new WebIngestProxy({
       allowedDomains: allowedReferences,
-      fetchFn: mockFetch as any,
+      fetchFn: mockFetch,
     });
 
     const disallowedMethods = ["POST", "PUT", "DELETE", "PATCH"];
@@ -126,7 +126,7 @@ describe("TASK-L.17a: Daemon Web Ingest Proxy", () => {
     const maxSizeBytes = 1024; // 1KB
 
     // Case 1: Declared in Content-Length header
-    const mockFetchHeader = vi.fn().mockResolvedValue(
+    const mockFetchHeader = vi.fn<typeof fetch>().mockResolvedValue(
       new Response("small body", {
         status: 200,
         headers: { "Content-Length": "2048" },
@@ -135,7 +135,7 @@ describe("TASK-L.17a: Daemon Web Ingest Proxy", () => {
     const proxyHeader = new WebIngestProxy({
       allowedDomains: allowedReferences,
       maxSizeBytes,
-      fetchFn: mockFetchHeader as any,
+      fetchFn: mockFetchHeader,
     });
 
     await expect(
@@ -147,7 +147,7 @@ describe("TASK-L.17a: Daemon Web Ingest Proxy", () => {
 
     // Case 2: Actual body exceeds limit
     const hugeBody = "X".repeat(2048);
-    const mockFetchBody = vi.fn().mockResolvedValue(
+    const mockFetchBody = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(hugeBody, {
         status: 200,
       }),
@@ -155,7 +155,7 @@ describe("TASK-L.17a: Daemon Web Ingest Proxy", () => {
     const proxyBody = new WebIngestProxy({
       allowedDomains: allowedReferences,
       maxSizeBytes,
-      fetchFn: mockFetchBody as any,
+      fetchFn: mockFetchBody,
     });
 
     await expect(
@@ -168,14 +168,14 @@ describe("TASK-L.17a: Daemon Web Ingest Proxy", () => {
 
   it("enforces rate limits and limits burst flooding with 429 E_WEB_INGEST_RATE_LIMITED", async () => {
     const mockFetch = vi
-      .fn()
-      .mockImplementation(() => new Response("OK", { status: 200 }));
+      .fn<typeof fetch>()
+      .mockImplementation(async () => new Response("OK", { status: 200 }));
 
     const proxy = new WebIngestProxy({
       allowedDomains: allowedReferences,
       rateLimitPerMinute: 5,
       rateBurstLimit: 3,
-      fetchFn: mockFetch as any,
+      fetchFn: mockFetch,
     });
 
     const targetUrl = "https://docs.reference.org/guide";
@@ -226,22 +226,24 @@ describe("TASK-L.17a: Daemon Web Ingest Proxy", () => {
   });
 
   it("blocks redirect bypass when whitelisted domain returns 302 to external domain (ADR-0014 §3)", async () => {
-    const mockFetch = vi.fn().mockImplementation((url: string, opts: any) => {
-      expect(opts.redirect).toBe("manual");
-      if (url === "https://docs.reference.org/external-jump") {
-        return new Response("", {
-          status: 302,
-          headers: {
-            Location: "https://evil.external-attacker.com/pwned",
-          },
-        });
-      }
-      return new Response("OK", { status: 200 });
-    });
+    const mockFetch = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async (url, opts) => {
+        expect(opts?.redirect).toBe("manual");
+        if (url === "https://docs.reference.org/external-jump") {
+          return new Response("", {
+            status: 302,
+            headers: {
+              Location: "https://evil.external-attacker.com/pwned",
+            },
+          });
+        }
+        return new Response("OK", { status: 200 });
+      });
 
     const proxy = new WebIngestProxy({
       allowedDomains: allowedReferences,
-      fetchFn: mockFetch as any,
+      fetchFn: mockFetch,
     });
 
     await expect(
@@ -254,29 +256,31 @@ describe("TASK-L.17a: Daemon Web Ingest Proxy", () => {
 
   it("allows redirect within whitelisted domains and tracks final url", async () => {
     let callCount = 0;
-    const mockFetch = vi.fn().mockImplementation((url: string, opts: any) => {
-      expect(opts.redirect).toBe("manual");
-      callCount++;
-      if (url === "https://docs.reference.org/old-guide") {
-        return new Response("", {
-          status: 301,
-          headers: {
-            Location: "https://docs.reference.org/guide",
-          },
-        });
-      }
-      if (url === "https://docs.reference.org/guide") {
-        return new Response("<html><body>Safe Guide Content</body></html>", {
-          status: 200,
-          headers: { "Content-Type": "text/html" },
-        });
-      }
-      return new Response("Not Found", { status: 404 });
-    });
+    const mockFetch = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async (url, opts) => {
+        expect(opts?.redirect).toBe("manual");
+        callCount++;
+        if (url === "https://docs.reference.org/old-guide") {
+          return new Response("", {
+            status: 301,
+            headers: {
+              Location: "https://docs.reference.org/guide",
+            },
+          });
+        }
+        if (url === "https://docs.reference.org/guide") {
+          return new Response("<html><body>Safe Guide Content</body></html>", {
+            status: 200,
+            headers: { "Content-Type": "text/html" },
+          });
+        }
+        return new Response("Not Found", { status: 404 });
+      });
 
     const proxy = new WebIngestProxy({
       allowedDomains: allowedReferences,
-      fetchFn: mockFetch as any,
+      fetchFn: mockFetch,
     });
 
     const result = await proxy.fetch({
@@ -290,14 +294,16 @@ describe("TASK-L.17a: Daemon Web Ingest Proxy", () => {
 
   it("prevents Worker from injecting or overriding Cookie or Authorization via request.headers", async () => {
     let capturedHeaders: Record<string, string> = {};
-    const mockFetch = vi.fn().mockImplementation((_url: string, opts: any) => {
-      capturedHeaders = opts.headers;
-      return new Response("OK", { status: 200 });
-    });
+    const mockFetch = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async (_url, opts) => {
+        capturedHeaders = (opts?.headers ?? {}) as Record<string, string>;
+        return new Response("OK", { status: 200 });
+      });
 
     const proxy = new WebIngestProxy({
       allowedDomains: allowedReferences,
-      fetchFn: mockFetch as any,
+      fetchFn: mockFetch,
     });
 
     await proxy.fetch({
