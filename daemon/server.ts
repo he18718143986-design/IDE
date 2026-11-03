@@ -2290,6 +2290,9 @@ export class StagentDaemon {
     const submittedPlan = scopePlanRaw as ScopePlan;
 
     try {
+      // 与预检同口径：先等基线扫落定，再用同一份脏区排除重算 digest，
+      // 避免「扫描恰好插在预检与冻结之间」造成的假漂移（见 handleScopePreflight）。
+      await this.ensureBaselineScan().catch(() => undefined);
       const schemeDraft =
         scheme as unknown as import("../src/lib/journey/scheme-draft").SchemeDraft;
       const freshPlan = assertScopePlanFreshForFreeze({
@@ -2375,6 +2378,10 @@ export class StagentDaemon {
       return;
     }
     try {
+      // 范围计划会读基线里的脏区排除（未跟踪/未保存文件），而基线扫是启动时
+      // 后台跑的。若预检在扫描落盘前算、冻结在落盘后重算，plan_digest 会无故变化
+      // → 假漂移 409。这里先等基线稳定，保证预检与冻结基于同一份基线。
+      await this.ensureBaselineScan().catch(() => undefined);
       // TASK-L.9：可选 stub_id → 桩视图预检；缺省时若有计划则用 nextStub
       let stub: import("../src/lib/project/project-plan").ContractStub | null =
         null;
