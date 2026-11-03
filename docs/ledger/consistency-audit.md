@@ -184,3 +184,10 @@
 > **L.17c 立卡（P-132 · 2026-11-03）**：Tina 授权纯文档立卡 `TASK-L.17c`（中栏方案审阅页嵌入试玩认可提交 · `[NEW_TASK]` · S/M）。兑现 completed §3.4f / §3.4i 已声明的 UI 挂账（`CompareView` 未挂路由、原话采集 UI 未实现）；**保留「未宣称」历史原文**；不新增 OP；Sprint 首要仍为 W.9c，本卡不抢首要。同步矩阵 / index / active / changelog / scheme / delivery-lifecycle 现行指针。仅 docs，不开工实现。
 
 > **L.17c 完成回写（P-133 · 2026-11-03）**：PR [#104](https://github.com/he18718143986-design/IDE/pull/104) / `06661be` 合入，L.17c COMPLETED；中栏同页挂载既有 CompareView、原话提交只走 `submitPlaytestEvidence`、读侧薄路由委托 `evaluatePlaytestGuard`（判定本体未改）。三项挂账照旧入 completed §3.4p：snapshots 前端拉数；会话原话候选未灌 index；真机 `check playtest` 执行债。**窄口径**：UI 已挂；**不**宣称端到端闭环。Sprint 首要仍为 W.9c。仅 docs 回写，不新增 OP。
+
+
+### W.9c 合入回写（P-134 · 2026-11-03 · 非 OP）
+
+- **状态**：W.9c → COMPLETED（PR [#107](https://github.com/he18718143986-design/IDE/pull/107)/`d3397a6`）；W.9a/b/c 均完成，W.9 母卡实质闭合，拆分标记 `[SPLIT]` 保留追溯。
+- **四项 W.9b 挂账**：搬入 completed §3.4q 并保留未销项状态：Docker host probe 放大、具体门禁拒绝原因诊断收窄、容器 env 内 API key 可读、Cursor 容器协议未实证。特别是 Cursor 仍 `E_CURSOR_AGENT_NO_EXECUTOR`；不因 W.9c 完成而推断其执行能力已实证。
+- **Sprint**：首要回到「在队清零」；矩阵无 `[NEW_TASK]` 实现卡，下一张由 Tina 指定。仅 docs 回写、不新增 OP、不宣称整体端到端闭环。

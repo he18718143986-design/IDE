@@ -280,3 +280,6 @@
 > **P-132 立卡物理指针（2026-11-03 · 保留作溯源）**：main@`e3262c924fcdf038817ec05cdf36f28ea20861c1`（PR #102，P-131 docs 回写；其下 #101 `b98e463` 为 W.9b 代码）。Sprint 首要**仍为** W.9c（READY，待 Tina 单卡授权）。**并行挂账立卡** `TASK-L.17c` `[NEW_TASK]`（中栏方案审阅页嵌入试玩认可提交 · S/M · **不抢**首要、开工须另授）；acc-6 / gap-11 端到端 UI 仍 ⏳，**未宣称闭环**。
 
 > **P-133 现行物理指针（2026-11-03）**：main@`06661befb9915c94b349a25b6f124ebb0f756c90`（PR #104，L.17c 代码 squash；其下 #103 为 P-132 立卡 docs）。`TASK-L.17c` → `[COMPLETED]`；中栏 UI 已挂（CompareView + 原话「认可完成」+ 读侧 status）。**三项挂账仍挂**：snapshots 拉数；会话原话候选未灌 index；真机 `check playtest` 执行债。Sprint 首要**仍为** W.9c（READY，待 Tina 单卡授权）。acc-6 / gap-11：**UI 接线已合入，验收债仍 ⏳**；**不宣称**端到端闭环。
+
+
+> **P-134 现行物理指针（2026-11-03）**：文档回写基线 main@`10bc1d3b9b0ca23d65e26f9be710b994e443ceac`（#108 tip 同步；W.9c 代码由 #107/`d3397a644603d8b49a96d765456031cba4254981` 合入其前一 tip）。W.9a/b/c 均 COMPLETED；W.9 母卡实质闭合，active `[SPLIT]` 仅保留拆分史。W.9b 四项挂账仍未销项，详见 completed §3.4q；不宣称端到端闭环。Sprint 首要为「在队清零」，下一张卡待 Tina 指定。

@@ -164,3 +164,6 @@
 - **状态回写**：L.17c 已 COMPLETED（PR [#104](https://github.com/he18718143986-design/IDE/pull/104) / `06661be`）；中栏方案审阅同页已挂既有 CompareView + 原话「认可完成」+ 薄读侧 `GET /api/playtest/status`。
 - **挂账（三项，不新增 OP · 不宣称关闭）**：① CompareView `snapshots` 前端拉数（L.17a 抓取成果接线）；② 会话原话候选未灌 `index`（props `sessionVerbatimCandidates` 已留）；③ 真机整段 `check playtest` 执行债。完整记录见 [`development-tasks-completed.md` §3.4p](../specs/development-tasks-completed.md#task-l.17c)。
 - **窄口径**：UI 已挂 / 代码合入；**不**宣称端到端 UI/产品闭环。Sprint 首要仍为 W.9c。现行物理 tip `06661be`。
+
+
+> **W.9c 合入回写（P-134 · 2026-11-03 · 非 OP）**：`TASK-W.9c` 已 COMPLETED（[#107](https://github.com/he18718143986-design/IDE/pull/107)/`d3397a6`），W.9 母卡实质闭合，拆分追溯 `[SPLIT]` 保留。W.9b 四项挂账逐条归档至 completed §3.4q，**均仍未销项**：逐行 Docker host probe 成本；布尔判据导致诊断码信息收窄；四类 API key 在容器 env 内可读；Cursor 镜像/运行协议未实证且继续 fail-closed。沿用先例，不新增 OP。Sprint 首要「在队清零」；下一张卡待 Tina 指定。仅 docs 回写；基于最新 main `10bc1d3`（#108 tip 同步）；不宣称端到端闭环。

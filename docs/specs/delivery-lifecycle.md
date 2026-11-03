@@ -171,3 +171,6 @@ q<n>（原话） → scheme item id（goal-* / mod-* / acc-*） → milestone_id
 - 多 Worktree 并行（RFC v0.2 §5，v0.3+）。
 - 云平台部署适配器（v0.3+，release-and-operations §8）。
 - 多人协作与权限（不在 v0.x 范围）。
+
+
+> **P-134（2026-11-03 · W.9c 完成与在队清零）**：W.9a / W.9b / W.9c 均已 COMPLETED；W.9 母卡实质闭合，但 active 仍保留 `[SPLIT]` 作拆分追溯。自注册派工 factory、版本绑定、共享判据与 witness 复用细节见 [`development-tasks-completed.md` §3.4q](./development-tasks-completed.md#task-w.9c)。W.9b 的四项后续挂账仍未销项；不宣称整体端到端闭环。Sprint 首要回到「在队清零」，下一张卡由 Tina 指定。

@@ -24,10 +24,10 @@
 | `TASK-W.6` | `COMPLETED` | 受控派工接线与默认适配器注册（DLV-3 · #74/`b5d8c53`）· NON_BLOCKER | [打开](./development-tasks-completed.md#task-w.6) |
 | `TASK-W.7` | `COMPLETED` | Worker 自助注册与自动验证（两级注册语义 · 五类断言探测包 · `promoteControlMode` 唯一升格入口；[#89](https://github.com/he18718143986-design/IDE/pull/89)/`be480bb` · L · **升格到 `SANDBOX_ENFORCED` 但无执行器 → `dispatchable:false`**；测试 34 passed）· NON_BLOCKER | [打开](./development-tasks-completed.md#task-w.7) |
 | `TASK-W.8` | `COMPLETED` | Worker 侧 Stagent MCP HTTP 端点 | [打开](./development-tasks-completed.md#task-w.8) |
-| `TASK-W.9` | `SPLIT` | 自注册/外部 Worker 执行器接线 · 母卡（P-128 经授权拆分，保留追溯） | [打开](./development-tasks-active.md#task-w.9) |
+| `TASK-W.9` | `COMPLETED（实质闭合）` | 自注册/外部 Worker 执行器接线 · 母卡（历史 `[SPLIT]` 标记保留追溯） | [打开](./development-tasks-active.md#task-w.9) |
 | `TASK-W.9a` | `COMPLETED` | 探测报告指纹升格 + launch 解耦（[#99](https://github.com/he18718143986-design/IDE/pull/99)/`22168ee`） | [打开](./development-tasks-completed.md#task-w.9a) |
 | `TASK-W.9b` | `COMPLETED` | `ContainerCliAdapter` + `runInSandbox()` + witness 证据面接线；Cursor 容器协议未实证（[#101](https://github.com/he18718143986-design/IDE/pull/101)/`b98e463`） | [打开](./development-tasks-completed.md#task-w.9b) |
-| `TASK-W.9c` | `READY` | 自注册工厂闭环（W.9a/b 前置满足；待 Tina 单卡授权） | [打开](./development-tasks-active.md#task-w.9c) |
+| `TASK-W.9c` | `COMPLETED` | 自注册工厂闭环（[#107](https://github.com/he18718143986-design/IDE/pull/107)/`d3397a6`；四项 W.9b 挂账仍未销项） | [打开](./development-tasks-completed.md#task-w.9c) |
 | `TASK-J.18` | `SPLIT` | Worker 派工墓地门禁（INV-LEDGER-03 工地侧）· 拆分母卡 | [打开](./development-tasks-active.md#task-j.18) |
 | `TASK-J.19` | `COMPLETED` | DN-2「可以」HTTP/画布入口（DLV-6） | [打开](./development-tasks-completed.md#task-j.19) |
 | `TASK-J.20` | `COMPLETED` | OP-1 授权清单落地（dec-10 实施） | [打开](./development-tasks-completed.md#task-j.20) |

@@ -2286,6 +2286,48 @@
 ---
 
 
+<a id="task-w.9c"></a>
+#### 【Task W.9c】自注册工厂闭环 `[COMPLETED]`
+
+> **归档注记（2026-11-03 · P-134）**：本卡已完成（[#107](https://github.com/he18718143986-design/IDE/pull/107)/`d3397a6`）；交付、验证与未宣称边界见 [`development-tasks-completed.md` §3.4q](./development-tasks-completed.md#task-w.9c)。
+
+* **任务编号**：`TASK-W.9c`
+* **任务名称**：自注册工厂闭环
+* **对应规格（R-1）**：`AdapterRegistry::registerDispatchFactory/getDispatchFactory`、`requireControlledDispatch()`、`WorkerDispatchFactory`、自注册 worker store；W.6 §3.4g、W.7 §3.4l 挂账 1、W.9a/W.9b。
+* **前置依赖（R-3）**：W.9a AND W.9b COMPLETED（DAG 两条硬边）；W.6/W.7 COMPLETED；W.9 SPLIT。全部前置满足；本卡已完成（P-134）。
+* **优先级**：P5 · 已完成（P-134）
+* **状态**：`[COMPLETED]`（[#107](https://github.com/he18718143986-design/IDE/pull/107)/`d3397a6`）
+* **对照痛点（R-4）**：自注册记录在 `.stagent/workers.json`，但未建 `CodingWorkerAdapter.run()` 或调用 `registerDispatchFactory()`；`requireControlledDispatch()` 对缺工厂会拒绝，升格与派工因此脱节。
+* **一句话目标（R-2）**：只有真实实现 run、工厂已注册且控制档/宿主门禁合格的 worker 才能派工，API/UI 与门禁共用同一 dispatchable 判据。
+* **ADR 修订（R-9）**：无；遵守 ADR-0001/0003/0014 与 REJ-010。
+* **采用的默认值（R-10）**：`dispatchable` 由有效 run、匹配当前 id/version 的已注册工厂及控制档/宿主可用性共同计算，调用方不能自报；升格不自动授予派工。
+* **范围（R-5）**：
+  1. 在 AdapterRegistry/自注册服务建立 id/version 绑定工厂，注册变更、撤销、改版使旧映射失效。
+  2. 接通 `requireControlledDispatch()`，检查控制档、factory 与实际 `run()` 合约；工厂失败或对象不合约均拒绝。
+  3. API/UI `dispatchable` 与派工门禁复用单一判据；无工厂/run 恒 false。
+  4. 增正反例：有效工厂可派工；升格无工厂、无 run、旧版本 factory/witness 均拒绝；状态投影与门禁一致。
+* **非目标（R-6）**：不重做 W.9a 报告/指纹校验或 W.9b 执行器抽象；不做多 Agent DAG；不改右栏只读白名单；不伪造 verified_on。
+* **不变声明（R-12）**：鉴权、Demo Origin、点亮三证、网关写范围不变；未通过门禁不派工；无 Gateway/容器绕行 fallback。
+* **验收（PASS，R-7）**：`EW9C-01` 有效工厂+run+合法档可派工；`EW9C-02` 升格无工厂仍不可派工并拒绝；`EW9C-03` 无 run 工厂拒绝；`EW9C-04` id/version 变化或撤销使旧 factory 失效；`EW9C-05` API/UI 与门禁判定一致；`EW9C-06` 代码与 DAG 均阻止 a/b 完成前抢跑。
+* **FAIL（R-8）**：无 run/工厂却 `dispatchable:true`；错版本工厂/witness 仍消费；升格等同自动派工；无 witness 仍记 SANDBOX_ENFORCED；存在绕过 Gateway/容器 fallback。
+* **关键文件**：`daemon/worker/adapter-registry.ts`、`worker-dispatch.ts`、`worker-registration-service.ts`、worker API/status projection；dispatch/registry unit tests。
+* **估算（R-11）**：M；若需引入执行器重构则退回重新估算，不混入本卡。
+
+
+### 3.4q 自注册工厂闭环（W.9c）
+
+<a id="task-w.9c"></a>
+
+#### 【Task W.9c】自注册工厂闭环 `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#107](https://github.com/he18718143986-design/IDE/pull/107)/`d3397a644603d8b49a96d765456031cba4254981`，squash；基线 `5774662b299d7faf220f0cd9b3f74913be03f31f`，父提交 #105/#106 链路已在该 main 中）。纯代码 PR；本次文档回写不改产品代码。
+- **交付**：`AdapterRegistry` 按 adapter id + protocol version 强绑定 factory；版本错配、撤销/注销及降级同步清理旧 factory 与升格档，重注册须重新验证。`WorkerRegistrationService` 接通自注册生命周期与 `ContainerCliAdapter` / `executeContainerCli`，复用 W.9b 的 `runInSandbox()` 和既有 `SandboxWitness → resolveEvidenceControlMode` 证据链，不另造容器执行路径。`requireControlledDispatch()` 与 API/UI 使用同一 `isControlledDispatchable()` 判据；升格、factory、可执行 `CodingWorkerAdapter.run()` 与宿主门禁均满足才可派工。缺档位、执行器或 factory 有可区分的拒绝结果；撤销后重注册不继承旧 `promoteControlMode` 结果。Cursor CLI 镜像/运行协议未实证，继续 `E_CURSOR_AGENT_NO_EXECUTOR`，无本地/Gateway/容器绕行 fallback。
+- **状态投影与门禁**：自注册 worker「升格但无执行面」负例保持 `dispatchable:false` 并拒绝；factory id/version 与当前注册版本不匹配时派工失败关闭。SANDBOX_ENFORCED 无本次有效 witness 不被证据链记为受控。W.9c 完成的是本卡自注册派工工厂闭环范围；**不宣称产品整体端到端闭环或绝对隔离**。
+- **测试与验证**：定向 5 个派工 / 执行器 / 沙箱测试文件 **132/132 passed**（干净 main baseline 126）；全量 **2765 passed / 17 failed**（baseline 2759 / 17）。失败差异逐项比对：`ws-security` 曾在并发全量中失败、单跑复验 **9/9 passed**，记录为「曾观察到、未复现」；`scheme-confirm-scope-drift` 为既有环境快照漂移。TypeScript 检查 **54 条诊断**，与 baseline 按诊断内容一致、零新增（行号偏移属正常）；`git diff --check` 通过。
+- **后续挂账（W.9b 四项，仍未销项、不新增 OP）**：① `WorkerRegistrationService.builtinView()` / `storedView()` 为行投影构造 Docker host 并可能探测可用性，行数增长的 probe 成本与副作用仍待评估；② `isControlledDispatchable()` 仍捕获拒绝并仅返回 boolean，虽然部分服务层视图单独补有说明，API 诊断仍可能丢失具体拒绝原因；③ `LLM_API_KEY`、`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`CURSOR_API_KEY` 仍可能通过允许的容器 env 被容器内进程读取，日志脱敏不改变此事实；④ Cursor CLI 镜像与运行协议仍未实证，generic 容器桥不代表 Cursor 可执行。详情沿用 W.9b 归档 §3.4o。
+- **边界**：W.9 母卡仍以 `[SPLIT]` 保留拆分追溯；三张子卡 W.9a/b/c 均已 COMPLETED，母卡实质闭合。不得把四条 W.9b 挂账写作已解决；Cursor 保持 fail-closed。
+
+
 ### 3.4p 中栏方案审阅页嵌入试玩认可提交（L.17c · 产品验收挂账）
 
 <a id="task-l.17c"></a>

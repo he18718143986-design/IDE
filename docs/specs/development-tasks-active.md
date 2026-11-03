@@ -443,8 +443,9 @@
   * `TASK-W.5b`（COMPLETED · #92/`bdac805`，cursor-agent 声明与 `buildLaunch()` 契约面在位）；
   * `TASK-W.5c-iii`（COMPLETED · #87/`2313597a`，`DockerContainerHost`、OpenHands 适配器与 `SandboxWitness` 链路在位）；
   * **全前置均为 COMPLETED**。
-* **优先级**：拆分母卡；Sprint 首要为 `TASK-W.9a`，`W.9b` 可并行
+* **优先级**：拆分母卡（P-134 后三子卡均已完成；仅作拆分期规划追溯）
 * **状态**：**`[SPLIT]`**（2026-11-02 · P-128 经 Tina 授权拆为 `W.9a` / `W.9b` / `W.9c`；本卡保留追溯，不再作为施工依据）
+> **实质闭合注记（2026-11-03 · P-134）**：W.9a、W.9b、W.9c 三张子卡均已 COMPLETED；母卡继续保留 `[SPLIT]` 作为拆分追溯，不再作为施工依据。
 * **对照痛点（代码事实，R-4）**：
   1. `daemon/worker/adapter-registry.ts::promoteControlMode()`（`:176-193`）：只校验 `typeof request.report_fingerprint === "string" && fingerprint.trim().length > 0`。只要调用方传入非空伪造指纹字符串，且 `declaration` 满足校验，即可将外部适配器强行升格，完全未校验该指纹是否对应已落盘、通过验收的真实探测报告，**自造指纹即可升格（W.5b 挂账）**；
   2. `daemon/worker/verify/worker-registration-service.ts` 与 `daemon/worker/verify/worker-registration.ts`：自注册 Worker 只写入 `.stagent/workers.json`，在 `createDefaultWorkerRegistry()` 与派工链路中没有对应的适配器实例与工厂挂接机制（`registry.registerDispatchFactory` 零调用），且自注册对象的 `run()` 缺失，导致升格后 `requireControlledDispatch()` 恒抛 `E_ADAPTER_NO_DISPATCH_FACTORY`，前端展示 `dispatchable: false`（**W.7 挂账 1**）；
@@ -523,9 +524,9 @@
   * **判 L**（跨 launch 契约解耦、AdapterRegistry 升格报告链重构、两类执行器抽象与派工工厂接线、容器见证与证据面消费四层联动，断言超 10 项）。
   * **按 R-11「L 卡不得开工、必须拆分」，本卡仅立卡、待 DoR 过审后由 Tina 授权拆分为子卡，待授权不擅动。**
   * **拆分落地（参照 W.5c 先例 · P-128 经授权）**：
-    * `TASK-W.9a`（探测报告指纹升格 + launch 解耦，S/M，`[READY]`）：`buildLaunch()` 缺端点降级预览 + `promoteControlMode()` 依赖真实探测报告消费链；
+    * `TASK-W.9a`（探测报告指纹升格 + launch 解耦，S/M，`[COMPLETED]`）：`buildLaunch()` 缺端点降级预览 + `promoteControlMode()` 依赖真实探测报告消费链；
     * `TASK-W.9b`（执行器抽象 + 容器见证接线，M，`[COMPLETED]`，#101/`b98e463`）：执行器统一抽象（Gateway 注入 vs 容器围栏方案对比落盘）+ 沙箱执行产物收集与 `SandboxWitness` 闭环；交付与挂账见 completed §3.4o。
-    * `TASK-W.9c`（自注册工厂闭环，M，`[READY · 待 Tina 单卡授权]`）：自注册 Worker 派工工厂挂接机制、`requireControlledDispatch` 端到端打通与 dispatchable 状态准确对账。
+    * `TASK-W.9c`（自注册工厂闭环，M，`[COMPLETED]` · #107/`d3397a6`）：交付与四项未销挂账见 completed §3.4q。
 * **台账**：
   * ledger **DLV-3** / **W.5b 挂账**：兑现「自造指纹升格重构」与「`buildLaunch` MCP 端点解耦」；
   * ledger **W.7 挂账 1**：解决「升格 ≠ 可派工」结构性边界，打通自注册 Worker 派工工厂与执行器接线。
@@ -588,31 +589,9 @@
 * **估算（R-11）**：M；若需大规模跨 Gateway/容器/多 adapter 重构，停止并重估拆分。
 
 <a id="task-w.9c"></a>
-#### 【Task W.9c】自注册工厂闭环 `[READY · 待 Tina 单卡授权]`
+#### 【Task W.9c】自注册工厂闭环 `[COMPLETED]`
 
-> **拆卡立卡（2026-11-02 · P-128）**：硬依赖 W.9a 与 W.9b 完成，且须 Tina 单张授权；此前不得抢跑派工接线。
-
-* **任务编号**：`TASK-W.9c`
-* **任务名称**：自注册工厂闭环
-* **对应规格（R-1）**：`AdapterRegistry::registerDispatchFactory/getDispatchFactory`、`requireControlledDispatch()`、`WorkerDispatchFactory`、自注册 worker store；W.6 §3.4g、W.7 §3.4l 挂账 1、W.9a/W.9b。
-* **前置依赖（R-3）**：W.9a AND W.9b COMPLETED（DAG 两条硬边）；W.6/W.7 COMPLETED；W.9 SPLIT。代码前置均满足；READY 仍须 Tina 单卡授权。
-* **优先级**：P5 · W.9a/W.9b 已完成，待 Tina 排程授权
-* **状态**：`[READY · W.9a/W.9b 前置均完成；待 Tina 单卡授权]`
-* **对照痛点（R-4）**：自注册记录在 `.stagent/workers.json`，但未建 `CodingWorkerAdapter.run()` 或调用 `registerDispatchFactory()`；`requireControlledDispatch()` 对缺工厂会拒绝，升格与派工因此脱节。
-* **一句话目标（R-2）**：只有真实实现 run、工厂已注册且控制档/宿主门禁合格的 worker 才能派工，API/UI 与门禁共用同一 dispatchable 判据。
-* **ADR 修订（R-9）**：无；遵守 ADR-0001/0003/0014 与 REJ-010。
-* **采用的默认值（R-10）**：`dispatchable` 由有效 run、匹配当前 id/version 的已注册工厂及控制档/宿主可用性共同计算，调用方不能自报；升格不自动授予派工。
-* **范围（R-5）**：
-  1. 在 AdapterRegistry/自注册服务建立 id/version 绑定工厂，注册变更、撤销、改版使旧映射失效。
-  2. 接通 `requireControlledDispatch()`，检查控制档、factory 与实际 `run()` 合约；工厂失败或对象不合约均拒绝。
-  3. API/UI `dispatchable` 与派工门禁复用单一判据；无工厂/run 恒 false。
-  4. 增正反例：有效工厂可派工；升格无工厂、无 run、旧版本 factory/witness 均拒绝；状态投影与门禁一致。
-* **非目标（R-6）**：不重做 W.9a 报告/指纹校验或 W.9b 执行器抽象；不做多 Agent DAG；不改右栏只读白名单；不伪造 verified_on。
-* **不变声明（R-12）**：鉴权、Demo Origin、点亮三证、网关写范围不变；未通过门禁不派工；无 Gateway/容器绕行 fallback。
-* **验收（PASS，R-7）**：`EW9C-01` 有效工厂+run+合法档可派工；`EW9C-02` 升格无工厂仍不可派工并拒绝；`EW9C-03` 无 run 工厂拒绝；`EW9C-04` id/version 变化或撤销使旧 factory 失效；`EW9C-05` API/UI 与门禁判定一致；`EW9C-06` 代码与 DAG 均阻止 a/b 完成前抢跑。
-* **FAIL（R-8）**：无 run/工厂却 `dispatchable:true`；错版本工厂/witness 仍消费；升格等同自动派工；无 witness 仍记 SANDBOX_ENFORCED；存在绕过 Gateway/容器 fallback。
-* **关键文件**：`daemon/worker/adapter-registry.ts`、`worker-dispatch.ts`、`worker-registration-service.ts`、worker API/status projection；dispatch/registry unit tests。
-* **估算（R-11）**：M；若需引入执行器重构则退回重新估算，不混入本卡。
+> **归档注记（2026-11-03 · P-134）**：本卡已完成（[#107](https://github.com/he18718143986-design/IDE/pull/107)/`d3397a6`）；完整卡文与交付、验证、挂账见 [`development-tasks-completed.md` §3.4q](./development-tasks-completed.md#task-w.9c)。
 
 ### 3.4c 闭环旅程 v2.1 第一批（Journey · 规格 `supervisor.md` 第三部分 §13～§20；对应 §19 落差 L-01～L-10）
 
