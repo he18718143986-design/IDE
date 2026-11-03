@@ -90,7 +90,13 @@ describe("D-2：withContractLock 真实产生租约事件", () => {
     const value = await withContractLock(
       lockKey,
       async () => {
-        await new Promise((resolve) => setTimeout(resolve, 70));
+        // 续租由真实计时器驱动：CI runner 一卡，固定 sleep 70ms 可能只跑到 1 次
+        // （macOS runner 上稳定只跑到 1 次）。这里等到「真的续上两次」再放行，
+        // 断言仍然是「持锁期间定时续租在跑」，但不再拿墙钟赌调度。
+        const deadline = Date.now() + 2_000;
+        while (renewed < 2 && Date.now() < deadline) {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
         return 42;
       },
       { heartbeatMs: 15 },
