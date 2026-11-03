@@ -123,7 +123,7 @@ describe("TASK-0.2 PASS-2 证据结论状态归属 Evidence", () => {
 });
 
 describe("TASK-0.2 PASS-3 原因码完整闭环", () => {
-  it("包含 §9.2 的 9 个原因码（含 PREPARATION_INTERRUPTED / WORKTREE_LOST）", () => {
+  it("包含 §9.2 的 9 个原因码 + L.3 义务四码 + L.12 知识漂移", () => {
     expect(reasonCodeSchema.options).toEqual([
       "SCOPE_VIOLATION",
       "BUDGET_EXHAUSTED",
@@ -134,6 +134,11 @@ describe("TASK-0.2 PASS-3 原因码完整闭环", () => {
       "EVIDENCE_STALE",
       "PREPARATION_INTERRUPTED",
       "WORKTREE_LOST",
+      "OBLIGATION_NOT_RED",
+      "OBLIGATION_RED_INVALID",
+      "OBLIGATION_NOT_GREEN",
+      "TEST_WEAKENED",
+      "KNOWLEDGE_DRIFT",
     ]);
   });
 });

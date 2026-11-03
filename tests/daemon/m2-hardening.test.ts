@@ -121,12 +121,13 @@ describe("M2 / TASK-A.2 stagent_declare_complete", () => {
     }
   });
 
-  it("暴露 6 个受控工具（W.2 新增 delete_file）", () => {
+  it("暴露 7 个受控工具（W.2 delete_file + L.17a web_ingest）", () => {
     const gateway = new ScopedWorktreeGateway(root, contract);
     const names = gateway.getToolDefinitions().map((t) => t.name);
     expect(names).toContain("stagent_declare_complete");
     expect(names).toContain("stagent_delete_file");
-    expect(names).toHaveLength(6);
+    expect(names).toContain("stagent_web_ingest");
+    expect(names).toHaveLength(7);
   });
 
   it("未运行验证时返回 VERIFICATION_NOT_RUN blocker", async () => {

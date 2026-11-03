@@ -209,10 +209,11 @@ describe("设置入口：Activity Bar 齿轮", () => {
     const labels = Array.from(
       bar.querySelectorAll("[data-testid^='activity-']"),
     ).map((el) => el.getAttribute("data-testid"));
-    // C.16：资源管理器 + 单门合同操作台；设置与验证输出在底部
+    // C.16：资源管理器 + 单门合同操作台；发布入口在操作台之后；设置与验证输出在底部
     expect(labels).toEqual([
       "activity-explorer",
       "activity-workbench",
+      "activity-release",
       "activity-settings",
       "activity-terminal",
     ]);
