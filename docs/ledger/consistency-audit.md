@@ -209,3 +209,5 @@
 > **新增两条边界挂账（记入 ledger，不新增 OP 编号，OP 范围仍 OP-1～OP-38；不宣称 OP 挂账区清零，OP-1～32 及其他卡内挂账仍在）**：
 > 1. **normalizeContractId 归一化多对一映射**：`"a:b"` 与 `"a/b"` 替换后撞同一文件名（`"playtest-a_b.json"`），碰撞未做区分；此属 evidence 路径既有字符归一行为延续，记为边界挂账。
 > 2. **`.history.jsonl` 无界增长**：历史链采用单行追加模式，目前只追加不轮转；因试玩认可动作频率低，实际无害，记为边界挂账。
+
+> **P-140 · v0.2 范围 RFC 起草（2026-11-03）**：基于 `main`@`e6802c4`（[#120](https://github.com/he18718143986-design/IDE/pull/120)）新增讨论稿 [`../rfc/v0.2-scope.md`](../rfc/v0.2-scope.md)（架构感知层 B.1 → B.2 → C.4；S.3 可选；D.1e 维持 DEFERRED）。**权威分层不变**：RFC 为讨论稿，与 `specs/` §1.1 矩阵冲突时以矩阵为准；五张卡状态全部维持 `[DEFERRED → v0.2+]`，矩阵仅追加「v0.2 RFC 评审中」注记。RFC §3 登记的三卡同领域存量代码（`daemon/arch/*`、`daemon/watcher/*`、`src/components/radar/*`）属 DoR 重写前置对账项，不在本台账另立 OP 号（OP 范围仍 OP-1～OP-38）。
