@@ -292,3 +292,5 @@
 > **P-138 现行物理指针（2026-11-03）**：main@`96225dfdafbba04b813da63c8e524cd22bbcc087`（[#118](https://github.com/he18718143986-design/IDE/pull/118) 为 OP-33~38 挂账清扫代码 squash；其下 #117 `41029dc` 为 CA-06 CI 工作流，#116 `e695649` 为 P-137 门禁强制化文档注记）。完成 OP-33（部分销项 / 平台侧限制改定性）、OP-34（改定性平台侧持续观察）、OP-35①、OP-35②、OP-36、OP-37、OP-38 逐条对账销项，新增两条边界挂账；Sprint 首要仍为「在队清零」，下一张卡待 Tina 指定。
 
 > **P-139 现行物理指针（2026-11-03）**：main@`c5de2f6dac622af99b0b7e3a1c566a62b26ccefa`（[#119](https://github.com/he18718143986-design/IDE/pull/119) 为 P-138 OP-33～38 台账回写 squash；其下 #118 `96225df` 为清扫代码 squash）。P-138 对账结果与两条新增边界挂账继续有效；Sprint 首要仍为「在队清零」，下一张卡待 Tina 指定。
+
+> **P-141 现行物理指针（2026-11-03）**：main@`49c7848ba8db72073e1ec5e2b3acacc7667c6a9e`（[#121](https://github.com/he18718143986-design/IDE/pull/121)，P-140 v0.2 范围 RFC squash）。D-1～D-6 已拍板：B.1/B.2/C.4 激活待 DoR 重写；S.3/D.1e 维持 DEFERRED。Sprint 首要为 TASK-B.1 DoR 重写先行；激活不等于开工，须 Tina 单卡授权。

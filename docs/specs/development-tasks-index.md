@@ -14,8 +14,8 @@
 | `TASK-A.6` | `COMPLETED` | Daemon 崩溃自愈、Git 锁清理与 TOCTOU 校验 | [矩阵行](./development-tasks.md)（无独立详细卡；正文时代已收口进矩阵） |
 | `TASK-A.7` | `COMPLETED` | Worktree seal 路径前缀对齐 | [打开](./development-tasks-completed.md#task-a.7) |
 | `TASK-S.6b` | `COMPLETED` | 真机试玩收口（S.6 降级项；无独立详细卡，见矩阵 S.6 行与 changelog P-22） | [矩阵/流水](./development-tasks.md)（无独立详细卡） |
-| `TASK-D.1e` | `DEFERRED` | 桌面壳 / 本机助手：真·选文件夹（Import 与工作台同壳） | [打开](./development-tasks-active.md#task-d.1e) |
-| `TASK-S.3` | `DEFERRED` | Supervisor HUD 建议流与 WebSocket 广播 | [打开](./development-tasks-active.md#task-s.3) |
+| `TASK-D.1e` | `DEFERRED` | 桌面壳 / 本机助手：维持 DEFERRED，桌面形态另立 RFC（D-6 / P-141） | [打开](./development-tasks-active.md#task-d.1e) |
+| `TASK-S.3` | `DEFERRED` | Supervisor HUD 建议流与 WebSocket 广播（v0.2 评审未激活 · D-5 / P-141） | [打开](./development-tasks-active.md#task-s.3) |
 | `TASK-W.5b` | `COMPLETED` | cursor-agent 适配器黑盒实测 (v1.3.3 新增) · [#92](https://github.com/he18718143986-design/IDE/pull/92)/`bdac805`；`UNCONTROLLED_EXTERNAL` 登记 + W.7 探测包非容器负向回归；`CA-06` 未执行（无有效 `CURSOR_API_KEY`）→ `verified_on` 空、不产出受控证据 | [打开](./development-tasks-completed.md#task-w.5b) |
 | `TASK-W.5c` | `SPLIT` | OpenHands 适配器（容器隔离）· 拆分母卡（P-118 经授权拆为 i/ii/iii，保留追溯） | [打开](./development-tasks-active.md#task-w.5c) |
 | `TASK-W.5c-i` | `COMPLETED` | 双枚举 `SANDBOX_ENFORCED` + `workerSpec` 目标字段（[#81](https://github.com/he18718143986-design/IDE/pull/81)/`c3e75cc` · S/M） | [打开](./development-tasks-completed.md#task-w.5c-i) |
@@ -41,9 +41,9 @@
 | `TASK-L.17c` | `COMPLETED` | 中栏同页 CompareView + 原话「认可完成」+ `GET /api/playtest/status`（[#104](https://github.com/he18718143986-design/IDE/pull/104)/`06661be`；三项挂账仍挂） | [打开](./development-tasks-completed.md#task-l.17c) |
 | `TASK-L.18` | `COMPLETED` | 系统地图 UI +「改这里会影响什么」（DLV-5） | [打开](./development-tasks-completed.md#task-l.18) |
 | `TASK-H.9` | `COMPLETED` | 废止 `.stagent/metadata/` 写入（DLV-4 · ADR-0011） | [打开](./development-tasks-completed.md#task-h.9) |
-| `TASK-B.1` | `DEFERRED` | 本地 AST 增量依赖图分析引擎 | [打开](./development-tasks-active.md#task-b.1) |
-| `TASK-B.2` | `DEFERRED` | 多活跃 Worktree 监听与 Evidence 状态联动 | [打开](./development-tasks-active.md#task-b.2) |
-| `TASK-C.4` | `DEFERRED` | 架构雷达视图与 Scope 圈选抽屉 | [打开](./development-tasks-active.md#task-c.4) |
+| `TASK-B.1` | `READY · 待 DoR 重写` | 本地 AST 增量依赖图分析引擎（v0.2 激活；先对账存量代码并按 R-1～R-12 重写，之后待 Tina 单卡授权开工） | [打开](./development-tasks-active.md#task-b.1) |
+| `TASK-B.2` | `READY · 待 DoR 重写` | 多活跃 Worktree 监听与 Evidence 状态联动（v0.2 激活；可与 B.1 并行重写，之后待 Tina 单卡授权开工） | [打开](./development-tasks-active.md#task-b.2) |
+| `TASK-C.4` | `READY · 待 DoR 重写` | 架构雷达视图与 Scope 圈选抽屉（v0.2 激活；硬依赖 B.1、软依赖 B.2；重写后待 Tina 单卡授权开工） | [打开](./development-tasks-active.md#task-c.4) |
 | `TASK-0.2b` | `COMPLETED` | Schema v1.2.0 增量演进、双状态机联动与存量迁移 | [打开](./development-tasks-completed.md#task-0.2b) |
 | `TASK-0.2c` | `COMPLETED` | Schema v1.3.0 增量演进、Fast Path 与自愈迁移边实现 [认领架构 P0.2c / C-01] | [打开](./development-tasks-completed.md#task-0.2c) |
 | `TASK-D.1` | `COMPLETED` | CLI 引导入口与安全 WebSocket 通信桥 | [打开](./development-tasks-completed.md#task-d.1) |

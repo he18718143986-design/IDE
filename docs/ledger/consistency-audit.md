@@ -211,3 +211,5 @@
 > 2. **`.history.jsonl` 无界增长**：历史链采用单行追加模式，目前只追加不轮转；因试玩认可动作频率低，实际无害，记为边界挂账。
 
 > **P-140 · v0.2 范围 RFC 起草（2026-11-03）**：基于 `main`@`e6802c4`（[#120](https://github.com/he18718143986-design/IDE/pull/120)）新增讨论稿 [`../rfc/v0.2-scope.md`](../rfc/v0.2-scope.md)（架构感知层 B.1 → B.2 → C.4；S.3 可选；D.1e 维持 DEFERRED）。**权威分层不变**：RFC 为讨论稿，与 `specs/` §1.1 矩阵冲突时以矩阵为准；五张卡状态全部维持 `[DEFERRED → v0.2+]`，矩阵仅追加「v0.2 RFC 评审中」注记。RFC §3 登记的三卡同领域存量代码（`daemon/arch/*`、`daemon/watcher/*`、`src/components/radar/*`）属 DoR 重写前置对账项，不在本台账另立 OP 号（OP 范围仍 OP-1～OP-38）。
+
+> **P-141 · v0.2 RFC 拍板（2026-11-03）**：Tina 对 [`../rfc/v0.2-scope.md`](../rfc/v0.2-scope.md) D-1～D-6 已拍板。B.1/B.2/C.4 激活并标 `[READY · 待 DoR 重写]`，激活 ≠ 开工；S.3（D-5）与 D.1e（D-6）维持 `[DEFERRED → v0.2+]`。B.1 DoR 重写必须先核对 main 上 `daemon/arch/graph.ts`、`daemon/arch/parser.ts`、`daemon/watcher/*`、`src/components/radar/*` 的实存资产并区分存在/新建/重构，不得按空白实现写卡。DAG：B.1→C.4 硬依赖，B.2→C.4 软依赖，B.1 与 B.2 无依赖可并行。无新增 OP 号；本次仅状态与文档同步。
