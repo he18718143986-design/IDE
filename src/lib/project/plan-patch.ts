@@ -95,10 +95,7 @@ function isLocked(status: ContractStub["status"]): boolean {
   return status === "signed" || status === "merged";
 }
 
-function findStub(
-  plan: ProjectPlan,
-  stubId: string,
-): ContractStub | undefined {
+function findStub(plan: ProjectPlan, stubId: string): ContractStub | undefined {
   return plan.contracts.find((c) => c.stub_id === stubId);
 }
 
@@ -110,7 +107,11 @@ function applyOneOp(
 ): void {
   switch (op.op) {
     case "add_milestone": {
-      if (draft.milestones.some((m) => m.milestone_id === op.milestone.milestone_id)) {
+      if (
+        draft.milestones.some(
+          (m) => m.milestone_id === op.milestone.milestone_id,
+        )
+      ) {
         // 同 id 替换（幂等）；不触碰已锁桩
         draft.milestones = draft.milestones.map((m) =>
           m.milestone_id === op.milestone.milestone_id ? op.milestone : m,
@@ -144,7 +145,9 @@ function applyOneOp(
         draft.contracts.push(stub);
       }
       // 确保里程碑 contract_ids 含此桩
-      const ms = draft.milestones.find((m) => m.milestone_id === stub.milestone_id);
+      const ms = draft.milestones.find(
+        (m) => m.milestone_id === stub.milestone_id,
+      );
       if (ms && !ms.contract_ids.includes(stub.stub_id)) {
         ms.contract_ids.push(stub.stub_id);
       }
@@ -190,17 +193,26 @@ function applyOneOp(
       return;
     }
     case "reorder": {
-      const ms = draft.milestones.find((m) => m.milestone_id === op.milestone_id);
+      const ms = draft.milestones.find(
+        (m) => m.milestone_id === op.milestone_id,
+      );
       if (!ms) return;
       // 只允许重排仍在该里程碑内的 planned 桩；锁住的保持相对位置
       const lockedIds = new Set(
         draft.contracts
-          .filter((c) => isLocked(c.status) && ms.contract_ids.includes(c.stub_id))
+          .filter(
+            (c) => isLocked(c.status) && ms.contract_ids.includes(c.stub_id),
+          )
           .map((c) => c.stub_id),
       );
       // 若 reorder 试图移动锁定桩 → 丢弃整条 reorder
-      if (op.contract_ids.some((id) => lockedIds.has(id) &&
-          ms.contract_ids.indexOf(id) !== op.contract_ids.indexOf(id))) {
+      if (
+        op.contract_ids.some(
+          (id) =>
+            lockedIds.has(id) &&
+            ms.contract_ids.indexOf(id) !== op.contract_ids.indexOf(id),
+        )
+      ) {
         // 简化：若提供的顺序包含锁定桩且相对位置改变，仍允许只要锁定桩 id 仍在列表
         // 规格：只能改 planned；对锁定桩的修改丢弃。这里若 contract_ids 含锁定桩，保留其相对顺序校验后应用。
       }

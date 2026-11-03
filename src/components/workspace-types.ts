@@ -6,9 +6,7 @@ export type RunMode = "VIBE" | "PROTECTED";
  * 不改变右栏 `role:"partner"` 只读白名单（J.1）与任何既有门禁。
  */
 export type WorkerControl =
-  | "GATEWAY_ENFORCED"
-  | "SANDBOX_ENFORCED"
-  | "UNCONTROLLED_EXTERNAL";
+  "GATEWAY_ENFORCED" | "SANDBOX_ENFORCED" | "UNCONTROLLED_EXTERNAL";
 export type ExecutionStatus =
   "IDLE" | "APPROVED" | "EXECUTING" | "PAUSED" | "DONE";
 

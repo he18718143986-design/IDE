@@ -1,4 +1,10 @@
-import { Files, Rocket, Settings, Sparkles, TerminalSquare } from "lucide-react";
+import {
+  Files,
+  Rocket,
+  Settings,
+  Sparkles,
+  TerminalSquare,
+} from "lucide-react";
 import { WORKBENCH_LABEL } from "../../lib/workbench-labels";
 
 /**

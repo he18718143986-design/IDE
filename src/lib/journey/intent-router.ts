@@ -161,7 +161,10 @@ function matched(patterns: RegExp[], text: string): string[] {
   return hits;
 }
 
-function matchedLiveTargets(text: string, names: string[] | undefined): string[] {
+function matchedLiveTargets(
+  text: string,
+  names: string[] | undefined,
+): string[] {
   if (!names || names.length === 0) return [];
   const hits: string[] = [];
   const lower = text.toLowerCase();
@@ -198,10 +201,7 @@ export function classifyJourneyIntent(
     const onlineHits = matched(LIVE_INCIDENT_PATTERNS, text);
     const targetHits = matchedLiveTargets(text, ctx.liveTargetNames);
     if (onlineHits.length > 0 || targetHits.length > 0) {
-      const bits = [
-        ...onlineHits.slice(0, 2),
-        ...targetHits.slice(0, 2),
-      ];
+      const bits = [...onlineHits.slice(0, 2), ...targetHits.slice(0, 2)];
       return {
         kind: "LIVE_INCIDENT",
         confidence: Math.min(0.95, 0.7 + bits.length * 0.08),

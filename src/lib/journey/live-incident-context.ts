@@ -15,7 +15,9 @@ export const CONSTRUCTION_LIFECYCLE_STATES: ReadonlySet<string> = new Set([
   "PENDING_RESUME",
 ]);
 
-export function isConstructionLifecycle(state: string | null | undefined): boolean {
+export function isConstructionLifecycle(
+  state: string | null | undefined,
+): boolean {
   if (!state) return false;
   return CONSTRUCTION_LIFECYCLE_STATES.has(state);
 }

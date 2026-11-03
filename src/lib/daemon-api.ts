@@ -2,10 +2,7 @@ import type { SoftwareContract } from "./contract.schema";
 import type { EvidenceBundle } from "./evidence.schema";
 import type { SupervisorProposalV1, TaskGraph } from "./graph/task-graph";
 import type { DemoGate, SchemeDraft } from "./journey/scheme-draft";
-import type {
-  ScopePlan,
-  ScopePlanDecisions,
-} from "./journey/scope-plan";
+import type { ScopePlan, ScopePlanDecisions } from "./journey/scope-plan";
 
 /**
  * Daemon REST 客户端（浏览器侧唯一数据入口）。
@@ -271,7 +268,11 @@ export async function request<T>(
     let message = `HTTP ${res.status}`;
     let code: string | undefined;
     if (typeof body === "object" && body) {
-      const rec = body as { message?: unknown; error?: unknown; code?: unknown };
+      const rec = body as {
+        message?: unknown;
+        error?: unknown;
+        code?: unknown;
+      };
       if (typeof rec.message === "string" && rec.message.trim()) {
         message = rec.message;
       } else if ("error" in rec) {
@@ -537,7 +538,11 @@ export interface DesignDependencySurprise {
 export async function fetchDesignDependencySurprise(
   conn: DaemonConnection,
   contractId: string,
-): Promise<{ ok: true; surprise: DesignDependencySurprise; lifecycle_state: string } | null> {
+): Promise<{
+  ok: true;
+  surprise: DesignDependencySurprise;
+  lifecycle_state: string;
+} | null> {
   try {
     return await request<{
       ok: true;
@@ -1126,11 +1131,10 @@ export async function runRelease(
   conn: DaemonConnection,
   releaseId: string,
 ): Promise<{ release: import("./release/release").ReleaseRecord }> {
-  return request(
-    conn,
-    `/api/releases/${encodeURIComponent(releaseId)}/run`,
-    { method: "POST", body: "{}" },
-  );
+  return request(conn, `/api/releases/${encodeURIComponent(releaseId)}/run`, {
+    method: "POST",
+    body: "{}",
+  });
 }
 
 export async function rollbackRelease(
@@ -1168,9 +1172,7 @@ export async function askAiForReleaseIncident(
 }
 
 /** TASK-L.10：读取项目计划（含服务端权威下一份）。 */
-export async function getProjectPlan(
-  conn: DaemonConnection,
-): Promise<{
+export async function getProjectPlan(conn: DaemonConnection): Promise<{
   ok: boolean;
   plan: import("./project/project-plan").ProjectPlan;
   next_stub_id: string | null;
@@ -1196,7 +1198,12 @@ export async function patchProjectPlan(
       existing_dirs: string[];
     };
   },
-): Promise<{ ok: boolean; plan?: unknown; code?: string; discarded?: unknown }> {
+): Promise<{
+  ok: boolean;
+  plan?: unknown;
+  code?: string;
+  discarded?: unknown;
+}> {
   return request(conn, "/api/project/plan/patch", {
     method: "POST",
     body: JSON.stringify(input),
@@ -2093,9 +2100,7 @@ export async function getSupervisorPrototypeStatus(
  * ------------------------------------------------------------------ */
 
 export type WorkerControlMode =
-  | "GATEWAY_ENFORCED"
-  | "SANDBOX_ENFORCED"
-  | "UNCONTROLLED_EXTERNAL";
+  "GATEWAY_ENFORCED" | "SANDBOX_ENFORCED" | "UNCONTROLLED_EXTERNAL";
 
 export interface WorkerProbeFindingView {
   id: string;

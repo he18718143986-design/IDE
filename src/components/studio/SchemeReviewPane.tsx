@@ -341,10 +341,7 @@ export function SchemeReviewPane(props: SchemeReviewPaneProps) {
 
       <ScopeAcceptanceBlock
         plan={props.scopePlan ?? null}
-        mode={
-          props.scopeAcceptanceMode ??
-          (frozen ? "frozen" : "pre_start")
-        }
+        mode={props.scopeAcceptanceMode ?? (frozen ? "frozen" : "pre_start")}
         frozen={frozen}
         policyMessage={
           confirmation.code === "E_SCOPE_POLICY" ? confirmation.message : null
@@ -513,7 +510,7 @@ export function SchemeReviewPane(props: SchemeReviewPaneProps) {
             {confirmation.message}
           </p>
         ) : null}
-{props.handoffStep ? (
+        {props.handoffStep ? (
           <div
             data-testid="handoff-progress"
             className="rounded border border-border bg-card p-3"
@@ -525,8 +522,7 @@ export function SchemeReviewPane(props: SchemeReviewPaneProps) {
               {HANDOFF_UI_STEPS.map((step) => {
                 const current = handoffStepIndex(props.handoffStep!);
                 const idx = handoffStepIndex(step.id);
-                const mark =
-                  idx < current ? "✓" : idx === current ? "●" : "○";
+                const mark = idx < current ? "✓" : idx === current ? "●" : "○";
                 return (
                   <li
                     key={step.id}

@@ -62,7 +62,12 @@ export function schemeViewForStub(
     scheme.modules.length > 0 &&
     typeof scheme.modules[0] === "object"
       ? filterByIds(
-          scheme.modules as Array<{ id: string; name: string; purpose?: string; kind?: "new" | "change_existing" }>,
+          scheme.modules as Array<{
+            id: string;
+            name: string;
+            purpose?: string;
+            kind?: "new" | "change_existing";
+          }>,
           ids,
         )
       : [];
@@ -74,7 +79,9 @@ export function schemeViewForStub(
     (scheme.modules.length === 0 || typeof scheme.modules[0] === "string")
       ? (scheme.modules as string[]).filter((name) =>
           // 旧 SchemeDraft.modules 无 id：若桩有 area_hints 则不依赖名字过滤
-          stub.area_hints.length === 0 ? true : stub.area_hints.some((h) => name.includes(h) || h.includes(name)),
+          stub.area_hints.length === 0
+            ? true
+            : stub.area_hints.some((h) => name.includes(h) || h.includes(name)),
         )
       : [];
 
@@ -100,7 +107,9 @@ export function schemeViewForStub(
   const outOfScope =
     "out_of_scope" in scheme && Array.isArray(scheme.out_of_scope)
       ? scheme.out_of_scope.map((o) =>
-          typeof o === "string" ? { text: o } : { text: (o as { text: string }).text },
+          typeof o === "string"
+            ? { text: o }
+            : { text: (o as { text: string }).text },
         )
       : [];
 
@@ -144,7 +153,10 @@ export function schemeViewForStub(
             id: a.id,
             text: "text" in a ? String(a.text) : a.id,
             check:
-              "check" in a && (a.check === "auto" || a.check === "playtest" || a.check === "both")
+              "check" in a &&
+              (a.check === "auto" ||
+                a.check === "playtest" ||
+                a.check === "both")
                 ? a.check
                 : ("both" as const),
           })),

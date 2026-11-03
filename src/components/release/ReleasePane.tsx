@@ -11,10 +11,7 @@ import {
   rollbackRelease,
   runRelease,
 } from "@/lib/daemon-api";
-import type {
-  ReleaseRecord,
-  ReleaseTargetConfig,
-} from "@/lib/release/release";
+import type { ReleaseRecord, ReleaseTargetConfig } from "@/lib/release/release";
 import { LiveIncidentCard } from "./LiveIncidentCard";
 
 export interface ReleasePaneProps {
@@ -145,7 +142,9 @@ export function ReleasePane(props: ReleasePaneProps) {
             className="rounded border border-border bg-background px-2 py-1"
           >
             {targets.length === 0 ? (
-              <option value="">（还没有目标，请写 .stagent/release-targets.json）</option>
+              <option value="">
+                （还没有目标，请写 .stagent/release-targets.json）
+              </option>
             ) : (
               targets.map((t) => (
                 <option key={t.target_id} value={t.target_id}>
@@ -167,10 +166,7 @@ export function ReleasePane(props: ReleasePaneProps) {
             type="button"
             data-testid="release-publish"
             disabled={
-              busy ||
-              !connected ||
-              !targetId ||
-              commitSha.trim().length < 7
+              busy || !connected || !targetId || commitSha.trim().length < 7
             }
             onClick={() => void publish()}
             className="rounded bg-primary px-3 py-1 text-primary-foreground disabled:opacity-40"

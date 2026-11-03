@@ -105,7 +105,8 @@ export function ProjectMapPane(props: ProjectMapPaneProps) {
                   {ms.contract_ids.map((stubId) => {
                     const stub = stubsById.get(stubId);
                     if (!stub) return null;
-                    const isNext = nextStubId !== null && stub.stub_id === nextStubId;
+                    const isNext =
+                      nextStubId !== null && stub.stub_id === nextStubId;
                     const label = stubStatusLabel(stub.status);
                     const canAct = stub.status === "planned" && !busy;
                     return (
@@ -154,7 +155,9 @@ export function ProjectMapPane(props: ProjectMapPaneProps) {
                               data-testid="project-map-confirm-start"
                               disabled={busy}
                               className="rounded border border-emerald-700/40 bg-emerald-600/15 px-2 py-0.5 text-[11px] text-emerald-950 hover:bg-emerald-600/25 disabled:opacity-40"
-                              onClick={() => props.onConfirmStart?.(stub.stub_id)}
+                              onClick={() =>
+                                props.onConfirmStart?.(stub.stub_id)
+                              }
                             >
                               确认开工
                             </button>

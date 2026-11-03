@@ -182,13 +182,11 @@ export function PlaytestAcceptBlock(props: PlaytestAcceptBlockProps) {
           className="rounded border border-border bg-muted/30 px-2 py-1.5 text-[11px] leading-relaxed"
         >
           {statusError ? (
-            <span className="text-destructive">门禁状态读取失败：{statusError}</span>
+            <span className="text-destructive">
+              门禁状态读取失败：{statusError}
+            </span>
           ) : status ? (
-            <span
-              className={
-                status.ok ? "text-emerald-800" : "text-amber-900"
-              }
-            >
+            <span className={status.ok ? "text-emerald-800" : "text-amber-900"}>
               门禁 {status.status}
               {status.code ? ` · ${status.code}` : ""}：{status.message}
             </span>

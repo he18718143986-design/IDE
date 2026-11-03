@@ -56,9 +56,7 @@ export function coversPath(
  * TASK-L.12 / KB-4：`depends_on` 在已知模块 id 集合内是否成环。
  * 指向不存在 id 的边忽略（Schema 已允许；不在此升级为漂移）。
  */
-export function hasDependsOnCycle(
-  modules: readonly ModuleEntry[],
-): boolean {
+export function hasDependsOnCycle(modules: readonly ModuleEntry[]): boolean {
   const ids = new Set(modules.map((m) => m.id));
   const adj = new Map<string, string[]>();
   for (const m of modules) {

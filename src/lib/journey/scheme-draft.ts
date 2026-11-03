@@ -11,10 +11,7 @@
  * J.3 / J.5（SSOT §15.5 / D7）：第三参 scopePlan；三条范围拒绝码恒开启。
  */
 
-import {
-  plainAreaLabel,
-  type ScopePlan,
-} from "./scope-plan";
+import { plainAreaLabel, type ScopePlan } from "./scope-plan";
 
 export interface SchemeDecision {
   id: string;
@@ -396,7 +393,10 @@ function evaluateScopeGate(
   scopePlan: ScopePlan | null,
   demoMode: SchemeConfirmationDecision["demo_mode"],
 ): SchemeConfirmationDecision | null {
-  if (scopePlan == null || scopePlan.scheme_revision !== draft.scheme_revision) {
+  if (
+    scopePlan == null ||
+    scopePlan.scheme_revision !== draft.scheme_revision
+  ) {
     return {
       ok: false,
       code: "E_SCOPE_NOT_READY",
@@ -511,8 +511,7 @@ export function evaluateSchemeConfirmation(
   let okMessage = "未生成 Demo，按静态方案签署";
 
   if (demo.status !== "none") {
-    demoMode =
-      demo.status === "degraded_flowcard" ? "degraded" : "interactive";
+    demoMode = demo.status === "degraded_flowcard" ? "degraded" : "interactive";
     if (demo.scheme_revision !== draft.scheme_revision) {
       return {
         ok: false,

@@ -146,10 +146,7 @@ import {
   type SchemeDraft,
 } from "@/lib/journey/scheme-draft";
 import { buildConfirmContractFromScopePlan } from "@/lib/journey/confirm-scheme-contract";
-import {
-  applyScopeDecisions,
-  type ScopePlan,
-} from "@/lib/journey/scope-plan";
+import { applyScopeDecisions, type ScopePlan } from "@/lib/journey/scope-plan";
 import type { ProjectPlan } from "@/lib/project/project-plan";
 import {
   authorizePendingSensitiveDecisions,
@@ -442,7 +439,6 @@ function Console() {
         : null,
     [schemeDraft, schemeDemoGate, scopePlan],
   );
-
 
   const refreshProjectPlan = useCallback(async () => {
     if (!conn || !connected) {
@@ -1193,266 +1189,273 @@ ${trimmed}`
       }
     } catch (err) {
       setConfirmPrototypeError(
-        err instanceof Error
-          ? err.message
-          : "重新核对改动范围失败，请稍后重试",
+        err instanceof Error ? err.message : "重新核对改动范围失败，请稍后重试",
       );
     } finally {
       setScopeDecisionBusy(false);
     }
   }, [conn, schemeDraft, scopePlan, scopeDecisionBusy]);
 
-  const handleConfirmScheme = useCallback(async (overridePlan?: ScopePlan) => {
-    if (!conn || !schemeDraft || schemeDraft.frozen || schemeConfirmBusy)
-      return;
-    setSchemeConfirmBusy(true);
-    setConfirmPrototypeError(null);
-    setHandoffCardText(null);
-    setHandoffCompensationFailed(false);
-    setHandoffStep("save_scheme");
+  const handleConfirmScheme = useCallback(
+    async (overridePlan?: ScopePlan) => {
+      if (!conn || !schemeDraft || schemeDraft.frozen || schemeConfirmBusy)
+        return;
+      setSchemeConfirmBusy(true);
+      setConfirmPrototypeError(null);
+      setHandoffCardText(null);
+      setHandoffCompensationFailed(false);
+      setHandoffStep("save_scheme");
 
-    const expectedRevision = schemeDraft.scheme_revision;
-    if (schemeConfirmIdRef.current?.revision !== expectedRevision) {
-      schemeConfirmIdRef.current = {
-        revision: expectedRevision,
-        id: newSchemeConfirmationId(),
-      };
-    }
-    const confirmationId = schemeConfirmIdRef.current.id;
+      const expectedRevision = schemeDraft.scheme_revision;
+      if (schemeConfirmIdRef.current?.revision !== expectedRevision) {
+        schemeConfirmIdRef.current = {
+          revision: expectedRevision,
+          id: newSchemeConfirmationId(),
+        };
+      }
+      const confirmationId = schemeConfirmIdRef.current.id;
 
-    // J.5：范围须在点击前算好；不再走 formatSchemeAsIntent → submitJourneyMessage。
-    // L.10：地图「确认开工」可传入刚预检的 overridePlan。
-    let planForConfirm = overridePlan ?? scopePlanRef.current ?? scopePlan;
-    if (
-      !planForConfirm ||
-      planForConfirm.scheme_revision !== expectedRevision
-    ) {
-      setConfirmPrototypeError("正在核对要改哪些地方…");
-      setHandoffStep(null);
-      setSchemeConfirmBusy(false);
-      return;
-    }
-
-    // J.6 / SA-1：有未表态敏感项时展开查看，并一键授权后带着新 digest 提交。
-    const pendingSensitive = planForConfirm.needs_approval.filter(
-      (item) => item.approved === null,
-    );
-    if (pendingSensitive.length > 0) {
-      setForceExpandSensitive(true);
-      planForConfirm = applyScopeDecisions(
-        planForConfirm,
-        authorizePendingSensitiveDecisions(planForConfirm),
-      );
-      setScopePlan(planForConfirm);
-    }
-
-    /**
-     * signAndPrepare 内部暂存，供 compensate 精确回收本次已建的合同。
-     * 用对象而不是两个 let：签名在回调里赋值，TS 无法对 `let` 做跨闭包收窄，
-     * 直接读会得到 `never`。
-     */
-    const staging: {
-      contractId: string | null;
-      target: SoftwareContract | null;
-      nodeCount: number;
-    } = { contractId: null, target: null, nodeCount: 0 };
-
-    const result = await runConfirmSchemeAtomic({
-      confirmationId,
-      scheme: schemeDraft,
-      demo: schemeDemoGate,
-      expectedRevision,
-      scopePlan: planForConfirm,
-
-      // 1. 先停流式，再禁右栏；交接瞬态锁定（J.7 / D9）。
-      quiesceRightChat: async () => {
-        await chatSession.stop();
-        setSchemeChatLocked(true);
-      },
-
-      // J.7：五阶段 → 三步人话进度
-      onStage: (stage) => {
-        setHandoffStep(confirmStepToHandoffUi(stage));
-      },
-
-      // 2. 不可变快照（幂等：同 id + 同内容返回原快照）；绑定当前 ScopePlan。
-      persistSnapshot: async ({ confirmation_id, scheme, demo, decision }) => {
-        try {
-          const view = await freezeSchemeSnapshot(conn, {
-            confirmation_id,
-            scheme,
-            demo,
-            decision: {
-              code: decision.code,
-              message: decision.message,
-              demo_mode: decision.demo_mode,
-            },
-            scope_plan: planForConfirm,
-          });
-          return {
-            snapshot_id: view.snapshot_id,
-            digest: view.digest,
-            idempotent: view.idempotent,
-          };
-        } catch (err) {
-          if (
-            err instanceof DaemonApiError &&
-            err.code === "E_SCOPE_PLAN_DRIFT"
-          ) {
-            const body = err.body as { scope_plan?: ScopePlan } | undefined;
-            const drift = Object.assign(new Error(err.message), {
-              code: "E_SCOPE_PLAN_DRIFT" as const,
-              ...(body?.scope_plan ? { scope_plan: body.scope_plan } : {}),
-            });
-            throw drift;
-          }
-          throw err;
-        }
-      },
-
-      // 3. 签署 + 施工准备：按 ScopePlan 投影建合同 → 批准 → 建任务图。
-      signAndPrepare: async ({ confirmation_id, onContractCreated }) => {
-        const fromPlan = buildConfirmContractFromScopePlan(
-          schemeDraft,
-          planForConfirm,
-        );
-        const created = await createContractWithAdmission(
-          conn,
-          softwareContractSchema.parse({
-            ...fromPlan,
-            lifecycle_state: "PENDING_APPROVAL",
-            approval: { status: "PENDING_REVIEW" },
-          }),
-          { confirmationId: confirmation_id },
-        );
-        const saved = created.admission?.contract ?? created.contract;
-        staging.contractId = saved.contract_id;
-        // 合同一落库就回报事务：后面建任务图失败时，补偿拿得到要吊销的那一份
-        onContractCreated?.(saved.contract_id);
-        setContracts((prev) => [
-          ...prev.filter((c) => c.contract_id !== saved.contract_id),
-          saved,
-        ]);
-        setSelectedId(saved.contract_id);
-
-        await approveContract(conn, saved.contract_id, "local-user", {
-          confirmationId: confirmation_id,
-        });
-        const list = await listContracts(conn);
-        setContracts(list);
-        const approved =
-          list.find((c) => c.contract_id === saved.contract_id) ?? saved;
-        staging.target = approved;
-
-        // 人话第三步：安排施工步骤（建任务图）
-        setHandoffStep("arrange_steps");
-        const graph = await createTaskGraph(
-          conn,
-          buildProposalFromContract(approved),
-        );
-        setTaskGraph(graph);
-        setStudioNonce((n) => n + 1);
-        // J.7 / DEC-005：交接卡进中栏，严禁向右栏注入系统消息。
-        staging.nodeCount = graph.nodes.length;
-        return { contract_id: saved.contract_id };
-      },
-
-      // 4. 补偿：终止本次已建合同（吊销 token、清 Worktree 由 Daemon 负责）。
-      compensate: async ({ contract_id, cause }) => {
-        const target = contract_id ?? staging.contractId;
-        if (!target) return;
-        await abortContract(conn, target, "local-user");
-        setContracts((prev) => prev.filter((c) => c.contract_id !== target));
-        // J.7：失败说明走中栏，不向右栏塞系统消息。
-        void cause;
-      },
-
-      // J.7：补偿成功 / 冻结前失败 → 解锁；补偿失败保持锁定。
-      restoreRightChat: () => {
-        setSchemeChatLocked(false);
+      // J.5：范围须在点击前算好；不再走 formatSchemeAsIntent → submitJourneyMessage。
+      // L.10：地图「确认开工」可传入刚预检的 overridePlan。
+      let planForConfirm = overridePlan ?? scopePlanRef.current ?? scopePlan;
+      if (
+        !planForConfirm ||
+        planForConfirm.scheme_revision !== expectedRevision
+      ) {
+        setConfirmPrototypeError("正在核对要改哪些地方…");
         setHandoffStep(null);
-      },
-    });
-
-    if (!result.ok) {
-      const compensationFailed = result.code === "E_COMPENSATION_FAILED";
-      const drifted = result.code === "E_SCOPE_PLAN_DRIFT";
-      if (drifted && result.scope_plan) {
-        setScopePlan(result.scope_plan);
+        setSchemeConfirmBusy(false);
+        return;
       }
-      setHandoffStep(null);
-      if (compensationFailed) {
-        setHandoffCompensationFailed(true);
-        setConfirmPrototypeError(null);
-      } else {
-        setHandoffCompensationFailed(false);
-        setConfirmPrototypeError(
-          drifted
-            ? "项目刚刚有变化，我重新核对了改动范围，请再看一眼"
-            : (result.reason ?? "确认方案失败，请检查方案与 Demo 状态后重试。"),
+
+      // J.6 / SA-1：有未表态敏感项时展开查看，并一键授权后带着新 digest 提交。
+      const pendingSensitive = planForConfirm.needs_approval.filter(
+        (item) => item.approved === null,
+      );
+      if (pendingSensitive.length > 0) {
+        setForceExpandSensitive(true);
+        planForConfirm = applyScopeDecisions(
+          planForConfirm,
+          authorizePendingSensitiveDecisions(planForConfirm),
         );
+        setScopePlan(planForConfirm);
       }
-      // J.7：失败不向右栏注入系统消息；补偿失败保持锁定，其余已由 restoreRightChat 解锁。
-      setSchemeConfirmBusy(false);
-      return;
-    }
 
-    // J.7 / D9：COMMIT 成功 → 右栏解锁；中栏画布交接卡；右栏零系统消息。
-    setSchemeDraft(result.frozen ?? freezeScheme(schemeDraft));
-    setDemoConfirmed(true);
-    setPlainContractVisible(false);
-    setHandoffStep(null);
-    setHandoffCompensationFailed(false);
-    setHandoffCardText(
-      formatHandoffStartedCard({
-        nodeCount: staging.nodeCount,
-        budgetPlain: planForConfirm.budget.plain,
-      }),
-    );
-    setSchemeChatLocked(false);
-    void refreshProjectPlan();
+      /**
+       * signAndPrepare 内部暂存，供 compensate 精确回收本次已建的合同。
+       * 用对象而不是两个 let：签名在回调里赋值，TS 无法对 `let` 做跨闭包收窄，
+       * 直接读会得到 `never`。
+       */
+      const staging: {
+        contractId: string | null;
+        target: SoftwareContract | null;
+        nodeCount: number;
+      } = { contractId: null, target: null, nodeCount: 0 };
 
-    const committed = staging.target;
-    if (committed) {
-      // 自动拉起 Worker：失败不回滚签署（合同已生效），只如实告知可重试。
-      try {
-        const worker = await runWorker(conn, committed.contract_id);
-        setWorkerResult(worker);
-        if (
-          worker.design?.status === "suspended" &&
-          worker.design.reason === "DESIGN_NEEDS_DEPENDENCY"
-        ) {
-          const res = await fetchDesignDependencySurprise(
-            conn,
-            committed.contract_id,
-          );
-          if (res) {
-            setDesignDepSurprise({
-              contract_id: res.surprise.contract_id,
-              detail: res.surprise.detail,
-              dependencies: res.surprise.dependencies,
+      const result = await runConfirmSchemeAtomic({
+        confirmationId,
+        scheme: schemeDraft,
+        demo: schemeDemoGate,
+        expectedRevision,
+        scopePlan: planForConfirm,
+
+        // 1. 先停流式，再禁右栏；交接瞬态锁定（J.7 / D9）。
+        quiesceRightChat: async () => {
+          await chatSession.stop();
+          setSchemeChatLocked(true);
+        },
+
+        // J.7：五阶段 → 三步人话进度
+        onStage: (stage) => {
+          setHandoffStep(confirmStepToHandoffUi(stage));
+        },
+
+        // 2. 不可变快照（幂等：同 id + 同内容返回原快照）；绑定当前 ScopePlan。
+        persistSnapshot: async ({
+          confirmation_id,
+          scheme,
+          demo,
+          decision,
+        }) => {
+          try {
+            const view = await freezeSchemeSnapshot(conn, {
+              confirmation_id,
+              scheme,
+              demo,
+              decision: {
+                code: decision.code,
+                message: decision.message,
+                demo_mode: decision.demo_mode,
+              },
+              scope_plan: planForConfirm,
             });
+            return {
+              snapshot_id: view.snapshot_id,
+              digest: view.digest,
+              idempotent: view.idempotent,
+            };
+          } catch (err) {
+            if (
+              err instanceof DaemonApiError &&
+              err.code === "E_SCOPE_PLAN_DRIFT"
+            ) {
+              const body = err.body as { scope_plan?: ScopePlan } | undefined;
+              const drift = Object.assign(new Error(err.message), {
+                code: "E_SCOPE_PLAN_DRIFT" as const,
+                ...(body?.scope_plan ? { scope_plan: body.scope_plan } : {}),
+              });
+              throw drift;
+            }
+            throw err;
           }
+        },
+
+        // 3. 签署 + 施工准备：按 ScopePlan 投影建合同 → 批准 → 建任务图。
+        signAndPrepare: async ({ confirmation_id, onContractCreated }) => {
+          const fromPlan = buildConfirmContractFromScopePlan(
+            schemeDraft,
+            planForConfirm,
+          );
+          const created = await createContractWithAdmission(
+            conn,
+            softwareContractSchema.parse({
+              ...fromPlan,
+              lifecycle_state: "PENDING_APPROVAL",
+              approval: { status: "PENDING_REVIEW" },
+            }),
+            { confirmationId: confirmation_id },
+          );
+          const saved = created.admission?.contract ?? created.contract;
+          staging.contractId = saved.contract_id;
+          // 合同一落库就回报事务：后面建任务图失败时，补偿拿得到要吊销的那一份
+          onContractCreated?.(saved.contract_id);
+          setContracts((prev) => [
+            ...prev.filter((c) => c.contract_id !== saved.contract_id),
+            saved,
+          ]);
+          setSelectedId(saved.contract_id);
+
+          await approveContract(conn, saved.contract_id, "local-user", {
+            confirmationId: confirmation_id,
+          });
+          const list = await listContracts(conn);
+          setContracts(list);
+          const approved =
+            list.find((c) => c.contract_id === saved.contract_id) ?? saved;
+          staging.target = approved;
+
+          // 人话第三步：安排施工步骤（建任务图）
+          setHandoffStep("arrange_steps");
+          const graph = await createTaskGraph(
+            conn,
+            buildProposalFromContract(approved),
+          );
+          setTaskGraph(graph);
+          setStudioNonce((n) => n + 1);
+          // J.7 / DEC-005：交接卡进中栏，严禁向右栏注入系统消息。
+          staging.nodeCount = graph.nodes.length;
+          return { contract_id: saved.contract_id };
+        },
+
+        // 4. 补偿：终止本次已建合同（吊销 token、清 Worktree 由 Daemon 负责）。
+        compensate: async ({ contract_id, cause }) => {
+          const target = contract_id ?? staging.contractId;
+          if (!target) return;
+          await abortContract(conn, target, "local-user");
+          setContracts((prev) => prev.filter((c) => c.contract_id !== target));
+          // J.7：失败说明走中栏，不向右栏塞系统消息。
+          void cause;
+        },
+
+        // J.7：补偿成功 / 冻结前失败 → 解锁；补偿失败保持锁定。
+        restoreRightChat: () => {
+          setSchemeChatLocked(false);
+          setHandoffStep(null);
+        },
+      });
+
+      if (!result.ok) {
+        const compensationFailed = result.code === "E_COMPENSATION_FAILED";
+        const drifted = result.code === "E_SCOPE_PLAN_DRIFT";
+        if (drifted && result.scope_plan) {
+          setScopePlan(result.scope_plan);
         }
-      } catch (err) {
-        // Worker 重试提示进中栏错误条，不进右栏系统消息。
-        setConfirmPrototypeError(
-          err instanceof Error
-            ? `已确认方案；Worker 稍后可在状态就绪后重试：${err.message}`
-            : "已确认方案；Worker 稍后可重试。",
-        );
+        setHandoffStep(null);
+        if (compensationFailed) {
+          setHandoffCompensationFailed(true);
+          setConfirmPrototypeError(null);
+        } else {
+          setHandoffCompensationFailed(false);
+          setConfirmPrototypeError(
+            drifted
+              ? "项目刚刚有变化，我重新核对了改动范围，请再看一眼"
+              : (result.reason ??
+                  "确认方案失败，请检查方案与 Demo 状态后重试。"),
+          );
+        }
+        // J.7：失败不向右栏注入系统消息；补偿失败保持锁定，其余已由 restoreRightChat 解锁。
+        setSchemeConfirmBusy(false);
+        return;
       }
-    }
-    setSchemeConfirmBusy(false);
-  }, [
-    conn,
-    schemeDraft,
-    scopePlan,
-    schemeDemoGate,
-    schemeConfirmBusy,
-    chatSession,
-    refreshProjectPlan,
-  ]);
+
+      // J.7 / D9：COMMIT 成功 → 右栏解锁；中栏画布交接卡；右栏零系统消息。
+      setSchemeDraft(result.frozen ?? freezeScheme(schemeDraft));
+      setDemoConfirmed(true);
+      setPlainContractVisible(false);
+      setHandoffStep(null);
+      setHandoffCompensationFailed(false);
+      setHandoffCardText(
+        formatHandoffStartedCard({
+          nodeCount: staging.nodeCount,
+          budgetPlain: planForConfirm.budget.plain,
+        }),
+      );
+      setSchemeChatLocked(false);
+      void refreshProjectPlan();
+
+      const committed = staging.target;
+      if (committed) {
+        // 自动拉起 Worker：失败不回滚签署（合同已生效），只如实告知可重试。
+        try {
+          const worker = await runWorker(conn, committed.contract_id);
+          setWorkerResult(worker);
+          if (
+            worker.design?.status === "suspended" &&
+            worker.design.reason === "DESIGN_NEEDS_DEPENDENCY"
+          ) {
+            const res = await fetchDesignDependencySurprise(
+              conn,
+              committed.contract_id,
+            );
+            if (res) {
+              setDesignDepSurprise({
+                contract_id: res.surprise.contract_id,
+                detail: res.surprise.detail,
+                dependencies: res.surprise.dependencies,
+              });
+            }
+          }
+        } catch (err) {
+          // Worker 重试提示进中栏错误条，不进右栏系统消息。
+          setConfirmPrototypeError(
+            err instanceof Error
+              ? `已确认方案；Worker 稍后可在状态就绪后重试：${err.message}`
+              : "已确认方案；Worker 稍后可重试。",
+          );
+        }
+      }
+      setSchemeConfirmBusy(false);
+    },
+    [
+      conn,
+      schemeDraft,
+      scopePlan,
+      schemeDemoGate,
+      schemeConfirmBusy,
+      chatSession,
+      refreshProjectPlan,
+    ],
+  );
 
   const handleProjectMapDefer = useCallback(
     async (stubId: string) => {
@@ -2875,7 +2878,6 @@ ${trimmed}`
     };
   }, [connected, conn, selectedId, contracts]);
 
-
   const needsProtectionConfirm =
     admission != null && shouldConfirmAdmission(admission);
   // C.10a：进行中只跟忙碌/确认/三步台；历史 journeyCards 不粘住 in_progress
@@ -3023,9 +3025,7 @@ ${trimmed}`
                 primaryCtaTestId={commandSurface.primaryCtaTestId}
                 onAssistantModeChange={setAssistantMode}
                 locked={schemeChatLocked}
-                lockedReason={
-                  schemeChatLocked ? HANDOFF_LOCK_HINT : undefined
-                }
+                lockedReason={schemeChatLocked ? HANDOFF_LOCK_HINT : undefined}
               />
             </div>
           }
@@ -3327,12 +3327,7 @@ ${trimmed}`
               }
             />
           }
-          releaseContent={
-            <ReleasePane
-              conn={conn}
-              connected={connected}
-            />
-          }
+          releaseContent={<ReleasePane conn={conn} connected={connected} />}
           banner={
             <>
               {protection?.corrupt && (
@@ -3522,7 +3517,9 @@ ${trimmed}`
                     demoStatus={demoPreview?.status ?? null}
                     demoGate={schemeDemoGate}
                     demoBusy={schemeDemoBusy}
-                    confirmBusy={schemeConfirmBusy || authorizeBusy || scopeDecisionBusy}
+                    confirmBusy={
+                      schemeConfirmBusy || authorizeBusy || scopeDecisionBusy
+                    }
                     errorMessage={confirmPrototypeError}
                     confirmation={schemeConfirmation ?? undefined}
                     scopePlan={scopePlan}

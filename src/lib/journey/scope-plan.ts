@@ -7,10 +7,7 @@
  *   已结构化的 ScopePlan，不读聊天。
  */
 
-import type {
-  BudgetLimits,
-  VerificationCommand,
-} from "../contract.schema";
+import type { BudgetLimits, VerificationCommand } from "../contract.schema";
 
 /** SSOT §15.3 ScopePlan */
 export interface ScopePlanArea {
@@ -140,7 +137,7 @@ function sha256Hex(message: string): string {
 
   const bytes = new TextEncoder().encode(message);
   const bitLen = bytes.length * 8;
-  const withPad = new Uint8Array(((bytes.length + 9 + 63) & ~63));
+  const withPad = new Uint8Array((bytes.length + 9 + 63) & ~63);
   withPad.set(bytes);
   withPad[bytes.length] = 0x80;
   const view = new DataView(withPad.buffer);
@@ -282,9 +279,7 @@ export function applyScopeDecisions(
 
   // 排除后仍落在活跃可写路径上的拒绝项才保留；全部消掉则 grade.ok
   const activePaths = new Set(
-    areas
-      .filter((a) => !a.excluded_by_user)
-      .flatMap((a) => a.paths),
+    areas.filter((a) => !a.excluded_by_user).flatMap((a) => a.paths),
   );
   const rejected = plan.grade.rejected.filter((r) => activePaths.has(r.path));
   const grade: ScopePlanGrade = {
@@ -430,7 +425,9 @@ export function scopePlanToContractScope(
 
 /** 由文件数与时长生成白话规模（禁止 token / tool 字样） */
 export function formatBudgetPlain(
-  limits: Pick<BudgetLimits, "max_file_modifications" | "max_duration_seconds"> | BudgetLimits,
+  limits:
+    | Pick<BudgetLimits, "max_file_modifications" | "max_duration_seconds">
+    | BudgetLimits,
 ): string {
   const n = limits.max_file_modifications ?? 10;
   const secs = limits.max_duration_seconds ?? 1800;
@@ -442,7 +439,10 @@ export function formatBudgetPlain(
 /**
  * 路径 → 白话区域标签：去掉通配，避免 `**` / glob 字样进入用户面。
  */
-export function plainAreaLabel(pathPattern: string, moduleName?: string): string {
+export function plainAreaLabel(
+  pathPattern: string,
+  moduleName?: string,
+): string {
   if (moduleName && moduleName.trim().length > 0) return moduleName.trim();
   const cleaned = pathPattern
     .replace(/\/\*\*$/, "")
@@ -497,7 +497,9 @@ export function contractMatchesScopePlan(
     verification_spec: {
       commands: contract.verification_spec.commands,
       ...(contract.verification_spec.manual_confirmation !== undefined
-        ? { manual_confirmation: contract.verification_spec.manual_confirmation }
+        ? {
+            manual_confirmation: contract.verification_spec.manual_confirmation,
+          }
         : {}),
     },
     budget: contract.budget_limits,

@@ -110,9 +110,14 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-
 /** TASK-L.14：设置 → 密钥（掩码输入、列表名、删除；永不回显值） */
-function VaultSecretsPanel({ conn, connected }: { conn: DaemonConnection; connected: boolean }) {
+function VaultSecretsPanel({
+  conn,
+  connected,
+}: {
+  conn: DaemonConnection;
+  connected: boolean;
+}) {
   const [names, setNames] = useState<string[]>([]);
   const [backend, setBackend] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -238,7 +243,11 @@ function VaultSecretsPanel({ conn, connected }: { conn: DaemonConnection; connec
         </p>
       ) : null}
       {err ? (
-        <p className="text-destructive" data-testid="vault-secret-error" role="alert">
+        <p
+          className="text-destructive"
+          data-testid="vault-secret-error"
+          role="alert"
+        >
           {err}
         </p>
       ) : null}

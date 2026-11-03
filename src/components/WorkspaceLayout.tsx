@@ -394,9 +394,7 @@ export function WorkspaceLayout(props: WorkspaceLayoutProps) {
       className="flex h-full min-h-0 flex-1 flex-col overflow-hidden"
     >
       {props.releaseContent ?? (
-        <div className="p-4 text-sm text-muted-foreground">
-          发布页未接线。
-        </div>
+        <div className="p-4 text-sm text-muted-foreground">发布页未接线。</div>
       )}
     </div>
   );

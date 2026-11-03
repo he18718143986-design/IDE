@@ -277,7 +277,9 @@ export function getPresentationState(
 
     case "PREPARING":
       // supervisor §16.2：PROJECT_MAPPING（整理项目地图）与 GRAPH_MAPPING（交接中）互斥
-      return runtime.project_mapping === true ? "PROJECT_MAPPING" : "GRAPH_MAPPING";
+      return runtime.project_mapping === true
+        ? "PROJECT_MAPPING"
+        : "GRAPH_MAPPING";
 
     case "EXECUTING":
       return runtime.stopping_requested === true ? "STOPPING" : "EXECUTING";

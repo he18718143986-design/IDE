@@ -99,17 +99,11 @@ export function isInFlightReleaseState(state: ReleaseState): boolean {
   return IN_FLIGHT_RELEASE_STATES.has(state);
 }
 
-export function canTransition(
-  from: ReleaseState,
-  to: ReleaseState,
-): boolean {
+export function canTransition(from: ReleaseState, to: ReleaseState): boolean {
   return (RELEASE_TRANSITIONS[from] ?? []).includes(to);
 }
 
-export function assertTransition(
-  from: ReleaseState,
-  to: ReleaseState,
-): void {
+export function assertTransition(from: ReleaseState, to: ReleaseState): void {
   if (!canTransition(from, to)) {
     throw new ReleaseInvariantError(
       "E_RELEASE_ILLEGAL_TRANSITION",
@@ -203,10 +197,7 @@ export function isReservedPort(port: number): boolean {
 export function validateTargetPort(port: number | undefined): void {
   if (port === undefined) return;
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new ReleaseInvariantError(
-      "E_RELEASE_BAD_PORT",
-      `端口 ${port} 非法`,
-    );
+    throw new ReleaseInvariantError("E_RELEASE_BAD_PORT", `端口 ${port} 非法`);
   }
   if (isReservedPort(port)) {
     throw new ReleaseInvariantError(

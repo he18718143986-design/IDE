@@ -40,8 +40,7 @@ export interface PlaytestGuidanceInput {
 export function buildPlaytestGuidance(
   input: PlaytestGuidanceInput = {},
 ): PlaytestGuidanceMessage[] {
-  const refs =
-    input.referenceUrls?.filter((u) => u.trim().length > 0) ?? [];
+  const refs = input.referenceUrls?.filter((u) => u.trim().length > 0) ?? [];
   const label = input.contractLabel?.trim() || "当前版本";
   const refLine =
     refs.length > 0

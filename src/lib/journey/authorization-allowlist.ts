@@ -73,11 +73,7 @@ export function computeExpiresAt(
 }
 
 export type AllowlistInvalidReason =
-  | "missing"
-  | "revoked"
-  | "ttl_expired"
-  | "protection_reclassified"
-  | "cleared";
+  "missing" | "revoked" | "ttl_expired" | "protection_reclassified" | "cleared";
 
 export interface PreauthorizeOptions {
   now?: Date | number | string;

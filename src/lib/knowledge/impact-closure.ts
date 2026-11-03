@@ -4,10 +4,7 @@
  * 图由代码算，不由模型画。
  */
 
-import {
-  coversPath,
-  type ModuleEntry,
-} from "./modules-schema";
+import { coversPath, type ModuleEntry } from "./modules-schema";
 
 export type ImpactVia = "depends_on" | "interface_consumer";
 

@@ -323,7 +323,8 @@ export const ERROR_CODE_CATALOG: Readonly<Record<ErrorCode, ErrorCodeSpec>> = {
     component: "Vault",
     task: "TASK-L.14",
     condition: "setSecret 拒绝短于 8 个字符的值（精确脱敏下限）",
-    plain_message: "这个密钥太短了，至少要 8 个字符，否则没法可靠地从日志里抹掉。",
+    plain_message:
+      "这个密钥太短了，至少要 8 个字符，否则没法可靠地从日志里抹掉。",
     http_status: 400,
   },
   E_VAULT_NAME_INVALID: {
@@ -332,7 +333,8 @@ export const ERROR_CODE_CATALOG: Readonly<Record<ErrorCode, ErrorCodeSpec>> = {
     component: "Vault",
     task: "TASK-L.14",
     condition: "密钥名不符合环境变量命名（字母/下划线开头）",
-    plain_message: "密钥名字不合法：请用字母或下划线开头，后面只能是字母、数字、下划线。",
+    plain_message:
+      "密钥名字不合法：请用字母或下划线开头，后面只能是字母、数字、下划线。",
     http_status: 400,
   },
   E_VAULT_NOT_FOUND: {
@@ -364,7 +366,6 @@ export const ERROR_CODE_CATALOG: Readonly<Record<ErrorCode, ErrorCodeSpec>> = {
     plain_message: "这段代码找不到完整的来历，链在某一环断了。",
     http_status: 404,
   },
-
 };
 
 // --- 4. 映射函数 ---

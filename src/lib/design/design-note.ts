@@ -178,7 +178,8 @@ export function validateDesignNote(
   }
 
   // DN-1：touches 全部落在 writable_paths
-  const writable = contract.authorization.file_system_scope.writable_paths ?? [];
+  const writable =
+    contract.authorization.file_system_scope.writable_paths ?? [];
   for (const touch of note.touches) {
     const check = matchesAnyPattern(touch.path, writable);
     if (!check.matches) {
@@ -194,8 +195,8 @@ export function validateDesignNote(
   // DN-2：有依赖时必须允许 dependency_changes_allowed
   if (note.dependencies.length > 0) {
     const allowed =
-      contract.authorization.execution_permissions.dependency_changes_allowed ===
-      true;
+      contract.authorization.execution_permissions
+        .dependency_changes_allowed === true;
     if (!allowed) {
       return {
         ok: false,
@@ -288,10 +289,7 @@ export interface DetectEscalationsResult {
   escalation_missed: DetectedEscalation[];
 }
 
-function decisionHasClass(
-  note: DesignNote,
-  cls: EscalationClass,
-): boolean {
+function decisionHasClass(note: DesignNote, cls: EscalationClass): boolean {
   return note.decisions.some((d) => d.escalation === cls);
 }
 

@@ -63,8 +63,12 @@ export function MonacoEditorPane({
   const [viewMode, setViewMode] = useState<MarkdownViewMode>(() =>
     defaultMarkdownViewMode(path),
   );
-  const [traceCard, setTraceCard] = useState<TraceCardState>({ status: "idle" });
-  const [impactCard, setImpactCard] = useState<ImpactCardState>({ status: "idle" });
+  const [traceCard, setTraceCard] = useState<TraceCardState>({
+    status: "idle",
+  });
+  const [impactCard, setImpactCard] = useState<ImpactCardState>({
+    status: "idle",
+  });
 
   useEffect(() => {
     setViewMode(defaultMarkdownViewMode(path));
@@ -101,7 +105,7 @@ export function MonacoEditorPane({
             err.body &&
             typeof err.body === "object" &&
             typeof (err.body as { ring?: unknown }).ring === "string"
-              ? ((err.body as { ring: string }).ring)
+              ? (err.body as { ring: string }).ring
               : undefined;
           setTraceCard({ status: "broken", line, message, ring });
         }
@@ -229,62 +233,62 @@ export function MonacoEditorPane({
             <p>正在沿着提交 → 合同 → 方案 → 原话查找…</p>
           ) : null}
 
-      {impactCard.status !== "idle" ? (
-        <div
-          data-testid="knowledge-impact-card"
-          role="dialog"
-          aria-label="改这里会影响什么"
-          className="border-b bg-sky-50 px-3 py-2 text-xs text-zinc-800"
-        >
-          <div className="mb-1 flex items-center justify-between gap-2">
-            <strong>改这里会影响什么 · {path}</strong>
-            <button
-              type="button"
-              className="rounded border px-1.5"
-              onClick={() => setImpactCard({ status: "idle" })}
+          {impactCard.status !== "idle" ? (
+            <div
+              data-testid="knowledge-impact-card"
+              role="dialog"
+              aria-label="改这里会影响什么"
+              className="border-b bg-sky-50 px-3 py-2 text-xs text-zinc-800"
             >
-              关闭
-            </button>
-          </div>
-          {impactCard.status === "loading" ? (
-            <p>正在按 modules.yaml 计算影响闭包…</p>
-          ) : null}
-          {impactCard.status === "error" ? (
-            <p className="text-destructive">{impactCard.message}</p>
-          ) : null}
-          {impactCard.status === "ok" ? (
-            <div className="space-y-1">
-              {impactCard.result.empty_reason === "no_modules" ? (
-                <p>还没有系统模块地图（缺少 modules.yaml）。</p>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <strong>改这里会影响什么 · {path}</strong>
+                <button
+                  type="button"
+                  className="rounded border px-1.5"
+                  onClick={() => setImpactCard({ status: "idle" })}
+                >
+                  关闭
+                </button>
+              </div>
+              {impactCard.status === "loading" ? (
+                <p>正在按 modules.yaml 计算影响闭包…</p>
               ) : null}
-              {impactCard.result.empty_reason === "no_owner" ? (
-                <p>当前文件未被任何模块的 paths 覆盖。</p>
+              {impactCard.status === "error" ? (
+                <p className="text-destructive">{impactCard.message}</p>
               ) : null}
-              {impactCard.result.empty_reason === "ok" ? (
-                <>
-                  <p>
-                    归属：
-                    {impactCard.result.owners
-                      .map((o) => `${o.name}（${o.id}）`)
-                      .join("、")}
-                  </p>
-                  {impactCard.result.affected.length === 0 ? (
-                    <p>没有其它模块会受影响。</p>
-                  ) : (
-                    <ul className="list-disc pl-4">
-                      {impactCard.result.affected.map((a) => (
-                        <li key={a.id}>
-                          {a.name}（{a.id}）· 经由 {a.via.join("+")}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </>
+              {impactCard.status === "ok" ? (
+                <div className="space-y-1">
+                  {impactCard.result.empty_reason === "no_modules" ? (
+                    <p>还没有系统模块地图（缺少 modules.yaml）。</p>
+                  ) : null}
+                  {impactCard.result.empty_reason === "no_owner" ? (
+                    <p>当前文件未被任何模块的 paths 覆盖。</p>
+                  ) : null}
+                  {impactCard.result.empty_reason === "ok" ? (
+                    <>
+                      <p>
+                        归属：
+                        {impactCard.result.owners
+                          .map((o) => `${o.name}（${o.id}）`)
+                          .join("、")}
+                      </p>
+                      {impactCard.result.affected.length === 0 ? (
+                        <p>没有其它模块会受影响。</p>
+                      ) : (
+                        <ul className="list-disc pl-4">
+                          {impactCard.result.affected.map((a) => (
+                            <li key={a.id}>
+                              {a.name}（{a.id}）· 经由 {a.via.join("+")}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </>
+                  ) : null}
+                </div>
               ) : null}
             </div>
           ) : null}
-        </div>
-      ) : null}
           {traceCard.status === "broken" ? (
             <p className="text-destructive">
               链断了

@@ -121,10 +121,7 @@ export function CompareView(props: CompareViewProps) {
         </div>
 
         {/* 右栏：iframe 直连真机 / LIVE 预览 */}
-        <div
-          data-testid="compare-view-right"
-          className="flex min-h-0 flex-col"
-        >
+        <div data-testid="compare-view-right" className="flex min-h-0 flex-col">
           <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/40 px-3 py-2">
             <span className="text-[11px] font-semibold text-foreground">
               当前 LIVE / 真机预览

@@ -36,8 +36,7 @@ export function SystemMapPane(props: SystemMapPaneProps) {
     setState({ status: "loading" });
     try {
       const loader =
-        props.modulesLoader ??
-        (() => fetchKnowledgeModules(loadConnection()));
+        props.modulesLoader ?? (() => fetchKnowledgeModules(loadConnection()));
       const data = await loader();
       if (!data.ok || data.modules.length === 0) {
         setState({
@@ -187,7 +186,9 @@ export function SystemMapPane(props: SystemMapPaneProps) {
                   依赖边（代码渲染，非模型画图）
                 </h4>
                 {edgeLabels.length === 0 ? (
-                  <p className="text-[10px] text-muted-foreground">暂无依赖边</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    暂无依赖边
+                  </p>
                 ) : (
                   <ul className="flex flex-wrap gap-1">
                     {edgeLabels.map((label) => (
@@ -249,8 +250,7 @@ export function SystemMapPane(props: SystemMapPaneProps) {
                 ) : null}
                 {impact.empty_reason === "no_owner" ? (
                   <p>
-                    路径 <code>{impact.path}</code>{" "}
-                    未被任何模块的 paths 覆盖。
+                    路径 <code>{impact.path}</code> 未被任何模块的 paths 覆盖。
                   </p>
                 ) : null}
                 {impact.empty_reason === "ok" ? (
@@ -266,7 +266,10 @@ export function SystemMapPane(props: SystemMapPaneProps) {
                         没有其它模块依赖这里（含接口消费者）。
                       </p>
                     ) : (
-                      <ul data-testid="system-map-impact-list" className="list-disc pl-4">
+                      <ul
+                        data-testid="system-map-impact-list"
+                        className="list-disc pl-4"
+                      >
                         {impact.affected.map((a) => (
                           <li key={a.id} data-module-id={a.id}>
                             <strong>{a.name}</strong>（{a.id}）· {a.purpose}

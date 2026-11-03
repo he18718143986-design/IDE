@@ -80,7 +80,10 @@ function FullReadonlyList(props: { plan: ScopePlan }) {
       <div>
         <h4 className="mb-1 font-medium text-foreground">怎么算做完</h4>
         {plan.verification.manual_only ? (
-          <p data-testid="scope-acceptance-manual-only" className="text-muted-foreground">
+          <p
+            data-testid="scope-acceptance-manual-only"
+            className="text-muted-foreground"
+          >
             没有自动检查，完成后需要你试玩确认
           </p>
         ) : null}
@@ -94,7 +97,10 @@ function FullReadonlyList(props: { plan: ScopePlan }) {
           </ul>
         ) : null}
       </div>
-      <p data-testid="scope-acceptance-budget" className="text-muted-foreground">
+      <p
+        data-testid="scope-acceptance-budget"
+        className="text-muted-foreground"
+      >
         预计规模：{plan.budget.plain}
       </p>
     </div>
@@ -103,8 +109,7 @@ function FullReadonlyList(props: { plan: ScopePlan }) {
 
 export function ScopeAcceptanceBlock(props: ScopeAcceptanceBlockProps) {
   const mode: ScopeAcceptanceMode =
-    props.mode ??
-    (props.frozen ? "frozen" : "pre_start");
+    props.mode ?? (props.frozen ? "frozen" : "pre_start");
   const readOnly = mode === "frozen" || mode === "acceptance";
   const plan = props.plan;
 
@@ -191,7 +196,10 @@ export function ScopeAcceptanceBlock(props: ScopeAcceptanceBlockProps) {
               {expanded ? (
                 <ul className="mt-1.5 space-y-1 text-[11px] text-muted-foreground">
                   {pending.map((item) => (
-                    <li key={item.id} data-testid="scope-acceptance-sensitive-item">
+                    <li
+                      key={item.id}
+                      data-testid="scope-acceptance-sensitive-item"
+                    >
                       {item.label}
                       {item.why ? ` —— ${item.why}` : ""}
                     </li>

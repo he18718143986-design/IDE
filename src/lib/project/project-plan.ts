@@ -3,11 +3,7 @@
  * 规格：project-decomposition.md §2、§3、§6、§8。
  */
 
-import {
-  dice,
-  lexemes,
-  matchNormalize,
-} from "../journey/evidence-anchor";
+import { dice, lexemes, matchNormalize } from "../journey/evidence-anchor";
 import { GRAVEYARD_DICE_THRESHOLD } from "../journey/scheme-patch-types";
 import type { SchemeDraftV2 } from "../journey/scheme-patch-types";
 
@@ -173,8 +169,8 @@ function systemKindAllowed(stub: ContractStub): boolean {
   if (stub.kind === "feature") {
     return Boolean(
       stub.context?.release_id ||
-        stub.context?.commit_sha ||
-        stub.context?.log_tail,
+      stub.context?.commit_sha ||
+      stub.context?.log_tail,
     );
   }
   if (stub.kind === "dependency") return Boolean(stub.context?.dependency);

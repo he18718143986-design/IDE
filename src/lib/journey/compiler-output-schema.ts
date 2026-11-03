@@ -6,11 +6,7 @@
  * 纯函数：零 node:*、零时钟、零网络。
  */
 import { z } from "zod";
-import type {
-  SchemeOp,
-  SchemePatch,
-  TurnRef,
-} from "./scheme-patch-types";
+import type { SchemeOp, SchemePatch, TurnRef } from "./scheme-patch-types";
 
 /** 别名 → turn_id；只在 Daemon 内存，不进提示词 */
 export type AliasMap = ReadonlyMap<string, string>;
@@ -80,7 +76,9 @@ function quoteItemSchema(ua: readonly string[]) {
         .string()
         .min(1)
         .max(120)
-        .refine((t) => /\S/.test(t), { message: "text must contain non-space" }),
+        .refine((t) => /\S/.test(t), {
+          message: "text must contain non-space",
+        }),
     })
     .strict();
 }
@@ -126,9 +124,7 @@ function flowItemSchema(ids: readonly string[]) {
       : z.string().regex(NEW_ID_RE);
   const modId =
     ids.length > 0
-      ? z
-          .union([enumOrNever(ids), z.string().regex(NEW_ID_RE)])
-          .nullable()
+      ? z.union([enumOrNever(ids), z.string().regex(NEW_ID_RE)]).nullable()
       : z.string().regex(NEW_ID_RE).nullable();
   return z
     .object({
@@ -427,10 +423,7 @@ const FORBIDDEN_EV_KEYS = new Set([
   "turn_id",
 ]);
 
-function fail(
-  subreason: AssembleSubreason,
-  detail?: string,
-): AssembleError {
+function fail(subreason: AssembleSubreason, detail?: string): AssembleError {
   return detail === undefined
     ? { ok: false, code: "E_PATCH_SCHEMA_INVALID", subreason }
     : { ok: false, code: "E_PATCH_SCHEMA_INVALID", subreason, detail };
@@ -537,7 +530,10 @@ export function assembleCompilerOutput(
 
   const expandRevival = (
     revival: { rejected_id: string; qid: string } | null | undefined,
-  ): { rejected_id: string; evidence: TurnRef[] } | undefined | AssembleError => {
+  ):
+    | { rejected_id: string; evidence: TurnRef[] }
+    | undefined
+    | AssembleError => {
     if (revival == null) return undefined;
     const q = quoteByQid.get(revival.qid);
     if (!q) return fail("assemble.unknown_qid", revival.qid);
@@ -569,7 +565,11 @@ export function assembleCompilerOutput(
       case "set_title":
       case "set_summary":
       case "set_audience": {
-        const evidence = expandEvidence(op.evidence, false, "assemble.unknown_qid");
+        const evidence = expandEvidence(
+          op.evidence,
+          false,
+          "assemble.unknown_qid",
+        );
         if (!Array.isArray(evidence)) return evidence;
         const revivalOrErr = expandRevival(op.revival);
         if (revivalOrErr && "ok" in revivalOrErr) return revivalOrErr;
@@ -587,7 +587,11 @@ export function assembleCompilerOutput(
       case "upsert_goal":
       case "upsert_out_of_scope":
       case "upsert_acceptance": {
-        const evidence = expandEvidence(op.evidence, false, "assemble.unknown_qid");
+        const evidence = expandEvidence(
+          op.evidence,
+          false,
+          "assemble.unknown_qid",
+        );
         if (!Array.isArray(evidence)) return evidence;
         const revivalOrErr = expandRevival(op.revival);
         if (revivalOrErr && "ok" in revivalOrErr) return revivalOrErr;
@@ -596,14 +600,14 @@ export function assembleCompilerOutput(
         if (typeof rid !== "string") return rid;
         item.id = rid;
         if (op.op === "upsert_flow" && Array.isArray(item["steps"])) {
-          item["steps"] = (item["steps"] as { module_id?: string | null }[]).map(
-            (s) => {
-              if (s.module_id == null) return s;
-              const mid = resolveId(s.module_id);
-              if (typeof mid !== "string") return s;
-              return { ...s, module_id: mid };
-            },
-          );
+          item["steps"] = (
+            item["steps"] as { module_id?: string | null }[]
+          ).map((s) => {
+            if (s.module_id == null) return s;
+            const mid = resolveId(s.module_id);
+            if (typeof mid !== "string") return s;
+            return { ...s, module_id: mid };
+          });
         }
         item["source"] = op.source;
         // 剥离 project_anchor null → undefined 以贴合引擎可选字段
@@ -619,7 +623,11 @@ export function assembleCompilerOutput(
         break;
       }
       case "remove_item": {
-        const evidence = expandEvidence(op.evidence, false, "assemble.unknown_qid");
+        const evidence = expandEvidence(
+          op.evidence,
+          false,
+          "assemble.unknown_qid",
+        );
         if (!Array.isArray(evidence)) return evidence;
         ops.push({
           op: "remove_item",
@@ -648,7 +656,11 @@ export function assembleCompilerOutput(
       }
       case "propose_decision":
       case "raise_conflict": {
-        const evidence = expandEvidence(op.evidence, false, "assemble.unknown_qid");
+        const evidence = expandEvidence(
+          op.evidence,
+          false,
+          "assemble.unknown_qid",
+        );
         if (!Array.isArray(evidence)) return evidence;
         const revivalOrErr = expandRevival(op.revival);
         if (revivalOrErr && "ok" in revivalOrErr) return revivalOrErr;
@@ -699,13 +711,21 @@ export function assembleCompilerOutput(
         break;
       }
       case "add_open_question": {
-        const evidence = expandEvidence(op.evidence, false, "assemble.unknown_qid");
+        const evidence = expandEvidence(
+          op.evidence,
+          false,
+          "assemble.unknown_qid",
+        );
         if (!Array.isArray(evidence)) return evidence;
         ops.push({ op: "add_open_question", text: op.text, evidence });
         break;
       }
       case "set_size_hint": {
-        const evidence = expandEvidence(op.evidence, false, "assemble.unknown_qid");
+        const evidence = expandEvidence(
+          op.evidence,
+          false,
+          "assemble.unknown_qid",
+        );
         if (!Array.isArray(evidence)) return evidence;
         ops.push({ op: "set_size_hint", value: op.value, evidence });
         break;

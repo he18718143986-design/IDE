@@ -61,17 +61,13 @@ export async function submitPlaytestEvidence(
   if (contractId.length === 0) {
     throw new Error("contract_id 不能为空");
   }
-  return request<PlaytestEvidenceResponse>(
-    conn,
-    "/api/playtest/evidence",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        contract_id: contractId,
-        user_verdict: verdict,
-      }),
-    },
-  );
+  return request<PlaytestEvidenceResponse>(conn, "/api/playtest/evidence", {
+    method: "POST",
+    body: JSON.stringify({
+      contract_id: contractId,
+      user_verdict: verdict,
+    }),
+  });
 }
 
 /**

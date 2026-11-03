@@ -46,11 +46,7 @@ export function obligationTestPath(
   runner: DetectedRunner,
 ): string {
   const ext =
-    runner.kind === "pytest"
-      ? "py"
-      : runner.kind === "go"
-        ? "go"
-        : "ts";
+    runner.kind === "pytest" ? "py" : runner.kind === "go" ? "go" : "ts";
   return `tests/stagent/${acceptanceId}.test.${ext}`;
 }
 
@@ -101,9 +97,7 @@ export function deriveObligations(
   runner: DetectedRunner,
 ): DeriveObligationsResult {
   const refs = contract.supervisor_metadata?.acceptance_refs ?? [];
-  const autoRefs = refs.filter(
-    (r) => r.check === "auto" || r.check === "both",
-  );
+  const autoRefs = refs.filter((r) => r.check === "auto" || r.check === "both");
 
   if (runner.kind === null) {
     return {
@@ -248,11 +242,13 @@ export function classifyRun(report: unknown): ObligationRunClass {
 }
 
 /** 从仓库目录拼装 RepoFacts（纯同步读；调用方决定是否使用） */
-export function repoFactsFromPackageJson(pkg: {
-  scripts?: Record<string, string>;
-  dependencies?: Record<string, string>;
-  devDependencies?: Record<string, string>;
-} | null): RepoFacts {
+export function repoFactsFromPackageJson(
+  pkg: {
+    scripts?: Record<string, string>;
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  } | null,
+): RepoFacts {
   if (!pkg) return {};
   return {
     package_scripts: { ...(pkg.scripts ?? {}) },

@@ -18,7 +18,8 @@ export const IN_FLIGHT_LIFECYCLE_STATES = [
   "AUDITED",
 ] as const;
 
-export type InFlightLifecycleState = (typeof IN_FLIGHT_LIFECYCLE_STATES)[number];
+export type InFlightLifecycleState =
+  (typeof IN_FLIGHT_LIFECYCLE_STATES)[number];
 
 export function isInFlightLifecycleState(
   state: string,
@@ -39,7 +40,8 @@ export function nextStub(plan: ProjectPlan): ContractStub | null {
   const candidates: Candidate[] = [];
 
   for (const ms of plan.milestones) {
-    const msIdx = milestoneIndex.get(ms.milestone_id) ?? Number.MAX_SAFE_INTEGER;
+    const msIdx =
+      milestoneIndex.get(ms.milestone_id) ?? Number.MAX_SAFE_INTEGER;
     for (let stubIdx = 0; stubIdx < ms.contract_ids.length; stubIdx++) {
       const id = ms.contract_ids[stubIdx]!;
       const stub = byId.get(id);

@@ -39,7 +39,8 @@ export function buildConfirmContractFromScopePlan(
     Boolean(projected.verification_spec.manual_confirmation);
   const draft = createContractDraft({
     title: scheme.title.trim() || "确认方案",
-    description: scheme.summary.trim() || scheme.title.trim() || "按范围计划签署",
+    description:
+      scheme.summary.trim() || scheme.title.trim() || "按范围计划签署",
     acceptanceCriteria:
       plan.verification.plain.length > 0
         ? [...plan.verification.plain]
@@ -49,13 +50,12 @@ export function buildConfirmContractFromScopePlan(
     ...(useManual
       ? {
           commands: projected.verification_spec.commands,
-          manualConfirmation: projected.verification_spec.manual_confirmation ?? {
+          manualConfirmation: projected.verification_spec
+            .manual_confirmation ?? {
             reason_required: true as const,
-            capture_evidence: [
-              "actor",
-              "confirmed_at",
-              "reason",
-            ] as Array<"actor" | "confirmed_at" | "reason">,
+            capture_evidence: ["actor", "confirmed_at", "reason"] as Array<
+              "actor" | "confirmed_at" | "reason"
+            >,
           },
         }
       : { commands: projected.verification_spec.commands }),
@@ -97,9 +97,7 @@ export function buildConfirmContractFromScopePlan(
             ],
           }
         : {}),
-      ...(exec?.network_policy
-        ? { network_policy: exec.network_policy }
-        : {}),
+      ...(exec?.network_policy ? { network_policy: exec.network_policy } : {}),
       ...(typeof exec?.dependency_changes_allowed === "boolean"
         ? { dependency_changes_allowed: exec.dependency_changes_allowed }
         : {}),

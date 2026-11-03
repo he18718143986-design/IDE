@@ -6,10 +6,7 @@
  */
 
 import type { NetworkPolicy } from "../contract.schema";
-import type {
-  ScopePlan,
-  ScopePlanNeedsApproval,
-} from "../journey/scope-plan";
+import type { ScopePlan, ScopePlanNeedsApproval } from "../journey/scope-plan";
 import { scopePlanDigest } from "../journey/scope-plan";
 import type { ContractStub, StubKind } from "./project-plan";
 
@@ -151,9 +148,7 @@ export function applyStubKindScopeRules(
         ...plan.verification,
         commands: deduped,
         plain: [
-          ...plan.verification.plain.filter(
-            (p) => !p.includes("知识库"),
-          ),
+          ...plan.verification.plain.filter((p) => !p.includes("知识库")),
           "系统知识库检查全部通过",
         ],
         manual_only: false,
