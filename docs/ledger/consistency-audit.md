@@ -182,3 +182,5 @@
 > **W.9b 完成回写与 dispatchable 口径（P-131 · 2026-11-03）**：PR [#101](https://github.com/he18718143986-design/IDE/pull/101) / `b98e463` 合入，W.9b COMPLETED；W.9c 的 W.9a、W.9b 两条 DAG 前置均满足，当前 READY 但仍须 Tina 单卡授权。#101 明确将共享 `dispatchable` 判定扩至 `SANDBOX_ENFORCED`（容器宿主可用 + 工厂存在），不再仅认 `GATEWAY_ENFORCED`。审查边界与四项挂账：逐行 host 构造/探测放大、拒绝错误码被 boolean helper 吞掉、API key 明文进入容器 env（日志脱敏不等于容器内不可读）、Cursor 镜像/运行协议未实证；详见 completed §3.4o。仅 docs 回写，不新增 OP。
 
 > **L.17c 立卡（P-132 · 2026-11-03）**：Tina 授权纯文档立卡 `TASK-L.17c`（中栏方案审阅页嵌入试玩认可提交 · `[NEW_TASK]` · S/M）。兑现 completed §3.4f / §3.4i 已声明的 UI 挂账（`CompareView` 未挂路由、原话采集 UI 未实现）；**保留「未宣称」历史原文**；不新增 OP；Sprint 首要仍为 W.9c，本卡不抢首要。同步矩阵 / index / active / changelog / scheme / delivery-lifecycle 现行指针。仅 docs，不开工实现。
+
+> **L.17c 完成回写（P-133 · 2026-11-03）**：PR [#104](https://github.com/he18718143986-design/IDE/pull/104) / `06661be` 合入，L.17c COMPLETED；中栏同页挂载既有 CompareView、原话提交只走 `submitPlaytestEvidence`、读侧薄路由委托 `evaluatePlaytestGuard`（判定本体未改）。三项挂账照旧入 completed §3.4p：snapshots 前端拉数；会话原话候选未灌 index；真机 `check playtest` 执行债。**窄口径**：UI 已挂；**不**宣称端到端闭环。Sprint 首要仍为 W.9c。仅 docs 回写，不新增 OP。

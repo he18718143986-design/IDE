@@ -158,3 +158,9 @@
 - **范围要点**：同页挂载既有 `CompareView`；原话 +「认可完成」→ `submitPlaytestEvidence`；读侧反映 `playtest-guard`；不改三本体；不碰 W.9c 施工面。
 - **挂账归口**：兑现 L.17b / C.23 已声明的端到端 UI 未接线（CompareView 未挂中栏、原话采集 UI）；**不新增 OP**；历史「未宣称」原文保留。
 - **Sprint**：首要仍为 `TASK-W.9c`（READY · 待 Tina 单卡授权）；L.17c **不抢**首要，开工须另授。物理 tip `e3262c9`（#102）。
+
+### TASK-L.17c（P-133 · 2026-11-03 · 非 OP）
+
+- **状态回写**：L.17c 已 COMPLETED（PR [#104](https://github.com/he18718143986-design/IDE/pull/104) / `06661be`）；中栏方案审阅同页已挂既有 CompareView + 原话「认可完成」+ 薄读侧 `GET /api/playtest/status`。
+- **挂账（三项，不新增 OP · 不宣称关闭）**：① CompareView `snapshots` 前端拉数（L.17a 抓取成果接线）；② 会话原话候选未灌 `index`（props `sessionVerbatimCandidates` 已留）；③ 真机整段 `check playtest` 执行债。完整记录见 [`development-tasks-completed.md` §3.4p](../specs/development-tasks-completed.md#task-l.17c)。
+- **窄口径**：UI 已挂 / 代码合入；**不**宣称端到端 UI/产品闭环。Sprint 首要仍为 W.9c。现行物理 tip `06661be`。

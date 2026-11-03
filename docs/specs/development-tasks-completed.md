@@ -2285,6 +2285,20 @@
 
 ---
 
+
+### 3.4p 中栏方案审阅页嵌入试玩认可提交（L.17c · 产品验收挂账）
+
+<a id="task-l.17c"></a>
+
+#### 【Task L.17c】中栏方案审阅页嵌入试玩认可提交 `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#104](https://github.com/he18718143986-design/IDE/pull/104)/`06661be`，squash；基线 #103/`8f33b73` P-132 立卡之后）。
+- **交付**：新增 `src/components/studio/PlaytestAcceptBlock.tsx`，在中栏 `SchemeReviewPane` **同页**嵌入既有 `CompareView`（**不改**组件本体 / props 契约）。原话框默认空（禁止引导文案自动填入）；「认可完成」**只**调用 `submitPlaytestEvidence(conn, { contract_id, user_verdict })`（请求体不含 `release_id`/`timestamp`/`operator`）。读侧选型为薄 HTTP：`GET /api/playtest/status?contract_id=` 委托既有 `evaluatePlaytestGuard`（**零改** `playtest-guard.ts`）；前端 `fetchPlaytestStatus` 反映拒绝态。`src/routes/index.tsx` 传 `contractId` / `references` / LIVE preview / `conn`。测试：`tests/ui/scheme-review-playtest.test.tsx` + `tests/unit/playtest-status-wiring.test.ts`（11 passed）；全量相对干净 main **零新增失败**。
+- **后续挂账（三项 · 不宣称关闭）**：① L.17a 参考站抓取成果 → CompareView `snapshots` 前端拉数（本卡可空左栏渲染）；② 会话原话候选列表接线（props 已留 `sessionVerbatimCandidates`；`index` 暂未灌聊天原话）；③ **真机整段 `check playtest` 执行债**（卡明文另挂，本卡不做门禁执行链路）。
+- **边界**：**窄口径**——UI 已挂 / 代码合入；**不**宣称端到端 UI/产品闭环；不碰 orchestrator / 派工 / AdapterRegistry（W.9c 施工面）；不复活多视口 Tab / 新设右栏入口；不改 CompareView / `submitPlaytestEvidence` / `playtest-guard` 判定与契约本体。
+
+---
+
 ### 3.4c 闭环旅程 v2.1 第一批（Journey · 规格 `supervisor.md` 第三部分 §13～§20；对应 §19 落差 L-01～L-10）
 
 <a id="task-j.1"></a>
@@ -3679,7 +3693,8 @@
   6. **（L.17a）`request.headers`**：已对敏感头做严格剥离过滤；当前 gateway 调用暂不传 headers，未来若不需要自定义头可彻底裁剪该字段。
   > 另：**`check playtest` 目前是独立命令、尚未被任何 verification profile 引用**——**已裁决（ruling 3 · 2026-11-02 · P-114 落盘）**：北极星合同（带 `references[]`）的 `verification_spec.commands` **自动附加** `{alias:"playtest", executable:"stagent", args:["check","playtest","<contract_id>"]}`，使试玩认可成为合并门禁；**非北极星合同不附加**。实现属小卡（合同装配段 + 测试），**另行立卡或挂账**——本轮仅落裁决口径，**未立卡、未开工**（不顺手立 `TASK-C.23`，避免新增未达 `task-card-standard.md` DoR 的薄卡债，DOR-3 同款）。裁决原文见 [`development-tasks-changelog.md`](./development-tasks-changelog.md) P-114 与 ledger [`../ledger/consistency-audit.md`](../ledger/consistency-audit.md) P-114 落笔。
 * **未宣称 / 未接线（不宣称端到端闭环）**：`CompareView` 未挂载进任何 UI 路由；用户原话采集 UI 未实现（右栏引导仅提示，不含提交动作）；`check playtest` 尚未被 verification profile 引用（**ruling 3 裁决已落盘、实现未开工，见上条**；本句是代码事实，不与「已裁决」混淆）。**本卡交付组件 + lib + 端点 + 门禁判定源，端到端 UI 串联与真机端口联调属后续。**
-> **（P-132 现行指针 · 保留上句原文作溯源）**：端到端 UI 接线立为 [`TASK-L.17c`](./development-tasks-active.md#task-l.17c) `[NEW_TASK]`（中栏挂载 CompareView + 原话「认可完成」+ 读侧反映 playtest-guard；**未开工、未宣称闭环**）。`check playtest` 装配侧已由 `TASK-C.23` COMPLETED（#82）；本句「尚未被 verification profile 引用」为 L.17b 归档当日事实。
+> **（P-132 立卡指针 · 保留上句原文作溯源）**：端到端 UI 接线立为 [`TASK-L.17c`](./development-tasks-active.md#task-l.17c) `[NEW_TASK]`（中栏挂载 CompareView + 原话「认可完成」+ 读侧反映 playtest-guard；**未开工、未宣称闭环**）。`check playtest` 装配侧已由 `TASK-C.23` COMPLETED（#82）；本句「尚未被 verification profile 引用」为 L.17b 归档当日事实。
+> **（P-133 现行指针）**：`TASK-L.17c` → `[COMPLETED]`（[#104](https://github.com/he18718143986-design/IDE/pull/104)/`06661be`）；交付与三项挂账见 [`#task-l.17c`](#task-l.17c)；**仍不宣称**端到端闭环。
 * **关键文件**：`src/components/project/CompareView.tsx`、`src/lib/journey/playtest-guidance.ts`、`src/lib/journey/playtest-evidence.ts`、`src/lib/daemon-api.ts`、`daemon/playtest/evidence.ts`、`daemon/release/active-live.ts`、`daemon/supervisor/preview/playtest-guard.ts`、`daemon/server.ts`、`bin/stagent.ts`、`tests/unit/compare-view.test.ts`、`tests/unit/playtest-guidance.test.ts`、`tests/unit/playtest-evidence.test.ts`、`tests/unit/playtest-reset.test.ts`。
 
 ---
@@ -3773,7 +3788,7 @@
 * **残余边界 / 后续挂账（P-119 归拢，共 3 条）**：
   1. **`scopePlanToContractScope()` 未按卡正文点名改动**：该函数**不接收** `references`（`references` 来自 `scheme`，在确认路径 `:128-130` 才投影进合同），故接线落在确认路径的**覆盖装配处**——即卡正文所指「覆盖式装配路径同步接线」。若要求落到该函数内部，需先为其加 `references` 入参（改动面更大）。
   2. **非北极星剔除调用方自带 `playtest`**：卡正文只写「不附加」，实现上进一步剔除已存在项以防绕开判据（**收紧**）。若调用方确有合法用途需保留，须另行裁决。
-  3. **不宣称端到端闭环**：`check playtest` 判定源由 L.17b 交付、本卡只做装配接线；`CompareView` UI 路由挂载与用户原话采集 UI 仍属后续（L.17b 已声明未接线）。 **（P-132）** 该后续现立为 [`TASK-L.17c`](./development-tasks-active.md#task-l.17c) `[NEW_TASK]`（未开工）。
+  3. **不宣称端到端闭环**：`check playtest` 判定源由 L.17b 交付、本卡只做装配接线；`CompareView` UI 路由挂载与用户原话采集 UI 仍属后续（L.17b 已声明未接线）。 **（P-132）** 该后续曾立为 [`TASK-L.17c`](./development-tasks-active.md#task-l.17c) `[NEW_TASK]`（未开工）。 **（P-133）** `TASK-L.17c` → `[COMPLETED]`（[#104](https://github.com/he18718143986-design/IDE/pull/104)/`06661be`）；UI 已挂，三项挂账与真机执行债仍挂，见 [`#task-l.17c`](#task-l.17c)；**仍不宣称**端到端闭环。
 * **未宣称 / 未接线（不宣称端到端闭环）**：本卡交付「合同装配时自动带验收命令」，**未**验证真实 `check playtest` 在门禁链路上的端到端执行；装配出的命令是否真被执行、执行结果如何回写，属门禁执行链路（后续）。
 * **关键文件**：`src/lib/contract.schema.ts`、`src/lib/journey/confirm-scheme-contract.ts`、`tests/unit/contract-playtest-wiring.test.ts`（新）；只读复用 `bin/stagent.ts`、`daemon/supervisor/preview/playtest-guard.ts`。
 

@@ -681,7 +681,7 @@
 
 #### 【Task L.17b】对比视图与试玩证据桩 `[COMPLETED]`
 
-> **归档注记（2026-11-02 · P-112）**：本卡已 COMPLETED（[#72](https://github.com/he18718143986-design/IDE/pull/72)/`d26def6`，squash merge）。完整交付记录、残余边界与挂账见 [`development-tasks-completed.md`](./development-tasks-completed.md) §3.4f（锚点 `#task-l.17b`）。本处保留原始卡文以存追溯，不再作为施工依据；**M5 北极星主序收官**。**（P-132 现行指针）**端到端 UI 接线（CompareView 挂中栏 + 原话「认可完成」）立为 [`TASK-L.17c`](#task-l.17c) `[NEW_TASK]`，**未开工、未宣称闭环**。
+> **归档注记（2026-11-02 · P-112）**：本卡已 COMPLETED（[#72](https://github.com/he18718143986-design/IDE/pull/72)/`d26def6`，squash merge）。完整交付记录、残余边界与挂账见 [`development-tasks-completed.md`](./development-tasks-completed.md) §3.4f（锚点 `#task-l.17b`）。本处保留原始卡文以存追溯，不再作为施工依据；**M5 北极星主序收官**。**（P-132 立卡指针 · 保留原文作溯源）**端到端 UI 接线立为 [`TASK-L.17c`](#task-l.17c) `[NEW_TASK]`，**未开工、未宣称闭环**。**（P-133 现行指针）**`TASK-L.17c` → `[COMPLETED]`（[#104](https://github.com/he18718143986-design/IDE/pull/104)/`06661be`）；交付与三项挂账见 [`development-tasks-completed.md`](./development-tasks-completed.md#task-l.17c)；**仍不宣称**端到端闭环。
 
 * **任务编号**：`TASK-L.17b`
 * **任务名称**：对比视图与试玩证据桩
@@ -713,16 +713,16 @@
 
 <a id="task-l.17c"></a>
 
-#### 【Task L.17c】中栏方案审阅页嵌入试玩认可提交 `[NEW_TASK]`
+#### 【Task L.17c】中栏方案审阅页嵌入试玩认可提交 `[COMPLETED]`
 
-> **立卡（2026-11-03 · P-132 · 经 Tina 授权）**：兑现 L.17b / C.23 已声明的端到端 UI 挂账（CompareView 未挂中栏、原话采集 UI 未实现）。本卡按 [`task-card-standard.md`](./task-card-standard.md) R-1～R-12 与 [`../templates/05-task-card.md`](../templates/05-task-card.md) 写全；**状态 `[NEW_TASK]`，就绪 ≠ 开工**——施工须 Tina 另行授权。**不抢 Sprint 首要**：现行首要仍为 `TASK-W.9c`（READY · 待 Tina 单卡授权）；本卡为产品验收挂账并行立卡，不碰 W.9c / orchestrator / AdapterRegistry。
+> **归档注记（2026-11-03 · P-133）**：本卡已 COMPLETED（[#104](https://github.com/he18718143986-design/IDE/pull/104)/`06661be` squash）。交付、三项挂账与边界见 [`development-tasks-completed.md`](./development-tasks-completed.md#task-l.17c)。**立卡原文（P-132）保留作溯源**：兑现 L.17b / C.23 已声明的端到端 UI 挂账；**不抢 Sprint 首要**（现行首要仍为 `TASK-W.9c`）；不碰 W.9c / orchestrator / AdapterRegistry；**不宣称**端到端闭环。
 
 * **任务编号**：`TASK-L.17c`
 * **任务名称**：中栏方案审阅页嵌入试玩认可提交
 * **对应规格**（R-1）：[`../scheme.md`](../scheme.md) **dec-12** / **acc-6** / gap-11；[`delivery-lifecycle.md`](./delivery-lifecycle.md) M5；[`development-tasks-completed.md`](./development-tasks-completed.md) §3.4f（L.17b 未接线声明）与 §3.4i（C.23 挂账「CompareView UI 路由挂载与用户原话采集 UI 仍属后续」）；W.5a / C.18 中栏单页方案审阅架构裁决（禁复活多视口 Tab）
 * **前置依赖**（R-3）：`TASK-L.17b`（**COMPLETED** · [#72](https://github.com/he18718143986-design/IDE/pull/72)/`d26def6`，CompareView / `submitPlaytestEvidence` / `playtest-guard` 已交付）；`TASK-C.18`（**COMPLETED**，中栏 `SchemeReviewPane` 单页已在）；`TASK-C.23`（**COMPLETED** · [#82](https://github.com/he18718143986-design/IDE/pull/82)/`a5223fb`，验收命令装配已兑现；本卡**不改**装配与判定源）
 * **优先级**：P3（产品验收挂账 · 不抢 W.9c）
-* **状态**：`[NEW_TASK]`（DoR 写全；**开工须 Tina 单卡授权**；不宣称 READY 以外的东西）
+* **状态**：`[COMPLETED]`（[#104](https://github.com/he18718143986-design/IDE/pull/104)/`06661be`）
 * **对照痛点（代码事实）**（R-4）：
   1. `src/components/project/CompareView.tsx::CompareView` 组件已在库，但**全仓无 JSX 挂载点**（仅单测引用）；中栏 `src/components/studio/SchemeReviewPane.tsx::SchemeReviewPane` 未 import / 未渲染它。
   2. `src/lib/journey/playtest-evidence.ts::submitPlaytestEvidence` 与 `POST /api/playtest/evidence` 已交付，但 UI **无「认可完成」按钮、无原话输入框**；右栏 `playtest-guidance.ts` 仅文案提示。
