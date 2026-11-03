@@ -42,10 +42,7 @@ import {
   writeGatePackFile,
 } from "../../daemon/guard/graveyard-wiring";
 import { buildGatePack } from "../../daemon/guard/worker-graveyard-gate";
-import {
-  MergeGateError,
-  squashMerge,
-} from "../../daemon/pipeline/merger";
+import { MergeGateError, squashMerge } from "../../daemon/pipeline/merger";
 import { evidenceBundleSchema } from "../../src/lib/evidence.schema";
 
 /** 端口登记声明（TM-GI · 3950–3959）——供 test-port-map 扫描；本套件当前不起 HTTP。 */
@@ -85,7 +82,10 @@ afterEach(() => {
   }
 });
 
-function entryOf(id: string, over: Partial<GraveyardEntry> = {}): GraveyardEntry {
+function entryOf(
+  id: string,
+  over: Partial<GraveyardEntry> = {},
+): GraveyardEntry {
   const t = fixture.tombstones[id];
   if (!t) throw new Error(`missing ${id}`);
   return {
@@ -143,7 +143,12 @@ function initRepo(): string {
 function freezeBound(
   repo: string,
   graveyard: GraveyardEntry[],
-): { confirmationId: string; snapshot: SchemeSnapshot; scope_plan: ScopePlan; contract: SoftwareContract } {
+): {
+  confirmationId: string;
+  snapshot: SchemeSnapshot;
+  scope_plan: ScopePlan;
+  contract: SoftwareContract;
+} {
   const scheme = makeScheme();
   const scope_plan = buildScopePlan({ repoRoot: repo, scheme });
   const confirmationId = `scheme-confirm-gi-${Date.now().toString(36)}`;
@@ -256,7 +261,8 @@ const mongoosePkg = JSON.stringify(
   2,
 );
 
-const mongooseSrc = 'import mongoose from "mongoose";\nexport const db = mongoose;\n';
+const mongooseSrc =
+  'import mongoose from "mongoose";\nexport const db = mongoose;\n';
 
 /** 挑一个合同可写且适合放 import 的相对路径 */
 function pickWritableTarget(contract: SoftwareContract): string {
@@ -280,7 +286,10 @@ function pickWritableTarget(contract: SoftwareContract): string {
   return "src/db.ts";
 }
 
-function changeForGate(contract: SoftwareContract): { path: string; content: string } {
+function changeForGate(contract: SoftwareContract): {
+  path: string;
+  content: string;
+} {
   const path = pickWritableTarget(contract);
   if (path.endsWith("package.json")) {
     return { path, content: mongoosePkg };
@@ -327,7 +336,9 @@ describe("TM-GI worker graveyard gate wiring", () => {
     }
 
     const evidenceDir = path.join(repo, ".stagent", "evidence");
-    const files = fs.readdirSync(evidenceDir).filter((f) => f.endsWith(".json"));
+    const files = fs
+      .readdirSync(evidenceDir)
+      .filter((f) => f.endsWith(".json"));
     expect(files.length).toBeGreaterThan(0);
     const bundles = files.map((f) =>
       evidenceBundleSchema.parse(

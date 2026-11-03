@@ -98,9 +98,7 @@ function makeScheme() {
 describe("TASK-L.10 ProjectMapPane", () => {
   it("renders two milestones and three stubs; next highlight is unique", () => {
     const plan = makePlan();
-    render(
-      <ProjectMapPane plan={plan} nextStubId="cs-2" />,
-    );
+    render(<ProjectMapPane plan={plan} nextStubId="cs-2" />);
 
     expect(screen.getAllByTestId("project-map-milestone")).toHaveLength(2);
     expect(screen.getAllByTestId("project-map-stub")).toHaveLength(3);
@@ -132,13 +130,7 @@ describe("TASK-L.10 ProjectMapPane", () => {
   it("defer button calls onDefer once (removed_by user path owned by parent)", () => {
     const plan = makePlan();
     const onDefer = vi.fn();
-    render(
-      <ProjectMapPane
-        plan={plan}
-        nextStubId="cs-2"
-        onDefer={onDefer}
-      />,
-    );
+    render(<ProjectMapPane plan={plan} nextStubId="cs-2" onDefer={onDefer} />);
     const deferButtons = screen.getAllByTestId("project-map-defer");
     expect(deferButtons.length).toBeGreaterThanOrEqual(1);
     fireEvent.click(deferButtons[0]!);

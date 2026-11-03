@@ -216,7 +216,11 @@ describe("TASK-J.2 ScopePlan 纯函数", () => {
       max_file_modifications: 10,
       max_duration_seconds: 1800,
     });
-    assertNoTechJargon(plain, plainAreaLabel("src/pages/**"), plainAreaLabel("src/**", "首页看板"));
+    assertNoTechJargon(
+      plain,
+      plainAreaLabel("src/pages/**"),
+      plainAreaLabel("src/**", "首页看板"),
+    );
     expect(plain).toMatch(/最多改约 10 个文件/);
     expect(plain).toMatch(/分钟/);
   });
@@ -233,7 +237,10 @@ describe("TASK-J.2 buildScopePlan 构建器", () => {
       }),
     );
     fs.mkdirSync(path.join(root, "src", "pages"), { recursive: true });
-    fs.writeFileSync(path.join(root, "src", "pages", "home.tsx"), "export {};\n");
+    fs.writeFileSync(
+      path.join(root, "src", "pages", "home.tsx"),
+      "export {};\n",
+    );
 
     const scheme = baseScheme({
       // 不写显式路径，走 infer→src/** 再 token 收敛到 src/pages/**
@@ -288,16 +295,21 @@ describe("TASK-J.2 buildScopePlan 构建器", () => {
       }),
     });
     expect(plan.grade.ok).toBe(true);
-    expect(plan.grade.rejected.find((r) => r.path === "src/**")).toBeUndefined();
-    expect(plan.areas.some((a) => a.paths.includes("src/pages/**"))).toBe(true);
     expect(
-      plan.areas.some((a) => a.paths.includes("src/components/**")),
-    ).toBe(false);
+      plan.grade.rejected.find((r) => r.path === "src/**"),
+    ).toBeUndefined();
+    expect(plan.areas.some((a) => a.paths.includes("src/pages/**"))).toBe(true);
+    expect(plan.areas.some((a) => a.paths.includes("src/components/**"))).toBe(
+      false,
+    );
   });
 
   it("老项目 + 无可匹配目录 → grade.ok=false 且 rejected 含 src/**（不编造）", () => {
     const root = emptyRepo();
-    fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "old" }));
+    fs.writeFileSync(
+      path.join(root, "package.json"),
+      JSON.stringify({ name: "old" }),
+    );
     fs.mkdirSync(path.join(root, "src", "legacy"), { recursive: true });
 
     const plan = buildScopePlan({
@@ -321,7 +333,10 @@ describe("TASK-J.2 buildScopePlan 构建器", () => {
 
   it("非 npm（Python 布局）不因缺 package.json 被误判为绿野", () => {
     const root = emptyRepo();
-    fs.writeFileSync(path.join(root, "pyproject.toml"), "[project]\nname='x'\n");
+    fs.writeFileSync(
+      path.join(root, "pyproject.toml"),
+      "[project]\nname='x'\n",
+    );
     fs.mkdirSync(path.join(root, "src"), { recursive: true });
 
     expect(isGreenfieldRepo(root)).toBe(false);
@@ -443,7 +458,10 @@ describe("TASK-J.2 buildScopePlan 构建器", () => {
 
   it("extraSources 可追加（L.3 扩展点）", () => {
     const root = emptyRepo();
-    fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "x" }));
+    fs.writeFileSync(
+      path.join(root, "package.json"),
+      JSON.stringify({ name: "x" }),
+    );
     fs.mkdirSync(path.join(root, "src", "pages"), { recursive: true });
     const plan = buildScopePlan(
       {

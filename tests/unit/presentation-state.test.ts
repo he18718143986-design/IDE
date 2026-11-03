@@ -119,11 +119,10 @@ describe("全部展示状态逐个可达", () => {
   });
 
   it("PROJECT_MAPPING：PREPARING 且 project_mapping（§16.2 整理项目地图）", () => {
-    expect(
-      project("PREPARING", "APPROVED", { project_mapping: true }),
-    ).toBe("PROJECT_MAPPING");
+    expect(project("PREPARING", "APPROVED", { project_mapping: true })).toBe(
+      "PROJECT_MAPPING",
+    );
   });
-
 
   it("NEEDS_APPROVAL：待审等待授权", () => {
     expect(project("PENDING_APPROVAL", "PENDING_REVIEW")).toBe(

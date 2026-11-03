@@ -11,7 +11,10 @@ import { createDaemon, type StagentDaemon } from "../../daemon/server";
 import { ReleaseManager } from "../../daemon/release/release-manager";
 import { writePlan, readPlan } from "../../daemon/project/plan-store";
 import { nextStub } from "../../src/lib/project/next-stub";
-import type { ContractStub, ProjectPlan } from "../../src/lib/project/project-plan";
+import type {
+  ContractStub,
+  ProjectPlan,
+} from "../../src/lib/project/project-plan";
 import type {
   ReleaseTargetAdapter,
   StepResult,
@@ -105,7 +108,7 @@ describe("TASK-L.16 live incident RO-10", () => {
       JSON.stringify({
         name: "l16",
         private: true,
-        scripts: { test: "node -e \"process.exit(0)\"" },
+        scripts: { test: 'node -e "process.exit(0)"' },
       }),
       "utf8",
     );
@@ -155,7 +158,10 @@ describe("TASK-L.16 live incident RO-10", () => {
       vault,
     });
 
-    const draft = await mgr.createDraft({ target_id: "local", commit_sha: sha });
+    const draft = await mgr.createDraft({
+      target_id: "local",
+      commit_sha: sha,
+    });
     const live = await mgr.run(draft.release_id);
     expect(live.state).toBe("LIVE");
 
@@ -223,7 +229,10 @@ describe("TASK-L.16 live incident RO-10", () => {
       isCommitOnProtectedBranch: () => true,
       healthAttempts: 1,
     });
-    const draft = await mgr.createDraft({ target_id: "local", commit_sha: sha });
+    const draft = await mgr.createDraft({
+      target_id: "local",
+      commit_sha: sha,
+    });
     const live = await mgr.run(draft.release_id);
     await mgr.recordLiveIncident({
       release_id: live.release_id,
@@ -264,7 +273,9 @@ describe("TASK-L.16 live incident RO-10", () => {
       plan: ProjectPlan;
     };
     expect(askJson.stub_id).toBe(`cs-incident-${live.release_id}`);
-    const stub = askJson.plan.contracts.find((c) => c.stub_id === askJson.stub_id)!;
+    const stub = askJson.plan.contracts.find(
+      (c) => c.stub_id === askJson.stub_id,
+    )!;
     expect(stub.origin).toBe("system");
     expect(stub.context?.release_id).toBe(live.release_id);
   });
@@ -308,7 +319,10 @@ describe("TASK-L.16 live incident RO-10", () => {
       vault,
     });
 
-    const draft = await mgr.createDraft({ target_id: "local", commit_sha: sha });
+    const draft = await mgr.createDraft({
+      target_id: "local",
+      commit_sha: sha,
+    });
     const live = await mgr.run(draft.release_id);
     expect(live.state).toBe("LIVE");
     expect(getLiveProcess("local")?.process).toBe(fakeProc);

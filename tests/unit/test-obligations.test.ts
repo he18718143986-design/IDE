@@ -85,9 +85,7 @@ function schemeWithAcceptance(
 }
 
 function contractWithRefs(
-  refs: NonNullable<
-    SoftwareContract["supervisor_metadata"]
-  >["acceptance_refs"],
+  refs: NonNullable<SoftwareContract["supervisor_metadata"]>["acceptance_refs"],
 ): SoftwareContract {
   const draft = createContractDraft({
     title: "t",

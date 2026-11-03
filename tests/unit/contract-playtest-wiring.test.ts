@@ -20,9 +20,7 @@ import {
   type SoftwareContract,
 } from "../../src/lib/contract.schema";
 import { emptySchemeDraft } from "../../src/lib/journey/scheme-draft";
-import {
-  buildConfirmContractFromScopePlan,
-} from "../../src/lib/journey/confirm-scheme-contract";
+import { buildConfirmContractFromScopePlan } from "../../src/lib/journey/confirm-scheme-contract";
 import {
   scopePlanDigest,
   type ScopePlan,
@@ -97,11 +95,7 @@ describe("PW-01：references[] 非空 → 自动附加 playtest（createContract
     const cmds = playtests(contract);
     expect(cmds).toHaveLength(1);
     expect(cmds[0]!.executable).toBe("stagent");
-    expect(cmds[0]!.args).toEqual([
-      "check",
-      "playtest",
-      contract.contract_id,
-    ]);
+    expect(cmds[0]!.args).toEqual(["check", "playtest", contract.contract_id]);
     // args[2] 必须是服务端装配的 contract_id
     expect(cmds[0]!.args[2]).toBe(contract.contract_id);
   });
@@ -118,9 +112,9 @@ describe("PW-02：非北极星合同不附加（createContractDraft）", () => {
   it("未传 references → 不含 playtest，且默认 test 命令不受影响", () => {
     const contract = draftWithRefs();
     expect(playtests(contract)).toHaveLength(0);
-    expect(
-      contract.verification_spec.commands.map((c) => c.alias),
-    ).toEqual(["test"]);
+    expect(contract.verification_spec.commands.map((c) => c.alias)).toEqual([
+      "test",
+    ]);
   });
 
   it("references: [] → 不含 playtest", () => {
@@ -153,9 +147,9 @@ describe("PW-02：非北极星合同不附加（createContractDraft）", () => {
     });
     expect(playtests(contract)).toHaveLength(0);
     // 既有 test 命令不受影响（剔除只针对 playtest）
-    expect(
-      contract.verification_spec.commands.map((c) => c.alias),
-    ).toEqual(["test"]);
+    expect(contract.verification_spec.commands.map((c) => c.alias)).toEqual([
+      "test",
+    ]);
   });
 });
 
@@ -214,7 +208,10 @@ describe("scheme 确认覆盖路径（buildConfirmContractFromScopePlan）同样
       modules: ["module1"],
       ...(references === undefined ? {} : { references }),
     });
-    return buildConfirmContractFromScopePlan(scheme, makeMinimalPlan(scheme.scheme_revision));
+    return buildConfirmContractFromScopePlan(
+      scheme,
+      makeMinimalPlan(scheme.scheme_revision),
+    );
   }
 
   it("PW-01：scheme.references 非空 → 产出合同带 playtest，args[2] === contract_id", () => {
@@ -228,9 +225,9 @@ describe("scheme 确认覆盖路径（buildConfirmContractFromScopePlan）同样
   it("PW-02：scheme 无 references → 不含 playtest，既有 test 命令保留", () => {
     const contract = schemeContract();
     expect(playtests(contract)).toHaveLength(0);
-    expect(
-      contract.verification_spec.commands.map((c) => c.alias),
-    ).toContain("test");
+    expect(contract.verification_spec.commands.map((c) => c.alias)).toContain(
+      "test",
+    );
   });
 
   it("PW-03：scheme.references 非空且方案已带 playtest → 恰好 1 条", () => {

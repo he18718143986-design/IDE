@@ -126,7 +126,7 @@ describe("TASK-L.11 design-step 生产路径", () => {
       JSON.stringify({
         name: "l11",
         private: true,
-        scripts: { test: "node -e \"process.exit(0)\"" },
+        scripts: { test: 'node -e "process.exit(0)"' },
       }),
       "utf8",
     );
@@ -138,10 +138,12 @@ describe("TASK-L.11 design-step 生产路径", () => {
     safeRmSync(repo);
   });
 
-  function seed(opts: {
-    dependencyChangesAllowed?: boolean;
-    stubId?: string | null;
-  } = {}) {
+  function seed(
+    opts: {
+      dependencyChangesAllowed?: boolean;
+      stubId?: string | null;
+    } = {},
+  ) {
     const draft = createContractDraft({
       title: "L.11 design",
       description: "design step wiring",
@@ -260,9 +262,7 @@ describe("TASK-L.11 design-step 生产路径", () => {
 
     const generator: DesignNoteGenerator = () => ({
       note: makeNote(live, {
-        dependencies: [
-          { name: "stripe", version: "14.0.0", why: "收款" },
-        ],
+        dependencies: [{ name: "stripe", version: "14.0.0", why: "收款" }],
         // 故意不标注 costs_money；二次判定应补上
         decisions: [],
       }),
@@ -357,9 +357,7 @@ describe("TASK-L.11 design-step 生产路径", () => {
     };
     writePlan(repo, plan);
 
-    const deps = [
-      { name: "left-pad", version: "1.3.0", why: "必须用" },
-    ];
+    const deps = [{ name: "left-pad", version: "1.3.0", why: "必须用" }];
     const generator: DesignNoteGenerator = (input) => {
       if (input.forbidDependencies) {
         return {

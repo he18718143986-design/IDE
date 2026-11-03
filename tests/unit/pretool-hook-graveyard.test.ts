@@ -85,7 +85,12 @@ function entryOf(id: string): GraveyardEntry {
 
 function writePack(root: string, ids: string[] = ["T-MONGO"]) {
   const pack = buildGatePack(ids.map(entryOf));
-  const abs = path.join(root, ".stagent", "claude-config", "graveyard-pack.json");
+  const abs = path.join(
+    root,
+    ".stagent",
+    "claude-config",
+    "graveyard-pack.json",
+  );
   fs.mkdirSync(path.dirname(abs), { recursive: true });
   fs.writeFileSync(abs, `${JSON.stringify(pack, null, 2)}\n`, "utf8");
   return pack;
@@ -93,7 +98,9 @@ function writePack(root: string, ids: string[] = ["T-MONGO"]) {
 
 async function loadHook() {
   return import(pathToFileURL(HOOK).href) as Promise<{
-    loadGatePackKeys: (mainRoot: string) =>
+    loadGatePackKeys: (
+      mainRoot: string,
+    ) =>
       | { ok: true; keys: Set<string>; byKey: Map<string, string> }
       | { ok: false; warning: "W_GATE_PACK_MISSING" };
     extractInstallPackages: (command: string) => string[];
@@ -103,9 +110,7 @@ async function loadHook() {
         | { ok: true; keys: Set<string>; byKey: Map<string, string> }
         | { ok: false; warning: string },
       candidates: string[],
-    ) =>
-      | { hit: false }
-      | { hit: true; rejected_id: string; key: string };
+    ) => { hit: false } | { hit: true; rejected_id: string; key: string };
   }>;
 }
 
@@ -209,7 +214,12 @@ describe("TM-GH CLI hook graveyard pack", () => {
 
   it("TM-GH-05 pack JSON 损坏 → allow + W_GATE_PACK_MISSING", async () => {
     const root = makeRoot();
-    const abs = path.join(root, ".stagent", "claude-config", "graveyard-pack.json");
+    const abs = path.join(
+      root,
+      ".stagent",
+      "claude-config",
+      "graveyard-pack.json",
+    );
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     fs.writeFileSync(abs, "{not-json", "utf8");
     const hook = await loadHook();

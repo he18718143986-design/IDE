@@ -1,4 +1,3 @@
-
 /**
  * TASK-L.15：ReleaseManager R-INV-3 / R-INV-2（RO-04、RO-05）。
  */
@@ -67,7 +66,15 @@ describe("TASK-L.15 release-manager RO-04/RO-05", () => {
     git(repo, ["checkout", "-b", "main"]);
     fs.writeFileSync(path.join(repo, "README.md"), "hi\n");
     git(repo, ["add", "."]);
-    git(repo, ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "init"]);
+    git(repo, [
+      "-c",
+      "user.email=t@t",
+      "-c",
+      "user.name=t",
+      "commit",
+      "-m",
+      "init",
+    ]);
     sha = git(repo, ["rev-parse", "HEAD"]).trim();
     writeTargets(repo);
   });

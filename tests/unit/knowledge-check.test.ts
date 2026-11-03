@@ -21,24 +21,22 @@ import {
 import { runCheckCommand } from "../../bin/stagent";
 import type { DesignNote } from "../../src/lib/design/design-note";
 
-function writeModulesYaml(
-  root: string,
-  modules: ModuleEntry[],
-): void {
+function writeModulesYaml(root: string, modules: ModuleEntry[]): void {
   const dir = path.join(root, "docs", "system");
   fs.mkdirSync(dir, { recursive: true });
-  const body = [
-    "schema_version: \"1.0.0\"",
-    "modules:",
-  ];
+  const body = ['schema_version: "1.0.0"', "modules:"];
   for (const m of modules) {
     body.push(`  - id: ${m.id}`);
     body.push(`    name: ${JSON.stringify(m.name)}`);
     body.push(`    purpose: ${JSON.stringify(m.purpose)}`);
     body.push(`    paths:`);
     for (const p of m.paths) body.push(`      - ${JSON.stringify(p)}`);
-    body.push(`    depends_on: [${m.depends_on.map((d) => JSON.stringify(d)).join(", ")}]`);
-    body.push(`    interfaces: [${m.interfaces.map((i) => JSON.stringify(i)).join(", ")}]`);
+    body.push(
+      `    depends_on: [${m.depends_on.map((d) => JSON.stringify(d)).join(", ")}]`,
+    );
+    body.push(
+      `    interfaces: [${m.interfaces.map((i) => JSON.stringify(i)).join(", ")}]`,
+    );
     body.push(`    introduced_by: ${JSON.stringify(m.introduced_by)}`);
     body.push(`    updated_by: []`);
   }
@@ -107,9 +105,7 @@ describe("TASK-L.12 checkKnowledge TD-06～TD-08", () => {
   });
 
   it("TD-06：改动文件不被覆盖 → KB-1", () => {
-    writeModulesYaml(root, [
-      baseModule({ paths: ["src/legacy/**"] }),
-    ]);
+    writeModulesYaml(root, [baseModule({ paths: ["src/legacy/**"] })]);
     fs.mkdirSync(path.join(root, "docs", "system"), { recursive: true });
     fs.writeFileSync(
       path.join(root, "docs", "system", "changelog.md"),
@@ -120,7 +116,10 @@ describe("TASK-L.12 checkKnowledge TD-06～TD-08", () => {
     const afterModules = git(root, ["rev-parse", "HEAD"]).trim();
 
     fs.mkdirSync(path.join(root, "src", "new"), { recursive: true });
-    fs.writeFileSync(path.join(root, "src", "new", "x.ts"), "export const x = 1;\n");
+    fs.writeFileSync(
+      path.join(root, "src", "new", "x.ts"),
+      "export const x = 1;\n",
+    );
     git(root, ["add", "-A"]);
     git(root, ["commit", "-m", "add uncovered"]);
     const candidate = git(root, ["rev-parse", "HEAD"]).trim();
@@ -185,15 +184,16 @@ describe("TASK-L.12 checkKnowledge TD-06～TD-08", () => {
   });
 
   it("CLI stagent check knowledge 失败出口码 1 且 reason_code=KNOWLEDGE_DRIFT", () => {
-    writeModulesYaml(root, [
-      baseModule({ paths: ["src/legacy/**"] }),
-    ]);
+    writeModulesYaml(root, [baseModule({ paths: ["src/legacy/**"] })]);
     fs.writeFileSync(
       path.join(root, "docs", "system", "changelog.md"),
       "## c-cli\n- x\n",
     );
     fs.mkdirSync(path.join(root, "src", "new"), { recursive: true });
-    fs.writeFileSync(path.join(root, "src", "new", "x.ts"), "export const x = 1;\n");
+    fs.writeFileSync(
+      path.join(root, "src", "new", "x.ts"),
+      "export const x = 1;\n",
+    );
     git(root, ["add", "-A"]);
     git(root, ["commit", "-m", "uncovered"]);
     const candidate = git(root, ["rev-parse", "HEAD"]).trim();
@@ -225,9 +225,7 @@ describe("TASK-L.12 checkKnowledge TD-06～TD-08", () => {
   });
 
   it("KB-3 / KB-5：decisions_add 与 interfaces 落盘校验", () => {
-    writeModulesYaml(root, [
-      baseModule({ interfaces: ["FooAPI"] }),
-    ]);
+    writeModulesYaml(root, [baseModule({ interfaces: ["FooAPI"] })]);
     fs.writeFileSync(
       path.join(root, "docs", "system", "changelog.md"),
       "## c-kb35\n- ok\n",
@@ -311,7 +309,7 @@ describe("TASK-L.12 TD-10：docs/system/** 不计入文件预算", () => {
 
     const docsWrite = await gateway.callTool("stagent_write_file", {
       path: "docs/system/modules.yaml",
-      content: "schema_version: \"1.0.0\"\nmodules: []\n",
+      content: 'schema_version: "1.0.0"\nmodules: []\n',
     });
     expect(docsWrite.isError).toBeFalsy();
 

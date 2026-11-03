@@ -94,7 +94,9 @@ describe("daemon/project/plan-store", () => {
 
     const archive = planRevisionPath(tempDir, 1);
     expect(fs.existsSync(archive)).toBe(true);
-    const archived = JSON.parse(fs.readFileSync(archive, "utf8")) as ProjectPlan;
+    const archived = JSON.parse(
+      fs.readFileSync(archive, "utf8"),
+    ) as ProjectPlan;
     expect(archived).toEqual(v1);
     expect(readPlan(tempDir)).toEqual(v2);
   });

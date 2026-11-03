@@ -70,7 +70,9 @@ describe("TASK-L.1 右栏纯净化（partner purity）", () => {
   const KEY_ANTHROPIC = "sk-ant-l1-purity-0123456789";
 
   beforeEach(() => {
-    tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "stagent-l1-")));
+    tmp = fs.realpathSync(
+      fs.mkdtempSync(path.join(os.tmpdir(), "stagent-l1-")),
+    );
     h.captured.length = 0;
   });
   afterEach(() => safeRmSync(tmp));

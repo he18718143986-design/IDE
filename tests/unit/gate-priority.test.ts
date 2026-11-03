@@ -14,11 +14,7 @@ import type { GraveyardEntry } from "../../src/lib/journey/scheme-patch-types";
 type Binding = "ok" | "not_found" | "mismatch" | "legacy";
 type Forbidden = 0 | 1;
 type Grave =
-  | "none"
-  | "weak"
-  | "strong-soft"
-  | "strong-user"
-  | "strong-security";
+  "none" | "weak" | "strong-soft" | "strong-user" | "strong-security";
 type Scope = "in" | "out" | "untracked";
 
 const BINDINGS: Binding[] = ["ok", "not_found", "mismatch", "legacy"];
@@ -258,8 +254,7 @@ describe("TM-GP 表列特例", () => {
         {
           path: "src/cfg.ts",
           before: "export {};\n",
-          after:
-            'export {};\nconst u = "https://cloud.mongodb.com";\n',
+          after: 'export {};\nconst u = "https://cloud.mongodb.com";\n',
         },
       ],
       commands: [],
@@ -267,9 +262,7 @@ describe("TM-GP 表列特例", () => {
     });
     expect(r.block).toBe(false);
     expect(r.warnings).toContain("W_GRAVEYARD_WEAK_MATCH");
-    const primary = pickPrimaryVerdict([
-      { code: "E_OUT_OF_SCOPE_UNTRACKED" },
-    ]);
+    const primary = pickPrimaryVerdict([{ code: "E_OUT_OF_SCOPE_UNTRACKED" }]);
     expect(primary?.code).toBe("E_OUT_OF_SCOPE_UNTRACKED");
   });
 

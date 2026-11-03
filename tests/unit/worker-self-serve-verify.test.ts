@@ -791,7 +791,9 @@ describe("W.7 · 服务层：登记 → 探测 → 升格", () => {
     expect(reg.dispatchable).toBe(false);
 
     // 2. 探测并升格为 SANDBOX_ENFORCED
-    const verifyRes = await service.verify(adapterId, { target_mode: "SANDBOX_ENFORCED" });
+    const verifyRes = await service.verify(adapterId, {
+      target_mode: "SANDBOX_ENFORCED",
+    });
     expect(verifyRes.promoted).toBe(true);
     expect(verifyRes.control_mode).toBe("SANDBOX_ENFORCED");
 
@@ -810,7 +812,9 @@ describe("W.7 · 服务层：登记 → 探测 → 升格", () => {
     expect(readyView?.dispatch_blocked_reason).toBeUndefined();
 
     // 门禁解析并验证执行契约
-    const factory = requireControlledDispatch(registry, adapterId, { containerHost: host });
+    const factory = requireControlledDispatch(registry, adapterId, {
+      containerHost: host,
+    });
     expect(factory).toBeDefined();
 
     // 4. 撤销自注册项
@@ -818,7 +822,9 @@ describe("W.7 · 服务层：登记 → 探测 → 升格", () => {
 
     // 撤销后立即同步清除存储与注册表，无窗口期
     expect(() => service.get(adapterId)).toThrowError(WorkerRegistrationError);
-    expect(service.list().find((w) => w.adapter_id === adapterId)).toBeUndefined();
+    expect(
+      service.list().find((w) => w.adapter_id === adapterId),
+    ).toBeUndefined();
     expect(registry.has(adapterId)).toBe(false);
     expect(registry.getDispatchFactory(adapterId)).toBeUndefined();
 
@@ -827,7 +833,6 @@ describe("W.7 · 服务层：登记 → 探测 → 升格", () => {
     expect(reReg.control_mode).toBe("UNCONTROLLED_EXTERNAL");
     expect(reReg.dispatchable).toBe(false);
   });
-
 });
 
 /**

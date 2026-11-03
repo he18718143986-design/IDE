@@ -1,4 +1,3 @@
-
 /**
  * TASK-L.15：user_command RO-06 / RO-07 / RO-09。
  */
@@ -9,10 +8,7 @@ import path from "node:path";
 import { safeRmSync } from "../helpers/tmp";
 import { git } from "../helpers/git";
 import { ReleaseManager } from "../../daemon/release/release-manager";
-import {
-  createVault,
-  MemoryVaultBackend,
-} from "../../daemon/vault";
+import { createVault, MemoryVaultBackend } from "../../daemon/vault";
 import type {
   ReleaseTargetAdapter,
   StepResult,

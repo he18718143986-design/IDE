@@ -19,7 +19,10 @@ import {
 } from "../../src/lib/contract.schema";
 import { ContractStore } from "../../daemon/pipeline/contract-store";
 import { writePlan, readPlan } from "../../daemon/project/plan-store";
-import type { ContractStub, ProjectPlan } from "../../src/lib/project/project-plan";
+import type {
+  ContractStub,
+  ProjectPlan,
+} from "../../src/lib/project/project-plan";
 import { writeDesignDependencySurprise } from "../../daemon/supervisor/design/design-dependency-surprise";
 import { createTaskWorktree } from "../../daemon/git/worktree-manager";
 import { emptyDraft } from "../helpers/scheme-patch-fixtures";
@@ -42,7 +45,7 @@ describe("TASK-J.19 DN-2 design dependency HTTP", () => {
       JSON.stringify({
         name: "j19",
         private: true,
-        scripts: { test: "node -e \"process.exit(0)\"" },
+        scripts: { test: 'node -e "process.exit(0)"' },
       }),
       "utf8",
     );
@@ -233,7 +236,11 @@ describe("TASK-J.19 DN-2 design dependency HTTP", () => {
     const { contract } = seedPendingDn2();
     const res = await fetch(
       `${base}/api/design/${encodeURIComponent(contract.contract_id)}/dependency-allow`,
-      { method: "POST", headers: { "content-type": "application/json" }, body: "{}" },
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      },
     );
     expect(res.status).toBe(401);
   });
@@ -291,7 +298,9 @@ describe("TASK-J.19 DN-2 design dependency HTTP", () => {
   it("deny → ABORTED 且计划无 dependency 桩", async () => {
     const { contract } = seedPendingDn2("cs-feature-deny");
     const before = readPlan(repo)!;
-    const beforeDepCount = before.contracts.filter((c) => c.kind === "dependency").length;
+    const beforeDepCount = before.contracts.filter(
+      (c) => c.kind === "dependency",
+    ).length;
 
     const denyRes = await fetch(
       `${base}/api/design/${encodeURIComponent(contract.contract_id)}/dependency-deny`,
@@ -311,7 +320,9 @@ describe("TASK-J.19 DN-2 design dependency HTTP", () => {
     expect(body.contract.lifecycle_state).toBe("ABORTED");
 
     const after = readPlan(repo)!;
-    const afterDepCount = after.contracts.filter((c) => c.kind === "dependency").length;
+    const afterDepCount = after.contracts.filter(
+      (c) => c.kind === "dependency",
+    ).length;
     expect(afterDepCount).toBe(beforeDepCount);
   });
 
@@ -323,7 +334,9 @@ describe("TASK-J.19 DN-2 design dependency HTTP", () => {
     });
 
     const before = readPlan(repo)!;
-    const beforeDep = before.contracts.filter((c) => c.kind === "dependency").length;
+    const beforeDep = before.contracts.filter(
+      (c) => c.kind === "dependency",
+    ).length;
 
     const resumeRes = await fetch(
       `${base}/api/contracts/${encodeURIComponent(contract.contract_id)}/resume`,
@@ -334,7 +347,9 @@ describe("TASK-J.19 DN-2 design dependency HTTP", () => {
     expect(body.contract.lifecycle_state).toBe("EXECUTING");
 
     const after = readPlan(repo)!;
-    const afterDep = after.contracts.filter((c) => c.kind === "dependency").length;
+    const afterDep = after.contracts.filter(
+      (c) => c.kind === "dependency",
+    ).length;
     expect(afterDep).toBe(beforeDep);
 
     // surprise 仍在：resume 不消费 DN-2 意外卡

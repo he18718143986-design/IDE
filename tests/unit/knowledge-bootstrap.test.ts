@@ -80,7 +80,7 @@ describe("TASK-L.12 draftModules TD-09", () => {
     }
     fs.writeFileSync(
       path.join(root, "alpha", "index.ts"),
-      'export const a = 1;\n',
+      "export const a = 1;\n",
     );
     fs.writeFileSync(
       path.join(root, "beta", "index.ts"),
@@ -94,11 +94,7 @@ describe("TASK-L.12 draftModules TD-09", () => {
     expect(listTopLevelSourceDirs(root)).toEqual(["alpha", "beta", "gamma"]);
     const drafts = draftModules(root);
     expect(drafts).toHaveLength(3);
-    expect(drafts.map((d) => d.id).sort()).toEqual([
-      "alpha",
-      "beta",
-      "gamma",
-    ]);
+    expect(drafts.map((d) => d.id).sort()).toEqual(["alpha", "beta", "gamma"]);
     const beta = drafts.find((d) => d.id === "beta");
     expect(beta?.depends_on).toContain("alpha");
     expect(beta?.paths).toEqual(["alpha/**".replace("alpha", "beta")]);
@@ -178,7 +174,6 @@ describe("TASK-L.12 withSystemScope 知识库并入", () => {
   });
 });
 
-
 describe("TASK-L.12 Tina 拍板 B：contract_type 身份门", () => {
   let root: string;
 
@@ -187,7 +182,10 @@ describe("TASK-L.12 Tina 拍板 B：contract_type 身份门", () => {
       fs.mkdtempSync(path.join(os.tmpdir(), "stagent-l12-ctype-")),
     );
     fs.mkdirSync(path.join(root, "pkg"), { recursive: true });
-    fs.writeFileSync(path.join(root, "pkg", "index.ts"), "export const x = 1;\n");
+    fs.writeFileSync(
+      path.join(root, "pkg", "index.ts"),
+      "export const x = 1;\n",
+    );
     fs.mkdirSync(path.join(root, "docs", "system"), { recursive: true });
   });
 
@@ -261,7 +259,9 @@ describe("TASK-L.12 Tina 拍板 B：contract_type 身份门", () => {
       scheme_revision: 1,
       title: "引导",
       summary: "知识库",
-      acceptance: [{ id: "sys-acc-knowledge", text: "KB 齐", check: "playtest" as const }],
+      acceptance: [
+        { id: "sys-acc-knowledge", text: "KB 齐", check: "playtest" as const },
+      ],
     };
     const plan = minimalPlan();
     plan.areas.push({

@@ -13,7 +13,10 @@ import {
   schemeSnapshotDigest,
 } from "../../daemon/pipeline/scheme-snapshot-store";
 import { buildConfirmContractFromScopePlan } from "../../src/lib/journey/confirm-scheme-contract";
-import { scopePlanDigest, type ScopePlan } from "../../src/lib/journey/scope-plan";
+import {
+  scopePlanDigest,
+  type ScopePlan,
+} from "../../src/lib/journey/scope-plan";
 
 function makeMinimalPlan(revision = 1): ScopePlan {
   const plan: ScopePlan = {

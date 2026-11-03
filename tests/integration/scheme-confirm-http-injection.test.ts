@@ -153,11 +153,9 @@ describe("T-HTTP R-10 / F-07 确认快照与建图补偿（真 Daemon）", () =>
               manualConfirmation: projected.verification_spec
                 .manual_confirmation ?? {
                 reason_required: true as const,
-                capture_evidence: [
-                  "actor",
-                  "confirmed_at",
-                  "reason",
-                ] as Array<"actor" | "confirmed_at" | "reason">,
+                capture_evidence: ["actor", "confirmed_at", "reason"] as Array<
+                  "actor" | "confirmed_at" | "reason"
+                >,
               },
             }
           : { commands: projected.verification_spec.commands }),
@@ -229,8 +227,7 @@ describe("T-HTTP R-10 / F-07 确认快照与建图补偿（真 Daemon）", () =>
     demo: DemoGate = EMPTY_DEMO_GATE,
     scope_plan?: ScopePlan,
   ) {
-    const plan =
-      scope_plan ?? buildScopePlan({ repoRoot: repo, scheme });
+    const plan = scope_plan ?? buildScopePlan({ repoRoot: repo, scheme });
     return {
       confirmation_id: confirmationId,
       scheme,

@@ -17,7 +17,9 @@ import {
 describe("V-06 离线 / 状态横幅", () => {
   it("text=null 时不渲染", () => {
     const { container } = render(<CompilerStatusBanner text={null} />);
-    expect(container.querySelector("[data-testid='compiler-status-banner']")).toBeNull();
+    expect(
+      container.querySelector("[data-testid='compiler-status-banner']"),
+    ).toBeNull();
   });
 
   it("展示离线文案「方案助手未连接」", () => {

@@ -13,7 +13,9 @@ import {
 } from "../../daemon/knowledge/modules-store";
 import { safeRmSync } from "../helpers/tmp";
 
-function mod(over: Partial<ModuleEntry> & Pick<ModuleEntry, "id">): ModuleEntry {
+function mod(
+  over: Partial<ModuleEntry> & Pick<ModuleEntry, "id">,
+): ModuleEntry {
   return {
     name: over.name ?? over.id,
     purpose: over.purpose ?? `${over.id} purpose`,
@@ -75,7 +77,9 @@ describe("TASK-L.18 impactClosure", () => {
     expect(r.empty_reason).toBe("ok");
     expect(r.owners.map((o) => o.id)).toEqual(["db"]);
     expect(r.affected.map((a) => a.id)).toEqual(["auth", "billing", "orders"]);
-    expect(r.affected.find((a) => a.id === "auth")?.via).toContain("depends_on");
+    expect(r.affected.find((a) => a.id === "auth")?.via).toContain(
+      "depends_on",
+    );
     expect(r.affected.find((a) => a.id === "billing")?.via).toContain(
       "depends_on",
     );

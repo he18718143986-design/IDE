@@ -11,7 +11,10 @@ import { state } from "../helpers/scheme-patch-fixtures";
 import type { LedgerState } from "../../src/lib/journey/scheme-patch-types";
 
 function harness(opts: {
-  casResults: Array<{ ok: true; revision: number } | { ok: false; reason: "cas_mismatch" | "io" }>;
+  casResults: Array<
+    | { ok: true; revision: number }
+    | { ok: false; reason: "cas_mismatch" | "io" }
+  >;
   /** 每次模型调用时读取的 revision 序列；缺省恒 12 */
   revisions?: number[];
 }) {
@@ -19,11 +22,10 @@ function harness(opts: {
   let callIdx = 0;
   let casIdx = 0;
   const logs: Record<string, unknown>[] = [];
-  let revisionSeq = opts.revisions ? [...opts.revisions] : [];
+  const revisionSeq = opts.revisions ? [...opts.revisions] : [];
   let currentRev = revisionSeq.shift() ?? 12;
 
-  const getState = (): LedgerState =>
-    state({ scheme_revision: currentRev });
+  const getState = (): LedgerState => state({ scheme_revision: currentRev });
 
   const client: IntentCompilerModelClient = {
     async generate() {
@@ -61,7 +63,10 @@ function harness(opts: {
     getTranscriptView: () => view,
     modelClient: client,
     casWrite: async () => {
-      const r = opts.casResults[casIdx] ?? { ok: true as const, revision: currentRev + 1 };
+      const r = opts.casResults[casIdx] ?? {
+        ok: true as const,
+        revision: currentRev + 1,
+      };
       casIdx += 1;
       if (r.ok) {
         currentRev = r.revision;
@@ -93,7 +98,9 @@ function harness(opts: {
       return casIdx;
     },
     async flush() {
-      const due = timers.splice(0, timers.length).filter((t) => t.ms === COMPILER_DEBOUNCE_MS);
+      const due = timers
+        .splice(0, timers.length)
+        .filter((t) => t.ms === COMPILER_DEBOUNCE_MS);
       for (const t of due) t.fn();
       await vi.waitFor(() => {
         expect(loop.getStats().lastStatus).not.toBe("debouncing");
@@ -148,6 +155,8 @@ describe("ADV-26～28 编译循环 STALE", () => {
     h.loop.notifyUserTurnCommitted("T5");
     await h.flush();
     expect(h.loop.getStats().lastStatus).toBe("noop");
-    expect(h.logs.some((l) => l["kind"] === "compiler_cas_mismatch")).toBe(true);
+    expect(h.logs.some((l) => l["kind"] === "compiler_cas_mismatch")).toBe(
+      true,
+    );
   });
 });

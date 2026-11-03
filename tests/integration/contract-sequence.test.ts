@@ -1,4 +1,3 @@
-
 /**
  * TASK-L.9：合同序列生产主路径——互斥、下一份 ScopePlan、中止重分解。
  */
@@ -280,9 +279,9 @@ describe("TASK-L.9 contract sequence", () => {
     expect(create.status).toBe(201);
     const id = create.body.contract.contract_id;
     expect(create.body.contract.supervisor_metadata?.stub_id).toBe("cs-1");
-    expect(readPlan(repo)?.contracts.find((c) => c.stub_id === "cs-1")?.status).toBe(
-      "signed",
-    );
+    expect(
+      readPlan(repo)?.contracts.find((c) => c.stub_id === "cs-1")?.status,
+    ).toBe("signed");
 
     // 把合同推到可 abort 的态：orchestrator.abort 接受多数态
     // DRAFT 可 abort

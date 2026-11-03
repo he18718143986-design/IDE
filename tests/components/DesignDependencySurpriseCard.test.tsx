@@ -15,9 +15,7 @@ describe("TASK-J.19 DesignDependencySurpriseCard", () => {
         view={{
           contract_id: "ctr-1",
           detail: "需要 left-pad",
-          dependencies: [
-            { name: "left-pad", version: "1.3.0", why: "必须用" },
-          ],
+          dependencies: [{ name: "left-pad", version: "1.3.0", why: "必须用" }],
         }}
         onAllow={onAllow}
         onDeny={onDeny}

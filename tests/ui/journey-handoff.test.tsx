@@ -185,9 +185,9 @@ describe("J-02 handoff progress helpers", () => {
   it("冻结后不得回写方案", () => {
     expect(partnerMessageMayRebuildScheme(null)).toBe(true);
     expect(partnerMessageMayRebuildScheme(makeScheme())).toBe(true);
-    expect(
-      partnerMessageMayRebuildScheme(makeScheme({ frozen: true })),
-    ).toBe(false);
+    expect(partnerMessageMayRebuildScheme(makeScheme({ frozen: true }))).toBe(
+      false,
+    );
   });
 });
 
@@ -256,9 +256,9 @@ describe("J-02 SchemeReviewPane 三步进度与中栏卡", () => {
         onOpenHandoffDiagnose={onOpen}
       />,
     );
-    expect(screen.getByTestId("handoff-compensation-failed").textContent).toContain(
-      HANDOFF_COMPENSATION_FAILED_MESSAGE,
-    );
+    expect(
+      screen.getByTestId("handoff-compensation-failed").textContent,
+    ).toContain(HANDOFF_COMPENSATION_FAILED_MESSAGE);
     fireEvent.click(screen.getByTestId("handoff-compensation-diagnose"));
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
@@ -450,9 +450,9 @@ describe("J-02 集成：点击确认驱动三步并解锁", () => {
       const [locked, setLocked] = useState(false);
       const [card, setCard] = useState<string | null>(null);
       const [busy, setBusy] = useState(false);
-      const [cards] = useState<
-        { id: string; kind: "SYSTEM"; text: string }[]
-      >([]);
+      const [cards] = useState<{ id: string; kind: "SYSTEM"; text: string }[]>(
+        [],
+      );
 
       const onConfirm = async () => {
         setBusy(true);

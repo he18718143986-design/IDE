@@ -3,7 +3,13 @@
  * TASK-L.18：系统地图同页嵌 + 空态 / 有 modules 渲染 + impact 查询烟测。
  */
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { SystemMapPane } from "../../src/components/project/SystemMapPane";
 import { SchemeReviewPane } from "../../src/components/studio/SchemeReviewPane";
 import {
@@ -11,7 +17,10 @@ import {
   evaluateSchemeConfirmation,
   rebuildSchemeFromCorpus,
 } from "../../src/lib/journey/scheme-draft";
-import type { KnowledgeImpactResult, KnowledgeModulesResult } from "../../src/lib/daemon-api";
+import type {
+  KnowledgeImpactResult,
+  KnowledgeModulesResult,
+} from "../../src/lib/daemon-api";
 
 const modulesOk: KnowledgeModulesResult = {
   ok: true,

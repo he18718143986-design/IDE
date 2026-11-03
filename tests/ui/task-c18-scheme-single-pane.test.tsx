@@ -118,11 +118,7 @@ describe("TASK-C.18 单页方案审阅", () => {
     render(
       <SchemeReviewPane
         scheme={scheme}
-        confirmation={evaluateSchemeConfirmation(
-          scheme,
-          EMPTY_DEMO_GATE,
-          plan,
-        )}
+        confirmation={evaluateSchemeConfirmation(scheme, EMPTY_DEMO_GATE, plan)}
         onGenerateDemo={onGenerate}
         onConfirmScheme={onConfirm}
       />,

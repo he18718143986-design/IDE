@@ -7,10 +7,7 @@ import {
   renderCompilerInput,
 } from "../../daemon/supervisor/intent-compiler/render-input";
 import { buildTombstone } from "../../src/lib/journey/graveyard-revival";
-import {
-  aiModule,
-  state,
-} from "../helpers/scheme-patch-fixtures";
+import { aiModule, state } from "../helpers/scheme-patch-fixtures";
 
 describe("normalizeForCompilerPrompt N1～N3", () => {
   it("N1：\\r\\n / \\r → \\n", () => {
@@ -83,9 +80,10 @@ describe("renderCompilerInput", () => {
     expect(r.prompt).toMatch(/alias="U\d+" role="user"/);
     expect(r.prompt).toMatch(/role="assistant" quotable="no"/);
     expect(r.prompt).not.toMatch(/alias="[^"]+" role="assistant"/);
-    expect(r.aliasMap.has("U1") || [...r.aliasMap.keys()].some((k) => k.startsWith("U"))).toBe(
-      true,
-    );
+    expect(
+      r.aliasMap.has("U1") ||
+        [...r.aliasMap.keys()].some((k) => k.startsWith("U")),
+    ).toBe(true);
   });
 
   it("nonce 出现在 transcript 边界标签", () => {

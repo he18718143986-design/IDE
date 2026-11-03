@@ -1,4 +1,3 @@
-
 /**
  * TASK-L.9 / PD-10：nextStub 确定性选出「下一份」。
  */
@@ -237,9 +236,7 @@ describe("schemeViewForStub + §5.1", () => {
     );
     expect(next.dependency_changes_allowed).toBe(true);
     expect(next.network_policy).toBe("EXPLICIT_TARGETS");
-    expect(next.allowed_commands?.some((c) => c.includes("vitest"))).toBe(
-      true,
-    );
+    expect(next.allowed_commands?.some((c) => c.includes("vitest"))).toBe(true);
     expect(next.needs_approval.some((n) => n.id === "lockfiles")).toBe(true);
   });
 });

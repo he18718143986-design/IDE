@@ -41,7 +41,11 @@ function writePkg(
 ): void {
   fs.writeFileSync(
     path.join(dir, "package.json"),
-    JSON.stringify({ name: "preview-fixture", private: true, scripts }, null, 2),
+    JSON.stringify(
+      { name: "preview-fixture", private: true, scripts },
+      null,
+      2,
+    ),
     "utf8",
   );
   if (serverSource) {

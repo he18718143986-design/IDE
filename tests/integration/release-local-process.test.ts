@@ -1,4 +1,3 @@
-
 /**
  * TASK-L.15：local_process RO-01～RO-03（适配器可注入，走真实 git archive 导出）。
  */

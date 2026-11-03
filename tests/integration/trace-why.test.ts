@@ -221,10 +221,7 @@ describe("TASK-L.13 trace why", () => {
       title: "truncate",
       schemeItemIds: ids,
     });
-    const resolved = resolveSchemeItemsTrailerValue(
-      contract.contract_id,
-      ids,
-    );
+    const resolved = resolveSchemeItemsTrailerValue(contract.contract_id, ids);
     expect(resolved.truncated).toBe(true);
     expect(resolved.value).toBe(contract.contract_id);
 
@@ -236,9 +233,7 @@ describe("TASK-L.13 trace why", () => {
     const schemeLine = message
       .split("\n")
       .find((l) => l.startsWith("Stagent-Scheme-Items:"));
-    expect(schemeLine).toBe(
-      `Stagent-Scheme-Items: ${contract.contract_id}`,
-    );
+    expect(schemeLine).toBe(`Stagent-Scheme-Items: ${contract.contract_id}`);
     expect(Buffer.byteLength(schemeLine!, "utf-8")).toBeLessThanOrEqual(
       MAX_TRAILER_LINE_BYTES,
     );
@@ -312,7 +307,9 @@ describe("TASK-L.13 trace why", () => {
       throw new Error("expected TraceBrokenError");
     } catch (err) {
       expect(err).toBeInstanceOf(TraceBrokenError);
-      expect((err as TraceBrokenError).message).toContain("提交无 Stagent Trailer");
+      expect((err as TraceBrokenError).message).toContain(
+        "提交无 Stagent Trailer",
+      );
     }
   });
 
@@ -370,9 +367,7 @@ describe("TASK-L.13 trace why", () => {
       baseEvidence(contract.contract_id, "evi_wide"),
       "tina",
     );
-    expect(message).toContain(
-      `Stagent-Scheme-Items: ${contract.contract_id}`,
-    );
+    expect(message).toContain(`Stagent-Scheme-Items: ${contract.contract_id}`);
     const msgFile = path.join(repo, ".git", "STAGENT_MSG");
     fs.writeFileSync(msgFile, message);
     git(repo, ["commit", "-q", "-F", msgFile]);
@@ -400,7 +395,10 @@ describe("TASK-L.13 GET /api/trace/why", () => {
     git(repoRoot, ["config", "user.email", "t@example.com"]);
     git(repoRoot, ["config", "user.name", "T"]);
     fs.mkdirSync(path.join(repoRoot, "src"), { recursive: true });
-    fs.writeFileSync(path.join(repoRoot, "src", "a.ts"), "export const a = 1;\n");
+    fs.writeFileSync(
+      path.join(repoRoot, "src", "a.ts"),
+      "export const a = 1;\n",
+    );
     git(repoRoot, ["add", "."]);
     git(repoRoot, ["commit", "-q", "-m", "init"]);
 

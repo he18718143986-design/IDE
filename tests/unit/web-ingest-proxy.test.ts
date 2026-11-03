@@ -33,11 +33,12 @@ describe("TASK-L.17a: Daemon Web Ingest Proxy", () => {
       </html>
     `;
 
-    const mockFetch = vi.fn().mockImplementation(() =>
-      new Response(htmlSample, {
-        status: 200,
-        headers: { "Content-Type": "text/html" },
-      }),
+    const mockFetch = vi.fn().mockImplementation(
+      () =>
+        new Response(htmlSample, {
+          status: 200,
+          headers: { "Content-Type": "text/html" },
+        }),
     );
 
     const proxy = new WebIngestProxy({
@@ -63,7 +64,9 @@ describe("TASK-L.17a: Daemon Web Ingest Proxy", () => {
     expect(textResult.format).toBe("text");
     expect(textResult.content).not.toContain("<title>");
     expect(textResult.content).toContain("Overview");
-    expect(textResult.content).toContain("Welcome to the partner documentation.");
+    expect(textResult.content).toContain(
+      "Welcome to the partner documentation.",
+    );
 
     // 3. Format: summary
     const summaryResult = await proxy.fetch({
@@ -72,7 +75,9 @@ describe("TASK-L.17a: Daemon Web Ingest Proxy", () => {
     });
     expect(summaryResult.format).toBe("summary");
     expect(summaryResult.summary?.title).toBe("API Documentation");
-    expect(summaryResult.summary?.description).toBe("Reference documentation for partner API");
+    expect(summaryResult.summary?.description).toBe(
+      "Reference documentation for partner API",
+    );
     expect(summaryResult.summary?.h1).toEqual(["Overview", "Endpoints"]);
     expect(summaryResult.summary?.snippet).toContain("API Documentation");
   });
@@ -162,9 +167,9 @@ describe("TASK-L.17a: Daemon Web Ingest Proxy", () => {
   });
 
   it("enforces rate limits and limits burst flooding with 429 E_WEB_INGEST_RATE_LIMITED", async () => {
-    const mockFetch = vi.fn().mockImplementation(() =>
-      new Response("OK", { status: 200 }),
-    );
+    const mockFetch = vi
+      .fn()
+      .mockImplementation(() => new Response("OK", { status: 200 }));
 
     const proxy = new WebIngestProxy({
       allowedDomains: allowedReferences,
@@ -181,9 +186,7 @@ describe("TASK-L.17a: Daemon Web Ingest Proxy", () => {
     await proxy.fetch({ url: targetUrl });
 
     // 2. 4th rapid request in the same second exceeds burst limit
-    await expect(
-      proxy.fetch({ url: targetUrl }),
-    ).rejects.toMatchObject({
+    await expect(proxy.fetch({ url: targetUrl })).rejects.toMatchObject({
       code: E_WEB_INGEST_RATE_LIMITED,
       status: 429,
     });
@@ -201,20 +204,23 @@ describe("TASK-L.17a: Daemon Web Ingest Proxy", () => {
       status: 400,
     });
 
-    await expect(
-      proxy.fetch({ url: "not-a-valid-url" }),
-    ).rejects.toMatchObject({
-      code: E_WEB_INGEST_INVALID_URL,
-      status: 400,
-    });
+    await expect(proxy.fetch({ url: "not-a-valid-url" })).rejects.toMatchObject(
+      {
+        code: E_WEB_INGEST_INVALID_URL,
+        status: 400,
+      },
+    );
   });
 
   it("utility functions handle HTML parsing and tag stripping robustly", () => {
-    const raw = "<div><p>Hello &amp; <b>World</b></p><script>alert(1)</script></div>";
+    const raw =
+      "<div><p>Hello &amp; <b>World</b></p><script>alert(1)</script></div>";
     const stripped = stripHtmlTags(raw);
     expect(stripped).toBe("Hello & World");
 
-    const summary = extractHtmlSummary("<html><head><title>Test Title</title></head><body><h1>H1 Heading</h1></body></html>");
+    const summary = extractHtmlSummary(
+      "<html><head><title>Test Title</title></head><body><h1>H1 Heading</h1></body></html>",
+    );
     expect(summary.title).toBe("Test Title");
     expect(summary.h1).toEqual(["H1 Heading"]);
   });
@@ -273,7 +279,9 @@ describe("TASK-L.17a: Daemon Web Ingest Proxy", () => {
       fetchFn: mockFetch as any,
     });
 
-    const result = await proxy.fetch({ url: "https://docs.reference.org/old-guide" });
+    const result = await proxy.fetch({
+      url: "https://docs.reference.org/old-guide",
+    });
     expect(result.status).toBe(200);
     expect(result.url).toBe("https://docs.reference.org/guide");
     expect(result.content).toContain("Safe Guide Content");

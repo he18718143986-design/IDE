@@ -126,9 +126,9 @@ describe("TASK-J.20 authorization allowlist", () => {
     writeAllowlist(root, list);
     const abs = path.join(root, ALLOWLIST_FILE_REL);
     expect(fs.existsSync(abs)).toBe(true);
-    expect(fs.existsSync(path.join(root, FORBIDDEN_ALLOWLIST_METADATA_REL))).toBe(
-      false,
-    );
+    expect(
+      fs.existsSync(path.join(root, FORBIDDEN_ALLOWLIST_METADATA_REL)),
+    ).toBe(false);
     const read = readAllowlist(root);
     expect(read.entries).toHaveLength(1);
     expect(read.entries[0]!.source_contract_id).toBe("c-1");
@@ -170,7 +170,11 @@ describe("TASK-J.20 authorization allowlist", () => {
     );
     expect(gated.code).toBe("E_SCOPE_APPROVAL_REQUIRED");
 
-    const auto = applyRepoAllowlistToScopePlan(root, plan2, "2026-11-02T00:00:00.000Z");
+    const auto = applyRepoAllowlistToScopePlan(
+      root,
+      plan2,
+      "2026-11-02T00:00:00.000Z",
+    );
     expect(auto.needs_approval[0]!.approved).toBe(true);
     const ok = evaluateSchemeConfirmation(
       emptySchemeDraft({

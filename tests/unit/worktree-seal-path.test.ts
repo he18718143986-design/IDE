@@ -39,7 +39,9 @@ describe("TASK-A.7 seal path prefix aligns with manager", () => {
     const sealDir = path.dirname(manifestPath);
     const managerDir = getWorktreePath(root, contractId);
 
-    expect(manifestPath.replace(/\\/g, "/")).toMatch(/\/task-wt-a7\/\.stagent_manifest\.json$/);
+    expect(manifestPath.replace(/\\/g, "/")).toMatch(
+      /\/task-wt-a7\/\.stagent_manifest\.json$/,
+    );
     expect(path.basename(sealDir)).toBe(`task-${contractId}`);
     expect(sealDir).toBe(managerDir);
   });
@@ -76,8 +78,8 @@ describe("TASK-A.7 seal path prefix aligns with manager", () => {
     expect(isWorktreeSealed(root, contractId)).toBe(true);
 
     // 旧路径仍在，但不被读
-    expect(
-      fs.existsSync(path.join(legacyDir, ".stagent_manifest.json")),
-    ).toBe(true);
+    expect(fs.existsSync(path.join(legacyDir, ".stagent_manifest.json"))).toBe(
+      true,
+    );
   });
 });

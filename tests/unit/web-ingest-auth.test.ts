@@ -1,9 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { type Vault, createVault } from "../../daemon/vault/vault";
-import {
-  AuthSessionManager,
-  WebIngestProxy,
-} from "../../daemon/web-ingest";
+import { AuthSessionManager, WebIngestProxy } from "../../daemon/web-ingest";
 
 describe("TASK-L.17a: Web Ingest Vault Auth and Worker Redaction", () => {
   let vault: Vault;
@@ -94,7 +91,9 @@ describe("TASK-L.17a: Web Ingest Vault Auth and Worker Redaction", () => {
     expect(result.content).toContain("[REDACTED_COOKIE]");
 
     // Verify sanitizeForWorker also strips Set-Cookie and Cookie lines
-    const sanitizedHeaders = authManager.sanitizeForWorker("Set-Cookie: token=123456\r\nCookie: session=abcdef");
+    const sanitizedHeaders = authManager.sanitizeForWorker(
+      "Set-Cookie: token=123456\r\nCookie: session=abcdef",
+    );
     expect(sanitizedHeaders).toContain("Set-Cookie: [REDACTED_COOKIE]");
     expect(sanitizedHeaders).toContain("Cookie: [REDACTED_COOKIE]");
   });
@@ -129,7 +128,9 @@ describe("TASK-L.17a: Web Ingest Vault Auth and Worker Redaction", () => {
     );
 
     await expect(
-      authManager.authenticate("login-nocookie.partner.com", { fetchFn: mockFetchNoCookie as any }),
+      authManager.authenticate("login-nocookie.partner.com", {
+        fetchFn: mockFetchNoCookie as any,
+      }),
     ).rejects.toMatchObject({
       code: "E_WEB_INGEST_AUTH_FAILED",
       status: 401,
@@ -142,12 +143,14 @@ describe("TASK-L.17a: Web Ingest Vault Auth and Worker Redaction", () => {
       loginUrl: "https://login-fail.partner.com/api/login",
     });
 
-    const mockFetchFail = vi.fn().mockResolvedValue(
-      new Response("Invalid credentials", { status: 401 }),
-    );
+    const mockFetchFail = vi
+      .fn()
+      .mockResolvedValue(new Response("Invalid credentials", { status: 401 }));
 
     await expect(
-      authManager.authenticate("login-fail.partner.com", { fetchFn: mockFetchFail as any }),
+      authManager.authenticate("login-fail.partner.com", {
+        fetchFn: mockFetchFail as any,
+      }),
     ).rejects.toMatchObject({
       code: "E_WEB_INGEST_AUTH_FAILED",
       status: 401,

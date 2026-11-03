@@ -168,11 +168,9 @@ describe("T-HTTP S205–S207 范围预检与快照漂移（真 Daemon）", () =>
             manualConfirmation: projected.verification_spec
               .manual_confirmation ?? {
               reason_required: true as const,
-              capture_evidence: [
-                "actor",
-                "confirmed_at",
-                "reason",
-              ] as Array<"actor" | "confirmed_at" | "reason">,
+              capture_evidence: ["actor", "confirmed_at", "reason"] as Array<
+                "actor" | "confirmed_at" | "reason"
+              >,
             },
           }
         : { commands: projected.verification_spec.commands }),
@@ -320,12 +318,16 @@ describe("T-HTTP S205–S207 范围预检与快照漂移（真 Daemon）", () =>
         code?: string;
         error?: string;
         message?: string;
-      }>("POST", `/api/contracts/${created.body.contract.contract_id}/approve`, {
-        reviewer: "j4-tester",
-        confirmation_id: confirmationId,
-        // 夹具故意留下未提交文件；与范围绑定无关，显式确认脏区
-        acknowledge_dirty: true,
-      });
+      }>(
+        "POST",
+        `/api/contracts/${created.body.contract.contract_id}/approve`,
+        {
+          reviewer: "j4-tester",
+          confirmation_id: confirmationId,
+          // 夹具故意留下未提交文件；与范围绑定无关，显式确认脏区
+          acknowledge_dirty: true,
+        },
+      );
       expect(
         approved.status,
         `${label}: approve → ${approved.body.code ?? approved.body.error}: ${approved.body.message ?? ""}`,
@@ -346,7 +348,7 @@ describe("T-HTTP S205–S207 范围预检与快照漂移（真 Daemon）", () =>
         JSON.stringify({
           name: "legacy",
           private: true,
-          scripts: { test: "node -e \"process.exit(0)\"" },
+          scripts: { test: 'node -e "process.exit(0)"' },
         }),
       );
       fs.mkdirSync(path.join(repo, "src", "pages"), { recursive: true });
@@ -370,10 +372,7 @@ describe("T-HTTP S205–S207 范围预检与快照漂移（真 Daemon）", () =>
         '[project]\nname = "demo"\nversion = "0.1.0"\n',
       );
       fs.mkdirSync(path.join(repo, "src", "pages"), { recursive: true });
-      fs.writeFileSync(
-        path.join(repo, "src", "pages", "view.py"),
-        "# view\n",
-      );
+      fs.writeFileSync(path.join(repo, "src", "pages", "view.py"), "# view\n");
     });
   });
 

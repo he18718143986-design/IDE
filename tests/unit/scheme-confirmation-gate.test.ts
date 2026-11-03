@@ -277,9 +277,7 @@ describe("T-GATE 单一确认谓词 evaluateSchemeConfirmation", () => {
   it("T-GATE-011b demoReady 四条件逐条落地：任一缺失即 false（§14.10 ≥1 有界面模块）", () => {
     expect(computeDemoReady(makeDraft())).toBe(true);
     // V-09：单个有界面模块 + 主流程 + 无冲突 + 有业务输入 → true
-    expect(computeDemoReady(makeDraft({ modules: ["仅一个模块"] }))).toBe(
-      true,
-    );
+    expect(computeDemoReady(makeDraft({ modules: ["仅一个模块"] }))).toBe(true);
     expect(computeDemoReady(makeDraft({ modules: [] }))).toBe(false);
     expect(computeDemoReady(makeDraft({ mermaidFlow: "" }))).toBe(false);
     expect(computeDemoReady(makeDraft({ conflicts: [openConflict()] }))).toBe(
@@ -309,7 +307,7 @@ describe("T-GATE 单一确认谓词 evaluateSchemeConfirmation", () => {
     ).toBe(true);
   });
 
-    it("T-GATE-011c canConfirmScheme 兼容别名：固定 null plan → 恒不可确认", () => {
+  it("T-GATE-011c canConfirmScheme 兼容别名：固定 null plan → 恒不可确认", () => {
     expect(canConfirmScheme(makeDraft())).toBe(false);
     expect(
       evaluateSchemeConfirmation(makeDraft(), EMPTY_DEMO_GATE, null).ok,

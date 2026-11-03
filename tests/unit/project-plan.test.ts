@@ -17,7 +17,10 @@ import type {
   WithText,
 } from "../../src/lib/journey/scheme-patch-types";
 import { emptyDraft } from "../helpers/scheme-patch-fixtures";
-import { ERROR_CODE_CATALOG, isKnownErrorCode } from "../../src/lib/error-codes";
+import {
+  ERROR_CODE_CATALOG,
+  isKnownErrorCode,
+} from "../../src/lib/error-codes";
 
 const BASE_FACTS: RepoFacts = {
   has_test_script: true,
@@ -58,10 +61,7 @@ function moduleOf(
   };
 }
 
-function entity(
-  id: string,
-  name: string,
-): SchemeDraftV2["entities"][number] {
+function entity(id: string, name: string): SchemeDraftV2["entities"][number] {
   return { ...meta(id), name, fields_hint: ["id"] };
 }
 

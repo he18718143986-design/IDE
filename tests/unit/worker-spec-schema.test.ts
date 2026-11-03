@@ -125,7 +125,10 @@ describe("SE-02：workerSpecSchema 目标字段（可选，缺省不写）", () 
 describe("SE-03：注册接受、未注入宿主时派工显式拒绝（W.5c-ii 起按宿主可用性判定）", () => {
   it("SANDBOX_ENFORCED 适配器注册成功（登记面接受）", () => {
     const registry = new AdapterRegistry();
-    const entry = registry.register(fakeAdapter(SANDBOX_ID), "SANDBOX_ENFORCED");
+    const entry = registry.register(
+      fakeAdapter(SANDBOX_ID),
+      "SANDBOX_ENFORCED",
+    );
     expect(entry.control_mode).toBe("SANDBOX_ENFORCED");
     expect(registry.has(SANDBOX_ID)).toBe(true);
   });

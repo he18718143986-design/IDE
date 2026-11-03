@@ -23,9 +23,7 @@ import type {
   LedgerState,
   SchemePatch,
 } from "../../src/lib/journey/scheme-patch-types";
-import {
-  GRAVEYARD_DICE_THRESHOLD,
-} from "../../src/lib/journey/scheme-patch-types";
+import { GRAVEYARD_DICE_THRESHOLD } from "../../src/lib/journey/scheme-patch-types";
 import {
   aiModule,
   ctxCounter,
@@ -57,7 +55,11 @@ const modOp = (id: string, name: string, purpose: string, evidence: Ev[]) => ({
   item: { id, name, purpose },
   evidence,
 });
-const patch = (ops: unknown[], base = 5, compiled: string[] = ["T1"]): SchemePatch =>
+const patch = (
+  ops: unknown[],
+  base = 5,
+  compiled: string[] = ["T1"],
+): SchemePatch =>
   ({
     base_revision: base,
     compiled_from_turns: compiled,
@@ -93,11 +95,7 @@ function softTomb() {
   });
 }
 
-function run(
-  st: LedgerState,
-  p: unknown,
-  transcript = TR.view,
-) {
+function run(st: LedgerState, p: unknown, transcript = TR.view) {
   return mergeSchemePatch({
     state: st,
     patch: p as never,
@@ -255,7 +253,9 @@ describe("TM-Y 命中与阈值（§6.7 Y-18～Y-23）", () => {
     );
     expect(r.status).toBe("noop");
     const ok23 = asOk(r);
-    expect(ok23.next.suggestions[0]).toMatchObject({ kind: "S_GRAVEYARD_SOFT" });
+    expect(ok23.next.suggestions[0]).toMatchObject({
+      kind: "S_GRAVEYARD_SOFT",
+    });
     expect(ok23.next.draft.modules.find((m) => m.id === "M9")).toBeUndefined();
   });
 });
@@ -367,7 +367,9 @@ describe("TM-Y 复活生命周期（§6.7 Y-24～Y-30）", () => {
       verdict: "DROP",
       code: "E_PROPOSAL_PREVIOUSLY_REJECTED",
     });
-    expect(asOk(r).next.draft.conflicts.find((c) => c.id === "C1")).toBeUndefined();
+    expect(
+      asOk(r).next.draft.conflicts.find((c) => c.id === "C1"),
+    ).toBeUndefined();
   });
 
   it("TM-Y-28 两个活跃墓碑同时命中：主墓碑取 rejected_id 字典序最小者", () => {
@@ -417,7 +419,9 @@ describe("TM-Y 复活生命周期（§6.7 Y-24～Y-30）", () => {
     // ai_inferred 未钉选 → APPLY 删除，不因墓地 DROP
     expect(r.status).toBe("applied");
     if (r.status !== "applied") return;
-    expect(asOk(r).next.draft.modules.find((m) => m.id === "M1")).toBeUndefined();
+    expect(
+      asOk(r).next.draft.modules.find((m) => m.id === "M1"),
+    ).toBeUndefined();
     expect(r.journal.verdicts[0]).toMatchObject({ verdict: "APPLY" });
   });
 });
@@ -425,41 +429,41 @@ describe("TM-Y 复活生命周期（§6.7 Y-24～Y-30）", () => {
 describe("TM-Y 关键词边界与 reject_item（§6.7 Y-32～Y-41）", () => {
   it("TM-Y-32 复活判定显式 occurrence → 忽略并记 W_REVIVAL_OCCURRENCE_IGNORED（引擎路径）", () => {
     const st = state({}, { graveyard: [hardTomb()] });
-    const r = run(
-      st,
-      {
-        base_revision: 5,
-        compiled_from_turns: ["T10"],
-        ops: [
-          {
-            op: "upsert_module",
-            item: {
-              id: "M9",
-              name: "Excel 导出",
-              purpose: "导出",
-              source: "user_said",
-            },
-            evidence: [{ turn_id: "T10", quote: "还是把 Excel 导出加上吧" }],
-            revival: {
-              rejected_id: "REJ-001",
-              evidence: [
-                {
-                  turn_id: "T10",
-                  quote: "Excel 导出",
-                  occurrence: 0,
-                },
-              ],
-            },
+    const r = run(st, {
+      base_revision: 5,
+      compiled_from_turns: ["T10"],
+      ops: [
+        {
+          op: "upsert_module",
+          item: {
+            id: "M9",
+            name: "Excel 导出",
+            purpose: "导出",
+            source: "user_said",
           },
-        ],
-      },
-    );
+          evidence: [{ turn_id: "T10", quote: "还是把 Excel 导出加上吧" }],
+          revival: {
+            rejected_id: "REJ-001",
+            evidence: [
+              {
+                turn_id: "T10",
+                quote: "Excel 导出",
+                occurrence: 0,
+              },
+            ],
+          },
+        },
+      ],
+    });
     // 合法复活应成功；occurrence 被忽略
     expect(["applied", "noop"]).toContain(r.status);
     if (r.status === "applied") {
-      expect(r.journal.patch_warnings ?? r.journal.verdicts.flatMap((v) => (v as { warnings?: string[] }).warnings ?? [])).toEqual(
-        expect.arrayContaining([]),
-      );
+      expect(
+        r.journal.patch_warnings ??
+          r.journal.verdicts.flatMap(
+            (v) => (v as { warnings?: string[] }).warnings ?? [],
+          ),
+      ).toEqual(expect.arrayContaining([]));
     }
   });
 
@@ -472,7 +476,14 @@ describe("TM-Y 关键词边界与 reject_item（§6.7 Y-32～Y-41）", () => {
     // keys 应含 ≥4 字素
     expect(e.revival_keys.some((k) => k.length >= 4 || true)).toBe(true);
     const keys = revivalKeysOf("用 MongoDB 存数据", ["用 MongoDB 存数据"]);
-    expect(keys.some((k) => matchNormalize("用mongodb存数据模块").includes(k) || matchNormalize("用 MongoDB 存数据 模块").includes(k) || k.length >= 4)).toBe(true);
+    expect(
+      keys.some(
+        (k) =>
+          matchNormalize("用mongodb存数据模块").includes(k) ||
+          matchNormalize("用 MongoDB 存数据 模块").includes(k) ||
+          k.length >= 4,
+      ),
+    ).toBe(true);
 
     const TR2 = makeTranscript([
       { seq: 1, role: "user", text: "先不要用 MongoDB" },
@@ -588,7 +599,9 @@ describe("TM-Y 关键词边界与 reject_item（§6.7 Y-32～Y-41）", () => {
     );
     expect(r.status).toBe("applied");
     if (r.status !== "applied") return;
-    expect(asOk(r).next.draft.modules.find((m) => m.id === "M1")).toBeUndefined();
+    expect(
+      asOk(r).next.draft.modules.find((m) => m.id === "M1"),
+    ).toBeUndefined();
     const g = asOk(r).next.graveyard.find((x) => x.status === "active");
     expect(g).toMatchObject({
       rejected_by: "user",
@@ -678,7 +691,14 @@ describe("TM-Y 关键词边界与 reject_item（§6.7 Y-32～Y-41）", () => {
         { kind: "edit" as const, ref: { edit_event_id: "E1", edited_at: 1 } },
       ],
     };
-    const said = userModule(TRU, "M2", "Excel 导出", "x", "T1", "我要 Excel 导出");
+    const said = userModule(
+      TRU,
+      "M2",
+      "Excel 导出",
+      "x",
+      "T1",
+      "我要 Excel 导出",
+    );
     const st = state({ modules: [pinned, said] });
     const r = mergeSchemePatch({
       state: st,
@@ -701,7 +721,9 @@ describe("TM-Y 关键词边界与 reject_item（§6.7 Y-32～Y-41）", () => {
       transcript: TRU.view,
       ctx: ctxCounter(),
     });
-    const kinds = asOk(r).next.suggestions.map((s) => s.kind).sort();
+    const kinds = asOk(r)
+      .next.suggestions.map((s) => s.kind)
+      .sort();
     expect(kinds).toEqual(
       expect.arrayContaining(["S_OVERRIDE_PINNED", "S_OVERRIDE_PROTECTED"]),
     );
@@ -760,7 +782,9 @@ describe("TM-A 级联补缺（A-04～A-06）", () => {
     expect(r.journal.verdicts.find((v) => v.target_id === "F1")).toMatchObject({
       code: "E_OP_DEPENDENCY_DROPPED",
     });
-    expect(asOk(r).next.draft.acceptance.find((a) => a.id === "A1")).toBeTruthy();
+    expect(
+      asOk(r).next.draft.acceptance.find((a) => a.id === "A1"),
+    ).toBeTruthy();
   });
 
   it("TM-A-05 SUGGEST 的新建 id 同样触发依赖 DROP", () => {
@@ -784,9 +808,9 @@ describe("TM-A 级联补缺（A-04～A-06）", () => {
         },
       ]),
     );
-    expect(asOk(r).next.suggestions.some((s) => s.kind === "S_GRAVEYARD_SOFT")).toBe(
-      true,
-    );
+    expect(
+      asOk(r).next.suggestions.some((s) => s.kind === "S_GRAVEYARD_SOFT"),
+    ).toBe(true);
     expect(r.journal.verdicts.find((v) => v.target_id === "F1")).toMatchObject({
       code: "E_OP_DEPENDENCY_DROPPED",
     });
@@ -924,11 +948,20 @@ describe("TM-C / TM-S / TM-P / TM-D / TM-L / TM-X 补缺", () => {
       verdict: "DROP",
       code: "E_SOURCE_ESCALATION_FORBIDDEN",
     });
-    expect(asOk(r).next.draft.modules.find((m) => m.id === "M1")?.purpose).toBe("x");
+    expect(asOk(r).next.draft.modules.find((m) => m.id === "M1")?.purpose).toBe(
+      "x",
+    );
   });
 
   it("TM-S-08 已有 user_said 被声明 ai_inferred：内容可更新，source 保持 user_said", () => {
-    const said = userModule(TR, "M1", "报表工具", "旧", "T1", "我要做一个报表工具");
+    const said = userModule(
+      TR,
+      "M1",
+      "报表工具",
+      "旧",
+      "T1",
+      "我要做一个报表工具",
+    );
     const st = state({ modules: [said] });
     const r = run(
       st,
@@ -951,17 +984,16 @@ describe("TM-C / TM-S / TM-P / TM-D / TM-L / TM-X 补缺", () => {
     );
     expect(r.status).toBe("applied");
     if (r.status !== "applied") return;
-    expect(asOk(r).next.draft.modules.find((m) => m.id === "M1")).toMatchObject({
-      purpose: "新用途",
-      source: "user_said",
-    });
+    expect(asOk(r).next.draft.modules.find((m) => m.id === "M1")).toMatchObject(
+      {
+        purpose: "新用途",
+        source: "user_said",
+      },
+    );
   });
 
   it("TM-S-09 新条目不声明 source → ai_inferred", () => {
-    const r = run(
-      state(),
-      patch([modOp("M9", "报表", "x", [ev("T1")])]),
-    );
+    const r = run(state(), patch([modOp("M9", "报表", "x", [ev("T1")])]));
     expect(r.status).toBe("applied");
     if (r.status !== "applied") return;
     expect(asOk(r).next.draft.modules.find((m) => m.id === "M9")?.source).toBe(
@@ -1055,10 +1087,7 @@ describe("TM-C / TM-S / TM-P / TM-D / TM-L / TM-X 补缺", () => {
   it("TM-D-06 undo 后 base=旧修订的补丁 → stale（ABA）", () => {
     const previous = state().draft; // 修订 5 的内容快照
     const st = state();
-    const r1 = run(
-      st,
-      patch([modOp("M9", "报表", "x", [ev("T1")])]),
-    );
+    const r1 = run(st, patch([modOp("M9", "报表", "x", [ev("T1")])]));
     expect(r1.status).toBe("applied");
     if (r1.status !== "applied") return;
     expect(r1.next.draft.scheme_revision).toBe(6);
@@ -1080,7 +1109,9 @@ describe("TM-C / TM-S / TM-P / TM-D / TM-L / TM-X 补缺", () => {
     if (!undone.ok) return;
     // 内容回到修订 5，但修订号前进到 7（K-7，挡 ABA）
     expect(undone.state.draft.scheme_revision).toBe(7);
-    expect(undone.state.draft.modules.find((m) => m.id === "M9")).toBeUndefined();
+    expect(
+      undone.state.draft.modules.find((m) => m.id === "M9"),
+    ).toBeUndefined();
     const stale = run(
       undone.state,
       patch([modOp("M8", "导入", "y", [ev("T1")])], 5),

@@ -83,7 +83,11 @@ const TR = makeTranscript([
   { seq: 19, role: "user", text: "还是用 MongoDB 存数据吧" },
   { seq: 20, role: "user", text: "直接读 .env 连生产库吧" },
   { seq: 21, role: "user", text: "导出先不要，等报表稳定了再导出" },
-  { seq: 22, role: "user", text: "先不要 Excel 导出。想了想还是加上 Excel 导出" },
+  {
+    seq: 22,
+    role: "user",
+    text: "先不要 Excel 导出。想了想还是加上 Excel 导出",
+  },
   { seq: 23, role: "user", text: "对比一下两个方案" },
   { seq: 24, role: "user", text: "好的好的" },
   {
@@ -168,11 +172,9 @@ describe("ADV A 摘录忠实（01～06）", () => {
   it("ADV-02 丢掉句号 → DROP E_QUOTE_NOT_FOUND", () => {
     const r = run(
       state(),
-      patch(
-        [modOp("M9", "报表", "导出", [ev("T6", "要报表还要能导出")])],
-        5,
-        ["T6"],
-      ),
+      patch([modOp("M9", "报表", "导出", [ev("T6", "要报表还要能导出")])], 5, [
+        "T6",
+      ]),
     );
     expect(firstVerdict(r)).toMatchObject({ code: "E_QUOTE_NOT_FOUND" });
   });
@@ -180,11 +182,9 @@ describe("ADV A 摘录忠实（01～06）", () => {
   it("ADV-03 纠错「登陆」→「登录」→ DROP E_QUOTE_NOT_FOUND", () => {
     const r = run(
       state(),
-      patch(
-        [modOp("M9", "登录页", "入口", [ev("T7", "搞个登录页")])],
-        5,
-        ["T7"],
-      ),
+      patch([modOp("M9", "登录页", "入口", [ev("T7", "搞个登录页")])], 5, [
+        "T7",
+      ]),
     );
     expect(firstVerdict(r)).toMatchObject({ code: "E_QUOTE_NOT_FOUND" });
   });
@@ -192,11 +192,9 @@ describe("ADV A 摘录忠实（01～06）", () => {
   it("ADV-04 大小写改写 → DROP E_QUOTE_NOT_FOUND", () => {
     const r = run(
       state(),
-      patch(
-        [modOp("M9", "导出", "excel", [ev("T8", "用 Excel 导出")])],
-        5,
-        ["T8"],
-      ),
+      patch([modOp("M9", "导出", "excel", [ev("T8", "用 Excel 导出")])], 5, [
+        "T8",
+      ]),
     );
     expect(firstVerdict(r)).toMatchObject({ code: "E_QUOTE_NOT_FOUND" });
   });
@@ -205,9 +203,7 @@ describe("ADV A 摘录忠实（01～06）", () => {
     const r = run(
       state(),
       patch(
-        [
-          modOp("M9", "支付网关", "收款", [ev("T9", "做个看板")], "user_said"),
-        ],
+        [modOp("M9", "支付网关", "收款", [ev("T9", "做个看板")], "user_said")],
         5,
         ["T9"],
       ),
@@ -226,11 +222,7 @@ describe("ADV A 摘录忠实（01～06）", () => {
     const r = run(
       state(),
       patch(
-        [
-          modOp("M9", "逾期看板", "统计", [
-            ev("T10", "首页展示逾期统计看板"),
-          ]),
-        ],
+        [modOp("M9", "逾期看板", "统计", [ev("T10", "首页展示逾期统计看板")])],
         5,
         ["T10"],
       ),
@@ -377,7 +369,9 @@ describe("ADV B 确认纪律（07～13）", () => {
         pendingDecision({
           source: "user_edited",
           user_pinned: true,
-          evidence: [{ kind: "edit", ref: { edit_event_id: "E1", edited_at: 1 } }],
+          evidence: [
+            { kind: "edit", ref: { edit_event_id: "E1", edited_at: 1 } },
+          ],
         }),
       ] as never,
     });
@@ -527,7 +521,9 @@ describe("ADV C 墓地（14～20）", () => {
     );
     expect(r.status === "noop" || r.status === "applied").toBe(true);
     if (!("next" in r)) return;
-    const sug = r.next.suggestions.find((s) => s.kind === "S_REVIVAL_AMBIGUOUS");
+    const sug = r.next.suggestions.find(
+      (s) => s.kind === "S_REVIVAL_AMBIGUOUS",
+    );
     const v = firstVerdict(r);
     expect(
       Boolean(sug) ||
@@ -601,11 +597,7 @@ describe("ADV D occurrence / 短引用（21～25）", () => {
   it("ADV-21 短「导出」→ DROP E_QUOTE_TOO_SHORT_UNBOUNDED", () => {
     const r = run(
       state(),
-      patch(
-        [modOp("M9", "导出", "功能", [ev("T21", "导出")])],
-        5,
-        ["T21"],
-      ),
+      patch([modOp("M9", "导出", "功能", [ev("T21", "导出")])], 5, ["T21"]),
     );
     expect(firstVerdict(r)).toMatchObject({
       code: "E_QUOTE_TOO_SHORT_UNBOUNDED",
@@ -639,7 +631,9 @@ describe("ADV D occurrence / 短引用（21～25）", () => {
     );
     expect(r.status === "noop" || r.status === "applied").toBe(true);
     if (!("next" in r)) return;
-    const sug = r.next.suggestions.find((s) => s.kind === "S_REVIVAL_AMBIGUOUS");
+    const sug = r.next.suggestions.find(
+      (s) => s.kind === "S_REVIVAL_AMBIGUOUS",
+    );
     const v = firstVerdict(r);
     expect(Boolean(sug) || v?.verdict === "DROP" || v?.verdict === "NOOP").toBe(
       true,
@@ -697,9 +691,7 @@ describe("ADV D occurrence / 短引用（21～25）", () => {
               source: "user_said",
               user_visible: true,
             },
-            evidence: [
-              { turn_id: "T22", quote: "Excel 导出", occurrence: 0 },
-            ],
+            evidence: [{ turn_id: "T22", quote: "Excel 导出", occurrence: 0 }],
             revival: {
               rejected_id: "REJ-001",
               evidence: [

@@ -17,9 +17,7 @@ import {
   type SchemeDraft,
 } from "../../src/lib/journey/scheme-draft";
 import { buildTombstone } from "../../src/lib/journey/graveyard-revival";
-import {
-  scopePlanToContractScope,
-} from "../../src/lib/journey/scope-plan";
+import { scopePlanToContractScope } from "../../src/lib/journey/scope-plan";
 import { buildScopePlan } from "../../daemon/supervisor/scope-plan-builder";
 import {
   SCHEME_SNAPSHOT_SCHEMA_VERSION_V11,
@@ -82,13 +80,15 @@ function draftContract(
   });
 }
 
-
 function alignContract(
   binding: NonNullable<SoftwareContract["scheme_binding"]>,
   projected: ReturnType<typeof scopePlanToContractScope>,
   over: Partial<SoftwareContract> = {},
 ): SoftwareContract {
-  const base = draftContract({ scheme_binding: binding }, projected.writable_paths);
+  const base = draftContract(
+    { scheme_binding: binding },
+    projected.writable_paths,
+  );
   return softwareContractSchema.parse({
     ...base,
     authorization: {
@@ -303,9 +303,7 @@ describe("TM-GB 派工绑定", () => {
     expect(GATE_PACK_RELATIVE_PATH).toBe(
       ".stagent/claude-config/graveyard-pack.json",
     );
-    expect(GATE_PACK_DENY_READ_RULE).toBe(
-      "Read(./.stagent/claude-config/**)",
-    );
+    expect(GATE_PACK_DENY_READ_RULE).toBe("Read(./.stagent/claude-config/**)");
     // 与 CLI adapter 生成的 deny 列表同形：Read(./.stagent/claude-config/**)
     const packAbsHint = path.posix.join(
       ".stagent",

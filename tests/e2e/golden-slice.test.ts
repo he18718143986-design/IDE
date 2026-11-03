@@ -28,7 +28,11 @@ import {
 import { buildScopePlan } from "../../daemon/supervisor/scope-plan-builder";
 import { buildConfirmContractFromScopePlan } from "../../src/lib/journey/confirm-scheme-contract";
 import type { WorkerModelClient } from "../../daemon/worker/ai-worker";
-import type { ChatAdapter, AdapterRunInput, AdapterEvent } from "../../daemon/chat/types";
+import type {
+  ChatAdapter,
+  AdapterRunInput,
+  AdapterEvent,
+} from "../../daemon/chat/types";
 import type { SoftwareContract } from "../../src/lib/contract.schema";
 
 const STAGENT_ROOT = path.resolve(
@@ -303,12 +307,10 @@ describe("TASK-L.6 黄金切片 E2E（一句需求 → 合入）", () => {
       draft.flows.length > 0
         ? [
             "flowchart LR",
-            ...draft.flows[0]!.steps.map(
-              (s, i) => `  S${i}["${s.action}"]`,
+            ...draft.flows[0]!.steps.map((s, i) => `  S${i}["${s.action}"]`),
+            ...draft.flows[0]!.steps.slice(1).map(
+              (_, i) => `  S${i} --> S${i + 1}`,
             ),
-            ...draft.flows[0]!.steps
-              .slice(1)
-              .map((_, i) => `  S${i} --> S${i + 1}`),
           ].join("\n")
         : "flowchart LR\n  A[打开] --> B[见问候]";
 
@@ -340,280 +342,271 @@ describe("TASK-L.6 黄金切片 E2E（一句需求 → 合入）", () => {
     };
   }
 
-  it(
-    "一句需求 → 方案 → 确认开工 → 红绿施工 → 真预览 → 合入",
-    async () => {
-      // ---------- 1. 右栏发一句 ----------
-      const journey = await call<{ plain_summary?: string }>(
-        "POST",
-        "/api/supervisor/journey",
-        { message: USER_TEXT },
-      );
-      expect(journey.status).toBe(200);
-      expect(typeof journey.body.plain_summary).toBe("string");
+  it("一句需求 → 方案 → 确认开工 → 红绿施工 → 真预览 → 合入", async () => {
+    // ---------- 1. 右栏发一句 ----------
+    const journey = await call<{ plain_summary?: string }>(
+      "POST",
+      "/api/supervisor/journey",
+      { message: USER_TEXT },
+    );
+    expect(journey.status).toBe(200);
+    expect(typeof journey.body.plain_summary).toBe("string");
 
-      await daemon!.flushIntentCompilerForTest();
+    await daemon!.flushIntentCompilerForTest();
 
-      expect(fs.existsSync(schemeLedgerPath(repo))).toBe(true);
-      const ledger = readSchemeLedger(repo);
-      expect(ledger).not.toBeNull();
-      expect(ledger!.state.draft.title.length).toBeGreaterThan(0);
-      expect(ledger!.state.draft.modules.length).toBeGreaterThan(0);
-      expect(JSON.stringify(ledger).includes("partner_hint")).toBe(false);
+    expect(fs.existsSync(schemeLedgerPath(repo))).toBe(true);
+    const ledger = readSchemeLedger(repo);
+    expect(ledger).not.toBeNull();
+    expect(ledger!.state.draft.title.length).toBeGreaterThan(0);
+    expect(ledger!.state.draft.modules.length).toBeGreaterThan(0);
+    expect(JSON.stringify(ledger).includes("partner_hint")).toBe(false);
 
-      // L.1：右栏适配器未收到非用户文本（旅程不走 ChatAdapter；若有调用则 prompt 全等）
-      for (const c of capture.calls) {
-        expect(c.prompt).toBe(USER_TEXT);
-      }
+    // L.1：右栏适配器未收到非用户文本（旅程不走 ChatAdapter；若有调用则 prompt 全等）
+    for (const c of capture.calls) {
+      expect(c.prompt).toBe(USER_TEXT);
+    }
 
-      // ---------- 2. 确认开工（手势 1 = freeze + create）----------
-      const scheme = ledgerToFreezeScheme();
-      const acceptanceId = scheme.acceptance![0]!.id;
-      const oblPath = `tests/stagent/${acceptanceId}.test.ts`;
-      const plan = buildScopePlan({ repoRoot: repo, scheme });
-      expect(plan.grade.ok).toBe(true);
-      expect(plan.needs_approval).toEqual([]);
+    // ---------- 2. 确认开工（手势 1 = freeze + create）----------
+    const scheme = ledgerToFreezeScheme();
+    const acceptanceId = scheme.acceptance![0]!.id;
+    const oblPath = `tests/stagent/${acceptanceId}.test.ts`;
+    const plan = buildScopePlan({ repoRoot: repo, scheme });
+    expect(plan.grade.ok).toBe(true);
+    expect(plan.needs_approval).toEqual([]);
 
-      const confirmationId = `golden-confirm-${scheme.scheme_id}`;
-      userAuthGestures.push("confirm_start");
-      const frozen = await call<{ snapshot_id: string }>(
-        "POST",
-        "/api/supervisor/scheme/freeze",
-        {
-          confirmation_id: confirmationId,
-          scheme,
-          demo: EMPTY_DEMO_GATE,
-          decision: {
-            code: "OK",
-            message: "未生成 Demo，按静态方案签署",
-            demo_mode: "none",
-          },
-          scope_plan: plan,
-        },
-      );
-      expect(frozen.status).toBe(201);
-
-      const contractDraft = buildConfirmContractFromScopePlan(scheme, plan);
-      const pending = {
-        ...contractDraft,
-        lifecycle_state: "PENDING_APPROVAL" as const,
-        approval: { status: "PENDING_REVIEW" as const },
-      };
-
-      const created = await call<{
-        contract: SoftwareContract;
-        admission?: { contract: SoftwareContract };
-      }>("POST", "/api/contracts", {
-        contract: pending,
+    const confirmationId = `golden-confirm-${scheme.scheme_id}`;
+    userAuthGestures.push("confirm_start");
+    const frozen = await call<{ snapshot_id: string }>(
+      "POST",
+      "/api/supervisor/scheme/freeze",
+      {
         confirmation_id: confirmationId,
-      });
-      expect(created.status).toBe(201);
-      const contract =
-        created.body.admission?.contract ?? created.body.contract;
-      expect(contract.lifecycle_state).toBe("EXECUTING");
-      expect(contract.approval?.approved_by).toBe("stagent-auto");
-      const contractId = contract.contract_id;
+        scheme,
+        demo: EMPTY_DEMO_GATE,
+        decision: {
+          code: "OK",
+          message: "未生成 Demo，按静态方案签署",
+          demo_mode: "none",
+        },
+        scope_plan: plan,
+      },
+    );
+    expect(frozen.status).toBe(201);
 
-      // ---------- 3. 两段式施工（生产 runWorker；桩模型 + 桩义务报告）----------
-      const worktree = path.join(
-        repo,
-        ".stagent",
-        "worktrees",
-        `task-${contractId}`,
-      );
-      expect(fs.existsSync(worktree)).toBe(true);
+    const contractDraft = buildConfirmContractFromScopePlan(scheme, plan);
+    const pending = {
+      ...contractDraft,
+      lifecycle_state: "PENDING_APPROVAL" as const,
+      approval: { status: "PENDING_REVIEW" as const },
+    };
 
-      // 真跑 vitest / stagent check：共享 IDE node_modules
-      const nmLink = path.join(worktree, "node_modules");
-      if (!fs.existsSync(nmLink)) {
-        fs.symlinkSync(
-          path.join(STAGENT_ROOT, "node_modules"),
-          nmLink,
-          "dir",
-        );
-      }
+    const created = await call<{
+      contract: SoftwareContract;
+      admission?: { contract: SoftwareContract };
+    }>("POST", "/api/contracts", {
+      contract: pending,
+      confirmation_id: confirmationId,
+    });
+    expect(created.status).toBe(201);
+    const contract = created.body.admission?.contract ?? created.body.contract;
+    expect(contract.lifecycle_state).toBe("EXECUTING");
+    expect(contract.approval?.approved_by).toBe("stagent-auto");
+    const contractId = contract.contract_id;
 
-      const redTest = [
-        'import { it, expect } from "vitest";',
-        'import { readFileSync } from "node:fs";',
-        "it(\"App 含问候语\", () => {",
-        '  const src = readFileSync("src/App.tsx", "utf8");',
-        `  expect(src).toContain(${JSON.stringify(GREETING)});`,
-        "});",
-        "",
-      ].join("\n");
-      const greenApp = [
-        "export default function App() {",
-        `  return ${JSON.stringify(GREETING)};`,
-        "}",
-        "",
-      ].join("\n");
+    // ---------- 3. 两段式施工（生产 runWorker；桩模型 + 桩义务报告）----------
+    const worktree = path.join(
+      repo,
+      ".stagent",
+      "worktrees",
+      `task-${contractId}`,
+    );
+    expect(fs.existsSync(worktree)).toBe(true);
 
-      const modelClient: WorkerModelClient = {
-        generateChanges: async (input) => {
-          const prompt = input.task.system_prompt;
-          if (prompt.includes("本段（T · 先写测试）义务")) {
-            return {
-              changes: [{ path: oblPath, content: redTest }],
-              log: ["T-red"],
-              usage: { inputTokens: 10, outputTokens: 20 },
-            };
-          }
-          expect(prompt).toContain("本段（I · 再实现）义务");
+    // 真跑 vitest / stagent check：共享 IDE node_modules
+    const nmLink = path.join(worktree, "node_modules");
+    if (!fs.existsSync(nmLink)) {
+      fs.symlinkSync(path.join(STAGENT_ROOT, "node_modules"), nmLink, "dir");
+    }
+
+    const redTest = [
+      'import { it, expect } from "vitest";',
+      'import { readFileSync } from "node:fs";',
+      'it("App 含问候语", () => {',
+      '  const src = readFileSync("src/App.tsx", "utf8");',
+      `  expect(src).toContain(${JSON.stringify(GREETING)});`,
+      "});",
+      "",
+    ].join("\n");
+    const greenApp = [
+      "export default function App() {",
+      `  return ${JSON.stringify(GREETING)};`,
+      "}",
+      "",
+    ].join("\n");
+
+    const modelClient: WorkerModelClient = {
+      generateChanges: async (input) => {
+        const prompt = input.task.system_prompt;
+        if (prompt.includes("本段（T · 先写测试）义务")) {
           return {
-            changes: [{ path: "src/App.tsx", content: greenApp }],
-            log: ["I-green"],
+            changes: [{ path: oblPath, content: redTest }],
+            log: ["T-red"],
             usage: { inputTokens: 10, outputTokens: 20 },
           };
+        }
+        expect(prompt).toContain("本段（I · 再实现）义务");
+        return {
+          changes: [{ path: "src/App.tsx", content: greenApp }],
+          log: ["I-green"],
+          usage: { inputTokens: 10, outputTokens: 20 },
+        };
+      },
+    };
+
+    // create 签发的 exec_token 只活在 Daemon 内同一 orchestrator 实例上
+    const orchestrator = (
+      daemon as unknown as { orchestrator: ContractOrchestrator }
+    ).orchestrator;
+    const workerResult = await orchestrator.runWorker(contractId, {
+      modelClient,
+      twoPhase: {
+        readObligationReport: (phase) =>
+          phase === "t"
+            ? {
+                schema: "stagent-obligation-report-v1",
+                test_count: 1,
+                assertion_failures: 1,
+                collection_or_compile_errors: 0,
+              }
+            : {
+                schema: "stagent-obligation-report-v1",
+                test_count: 1,
+                assertion_failures: 0,
+                collection_or_compile_errors: 0,
+              },
+      },
+    });
+
+    expect(workerResult.two_phase?.phase).toBe("two_phase");
+    expect(workerResult.two_phase?.can_merge).toBe(true);
+    expect(workerResult.two_phase?.obligations.length).toBeGreaterThan(0);
+    const obl = workerResult.two_phase!.obligations[0]!;
+    expect(obl.red?.classification).toBe("red");
+    expect(obl.green?.classification).toBe("green");
+    expect(fs.existsSync(path.join(worktree, oblPath))).toBe(true);
+    expect(
+      fs.readFileSync(path.join(worktree, "src", "App.tsx"), "utf8"),
+    ).toContain(GREETING);
+
+    // execute 前种植合同校验文件（相对 Worktree）
+    const recordsDir = path.join(worktree, ".stagent", "records");
+    fs.mkdirSync(recordsDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(recordsDir, "obligation-report.json"),
+      `${JSON.stringify(
+        {
+          schema: "stagent-obligation-report-v1",
+          test_count: 1,
+          assertion_failures: 0,
+          collection_or_compile_errors: 0,
         },
+        null,
+        2,
+      )}\n`,
+    );
+    // 完整性比对：基线=候选（施工后测试未削弱）
+    fs.writeFileSync(path.join(recordsDir, "test-baseline"), redTest);
+    fs.writeFileSync(path.join(recordsDir, "test-candidate"), redTest);
+
+    // ---------- 4. 验证（系统）----------
+    const executed = await call<{
+      contract: { lifecycle_state: string };
+      evidence: {
+        evidence_id: string;
+        verdict: { status: string; can_merge: boolean };
+        verification_results?: Array<{
+          command_alias: string;
+          passed: boolean;
+        }>;
       };
+    }>("POST", `/api/contracts/${contractId}/execute`);
+    expect(executed.status).toBe(200);
+    expect(executed.body.contract.lifecycle_state).toBe("AUDITED");
+    expect(executed.body.evidence.verdict).toMatchObject({
+      status: "PASSED",
+      can_merge: true,
+    });
+    const aliases = (executed.body.evidence.verification_results ?? []).map(
+      (r) => r.command_alias,
+    );
+    expect(aliases).toEqual(
+      expect.arrayContaining([
+        "obligation-tests",
+        "check-obligations",
+        "check-test-integrity",
+      ]),
+    );
+    for (const r of executed.body.evidence.verification_results ?? []) {
+      expect(r.passed).toBe(true);
+    }
 
-      // create 签发的 exec_token 只活在 Daemon 内同一 orchestrator 实例上
-      const orchestrator = (
-        daemon as unknown as { orchestrator: ContractOrchestrator }
-      ).orchestrator;
-      const workerResult = await orchestrator.runWorker(contractId, {
-        modelClient,
-        twoPhase: {
-          readObligationReport: (phase) =>
-            phase === "t"
-              ? {
-                  schema: "stagent-obligation-report-v1",
-                  test_count: 1,
-                  assertion_failures: 1,
-                  collection_or_compile_errors: 0,
-                }
-              : {
-                  schema: "stagent-obligation-report-v1",
-                  test_count: 1,
-                  assertion_failures: 0,
-                  collection_or_compile_errors: 0,
-                },
-        },
-      });
+    // 证据含红绿义务（两段式结果 + 落盘证据文件）
+    const evidenceFile = path.join(
+      repo,
+      ".stagent",
+      "evidence",
+      `${contractId}-${executed.body.evidence.evidence_id}.json`,
+    );
+    expect(fs.existsSync(evidenceFile)).toBe(true);
+    expect(
+      workerResult.two_phase!.obligations.some((o) => o.red && o.green),
+    ).toBe(true);
 
-      expect(workerResult.two_phase?.phase).toBe("two_phase");
-      expect(workerResult.two_phase?.can_merge).toBe(true);
-      expect(workerResult.two_phase?.obligations.length).toBeGreaterThan(0);
-      const obl = workerResult.two_phase!.obligations[0]!;
-      expect(obl.red?.classification).toBe("red");
-      expect(obl.green?.classification).toBe("green");
-      expect(fs.existsSync(path.join(worktree, oblPath))).toBe(true);
-      expect(
-        fs.readFileSync(path.join(worktree, "src", "App.tsx"), "utf8"),
-      ).toContain(GREETING);
+    // ---------- 5. 真预览（非占位）----------
+    const previewStart = await call<{
+      url?: string;
+      preview_url?: string;
+      stub?: boolean;
+      mode?: string;
+    }>("POST", "/api/preview/real/start", { contract_id: contractId });
+    expect(previewStart.status).toBe(200);
+    expect(previewStart.body.stub).not.toBe(true);
+    const previewUrl =
+      previewStart.body.url ?? previewStart.body.preview_url ?? "";
+    expect(previewUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+/);
 
-      // execute 前种植合同校验文件（相对 Worktree）
-      const recordsDir = path.join(worktree, ".stagent", "records");
-      fs.mkdirSync(recordsDir, { recursive: true });
-      fs.writeFileSync(
-        path.join(recordsDir, "obligation-report.json"),
-        `${JSON.stringify(
-          {
-            schema: "stagent-obligation-report-v1",
-            test_count: 1,
-            assertion_failures: 0,
-            collection_or_compile_errors: 0,
-          },
-          null,
-          2,
-        )}\n`,
-      );
-      // 完整性比对：基线=候选（施工后测试未削弱）
-      fs.writeFileSync(path.join(recordsDir, "test-baseline"), redTest);
-      fs.writeFileSync(path.join(recordsDir, "test-candidate"), redTest);
+    const page = await fetch(previewUrl, { headers: { connection: "close" } });
+    expect(page.status).toBe(200);
+    const pageText = await page.text();
+    expect(pageText).toContain(REAL_APP_MARKER);
+    expect(pageText).not.toContain(STUB_PREVIEW_BADGE);
 
-      // ---------- 4. 验证（系统）----------
-      const executed = await call<{
+    await call("POST", "/api/preview/real/stop", {
+      contract_id: contractId,
+    });
+
+    // ---------- 6. 合入（手势 2）----------
+    userAuthGestures.push("merge");
+    const merged = await call<{
+      result: {
+        commitSha: string;
         contract: { lifecycle_state: string };
-        evidence: {
-          evidence_id: string;
-          verdict: { status: string; can_merge: boolean };
-          verification_results?: Array<{
-            command_alias: string;
-            passed: boolean;
-          }>;
-        };
-      }>("POST", `/api/contracts/${contractId}/execute`);
-      expect(executed.status).toBe(200);
-      expect(executed.body.contract.lifecycle_state).toBe("AUDITED");
-      expect(executed.body.evidence.verdict).toMatchObject({
-        status: "PASSED",
-        can_merge: true,
-      });
-      const aliases = (executed.body.evidence.verification_results ?? []).map(
-        (r) => r.command_alias,
-      );
-      expect(aliases).toEqual(
-        expect.arrayContaining([
-          "obligation-tests",
-          "check-obligations",
-          "check-test-integrity",
-        ]),
-      );
-      for (const r of executed.body.evidence.verification_results ?? []) {
-        expect(r.passed).toBe(true);
-      }
+      };
+    }>("POST", `/api/contracts/${contractId}/merge`, {
+      evidence_id: executed.body.evidence.evidence_id,
+      reviewer: "tina",
+    });
+    expect(merged.status).toBe(200);
+    expect(merged.body.result.contract.lifecycle_state).toBe("MERGED");
 
-      // 证据含红绿义务（两段式结果 + 落盘证据文件）
-      const evidenceFile = path.join(
-        repo,
-        ".stagent",
-        "evidence",
-        `${contractId}-${executed.body.evidence.evidence_id}.json`,
-      );
-      expect(fs.existsSync(evidenceFile)).toBe(true);
-      expect(workerResult.two_phase!.obligations.some((o) => o.red && o.green)).toBe(
-        true,
-      );
+    const log = git(repo, ["log", "-1", "--format=%B"]);
+    expect(log).toContain(`Stagent-Contract-ID: ${contractId}`);
+    expect(
+      fs.readFileSync(path.join(repo, "src", "App.tsx"), "utf8"),
+    ).toContain(GREETING);
 
-      // ---------- 5. 真预览（非占位）----------
-      const previewStart = await call<{
-        url?: string;
-        preview_url?: string;
-        stub?: boolean;
-        mode?: string;
-      }>("POST", "/api/preview/real/start", { contract_id: contractId });
-      expect(previewStart.status).toBe(200);
-      expect(previewStart.body.stub).not.toBe(true);
-      const previewUrl =
-        previewStart.body.url ?? previewStart.body.preview_url ?? "";
-      expect(previewUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+/);
-
-      const page = await fetch(previewUrl, { headers: { connection: "close" } });
-      expect(page.status).toBe(200);
-      const pageText = await page.text();
-      expect(pageText).toContain(REAL_APP_MARKER);
-      expect(pageText).not.toContain(STUB_PREVIEW_BADGE);
-
-      await call("POST", "/api/preview/real/stop", {
-        contract_id: contractId,
-      });
-
-      // ---------- 6. 合入（手势 2）----------
-      userAuthGestures.push("merge");
-      const merged = await call<{
-        result: {
-          commitSha: string;
-          contract: { lifecycle_state: string };
-        };
-      }>("POST", `/api/contracts/${contractId}/merge`, {
-        evidence_id: executed.body.evidence.evidence_id,
-        reviewer: "tina",
-      });
-      expect(merged.status).toBe(200);
-      expect(merged.body.result.contract.lifecycle_state).toBe("MERGED");
-
-      const log = git(repo, ["log", "-1", "--format=%B"]);
-      expect(log).toContain(`Stagent-Contract-ID: ${contractId}`);
-      expect(fs.readFileSync(path.join(repo, "src", "App.tsx"), "utf8")).toContain(
-        GREETING,
-      );
-
-      // PASS：用户授权类手势恰好 2 次；未点 approve（自动批准）
-      expect(userAuthGestures).toEqual(["confirm_start", "merge"]);
-      expect(userAuthGestures).toHaveLength(2);
-    },
-    180_000,
-  );
+    // PASS：用户授权类手势恰好 2 次；未点 approve（自动批准）
+    expect(userAuthGestures).toEqual(["confirm_start", "merge"]);
+    expect(userAuthGestures).toHaveLength(2);
+  }, 180_000);
 });

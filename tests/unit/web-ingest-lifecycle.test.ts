@@ -47,7 +47,9 @@ describe("TASK-L.17a: Web Ingest Credential Lifecycle (dec-13)", () => {
 
     // 7. After manual deletion, authentication fails
     authManager.clearInMemorySessions();
-    await expect(authManager.authenticate("data.partner.com")).rejects.toMatchObject({
+    await expect(
+      authManager.authenticate("data.partner.com"),
+    ).rejects.toMatchObject({
       code: "E_WEB_INGEST_AUTH_FAILED",
       status: 401,
     });

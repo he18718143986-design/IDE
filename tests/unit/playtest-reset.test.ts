@@ -87,7 +87,10 @@ describe("TASK-L.17b playtest-reset 跨版本重置", () => {
   });
 
   it("文件不存在 → 未认可（UNCONFIRMED），不是 PASS", () => {
-    const v = evaluatePlaytestGuard({ repoRoot: repo, contractId: CONTRACT_ID });
+    const v = evaluatePlaytestGuard({
+      repoRoot: repo,
+      contractId: CONTRACT_ID,
+    });
     expect(v.ok).toBe(false);
     expect(v.status).toBe("UNCONFIRMED");
   });
@@ -95,7 +98,10 @@ describe("TASK-L.17b playtest-reset 跨版本重置", () => {
   it("核心：同 contract_id 不同 release_id → STALE_VERSION 并重置认可", () => {
     // 证据文件真实存在、完整，但绑的是旧/外部版本，与当前 LIVE(REL_A) 不同
     writeEvidence(repo, "rel-FOREIGN-OLD");
-    const v = evaluatePlaytestGuard({ repoRoot: repo, contractId: CONTRACT_ID });
+    const v = evaluatePlaytestGuard({
+      repoRoot: repo,
+      contractId: CONTRACT_ID,
+    });
     expect(v.ok).toBe(false);
     expect(v.status).toBe("STALE_VERSION");
     expect(v.code).toBe("STALE_VERSION");
@@ -106,7 +112,10 @@ describe("TASK-L.17b playtest-reset 跨版本重置", () => {
 
   it("版本匹配 → 认可有效（APPROVED / PASS）", () => {
     writeEvidence(repo, REL_A);
-    const v = evaluatePlaytestGuard({ repoRoot: repo, contractId: CONTRACT_ID });
+    const v = evaluatePlaytestGuard({
+      repoRoot: repo,
+      contractId: CONTRACT_ID,
+    });
     expect(v.ok).toBe(true);
     expect(v.status).toBe("APPROVED");
     expect(v.reset_approval).toBe(false);
@@ -127,7 +136,10 @@ describe("TASK-L.17b playtest-reset 跨版本重置", () => {
     writeRelease(repo, REL_A, "SUPERSEDED", "2026-11-01T00:00:00.000Z");
     writeRelease(repo, REL_B, "LIVE", "2026-11-02T00:00:00.000Z");
 
-    const v = evaluatePlaytestGuard({ repoRoot: repo, contractId: CONTRACT_ID });
+    const v = evaluatePlaytestGuard({
+      repoRoot: repo,
+      contractId: CONTRACT_ID,
+    });
     expect(v.ok).toBe(false);
     expect(v.status).toBe("STALE_VERSION");
     expect(v.evidence_release_id).toBe(REL_A);
@@ -138,7 +150,10 @@ describe("TASK-L.17b playtest-reset 跨版本重置", () => {
   it("合同无 references[] / 非北极星场景 → 明确错误码，绝不静默 PASS", () => {
     // 覆盖为无 references 的合同
     writeContract(repo, []);
-    const v = evaluatePlaytestGuard({ repoRoot: repo, contractId: CONTRACT_ID });
+    const v = evaluatePlaytestGuard({
+      repoRoot: repo,
+      contractId: CONTRACT_ID,
+    });
     expect(v.ok).toBe(false);
     expect(v.status).toBe("NOT_NORTHSTAR_SCENARIO");
     expect(v.code).toBe("NOT_NORTHSTAR_SCENARIO");
@@ -157,7 +172,10 @@ describe("TASK-L.17b playtest-reset 跨版本重置", () => {
     const file = playtestEvidencePath(repo, CONTRACT_ID);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, JSON.stringify({ contract_id: CONTRACT_ID }));
-    const v = evaluatePlaytestGuard({ repoRoot: repo, contractId: CONTRACT_ID });
+    const v = evaluatePlaytestGuard({
+      repoRoot: repo,
+      contractId: CONTRACT_ID,
+    });
     expect(v.ok).toBe(false);
     expect(v.status).toBe("EVIDENCE_INVALID");
   });
@@ -176,7 +194,10 @@ describe("TASK-L.17b playtest-reset 跨版本重置", () => {
         timestamp: "2026-11-02T01:00:00.000Z",
       }),
     );
-    const v = evaluatePlaytestGuard({ repoRoot: repo, contractId: CONTRACT_ID });
+    const v = evaluatePlaytestGuard({
+      repoRoot: repo,
+      contractId: CONTRACT_ID,
+    });
     expect(v.ok).toBe(false);
     expect(v.status).toBe("EVIDENCE_INVALID");
   });
@@ -233,8 +254,6 @@ describe("TASK-L.17b check playtest CLI 门禁委托", () => {
   it("缺 --contract-id → 明确报错，不静默", () => {
     const res = runCheckCommand(["playtest", "--repo", repo]);
     expect(res.exitCode).toBe(1);
-    expect(JSON.parse(res.stdout) as { error: string }).toHaveProperty(
-      "error",
-    );
+    expect(JSON.parse(res.stdout) as { error: string }).toHaveProperty("error");
   });
 });

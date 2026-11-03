@@ -88,7 +88,10 @@ const stubModelClient: WorkerModelClient = {
 describe("A. 派工门禁 requireControlledDispatch", () => {
   it("已注册受控 + 已挂工厂 → 返回工厂", () => {
     const registry = new AdapterRegistry();
-    registry.register(fakeControlledAdapter(FAKE_ADAPTER_ID), "GATEWAY_ENFORCED");
+    registry.register(
+      fakeControlledAdapter(FAKE_ADAPTER_ID),
+      "GATEWAY_ENFORCED",
+    );
     const factory: WorkerDispatchFactory = () => ({
       run: async () => ({
         applied: true,
@@ -151,7 +154,10 @@ describe("A. 派工门禁 requireControlledDispatch", () => {
 
   it("已注册受控但未挂派工工厂 → E_ADAPTER_NO_DISPATCH_FACTORY", () => {
     const registry = new AdapterRegistry();
-    registry.register(fakeControlledAdapter(FAKE_ADAPTER_ID), "GATEWAY_ENFORCED");
+    registry.register(
+      fakeControlledAdapter(FAKE_ADAPTER_ID),
+      "GATEWAY_ENFORCED",
+    );
     const err: unknown = (() => {
       try {
         requireControlledDispatch(registry, FAKE_ADAPTER_ID);
@@ -184,7 +190,9 @@ describe("B. createDefaultWorkerRegistry 默认注册", () => {
       "UNCONTROLLED_EXTERNAL",
     );
     // 未挂工厂是第二重保险；但受控门禁必须先以 E_ADAPTER_NOT_CONTROLLED 拒绝
-    expect(registry.getDispatchFactory(CLAUDE_CODE_WORKER_ADAPTER_ID)).toBeUndefined();
+    expect(
+      registry.getDispatchFactory(CLAUDE_CODE_WORKER_ADAPTER_ID),
+    ).toBeUndefined();
     const err: unknown = (() => {
       try {
         requireControlledDispatch(registry, CLAUDE_CODE_WORKER_ADAPTER_ID);
@@ -312,7 +320,10 @@ describe("D. 真实派工路径：orchestrator 经 Registry 派工", () => {
 
   it("正例：合同指向 FakeControlledWorkerAdapter → 派工与产物收集完成", async () => {
     const registry = new AdapterRegistry();
-    registry.register(fakeControlledAdapter(FAKE_ADAPTER_ID), "GATEWAY_ENFORCED");
+    registry.register(
+      fakeControlledAdapter(FAKE_ADAPTER_ID),
+      "GATEWAY_ENFORCED",
+    );
 
     let factoryCalls = 0;
     let workerRuns = 0;
@@ -349,9 +360,9 @@ describe("D. 真实派工路径：orchestrator 经 Registry 派工", () => {
     expect(factoryCalls).toBe(1);
     expect(workerRuns).toBe(1);
     expect(captured).not.toBeNull();
-    expect((captured as unknown as WorkerDispatchContext).contract.contract_id).toBe(
-      contract.contract_id,
-    );
+    expect(
+      (captured as unknown as WorkerDispatchContext).contract.contract_id,
+    ).toBe(contract.contract_id);
     expect((captured as unknown as WorkerDispatchContext).repoRoot).toBe(repo);
     // 产物收集：Fake 执行器的结果原样出现在 runWorker 返回中
     expect(result.changes).toEqual(FAKE_CHANGES);
@@ -454,7 +465,10 @@ describe("E. TASK-W.9c · 自注册工厂闭环与门禁单一判定 (EW9C-01 ~ 
 
   it("EW9C-01: 有效工厂 + 合规真实 run() + 受控档位 → 允许派工且 dispatchable 为 true", () => {
     const registry = new AdapterRegistry();
-    registry.register(makeExecutableAdapter(W9C_ADAPTER_ID), "GATEWAY_ENFORCED");
+    registry.register(
+      makeExecutableAdapter(W9C_ADAPTER_ID),
+      "GATEWAY_ENFORCED",
+    );
     registry.registerDispatchFactory(W9C_ADAPTER_ID, dummyFactory, W9C_VERSION);
 
     expect(isControlledDispatchable(registry, W9C_ADAPTER_ID)).toBe(true);
@@ -464,29 +478,37 @@ describe("E. TASK-W.9c · 自注册工厂闭环与门禁单一判定 (EW9C-01 ~ 
 
   it("EW9C-02: 升格为受控档但无派工工厂 → 明确拒绝 E_ADAPTER_NO_DISPATCH_FACTORY", () => {
     const registry = new AdapterRegistry();
-    registry.register(makeExecutableAdapter(W9C_ADAPTER_ID), "GATEWAY_ENFORCED");
+    registry.register(
+      makeExecutableAdapter(W9C_ADAPTER_ID),
+      "GATEWAY_ENFORCED",
+    );
 
     expect(isControlledDispatchable(registry, W9C_ADAPTER_ID)).toBe(false);
-    expect(() => requireControlledDispatch(registry, W9C_ADAPTER_ID)).toThrowError(
-      WorkerDispatchError,
-    );
+    expect(() =>
+      requireControlledDispatch(registry, W9C_ADAPTER_ID),
+    ).toThrowError(WorkerDispatchError);
     try {
       requireControlledDispatch(registry, W9C_ADAPTER_ID);
     } catch (err) {
-      expect((err as WorkerDispatchError).code).toBe(E_ADAPTER_NO_DISPATCH_FACTORY);
+      expect((err as WorkerDispatchError).code).toBe(
+        E_ADAPTER_NO_DISPATCH_FACTORY,
+      );
     }
   });
 
   it("EW9C-03: W.7 挂账 1 兑现——升格受控且有工厂，但无合规执行面（仅声明桩）→ 明确拒绝 E_WORKER_NO_EXECUTOR", () => {
     const registry = new AdapterRegistry();
-    registry.register(makeDeclarationOnlyAdapter(W9C_ADAPTER_ID), "GATEWAY_ENFORCED");
+    registry.register(
+      makeDeclarationOnlyAdapter(W9C_ADAPTER_ID),
+      "GATEWAY_ENFORCED",
+    );
     registry.registerDispatchFactory(W9C_ADAPTER_ID, dummyFactory, W9C_VERSION);
 
     // 升格不等于自动派工：无真实执行器时恒为 false
     expect(isControlledDispatchable(registry, W9C_ADAPTER_ID)).toBe(false);
-    expect(() => requireControlledDispatch(registry, W9C_ADAPTER_ID)).toThrowError(
-      WorkerDispatchError,
-    );
+    expect(() =>
+      requireControlledDispatch(registry, W9C_ADAPTER_ID),
+    ).toThrowError(WorkerDispatchError);
     try {
       requireControlledDispatch(registry, W9C_ADAPTER_ID);
     } catch (err) {
@@ -496,7 +518,10 @@ describe("E. TASK-W.9c · 自注册工厂闭环与门禁单一判定 (EW9C-01 ~ 
 
   it("EW9C-04: 工厂与版本强绑定 + 撤销失效 + 撤销归零", () => {
     const registry = new AdapterRegistry();
-    registry.register(makeExecutableAdapter(W9C_ADAPTER_ID, "0.1.0"), "GATEWAY_ENFORCED");
+    registry.register(
+      makeExecutableAdapter(W9C_ADAPTER_ID, "0.1.0"),
+      "GATEWAY_ENFORCED",
+    );
 
     // 1. 版本失配拒绝挂接工厂
     expect(() =>
@@ -505,10 +530,14 @@ describe("E. TASK-W.9c · 自注册工厂闭环与门禁单一判定 (EW9C-01 ~ 
 
     // 2. 正常绑定 0.1.0
     registry.registerDispatchFactory(W9C_ADAPTER_ID, dummyFactory, "0.1.0");
-    expect(registry.getDispatchFactory(W9C_ADAPTER_ID, "0.1.0")).toBe(dummyFactory);
+    expect(registry.getDispatchFactory(W9C_ADAPTER_ID, "0.1.0")).toBe(
+      dummyFactory,
+    );
 
     // 3. 版本改版（以 0.2.0 读取）→ 同步清理旧工厂
-    expect(registry.getDispatchFactory(W9C_ADAPTER_ID, "0.2.0")).toBeUndefined();
+    expect(
+      registry.getDispatchFactory(W9C_ADAPTER_ID, "0.2.0"),
+    ).toBeUndefined();
     expect(registry.getDispatchFactory(W9C_ADAPTER_ID)).toBeUndefined(); // 旧映射已被清除，无窗口期
 
     // 4. 重新挂接并撤销注销
@@ -520,13 +549,21 @@ describe("E. TASK-W.9c · 自注册工厂闭环与门禁单一判定 (EW9C-01 ~ 
     expect(registry.getDispatchFactory(W9C_ADAPTER_ID)).toBeUndefined();
 
     // 5. 撤销后重注册 → 不得继承旧受控档位（撤销归零，重新以非受控注册）
-    registry.register(makeExecutableAdapter(W9C_ADAPTER_ID, "0.1.0"), "UNCONTROLLED_EXTERNAL");
-    expect(registry.get(W9C_ADAPTER_ID)?.control_mode).toBe("UNCONTROLLED_EXTERNAL");
+    registry.register(
+      makeExecutableAdapter(W9C_ADAPTER_ID, "0.1.0"),
+      "UNCONTROLLED_EXTERNAL",
+    );
+    expect(registry.get(W9C_ADAPTER_ID)?.control_mode).toBe(
+      "UNCONTROLLED_EXTERNAL",
+    );
     expect(isControlledDispatchable(registry, W9C_ADAPTER_ID)).toBe(false);
 
     // 6. 受控档位降级为 UNCONTROLLED_EXTERNAL 时同步清理工厂
     registry.unregister(W9C_ADAPTER_ID);
-    registry.register(makeExecutableAdapter(W9C_ADAPTER_ID, "0.1.0"), "GATEWAY_ENFORCED");
+    registry.register(
+      makeExecutableAdapter(W9C_ADAPTER_ID, "0.1.0"),
+      "GATEWAY_ENFORCED",
+    );
     registry.registerDispatchFactory(W9C_ADAPTER_ID, dummyFactory, "0.1.0");
     expect(registry.getDispatchFactory(W9C_ADAPTER_ID)).toBe(dummyFactory);
 
@@ -539,7 +576,10 @@ describe("E. TASK-W.9c · 自注册工厂闭环与门禁单一判定 (EW9C-01 ~ 
     const registry = new AdapterRegistry();
 
     // 1. 档位不够
-    registry.register(makeExecutableAdapter("worker.uncontrolled"), "UNCONTROLLED_EXTERNAL");
+    registry.register(
+      makeExecutableAdapter("worker.uncontrolled"),
+      "UNCONTROLLED_EXTERNAL",
+    );
     try {
       requireControlledDispatch(registry, "worker.uncontrolled");
       expect.unreachable();
@@ -548,16 +588,24 @@ describe("E. TASK-W.9c · 自注册工厂闭环与门禁单一判定 (EW9C-01 ~ 
     }
 
     // 2. 无工厂
-    registry.register(makeExecutableAdapter("worker.no-factory"), "GATEWAY_ENFORCED");
+    registry.register(
+      makeExecutableAdapter("worker.no-factory"),
+      "GATEWAY_ENFORCED",
+    );
     try {
       requireControlledDispatch(registry, "worker.no-factory");
       expect.unreachable();
     } catch (e) {
-      expect((e as WorkerDispatchError).code).toBe(E_ADAPTER_NO_DISPATCH_FACTORY);
+      expect((e as WorkerDispatchError).code).toBe(
+        E_ADAPTER_NO_DISPATCH_FACTORY,
+      );
     }
 
     // 3. 升格但无执行面
-    registry.register(makeDeclarationOnlyAdapter("worker.no-exec"), "GATEWAY_ENFORCED");
+    registry.register(
+      makeDeclarationOnlyAdapter("worker.no-exec"),
+      "GATEWAY_ENFORCED",
+    );
     registry.registerDispatchFactory("worker.no-exec", dummyFactory);
     try {
       requireControlledDispatch(registry, "worker.no-exec");
@@ -579,7 +627,11 @@ describe("E. TASK-W.9c · 自注册工厂闭环与门禁单一判定 (EW9C-01 ~ 
         declaration: sandboxDecl,
         kind: "CLI",
         has_executor: true,
-        run: async () => ({ changes: [], log: [], usage: { inputTokens: 0, outputTokens: 0 } }),
+        run: async () => ({
+          changes: [],
+          log: [],
+          usage: { inputTokens: 0, outputTokens: 0 },
+        }),
       },
       "SANDBOX_ENFORCED",
     );

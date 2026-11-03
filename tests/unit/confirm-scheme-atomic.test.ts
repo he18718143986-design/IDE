@@ -217,7 +217,6 @@ describe("T-ATOM 五阶段事务", () => {
     expect(stages).toEqual([...CONFIRM_SCHEME_STEPS]);
   });
 
-
   it("T-ATOM-002 同 confirmation_id + 同修订重放：幂等返回，不重复签署", async () => {
     const h = makeHarness();
     const first = await runConfirmSchemeAtomic(h.input);

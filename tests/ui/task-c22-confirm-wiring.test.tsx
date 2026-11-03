@@ -336,7 +336,9 @@ describe("T-UI-4 J.5 范围预检与确认接线", () => {
 
   it("T-UI-013 点击确认：createContractWithAdmission 的 writable_paths 与 plan 一致，且未走 submitJourneyMessage", async () => {
     const scheme = makeScheme();
-    const plan = compliantScopePlan({ scheme_revision: scheme.scheme_revision });
+    const plan = compliantScopePlan({
+      scheme_revision: scheme.scheme_revision,
+    });
     const expectedWritable = scopePlanToContractScope(plan).writable_paths;
     const createContractWithAdmission = vi.fn(
       async (_conn: unknown, contract: unknown) => ({

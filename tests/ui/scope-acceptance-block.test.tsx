@@ -144,11 +144,7 @@ describe("TASK-J.6 ScopeAcceptanceBlock（S2-08）", () => {
       ],
     });
     render(
-      <ScopeAcceptanceBlock
-        plan={plan}
-        mode="pre_start"
-        approvalRequired
-      />,
+      <ScopeAcceptanceBlock plan={plan} mode="pre_start" approvalRequired />,
     );
     assertNoTechJargon(screen.getByTestId("scope-acceptance-block"));
   });
@@ -195,9 +191,9 @@ describe("TASK-J.6 ScopeAcceptanceBlock（S2-08）", () => {
     expect(decisions.approvals["prot-0"]).toBe(false);
     const next = applyScopeDecisions(plan, decisions);
     expect(next.needs_approval[0]!.approved).toBe(false);
-    expect(
-      next.never_touch.some((g) => g.paths.includes("package.json")),
-    ).toBe(true);
+    expect(next.never_touch.some((g) => g.paths.includes("package.json"))).toBe(
+      true,
+    );
   });
 
   it("开工点击路径：一键授权敏感项并产生新 plan_digest", () => {
@@ -252,7 +248,9 @@ describe("TASK-J.6 ScopeAcceptanceBlock（S2-08）", () => {
     );
     const frozenBlock = screen.getByTestId("scope-acceptance-block");
     expect(frozenBlock).toHaveAttribute("data-readonly", "true");
-    expect(screen.getByTestId("scope-acceptance-full-list")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("scope-acceptance-full-list"),
+    ).toBeInTheDocument();
     expect(screen.getAllByTestId("scope-acceptance-area-row").length).toBe(2);
     expect(screen.getAllByTestId("scope-acceptance-never-touch").length).toBe(
       2,
@@ -262,13 +260,13 @@ describe("TASK-J.6 ScopeAcceptanceBlock（S2-08）", () => {
     ).toBeNull();
     expect(screen.queryByRole("button", { name: /不要改这里/ })).toBeNull();
 
-    rerender(
-      <ScopeAcceptanceBlock plan={plan} mode="acceptance" />,
-    );
+    rerender(<ScopeAcceptanceBlock plan={plan} mode="acceptance" />);
     const acceptance = screen.getByTestId("scope-acceptance-block");
     expect(acceptance).toHaveAttribute("data-mode", "acceptance");
     expect(acceptance).toHaveAttribute("data-readonly", "true");
-    expect(screen.getByTestId("scope-acceptance-full-list")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("scope-acceptance-full-list"),
+    ).toBeInTheDocument();
     expect(
       screen.queryByTestId("scope-acceptance-decline-sensitive"),
     ).toBeNull();
@@ -323,11 +321,7 @@ describe("TASK-J.6 ScopeAcceptanceBlock（S2-08）", () => {
       <SchemeReviewPane
         scheme={scheme}
         demoGate={EMPTY_DEMO_GATE}
-        confirmation={evaluateSchemeConfirmation(
-          scheme,
-          EMPTY_DEMO_GATE,
-          plan,
-        )}
+        confirmation={evaluateSchemeConfirmation(scheme, EMPTY_DEMO_GATE, plan)}
         scopePlan={plan}
         onConfirmScheme={onConfirm}
         onDeclineSensitive={onDecline}

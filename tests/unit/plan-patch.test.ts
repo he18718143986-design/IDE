@@ -74,10 +74,7 @@ function moduleOf(
   };
 }
 
-function entity(
-  id: string,
-  name: string,
-): SchemeDraftV2["entities"][number] {
+function entity(id: string, name: string): SchemeDraftV2["entities"][number] {
   return { ...meta(id), name, fields_hint: ["id"] };
 }
 

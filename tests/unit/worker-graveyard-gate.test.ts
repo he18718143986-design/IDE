@@ -53,7 +53,10 @@ function toEntry(
   };
 }
 
-function entryOf(id: string, over: Partial<GraveyardEntry> = {}): GraveyardEntry {
+function entryOf(
+  id: string,
+  over: Partial<GraveyardEntry> = {},
+): GraveyardEntry {
   const t = fixture.tombstones[id];
   if (!t) throw new Error(`missing ${id}`);
   return toEntry(id, t, over);
@@ -108,7 +111,10 @@ function baseInput(over: Partial<GateInput> = {}): GateInput {
   };
 }
 
-function pkgChange(deps: Record<string, string>, beforeDeps: Record<string, string> = {}) {
+function pkgChange(
+  deps: Record<string, string>,
+  beforeDeps: Record<string, string> = {},
+) {
   return {
     path: "package.json",
     before: JSON.stringify({ name: "app", dependencies: beforeDeps }),
@@ -312,7 +318,7 @@ describe("TM-GA 别名改写对抗", () => {
           {
             path: "src/x.ts",
             before: "export {};\n",
-            after: 'export {};\nconst lib = name;\nconst c = require(lib);\n',
+            after: "export {};\nconst lib = name;\nconst c = require(lib);\n",
           },
         ],
       }),
@@ -328,8 +334,7 @@ describe("TM-GA 别名改写对抗", () => {
           {
             path: "src/x.ts",
             before: "export {};\n",
-            after:
-              'export {};\nconst c = require(["mon","godb"].join(""));\n',
+            after: 'export {};\nconst c = require(["mon","godb"].join(""));\n',
           },
         ],
       }),
@@ -344,8 +349,7 @@ describe("TM-GA 别名改写对抗", () => {
           {
             path: "src/x.ts",
             before: "export {};\n",
-            after:
-              'export {};\nfetch("https://data.mongodb-api.com/v1");\n',
+            after: 'export {};\nfetch("https://data.mongodb-api.com/v1");\n',
           },
         ],
       }),
@@ -501,9 +505,7 @@ describe("TM-GE 边界与失败关闭", () => {
     expect(a.ok).toBe(true);
     if (a.ok) {
       expect(a.warnings).toContain("W_GATE_DIFF_TRUNCATED");
-      const r = evaluateGraveyardGate(
-        baseInput({ changes: a.changes }),
-      );
+      const r = evaluateGraveyardGate(baseInput({ changes: a.changes }));
       // 仅路径 vendor 不含 mongo → 无命中；这里只断言不因正文误拦
       expect(r.block).toBe(false);
     }
@@ -551,9 +553,9 @@ describe("TM-GE 边界与失败关闭", () => {
       baseInput({ changes: [pkgChange({ mongodb: "^6" })] }),
     );
     expect(recommendGateCardAction(r.primary, new Set())).toBe("retry");
-    expect(
-      recommendGateCardAction(r.primary, new Set(["T-MONGO"])),
-    ).toBe("abandon_or_revive");
+    expect(recommendGateCardAction(r.primary, new Set(["T-MONGO"]))).toBe(
+      "abandon_or_revive",
+    );
   });
 
   it("TM-GE-08 同一输入两次调用 stableStringify 相等", () => {

@@ -1,9 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { createVault } from "../../daemon/vault/vault";
-import {
-  AuthSessionManager,
-  WebIngestProxy,
-} from "../../daemon/web-ingest";
+import { AuthSessionManager, WebIngestProxy } from "../../daemon/web-ingest";
 
 describe("TASK-L.17a: Silent Cookie Expiry Relogin (dec-13)", () => {
   it("enforces dec-13 clause 2: silently relogins on 401 upstream and retries fetch with zero exposure to Worker", async () => {
@@ -42,10 +39,13 @@ describe("TASK-L.17a: Silent Cookie Expiry Relogin (dec-13)", () => {
       // Second attempt: Daemon has silently refreshed the cookie using Vault credentials
       if (upstreamAttempts === 2) {
         expect(cookieHeader).toBe("session_token=gen_2");
-        return new Response("<html><body><h1>Dashboard</h1><p>Secret content</p></body></html>", {
-          status: 200,
-          headers: { "Content-Type": "text/html" },
-        });
+        return new Response(
+          "<html><body><h1>Dashboard</h1><p>Secret content</p></body></html>",
+          {
+            status: 200,
+            headers: { "Content-Type": "text/html" },
+          },
+        );
       }
 
       return new Response("Error", { status: 500 });

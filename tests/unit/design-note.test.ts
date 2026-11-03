@@ -15,15 +15,17 @@ import {
 import { PAID_SDK_LIST } from "../../src/lib/design/paid-sdk-list";
 import type { ModuleEntry } from "../../src/lib/knowledge/modules-schema";
 
-function makeContract(over: {
-  writablePaths?: string[];
-  dependencyChangesAllowed?: boolean;
-  acceptanceRefs?: Array<{
-    id: string;
-    text: string;
-    check: "auto" | "playtest" | "both";
-  }>;
-} = {}): SoftwareContract {
+function makeContract(
+  over: {
+    writablePaths?: string[];
+    dependencyChangesAllowed?: boolean;
+    acceptanceRefs?: Array<{
+      id: string;
+      text: string;
+      check: "auto" | "playtest" | "both";
+    }>;
+  } = {},
+): SoftwareContract {
   const refs = over.acceptanceRefs ?? [
     { id: "ac-1", text: "能跑通", check: "auto" as const },
   ];
@@ -109,9 +111,7 @@ describe("TASK-L.11 DesignNote TD-01～TD-05", () => {
   it("TD-01: touches 含合同范围外路径 → DESIGN_INVALID（DN-1）", () => {
     const contract = makeContract({ writablePaths: ["src/**"] });
     const note = baseNote(contract, {
-      touches: [
-        { path: "secrets/token.json", change: "modify", why: "越权" },
-      ],
+      touches: [{ path: "secrets/token.json", change: "modify", why: "越权" }],
     });
     const r = validateDesignNote(note, contract, modules);
     expect(r.ok).toBe(false);
@@ -174,9 +174,7 @@ describe("TASK-L.11 DesignNote TD-01～TD-05", () => {
   it("TD-05: 未标注但依赖命中付费 SDK → costs_money + escalation_missed", () => {
     const contract = makeContract({ dependencyChangesAllowed: true });
     const note = baseNote(contract, {
-      dependencies: [
-        { name: "stripe", version: "14.0.0", why: "收款" },
-      ],
+      dependencies: [{ name: "stripe", version: "14.0.0", why: "收款" }],
       decisions: [],
     });
     const v = validateDesignNote(note, contract, modules);

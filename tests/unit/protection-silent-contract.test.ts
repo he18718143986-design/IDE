@@ -215,7 +215,6 @@ describe("TASK-P.1 保护清单与本轮授权", () => {
       false,
     );
   });
-
 });
 
 describe("TASK-P.1 Auto-Checkpoint 与整轮撤销", () => {

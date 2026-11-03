@@ -82,7 +82,9 @@ describe("TASK-L.17b playtest-evidence", () => {
     // release_id 由服务端从 Release Store 当前 LIVE 填入
     expect(ev.release_id).toBe(LIVE_RELEASE_ID);
     // 精确 ISO 时间戳
-    expect(ev.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    expect(ev.timestamp).toMatch(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+    );
     // 落盘内容与 schema 自洽
     const onDisk = JSON.parse(
       fs.readFileSync(playtestEvidencePath(repo, CONTRACT_ID), "utf-8"),
@@ -196,27 +198,24 @@ describe("TASK-L.17b playtest-evidence", () => {
 
   it("客户端 submitPlaytestEvidence 只发 contract_id + user_verdict", async () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
-    vi.stubGlobal(
-      "fetch",
-      async (url: string, init: RequestInit) => {
-        calls.push({ url, init });
-        return {
-          ok: true,
-          text: async () =>
-            JSON.stringify({
-              ok: true,
-              evidence: {
-                schema_version: "1.0.0",
-                contract_id: CONTRACT_ID,
-                release_id: LIVE_RELEASE_ID,
-                user_verdict: "认可完成",
-                operator: "user",
-                timestamp: LIVE_CREATED_AT,
-              },
-            }),
-        };
-      },
-    );
+    vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      return {
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            ok: true,
+            evidence: {
+              schema_version: "1.0.0",
+              contract_id: CONTRACT_ID,
+              release_id: LIVE_RELEASE_ID,
+              user_verdict: "认可完成",
+              operator: "user",
+              timestamp: LIVE_CREATED_AT,
+            },
+          }),
+      };
+    });
     await submitPlaytestEvidence(
       { baseUrl: "http://127.0.0.1:3001", token: "abc123" },
       { contract_id: CONTRACT_ID, user_verdict: "认可完成" },
@@ -316,9 +315,9 @@ describe("TASK-L.17b POST /api/playtest/evidence HTTP 接线", () => {
       }),
     });
     expect(forged.status).toBe(400);
-    expect(
-      ((await forged.json()) as { code: string }).code,
-    ).toBe(E_EVIDENCE_FORGED_FIELD);
+    expect(((await forged.json()) as { code: string }).code).toBe(
+      E_EVIDENCE_FORGED_FIELD,
+    );
     expect(fs.existsSync(playtestEvidencePath(repo, CONTRACT_ID))).toBe(false);
 
     // 3) 空原话 → 拒绝

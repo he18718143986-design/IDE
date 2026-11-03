@@ -34,15 +34,17 @@ import { ContractStore } from "../../daemon/pipeline/contract-store";
 import { git } from "../helpers/git";
 import type { WorkerModelClient } from "../../daemon/worker/ai-worker";
 
-function makeContract(opts: {
-  writablePaths?: string[];
-  acceptanceRefs?: Array<{
-    id: string;
-    text: string;
-    check: "auto" | "playtest" | "both";
-  }>;
-  maxVerificationRetries?: number;
-} = {}) {
+function makeContract(
+  opts: {
+    writablePaths?: string[];
+    acceptanceRefs?: Array<{
+      id: string;
+      text: string;
+      check: "auto" | "playtest" | "both";
+    }>;
+    maxVerificationRetries?: number;
+  } = {},
+) {
   const refs = opts.acceptanceRefs ?? [
     { id: "ac-login", text: "登录成功", check: "auto" as const },
   ];
@@ -362,9 +364,7 @@ describe("TASK-L.4 两段式施工", () => {
 
   it("全部豁免 → 只运行一段，与 happy-path 一致", async () => {
     const contract = makeContract({
-      acceptanceRefs: [
-        { id: "ac-manual", text: "靠试玩", check: "playtest" },
-      ],
+      acceptanceRefs: [{ id: "ac-manual", text: "靠试玩", check: "playtest" }],
     });
     let tCalls = 0;
     let iCalls = 0;
@@ -412,13 +412,7 @@ describe("TASK-L.4 两段式施工", () => {
 
     const tmp = path.join(repoRoot, "rep.json");
     fs.writeFileSync(tmp, JSON.stringify(report("red")), "utf8");
-    const t = runCheckCommand([
-      "obligations",
-      "--report",
-      tmp,
-      "--phase",
-      "t",
-    ]);
+    const t = runCheckCommand(["obligations", "--report", tmp, "--phase", "t"]);
     expect(t.exitCode).toBe(0);
     expect(JSON.parse(t.stdout).classification).toBe("red");
 
@@ -482,7 +476,6 @@ describe("TASK-L.4 两段式施工", () => {
   });
 });
 
-
 describe("TASK-L.4 生产调度接线（orchestrator.runWorker）", () => {
   let repo: string;
 
@@ -522,9 +515,7 @@ describe("TASK-L.4 生产调度接线（orchestrator.runWorker）", () => {
       maxVerificationRetries: 5,
       supervisorMetadata: {
         suggestion_id: "scheme:l4-prod",
-        acceptance_refs: [
-          { id: "ac-login", text: "登录成功", check: "auto" },
-        ],
+        acceptance_refs: [{ id: "ac-login", text: "登录成功", check: "auto" }],
         scheme_item_ids: ["ac-login"],
         stub_id: null,
       },
@@ -644,9 +635,7 @@ describe("TASK-L.4 生产调度接线（orchestrator.runWorker）", () => {
       writablePaths: ["src/**"],
       supervisorMetadata: {
         suggestion_id: "scheme:l4-waive",
-        acceptance_refs: [
-          { id: "ac-play", text: "手测", check: "playtest" },
-        ],
+        acceptance_refs: [{ id: "ac-play", text: "手测", check: "playtest" }],
         scheme_item_ids: ["ac-play"],
         stub_id: null,
       },
@@ -675,9 +664,7 @@ describe("TASK-L.4 生产调度接线（orchestrator.runWorker）", () => {
         generateChanges: async () => {
           calls += 1;
           return {
-            changes: [
-              { path: "src/b.ts", content: "export const b = 2;\n" },
-            ],
+            changes: [{ path: "src/b.ts", content: "export const b = 2;\n" }],
             log: ["single"],
             usage: { inputTokens: 1, outputTokens: 1 },
           };
