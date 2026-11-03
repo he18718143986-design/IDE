@@ -297,7 +297,7 @@ describe("TASK-L.6 黄金切片 E2E（一句需求 → 合入）", () => {
       name: string;
       purpose: string;
       kind: "new" | "change_existing";
-      project_anchor: string | null;
+      project_anchor?: string;
     }>;
   } {
     const record = readSchemeLedger(repo);
@@ -321,7 +321,8 @@ describe("TASK-L.6 黄金切片 E2E（一句需求 → 合入）", () => {
       summary: draft.summary,
       modules: draft.modules.map((m) => m.name),
       mermaidFlow,
-      business_input_rounds: Math.max(1, draft.business_input_rounds ?? 1),
+      // 本用例只发了 USER_TEXT 一条需求 → 恰好 1 轮业务输入（V2 账本不存该计数）
+      business_input_rounds: 1,
       demoReady: true,
       acceptance: draft.acceptance.map((a) => ({
         id: a.id,
@@ -337,7 +338,9 @@ describe("TASK-L.6 黄金切片 E2E（一句需求 → 合入）", () => {
         name: m.name,
         purpose: m.purpose,
         kind: m.kind,
-        project_anchor: m.project_anchor,
+        ...(m.project_anchor !== undefined
+          ? { project_anchor: m.project_anchor }
+          : {}),
       })),
     };
   }

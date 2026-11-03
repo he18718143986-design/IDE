@@ -126,7 +126,7 @@ function runHook(opts: {
     STAGENT_HOOK_ROOT: opts.root,
     STAGENT_HOOK_LOG: logFile,
   };
-  if (opts.allowBash) env.STAGENT_HOOK_ALLOW_BASH = "1";
+  if (opts.allowBash) env["STAGENT_HOOK_ALLOW_BASH"] = "1";
   const r = spawnSync(process.execPath, [HOOK], {
     input: JSON.stringify({
       tool_name: opts.tool,

@@ -21,7 +21,6 @@ export type SchemeLikeForStubView =
       | "acceptance"
       | "out_of_scope"
       | "entities"
-      | "notes"
     > & {
       modules?: SchemeDraftV2["modules"] | string[];
       notes?: string | null;
@@ -131,9 +130,11 @@ export function schemeViewForStub(
           modules_v2: modulesV2.map((m) => ({
             id: m.id,
             name: m.name,
-            purpose: m.purpose,
+            ...(m.purpose !== undefined ? { purpose: m.purpose } : {}),
             kind: m.kind ?? "new",
-            project_anchor: stub.area_hints[0],
+            ...(stub.area_hints[0] !== undefined
+              ? { project_anchor: stub.area_hints[0] }
+              : {}),
           })),
         }
       : stub.area_hints.length > 0
@@ -151,7 +152,7 @@ export function schemeViewForStub(
       ? {
           acceptance: acceptance.map((a) => ({
             id: a.id,
-            text: "text" in a ? String(a.text) : a.id,
+            text: String((a as { text?: unknown }).text ?? a.id),
             check:
               "check" in a &&
               (a.check === "auto" ||

@@ -7,11 +7,11 @@ describe("TASK-L.15 hostEnvAllowlist", () => {
     process.env[marker] = "should-not-leak";
     try {
       const env = hostEnvAllowlist({ FOO: "bar" });
-      expect(env.FOO).toBe("bar");
+      expect(env["FOO"]).toBe("bar");
       expect(env[marker]).toBeUndefined();
       // PATH 通常存在
-      if (typeof process.env.PATH === "string") {
-        expect(env.PATH).toBe(process.env.PATH);
+      if (typeof process.env["PATH"] === "string") {
+        expect(env["PATH"]).toBe(process.env["PATH"]);
       }
     } finally {
       delete process.env[marker];

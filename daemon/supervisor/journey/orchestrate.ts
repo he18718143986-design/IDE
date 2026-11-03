@@ -94,8 +94,12 @@ export async function orchestrateJourney(
   input: JourneyOrchestrateInput,
 ): Promise<JourneyOrchestrateResult> {
   const intent = classifyJourneyIntent(input.message, {
-    liveTargetNames: input.liveTargetNames,
-    hasInProgressContract: input.hasInProgressContract,
+    ...(input.liveTargetNames !== undefined
+      ? { liveTargetNames: input.liveTargetNames }
+      : {}),
+    ...(input.hasInProgressContract !== undefined
+      ? { hasInProgressContract: input.hasInProgressContract }
+      : {}),
   });
   const now = input.now?.() ?? new Date();
   // TASK-C.14c：深度扫未完时防抢跑（不抛异常、不空白）

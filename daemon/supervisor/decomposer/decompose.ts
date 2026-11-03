@@ -348,7 +348,7 @@ export async function decompose(
         scheme,
         repoFacts: input.repoFacts,
         pab,
-        priorViolations,
+        ...(priorViolations ? { priorViolations } : {}),
       });
     } catch {
       return {
@@ -384,7 +384,7 @@ export async function decompose(
     ok: false,
     code: "E_PLAN_INVALID",
     plain_message: "这个需求我还没拆好",
-    violations: priorViolations,
+    ...(priorViolations ? { violations: priorViolations } : {}),
     model_calls: modelCalls,
   };
 }

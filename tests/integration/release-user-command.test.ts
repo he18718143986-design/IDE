@@ -131,7 +131,7 @@ describe("TASK-L.15 release-user-command RO-06/07/09", () => {
         stamp(
           ["npm", "run", "deploy"],
           true,
-          `deploying with ${ctx.env.API_TOKEN ?? secret}`,
+          `deploying with ${ctx.env["API_TOKEN"] ?? secret}`,
         ),
       health: async () => stamp(["true"], true, "ok"),
     };

@@ -70,7 +70,7 @@ function detectRepoFacts(repoRoot: string): RepoFacts {
       const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as {
         scripts?: Record<string, string>;
       };
-      has_test_script = Boolean(pkg.scripts?.test);
+      has_test_script = Boolean(pkg.scripts?.["test"]);
     }
   } catch {
     has_test_script = false;

@@ -160,10 +160,12 @@ export function evaluateGraveyardGate(input: GateInput): GateResult {
   );
   const chosen = strongSecurity ?? strongUser;
   if (chosen) {
+    // chosen 只可能来自 strongSecurity / strongUser；显式收窄掉 GraveyardHit 的 "soft"，
+    // 保证阻断级主码的 lock 只能是 security / user。
     primary = {
       code: "E_PROPOSAL_PREVIOUSLY_REJECTED",
       rejected_id: chosen.rejected_id,
-      lock: chosen.lock,
+      lock: chosen.lock === "security" ? "security" : "user",
     };
   }
 

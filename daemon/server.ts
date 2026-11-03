@@ -65,6 +65,7 @@ import { explainLine, TraceBrokenError, E_TRACE_BROKEN } from "./trace/why";
 import { loadModulesForRepo } from "./knowledge/modules-store";
 import { impactClosure } from "../src/lib/knowledge/impact-closure";
 import { ReleaseManager, listReleaseRecords } from "./release/release-manager";
+import { ReleaseInvariantError } from "../src/lib/release/release";
 import { loadOrInitLedgerState } from "./supervisor/intent-compiler/scheme-ledger-store";
 import {
   assertContractScopeAllowed,
@@ -1720,7 +1721,7 @@ export class StagentDaemon {
           const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as {
             scripts?: Record<string, string>;
           };
-          hasTestScript = typeof pkg.scripts?.test === "string";
+          hasTestScript = typeof pkg.scripts?.["test"] === "string";
         }
       } catch {
         hasTestScript = false;
@@ -3983,7 +3984,9 @@ export class StagentDaemon {
             ? {
                 target_id: r.live_incident.target_id,
                 target_label: r.live_incident.target_label,
-                stub_created: r.live_incident.stub_created,
+                ...(r.live_incident.stub_created !== undefined
+                  ? { stub_created: r.live_incident.stub_created }
+                  : {}),
               }
             : null,
         };
@@ -4872,7 +4875,9 @@ export class StagentDaemon {
           repoFacts,
           pab: body.pab ?? null,
           existingPlan: existing,
-          project_id: body.project_id,
+          ...(body.project_id !== undefined
+            ? { project_id: body.project_id }
+            : {}),
         });
         if (!result.ok) {
           this.sendJson(res, 422, {

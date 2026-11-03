@@ -15,6 +15,19 @@ import type {
 } from "../../src/lib/project/project-plan";
 import type { ScopePlan } from "../../src/lib/journey/scope-plan";
 import { scopePlanDigest } from "../../src/lib/journey/scope-plan";
+import type { WithText } from "../../src/lib/journey/scheme-patch-types";
+
+/** 最小合法方案条目：桩视图按 id 过滤，元数据只需满足 WithText */
+function item(id: string, text: string): WithText {
+  return {
+    id,
+    text,
+    source: "user_said",
+    evidence: [],
+    user_pinned: false,
+    updated_in_revision: 1,
+  };
+}
 
 function stub(
   partial: Partial<ContractStub> & Pick<ContractStub, "stub_id" | "title">,
@@ -167,15 +180,15 @@ describe("schemeViewForStub + §5.1", () => {
         scheme_revision: 1,
         title: "整案",
         summary: "全部",
+        notes: "",
         modules: ["登录", "支付"],
-        goals: [
-          { id: "g-1", text: "登录" },
-          { id: "g-2", text: "支付" },
-        ],
+        goals: [item("g-1", "登录"), item("g-2", "支付")],
         acceptance: [
-          { id: "acc-1", text: "能登录", check: "both" },
-          { id: "acc-2", text: "能支付", check: "both" },
+          { ...item("acc-1", "能登录"), check: "both" },
+          { ...item("acc-2", "能支付"), check: "both" },
         ],
+        out_of_scope: [],
+        entities: [],
       },
       stub({
         stub_id: "cs-pay",
@@ -199,13 +212,14 @@ describe("schemeViewForStub + §5.1", () => {
           label: "测试",
           why: "基建",
           module_ids: [],
-          kind: "new",
+          kind: "create_new",
           paths: ["tests/**"],
           excluded_by_user: false,
         },
       ],
       never_touch: [],
       needs_approval: [],
+      grade: { ok: true, rejected: [] },
       verification: {
         plain: ["测试通过"],
         commands: [],
@@ -215,7 +229,7 @@ describe("schemeViewForStub + §5.1", () => {
         plain: "小改",
         limits: {
           max_file_modifications: 10,
-          max_diff_lines: 500,
+          max_total_diff_lines: 500,
           max_duration_seconds: 600,
           max_verification_retries: 2,
         },

@@ -98,7 +98,9 @@ export function buildJourneyLiveIncidentContext(input: {
     liveTargetNames: collectLiveTargetNames(input.releases),
     hasInProgressContract: hasInProgressConstruction({
       contracts: input.contracts,
-      selectedContract: input.selectedContract,
+      ...(input.selectedContract !== undefined
+        ? { selectedContract: input.selectedContract }
+        : {}),
     }),
   };
 }

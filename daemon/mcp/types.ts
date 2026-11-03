@@ -121,4 +121,5 @@ export const StagentWebIngestSchema = z.object({
 export type StagentWebIngestInput = z.infer<typeof StagentWebIngestSchema>;
 
 export const E_INGEST_NOT_WIRED = "E_INGEST_NOT_WIRED";
-export const E_WEB_INGEST_FORBIDDEN_DOMAIN = "E_WEB_INGEST_FORBIDDEN_DOMAIN";
+// 错误码单一事实源在 web-ingest/types.ts，此处仅转出，避免 daemon/index.ts 出现同名歧义导出。
+export { E_WEB_INGEST_FORBIDDEN_DOMAIN } from "../web-ingest/types";

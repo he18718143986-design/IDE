@@ -45,6 +45,9 @@ type TraceCardState =
   | { status: "ok"; line: number; result: TraceWhyResult }
   | { status: "broken"; line: number; message: string; ring?: string };
 
+/** monaco 编辑器实例类型，从 OnMount 的入参推导，避免直接依赖 monaco-editor 包类型。 */
+type MonacoEditorInstance = Parameters<OnMount>[0];
+
 type ImpactCardState =
   | { status: "idle" }
   | { status: "loading" }
@@ -84,7 +87,7 @@ export function MonacoEditorPane({
       label: "这段为什么存在",
       contextMenuGroupId: "navigation",
       contextMenuOrder: 1.5,
-      run: async (ed) => {
+      run: async (ed: MonacoEditorInstance) => {
         const position = ed.getPosition();
         if (!position) return;
         const line = position.lineNumber;
@@ -107,7 +110,12 @@ export function MonacoEditorPane({
             typeof (err.body as { ring?: unknown }).ring === "string"
               ? (err.body as { ring: string }).ring
               : undefined;
-          setTraceCard({ status: "broken", line, message, ring });
+          setTraceCard({
+            status: "broken",
+            line,
+            message,
+            ...(ring !== undefined ? { ring } : {}),
+          });
         }
       },
     });

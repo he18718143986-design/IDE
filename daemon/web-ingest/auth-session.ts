@@ -190,7 +190,10 @@ export class AuthSessionManager {
   ): Promise<string | null> {
     const norm = this.normalizeDomain(domain);
     this.sessions.delete(norm);
-    return this.authenticate(norm, { forceRelogin: true, fetchFn });
+    return this.authenticate(norm, {
+      forceRelogin: true,
+      ...(fetchFn ? { fetchFn } : {}),
+    });
   }
 
   /**

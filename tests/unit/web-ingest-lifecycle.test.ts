@@ -16,7 +16,7 @@ describe("TASK-L.17a: Web Ingest Credential Lifecycle (dec-13)", () => {
       domain: "data.partner.com",
       credentialName: secretName,
       loginHandler: async (creds) => ({
-        cookie: `auth=${creds.token}`,
+        cookie: `auth=${creds["token"]}`,
         expiresAt: Date.now() + 1800 * 1000,
       }),
     });

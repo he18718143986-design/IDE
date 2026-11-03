@@ -95,9 +95,11 @@ export interface IntentCompilerModelClient {
 export interface CompilerCasWriteInput {
   expectedPrevRevision: number;
   next: LedgerState;
-  journal: MergeJournal;
-  patch: SchemePatch;
-  promptVersion: string;
+  /** 没有经过编译回合的账本（如手工植入初始态）允许为空 */
+  journal?: MergeJournal | null;
+  /** 存储层不落盘 patch，仅编译回合内部使用 */
+  patch?: SchemePatch;
+  promptVersion?: string | null;
   modelId: string | null;
   offline: boolean;
 }

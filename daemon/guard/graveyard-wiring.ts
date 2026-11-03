@@ -5,7 +5,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { SoftwareContract } from "../../src/lib/contract.schema";
-import type { ArtifactChange } from "../../src/lib/journey/artifact-projection";
+import type {
+  ArtifactChange,
+  GateUnit,
+} from "../../src/lib/journey/artifact-projection";
 import type { GraveyardEntry } from "../../src/lib/journey/scheme-patch-types";
 import { readDiffFiles, type DiffFilesResult } from "../diff/diff-files";
 import {
@@ -229,7 +232,7 @@ export async function scanWorktreeGraveyard(input: {
   worktreePath: string;
   baseBranch: string;
   context: GraveyardGateContext;
-  texts?: readonly { text: string; source: "change" | "log" | "commit" }[];
+  texts?: readonly { text: string; source: GateUnit["source"] }[];
   commands?: readonly (readonly string[])[];
 }): Promise<WorktreeGraveyardScan> {
   let diff: DiffFilesResult;

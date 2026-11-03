@@ -20,8 +20,10 @@ import {
   type SchemeDraft,
 } from "../../src/lib/journey/scheme-draft";
 import type { GraveyardEntry } from "../../src/lib/journey/scheme-patch-types";
+import type { ScopePlan } from "../../src/lib/journey/scope-plan";
 import { scopePlanToContractScope } from "../../src/lib/journey/scope-plan";
 import { buildScopePlan } from "../../daemon/supervisor/scope-plan-builder";
+import type { SchemeSnapshot } from "../../daemon/pipeline/scheme-snapshot-store";
 import {
   schemeBindingFromSnapshot,
   writeSchemeSnapshot,
@@ -472,6 +474,8 @@ describe("TM-GI worker graveyard gate wiring", () => {
     });
 
     const worktree = path.join(repo, ".stagent", "worktrees", "manual");
+    // 网关与 Worker 共用同一份预算计数，避免各自计账
+    const costMonitor = new CostMonitor();
     fs.mkdirSync(worktree, { recursive: true });
     fs.copyFileSync(
       path.join(repo, "package.json"),
@@ -479,10 +483,11 @@ describe("TM-GI worker graveyard gate wiring", () => {
     );
     const gateway = new ScopedWorktreeGateway(worktree, approved, {
       graveyardGate: prep.context,
-      costMonitor: new CostMonitor(),
+      costMonitor,
     });
     const worker = new AiWorker({
       gateway,
+      costMonitor,
       modelClient: {
         generateChanges: async () => ({
           changes: [],

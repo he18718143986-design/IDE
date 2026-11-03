@@ -118,9 +118,9 @@ export function casWriteSchemeLedger(
     schema_version: SCHEME_LEDGER_SCHEMA_VERSION,
     updated_at: new Date().toISOString(),
     state: input.next,
-    last_journal: input.journal,
+    last_journal: input.journal ?? null,
     last_model_id: input.modelId,
-    last_prompt_version: input.promptVersion,
+    last_prompt_version: input.promptVersion ?? null,
     offline: input.offline,
   };
 

@@ -1517,10 +1517,12 @@ export class ContractOrchestrator {
       let activeDesignNote: DesignNote | undefined;
       let designInfo: DesignRunInfo | undefined;
       if (options.skipDesignStep !== true) {
+        const designGenerator =
+          options.designNoteGenerator ?? this.designNoteGenerator;
         const designResult = await runDesignStep({
           repoRoot: this.repoRoot,
           contract: current,
-          generator: options.designNoteGenerator ?? this.designNoteGenerator,
+          ...(designGenerator ? { generator: designGenerator } : {}),
         });
         if (designResult.status === "suspended") {
           this.revokeExecTokenFor(contractId);

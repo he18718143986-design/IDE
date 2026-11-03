@@ -208,7 +208,7 @@ describe("TASK-L.18 parseInterfaceConsumersMarkdown / loadModulesForRepo", () =>
         "db",
         "orders",
       ]);
-      expect(loaded.interfaceConsumers.auth).toEqual(["orders"]);
+      expect(loaded.interfaceConsumers["auth"]).toEqual(["orders"]);
       const impact = impactClosure({
         modules: loaded.data.modules,
         path: "src/db/x.ts",

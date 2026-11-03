@@ -267,7 +267,7 @@ describe("TM-GP 表列特例", () => {
   });
 
   it("TM-GP-06 任意执行期组合主码永不为 E_SCOPE_PLAN_DRIFT", () => {
-    const sneaky = [
+    const sneaky: LineVerdict[] = [
       { code: "E_OUT_OF_SCOPE" },
       {
         code: "E_SCOPE_PLAN_DRIFT" as unknown as BlockingCode,

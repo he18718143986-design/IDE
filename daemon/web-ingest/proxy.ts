@@ -270,7 +270,7 @@ export class WebIngestProxy {
     } catch (err: unknown) {
       throw new WebIngestError(
         E_WEB_INGEST_FETCH_FAILED,
-        `Failed to read response body from '${host}': ${(err as Error).message}`,
+        `Failed to read response body from '${currentUrl.hostname}': ${(err as Error).message}`,
         502,
       );
     }
@@ -353,7 +353,8 @@ export class WebIngestProxy {
 export function extractHtmlSummary(html: string): WebIngestSummary {
   // Title
   const titleMatch = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
-  const title = titleMatch ? stripHtmlTags(titleMatch[1]).trim() : undefined;
+  const titleRaw = titleMatch?.[1];
+  const title = titleRaw ? stripHtmlTags(titleRaw).trim() : undefined;
 
   // Description
   const metaMatch =
@@ -363,14 +364,15 @@ export function extractHtmlSummary(html: string): WebIngestSummary {
     /<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i.exec(
       html,
     );
-  const description = metaMatch ? metaMatch[1].trim() : undefined;
+  const descriptionRaw = metaMatch?.[1];
+  const description = descriptionRaw ? descriptionRaw.trim() : undefined;
 
   // H1s
   const h1Regex = /<h1[^>]*>([\s\S]*?)<\/h1>/gi;
   const h1: string[] = [];
   let match: RegExpExecArray | null;
   while ((match = h1Regex.exec(html)) !== null) {
-    const text = stripHtmlTags(match[1]).trim();
+    const text = stripHtmlTags(match[1] ?? "").trim();
     if (text) h1.push(text);
   }
 
