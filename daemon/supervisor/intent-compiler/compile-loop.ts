@@ -85,8 +85,7 @@ export interface IntentCompilerModelFailure {
 }
 
 export type IntentCompilerModelResult =
-  | IntentCompilerModelSuccess
-  | IntentCompilerModelFailure;
+  IntentCompilerModelSuccess | IntentCompilerModelFailure;
 
 /** 可替换模型客户端（测试用桩；生产注入 generateObject） */
 export interface IntentCompilerModelClient {
@@ -104,8 +103,7 @@ export interface CompilerCasWriteInput {
 }
 
 export type CompilerCasWriteResult =
-  | { ok: true; revision: number }
-  | { ok: false; reason: "cas_mismatch" | "io" };
+  { ok: true; revision: number } | { ok: false; reason: "cas_mismatch" | "io" };
 
 export interface CompilerLoopDeps {
   /** 读取当前账本 */
@@ -215,7 +213,9 @@ export class IntentCompileLoop {
   }
 
   /** AI 回复完毕 / 空闲计时 / 用户手改：明确不触发（V-05） */
-  notifyNonTrigger(trigger: Exclude<CompilerTrigger, "USER_TURN_COMMITTED">): void {
+  notifyNonTrigger(
+    trigger: Exclude<CompilerTrigger, "USER_TURN_COMMITTED">,
+  ): void {
     void trigger;
     // 故意空实现：结构性保证 modelCalls 不变
   }
@@ -280,8 +280,7 @@ export class IntentCompileLoop {
       return;
     }
 
-    const hasKey =
-      this.deps.hasModelKey?.() ?? this.deps.modelClient !== null;
+    const hasKey = this.deps.hasModelKey?.() ?? this.deps.modelClient !== null;
     if (!hasKey || this.deps.modelClient === null) {
       await this.runOffline(batch);
       return;
@@ -319,24 +318,25 @@ export class IntentCompileLoop {
     const started = (this.deps.now ?? Date.now)();
     try {
       if (this.deps.budget) {
-        const outcome = await this.deps.budget.runModelCall<IntentCompilerModelResult>({
-          call: async () => {
-            const r = await this.callModel(system, rendered, enums);
-            this.modelCalls += 1;
-            if (!r.ok) {
+        const outcome =
+          await this.deps.budget.runModelCall<IntentCompilerModelResult>({
+            call: async () => {
+              const r = await this.callModel(system, rendered, enums);
+              this.modelCalls += 1;
+              if (!r.ok) {
+                return {
+                  result: r,
+                  input_tokens: 0,
+                  output_tokens: 0,
+                };
+              }
               return {
                 result: r,
-                input_tokens: 0,
-                output_tokens: 0,
+                input_tokens: r.input_tokens,
+                output_tokens: r.output_tokens,
               };
-            }
-            return {
-              result: r,
-              input_tokens: r.input_tokens,
-              output_tokens: r.output_tokens,
-            };
-          },
-        });
+            },
+          });
         modelResult = outcome.result;
       } else {
         modelResult = await this.callModel(system, rendered, enums);
@@ -430,7 +430,8 @@ export class IntentCompileLoop {
       return result;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (/abort/i.test(msg)) return { ok: false, reason: "timeout", detail: msg };
+      if (/abort/i.test(msg))
+        return { ok: false, reason: "timeout", detail: msg };
       return { ok: false, reason: "network", detail: msg };
     } finally {
       clearTimeoutFn(timer as NodeJS.Timeout);

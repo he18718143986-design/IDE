@@ -104,10 +104,7 @@ export async function httpHealthCheck(opts: {
   timeoutMs?: number;
 }): Promise<{ ok: boolean; status: number; body_tail: string }> {
   const controller = new AbortController();
-  const timer = setTimeout(
-    () => controller.abort(),
-    opts.timeoutMs ?? 5_000,
-  );
+  const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 5_000);
   try {
     const res = await fetch(opts.url, {
       method: "GET",

@@ -4,7 +4,10 @@ import net from "node:net";
 import path from "node:path";
 import { sanitizeEnvironment } from "../../runner/env-filter";
 import { killProcessTree } from "../../runner/process-tree";
-import { spawnManaged, type ManagedProcess } from "../../worker/cli-host/process-host";
+import {
+  spawnManaged,
+  type ManagedProcess,
+} from "../../worker/cli-host/process-host";
 
 /**
  * TASK-L.5：在 Worktree 里启动用户应用的真实预览进程。
@@ -159,9 +162,7 @@ export async function startAppPreview(
 
   const picked = options.command ?? pickPreviewCommand(worktreeDir);
   if (!picked) {
-    throw new Error(
-      `[E_APP_PREVIEW_NO_COMMAND] ${NO_PREVIEW_PLAIN_MESSAGE}`,
-    );
+    throw new Error(`[E_APP_PREVIEW_NO_COMMAND] ${NO_PREVIEW_PLAIN_MESSAGE}`);
   }
 
   const port = options.port;
@@ -220,14 +221,11 @@ export async function startAppPreview(
 
 function probeOnce(port: number, host: string): Promise<boolean> {
   return new Promise((resolve) => {
-    const req = http.get(
-      { host, port, path: "/", timeout: 1_500 },
-      (res) => {
-        // 任意 HTTP 响应（含 3xx / 4xx）即就绪
-        res.resume();
-        resolve(true);
-      },
-    );
+    const req = http.get({ host, port, path: "/", timeout: 1_500 }, (res) => {
+      // 任意 HTTP 响应（含 3xx / 4xx）即就绪
+      res.resume();
+      resolve(true);
+    });
     req.on("error", () => resolve(false));
     req.on("timeout", () => {
       req.destroy();
@@ -270,7 +268,10 @@ export async function waitReady(
  */
 export async function stopAppPreview(handle: AppPreviewHandle): Promise<void> {
   try {
-    await killProcessTree(handle.pid, { graceMs: 3_000, confirmTimeoutMs: 2_000 });
+    await killProcessTree(handle.pid, {
+      graceMs: 3_000,
+      confirmTimeoutMs: 2_000,
+    });
   } catch {
     // 尽最大努力
   }

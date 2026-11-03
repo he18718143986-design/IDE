@@ -1,7 +1,11 @@
 /**
  * TASK-L.15：user_command 目标 —— 执行用户自有部署脚本。
  */
-import type { ReleaseTargetAdapter, ReleaseContext, StepResult } from "../target-adapter";
+import type {
+  ReleaseTargetAdapter,
+  ReleaseContext,
+  StepResult,
+} from "../target-adapter";
 import {
   detectInstallArgv,
   httpHealthCheck,

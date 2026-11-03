@@ -72,7 +72,9 @@ export function writeAllowlist(
   const abs = allowlistAbs(repoRoot);
   // 硬拒：不得写 metadata
   if (abs.includes(`${path.sep}.stagent${path.sep}metadata${path.sep}`)) {
-    throw new Error("authorization allowlist must not write under .stagent/metadata/");
+    throw new Error(
+      "authorization allowlist must not write under .stagent/metadata/",
+    );
   }
   fs.mkdirSync(path.dirname(abs), { recursive: true });
   const tmp = `${abs}.tmp-${process.pid}-${Date.now()}`;

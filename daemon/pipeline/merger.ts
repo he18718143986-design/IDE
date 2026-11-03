@@ -321,7 +321,6 @@ export function ensureChangelogSchemeItemIds(
   return rel.replace(/\\/g, "/");
 }
 
-
 /** Trailer 行形态：`Key: value`，Key 为字母开头的连字符标识 */
 const TRAILER_LINE_PATTERN = /^[A-Za-z][A-Za-z0-9-]*: /;
 

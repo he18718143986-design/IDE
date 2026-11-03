@@ -485,7 +485,6 @@ export class ScopedWorktreeGateway {
     return n;
   }
 
-
   public getModifiedTestFiles(): readonly string[] {
     return Array.from(this.modifiedTestFiles);
   }
@@ -746,7 +745,8 @@ export class ScopedWorktreeGateway {
           properties: {
             url: {
               type: "string",
-              description: "Target HTTP/HTTPS URL to ingest; domain must be in references whitelist",
+              description:
+                "Target HTTP/HTTPS URL to ingest; domain must be in references whitelist",
             },
             format: {
               type: "string",
@@ -1053,7 +1053,10 @@ export class ScopedWorktreeGateway {
             return null;
           }
         })
-        .filter((h: string | null): h is string => typeof h === "string" && h.length > 0),
+        .filter(
+          (h: string | null): h is string =>
+            typeof h === "string" && h.length > 0,
+        ),
     );
 
     const targetHost = targetUrl.hostname.toLowerCase();
@@ -1269,7 +1272,6 @@ export class ScopedWorktreeGateway {
       },
     };
   }
-
 
   /**
    * TASK-J.18d：单次写的墓地门禁。强命中 → onScopeBlocked + 阻断；

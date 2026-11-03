@@ -26,10 +26,7 @@ import { findTarget, loadReleaseTargets } from "./targets-store";
 import type { ReleaseTargetAdapter, StepResult } from "./target-adapter";
 import { LocalProcessAdapter } from "./targets/local-process";
 import { UserCommandAdapter } from "./targets/user-command";
-import {
-  clearLiveProcess,
-  getLiveProcess,
-} from "./process-registry";
+import { clearLiveProcess, getLiveProcess } from "./process-registry";
 import { insertLiveIncidentStub } from "./live-incident-stub";
 import { getActiveVault, type Vault } from "../vault";
 import { isProtectedBranch } from "../git/branch-guard";
@@ -148,7 +145,12 @@ function defaultIsCommitOnProtectedBranch(
     );
     return outAll
       .split("\n")
-      .map((l) => l.replace(/^\*\s*/, "").trim().replace(/^origin\//, ""))
+      .map((l) =>
+        l
+          .replace(/^\*\s*/, "")
+          .trim()
+          .replace(/^origin\//, ""),
+      )
       .filter(Boolean)
       .some((b) => isProtectedBranch(b));
   } catch {
@@ -165,11 +167,10 @@ function collectContractIds(
     const range = previousLiveSha
       ? `${previousLiveSha}..${commitSha}`
       : commitSha;
-    const log = execFileSync(
-      "git",
-      ["log", range, "--format=%B%x00"],
-      { cwd: repoRoot, encoding: "utf-8" },
-    );
+    const log = execFileSync("git", ["log", range, "--format=%B%x00"], {
+      cwd: repoRoot,
+      encoding: "utf-8",
+    });
     const ids = new Set<string>();
     for (const msg of log.split("\0")) {
       for (const line of msg.split("\n")) {
@@ -209,11 +210,11 @@ export function exportCheckout(
   for (const name of fs.readdirSync(dest)) {
     fs.rmSync(path.join(dest, name), { recursive: true, force: true });
   }
-  const archive = spawnSync(
-    "git",
-    ["archive", "--format=tar", commitSha],
-    { cwd: repoRoot, encoding: "buffer", maxBuffer: 64 * 1024 * 1024 },
-  );
+  const archive = spawnSync("git", ["archive", "--format=tar", commitSha], {
+    cwd: repoRoot,
+    encoding: "buffer",
+    maxBuffer: 64 * 1024 * 1024,
+  });
   if (archive.status !== 0) {
     throw new ReleaseInvariantError(
       "E_RELEASE_ARCHIVE",
@@ -257,8 +258,7 @@ export class ReleaseManager {
     this.adapters = {
       local_process:
         options.adapters?.local_process ?? new LocalProcessAdapter(),
-      user_command:
-        options.adapters?.user_command ?? new UserCommandAdapter(),
+      user_command: options.adapters?.user_command ?? new UserCommandAdapter(),
     };
     this.isCommitOnProtectedBranch =
       options.isCommitOnProtectedBranch ??
@@ -284,7 +284,10 @@ export class ReleaseManager {
   /**
    * LIVE 后挂监测：进程退出 + 周期性探活（目标 `watch: false` 可关）。
    */
-  private startLiveWatch(rec: ReleaseRecord, target: ReleaseTargetConfig): void {
+  private startLiveWatch(
+    rec: ReleaseRecord,
+    target: ReleaseTargetConfig,
+  ): void {
     this.clearWatch(rec.target_id);
     if (target.watch === false) return;
 
@@ -597,8 +600,6 @@ export class ReleaseManager {
     });
   }
 
-
-
   /**
    * 部署失败后的恢复：适配器可能已 stop 旧 LIVE。
    * - 有上一 LIVE 且允许回滚 → 尝试重新 deploy 上一版（保持其 LIVE）
@@ -621,8 +622,7 @@ export class ReleaseManager {
         try {
           exportCheckout(this.repoRoot, prev.commit_sha, prevCheckout);
         } catch (err) {
-          prev.incident =
-            `新版本部署失败，且无法导出上一版本目录：${(err as Error).message}`;
+          prev.incident = `新版本部署失败，且无法导出上一版本目录：${(err as Error).message}`;
           if (prev.state === "LIVE" && canTransition(prev.state, "FAILED")) {
             prev.state = "FAILED";
           }
@@ -680,9 +680,11 @@ export class ReleaseManager {
     persist(this.repoRoot, rec);
   }
 
-  private async resolveDeployEnv(
-    target: ReleaseTargetConfig,
-  ): Promise<{ env: Record<string, string>; secrets: string[]; missing: string[] }> {
+  private async resolveDeployEnv(target: ReleaseTargetConfig): Promise<{
+    env: Record<string, string>;
+    secrets: string[];
+    missing: string[];
+  }> {
     const keys = target.env_keys ?? [];
     const vault = this.vault();
     const missing: string[] = [];
@@ -752,10 +754,7 @@ export class ReleaseManager {
       (r) => r.release_id !== rec.release_id,
     );
     assertAtMostOneActive(
-      [
-        ...others,
-        { ...rec, state: "BUILDING" },
-      ],
+      [...others, { ...rec, state: "BUILDING" }],
       rec.target_id,
     );
 
@@ -819,7 +818,12 @@ export class ReleaseManager {
     if (!deployResult.ok) {
       // local_process 等适配器会先 stop 旧进程再启新进程；部署失败时旧 LIVE 可能已无进程。
       // 尽量恢复上一 LIVE；恢复不了则给旧记录打 incident，并允许 LIVE→FAILED（去掉假 LIVE）。
-      await this.recoverPreviousAfterDeployFailure(rec, target, adapter, deployEnv);
+      await this.recoverPreviousAfterDeployFailure(
+        rec,
+        target,
+        adapter,
+        deployEnv,
+      );
       this.transition(rec, "FAILED");
       return rec;
     }
@@ -857,7 +861,11 @@ export class ReleaseManager {
       const prevId = rec.previous_live_release_id;
       if (prevId) {
         const prev = readRelease(this.repoRoot, prevId);
-        if (prev && prev.state === "LIVE" && canTransition(prev.state, "SUPERSEDED")) {
+        if (
+          prev &&
+          prev.state === "LIVE" &&
+          canTransition(prev.state, "SUPERSEDED")
+        ) {
           prev.state = "SUPERSEDED";
           persist(this.repoRoot, prev);
         }

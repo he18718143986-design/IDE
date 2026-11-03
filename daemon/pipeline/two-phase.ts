@@ -65,9 +65,7 @@ export function obligationChecksExtras(
 ): string[] {
   if (obligations.length === 0) return [];
   const header =
-    phase === "t"
-      ? "本段（T · 先写测试）义务："
-      : "本段（I · 再实现）义务：";
+    phase === "t" ? "本段（T · 先写测试）义务：" : "本段（I · 再实现）义务：";
   return [
     header,
     ...obligations.map(
@@ -173,9 +171,7 @@ export function writeSuspension(
  * 从 T 段 modifiedFiles 中筛出应在 I 段只读的路径。
  * 默认：全部 T 段写过的文件（含测试）；调用方可再过滤。
  */
-export function tPhaseLockedPaths(
-  modifiedFiles: readonly string[],
-): string[] {
+export function tPhaseLockedPaths(modifiedFiles: readonly string[]): string[] {
   return [...modifiedFiles];
 }
 
@@ -197,9 +193,7 @@ export interface IGreenFailState {
 
 export type IGreenFailAction = "continue_i" | "return_to_t" | "suspend";
 
-export function nextIGreenFailAction(
-  state: IGreenFailState,
-): IGreenFailAction {
+export function nextIGreenFailAction(state: IGreenFailState): IGreenFailAction {
   if (state.consecutiveFailures < 2) return "continue_i";
   if (!state.returnedToT) return "return_to_t";
   return "suspend";

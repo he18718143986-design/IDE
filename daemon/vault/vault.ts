@@ -118,8 +118,7 @@ export function setActiveVault(vault: Vault | null): void {
 
 export async function createVault(options: CreateVaultOptions): Promise<Vault> {
   const envKind = process.env["STAGENT_VAULT_BACKEND"] as
-    | VaultBackend["kind"]
-    | undefined;
+    VaultBackend["kind"] | undefined;
   const requested = options.backend ?? envKind;
 
   let backend: VaultBackend;

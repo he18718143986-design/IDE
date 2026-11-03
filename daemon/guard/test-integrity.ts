@@ -53,7 +53,8 @@ export function scopeExplicitlyIncludesTests(writablePaths: string[]): boolean {
 }
 
 /** 语言标签：决定断言与 skip/only 识别规则 */
-export type TestIntegrityLang = "ts" | "js" | "tsx" | "jsx" | "py" | "go" | "rs";
+export type TestIntegrityLang =
+  "ts" | "js" | "tsx" | "jsx" | "py" | "go" | "rs";
 
 export interface TestWeakeningResult {
   weakened: boolean;
@@ -67,11 +68,7 @@ const ASSERTION_PATTERNS: Record<string, RegExp[]> = {
   js: [/\bexpect\s*\(/g, /\bassert\s*\(/g, /\bassert\.\w+\s*\(/g],
   tsx: [/\bexpect\s*\(/g, /\bassert\s*\(/g],
   jsx: [/\bexpect\s*\(/g, /\bassert\s*\(/g],
-  py: [
-    /\bassert\b/g,
-    /\bself\.assert\w+\s*\(/g,
-    /\bpytest\.raises\s*\(/g,
-  ],
+  py: [/\bassert\b/g, /\bself\.assert\w+\s*\(/g, /\bpytest\.raises\s*\(/g],
   go: [/\b(?:assert|require|assertEq)\w*\s*\(/g, /\bt\.(?:Fatal|Error|Fail)/g],
   rs: [/\bassert(?:_eq|_ne|_lt|_gt)?!\s*\(/g],
 };
@@ -140,9 +137,7 @@ export function detectTestWeakening(
   const reasons: string[] = [];
 
   if (candidateCount < baseCount) {
-    reasons.push(
-      `assertion_count_dropped:${baseCount}->${candidateCount}`,
-    );
+    reasons.push(`assertion_count_dropped:${baseCount}->${candidateCount}`);
   }
 
   const baseInserts = collectInsertHits(baseText);

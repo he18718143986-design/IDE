@@ -21,17 +21,21 @@ import {
   safeParseModulesYaml,
   type ModuleEntry,
 } from "../../../src/lib/knowledge/modules-schema";
-import type { ContractStub, ProjectPlan } from "../../../src/lib/project/project-plan";
+import type {
+  ContractStub,
+  ProjectPlan,
+} from "../../../src/lib/project/project-plan";
 import { applyPlanPatch } from "../../../src/lib/project/plan-patch";
-import type { ProjectPlanScheme, RepoFacts } from "../../../src/lib/project/project-plan";
+import type {
+  ProjectPlanScheme,
+  RepoFacts,
+} from "../../../src/lib/project/project-plan";
 import { writePlan, readPlan } from "../../project/plan-store";
 import { writeSuspension } from "../../pipeline/two-phase";
 import { writeDesignDependencySurprise } from "./design-dependency-surprise";
 
 export type DesignSuspensionReason =
-  | "DESIGN_INVALID"
-  | "DESIGN_ESCALATION"
-  | "DESIGN_NEEDS_DEPENDENCY";
+  "DESIGN_INVALID" | "DESIGN_ESCALATION" | "DESIGN_NEEDS_DEPENDENCY";
 
 export interface DesignGeneratorInput {
   contract: SoftwareContract;
@@ -87,7 +91,6 @@ export interface RunDesignStepOptions {
   modules?: ModuleEntry[];
 }
 
-
 function persistDn2Surprise(
   repoRoot: string,
   contract: SoftwareContract,
@@ -122,9 +125,10 @@ export function obligationsJsonPath(
   return path.join(recordsDir(repoRoot, contractId), "obligations.json");
 }
 
-export function loadModulesFromDocsSystem(
-  repoRoot: string,
-): { modules: ModuleEntry[]; docsSystemDir: string | null } {
+export function loadModulesFromDocsSystem(repoRoot: string): {
+  modules: ModuleEntry[];
+  docsSystemDir: string | null;
+} {
   const docsSystemDir = path.join(repoRoot, "docs", "system");
   const modulesFile = path.join(docsSystemDir, "modules.yaml");
   if (!fs.existsSync(modulesFile)) {
@@ -260,7 +264,10 @@ export async function runDesignStep(
   const paidSdkList = options.paidSdkList ?? PAID_SDK_LIST;
 
   const loaded = options.modules
-    ? { modules: options.modules, docsSystemDir: path.join(repoRoot, "docs", "system") }
+    ? {
+        modules: options.modules,
+        docsSystemDir: path.join(repoRoot, "docs", "system"),
+      }
     : loadModulesFromDocsSystem(repoRoot);
 
   const generate = async (
@@ -424,7 +431,9 @@ export function insertDependencyStubBeforeOriginal(
     dependencies: Array<{ name: string; version: string; why: string }>;
   },
 ): ResolveDependencySurpriseResult {
-  const original = plan.contracts.find((c) => c.stub_id === opts.originalStubId);
+  const original = plan.contracts.find(
+    (c) => c.stub_id === opts.originalStubId,
+  );
   if (!original) {
     return {
       ok: false,

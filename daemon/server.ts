@@ -61,17 +61,10 @@ import {
   schemeBindingFromSnapshot,
   SchemeSnapshotConflictError,
 } from "./pipeline/scheme-snapshot-store";
-import {
-  explainLine,
-  TraceBrokenError,
-  E_TRACE_BROKEN,
-} from "./trace/why";
+import { explainLine, TraceBrokenError, E_TRACE_BROKEN } from "./trace/why";
 import { loadModulesForRepo } from "./knowledge/modules-store";
 import { impactClosure } from "../src/lib/knowledge/impact-closure";
-import {
-  ReleaseManager,
-  listReleaseRecords,
-} from "./release/release-manager";
+import { ReleaseManager, listReleaseRecords } from "./release/release-manager";
 import { loadOrInitLedgerState } from "./supervisor/intent-compiler/scheme-ledger-store";
 import {
   assertContractScopeAllowed,
@@ -261,15 +254,9 @@ import {
 } from "./project/contract-sequence";
 import { nextStub } from "../src/lib/project/next-stub";
 
-import {
-  applyPlanPatch,
-  type PlanPatch,
-} from "../src/lib/project/plan-patch";
+import { applyPlanPatch, type PlanPatch } from "../src/lib/project/plan-patch";
 import type { RepoFacts } from "../src/lib/project/project-plan";
-import {
-  decompose,
-  type ReadyPabView,
-} from "./supervisor/decomposer";
+import { decompose, type ReadyPabView } from "./supervisor/decomposer";
 import {
   httpStatusForErrorCode,
   plainMessageForErrorCode,
@@ -492,11 +479,9 @@ export class StagentDaemon {
   private intentCompilerHost: IntentCompilerHost | null = null;
   private readonly intentCompilerModelClient: IntentCompilerModelClient | null;
   private readonly intentCompilerSetTimeout:
-    | ((fn: () => void, ms: number) => unknown)
-    | undefined;
+    ((fn: () => void, ms: number) => unknown) | undefined;
   private readonly intentCompilerClearTimeout:
-    | ((handle: unknown) => void)
-    | undefined;
+    ((handle: unknown) => void) | undefined;
 
   constructor(options: DaemonServerOptions) {
     this.repoRoot = path.resolve(options.repoRoot);
@@ -1547,7 +1532,10 @@ export class StagentDaemon {
     const store = this.orchestrator.getStore();
     const contract = store.get(contractId);
     if (!contract) {
-      this.sendJson(res, 404, { error: "Contract not found", contract_id: contractId });
+      this.sendJson(res, 404, {
+        error: "Contract not found",
+        contract_id: contractId,
+      });
       return;
     }
 
@@ -1561,7 +1549,11 @@ export class StagentDaemon {
         });
         return;
       }
-      this.sendJson(res, 200, { ok: true, surprise, lifecycle_state: contract.lifecycle_state });
+      this.sendJson(res, 200, {
+        ok: true,
+        surprise,
+        lifecycle_state: contract.lifecycle_state,
+      });
       return;
     }
 
@@ -1757,7 +1749,8 @@ export class StagentDaemon {
         this.emitContractUpdate(resolved.aborted);
         // L.9：ABORTED → 桩 aborted；必要时触发重新分解（与 abort 路由对齐）
         let redecompose_requested = false;
-        const abortedStubId = stubIdFromContract(resolved.aborted) ?? originalStubId;
+        const abortedStubId =
+          stubIdFromContract(resolved.aborted) ?? originalStubId;
         if (abortedStubId) {
           const sync = applyContractStubTerminal(
             this.repoRoot,
@@ -1782,7 +1775,8 @@ export class StagentDaemon {
           dependency_stub_id: resolved.dependencyStubId,
           plan: resolved.plan,
           contract_bytes_unchanged:
-            resolved.contractBytesBeforeAllow === resolved.contractBytesAfterAllow,
+            resolved.contractBytesBeforeAllow ===
+            resolved.contractBytesAfterAllow,
           redecompose_requested,
         });
       } catch (err) {
@@ -1991,7 +1985,9 @@ export class StagentDaemon {
     method: string,
     pathname: string,
   ): Promise<void> {
-    const match = /^\/api\/workers(?:\/([^/]+))?(?:\/(verify))?$/.exec(pathname);
+    const match = /^\/api\/workers(?:\/([^/]+))?(?:\/(verify))?$/.exec(
+      pathname,
+    );
     if (match === null) {
       this.sendJson(res, 404, { error: "Not Found" });
       return;
@@ -4446,12 +4442,16 @@ export class StagentDaemon {
         this.sendJson(res, 401, { error: "Unauthorized" });
         return;
       }
-      const adapters = this.orchestrator.listRegisteredAdapters().map((entry) => ({
-        adapter_id: entry.declaration.adapter_id,
-        control_mode: entry.control_mode,
-        kind: entry.adapter.kind,
-        dispatchable: this.orchestrator.isAdapterDispatchable(entry.declaration.adapter_id),
-      }));
+      const adapters = this.orchestrator
+        .listRegisteredAdapters()
+        .map((entry) => ({
+          adapter_id: entry.declaration.adapter_id,
+          control_mode: entry.control_mode,
+          kind: entry.adapter.kind,
+          dispatchable: this.orchestrator.isAdapterDispatchable(
+            entry.declaration.adapter_id,
+          ),
+        }));
       this.sendJson(res, 200, { adapters });
       return;
     }
@@ -4948,7 +4948,6 @@ export class StagentDaemon {
       return;
     }
 
-
     // TASK-L.18：系统知识库只读 API（/api/knowledge/*；与 /api/design/* 错开）
     if (method === "GET" && pathname === "/api/knowledge/modules") {
       if (!this.isAuthorized(req)) {
@@ -5152,7 +5151,10 @@ export class StagentDaemon {
       try {
         const body = (await this.readJsonBody(req)) as { value?: string };
         if (typeof body.value !== "string") {
-          this.sendJson(res, 400, { error: "value is required", code: "E_VAULT_NAME_INVALID" });
+          this.sendJson(res, 400, {
+            error: "value is required",
+            code: "E_VAULT_NAME_INVALID",
+          });
           return;
         }
         let vault = this.vault ?? getActiveVault();

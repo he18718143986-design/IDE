@@ -62,10 +62,7 @@ const IGNORED_TOP = new Set([
   ".cache",
 ]);
 
-function gitLines(
-  worktreeDir: string,
-  args: string[],
-): string[] {
+function gitLines(worktreeDir: string, args: string[]): string[] {
   try {
     const out = execFileSync("git", args, {
       cwd: worktreeDir,
@@ -263,11 +260,7 @@ export function checkKnowledge(
     for (const decisionId of decisionsAdd) {
       const hit = newDecisionFiles.some((rel) => {
         if (rel.includes(decisionId)) return true;
-        const body = readCandidateFile(
-          worktreeDir,
-          input.candidateSha,
-          rel,
-        );
+        const body = readCandidateFile(worktreeDir, input.candidateSha, rel);
         return body !== null && body.includes(decisionId);
       });
       if (!hit) {
@@ -297,11 +290,7 @@ export function checkKnowledge(
         continue;
       }
       const rel = `docs/system/interfaces/${owner}.md`;
-      const body = readCandidateFile(
-        worktreeDir,
-        input.candidateSha,
-        rel,
-      );
+      const body = readCandidateFile(worktreeDir, input.candidateSha, rel);
       if (body === null || !body.includes(iface.name)) {
         failures.push({
           rule: "KB-5",

@@ -335,14 +335,18 @@ export async function runTwoPhaseConstruction(
         break;
       }
       if (action === "suspend") {
-        const suspension_path = writeSuspension(host.repoRoot, contract.contract_id, {
-          reason: "OBLIGATION_NOT_GREEN",
-          phase: "two_phase",
-          detail:
-            "I-phase green check failed twice after returning to T once",
-          i_green_failures: iFailState.consecutiveFailures,
-          returned_to_t: true,
-        });
+        const suspension_path = writeSuspension(
+          host.repoRoot,
+          contract.contract_id,
+          {
+            reason: "OBLIGATION_NOT_GREEN",
+            phase: "two_phase",
+            detail:
+              "I-phase green check failed twice after returning to T once",
+            i_green_failures: iFailState.consecutiveFailures,
+            returned_to_t: true,
+          },
+        );
         host.transitionPendingResume?.(
           "OBLIGATION_NOT_GREEN",
           "exhausted return-to-T",
@@ -364,13 +368,17 @@ export async function runTwoPhaseConstruction(
 
       // continue_i：仍在 I 段返工
       if (verificationRetries > maxRetries) {
-        const suspension_path = writeSuspension(host.repoRoot, contract.contract_id, {
-          reason: verdict.reason_code,
-          phase: "i",
-          detail: `I-phase failed after ${verificationRetries} verification retries`,
-          i_green_failures: iFailState.consecutiveFailures,
-          returned_to_t: returnedToT,
-        });
+        const suspension_path = writeSuspension(
+          host.repoRoot,
+          contract.contract_id,
+          {
+            reason: verdict.reason_code,
+            phase: "i",
+            detail: `I-phase failed after ${verificationRetries} verification retries`,
+            i_green_failures: iFailState.consecutiveFailures,
+            returned_to_t: returnedToT,
+          },
+        );
         host.transitionPendingResume?.(
           verdict.reason_code,
           "I-phase exhausted retries",

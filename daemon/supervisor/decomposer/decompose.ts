@@ -32,9 +32,7 @@ export interface ReadyPabView {
 }
 
 export type DecomposeFailureCode =
-  | "E_PAB_NOT_READY"
-  | "E_PLAN_INVALID"
-  | "E_DECOMPOSE_FAILED";
+  "E_PAB_NOT_READY" | "E_PLAN_INVALID" | "E_DECOMPOSE_FAILED";
 
 export type DecomposeResult =
   | {
@@ -250,10 +248,7 @@ export function buildStandardPlanPatch(scheme: SchemeDraftV2): PlanPatch {
   return { base_revision: 0, reason: "initial", ops };
 }
 
-function basePlanFor(
-  input: DecomposeInput,
-  pab: ReadyPabView,
-): ProjectPlan {
+function basePlanFor(input: DecomposeInput, pab: ReadyPabView): ProjectPlan {
   if (input.existingPlan) return input.existingPlan;
   return emptyProjectPlan({
     project_id: input.project_id ?? `proj-${input.scheme.scheme_id}`,
@@ -270,7 +265,15 @@ async function tryApply(
   repoFacts: RepoFacts,
 ): Promise<
   | { ok: true; plan: ProjectPlan }
-  | { ok: false; violations: PlanViolation[]; code: "E_PLAN_INVALID" | "E_PLAN_STUB_REVIVED" | "E_PLAN_STALE" | "E_PLAN_STUB_LOCKED" }
+  | {
+      ok: false;
+      violations: PlanViolation[];
+      code:
+        | "E_PLAN_INVALID"
+        | "E_PLAN_STUB_REVIVED"
+        | "E_PLAN_STALE"
+        | "E_PLAN_STUB_LOCKED";
+    }
 > {
   // initial 分解对空计划 base_revision 必须为 0；若 existing 非空则以计划 revision 为准
   const aligned: PlanPatch = {
@@ -357,9 +360,7 @@ export async function decompose(
     }
     const parsed = modelPlanPatchSchema.safeParse(raw);
     if (!parsed.success) {
-      priorViolations = [
-        { rule: "D-1", target: "model_schema" },
-      ];
+      priorViolations = [{ rule: "D-1", target: "model_schema" }];
       continue;
     }
     const patch: PlanPatch = {

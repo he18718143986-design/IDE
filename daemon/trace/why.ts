@@ -23,10 +23,7 @@ export const E_TRACE_BROKEN = "E_TRACE_BROKEN" as const;
 
 /** 断环标签（与卡 / delivery-lifecycle §6 对齐，供 UI 白话展示） */
 export type TraceBrokenRing =
-  | "提交无 Stagent Trailer"
-  | "合同"
-  | "方案条目"
-  | "原话";
+  "提交无 Stagent Trailer" | "合同" | "方案条目" | "原话";
 
 export class TraceBrokenError extends Error {
   readonly code = E_TRACE_BROKEN;
@@ -152,7 +149,9 @@ export async function blameCommitSha(
   return sha;
 }
 
-function quotesFromEvidence(evidence: EvidenceItem[] | undefined): TraceQuote[] {
+function quotesFromEvidence(
+  evidence: EvidenceItem[] | undefined,
+): TraceQuote[] {
   if (!evidence?.length) return [];
   const out: TraceQuote[] = [];
   for (const item of evidence) {

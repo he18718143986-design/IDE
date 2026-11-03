@@ -114,7 +114,10 @@ import {
   type DesignNoteGenerator,
   type DesignSuspensionReason,
 } from "../supervisor/design/design-step";
-import type { DesignNote, DetectedEscalation } from "../../src/lib/design/design-note";
+import type {
+  DesignNote,
+  DetectedEscalation,
+} from "../../src/lib/design/design-note";
 import type {
   ProjectPlan,
   ProjectPlanScheme,
@@ -236,7 +239,6 @@ export interface DesignRunInfo {
   escalation_missed?: DetectedEscalation[];
 }
 
-
 /** TASK-L.12：把 check-knowledge 占位 SHA / 合同号换成真实值，并挂上 design-note 路径。 */
 function resolveKnowledgeCheckArgs(
   args: readonly string[],
@@ -319,8 +321,7 @@ export class ContractOrchestrator {
     this.onTerminalLine = options.onTerminalLine;
     this.onGatewayViolation = options.onGatewayViolation;
     this.designNoteGenerator = options.designNoteGenerator;
-    this.workerRegistry =
-      options.registry ?? createDefaultWorkerRegistry();
+    this.workerRegistry = options.registry ?? createDefaultWorkerRegistry();
     this.containerHost = options.containerHost;
   }
 
@@ -1061,10 +1062,7 @@ export class ContractOrchestrator {
             "rev-parse",
             current.authorization.git.base_branch,
           ]) ?? candidateSha;
-        const dnFile = designNotePath(
-          this.repoRoot,
-          current.contract_id,
-        );
+        const dnFile = designNotePath(this.repoRoot, current.contract_id);
         commandArgs = resolveKnowledgeCheckArgs(commandArgs, {
           baseSha,
           candidateSha,
@@ -1522,8 +1520,7 @@ export class ContractOrchestrator {
         const designResult = await runDesignStep({
           repoRoot: this.repoRoot,
           contract: current,
-          generator:
-            options.designNoteGenerator ?? this.designNoteGenerator,
+          generator: options.designNoteGenerator ?? this.designNoteGenerator,
         });
         if (designResult.status === "suspended") {
           this.revokeExecTokenFor(contractId);
@@ -1599,9 +1596,7 @@ export class ContractOrchestrator {
           repoRoot: this.repoRoot,
           worktreeRoot,
           ...(containerHost === undefined ? {} : { containerHost }),
-          ...(activeDesignNote
-            ? { designNote: activeDesignNote }
-            : {}),
+          ...(activeDesignNote ? { designNote: activeDesignNote } : {}),
         };
         // TASK-W.6：执行器由 Registry 解析出的工厂产出，编排器不 new 具体适配器
         const worker = dispatchFactory(context);
@@ -1658,9 +1653,7 @@ export class ContractOrchestrator {
                   forbiddenViolations: violations,
                   modifiedFiles: [...gateway.getModifiedFiles()],
                   testsModified: gateway.wasTestsModified(),
-                  ...(gateCtx
-                    ? { graveyardCheck: gateCtx.availability }
-                    : {}),
+                  ...(gateCtx ? { graveyardCheck: gateCtx.availability } : {}),
                 },
                 costMonitor,
                 gateway.getWorktreeRoot(),
@@ -1726,9 +1719,7 @@ export class ContractOrchestrator {
           worktreeRoot,
           checksExtras: extras,
           ...(containerHost === undefined ? {} : { containerHost }),
-          ...(activeDesignNote
-            ? { designNote: activeDesignNote }
-            : {}),
+          ...(activeDesignNote ? { designNote: activeDesignNote } : {}),
         };
         // TASK-W.6：两段式 T/I 段同样经 Registry 解析出的工厂派工
         const worker = dispatchFactory(context);
@@ -2279,9 +2270,7 @@ export class ContractOrchestrator {
        * TASK-W.5c-ii：扩三值（`SANDBOX_ENFORCED` 属受控档位，如实记档）。
        */
       workerControlMode?:
-        | "GATEWAY_ENFORCED"
-        | "SANDBOX_ENFORCED"
-        | "UNCONTROLLED_EXTERNAL";
+        "GATEWAY_ENFORCED" | "SANDBOX_ENFORCED" | "UNCONTROLLED_EXTERNAL";
       /** TASK-J.18d：墓地检查可用性 */
       graveyardCheck?: "snapshot" | "unavailable";
     },
@@ -2479,7 +2468,6 @@ export class ContractOrchestrator {
       hooks,
     );
   }
-
 }
 
 /** 单条验证命令在 Evidence 中保留的日志尾巴字符数 */

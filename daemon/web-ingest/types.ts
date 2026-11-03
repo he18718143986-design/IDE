@@ -3,9 +3,12 @@
  * Spec: ADR-0014 §3; scheme.md goal-2, conf-6, dec-13, oq-3; delivery-lifecycle.md M5
  */
 
-export const E_WEB_INGEST_FORBIDDEN_DOMAIN = "E_WEB_INGEST_FORBIDDEN_DOMAIN" as const;
-export const E_WEB_INGEST_METHOD_NOT_ALLOWED = "E_WEB_INGEST_METHOD_NOT_ALLOWED" as const;
-export const E_WEB_INGEST_PAYLOAD_TOO_LARGE = "E_WEB_INGEST_PAYLOAD_TOO_LARGE" as const;
+export const E_WEB_INGEST_FORBIDDEN_DOMAIN =
+  "E_WEB_INGEST_FORBIDDEN_DOMAIN" as const;
+export const E_WEB_INGEST_METHOD_NOT_ALLOWED =
+  "E_WEB_INGEST_METHOD_NOT_ALLOWED" as const;
+export const E_WEB_INGEST_PAYLOAD_TOO_LARGE =
+  "E_WEB_INGEST_PAYLOAD_TOO_LARGE" as const;
 export const E_WEB_INGEST_RATE_LIMITED = "E_WEB_INGEST_RATE_LIMITED" as const;
 export const E_WEB_INGEST_AUTH_FAILED = "E_WEB_INGEST_AUTH_FAILED" as const;
 export const E_WEB_INGEST_FETCH_FAILED = "E_WEB_INGEST_FETCH_FAILED" as const;
@@ -41,7 +44,12 @@ export class WebIngestError extends Error {
   readonly status: number;
   readonly details?: Record<string, unknown> | undefined;
 
-  constructor(code: string, message: string, status: number = 400, details?: Record<string, unknown>) {
+  constructor(
+    code: string,
+    message: string,
+    status: number = 400,
+    details?: Record<string, unknown>,
+  ) {
     super(message);
     this.name = "WebIngestError";
     this.code = code;

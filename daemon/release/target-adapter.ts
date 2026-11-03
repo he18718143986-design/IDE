@@ -1,7 +1,10 @@
 /**
  * TASK-L.15：部署目标适配器接口。
  */
-import type { ReleaseRecord, ReleaseTargetConfig } from "../../src/lib/release/release";
+import type {
+  ReleaseRecord,
+  ReleaseTargetConfig,
+} from "../../src/lib/release/release";
 
 export interface StepResult {
   ok: boolean;

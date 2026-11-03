@@ -284,7 +284,6 @@ export async function executeContainerCli(
   };
 }
 
-
 export interface ContainerCliAdapterOptions {
   host: ContainerHostPort;
   declaration: AdapterCapabilityDeclaration;

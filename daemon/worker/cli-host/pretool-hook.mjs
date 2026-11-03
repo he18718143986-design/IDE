@@ -153,9 +153,12 @@ function readJson(file) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
-
 /** TASK-J.18d / GAP-W4：gate pack 相对主仓路径 */
-const GATE_PACK_REL = path.join(".stagent", "claude-config", "graveyard-pack.json");
+const GATE_PACK_REL = path.join(
+  ".stagent",
+  "claude-config",
+  "graveyard-pack.json",
+);
 
 /**
  * 加载 gate pack 的小写 key 集合。
@@ -172,11 +175,7 @@ export function loadGatePackKeys(mainRoot) {
   } catch {
     return { ok: false, warning: "W_GATE_PACK_MISSING" };
   }
-  if (
-    !pack ||
-    pack.pack_version !== 1 ||
-    !Array.isArray(pack.tombstones)
-  ) {
+  if (!pack || pack.pack_version !== 1 || !Array.isArray(pack.tombstones)) {
     return { ok: false, warning: "W_GATE_PACK_MISSING" };
   }
   const keys = new Set();
@@ -450,7 +449,6 @@ function inside(root, p) {
   return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
 }
 
-
 /** 仅作为 CLI 入口执行主流程；被 import 时不跑 stdin 判定（TM-GH-06）。 */
 function isInvokedAsCli() {
   try {
@@ -462,136 +460,136 @@ function isInvokedAsCli() {
 }
 
 if (isInvokedAsCli()) {
-try {
-  const raw = fs.readFileSync(0, "utf8");
-  input = JSON.parse(raw || "{}");
-  const root = process.env.STAGENT_HOOK_ROOT;
-  if (!root) deny("未配置 STAGENT_HOOK_ROOT");
-  const realRoot = fs.realpathSync(root);
-  const mainRoot = mainRepoRootOf(realRoot);
-  const tool = String(input.tool_name ?? "");
-  const ti = input.tool_input ?? {};
+  try {
+    const raw = fs.readFileSync(0, "utf8");
+    input = JSON.parse(raw || "{}");
+    const root = process.env.STAGENT_HOOK_ROOT;
+    if (!root) deny("未配置 STAGENT_HOOK_ROOT");
+    const realRoot = fs.realpathSync(root);
+    const mainRoot = mainRepoRootOf(realRoot);
+    const tool = String(input.tool_name ?? "");
+    const ti = input.tool_input ?? {};
 
-  // TASK-J.1：右栏搭档只读。放在所有分支之前，写类 / Shell / Todo / 未知工具一律 block；
-  // 即便 CLI 参数层被绕过（老版本、配置丢失），这里仍然拦得住。
-  if (
-    process.env.STAGENT_HOOK_ROLE === "partner" &&
-    !PARTNER_ALLOWED_TOOLS.has(tool)
-  ) {
-    deny(
-      `方案工作台右栏是只读搭档：只能读文件、搜代码、按模式列目录（Glob），已拦截 ${tool || "(未知工具)"} 调用`,
-    );
-  }
+    // TASK-J.1：右栏搭档只读。放在所有分支之前，写类 / Shell / Todo / 未知工具一律 block；
+    // 即便 CLI 参数层被绕过（老版本、配置丢失），这里仍然拦得住。
+    if (
+      process.env.STAGENT_HOOK_ROLE === "partner" &&
+      !PARTNER_ALLOWED_TOOLS.has(tool)
+    ) {
+      deny(
+        `方案工作台右栏是只读搭档：只能读文件、搜代码、按模式列目录（Glob），已拦截 ${tool || "(未知工具)"} 调用`,
+      );
+    }
 
-  if (tool === "Bash") {
-    if (process.env.STAGENT_HOOK_ALLOW_BASH !== "1")
-      deny("未授权的 Shell 命令");
-    const command = String(ti.command ?? "");
-    // 加固 1：核心元数据（.stagent/.git/.claude/.cursor/.env）一律不许经 Shell 触碰
-    const reserved = reservedMetadataHit(command);
-    if (reserved)
-      deny(`禁止通过 Shell 访问或修改系统保护元数据（${reserved}）`);
-    // 加固 2：目录穿越（../）与指向工作目录之外的绝对路径一律拒绝
-    const escape = shellEscapeVerdict(realRoot, command);
-    if (escape) deny(escape);
-    // 既有：保护清单命中且未获本轮授权 → 投递确认卡并拒绝
-    const bashVerdict = shellProtectionVerdict(mainRoot, command);
-    if (bashVerdict) deny(bashVerdict);
-    // TASK-J.18d / GAP-W4：gate pack 集合查找（U-CMD）
-    {
-      const pack = loadGatePackKeys(mainRoot);
-      if (!pack.ok) {
-        log({ decision: "allow", warning: pack.warning });
-      } else {
-        const pkgs = extractInstallPackages(command);
-        const hit = evaluateGatePackHit(pack, pkgs);
-        if (hit.hit) {
-          log({
-            decision: "deny",
-            code: "E_PROPOSAL_PREVIOUSLY_REJECTED",
-            rejected_id: hit.rejected_id,
-            key: hit.key,
-          });
-          deny(
-            `命令安装了用户否决过的依赖「${hit.key}」（E_PROPOSAL_PREVIOUSLY_REJECTED）`,
-          );
+    if (tool === "Bash") {
+      if (process.env.STAGENT_HOOK_ALLOW_BASH !== "1")
+        deny("未授权的 Shell 命令");
+      const command = String(ti.command ?? "");
+      // 加固 1：核心元数据（.stagent/.git/.claude/.cursor/.env）一律不许经 Shell 触碰
+      const reserved = reservedMetadataHit(command);
+      if (reserved)
+        deny(`禁止通过 Shell 访问或修改系统保护元数据（${reserved}）`);
+      // 加固 2：目录穿越（../）与指向工作目录之外的绝对路径一律拒绝
+      const escape = shellEscapeVerdict(realRoot, command);
+      if (escape) deny(escape);
+      // 既有：保护清单命中且未获本轮授权 → 投递确认卡并拒绝
+      const bashVerdict = shellProtectionVerdict(mainRoot, command);
+      if (bashVerdict) deny(bashVerdict);
+      // TASK-J.18d / GAP-W4：gate pack 集合查找（U-CMD）
+      {
+        const pack = loadGatePackKeys(mainRoot);
+        if (!pack.ok) {
+          log({ decision: "allow", warning: pack.warning });
+        } else {
+          const pkgs = extractInstallPackages(command);
+          const hit = evaluateGatePackHit(pack, pkgs);
+          if (hit.hit) {
+            log({
+              decision: "deny",
+              code: "E_PROPOSAL_PREVIOUSLY_REJECTED",
+              rejected_id: hit.rejected_id,
+              key: hit.key,
+            });
+            deny(
+              `命令安装了用户否决过的依赖「${hit.key}」（E_PROPOSAL_PREVIOUSLY_REJECTED）`,
+            );
+          }
         }
       }
+      log({ decision: "allow" });
+      process.exit(0);
     }
-    log({ decision: "allow" });
-    process.exit(0);
-  }
 
-  const target = ti.file_path ?? ti.notebook_path ?? ti.path;
-  if (WRITE_TOOLS.has(tool) || (READ_TOOLS.has(tool) && target)) {
-    if (WRITE_TOOLS.has(tool) && !target) deny("写入缺少目标路径");
-    if (target) {
-      const abs = path.resolve(realRoot, String(target));
-      let real = abs;
-      try {
-        // 已存在的路径按真实路径判定（防 symlink 逃逸）；不存在则判其父目录
-        real = fs.existsSync(abs)
-          ? fs.realpathSync(abs)
-          : path.join(fs.realpathSync(path.dirname(abs)), path.basename(abs));
-      } catch {
-        real = abs;
-      }
-      if (!inside(realRoot, real)) deny(`路径在工作目录之外：${target}`);
-      const rel = path.relative(realRoot, real).split(path.sep);
-      // 读写都不许碰 Claude Code 专用配置目录（会话记录）和 Daemon 会话令牌
-      if (
-        rel[0] === ".stagent" &&
-        (rel[1] === "claude-config" || rel[1] === "session-token")
-      ) {
-        deny(`受保护路径：${target}`);
-      }
-      if (WRITE_TOOLS.has(tool)) {
+    const target = ti.file_path ?? ti.notebook_path ?? ti.path;
+    if (WRITE_TOOLS.has(tool) || (READ_TOOLS.has(tool) && target)) {
+      if (WRITE_TOOLS.has(tool) && !target) deny("写入缺少目标路径");
+      if (target) {
+        const abs = path.resolve(realRoot, String(target));
+        let real = abs;
+        try {
+          // 已存在的路径按真实路径判定（防 symlink 逃逸）；不存在则判其父目录
+          real = fs.existsSync(abs)
+            ? fs.realpathSync(abs)
+            : path.join(fs.realpathSync(path.dirname(abs)), path.basename(abs));
+        } catch {
+          real = abs;
+        }
+        if (!inside(realRoot, real)) deny(`路径在工作目录之外：${target}`);
+        const rel = path.relative(realRoot, real).split(path.sep);
+        // 读写都不许碰 Claude Code 专用配置目录（会话记录）和 Daemon 会话令牌
         if (
-          rel.some((seg) => PROTECTED_SEGMENTS.includes(seg)) ||
-          rel.at(-1) === ".mcp.json"
+          rel[0] === ".stagent" &&
+          (rel[1] === "claude-config" || rel[1] === "session-token")
         ) {
           deny(`受保护路径：${target}`);
         }
-        // P.1 保护清单：命中且未获本轮授权 → 投递卡片请求并拒绝（先拦后写）
-        const verdict = protectionVerdict(mainRoot, rel.join("/"));
-        if (verdict) deny(verdict);
-        // TASK-J.18d / GAP-W4：gate pack 集合查找（U-DEP / U-IMPORT）
-        {
-          const pack = loadGatePackKeys(mainRoot);
-          if (!pack.ok) {
-            log({ decision: "allow", warning: pack.warning });
-          } else {
-            const body =
-              tool === "Edit" || tool === "MultiEdit"
-                ? String(ti.new_string ?? ti.content ?? "")
-                : String(ti.content ?? "");
-            const keys = extractContentKeys(rel.join("/"), body);
-            const hit = evaluateGatePackHit(pack, keys);
-            if (hit.hit) {
-              log({
-                decision: "deny",
-                code: "E_PROPOSAL_PREVIOUSLY_REJECTED",
-                rejected_id: hit.rejected_id,
-                key: hit.key,
-              });
-              deny(
-                `写入内容触及用户否决过的方案（依赖/导入「${hit.key}」，E_PROPOSAL_PREVIOUSLY_REJECTED）`,
-              );
+        if (WRITE_TOOLS.has(tool)) {
+          if (
+            rel.some((seg) => PROTECTED_SEGMENTS.includes(seg)) ||
+            rel.at(-1) === ".mcp.json"
+          ) {
+            deny(`受保护路径：${target}`);
+          }
+          // P.1 保护清单：命中且未获本轮授权 → 投递卡片请求并拒绝（先拦后写）
+          const verdict = protectionVerdict(mainRoot, rel.join("/"));
+          if (verdict) deny(verdict);
+          // TASK-J.18d / GAP-W4：gate pack 集合查找（U-DEP / U-IMPORT）
+          {
+            const pack = loadGatePackKeys(mainRoot);
+            if (!pack.ok) {
+              log({ decision: "allow", warning: pack.warning });
+            } else {
+              const body =
+                tool === "Edit" || tool === "MultiEdit"
+                  ? String(ti.new_string ?? ti.content ?? "")
+                  : String(ti.content ?? "");
+              const keys = extractContentKeys(rel.join("/"), body);
+              const hit = evaluateGatePackHit(pack, keys);
+              if (hit.hit) {
+                log({
+                  decision: "deny",
+                  code: "E_PROPOSAL_PREVIOUSLY_REJECTED",
+                  rejected_id: hit.rejected_id,
+                  key: hit.key,
+                });
+                deny(
+                  `写入内容触及用户否决过的方案（依赖/导入「${hit.key}」，E_PROPOSAL_PREVIOUSLY_REJECTED）`,
+                );
+              }
             }
           }
         }
       }
+      log({ decision: "allow" });
+      process.exit(0);
     }
-    log({ decision: "allow" });
-    process.exit(0);
-  }
 
-  if (READ_TOOLS.has(tool)) {
-    log({ decision: "allow" });
-    process.exit(0);
+    if (READ_TOOLS.has(tool)) {
+      log({ decision: "allow" });
+      process.exit(0);
+    }
+    deny(`未在白名单内的工具：${tool}`);
+  } catch (err) {
+    deny(`hook 内部错误，按拒绝处理：${err && err.message}`);
   }
-  deny(`未在白名单内的工具：${tool}`);
-} catch (err) {
-  deny(`hook 内部错误，按拒绝处理：${err && err.message}`);
-}
 }

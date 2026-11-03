@@ -62,7 +62,9 @@ export function isAdapterExecutable(adapter: CodingWorkerAdapter): boolean {
   if ((adapter as { has_executor?: boolean }).has_executor === false) {
     return false;
   }
-  if ((adapter as { is_declaration_only?: boolean }).is_declaration_only === true) {
+  if (
+    (adapter as { is_declaration_only?: boolean }).is_declaration_only === true
+  ) {
     return false;
   }
   if (typeof adapter.run !== "function") {

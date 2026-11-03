@@ -124,7 +124,9 @@ function moduleNames(scheme: ScopePlanSchemeInput): string[] {
 }
 
 /** 方案结构 → 合成文本（供路径提取 / token 匹配；不是聊天旁路） */
-export function synthesizeSchemeScopeText(scheme: ScopePlanSchemeInput): string {
+export function synthesizeSchemeScopeText(
+  scheme: ScopePlanSchemeInput,
+): string {
   const parts: string[] = [
     scheme.title ?? "",
     scheme.summary ?? "",
@@ -180,15 +182,15 @@ function mergeContribution(
       ...(base.forbidden_paths ?? []),
       ...(extra.forbidden_paths ?? []),
     ]),
-    never_touch: [
-      ...(base.never_touch ?? []),
-      ...(extra.never_touch ?? []),
-    ],
+    never_touch: [...(base.never_touch ?? []), ...(extra.never_touch ?? [])],
     needs_approval: [
       ...(base.needs_approval ?? []),
       ...(extra.needs_approval ?? []),
     ],
-    budget_limits: { ...(base.budget_limits ?? {}), ...(extra.budget_limits ?? {}) },
+    budget_limits: {
+      ...(base.budget_limits ?? {}),
+      ...(extra.budget_limits ?? {}),
+    },
   };
   const commands =
     extra.commands !== undefined && extra.commands.length > 0
@@ -398,9 +400,7 @@ function findModuleForPath(
       const anchor = (m.project_anchor ?? m.name).toLowerCase();
       if (
         cleaned.includes(anchor) ||
-        englishTokens(m.name).some((t) =>
-          cleaned.includes(t.toLowerCase()),
-        )
+        englishTokens(m.name).some((t) => cleaned.includes(t.toLowerCase()))
       ) {
         return {
           id: m.id ?? `mod-${index}`,
@@ -436,9 +436,7 @@ function buildAreas(
     return {
       id: `area-${index}`,
       label,
-      why: mod
-        ? `因为要做「${mod.name}」`
-        : "根据当前方案整理出的改动范围",
+      why: mod ? `因为要做「${mod.name}」` : "根据当前方案整理出的改动范围",
       module_ids: mod ? [mod.id] : [],
       kind: mod?.kind ?? "change_existing",
       paths: [p],
@@ -652,12 +650,7 @@ function readRepoFacts(repoRoot: string): RepoFacts {
   } catch {
     // ignore
   }
-  const pytestHints = [
-    "pytest.ini",
-    "pyproject.toml",
-    "setup.cfg",
-    "tox.ini",
-  ];
+  const pytestHints = ["pytest.ini", "pyproject.toml", "setup.cfg", "tox.ini"];
   for (const hint of pytestHints) {
     try {
       if (fs.existsSync(path.join(repoRoot, hint))) {
@@ -671,9 +664,7 @@ function readRepoFacts(repoRoot: string): RepoFacts {
   return facts;
 }
 
-function hasAutoAcceptance(
-  scheme: ScopePlanSchemeInput,
-): boolean {
+function hasAutoAcceptance(scheme: ScopePlanSchemeInput): boolean {
   return (scheme.acceptance ?? []).some(
     (a) => a.check === "auto" || a.check === "both",
   );
@@ -699,8 +690,7 @@ export function withSystemScope(
     "modules.yaml",
   );
   const knowledgeNeeded =
-    ctx.stub?.kind === "knowledge_bootstrap" ||
-    fs.existsSync(modulesYamlPath);
+    ctx.stub?.kind === "knowledge_bootstrap" || fs.existsSync(modulesYamlPath);
 
   const wantsTests = hasAutoAcceptance(ctx.scheme);
   const facts = wantsTests
@@ -767,8 +757,9 @@ export function withSystemScope(
 
     const obligationPaths = (ctx.scheme.acceptance ?? [])
       .filter((a) => a.check === "auto" || a.check === "both")
-      .map((a) =>
-        `tests/stagent/${a.id}.test.${runner.kind === "pytest" ? "py" : runner.kind === "go" ? "go" : "ts"}`,
+      .map(
+        (a) =>
+          `tests/stagent/${a.id}.test.${runner.kind === "pytest" ? "py" : runner.kind === "go" ? "go" : "ts"}`,
       );
 
     const cmd = obligationCommand(runner, obligationPaths);
@@ -828,9 +819,7 @@ export function withSystemScope(
           "义务测试先红后绿，且既有测试不被削弱",
         )
       ) {
-        next.verification.plain.push(
-          "义务测试先红后绿，且既有测试不被削弱",
-        );
+        next.verification.plain.push("义务测试先红后绿，且既有测试不被削弱");
       }
     }
   }
@@ -888,9 +877,7 @@ export function withSystemScope(
       next.verification.commands.push(knowledgeCmd);
     }
     next.verification.manual_only = false;
-    if (
-      !next.verification.plain.includes("系统知识库检查全部通过")
-    ) {
+    if (!next.verification.plain.includes("系统知识库检查全部通过")) {
       next.verification.plain.push("系统知识库检查全部通过");
     }
   }

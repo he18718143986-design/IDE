@@ -60,10 +60,7 @@ function readPayload(repoRoot: string): Record<string, string> {
   return JSON.parse(plain) as Record<string, string>;
 }
 
-function writePayload(
-  repoRoot: string,
-  secrets: Record<string, string>,
-): void {
+function writePayload(repoRoot: string, secrets: Record<string, string>): void {
   const file = vaultEncPath(repoRoot);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const salt = randomBytes(16);

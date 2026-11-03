@@ -121,8 +121,7 @@ export function evaluatePlaytestGuard(input: {
       ok: false,
       status: "UNCONFIRMED",
       code: PLAYTEST_GUARD_CODES.UNCONFIRMED,
-      message:
-        "还没有试玩认可证据，视为未认可（请先对照参考站试玩并明确表态）",
+      message: "还没有试玩认可证据，视为未认可（请先对照参考站试玩并明确表态）",
     };
   }
 

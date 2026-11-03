@@ -121,9 +121,7 @@ export function renderRejectedProposalsSection(
     const reason = entry.rejection_reason.trim();
     if (!proposal) continue;
     lines.push(
-      reason
-        ? `- ${proposal}（否决理由：${reason}）`
-        : `- ${proposal}`,
+      reason ? `- ${proposal}（否决理由：${reason}）` : `- ${proposal}`,
     );
   }
   if (lines.length === 0) return null;
@@ -272,9 +270,7 @@ export async function scanWorktreeGraveyard(input: {
 }
 
 /** evidence.forbidden_violations 条目：`graveyard:<rejected_id>` */
-export function graveyardViolationTags(
-  gate: GateResult,
-): string[] {
+export function graveyardViolationTags(gate: GateResult): string[] {
   if (!gate.block || !gate.primary) return [];
   return [`graveyard:${gate.primary.rejected_id}`];
 }

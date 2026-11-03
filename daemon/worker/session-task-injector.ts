@@ -307,12 +307,8 @@ export function renderChecksSection(
     }
   }
 
-  const hasKnowledgeCheck = commands.some(
-    (c) => c.alias === "check-knowledge",
-  );
-  const kbExtras = hasKnowledgeCheck
-    ? KNOWLEDGE_CHECK_RULE_SUMMARIES
-    : [];
+  const hasKnowledgeCheck = commands.some((c) => c.alias === "check-knowledge");
+  const kbExtras = hasKnowledgeCheck ? KNOWLEDGE_CHECK_RULE_SUMMARIES : [];
   for (const extra of [...kbExtras, ...extras]) {
     lines.push(extra);
   }
@@ -451,9 +447,7 @@ export function buildWorkerTaskInstruction(
         `- 风险等级：${objective.risk_level}`,
       ].join("\n"),
     },
-    ...(input.designNote
-      ? [renderDesignNoteSection(input.designNote)]
-      : []),
+    ...(input.designNote ? [renderDesignNoteSection(input.designNote)] : []),
     {
       title: "可写范围（allowed_files / directories）",
       body: bulletList(scope.writable_paths, "（未授权任何可写路径）"),

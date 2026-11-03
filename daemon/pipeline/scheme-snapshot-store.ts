@@ -101,12 +101,8 @@ function decisionBearingScheme(
 }
 
 /** 墓地内容的稳定摘要（GAP-W2）。 */
-export function graveyardDigest(
-  graveyard: readonly GraveyardEntry[],
-): string {
-  return createHash("sha256")
-    .update(stableStringify(graveyard))
-    .digest("hex");
+export function graveyardDigest(graveyard: readonly GraveyardEntry[]): string {
+  return createHash("sha256").update(stableStringify(graveyard)).digest("hex");
 }
 
 export function schemeSnapshotDigest(input: {
@@ -140,7 +136,9 @@ export function schemeSnapshotPath(
   return path.join(path.resolve(repoRoot), SCHEME_SNAPSHOT_DIR, `${id}.json`);
 }
 
-function isSupportedSchemaVersion(value: unknown): value is
+function isSupportedSchemaVersion(
+  value: unknown,
+): value is
   | typeof SCHEME_SNAPSHOT_SCHEMA_VERSION
   | typeof SCHEME_SNAPSHOT_SCHEMA_VERSION_V11
   | typeof SCHEME_SNAPSHOT_SCHEMA_VERSION_LEGACY {
@@ -208,11 +206,7 @@ export function readSchemeSnapshot(
     }
     // 1.1：graveyard 视为缺失
     if (parsed.schema_version === SCHEME_SNAPSHOT_SCHEMA_VERSION_V11) {
-      const {
-        graveyard: _dropGy,
-        graveyard_digest: _dropGd,
-        ...rest
-      } = parsed;
+      const { graveyard: _dropGy, graveyard_digest: _dropGd, ...rest } = parsed;
       return rest;
     }
     // 1.2：须含 graveyard 数组与 graveyard_digest

@@ -95,7 +95,11 @@ export function readDemoConfirm(
       fs.writeFileSync(
         absNew,
         JSON.stringify(
-          { records: legacy, migrated_from: LEGACY_DEMO_CONFIRM_STATE_FILE, updated_at: new Date().toISOString() },
+          {
+            records: legacy,
+            migrated_from: LEGACY_DEMO_CONFIRM_STATE_FILE,
+            updated_at: new Date().toISOString(),
+          },
           null,
           2,
         ),

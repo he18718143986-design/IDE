@@ -7,7 +7,10 @@
  * ADR-0014 / DEC-004：不产生 partner_hint，不回流右栏聊天。
  */
 import { createHash } from "node:crypto";
-import type { TranscriptTurn, TranscriptView } from "../../../src/lib/journey/scheme-patch-types";
+import type {
+  TranscriptTurn,
+  TranscriptView,
+} from "../../../src/lib/journey/scheme-patch-types";
 import type { LedgerState } from "../../../src/lib/journey/scheme-patch-types";
 import {
   IntentCompileLoop,

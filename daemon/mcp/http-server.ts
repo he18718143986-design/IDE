@@ -30,7 +30,8 @@ export const STAGENT_WEB_INGEST_DEFINITION: MCPToolDefinition = {
     properties: {
       url: {
         type: "string",
-        description: "Target HTTP/HTTPS URL to ingest; domain must be in references whitelist",
+        description:
+          "Target HTTP/HTTPS URL to ingest; domain must be in references whitelist",
       },
       format: {
         type: "string",
@@ -69,7 +70,8 @@ export interface McpHttpServerOptions {
 export class McpHttpServer {
   private getGateway: () => ScopedWorktreeGateway | undefined;
   private readonly allowedTools: Set<string>;
-  private readonly isAuthorized?: ((req: http.IncomingMessage) => boolean) | undefined;
+  private readonly isAuthorized?:
+    ((req: http.IncomingMessage) => boolean) | undefined;
 
   constructor(options: McpHttpServerOptions = {}) {
     if (typeof options.gateway === "function") {
@@ -105,7 +107,9 @@ export class McpHttpServer {
     return list;
   }
 
-  public async handleJsonRpc(request: JsonRpcRequest): Promise<JsonRpcResponse> {
+  public async handleJsonRpc(
+    request: JsonRpcRequest,
+  ): Promise<JsonRpcResponse> {
     const id = request.id ?? null;
 
     if (!request.method || typeof request.method !== "string") {

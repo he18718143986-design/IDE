@@ -16,10 +16,7 @@ import {
   matchArtifactUnit,
 } from "../../src/lib/journey/graveyard-match";
 import type { GraveyardEntry } from "../../src/lib/journey/scheme-patch-types";
-import {
-  MAX_DIFF_FILE_BYTES,
-  MAX_DIFF_FILES,
-} from "../diff/diff-files";
+import { MAX_DIFF_FILE_BYTES, MAX_DIFF_FILES } from "../diff/diff-files";
 
 /** 再导出，供单测与接线方统一引用。 */
 export { MAX_DIFF_FILE_BYTES, MAX_DIFF_FILES };
@@ -63,15 +60,9 @@ export interface GateResult {
   };
 }
 
-const STRONG_KINDS = new Set<GateUnit["kind"]>([
-  "U-DEP",
-  "U-CMD",
-  "U-IMPORT",
-]);
+const STRONG_KINDS = new Set<GateUnit["kind"]>(["U-DEP", "U-CMD", "U-IMPORT"]);
 
-function hitLock(
-  entry: GraveyardEntry,
-): "user" | "security" | "soft" {
+function hitLock(entry: GraveyardEntry): "user" | "security" | "soft" {
   if (!entry.disallow_revival) return "soft";
   return entry.rejected_by === "security_gate" ? "security" : "user";
 }
@@ -86,7 +77,10 @@ function classifyStrengthAndVia(
 
   if (hasStrongKind) {
     const strongMatch = matched.find((m) => STRONG_KINDS.has(m.unit.kind))!;
-    return { strength: "strong", via: strongMatch.via === "nl" ? "direct" : strongMatch.via };
+    return {
+      strength: "strong",
+      via: strongMatch.via === "nl" ? "direct" : strongMatch.via,
+    };
   }
   if (hasPath && hasIdent) {
     return { strength: "strong", via: "path+ident" };
@@ -267,9 +261,7 @@ export interface GatePack {
 }
 
 /** 只含 active 且 disallow_revival 的阻断类墓碑；keys 已含别名、已小写。 */
-export function buildGatePack(
-  graveyard: readonly GraveyardEntry[],
-): GatePack {
+export function buildGatePack(graveyard: readonly GraveyardEntry[]): GatePack {
   const tombstones: GatePack["tombstones"] = [];
   for (const entry of graveyard) {
     if (entry.status !== "active") continue;
@@ -382,9 +374,7 @@ export function assessDiffScan(input: {
 }
 
 export type GateCardRecommendation =
-  | "retry"
-  | "abandon_or_revive"
-  | "explain_security";
+  "retry" | "abandon_or_revive" | "explain_security";
 
 /**
  * 卡片推荐动作（§5.1）：同墓碑本轮第二次强命中 → 不再推荐重试。

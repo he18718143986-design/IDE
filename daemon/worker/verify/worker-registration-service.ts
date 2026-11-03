@@ -298,10 +298,7 @@ export class WorkerRegistrationService {
       host,
       declaration: record.declaration,
       declaredControlMode: "SANDBOX_ENFORCED",
-      buildArgv: (_taskInput) => [
-        record.launch.command,
-        ...record.launch.args,
-      ],
+      buildArgv: (_taskInput) => [record.launch.command, ...record.launch.args],
       ...(options?.env === undefined ? {} : { env: options.env }),
       ...(options?.expectedArtifacts === undefined
         ? {}

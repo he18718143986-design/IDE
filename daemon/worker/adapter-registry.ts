@@ -81,12 +81,13 @@ export interface AdapterModeChangeRequest {
 export class AdapterRegistry {
   private readonly entries = new Map<string, RegisteredAdapter>();
   /** TASK-W.6：adapter_id → 派工工厂（与 entries 分离，避免改动既有注册项结构） */
-  private readonly dispatchFactories = new Map<string, DispatchFactoryBinding>();
+  private readonly dispatchFactories = new Map<
+    string,
+    DispatchFactoryBinding
+  >();
   /** 由 WorkerRegistrationService 绑定的服务端持久层查询，不接受调用方传入报告对象。 */
   private probeReportLookup:
-    | ((
-        reportId: string,
-      ) =>
+    | ((reportId: string) =>
         | {
             report: WorkerProbeReportSummary;
             current_adapter_id: string;
@@ -96,9 +97,7 @@ export class AdapterRegistry {
     | undefined;
 
   bindProbeReportAuthority(
-    lookup: (
-      reportId: string,
-    ) =>
+    lookup: (reportId: string) =>
       | {
           report: WorkerProbeReportSummary;
           current_adapter_id: string;

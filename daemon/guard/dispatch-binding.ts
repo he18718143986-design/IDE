@@ -82,9 +82,7 @@ export async function verifyDispatchBinding(
   }
 
   if (snapshot.scope_plan.plan_digest !== binding.plan_digest) {
-    return mismatch(
-      "方案范围摘要与合同 scheme_binding.plan_digest 不一致",
-    );
+    return mismatch("方案范围摘要与合同 scheme_binding.plan_digest 不一致");
   }
 
   const scope = contract.authorization.file_system_scope;
@@ -106,9 +104,7 @@ export async function verifyDispatchBinding(
     snapshot.scope_plan,
   );
   if (!matches) {
-    return mismatch(
-      "合同可写范围与确认快照 ScopePlan 投影不一致",
-    );
+    return mismatch("合同可写范围与确认快照 ScopePlan 投影不一致");
   }
 
   const graveyard = [...snapshot.graveyard];

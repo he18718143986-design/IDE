@@ -147,10 +147,7 @@ export function upsertWorker(
 }
 
 /** TASK-W.9c：删除自注册 Worker（撤销 / 注销） */
-export function deleteWorker(
-  repoRoot: string,
-  adapterId: string,
-): boolean {
+export function deleteWorker(repoRoot: string, adapterId: string): boolean {
   const store = loadWorkerStore(repoRoot);
   const before = store.workers.length;
   store.workers = store.workers.filter(

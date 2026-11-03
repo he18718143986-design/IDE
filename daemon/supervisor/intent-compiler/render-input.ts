@@ -193,7 +193,13 @@ function renderPendingCards(suggestions: readonly Suggestion[]): string {
 }
 
 function summarizeOp(op: Suggestion["op"]): string {
-  const o = op as { op: string; id?: string; item?: { name?: string; question?: string; text?: string }; value?: string; text?: string };
+  const o = op as {
+    op: string;
+    id?: string;
+    item?: { name?: string; question?: string; text?: string };
+    value?: string;
+    text?: string;
+  };
   if (o.item?.name) return String(o.item.name);
   if (o.item?.question) return String(o.item.question);
   if (o.item?.text) return String(o.item.text);
@@ -241,7 +247,9 @@ function renderGraveyard(entries: readonly GraveyardEntry[]): string {
   const lines = ["<graveyard>"];
   for (const g of entries) {
     const lock = tombstoneLock(g);
-    lines.push(`  <tombstone id="${escapeXmlText(g.rejected_id)}" lock="${lock}">`);
+    lines.push(
+      `  <tombstone id="${escapeXmlText(g.rejected_id)}" lock="${lock}">`,
+    );
     lines.push(`    <proposal>${escapeXmlText(g.proposal)}</proposal>`);
     lines.push(`    <reason>${escapeXmlText(g.rejection_reason)}</reason>`);
     lines.push(`  </tombstone>`);
@@ -255,11 +263,15 @@ function renderGraveyard(entries: readonly GraveyardEntry[]): string {
   return joined;
 }
 
-function renderProjectProfile(profile: ProjectProfileView | null | undefined): string {
+function renderProjectProfile(
+  profile: ProjectProfileView | null | undefined,
+): string {
   const p = profile ?? {};
   const lines = ["<project_profile>"];
   if (p.package_name) {
-    lines.push(`  <package_name>${escapeXmlText(p.package_name)}</package_name>`);
+    lines.push(
+      `  <package_name>${escapeXmlText(p.package_name)}</package_name>`,
+    );
   }
   if (p.greenfield !== undefined) {
     lines.push(`  <greenfield>${p.greenfield ? "yes" : "no"}</greenfield>`);
@@ -400,9 +412,7 @@ export function renderCompilerInput(
       );
     } else if (t.role === "assistant") {
       const norm = normalizeForCompilerPrompt(t.text);
-      turnLines.push(
-        `  <turn role="assistant" quotable="no">${norm}</turn>`,
-      );
+      turnLines.push(`  <turn role="assistant" quotable="no">${norm}</turn>`);
     }
   }
 

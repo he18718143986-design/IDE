@@ -59,9 +59,7 @@ export function emptySchemeDraftV2(
   };
 }
 
-export function emptyLedgerState(
-  over: Partial<LedgerState> = {},
-): LedgerState {
+export function emptyLedgerState(over: Partial<LedgerState> = {}): LedgerState {
   return {
     draft: emptySchemeDraftV2(over.draft),
     graveyard: over.graveyard ?? [],

@@ -50,7 +50,8 @@ export class WebIngestProxy {
     this.maxSizeBytes = options.maxSizeBytes ?? 5 * 1024 * 1024; // 5MB
     this.rateLimitPerMinute = options.rateLimitPerMinute ?? 60;
     this.rateBurstLimit = options.rateBurstLimit ?? 10;
-    this.authSessionManager = options.authSessionManager ?? new AuthSessionManager();
+    this.authSessionManager =
+      options.authSessionManager ?? new AuthSessionManager();
     this.fetchFn = options.fetchFn ?? globalThis.fetch;
   }
 
@@ -59,7 +60,10 @@ export class WebIngestProxy {
   }
 
   getAllowedDomains(): Set<string> {
-    const raw = typeof this.allowedDomains === "function" ? this.allowedDomains() : this.allowedDomains;
+    const raw =
+      typeof this.allowedDomains === "function"
+        ? this.allowedDomains()
+        : this.allowedDomains;
     const hosts = new Set<string>();
     for (const item of raw) {
       if (!item) continue;
@@ -129,7 +133,11 @@ export class WebIngestProxy {
       if (request.headers) {
         for (const [k, v] of Object.entries(request.headers)) {
           const lower = k.toLowerCase();
-          if (lower === "cookie" || lower === "authorization" || lower === "set-cookie") {
+          if (
+            lower === "cookie" ||
+            lower === "authorization" ||
+            lower === "set-cookie"
+          ) {
             continue;
           }
           safeCustomHeaders[k] = v;
@@ -138,7 +146,8 @@ export class WebIngestProxy {
 
       const headers: Record<string, string> = {
         "User-Agent": "Stagent-Daemon-WebIngest/1.0",
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        Accept:
+          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         ...safeCustomHeaders,
       };
 
@@ -167,9 +176,15 @@ export class WebIngestProxy {
 
       // 7. dec-13 条款 2：Cookie 过期静默重登
       // 若收到 401/403 且配置了代登凭据，由 Daemon 用 Vault 账密静默重登换取新 Cookie 并重试一次，Worker 全程无感
-      if ((res.status === 401 || res.status === 403) && this.authSessionManager.hasAuthConfig(host)) {
+      if (
+        (res.status === 401 || res.status === 403) &&
+        this.authSessionManager.hasAuthConfig(host)
+      ) {
         try {
-          cookie = await this.authSessionManager.handleSessionExpired(host, this.fetchFn);
+          cookie = await this.authSessionManager.handleSessionExpired(
+            host,
+            this.fetchFn,
+          );
           if (cookie) {
             headers["Cookie"] = cookie;
             res = await this.fetchFn(currentUrl.toString(), {
@@ -205,7 +220,10 @@ export class WebIngestProxy {
             );
           }
 
-          if (redirectTarget.protocol !== "http:" && redirectTarget.protocol !== "https:") {
+          if (
+            redirectTarget.protocol !== "http:" &&
+            redirectTarget.protocol !== "https:"
+          ) {
             throw new WebIngestError(
               E_WEB_INGEST_INVALID_URL,
               `Redirect protocol '${redirectTarget.protocol}' not supported`,
@@ -339,8 +357,12 @@ export function extractHtmlSummary(html: string): WebIngestSummary {
 
   // Description
   const metaMatch =
-    /<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i.exec(html) ||
-    /<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i.exec(html);
+    /<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i.exec(
+      html,
+    ) ||
+    /<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i.exec(
+      html,
+    );
   const description = metaMatch ? metaMatch[1].trim() : undefined;
 
   // H1s
@@ -354,7 +376,8 @@ export function extractHtmlSummary(html: string): WebIngestSummary {
 
   // Snippet
   const plainText = stripHtmlTags(html).replace(/\s+/g, " ").trim();
-  const snippet = plainText.length > 500 ? `${plainText.slice(0, 500)}...` : plainText;
+  const snippet =
+    plainText.length > 500 ? `${plainText.slice(0, 500)}...` : plainText;
 
   return {
     title: title || undefined,

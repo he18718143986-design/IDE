@@ -40,10 +40,7 @@ export type InsertLiveIncidentStubResult =
       message: string;
     };
 
-function schemeForPlan(
-  repoRoot: string,
-  plan: ProjectPlan,
-): ProjectPlanScheme {
+function schemeForPlan(repoRoot: string, plan: ProjectPlan): ProjectPlanScheme {
   const ledger = readSchemeLedger(repoRoot);
   if (ledger?.state.draft) {
     const d = ledger.state.draft;
@@ -160,10 +157,7 @@ export function insertLiveIncidentStub(
   };
 
   const ms = plan.milestones.find((m) => m.milestone_id === slot.milestone_id)!;
-  const reorderIds = [
-    stubId,
-    ...ms.contract_ids.filter((id) => id !== stubId),
-  ];
+  const reorderIds = [stubId, ...ms.contract_ids.filter((id) => id !== stubId)];
 
   const editOps = slot.planned
     .filter((c) => c.stub_id !== stubId)

@@ -124,8 +124,7 @@ function contractScopeFields(contract: SoftwareContract) {
       commands: contract.verification_spec.commands,
       ...(contract.verification_spec.manual_confirmation !== undefined
         ? {
-            manual_confirmation:
-              contract.verification_spec.manual_confirmation,
+            manual_confirmation: contract.verification_spec.manual_confirmation,
           }
         : {}),
     },
@@ -160,7 +159,8 @@ export function assertSignedContractMatchesSnapshot(input: {
 
   const greenfield = isGreenfieldRepo(input.repoRoot);
   const grade = gradeWritableScope({
-    writable_paths: input.contract.authorization.file_system_scope.writable_paths,
+    writable_paths:
+      input.contract.authorization.file_system_scope.writable_paths,
     greenfield,
   });
   if (!grade.ok) {

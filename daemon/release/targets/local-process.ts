@@ -2,7 +2,11 @@
  * TASK-L.15：local_process 目标 —— 本机拉起应用并保活。
  */
 import { spawnManaged } from "../../worker/cli-host/process-host";
-import type { ReleaseTargetAdapter, ReleaseContext, StepResult } from "../target-adapter";
+import type {
+  ReleaseTargetAdapter,
+  ReleaseContext,
+  StepResult,
+} from "../target-adapter";
 import {
   detectInstallArgv,
   hostEnvAllowlist,
@@ -128,7 +132,9 @@ export class LocalProcessAdapter implements ReleaseTargetAdapter {
     // 若已立即退出，视为部署失败
     const raced = await Promise.race([
       proc.exited.then((e) => ({ kind: "exit" as const, e })),
-      new Promise<{ kind: "alive" }>((r) => setTimeout(() => r({ kind: "alive" }), 200)),
+      new Promise<{ kind: "alive" }>((r) =>
+        setTimeout(() => r({ kind: "alive" }), 200),
+      ),
     ]);
     if (raced.kind === "exit") {
       const stderr = proc.stderr();

@@ -27,7 +27,9 @@ export const E_SCHEME_BINDING_IMMUTABLE = "E_SCHEME_BINDING_IMMUTABLE";
  */
 export class SchemeBindingImmutableError extends Error {
   readonly code: typeof E_SCHEME_BINDING_IMMUTABLE = E_SCHEME_BINDING_IMMUTABLE;
-  constructor(message = "scheme_binding 签署后不可改，且旧直签合同不得事后写入") {
+  constructor(
+    message = "scheme_binding 签署后不可改，且旧直签合同不得事后写入",
+  ) {
     super(`[${E_SCHEME_BINDING_IMMUTABLE}] ${message}`);
     this.name = "SchemeBindingImmutableError";
   }

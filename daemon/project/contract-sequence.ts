@@ -41,9 +41,7 @@ export function findInFlightContract(
   return null;
 }
 
-export function stubIdFromContract(
-  contract: SoftwareContract,
-): string | null {
+export function stubIdFromContract(contract: SoftwareContract): string | null {
   const meta = contract.supervisor_metadata;
   if (!meta) return null;
   const id = meta.stub_id;

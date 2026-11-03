@@ -233,13 +233,23 @@ export class AuthSessionManager {
     }
 
     // 3. 擦除 Set-Cookie / Cookie 字符串
-    sanitized = sanitized.replace(/Set-Cookie:[^\r\n]+/gi, "Set-Cookie: [REDACTED_COOKIE]");
-    sanitized = sanitized.replace(/Cookie:[^\r\n]+/gi, "Cookie: [REDACTED_COOKIE]");
+    sanitized = sanitized.replace(
+      /Set-Cookie:[^\r\n]+/gi,
+      "Set-Cookie: [REDACTED_COOKIE]",
+    );
+    sanitized = sanitized.replace(
+      /Cookie:[^\r\n]+/gi,
+      "Cookie: [REDACTED_COOKIE]",
+    );
 
     return sanitized;
   }
 
   private normalizeDomain(domain: string): string {
-    return domain.trim().toLowerCase().replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
+    return domain
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\//i, "")
+      .replace(/\/.*$/, "");
   }
 }

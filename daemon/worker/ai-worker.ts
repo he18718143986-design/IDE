@@ -230,9 +230,7 @@ export class AiWorker {
       ...(this.checksExtras === undefined
         ? {}
         : { checksExtras: this.checksExtras }),
-      ...(this.designNote === undefined
-        ? {}
-        : { designNote: this.designNote }),
+      ...(this.designNote === undefined ? {} : { designNote: this.designNote }),
       ...(gate && gate.availability === "snapshot"
         ? { graveyard: gate.graveyard }
         : {}),
@@ -432,12 +430,14 @@ export class AiWorker {
       if (gate.block && gate.primary) {
         blockers.push({
           code: gate.primary.code,
-          message:
-            `触及用户否决过的方案（${gate.primary.rejected_id}）；整批不写盘`,
+          message: `触及用户否决过的方案（${gate.primary.rejected_id}）；整批不写盘`,
         });
         lineVerdicts.push({
           code: gate.primary.code,
-          detail: { lock: gate.primary.lock, rejected_id: gate.primary.rejected_id },
+          detail: {
+            lock: gate.primary.lock,
+            rejected_id: gate.primary.rejected_id,
+          },
         });
       }
       // 弱证据 / unavailable：不阻断；warnings 由编排器在证据侧记录
