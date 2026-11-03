@@ -151,3 +151,10 @@
 - **交付与边界**：容器 CLI 仅走 `runInSandbox()`，成功 witness 经证据面消费；`dispatchable` 共享门禁现支持宿主可用且工厂齐备的 `SANDBOX_ENFORCED`。Cursor 镜像/协议未实证，仍 `E_CURSOR_AGENT_NO_EXECUTOR`。完整记录见 [`development-tasks-completed.md` §3.4o](../specs/development-tasks-completed.md#task-w.9b)。
 - **挂账（四项，不新增 OP）**：逐行 Docker host probe 放大；拒绝原因被 `isControlledDispatchable()` 吞并导致诊断收窄；四类 API key 可读于容器 env（日志脱敏不改变该事实）；Cursor 容器镜像与运行协议未实证。
 - **语义变更注记**：dispatchable 从仅 GATEWAY 判定扩为 `GATEWAY_ENFORCED` 或（宿主可用且工厂齐备的）`SANDBOX_ENFORCED`；不可据此声称 Cursor 已跨越真容器执行边界。现行物理 tip `b98e463`。
+
+### TASK-L.17c（P-132 · 2026-11-03 · 非 OP）
+
+- **立卡**：Tina 授权纯文档立卡 `TASK-L.17c`「中栏方案审阅页嵌入试玩认可提交」`[NEW_TASK]`（S/M）。
+- **范围要点**：同页挂载既有 `CompareView`；原话 +「认可完成」→ `submitPlaytestEvidence`；读侧反映 `playtest-guard`；不改三本体；不碰 W.9c 施工面。
+- **挂账归口**：兑现 L.17b / C.23 已声明的端到端 UI 未接线（CompareView 未挂中栏、原话采集 UI）；**不新增 OP**；历史「未宣称」原文保留。
+- **Sprint**：首要仍为 `TASK-W.9c`（READY · 待 Tina 单卡授权）；L.17c **不抢**首要，开工须另授。物理 tip `e3262c9`（#102）。

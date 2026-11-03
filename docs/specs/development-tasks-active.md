@@ -681,7 +681,7 @@
 
 #### 【Task L.17b】对比视图与试玩证据桩 `[COMPLETED]`
 
-> **归档注记（2026-11-02 · P-112）**：本卡已 COMPLETED（[#72](https://github.com/he18718143986-design/IDE/pull/72)/`d26def6`，squash merge）。完整交付记录、残余边界与挂账见 [`development-tasks-completed.md`](./development-tasks-completed.md) §3.4f（锚点 `#task-l.17b`）。本处保留原始卡文以存追溯，不再作为施工依据；**M5 北极星主序收官**。
+> **归档注记（2026-11-02 · P-112）**：本卡已 COMPLETED（[#72](https://github.com/he18718143986-design/IDE/pull/72)/`d26def6`，squash merge）。完整交付记录、残余边界与挂账见 [`development-tasks-completed.md`](./development-tasks-completed.md) §3.4f（锚点 `#task-l.17b`）。本处保留原始卡文以存追溯，不再作为施工依据；**M5 北极星主序收官**。**（P-132 现行指针）**端到端 UI 接线（CompareView 挂中栏 + 原话「认可完成」）立为 [`TASK-L.17c`](#task-l.17c) `[NEW_TASK]`，**未开工、未宣称闭环**。
 
 * **任务编号**：`TASK-L.17b`
 * **任务名称**：对比视图与试玩证据桩
@@ -709,6 +709,52 @@
   3. 机器自动比对（像素/DOM）作为强阻断门禁复活。
 * **关键文件**：`src/components/project/CompareView.tsx`（新）、`src/lib/journey/playtest-evidence.ts`（新）、`daemon/supervisor/preview/playtest-guard.ts`、`tests/unit/playtest-evidence.test.ts`（新）
 * **估算**：M
+
+
+<a id="task-l.17c"></a>
+
+#### 【Task L.17c】中栏方案审阅页嵌入试玩认可提交 `[NEW_TASK]`
+
+> **立卡（2026-11-03 · P-132 · 经 Tina 授权）**：兑现 L.17b / C.23 已声明的端到端 UI 挂账（CompareView 未挂中栏、原话采集 UI 未实现）。本卡按 [`task-card-standard.md`](./task-card-standard.md) R-1～R-12 与 [`../templates/05-task-card.md`](../templates/05-task-card.md) 写全；**状态 `[NEW_TASK]`，就绪 ≠ 开工**——施工须 Tina 另行授权。**不抢 Sprint 首要**：现行首要仍为 `TASK-W.9c`（READY · 待 Tina 单卡授权）；本卡为产品验收挂账并行立卡，不碰 W.9c / orchestrator / AdapterRegistry。
+
+* **任务编号**：`TASK-L.17c`
+* **任务名称**：中栏方案审阅页嵌入试玩认可提交
+* **对应规格**（R-1）：[`../scheme.md`](../scheme.md) **dec-12** / **acc-6** / gap-11；[`delivery-lifecycle.md`](./delivery-lifecycle.md) M5；[`development-tasks-completed.md`](./development-tasks-completed.md) §3.4f（L.17b 未接线声明）与 §3.4i（C.23 挂账「CompareView UI 路由挂载与用户原话采集 UI 仍属后续」）；W.5a / C.18 中栏单页方案审阅架构裁决（禁复活多视口 Tab）
+* **前置依赖**（R-3）：`TASK-L.17b`（**COMPLETED** · [#72](https://github.com/he18718143986-design/IDE/pull/72)/`d26def6`，CompareView / `submitPlaytestEvidence` / `playtest-guard` 已交付）；`TASK-C.18`（**COMPLETED**，中栏 `SchemeReviewPane` 单页已在）；`TASK-C.23`（**COMPLETED** · [#82](https://github.com/he18718143986-design/IDE/pull/82)/`a5223fb`，验收命令装配已兑现；本卡**不改**装配与判定源）
+* **优先级**：P3（产品验收挂账 · 不抢 W.9c）
+* **状态**：`[NEW_TASK]`（DoR 写全；**开工须 Tina 单卡授权**；不宣称 READY 以外的东西）
+* **对照痛点（代码事实）**（R-4）：
+  1. `src/components/project/CompareView.tsx::CompareView` 组件已在库，但**全仓无 JSX 挂载点**（仅单测引用）；中栏 `src/components/studio/SchemeReviewPane.tsx::SchemeReviewPane` 未 import / 未渲染它。
+  2. `src/lib/journey/playtest-evidence.ts::submitPlaytestEvidence` 与 `POST /api/playtest/evidence` 已交付，但 UI **无「认可完成」按钮、无原话输入框**；右栏 `playtest-guidance.ts` 仅文案提示。
+  3. `daemon/supervisor/preview/playtest-guard.ts::evaluatePlaytestGuard` 为 `check playtest` 单一判定源；**无读侧 HTTP/UI 接线**把 `UNCONFIRMED` / `STALE_VERSION` / `NOT_NORTHSTAR_SCENARIO` / `ok:true` 等拒绝态反映到按钮可用态与提交结果（`daemon/server.ts` 目前仅挂 `POST /api/playtest/evidence`）。
+* **一句话目标**（R-2）：用户在中栏「方案审阅」同页看见既有对照试玩视图，输入原话点「认可完成」后，证据经既有 `submitPlaytestEvidence` 落盘；按钮与结果文案如实反映 `playtest-guard` 判定（含拒绝态），无需另开 Tab / 右栏入口。
+* **ADR 修订**（R-9）：无（不复活 REJ-009；不改 ADR-0001 / ADR-0014）
+* **采用的默认值**（R-10）：沿用 **dec-12 / L.17b** 证据口径——`user_verdict` 为用户原话（证据的一部分，**不许改造/摘要**）；`release_id` / `timestamp` / `operator` 仍只由服务端装配；AI 不代判。
+* **范围**（R-5）：
+  1. **挂载（不重建组件）**：修改 `src/components/studio/SchemeReviewPane.tsx`（及若必要的 `src/routes/index.tsx` 传参），在中栏方案审阅**同页**嵌入既有 `CompareView`；**不改** `CompareView.tsx` 组件本体 / props 契约（缺 props 时由调用方装配既有字段：`contractId` / `references` / `snapshots` / `previewUrl` 等）。
+  2. **原话 +「认可完成」**：在同页（CompareView 邻近区域或 SchemeReviewPane 内新小节）增加原话展示/输入与「认可完成」按钮；点击后**只**调用 `src/lib/journey/playtest-evidence.ts::submitPlaytestEvidence(conn, { contract_id, user_verdict })`；提交前本地拒空/空白原话；**禁止**对原话做摘要/改写后再提交。
+  3. **读侧接线（不改门禁本体）**：新增薄读侧（建议 `GET /api/playtest/status?contract_id=` 或等价，委托既有 `evaluatePlaytestGuard`，**零改** `playtest-guard.ts` 判定逻辑）+ 前端消费：按钮 disabled/文案与提交结果反映既有拒绝态（至少覆盖 `UNCONFIRMED` / `STALE_VERSION` / `NOT_NORTHSTAR_SCENARIO` / `CONTRACT_NOT_FOUND` / `EVIDENCE_INVALID` / `ok:true`）；提交成功后刷新读侧状态。
+  4. **测试**：新增 UI/单元测（建议 `tests/ui/scheme-review-playtest.test.tsx` 与/或 `tests/unit/playtest-status-wiring.test.ts`）覆盖挂载、空原话不可提交、提交走 `submitPlaytestEvidence`、读侧拒绝态反映。
+* **非目标**（R-6）：
+  1. **不碰** `daemon/pipeline/orchestrator.ts` / 派工 / `AdapterRegistry` / `requireControlledDispatch`（**W.9c 施工面**）。
+  2. **真机整段 `check playtest` 执行债另挂**，不塞进本卡（本卡只做 UI + 读侧反映，不改门禁执行链路）。
+  3. **不改** `CompareView` / `submitPlaytestEvidence` / `playtest-guard` / `withPlaytestCommand` **本体**（契约与判定逻辑冻结；只消费）。
+  4. **不**复活 Studio 多视口 Tab、**不**新设右栏入口、**不**新开 ActivityBar 项（W.5a / C.18 裁决）。
+  5. **不**宣称端到端产品闭环已完成；本卡完工后仍须真机联调另证。
+* **不变声明**（R-12）：鉴权 / Demo Origin / 点亮三证 / 网关写范围 **不变**；右栏 `role:"partner"` 只读白名单 **不变**；dec-12 / REJ-009 **不变**。
+* **验收（PASS）**（R-7）：
+  1. 中栏方案审阅页 DOM 出现既有 `data-testid="compare-view"`（来自库内 CompareView，非重建副本）。
+  2. 无原话 / 空白原话时「认可完成」不可成功提交（前端拦截 + 与既有 API 400 口径一致）。
+  3. 有效原话提交的网络/调用路径断言命中 `submitPlaytestEvidence` → `POST /api/playtest/evidence`；请求体**仅** `contract_id` + `user_verdict`（原话未经摘要）。
+  4. 读侧在 `STALE_VERSION` / `UNCONFIRMED` / `NOT_NORTHSTAR_SCENARIO` 等态下，按钮或结果区有可见反映；`playtest-guard.ts` diff **为空**（判定本体未改）。
+  5. 静态扫描：本卡 diff **不含** 新 ActivityBar 视口 / 多 Tab 路由复活。
+* **FAIL**（R-8）：
+  1. 复活多视口 Tab / 新设右栏入口 → FAIL（W.5a 架构裁决）。
+  2. 改造 / 摘要原话再提交 → FAIL（证据完整性 / dec-12）。
+  3. 无原话 / 空原话可提交 → FAIL。
+  4. 提交路径绕过 `submitPlaytestEvidence` 直连 evidence 存储（浏览器直写 `.stagent/` 或自造 POST 体带 `release_id`/`operator`/`timestamp`）→ FAIL。
+* **关键文件**：`src/components/studio/SchemeReviewPane.tsx`（改）、`src/routes/index.tsx`（改·传参，若需要）、`src/components/project/CompareView.tsx`（**只读复用**）、`src/lib/journey/playtest-evidence.ts`（**只读复用**）、`daemon/supervisor/preview/playtest-guard.ts`（**只读复用**）、`daemon/server.ts`（改·薄读侧路由，若采用 HTTP）、`tests/ui/scheme-review-playtest.test.tsx`（新）与/或 `tests/unit/playtest-status-wiring.test.ts`（新）
+* **估算**（R-11）：**S/M**（同页挂载 + 表单 + 薄读侧；单层 UI/接线，不跨 orchestrator）
 
 ### 3.4e 台账债立卡（2026-11-01 · NON_BLOCKER · 不抢主序）
 

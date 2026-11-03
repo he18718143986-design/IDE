@@ -38,6 +38,7 @@
 | `TASK-L.17` | `SPLIT` | 受控只读外网摄取（北极星前置 · 已拆分） | [打开](./development-tasks-active.md#task-l.17) |
 | `TASK-L.17a` | `COMPLETED` | 受控摄取与代登代理 | [打开](./development-tasks-completed.md#task-l.17a) |
 | `TASK-L.17b` | `COMPLETED` | 对比视图与试玩证据桩（M5 主序收官 · dec-12 证据桩） | [打开](./development-tasks-completed.md#task-l.17b) |
+| `TASK-L.17c` | `NEW_TASK` | 中栏方案审阅页嵌入试玩认可提交（CompareView 挂载 + 原话「认可完成」· 不抢 W.9c） | [打开](./development-tasks-active.md#task-l.17c) |
 | `TASK-L.18` | `COMPLETED` | 系统地图 UI +「改这里会影响什么」（DLV-5） | [打开](./development-tasks-completed.md#task-l.18) |
 | `TASK-H.9` | `COMPLETED` | 废止 `.stagent/metadata/` 写入（DLV-4 · ADR-0011） | [打开](./development-tasks-completed.md#task-h.9) |
 | `TASK-B.1` | `DEFERRED` | 本地 AST 增量依赖图分析引擎 | [打开](./development-tasks-active.md#task-b.1) |
