@@ -144,3 +144,10 @@
 - **后续挂账**（归档见 [`development-tasks-completed.md` §3.4n](../specs/development-tasks-completed.md#task-w.9a)，不新增 OP）：清理死码导出 `E_CURSOR_AGENT_MCP_ENDPOINT_MISSING`；W.9c 接执行面时重估 `bindProbeReportAuthority` 公开重绑边界。
 - **审查说明**：PR #99 的 Claude spawn LEGACY 白名单新增四文件是既有 `child_process` import 补登记，非 W.9a 新增执行面。
 - **开工边界**：W.9b 当前选容器路径，Gateway capability 不可用且不冒称 `GATEWAY_ENFORCED`；仅容器成功并产 witness 才可标 `SANDBOX_ENFORCED`。
+
+### TASK-W.9（P-131 · 2026-11-03 · 非 OP）
+
+- **状态回写**：W.9b 已 COMPLETED（PR #101 / `b98e463`）；W.9a、W.9b 的 DAG 前置均满足，Sprint 首要转 W.9c（READY，仍待 Tina 单卡授权）。
+- **交付与边界**：容器 CLI 仅走 `runInSandbox()`，成功 witness 经证据面消费；`dispatchable` 共享门禁现支持宿主可用且工厂齐备的 `SANDBOX_ENFORCED`。Cursor 镜像/协议未实证，仍 `E_CURSOR_AGENT_NO_EXECUTOR`。完整记录见 [`development-tasks-completed.md` §3.4o](../specs/development-tasks-completed.md#task-w.9b)。
+- **挂账（四项，不新增 OP）**：逐行 Docker host probe 放大；拒绝原因被 `isControlledDispatchable()` 吞并导致诊断收窄；四类 API key 可读于容器 env（日志脱敏不改变该事实）；Cursor 容器镜像与运行协议未实证。
+- **语义变更注记**：dispatchable 从仅 GATEWAY 判定扩为 `GATEWAY_ENFORCED` 或（宿主可用且工厂齐备的）`SANDBOX_ENFORCED`；不可据此声称 Cursor 已跨越真容器执行边界。现行物理 tip `b98e463`。

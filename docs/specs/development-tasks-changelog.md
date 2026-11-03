@@ -138,3 +138,5 @@
 - **P-130（W.9a 合入回写 + W.9b 开工，2026-11-02）**：W.9a → `[COMPLETED]`（[#99](https://github.com/he18718143986-design/IDE/pull/99)/`22168ee`）；W.9b 经 Tina 授权进入施工，W.9c 仍待 a+b。同步矩阵、Sprint、active/archive、completed §3.4n、index、ledger 与 `scheme.md` tip。PR #99 审查注记：spawn LEGACY 白名单四文件是既有 `child_process` 使用补登记，非新增执行面。归拢两条挂账：清理 `E_CURSOR_AGENT_MCP_ENDPOINT_MISSING` 导出；W.9c 重新评估 `bindProbeReportAuthority` 公开重绑边界。不宣称端到端闭环。
 
 - **P-130 状态注记**：W.9a 已完成后，W.9c 当前唯一未满足的代码前置为 W.9b；因此活动卡/当前矩阵显示 `[BLOCKED · 待 b]`，历史拆分记录保留立卡时的「待 a+b」口径。
+
+- **P-131（W.9b 合入回写，2026-11-03）**：`TASK-W.9b` → `[COMPLETED]`（[#101](https://github.com/he18718143986-design/IDE/pull/101)/`b98e463`）；active→completed 归档，completed §3.4o 写明 `ContainerCliAdapter` / `executeContainerCli`、witness/evidence、dispatchability 与 Cursor 未实证边界，收录四项挂账。同步矩阵、index、active、版本头、Sprint 与 ledger / `scheme.md` 指针；Sprint 首要推进 W.9c，DAG a、b 前置满足，但仍待 Tina 单卡授权。**dispatchable 语义扩展**：#101 使 `SANDBOX_ENFORCED` 可在宿主可用且工厂齐备时通过共享门禁，和原仅 GATEWAY 的视图口径相比为显式扩展；具体宿主探测成本与错误原因丢失分别挂账，不把 Cursor 泛型容器桥说成已实证。历史流水保留原文；仅 docs，不新增 OP。main tip `b98e463`。

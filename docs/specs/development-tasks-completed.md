@@ -2270,6 +2270,19 @@
 - **后续挂账（两项）**：① 清理未再使用的 `E_CURSOR_AGENT_MCP_ENDPOINT_MISSING` 导出；② W.9c 接执行面时重新评估 `bindProbeReportAuthority` 作为公开方法可被进程内重绑的信任边界。
 - **边界**：不宣称端到端闭环；W.9b 执行器抽象与见证接线另行施工，W.9c 自注册工厂闭环仍待 W.9a+b 完成。
 
+
+### 3.4o Worker 执行器链路（W.9b）
+
+<a id="task-w.9b"></a>
+
+#### 【Task W.9b】执行器抽象 + 容器见证接线 `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#101](https://github.com/he18718143986-design/IDE/pull/101)/`b98e463`，squash；基线 #100/#99 之后）。
+- **交付**：新增 `ContainerCliAdapter` + `executeContainerCli`，外部 CLI 仅委托 `runInSandbox()`，无本地 `spawn`；容器环境采用白名单，日志中的敏感值脱敏。仅当 `via === "exit" && exitCode === 0` 才生成本次 `sandboxWitness` 并读取精确声明的 Worktree 相对产物；失败、拒绝、超时不接收产物或 witness。`resolveEvidenceControlMode()` 消费执行见证，无 witness 自动回落 `UNCONTROLLED_EXTERNAL`。`orchestrator` 通过 `sandboxWitnesses` Map 将见证带入证据面。`server.ts` / `WorkerRegistrationService` 的派工可用性投影与 `requireControlledDispatch()` 共用判定源：`SANDBOX_ENFORCED` + 宿主可用 + 工厂齐备才可派工；自注册记录尚无派工工厂仍不可派工。Gateway mediation 与容器 CLI 边界分开记录，不宣称 Gateway capability。
+- **Cursor 未实证边界**：Cursor CLI 容器镜像与运行协议均未确认；`cursor-agent` 仍以 `E_CURSOR_AGENT_NO_EXECUTOR` 明确拒绝执行。本卡不声称 Cursor 已实现真容器执行，也不声称端到端闭环。
+- **后续挂账（四项）**：① `WorkerRegistrationService.builtinView()` 对每个内建适配器行创建 `DockerContainerHost`；SANDBOX 档判定会通过 `isAvailable()` 探测宿主，行数增长可能放大 Docker probe。静态形态预检仍可诚实反映工厂/档位，但宿主可用性探测成本与副作用需另行评估；② `isControlledDispatchable()` 捕获全部拒绝异常并仅返回 boolean，`dispatch_blocked_reason` 因而为泛化文案、具体拒绝码丢失，诊断信息面收窄；③ env 白名单允许 `LLM_API_KEY`、`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`CURSOR_API_KEY` 直通容器进程环境，容器内进程可读取明文；日志脱敏仅约束日志输出，不改变容器内可读事实；④ Cursor CLI 容器镜像 / 运行协议尚未实证，generic `runInSandbox()` 桥不等于已跨越 Cursor 真容器执行边界。
+- **边界**：容器见证是执行记录，不代表绝对隔离；本卡没有接通最终自注册 Worker 工厂闭环（W.9c），不宣称端到端闭环。
+
 ---
 
 ### 3.4c 闭环旅程 v2.1 第一批（Journey · 规格 `supervisor.md` 第三部分 §13～§20；对应 §19 落差 L-01～L-10）

@@ -524,8 +524,8 @@
   * **按 R-11「L 卡不得开工、必须拆分」，本卡仅立卡、待 DoR 过审后由 Tina 授权拆分为子卡，待授权不擅动。**
   * **拆分落地（参照 W.5c 先例 · P-128 经授权）**：
     * `TASK-W.9a`（探测报告指纹升格 + launch 解耦，S/M，`[READY]`）：`buildLaunch()` 缺端点降级预览 + `promoteControlMode()` 依赖真实探测报告消费链；
-    * `TASK-W.9b`（执行器抽象 + 容器见证接线，M，`[READY]`）：执行器统一抽象（Gateway 注入 vs 容器围栏方案对比落盘）+ 沙箱执行产物收集与 `SandboxWitness` 闭环；
-    * `TASK-W.9c`（自注册工厂闭环，M，`[BLOCKED · 待 b]`）：自注册 Worker 派工工厂挂接机制、`requireControlledDispatch` 端到端打通与 dispatchable 状态准确对账。
+    * `TASK-W.9b`（执行器抽象 + 容器见证接线，M，`[COMPLETED]`，#101/`b98e463`）：执行器统一抽象（Gateway 注入 vs 容器围栏方案对比落盘）+ 沙箱执行产物收集与 `SandboxWitness` 闭环；交付与挂账见 completed §3.4o。
+    * `TASK-W.9c`（自注册工厂闭环，M，`[READY · 待 Tina 单卡授权]`）：自注册 Worker 派工工厂挂接机制、`requireControlledDispatch` 端到端打通与 dispatchable 状态准确对账。
 * **台账**：
   * ledger **DLV-3** / **W.5b 挂账**：兑现「自造指纹升格重构」与「`buildLaunch` MCP 端点解耦」；
   * ledger **W.7 挂账 1**：解决「升格 ≠ 可派工」结构性边界，打通自注册 Worker 派工工厂与执行器接线。
@@ -560,16 +560,16 @@
 * **估算（R-11）**：S/M；若报告/执行面改造跨越本卡边界则先重估并拆分，不扩成 L 卡直接开工。
 
 <a id="task-w.9b"></a>
-#### 【Task W.9b】执行器抽象 + 容器见证接线 `[IN_PROGRESS · 施工中]`
+#### 【Task W.9b】执行器抽象 + 容器见证接线 `[COMPLETED]`
 
-> **开工注记（2026-11-02 · P-130）**：Tina 已授权 W.9b 可并行或跟随 W.9a；本轮基于 main `22168ee` 开始实现。Gateway 注入与容器 CLI 两形态先作边界对比；不接 W.9c 最终自注册工厂闭环。
+> **归档注记（2026-11-03 · P-131）**：本卡已 COMPLETED（[#101](https://github.com/he18718143986-design/IDE/pull/101)/`b98e463` squash）。交付、测试边界与四项挂账见 [`development-tasks-completed.md`](./development-tasks-completed.md#task-w.9b)。
 
 * **任务编号**：`TASK-W.9b`
 * **任务名称**：执行器抽象 + 容器见证接线
 * **对应规格（R-1）**：`system-architecture.md` §9.1、§4.2.3 P-17、§0.6.1；`CodingWorkerAdapter`、`runInSandbox()`、`SandboxWitness`、`resolveEvidenceControlMode()`；W.5b §3.4m 与 W.5c-iii §3.4k。
 * **前置依赖（R-3）**：W.5b COMPLETED（#92/`bdac805`）、W.5c-iii COMPLETED（#87/`2313597a`）、母卡 W.9 SPLIT；W.9c 等待本卡完成。与 W.9a 可并行。
-* **优先级**：P5 · Sprint 首要并行项（Tina 已授权）
-* **状态**：`[IN_PROGRESS · 施工中]`（P-130 · Tina 授权）
+* **优先级**：P5 · 已完成（#101）
+* **状态**：`[COMPLETED]`（[#101](https://github.com/he18718143986-design/IDE/pull/101)/`b98e463`）
 * **对照痛点（R-4）**：`daemon/worker/cli-host/cursor-agent-adapter.ts::run()`（母卡核验 `:359-373`）仍分支失败，launch 结构未执行或收集产物；W.5c-iii 已有 `DockerContainerHost/runInSandbox/SandboxWitness`，但缺面向自注册/外部 CLI 的桥接。Gateway session/tool mediation 与容器执行的控制边界不同，不可用统一接口掩盖能力差异。
 * **一句话目标（R-2）**：外部 adapter 只经其真实可用的 Gateway 或容器执行路径运行并收集产物，证据档由执行事实和 witness 决定。
 * **ADR 修订（R-9）**：无；遵守 ADR-0001/0003/0014，不宣称容器绝对隔离。
@@ -588,16 +588,16 @@
 * **估算（R-11）**：M；若需大规模跨 Gateway/容器/多 adapter 重构，停止并重估拆分。
 
 <a id="task-w.9c"></a>
-#### 【Task W.9c】自注册工厂闭环 `[BLOCKED · 待 b]`
+#### 【Task W.9c】自注册工厂闭环 `[READY · 待 Tina 单卡授权]`
 
 > **拆卡立卡（2026-11-02 · P-128）**：硬依赖 W.9a 与 W.9b 完成，且须 Tina 单张授权；此前不得抢跑派工接线。
 
 * **任务编号**：`TASK-W.9c`
 * **任务名称**：自注册工厂闭环
 * **对应规格（R-1）**：`AdapterRegistry::registerDispatchFactory/getDispatchFactory`、`requireControlledDispatch()`、`WorkerDispatchFactory`、自注册 worker store；W.6 §3.4g、W.7 §3.4l 挂账 1、W.9a/W.9b。
-* **前置依赖（R-3）**：W.9a AND W.9b COMPLETED（DAG 两条硬边）；W.6/W.7 COMPLETED；W.9 SPLIT。当前 BLOCKED。
-* **优先级**：P5 · 跟随 a+b，届时由 Tina 排程
-* **状态**：`[BLOCKED · 待 b]`
+* **前置依赖（R-3）**：W.9a AND W.9b COMPLETED（DAG 两条硬边）；W.6/W.7 COMPLETED；W.9 SPLIT。代码前置均满足；READY 仍须 Tina 单卡授权。
+* **优先级**：P5 · W.9a/W.9b 已完成，待 Tina 排程授权
+* **状态**：`[READY · W.9a/W.9b 前置均完成；待 Tina 单卡授权]`
 * **对照痛点（R-4）**：自注册记录在 `.stagent/workers.json`，但未建 `CodingWorkerAdapter.run()` 或调用 `registerDispatchFactory()`；`requireControlledDispatch()` 对缺工厂会拒绝，升格与派工因此脱节。
 * **一句话目标（R-2）**：只有真实实现 run、工厂已注册且控制档/宿主门禁合格的 worker 才能派工，API/UI 与门禁共用同一 dispatchable 判据。
 * **ADR 修订（R-9）**：无；遵守 ADR-0001/0003/0014 与 REJ-010。

@@ -178,3 +178,5 @@
 
 
 > **W.9a 后续挂账（P-130 · 2026-11-02）**：PR [#99](https://github.com/he18718143986-design/IDE/pull/99) 合入，W.9a COMPLETED；两项边界归拢至 [`development-tasks-completed.md` §3.4n](../specs/development-tasks-completed.md#task-w.9a)，沿用 P-112/P-113/P-121/P-122 先例不新增 OP：① 清理游离导出 `E_CURSOR_AGENT_MCP_ENDPOINT_MISSING`；② W.9c 接执行面时评估公开 `bindProbeReportAuthority` 的进程内重绑信任边界。`cli-host-claude-code.test.ts` spawn 静态禁令 LEGACY 白名单新增四文件仅补登记既有 `child_process` imports，不是本卡新增执行面。Sprint 首要为经授权施工中的 W.9b。
+
+> **W.9b 完成回写与 dispatchable 口径（P-131 · 2026-11-03）**：PR [#101](https://github.com/he18718143986-design/IDE/pull/101) / `b98e463` 合入，W.9b COMPLETED；W.9c 的 W.9a、W.9b 两条 DAG 前置均满足，当前 READY 但仍须 Tina 单卡授权。#101 明确将共享 `dispatchable` 判定扩至 `SANDBOX_ENFORCED`（容器宿主可用 + 工厂存在），不再仅认 `GATEWAY_ENFORCED`。审查边界与四项挂账：逐行 host 构造/探测放大、拒绝错误码被 boolean helper 吞掉、API key 明文进入容器 env（日志脱敏不等于容器内不可读）、Cursor 镜像/运行协议未实证；详见 completed §3.4o。仅 docs 回写，不新增 OP。

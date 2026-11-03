@@ -275,4 +275,4 @@
 
 传统模板的对应关系见 [`templates/00-filling-guide.md`](./templates/00-filling-guide.md) 与 [`specs/supervisor.md`](./specs/supervisor.md) §14.11 小节 3（`goals` ↔ REQ，`acceptance` ↔ AC，`decisions` ↔ ADR，证据 ↔ EVID）。
 
-> **P-130 现行物理指针（2026-11-02）**：main@`22168ee62c62c674bc526df7254850487c068033`（PR #99，W.9a squash）。W.9a COMPLETED；W.9b 经 Tina 授权进入施工；W.9c 仍待 a+b。
+> **P-131 现行物理指针（2026-11-03）**：main@`b98e463d8932ecd111b35b1dea9de624df237ccb`（PR #101，W.9b squash；其下 #100 为 P-130 文档回写）。W.9a/W.9b COMPLETED；Sprint 首要为 W.9c（READY，待 Tina 单卡授权）。dispatchable 语义已扩至宿主可用且工厂齐备的 `SANDBOX_ENFORCED`；此为共享门禁口径扩展，不等于 Cursor 容器镜像 / 运行协议已实证。挂账见 completed §3.4o。
