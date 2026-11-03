@@ -285,3 +285,5 @@
 > **P-134 现行物理指针（2026-11-03）**：文档回写基线 main@`10bc1d3b9b0ca23d65e26f9be710b994e443ceac`（#108 tip 同步；W.9c 代码由 #107/`d3397a644603d8b49a96d765456031cba4254981` 合入其前一 tip）。W.9a/b/c 均 COMPLETED；W.9 母卡实质闭合，active `[SPLIT]` 仅保留拆分史。W.9b 四项挂账仍未销项，详见 completed §3.4q；不宣称端到端闭环。Sprint 首要为「在队清零」，下一张卡待 Tina 指定。
 
 > **P-135 现行物理指针（2026-11-03）**：文档回写基线 `main@2559f5c30f413d4b5b13757e8dae2675631d892b`（#113 squash）。清扫成果已按无卡基建修正登记；挂账为手工植入路径审计语义及 Windows CRLF / `path.sep` / 临时目录 `EBUSY` 重试；completed §3.4q 重复锚点清理。Sprint 首要仍为「在队清零」；本 PR 合入后物理指针再更新为合入 SHA。
+
+> **P-136 现行物理指针（2026-11-03）**：main@`de50d38de3089dc17d601627a35b4096609fb706`（#114 为 P-135 docs 回写 squash；其下 #113 `2559f5c3` 为无卡基建清扫代码 squash）。P-135 清扫成果（typecheck 54→0、Unit tests 7 项红销项、假漂移与续租修复）与两项挂账现行有效；completed §3.4q 唯一锚点已落定。Sprint 首要仍为「在队清零」，下一张卡待 Tina 指定。
