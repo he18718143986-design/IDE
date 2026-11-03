@@ -27,8 +27,8 @@ describe("TASK-C.3 编辑器保存的服务端强制校验", () => {
     fs.writeFileSync(path.join(repo, "a.ts"), "export const a = 1;\n");
     daemon = createDaemon({
       repoRoot: repo,
-      startPort: 3700,
-      endPort: 3709,
+      startPort: 4210,
+      endPort: 4219,
       enableCrashRecovery: false,
     });
     const { port } = await daemon.start();

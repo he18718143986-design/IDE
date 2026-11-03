@@ -27,8 +27,8 @@ describe("POST /api/repo/delete (C.10h)", () => {
     fs.writeFileSync(path.join(repo, "src", "secret.ts"), "export {};\n");
     daemon = createDaemon({
       repoRoot: repo,
-      startPort: 3720,
-      endPort: 3729,
+      startPort: 4311,
+      endPort: 4320,
       enableCrashRecovery: false,
     });
     const { port } = await daemon.start();

@@ -101,6 +101,30 @@ const LEGACY_ALLOWLIST: LegacyAllowance[] = [
     reason:
       "TASK-H.8：仅 spawnSync zip 打包 .stagent/records/ 脱敏导出（不上云）",
   },
+  {
+    file: "daemon/release/release-manager.ts",
+    module: "daemon/release",
+    reason:
+      "TASK-L.15：仅 execFileSync/spawnSync 调用 git log|show|archive 与 tar，做发布前 sha 核对与产物打包（固定二进制）",
+  },
+  {
+    file: "daemon/trace/why.ts",
+    module: "daemon/trace",
+    reason:
+      "TASK-L.13：仅 execFile 调用 git log/show 读取 stagent trailer 与方案绑定（只读追溯，固定 git 二进制）",
+  },
+  {
+    file: "daemon/knowledge/check-knowledge.ts",
+    module: "daemon/knowledge",
+    reason:
+      "TASK-L.18：仅 execFileSync 调用 git rev-parse/show 核对知识库引用是否漂移（KNOWLEDGE_DRIFT 取证）",
+  },
+  {
+    file: "daemon/vault/keychain-backend.ts",
+    module: "daemon/vault",
+    reason:
+      "OQ-REL-1 决议 A：系统钥匙串后端，仅 execFile/spawn 调用固定二进制 security（macOS）/ secret-tool（Linux），参数经白名单校验",
+  },
 ];
 
 const CLI_HOST_PREFIX = "daemon/worker/cli-host/";
@@ -151,6 +175,33 @@ const LINE_ALLOWLIST: Array<{
     pattern: /fence\.exec\(trimmed\)/,
     reason: "RegExp.prototype.exec，剥 markdown 围栏（TASK-H.1）",
   },
+  {
+    file: "daemon/trace/why.ts",
+    pattern:
+      /\/\^\(\[A-Za-z\]\[A-Za-z0-9-\]\*\):\\s\*\(\.\*\)\$\/\.exec\(line\)/,
+    reason: "RegExp.prototype.exec，stagent trailer 键值解析（TASK-L.13）",
+  },
+  {
+    file: "daemon/trace/why.ts",
+    pattern: /\/scheme_item_ids:\\s\+\(\.\+\)\\s\*\$\/\.exec\(line\)/,
+    reason: "RegExp.prototype.exec，scheme_item_ids 行解析（TASK-L.13）",
+  },
+  {
+    file: "daemon/web-ingest/proxy.ts",
+    pattern: /h1Regex\.exec\(html\)/,
+    reason: "RegExp.prototype.exec，抽 HTML 一级标题（TASK-L.17a）",
+  },
+  {
+    file: "src/lib/journey/artifact-projection.ts",
+    pattern: /re\.exec\(line\.trim\(\)\)/,
+    reason: "RegExp.prototype.exec，依赖清单逐行解析（TASK-J.6）",
+  },
+  {
+    file: "daemon/release/active-live.ts",
+    pattern: /传递引入 `node:child_process`/,
+    reason:
+      "文档注释引用模块名（说明为何刻意不 import release-manager），非真实导入",
+  },
 ];
 
 /** 明确的进程启动 API（排除 xxx.spawn( 这类同名方法） */
@@ -158,6 +209,11 @@ const SPAWN_CALL =
   /(?<![.\w])(?:spawn|spawnSync|execFile|execFileSync|execSync|fork)\s*\(/;
 /** 恢复 .exec( 检测（含对象方法），靠行级豁免排除 RegExp 误报 */
 const DOT_EXEC = /\.exec\s*\(/;
+/**
+ * 可静态证明的 RegExp 字面量调用：`/…/flags.exec(...)`。
+ * 字面量正则不可能是子进程 API，因此无需逐行登记（减少白名单腐化）。
+ */
+const REGEX_LITERAL_EXEC = /\/(?:[^/\\\n]|\\.)+\/[a-z]*\.exec\s*\(/;
 /** 需要禁止的第三方/运行时启动方式 */
 const OTHER_LAUNCHERS: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /process\s*\.\s*binding\s*\(/, label: "process.binding" },
@@ -204,7 +260,7 @@ export function scanContent(rel: string, content: string): string[] {
       violations.push(`${where} 调用进程启动 API`);
       return;
     }
-    if (DOT_EXEC.test(line)) {
+    if (DOT_EXEC.test(line) && !REGEX_LITERAL_EXEC.test(line)) {
       violations.push(`${where} 调用 .exec(（未能证明是 RegExp）`);
     }
   });

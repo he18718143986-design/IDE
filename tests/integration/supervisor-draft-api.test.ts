@@ -32,8 +32,8 @@ describe("POST /api/supervisor/draft（Supervisor 草案控制面）", () => {
     daemon = createDaemon({
       repoRoot: repo,
       // 端口段：与其余套件不重叠，登记表见 tests/unit/test-port-map.test.ts
-      startPort: 3900,
-      endPort: 3909,
+      startPort: 4729,
+      endPort: 4738,
       enableCrashRecovery: false,
       ...(enrich === undefined ? {} : { supervisorEnrich: enrich }),
     });

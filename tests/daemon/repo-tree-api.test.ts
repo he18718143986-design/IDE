@@ -23,8 +23,8 @@ describe("GET /api/repo/tree (C.10f)", () => {
     fs.writeFileSync(path.join(repo, "src", "main.ts"), "export {};\n");
     daemon = createDaemon({
       repoRoot: repo,
-      startPort: 3710,
-      endPort: 3719,
+      startPort: 4250,
+      endPort: 4259,
       enableCrashRecovery: false,
     });
     const { port } = await daemon.start();

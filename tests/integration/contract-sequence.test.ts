@@ -210,8 +210,8 @@ describe("TASK-L.9 contract sequence", () => {
 
     daemon = createDaemon({
       repoRoot: repo,
-      startPort: 3841,
-      endPort: 3860,
+      startPort: 4529,
+      endPort: 4548,
       consolePublicDir: null,
     });
     const info = await daemon.start();

@@ -107,7 +107,7 @@ describe("M4 / TASK-D.1 Local IPC / WebSocket 通信桥", () => {
   let port: number;
 
   // 端口段：与其余套件不重叠，登记表见 tests/unit/test-port-map.test.ts
-  const PORT_RANGE = { startPort: 3810, endPort: 3819 } as const;
+  const PORT_RANGE = { startPort: 4449, endPort: 4458 } as const;
 
   /** 起（或重起）daemon，超时预算按用例需要切换（见 AUTH_TIMEOUT_MS 注释） */
   async function startDaemon(authTimeoutMs: number): Promise<void> {

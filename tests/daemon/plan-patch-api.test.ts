@@ -150,8 +150,8 @@ describe("TASK-L.8 plan patch / decompose HTTP", () => {
   it("decompose standard → 落盘 1 里程碑 1 桩；随后 reorder 成功", async () => {
     daemon = createDaemon({
       repoRoot: repo,
-      startPort: 3721,
-      endPort: 3730,
+      startPort: 4331,
+      endPort: 4340,
       consolePublicDir: null,
     });
     const info = await daemon.start();
@@ -237,8 +237,8 @@ describe("TASK-L.8 plan patch / decompose HTTP", () => {
     writePlan(repo, samplePlan());
     daemon = createDaemon({
       repoRoot: repo,
-      startPort: 3731,
-      endPort: 3740,
+      startPort: 4388,
+      endPort: 4397,
       consolePublicDir: null,
     });
     const info = await daemon.start();

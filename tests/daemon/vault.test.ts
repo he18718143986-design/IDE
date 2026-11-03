@@ -229,8 +229,8 @@ describe("TASK-L.14 凭据保险库", () => {
       process.env["STAGENT_VAULT_BACKEND"] = "file";
       daemon = createDaemon({
         repoRoot: repo,
-        startPort: 3701,
-        endPort: 3710,
+        startPort: 4230,
+        endPort: 4239,
         consolePublicDir: null,
       });
       const info = await daemon.start();
@@ -302,8 +302,8 @@ describe("TASK-L.14 凭据保险库", () => {
     it("无 Token → 401", async () => {
       daemon = createDaemon({
         repoRoot: repo,
-        startPort: 3711,
-        endPort: 3720,
+        startPort: 4291,
+        endPort: 4300,
         consolePublicDir: null,
       });
       const info = await daemon.start();

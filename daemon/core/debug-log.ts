@@ -12,7 +12,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { getActiveVault } from "../vault";
+// 刻意不走 "../vault" barrel：门面为了选后端会带出 keychain-backend（spawn
+// security / secret-tool），令 Supervisor 的零工具静态依赖闭包被污染（TASK-S.1）。
+import { getActiveVault } from "../vault/active";
 
 export const DEBUG_LOGS_DIR_REL = ".stagent/logs";
 export const DAEMON_LOG_FILE = "daemon.jsonl";

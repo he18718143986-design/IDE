@@ -427,8 +427,8 @@ describe("TASK-L.13 GET /api/trace/why", () => {
 
     daemon = createDaemon({
       repoRoot,
-      startPort: 3891,
-      endPort: 3920,
+      startPort: 4689,
+      endPort: 4718,
       consolePublicDir: null,
     });
     const info = await daemon.start();

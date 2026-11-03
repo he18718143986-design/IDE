@@ -105,7 +105,7 @@ describe("WebSocket 第一帧 AUTH 鉴权（协议 v1.1）", () => {
   let token: string;
   let port: number;
 
-  const PORT_RANGE = { startPort: 3740, endPort: 3750 } as const;
+  const PORT_RANGE = { startPort: 4408, endPort: 4418 } as const;
 
   /**
    * 起（或重起）daemon。超时预算按用例需要切换：

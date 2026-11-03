@@ -30,8 +30,8 @@ describe("E2E / happy path：创建 → 审批 → 执行 → 验证 → 人工�
       repoRoot: repo,
       // 端口段：与其余套件不重叠（原 3710–3715 与 repo-tree-api 的 3710–3719 重叠），
       // 登记表见 tests/unit/test-port-map.test.ts
-      startPort: 3870,
-      endPort: 3879,
+      startPort: 4629,
+      endPort: 4638,
       enableCrashRecovery: false,
     });
     const info = await daemon.start();

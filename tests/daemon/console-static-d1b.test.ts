@@ -49,8 +49,8 @@ describe("Daemon console static host (TASK-D.1b)", () => {
     daemon = createDaemon({
       repoRoot: repo,
       // 端口段：与其余套件不重叠，登记表见 tests/unit/test-port-map.test.ts
-      startPort: 3910,
-      endPort: 3919,
+      startPort: 4749,
+      endPort: 4758,
       enableCrashRecovery: false,
       autoShutdownSignals: false,
       consolePublicDir: publicDir,

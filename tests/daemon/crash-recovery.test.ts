@@ -176,8 +176,8 @@ describe("M3 / TASK-A.6 Daemon 崩溃恢复与工作区自愈", () => {
     // 端口段：与其余套件不重叠，登记表见 tests/unit/test-port-map.test.ts
     const daemon = createDaemon({
       repoRoot: repo,
-      startPort: 3920,
-      endPort: 3929,
+      startPort: 4769,
+      endPort: 4778,
     });
     try {
       await daemon.start();

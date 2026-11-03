@@ -72,8 +72,8 @@ describe("E2E / 崩溃恢复：PREPARING 回退与 EXECUTING 恢复", () => {
 
     daemon = createDaemon({
       repoRoot: repo,
-      startPort: 3730,
-      endPort: 3735,
+      startPort: 4351,
+      endPort: 4356,
       enableCrashRecovery: true,
     });
     await daemon.start();

@@ -218,8 +218,8 @@ describe("TASK-L.16 live incident RO-10", () => {
   it("RO-10 HTTP：ask-ai 接线；进程退出监听命中 stopping=false", async () => {
     daemon = createDaemon({
       repoRoot: repo,
-      startPort: 3730,
-      endPort: 3740,
+      startPort: 4367,
+      endPort: 4377,
       enableCrashRecovery: false,
     });
     // 注入 manager 之前先用公开 API：先本机 ReleaseManager 写好 LIVE+incident

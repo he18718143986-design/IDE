@@ -135,8 +135,8 @@ beforeEach(async () => {
   daemon = createDaemon({
     repoRoot: repo,
     // 端口段：与其余套件不重叠，登记表见 tests/unit/test-port-map.test.ts
-    startPort: 3820,
-    endPort: 3829,
+    startPort: 4489,
+    endPort: 4498,
     enableCrashRecovery: false,
   });
   await daemon.start();

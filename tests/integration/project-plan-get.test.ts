@@ -122,8 +122,8 @@ describe("TASK-L.10 GET /api/project/plan", () => {
 
     daemon = createDaemon({
       repoRoot,
-      startPort: 3861,
-      endPort: 3880,
+      startPort: 4599,
+      endPort: 4618,
       consolePublicDir: null,
     });
     const info = await daemon.start();

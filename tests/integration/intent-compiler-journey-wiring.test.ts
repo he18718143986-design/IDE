@@ -71,8 +71,8 @@ describe("J.10 用户消息 → 方案补丁落盘（生产接线）", () => {
 
     daemon = createDaemon({
       repoRoot: repo,
-      startPort: 3810,
-      endPort: 3819,
+      startPort: 4429,
+      endPort: 4438,
       enableCrashRecovery: false,
       intentCompilerModelClient: stub,
       // 只登记回调，由 flushIntentCompilerForTest 触发（跳过 1.2s 墙钟）
@@ -143,8 +143,8 @@ describe("J.10 用户消息 → 方案补丁落盘（生产接线）", () => {
     await daemon!.stop();
     daemon = createDaemon({
       repoRoot: repo,
-      startPort: 3820,
-      endPort: 3829,
+      startPort: 4469,
+      endPort: 4478,
       enableCrashRecovery: false,
       intentCompilerModelClient: null,
       intentCompilerSetTimeout: (fn) => {

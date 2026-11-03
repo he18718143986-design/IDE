@@ -60,8 +60,8 @@ describe("TASK-J.19 DN-2 design dependency HTTP", () => {
 
     daemon = createDaemon({
       repoRoot: repo,
-      startPort: 3710,
-      endPort: 3720,
+      startPort: 4270,
+      endPort: 4280,
       enableCrashRecovery: false,
     });
     const info = await daemon.start();

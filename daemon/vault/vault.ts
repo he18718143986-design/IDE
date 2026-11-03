@@ -9,6 +9,7 @@
 import {
   assertValidSecretName,
   assertValidSecretValue,
+  type Vault,
   type VaultBackend,
   VaultError,
   E_VAULT_NOT_FOUND,
@@ -20,17 +21,10 @@ import {
 } from "./keychain-backend";
 import { MemoryVaultBackend } from "./memory-backend";
 
-export interface Vault {
-  readonly backendKind: VaultBackend["kind"];
-  setSecret(name: string, value: string): Promise<void>;
-  listNames(): Promise<string[]>;
-  deleteSecret(name: string): Promise<void>;
-  resolveEnv(names: string[]): Promise<Record<string, string>>;
-  /** 同步：当前缓存中的全部秘密值（供 redactSecrets） */
-  currentValues(): string[];
-  /** 启动时从后端灌入缓存 */
-  hydrate(): Promise<void>;
-}
+/** 接口本体在 `./types`（零依赖叶子）；此处转出以保持既有导入面。 */
+export type { Vault } from "./types";
+/** 活跃实例注册表在 `./active`（叶子）；此处转出，调用方仍可从门面取。 */
+export { getActiveVault, setActiveVault } from "./active";
 
 export interface CreateVaultOptions {
   repoRoot: string;
@@ -104,16 +98,6 @@ class VaultImpl implements Vault {
   currentValues(): string[] {
     return [...this.cache.values()].filter((v) => v.length >= 6);
   }
-}
-
-let activeVault: Vault | null = null;
-
-export function getActiveVault(): Vault | null {
-  return activeVault;
-}
-
-export function setActiveVault(vault: Vault | null): void {
-  activeVault = vault;
 }
 
 export async function createVault(options: CreateVaultOptions): Promise<Vault> {

@@ -234,8 +234,8 @@ describe("Chaos 3 / HTTP 层并发语义：409 Conflict", () => {
       repoRoot: repo,
       // 端口段：与其余套件不重叠（原 3770–3775 与 ws-auth-handshake、ws-security 重叠），
       // 登记表见 tests/unit/test-port-map.test.ts
-      startPort: 3840,
-      endPort: 3849,
+      startPort: 4509,
+      endPort: 4518,
       enableCrashRecovery: false,
     });
     const info = await daemon.start();
