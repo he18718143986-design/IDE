@@ -746,23 +746,37 @@
 
 #### 【Task B.1】本地 AST 增量依赖图分析引擎
 * **任务编号**：`TASK-B.1`
-* **前置依赖**：`TASK-D.1`
-* **任务状态**：**[READY · 待 DoR 重写]**（Tina 拍板 D-2 / P-141 激活；**激活 ≠ 开工**，开工须经卡正文 DoR 重写 + Tina 单卡授权）
-* **DoR 重写前置项（§3 存量对账 · 必须先行）**：
-  - `daemon/arch/graph.ts`、`daemon/arch/parser.ts`（注释自称 TASK-B.1）、`daemon/watcher/*`、`src/components/radar/*` 已在 main 上，卡内文件名（如 `ast-parser.ts`、`dependency-graph.ts`）与实存代码不符。
-  - 重写本卡前必须先对账「哪些已存在、哪些要新建、哪些要重构」，按实际存量资产编写差异增量与重构口径，**严禁按空白实现写卡**。
-* **核心目标**：
-  1. **统一路径前缀 (G-16)**：解析 `src/**/*.{ts,tsx,js,jsx,mjs,cjs,json}`，构建文件级依赖拓扑。
-  2. 达成性能门槛：1000 节点冷启动 ≤ 1.5s，单文件增量修补 ≤ 20ms。
-* **涉及核心文件**：
-  - 新增：`daemon/arch/ast-parser.ts`
-  - 新增：`daemon/arch/dependency-graph.ts`
-  - 测试：`tests/unit/ast-dependency-graph.test.ts`
-* **Pass/Fail 验收判定**：
-  - **PASS**：冷启动 ≤1500ms，增量 ≤20ms，支持 JSON/MJS/CJS。
-  - **FAIL**：解析内存泄漏或循环依赖死锁。
-
----
+* **前置依赖（R-3）**：`TASK-D.1`（**COMPLETED**）；无其他前置。与 `TASK-B.2` 无依赖，可并行；`TASK-C.4` 对本卡为硬依赖（沿用 P-141 DAG）。
+* **任务状态**：**[READY · 待 DoR 重写]**（Tina 拍板 D-2 / P-141 激活；**激活 ≠ 开工**。本次仅重写 DoR 卡正文，不施工代码；施工授权由 Tina 单卡拍。）
+* **DoR 正文重写记录**：原卡引用的 `daemon/arch/ast-parser.ts`、`dependency-graph.ts` 与 main 实际文件名不符。按 main@`2cbd91c7fb92cbdcfd831e2564c27c7c55576bcf` 存量重写；不新建平行 parser/graph 文件。代码对账结论如下：
+  - **已存在**：`daemon/arch/parser.ts` 使用 `ts.createSourceFile` 解析单文件 import/export/dynamic import/require、区分 `typeOnly`、解析 tsconfig `paths`/`baseUrl` 别名；`daemon/arch/graph.ts` 已有 `DependencyGraph`、`buildDependencyGraph`、`clearArchGraphCache`、迭代式 Tarjan SCC、Kahn 拓扑、mtime/size 解析缓存、`updateFile` 增量更新及 `SCAN_SUBDIR = "src"`；`daemon/server.ts` 已挂载带鉴权的 `GET /api/arch/graph` 基础端点。既有测试为 `tests/daemon/arch-graph.test.ts` 与 `tests/unit/arch-graph-cache.test.ts`。
+  - **需新建**：`tests/perf/arch-graph-benchmark.test.ts`；`tests/unit/arch-graph-boundaries.test.ts`（JSON/CJS/MJS 边界恶魔测试）。
+  - **需重构**：`daemon/arch/parser.ts`（增加 `.json` 静态导入解析并补齐健壮性）；`daemon/arch/graph.ts`（节点新增/更新/删除生命周期治理、按 repoRoot 复用的增量图单例）；`daemon/server.ts`（让 `/api/arch/graph` 复用图缓存，不得每次请求全量扫盘）。
+* **对应规格（R-1）**：[`../rfc/v0.2-scope.md`](../rfc/v0.2-scope.md) §2、§4.1（P-141 拍板后的 B.1 范围与性能目标）；[`system-architecture.md`](./system-architecture.md) 中 G-16 路径前缀约束；[`task-card-standard.md`](./task-card-standard.md) R-1～R-12 / §4；[`development-tasks.md`](./development-tasks.md) §1.1 `TASK-B.1` 与 §2 DAG（P-141）。
+* **目标（R-2）**：Daemon 为 `src/**/*.{ts,tsx,js,jsx,mjs,cjs,json}` 提供可复用、可增量更新的文件级依赖图；每次读取图时不因 HTTP 请求重复全量扫盘，且既有调用方无需改签名。
+* **代码事实与落差（R-4）**：`daemon/arch/parser.ts::resolveSpecifier()` 的扩展名表不含 `.json`，`parseSource()` 当前把导入解析到的文件全部当普通模块处理；`daemon/arch/graph.ts::buildDependencyGraph()` 每次调用都会重新 walk `src/` 并新建 `DependencyGraph`，mtime/size 命中只复用解析结果，不能避免 GET 每次全量扫盘；`removeModule()` 删除目标节点时未清理它作为其他节点 reverse 边目标的所有残留引用；现有 cache 生命周期与图实例未按 repoRoot 管理。`daemon/server.ts` 的 `/api/arch/graph` 已鉴权，但请求处理每次调用 `buildDependencyGraph()`。兼容调用方是 `daemon/knowledge/bootstrap-draft.ts`：只读依赖 `DependencyGraph`、`parseFile`、`loadPathAliases`，其签名与行为兼容为 FAIL 红线（当前 main 实际路径为 `daemon/knowledge/bootstrap-draft.ts`，不沿用旧记录中错误的 `daemon/pipeline/bootstrap-draft.ts` 路径）。
+* **范围与接口（R-5）**：
+  - **重构** `daemon/arch/parser.ts`：维持 `parseFile(filePath: string, aliases: PathAliasConfig): ParsedModule`、`parseSource(filePath: string, content: string, aliases: PathAliasConfig): ParsedModule`、`loadPathAliases(repoRoot: string, tsconfigPath?: string): PathAliasConfig` 既有导出签名；静态 `.json` 导入可解析到仓库内文件。
+  - **重构** `daemon/arch/graph.ts`：维持 `DependencyGraph`、`buildDependencyGraph(options: { root: string; aliases?: PathAliasConfig; files?: string[] }): { graph: DependencyGraph; durationMs: number }`、`clearArchGraphCache(): void`、`archGraphCacheSize(): number` 既有导出及 `DependencyGraph.updateFile(filePath: string, content: string, aliases: PathAliasConfig): number` 签名；更新图生命周期时同步清理正向/反向边与相应缓存条目；同一规范化 repoRoot 复用图单例。`.json` 入图为叶子节点：可以有入边，必须无出边，且不得参与环检测。
+  - **重构** `daemon/server.ts`：复用上述图单例处理已鉴权 `GET /api/arch/graph`；保持现有响应字段 `durationMs`、`stats`、`cycles`、`graph` 与鉴权行为，不得为缓存优化引入公开或未鉴权路径。
+  - **新建** `tests/perf/arch-graph-benchmark.test.ts`、`tests/unit/arch-graph-boundaries.test.ts`；扩充现有 `tests/daemon/arch-graph.test.ts` / `tests/unit/arch-graph-cache.test.ts` 回归。
+* **非目标（R-6）**：不新建 `ast-parser.ts` / `dependency-graph.ts` 等平行文件；不改 `daemon/knowledge/bootstrap-draft.ts` 消费方签名或业务行为；不实现 B.2 文件监听 / Evidence STALE 联动；不改 C.4 雷达 UI / Scope 圈选；不改鉴权、Demo Origin、点亮三证或网关写范围。
+* **PASS（R-7）**：
+  1. `tests/perf/arch-graph-benchmark.test.ts`：固定合成夹具 1000 个 `src/` 模块、边数固定并写入测试；冷启动从建图调用开始至图构建完成（含扫描、读盘与解析）≤1500ms。
+  2. 同文件：对已建图单文件调用 `updateFile`，计时边界为调用进入至返回（含解析与图边更新，不含夹具写盘），≤20ms。
+  3. 同文件：常驻内存增量按 **三次独立构建的中位数**；每次在图实例保持可达时分别强制 GC 后读取 `process.memoryUsage().heapUsed`，取构建后减构建前差值，三次差值中位数 ≤40 MiB；GC 不可用则测试明确失败，不得静默跳过。
+  4. 同文件：10000 节点高深度有向环执行 Tarjan，≤100ms 收敛且不爆栈，返回包含该环的 SCC。
+  5. `tests/unit/arch-graph-boundaries.test.ts`：`.json` 静态导入可解析并作为叶子入图；断言有入边、无出边且不进入环结果。
+  6. 同文件：`.cjs` / `.mjs` 静态导入与动态导入按既有边界正确解析；不支持的非相对外部包仍保持未解析，不生成仓库外节点。
+  7. `tests/unit/arch-graph-cache.test.ts`：同一 repoRoot 重复构建/请求复用同一增量图缓存；删除或移出 `src/` 的节点同时清除正向边、反向边与缓存记录。
+  8. `tests/daemon/arch-graph.test.ts`：既有 Tarjan、Kahn、`updateFile` 与 JSON 序列化行为回归通过。
+  9. `tests/unit/arch-graph-cache.test.ts`：连续两次已缓存 `GET /api/arch/graph` 不触发第二次全量目录遍历；响应字段与授权行为保持兼容。
+  10. `daemon/knowledge/bootstrap-draft.ts` 现有调用无需改动；相关现有单测通过。
+* **FAIL（R-8）**：出现以下任一情况即不合格：新增平行 parser/graph 文件；破坏 `daemon/knowledge/bootstrap-draft.ts` 的既有导入签名；`.json` 节点产生出边或进入环检测；缓存清理留下 dangling reverse edge / 已删除节点；每个 GET 仍全量扫盘；任一性能门禁超限或 Tarjan 爆栈；改动上述非目标安全边界。
+* **安全 / ADR（R-9）**：不得与已接受 ADR 冲突；本卡沿用 P-141 范围，不修改 ADR。`GET /api/arch/graph` 保持现有 `isAuthorized` 鉴权；只扫描 `src/`，不得扩展到仓库外路径。若施工发现需调整鉴权或目录边界，必须停工另行裁决，不得在本卡顺手放宽。
+* **默认值与未决项（R-10）**：源根固定 `src/`（G-16）；扩展名按目标清单；别名继续使用现有 `tsconfig paths/baseUrl` 规则；无法解析的外部依赖保持 `resolved: null`；`.json` 仅作为叶子文件节点，不解析 JSON 内部引用；性能夹具固定 1000 节点及固定边数，冷启动计时含扫描与读盘、增量计时不含夹具写盘、内存使用 GC 后 `heapUsed` 差值三次中位。无待产品裁决问题。
+* **估算（R-11）**：**M（≤2 天）**。范围限 Daemon 解析/图缓存/既有端点协同及定向测试；不含 watcher 与 UI。若实现必须跨出上述边界，先停下重估并拆分，不得扩成 L 卡施工。
+* **不变声明（R-12）**：**不改变** Daemon API 鉴权、Demo Origin、点亮三证、网关写范围、`src/` 扫描边界、P-141 DAG；仅在现有鉴权端点内缓存协同，`bootstrap-draft.ts` 消费方接口保持兼容。
 
 ---
 

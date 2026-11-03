@@ -176,3 +176,6 @@
 > **P-138（2026-11-03 · OP-33～38 挂账清扫销项与新增边界挂账）**：基于最新 `main`（[#118](https://github.com/he18718143986-design/IDE/pull/118)/`96225dfdafbba04b813da63c8e524cd22bbcc087`，squash）完成台账回写。对 consistency-audit.md 六条账逐条处理：OP-33 部分销项（CRLF / path.sep / safeRmSync 退避重试在 #118/96225df 已修，symlink 权限类系统限制保留挂账改定性「平台侧不可修」）；OP-34 改定性「平台侧、代码不可修、持续观察」不销项；OP-35① 销项（定向帧等待全仓替换）；OP-35② 销项（#113 已修不重复改）；OP-36 销项（回退已删、无匹配返回 null、调用方收敛保守拒绝）；OP-37 销项（normalizeContractId 读写共用 + 读侧原始名兜底）；OP-38 销项（.history.jsonl 单行追加 + readPlaytestEvidenceHistory）。新增两条边界挂账（多对一映射碰撞未区分、.history.jsonl 无界增长边界）；不新增 OP 号（OP 范围仍 OP-1～OP-38）；不宣称 OP 挂账区清零（OP-1～32 及其他卡内挂账仍在）。Sprint 物理起点推进至 `96225df`（首要仍「在队清零」）。仅 docs 回写，不改产品代码。
 
 > **P-141 v0.2 RFC 拍板（2026-11-03）**：B.1/B.2/C.4 激活待 DoR 重写；S.3/D.1e 维持 DEFERRED（D-5/D-6）。激活不等于开工，三卡须按 R-1～R-12 重写并经 Tina 单卡授权；B.1 重写前先对账 main 存量实现。
+
+
+> **P-142 · TASK-B.1 DoR 重写（2026-11-03）**：B.1 卡正文按 R-1～R-12 重写并对齐 main 存量；状态仍 `[READY · 待 DoR 重写]`，施工授权待 Tina 单卡拍。存量分为已存在 / 需新建 / 需重构；性能门禁含 GC 后 `heapUsed` 差值三次中位 ≤40 MiB 与 Tarjan 高深度环 ≤100ms；`.json` 入图为叶子节点。**本注仅同步审计留痕，不新增 OP 号**。
