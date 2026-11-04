@@ -4008,3 +4008,46 @@
   - **不宣称「通过校验 = 够格标沙箱」**：`validateSandboxFenceTier()` 只查 `known_limitations` + 平台矩阵，宿主进程适配器也能过——这条陷阱已固化为断言。
   - **不改变**：鉴权 / Demo Origin / 点亮三证 / 网关写范围（ADR-0001 纪律）；三档判据与 `resolveEvidenceControlMode()` 唯一强制点；`worker-probe.ts` 五类断言语义与 `target_mode` 类型；`UNCONTROLLED_EXTERNAL` 仍不得作为受控 / 可合并证据。
 * **关键文件**：`daemon/worker/cli-host/cursor-agent-adapter.ts`（新 · 393 行）、`daemon/worker/default-worker-registry.ts`（改 · 增 1 行登记）、`tests/unit/cursor-agent-adapter.test.ts`（新 · 33 用例）、`tests/e2e/cursor-agent-real.real.test.ts`（新 · 8 用例）、`tests/unit/adapter-registry-dispatch.test.ts`（改 · 项数断言 4 → 5）；**只读复用**：`daemon/worker/cli-host/claude-code-adapter.ts`、`daemon/worker/verify/worker-probe.ts`、`daemon/worker/adapter-registry.ts`、`daemon/worker/key-store.ts`（核对无 cursor 通道，未改）。
+
+---
+
+### 3.4r 本地 AST 增量依赖图分析引擎（B.1 · 架构感知层首卡）
+
+<a id="task-b.1"></a>
+
+#### 【Task B.1】本地 AST 增量依赖图分析引擎 `[COMPLETED]`
+* **任务编号**：`TASK-B.1`
+* **状态与证据**：`[COMPLETED]`（[#124](https://github.com/he18718143986-design/IDE/pull/124)/`9c177e92992566522929efecd9c1435244a17491`，squash merge；分支 `feat/b1-arch-graph`，parent `ad19bcd3`；合入后 main 的 tree 与分支完全一致）。
+* **对应规格**：[`../rfc/v0.2-scope.md`](../rfc/v0.2-scope.md) §2、§4.1；[`system-architecture.md`](./system-architecture.md) G-16；[`task-card-standard.md`](./task-card-standard.md) R-1～R-12；[`development-tasks.md`](./development-tasks.md) §1.1。
+* **前置依赖**：`TASK-D.1`（**COMPLETED**）；与 `TASK-B.2` 无依赖，可并行；`TASK-C.4` 对本卡为硬依赖（沿用 P-141 DAG）。
+* **交付内容**：
+  1. **存量代码重构增强**：
+     - `daemon/arch/parser.ts`：扩展名表补齐 `.json`，`.json` 入图为叶子节点（有入边、无出边、不参与环检测）；增加 JS/MJS/CJS AST 解析支持；别名解析兜底规范化与单文件异常降级防护（解析失败不炸整图，降级为空出边并记录日志）。
+     - `daemon/arch/graph.ts`：节点生命周期治理（`removeModule` 清理被删除节点的所有出边及悬空反向边 dangling reverse edges）；仓库级单例缓存管理（按规范化 `repoRoot` 进程内复用 `DependencyGraph` 实例，`updateRepoGraphFile` 与实例方法 `updateFile` 走 mtime/size 增量修补）。
+     - `daemon/server.ts`：`GET /api/arch/graph` 端点接入图单例与缓存协同，避免每请求全量扫盘。
+  2. **新建专用测试套件**：
+     - `tests/perf/arch-graph-benchmark.test.ts`：冷启动、单文件增量更新、GC 堆增量中位数、高深度环 Tarjan 性能基准测试。
+     - `tests/unit/arch-graph-boundaries.test.ts`：`.json` 叶节点无出边/不入环、`.cjs`/`.mjs` 导入、语法错误单文件隔离降级、反向边清理等边界恶魔测试。
+     - `tests/unit/arch-graph-cache.test.ts` & `tests/daemon/arch-graph.test.ts`：增量缓存复用、生命周期清理、既有拓扑/环检测/序列化回归。
+     - `tests/integration/contract-api.test.ts`：加强 `/api/arch/graph` 响应形状与数据结构断言防线。
+  3. **契约兼容超集**：
+     - `toJSON()` 还原旧契约超集：返回 `{ nodes: GraphNode[], edges: Array<{from, to}> }`，每个节点携带完整 `filePath`、`exports` 与 `imports`（`resolved` 经 `path.resolve` 规范化），为 C.4 雷达提供开箱即用数据源；内部邻接表形式保留为 `toAdjacencyList()` 与内部属性。
+     - `topologicalSort()` 返回值恢复 `{ order, hasCycle }`，且排序语义纠正为标准依赖优先拓扑序（被依赖者先出队；`.json` 叶子节点 in-degree 0 优先入队，不误报环）。
+     - 实例方法补齐别名兼容：保留 `hasNode` / `getModule`，同时提供 `has()` 与 `getNode(): GraphNode | undefined`；提供标准 `updateFile(filePath, content, aliases): number`。
+     - 只读消费方 `daemon/knowledge/bootstrap-draft.ts` 零改动、零破坏，签名保持完全兼容。
+* **实测性能数据（实测值，非目标值）**：
+  1. **1000 模块冷启动**：**228.81ms**（门禁目标值 ≤1500ms，达标）。
+  2. **单文件 `updateFile` 增量修补**：**平均 0.080ms / 最大 0.122ms**（门禁目标值 ≤20ms，达标）。
+  3. **全量图常驻内存增量**：强制 GC 后 `heapUsed` 差值三次中位数 **1.00 MiB**（门禁目标值 ≤40 MiB，达标）。
+  4. **10000 节点高深度环 Tarjan 环检测**：**17.11ms** 收敛且不爆栈（门禁目标值 ≤100ms，达标）。
+* **残余边界 / 后续挂账（共 4 条，3 条在账 + 1 条已核销）**：
+  1. **挂账①（CI 环境 GC 暴露）**：`tests/perf/arch-graph-benchmark.test.ts` 在未注入 `--expose-gc` 参数的 CI 环境下，`global.gc` 不存在导致内存门禁退化为空真；需在后续专用性能基准工作流或启动参数中补显式配置。
+  2. **挂账②（Scan-root 边界收敛）**：`updateRepoGraphFile(repoRoot, filePath)` 当前未对 `filePath` 前置执行 `isUnderScanRoot()` 过滤收敛；若外部 watcher 传入 `src/` 之外的文件变更，仍会进入单文件解析流程，需后续补前缀守卫。
+  3. **挂账③（目录遍历过滤防御）**：`walkSourceFiles` 递归收集源码时仅基于简单子目录扫描，未对 `.git`、`node_modules`、`dist` 等配置显式 `IGNORED_DIRS` 集合做剪枝过滤；当前因受限于固定 `SCAN_SUBDIR = "src"` 暂不引发问题，但在根路径或非标子树下存在潜在冗余扫描风险。
+  4. **挂账④（addModule 覆盖式语义 · 已核销）**：经源码走查 `daemon/arch/graph.ts` 确认，`addModule` 在向 `modules` 插入前显式执行 `this.clearModuleEdges(key)`，先清空目标节点旧出边并从所有被引节点的 `reverse` 索引中剔除该源节点，再按新解析模块建立正反向边；文件 import 减少时不会残留悬空废旧边，本条挂账确认闭合核销。
+* **未宣称 / 不宣称端到端闭环**：
+  - **不宣称架构雷达前后台闭环**：前端雷达视口（C.4）尚未接入，本卡仅交付底座数据源与 API 契约超集。
+  - **不宣称多工作树文件监听联动已实现**：外部变更由 B.2 负责监听与 STALE 联动，本卡仅提供单进程内图引擎增量修补能力。
+  - **不改变**：Daemon API 鉴权、Demo Origin、点亮三证、网关写范围（ADR-0001 纪律）；`src/` 扫描前缀限制（G-16）；P-141 DAG 拓扑关系。
+* **关键文件**：`daemon/arch/parser.ts`（增强）、`daemon/arch/graph.ts`（增强）、`daemon/server.ts`（接入端点缓存）、`tests/perf/arch-graph-benchmark.test.ts`（新）、`tests/unit/arch-graph-boundaries.test.ts`（新）、`tests/unit/arch-graph-cache.test.ts`（增强）、`tests/integration/contract-api.test.ts`（增强契约断言）；**只读复用**：`daemon/knowledge/bootstrap-draft.ts`、`tests/daemon/arch-graph.test.ts`。
+

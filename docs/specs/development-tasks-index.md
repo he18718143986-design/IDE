@@ -41,7 +41,7 @@
 | `TASK-L.17c` | `COMPLETED` | 中栏同页 CompareView + 原话「认可完成」+ `GET /api/playtest/status`（[#104](https://github.com/he18718143986-design/IDE/pull/104)/`06661be`；三项挂账仍挂） | [打开](./development-tasks-completed.md#task-l.17c) |
 | `TASK-L.18` | `COMPLETED` | 系统地图 UI +「改这里会影响什么」（DLV-5） | [打开](./development-tasks-completed.md#task-l.18) |
 | `TASK-H.9` | `COMPLETED` | 废止 `.stagent/metadata/` 写入（DLV-4 · ADR-0011） | [打开](./development-tasks-completed.md#task-h.9) |
-| `TASK-B.1` | `READY · 待 DoR 重写` | 本地 AST 增量依赖图分析引擎（DoR 已按 main 存量与 R-1～R-12 重写；施工仍待 Tina 单卡授权） | [打开](./development-tasks-active.md#task-b.1) |
+| `TASK-B.1` | `COMPLETED` | 本地 AST 增量依赖图分析引擎（parser/graph 增强 + 性能基准 + 恶魔测试 + 契约兼容超集；#124/9c177e9） | [打开](./development-tasks-completed.md#task-b.1) |
 | `TASK-B.2` | `READY · 待 DoR 重写` | 多活跃 Worktree 监听与 Evidence 状态联动（v0.2 激活；可与 B.1 并行重写，之后待 Tina 单卡授权开工） | [打开](./development-tasks-active.md#task-b.2) |
 | `TASK-C.4` | `READY · 待 DoR 重写` | 架构雷达视图与 Scope 圈选抽屉（v0.2 激活；硬依赖 B.1、软依赖 B.2；重写后待 Tina 单卡授权开工） | [打开](./development-tasks-active.md#task-c.4) |
 | `TASK-0.2b` | `COMPLETED` | Schema v1.2.0 增量演进、双状态机联动与存量迁移 | [打开](./development-tasks-completed.md#task-0.2b) |

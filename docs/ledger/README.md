@@ -179,3 +179,5 @@
 
 
 > **P-142 · TASK-B.1 DoR 重写（2026-11-03）**：B.1 卡正文按 R-1～R-12 重写并对齐 main 存量；状态仍 `[READY · 待 DoR 重写]`，施工授权待 Tina 单卡拍。存量分为已存在 / 需新建 / 需重构；性能门禁含 GC 后 `heapUsed` 差值三次中位 ≤40 MiB 与 Tarjan 高深度环 ≤100ms；`.json` 入图为叶子节点。**本注仅同步审计留痕，不新增 OP 号**。
+
+> **P-143 · TASK-B.1 合入回写（2026-11-04）**：基于最新 `main`@`9c177e92992566522929efecd9c1435244a17491`（[#124](https://github.com/he18718143986-design/IDE/pull/124) 代码 squash，parent `ad19bcd3`）。TASK-B.1 标 `[COMPLETED]` 并从 active 迁出至 completed §3.4r；交付 parser/graph/server 增强、新建 perf 与 boundaries 测试、契约兼容超集（toJSON 旧形状、topologicalSort 签名与方向修正、has/getNode 兼容、bootstrap-draft 零破坏）及实测性能四项（228.81ms / 0.080ms / 1.00MiB / 17.11ms，实测值非目标值）。登记四条挂账（① global.gc 暴露、② isUnderScanRoot 收敛、③ IGNORED_DIRS 过滤、④ addModule 覆盖式语义已核销）。物理指针链推进两格：`2cbd91c` → `ad19bcd3`（#123 DoR）→ `9c177e9`（#124 代码）。Sprint 首要转为 `TASK-B.2`（待 DoR 重写）。本注仅同步审计留痕，不新增 OP 号（范围仍 OP-1～OP-38）。
