@@ -120,8 +120,30 @@ export class DependencyGraph {
     this.reverse.delete(key);
   }
 
+  /** Compatibility alias retained for callers using the original method name. */
+  has(filePath: string): boolean {
+    return this.hasNode(filePath);
+  }
+
   hasNode(filePath: string): boolean {
     return this.nodes.has(path.resolve(filePath));
+  }
+
+  /** Return the original GraphNode view while retaining ParsedModule internally. */
+  getNode(filePath: string): GraphNode | undefined {
+    const key = path.resolve(filePath);
+    const module = this.modules.get(key);
+    if (!module) return undefined;
+
+    return {
+      filePath: key,
+      exports: [...module.exports],
+      imports: module.imports.map((imp) => ({
+        specifier: imp.specifier,
+        resolved: imp.resolved ? path.resolve(imp.resolved) : null,
+        typeOnly: imp.typeOnly,
+      })),
+    };
   }
 
   getNodes(): string[] {
@@ -140,6 +162,20 @@ export class DependencyGraph {
 
   getModule(filePath: string): ParsedModule | undefined {
     return this.modules.get(path.resolve(filePath));
+  }
+
+  /**
+   * Legacy single-file update API retained for callers and benchmark tests.
+   * Repo-level mtime/size caching remains in updateRepoGraphFile().
+   */
+  updateFile(
+    filePath: string,
+    content: string,
+    aliases: PathAliasConfig,
+  ): number {
+    const start = performance.now();
+    this.addModule(parseSource(filePath, content, aliases));
+    return performance.now() - start;
   }
 
   /**
@@ -264,41 +300,39 @@ export class DependencyGraph {
    * Kahn 拓扑排序算法。
    * 若含环，环内节点不会被包含在排序结果中（Kahn 算法经典行为）。
    */
-  topologicalSort(): string[] {
+  topologicalSort(): { order: string[]; hasCycle: boolean } {
     const inDegree = new Map<string, number>();
     for (const node of this.nodes) {
-      inDegree.set(node, 0);
-    }
-
-    for (const [, targets] of this.edges) {
-      for (const target of targets) {
-        if (this.nodes.has(target)) {
-          inDegree.set(target, (inDegree.get(target) ?? 0) + 1);
-        }
-      }
+      const dependencies = this.edges.get(node);
+      inDegree.set(
+        node,
+        dependencies
+          ? Array.from(dependencies).filter((dependency) =>
+              this.nodes.has(dependency),
+            ).length
+          : 0,
+      );
     }
 
     const queue: string[] = [];
-    for (const [node, deg] of inDegree) {
-      if (deg === 0) queue.push(node);
+    for (const [node, degree] of inDegree) {
+      if (degree === 0) queue.push(node);
     }
 
     const order: string[] = [];
     while (queue.length > 0) {
-      const u = queue.shift()!;
-      order.push(u);
-      const targets = this.edges.get(u);
-      if (targets) {
-        for (const v of targets) {
-          if (!this.nodes.has(v)) continue;
-          const newDeg = (inDegree.get(v) ?? 1) - 1;
-          inDegree.set(v, newDeg);
-          if (newDeg === 0) queue.push(v);
-        }
+      const node = queue.shift()!;
+      order.push(node);
+      // Reverse edges point from a dependency to the modules that use it.
+      for (const dependent of this.reverse.get(node) ?? []) {
+        if (!this.nodes.has(dependent)) continue;
+        const nextDegree = (inDegree.get(dependent) ?? 0) - 1;
+        inDegree.set(dependent, nextDegree);
+        if (nextDegree === 0) queue.push(dependent);
       }
     }
 
-    return order;
+    return { order, hasCycle: order.length !== this.nodes.size };
   }
 
   getStats(): GraphStats {
