@@ -67,6 +67,19 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   });
 }
 
+/** 有界轮询等待条件成立（替代固定 sleep，适应 macOS 原生事件延迟）。 */
+async function waitFor(
+  predicate: () => boolean,
+  timeoutMs: number,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (predicate()) return true;
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  return predicate();
+}
+
 function median(values: number[]): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -299,8 +312,15 @@ describe("TASK-B.2 多 Worktree Watcher 性能与并发监听测试", () => {
       );
     }
 
-    // 等待全部 watcher 处理完毕
-    await new Promise((r) => setTimeout(r, 200));
+    // 等待全部 watcher 处理完毕（有界轮询，直到全部证据变为 STALE 或超时）
+    await waitFor(
+      () =>
+        evidencePaths.every((evPath) => {
+          const c = JSON.parse(fs.readFileSync(evPath, "utf-8"));
+          return c.verdict.status === "STALE";
+        }),
+      5000,
+    );
 
     // 验证所有证据都被原子重写为 STALE
     for (let i = 0; i < count; i++) {
@@ -363,7 +383,8 @@ describe("TASK-B.2 多 Worktree Watcher 性能与并发监听测试", () => {
     );
     fs.writeFileSync(path.join(wtDir, "dist", "bundle.js"), "bundle\n");
 
-    await new Promise((r) => setTimeout(r, 150));
+    // 留足窗口让可能的误报送达（忽略目录事件应当为零）
+    await new Promise((r) => setTimeout(r, 500));
 
     // 失败时打印诊断：root（realpath）、事件路径、归一后的相对路径与忽略判定
     const diag = seen.map(
@@ -377,6 +398,89 @@ describe("TASK-B.2 多 Worktree Watcher 性能与并发监听测试", () => {
     const content = JSON.parse(fs.readFileSync(evPath, "utf-8"));
     expect(content.verdict.status).toBe("PASSED");
     expect(content.verdict.can_merge).toBe(true);
+  });
+});
+
+describe("TASK-B.2 macOS 事件竞争回归（平台无关的行为断言）", () => {
+  let base: string;
+  const cleanup: WorktreeWatcher[] = [];
+
+  beforeEach(() => {
+    base = fs.mkdtempSync(path.join(os.tmpdir(), "stagent-b2-race-"));
+  });
+
+  afterEach(async () => {
+    for (const w of cleanup) await w.stop();
+    cleanup.length = 0;
+    safeRmSync(base);
+  });
+
+  it("武装窗口：ready 后等待 armSettleMs 才对外报告就绪", async () => {
+    const wt = path.join(base, "wt-settle");
+    fs.mkdirSync(path.join(wt, "src"), { recursive: true });
+    fs.writeFileSync(path.join(wt, "src", "a.ts"), "a\n");
+    const w = new WorktreeWatcher({
+      worktreePath: wt,
+      armSettleMs: 250,
+      onChange: () => {},
+    });
+    cleanup.push(w);
+    const t0 = Date.now();
+    w.start();
+    expect(await w.waitUntilReady()).toBe(true);
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(240);
+    expect(w.isReady).toBe(true);
+  });
+
+  it("启动前已写入的文件不计为变更（历史事件过滤）", async () => {
+    const wt = path.join(base, "wt-history");
+    fs.mkdirSync(path.join(wt, "src"), { recursive: true });
+    const early = path.join(wt, "src", "early.ts");
+    fs.writeFileSync(early, "before start\n");
+    // 确保 mtime 严格早于 start()
+    await new Promise((r) => setTimeout(r, 20));
+
+    const seen: string[] = [];
+    const w = new WorktreeWatcher({
+      worktreePath: wt,
+      armSettleMs: 0,
+      debounceMs: 20,
+      onChange: (paths) => seen.push(...paths),
+    });
+    cleanup.push(w);
+    w.start();
+    expect(await w.waitUntilReady()).toBe(true);
+
+    // 启动后的真实修改必须被捕获
+    const late = path.join(wt, "src", "late.ts");
+    fs.writeFileSync(late, "after start\n");
+    const got = await waitFor(
+      () => seen.some((p) => p.endsWith(path.join("src", "late.ts"))),
+      5000,
+    );
+    expect(got).toBe(true);
+    expect(seen.some((p) => p.endsWith(path.join("src", "early.ts")))).toBe(
+      false,
+    );
+  });
+
+  it("stop() 发生在武装窗口内：不把已停止的 watcher 翻成 ready", async () => {
+    const wt = path.join(base, "wt-stop");
+    fs.mkdirSync(wt, { recursive: true });
+    const w = new WorktreeWatcher({
+      worktreePath: wt,
+      armSettleMs: 400,
+      readyTimeoutMs: 1000,
+      onChange: () => {},
+    });
+    cleanup.push(w);
+    w.start();
+    const waiting = w.waitUntilReady();
+    await new Promise((r) => setTimeout(r, 50));
+    await w.stop();
+    await waiting;
+    await new Promise((r) => setTimeout(r, 500));
+    expect(w.isReady).toBe(false);
   });
 });
 

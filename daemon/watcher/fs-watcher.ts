@@ -12,9 +12,19 @@ export interface WorktreeWatcherOptions {
   debounceMs?: number;
   /** 等待 ready 事件的超时兜底（默认 5000ms），超时后降级继续，不挂死。 */
   readyTimeoutMs?: number;
+  /** ready 之后的武装窗口（默认：macOS 300ms，其他平台 0）。 */
+  armSettleMs?: number;
 }
 
 type ReadyState = "idle" | "pending" | "ready" | "timeout";
+
+/**
+ * macOS 上 chokidar 5 经 fs.watch（libuv FSEvents）监听，原生流是异步启动的：
+ * chokidar 在 fs.watch 调用返回后就立即 emit ready，此时 FSEvents 流未必已武装，
+ * ready 之后紧接着的写入会被静默丢失（B.2 门禁①、5 worktree 并发用例的 STALE 漏报根因）。
+ * 因此 macOS 上 ready 后额外等待一段武装窗口再对外报告就绪。其他平台为 0，行为不变。
+ */
+const ARM_SETTLE_MS = process.platform === "darwin" ? 300 : 0;
 
 const IGNORED_SEGMENTS = new Set([
   ".git",
@@ -50,12 +60,15 @@ export class WorktreeWatcher {
   private readonly root: string;
   private readonly debounceMs: number;
   private readonly readyTimeoutMs: number;
+  private readonly armSettleMs: number;
   private readonly onChange: (paths: string[]) => void;
   private watcher: FSWatcher | null = null;
   private pending = new Set<string>();
   private timer: NodeJS.Timeout | null = null;
   private readyPromise: Promise<void> | null = null;
   private readyState: ReadyState = "idle";
+  /** start() 调用时刻（小数毫秒，与文件 mtime 同为墙钟口径）；早于它的修改属于基线。 */
+  private startedAtMs = 0;
 
   constructor(options: WorktreeWatcherOptions) {
     // 规范收紧点 2：在构造函数中一次性执行 fs.realpathSync 归一化工作树根路径（例如 macOS /var 与 /private/var）
@@ -65,11 +78,13 @@ export class WorktreeWatcher {
       : path.resolve(options.worktreePath);
     this.debounceMs = options.debounceMs ?? 60;
     this.readyTimeoutMs = options.readyTimeoutMs ?? 5000;
+    this.armSettleMs = options.armSettleMs ?? ARM_SETTLE_MS;
     this.onChange = options.onChange;
   }
 
   start(): void {
     if (this.watcher) return;
+    this.startedAtMs = performance.timeOrigin + performance.now();
     this.watcher = chokidar.watch(this.root, {
       ignoreInitial: true,
       ignored: (p: string) => shouldIgnore(p, this.root),
@@ -77,15 +92,35 @@ export class WorktreeWatcher {
     });
 
     this.readyState = "pending";
+    const watcher = this.watcher;
     this.readyPromise = new Promise<void>((resolve) => {
-      this.watcher?.once("ready", () => {
-        if (this.readyState !== "timeout") this.readyState = "ready";
-        resolve();
+      watcher.once("ready", () => {
+        const finish = () => {
+          if (this.watcher !== watcher) return; // 已 stop，不再翻转状态
+          if (this.readyState !== "timeout") this.readyState = "ready";
+          resolve();
+        };
+        if (this.armSettleMs > 0) setTimeout(finish, this.armSettleMs);
+        else finish();
       });
     });
 
-    const enqueue = (filePath: string) => {
+    /** 启动前已写入的文件（macOS FSEvents 可能延迟投递其事件）不计为变更。 */
+    const predatesStart = (filePath: string): boolean => {
+      try {
+        const { mtimeMs } = fs.statSync(filePath);
+        // 只有亚秒精度的 mtime 才能可靠地与启动时刻比较；整秒 mtime（如 HFS+）无法判定，
+        // 保守视为变更。误报只会让证据偏保守，漏报才危险。
+        const hasSubSecond = mtimeMs % 1 !== 0;
+        return hasSubSecond && mtimeMs < this.startedAtMs;
+      } catch {
+        return false; // 已删除或不可读：保守视为变更
+      }
+    };
+
+    const enqueue = (filePath: string, kind: "add" | "change" | "unlink") => {
       if (shouldIgnore(filePath, this.root)) return;
+      if (kind !== "unlink" && predatesStart(filePath)) return;
       this.pending.add(path.resolve(filePath));
       if (this.timer) clearTimeout(this.timer);
       this.timer = setTimeout(() => {
@@ -96,9 +131,9 @@ export class WorktreeWatcher {
       }, this.debounceMs);
     };
 
-    this.watcher.on("add", enqueue);
-    this.watcher.on("change", enqueue);
-    this.watcher.on("unlink", enqueue);
+    this.watcher.on("add", (p: string) => enqueue(p, "add"));
+    this.watcher.on("change", (p: string) => enqueue(p, "change"));
+    this.watcher.on("unlink", (p: string) => enqueue(p, "unlink"));
   }
 
   get isWatching(): boolean {
