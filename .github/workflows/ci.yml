@@ -20,12 +20,14 @@ on:
 #
 # docs-only 豁免（工程修复，非 docs 流水）：
 # 一个前置 job `changes` 判断 PR 是否只改了 docs/ 下的文件。
-# - 仅 docs/** 改动 → code=false → lint/typecheck/test 三个矩阵 job 被 if 跳过。
-#   job 级 skipped 在 required checks 中计为通过；不用 paths-ignore，因为 workflow
-#   不触发时 required check 永远 pending，PR 仍被 blocked。
+# - 仅 docs/** 改动 → code=false → lint/typecheck/test 三个矩阵 job 照常展开并成功结束，
+#   但每个 step 都由 `if: needs.changes.outputs.code == 'true'` 跳过。
+#   条件放在 step 级而非 job 级：job 级 if 会让矩阵在展开前被跳过，GitHub 报出字面名
+#   `Lint (${{ matrix.os }})`，required checks 的 `Lint (ubuntu-latest)` 等名字永远不出现。
+#   不用 paths-ignore，因为 workflow 不触发时 required check 永远 pending，PR 仍被 blocked。
 # - 其它任何文件（含 .github/workflows/*、package.json、根目录文件）或混合改动 → code=true → 全量跑。
 # - 非 pull_request 事件（push 到 main、workflow_dispatch）恒全量跑。
-# - `changes` 本身不带 if，必须恒跑，否则下游拿不到输出。
+# - `changes` 本身不带 if，必须恒跑，否则下游拿不到输出；矩阵 job 只保留 needs: changes。
 #
 # Windows 目前**不阻断合并**：README 的「平台矩阵」写明 Windows 尚未完成
 # 真机验证（路径分隔符、autocrlf 换行、符号链接需管理员权限、文件锁导致
@@ -78,7 +80,6 @@ jobs:
   lint:
     name: Lint (${{ matrix.os }})
     needs: changes
-    if: github.event_name != 'pull_request' || needs.changes.outputs.code == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -87,26 +88,30 @@ jobs:
     continue-on-error: ${{ matrix.os == 'windows-latest' }}
     steps:
       - uses: actions/checkout@v4
+        if: needs.changes.outputs.code == 'true'
 
       - uses: actions/setup-node@v4
+        if: needs.changes.outputs.code == 'true'
         with:
           # 22 = 当前 LTS，同时与开发机一致；20 已在 runner 上标记弃用
           node-version: 22
           cache: npm
 
       - name: Verify environment (Node >= 20, Git >= 2.30)
+        if: needs.changes.outputs.code == 'true'
         run: node scripts/verify-env.mjs --env-only
 
       - name: Install dependencies (locked)
+        if: needs.changes.outputs.code == 'true'
         run: npm ci
 
       - name: Lint
+        if: needs.changes.outputs.code == 'true'
         run: npm run lint
 
   typecheck:
     name: Typecheck (${{ matrix.os }})
     needs: changes
-    if: github.event_name != 'pull_request' || needs.changes.outputs.code == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -115,25 +120,29 @@ jobs:
     continue-on-error: ${{ matrix.os == 'windows-latest' }}
     steps:
       - uses: actions/checkout@v4
+        if: needs.changes.outputs.code == 'true'
 
       - uses: actions/setup-node@v4
+        if: needs.changes.outputs.code == 'true'
         with:
           node-version: 22
           cache: npm
 
       - name: Verify environment (Node >= 20, Git >= 2.30)
+        if: needs.changes.outputs.code == 'true'
         run: node scripts/verify-env.mjs --env-only
 
       - name: Install dependencies (locked)
+        if: needs.changes.outputs.code == 'true'
         run: npm ci
 
       - name: Typecheck
+        if: needs.changes.outputs.code == 'true'
         run: npm run typecheck
 
   test:
     name: Unit tests (${{ matrix.os }})
     needs: changes
-    if: github.event_name != 'pull_request' || needs.changes.outputs.code == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -142,17 +151,22 @@ jobs:
     continue-on-error: ${{ matrix.os == 'windows-latest' }}
     steps:
       - uses: actions/checkout@v4
+        if: needs.changes.outputs.code == 'true'
 
       - uses: actions/setup-node@v4
+        if: needs.changes.outputs.code == 'true'
         with:
           node-version: 22
           cache: npm
 
       - name: Verify environment (Node >= 20, Git >= 2.30)
+        if: needs.changes.outputs.code == 'true'
         run: node scripts/verify-env.mjs --env-only
 
       - name: Install dependencies (locked)
+        if: needs.changes.outputs.code == 'true'
         run: npm ci
 
       - name: Unit tests
+        if: needs.changes.outputs.code == 'true'
         run: npm test
