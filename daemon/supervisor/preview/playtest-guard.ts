@@ -12,7 +12,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { playtestEvidenceSchema } from "../../../src/lib/journey/playtest-evidence";
-import { readPlaytestEvidenceRaw } from "../../playtest/evidence";
+import {
+  normalizeContractId,
+  readPlaytestEvidenceRaw,
+} from "../../playtest/evidence";
 import { resolveCurrentLiveReleaseId } from "../../release/active-live";
 
 export type PlaytestGuardStatus =
@@ -56,9 +59,16 @@ function readContractReferences(
   repoRoot: string,
   contractId: string,
 ): { exists: boolean; references: string[] } {
-  // 合同文件名与 ContractStore 落盘口径一致（contract_id 原样）；
-  // `.stagent/contracts/` 是固定目录，check 为本地只读，不做别名归一以免找不到合同。
-  const file = path.join(contractsDir(repoRoot), `${contractId}.json`);
+  // OP-37：统一使用 normalizeContractId 做文件名归一，读侧写侧严格同口径；
+  // 同时保留未归一原始名称兜底，兼容存量未归一合同文件。
+  const safe = normalizeContractId(contractId);
+  let file = path.join(contractsDir(repoRoot), `${safe}.json`);
+  if (!fs.existsSync(file) && safe !== contractId) {
+    const rawFile = path.join(contractsDir(repoRoot), `${contractId}.json`);
+    if (fs.existsSync(rawFile)) {
+      file = rawFile;
+    }
+  }
   if (!fs.existsSync(file)) return { exists: false, references: [] };
   try {
     const raw = JSON.parse(fs.readFileSync(file, "utf-8")) as {

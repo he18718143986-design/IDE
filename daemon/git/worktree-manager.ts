@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import {
   generateTaskBranch,
   validateTaskBranchOperation,
@@ -149,6 +149,29 @@ export function assertSafeGitCwd(
  * 声明为 `async` 是为了让守卫的同步抛错自动变成 rejected promise，
  * 调用方用 `await expect(...).rejects` 就能断言到。
  */
+export function execGitSync(
+  args: string[],
+  cwd: string,
+  options: { raw?: boolean } = {},
+): { stdout: string; stderr: string; exitCode: number } {
+  assertSafeGitCwd(args, cwd);
+  const result = spawnSync("git", args, {
+    cwd,
+    stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+    encoding: "utf-8",
+  });
+  return {
+    stdout: options.raw
+      ? (result.stdout ?? "")
+      : (result.stdout ?? "").trimEnd(),
+    stderr: options.raw
+      ? (result.stderr ?? "")
+      : (result.stderr ?? "").trimEnd(),
+    exitCode: result.status ?? 0,
+  };
+}
+
 export async function execGit(
   args: string[],
   cwd: string,

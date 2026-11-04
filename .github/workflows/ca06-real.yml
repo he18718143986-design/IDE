@@ -1,0 +1,77 @@
+name: ca06-real
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  ca06:
+    # The API-key test must only run against the merged, reviewed main tree.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Keep aligned with .github/workflows/ci.yml.
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install cursor-agent CLI
+        run: |
+          curl https://cursor.com/install -fsS | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: 前置断言（环境边界检查，失败即停）
+        run: |
+          test "$HOME" = "/home/runner" || exit 1
+          test "$PWD" != "$HOME" || exit 1
+          set -o pipefail
+          cursor-agent status | grep -i "not logged in" || exit 1
+        # Isolated runner must be logged out; authentication is only via CURSOR_API_KEY.
+
+      - name: Require CURSOR_API_KEY secret
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+        run: test -n "$CURSOR_API_KEY"
+
+      - name: CA-06 实测
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          STAGENT_REAL_CURSOR: "1"
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          result = subprocess.run(
+              ["npx", "vitest", "run", "tests/e2e/cursor-agent-real.real.test.ts"],
+              capture_output=True,
+              text=True,
+              check=False,
+          )
+          output = result.stdout + result.stderr
+          secret = os.environ.get("CURSOR_API_KEY", "")
+          if secret:
+              output = output.replace(secret, "[REDACTED]")
+          output = re.sub(r"(?i)(CURSOR_API_KEY\s*[=:]\s*)[^\s\"']+", r"\1[REDACTED]", output)
+          Path("CURSOR_AGENT_MEASUREMENT.log").write_text(output, encoding="utf-8")
+          print(output, end="")
+          sys.exit(result.returncode)
+          PY
+
+      - name: 上传实测记录
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ca06-measurement
+          path: "**/CURSOR_AGENT_MEASUREMENT*"
+          if-no-files-found: warn

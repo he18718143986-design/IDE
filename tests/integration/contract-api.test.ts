@@ -276,11 +276,38 @@ describe("M5 / 合同 HTTP API（Bearer 保护）", () => {
     const res = await fetch(`${base}/api/arch/graph`, { headers: auth() });
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      stats: { nodes: number };
-      graph: { nodes: unknown[] };
+      stats: { nodes: number; edges: number; cycles: number };
+      graph: {
+        nodes: Array<{
+          filePath: string;
+          exports: string[];
+          imports: Array<{
+            specifier: string;
+            resolved: string | null;
+            typeOnly: boolean;
+          }>;
+        }>;
+        edges: Array<{ from: string; to: string }>;
+      };
     };
     expect(body.stats.nodes).toBeGreaterThan(0);
     expect(body.graph.nodes.length).toBe(body.stats.nodes);
+    // 加强契约防线：断言节点包含完整 filePath/exports/imports，且 edges 为扁平数组
+    const firstNode = body.graph.nodes[0];
+    expect(firstNode).toBeDefined();
+    if (firstNode) {
+      expect(typeof firstNode.filePath).toBe("string");
+      expect(Array.isArray(firstNode.exports)).toBe(true);
+      expect(Array.isArray(firstNode.imports)).toBe(true);
+    }
+    expect(Array.isArray(body.graph.edges)).toBe(true);
+    if (body.graph.edges.length > 0) {
+      const firstEdge = body.graph.edges[0];
+      if (firstEdge) {
+        expect(typeof firstEdge.from).toBe("string");
+        expect(typeof firstEdge.to).toBe("string");
+      }
+    }
   });
 
   it("执行通过后外部修改 Worktree 会把 Evidence 置为 STALE（B.2 联动）", async () => {

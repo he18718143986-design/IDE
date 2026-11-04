@@ -283,3 +283,21 @@
 
 
 > **P-134 现行物理指针（2026-11-03）**：文档回写基线 main@`10bc1d3b9b0ca23d65e26f9be710b994e443ceac`（#108 tip 同步；W.9c 代码由 #107/`d3397a644603d8b49a96d765456031cba4254981` 合入其前一 tip）。W.9a/b/c 均 COMPLETED；W.9 母卡实质闭合，active `[SPLIT]` 仅保留拆分史。W.9b 四项挂账仍未销项，详见 completed §3.4q；不宣称端到端闭环。Sprint 首要为「在队清零」，下一张卡待 Tina 指定。
+
+> **P-135 现行物理指针（2026-11-03）**：文档回写基线 `main@2559f5c30f413d4b5b13757e8dae2675631d892b`（#113 squash）。清扫成果已按无卡基建修正登记；挂账为手工植入路径审计语义及 Windows CRLF / `path.sep` / 临时目录 `EBUSY` 重试；completed §3.4q 重复锚点清理。Sprint 首要仍为「在队清零」；本 PR 合入后物理指针再更新为合入 SHA。
+
+> **P-136 现行物理指针（2026-11-03）**：main@`de50d38de3089dc17d601627a35b4096609fb706`（#114 为 P-135 docs 回写 squash；其下 #113 `2559f5c3` 为无卡基建清扫代码 squash）。P-135 清扫成果（typecheck 54→0、Unit tests 7 项红销项、假漂移与续租修复）与两项挂账现行有效；completed §3.4q 唯一锚点已落定。Sprint 首要仍为「在队清零」，下一张卡待 Tina 指定。
+> **P-137 现行物理指针（2026-11-03）**：main@`08e1a60258f9d7225cf718ab99045711a0150bf8`（#115 为 P-136 docs 回写 squash；其下 #114 `de50d38` 为 P-135 docs 回写 squash，#113 `2559f5c3` 为无卡基建清扫代码 squash）。GitHub Branch Ruleset `main`（ID 26435584）已激活启用 required checks，门禁由惯例升格为物理强制。P-135 清扫成果与两项挂账现行有效；Sprint 首要仍为「在队清零」，下一张卡待 Tina 指定。
+
+> **P-138 现行物理指针（2026-11-03）**：main@`96225dfdafbba04b813da63c8e524cd22bbcc087`（[#118](https://github.com/he18718143986-design/IDE/pull/118) 为 OP-33~38 挂账清扫代码 squash；其下 #117 `41029dc` 为 CA-06 CI 工作流，#116 `e695649` 为 P-137 门禁强制化文档注记）。完成 OP-33（部分销项 / 平台侧限制改定性）、OP-34（改定性平台侧持续观察）、OP-35①、OP-35②、OP-36、OP-37、OP-38 逐条对账销项，新增两条边界挂账；Sprint 首要仍为「在队清零」，下一张卡待 Tina 指定。
+
+> **P-139 现行物理指针（2026-11-03）**：main@`c5de2f6dac622af99b0b7e3a1c566a62b26ccefa`（[#119](https://github.com/he18718143986-design/IDE/pull/119) 为 P-138 OP-33～38 台账回写 squash；其下 #118 `96225df` 为清扫代码 squash）。P-138 对账结果与两条新增边界挂账继续有效；Sprint 首要仍为「在队清零」，下一张卡待 Tina 指定。
+
+> **P-141 现行物理指针（2026-11-03）**：main@`49c7848ba8db72073e1ec5e2b3acacc7667c6a9e`（[#121](https://github.com/he18718143986-design/IDE/pull/121)，P-140 v0.2 范围 RFC squash）。D-1～D-6 已拍板：B.1/B.2/C.4 激活待 DoR 重写；S.3/D.1e 维持 DEFERRED。Sprint 首要为 TASK-B.1 DoR 重写先行；激活不等于开工，须 Tina 单卡授权。
+
+> **P-143 现行物理指针（2026-11-04）**：main@`9c177e92992566522929efecd9c1435244a17491`（[#124](https://github.com/he18718143986-design/IDE/pull/124) B.1 代码 squash；其下 #123 `ad19bcd3` 为 P-142 DoR 重写 squash，#122 `2cbd91c` 为 P-141 拍板）。`TASK-B.1` 已 `[COMPLETED]` 并迁入 completed §3.4r；实测性能达标，交付契约兼容超集，登记三项后续挂账（CI GC 暴露、isUnderScanRoot 前缀收敛、IGNORED_DIRS 过滤）及一条已核销注记（addModule 覆盖式语义）。物理指针链推进两格至 `9c177e9`。Sprint 首要转为 `TASK-B.2`（待 DoR 重写，须经存量对账与 Tina 单卡授权后施工）。不新增 OP 号。
+
+> **P-144 现行物理指针（2026-11-04）**：main@`5b0a8cd08f1bca54930d6bf43db0ea78f0d55e23`（[#125](https://github.com/he18718143986-design/IDE/pull/125) P-143 TASK-B.1 回写 squash；其下 #124 `9c177e9` 为 B.1 代码 squash）。`TASK-B.2` 已按 R-1～R-12 与存量对账矩阵完成卡正文重写，状态保持 `[READY · 待 DoR 重写]`，施工授权待 Tina 单卡拍板。物理指针链推进至 `5b0a8cd0`。不新增 OP 号。
+
+> **P-145 现行物理指针（2026-11-04）**：main@`b1aa44f320a33f0c61197f63550e8c0f173a3a82`（[#128](https://github.com/he18718143986-design/IDE/pull/128) TASK-B.2 代码 squash；其下 #125 `5b0a8cd0` 为 P-143 回写，#124 `9c177e9` 为 B.1 代码 squash）。`TASK-B.2` 已 `[COMPLETED]` 并迁入 completed §3.4s；B.1 挂账② 已销项。Sprint 首要转为 `TASK-C.4`（待 DoR 重写；硬依赖 B.1、软依赖 B.2 均已满足；激活 ≠ 开工，须 Tina 单卡授权）。不新增 OP 号。
+> **P-147 现行物理指针（2026-11-04）**：main@`78ae73b2924e4854b4c4c5b7e6dce157ccdd1896`（[#129](https://github.com/he18718143986-design/IDE/pull/129) P-145 TASK-B.2 回写 squash；其下 #128 `b1aa44f` 为 B.2 代码 squash）。`TASK-C.4` 已按 R-1～R-12 与存量对账矩阵完成卡正文重写，状态保持 `[READY · 待 DoR 重写]`，施工授权待 Tina 单卡拍板。物理指针链推进至 `78ae73b`。不新增 OP 号。

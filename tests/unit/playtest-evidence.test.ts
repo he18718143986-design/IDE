@@ -18,9 +18,14 @@ import {
   assembleAndStorePlaytestEvidence,
   evidenceDir,
   handlePlaytestEvidenceRequest,
+  normalizeContractId,
   playtestEvidencePath,
+  playtestHistoryPath,
+  readPlaytestEvidenceHistory,
+  readPlaytestEvidenceRaw,
   validatePlaytestEvidenceRequest,
 } from "../../daemon/playtest/evidence";
+import { resolveCurrentLiveReleaseId } from "../../daemon/release/active-live";
 import { playtestEvidenceSchema } from "../../src/lib/journey/playtest-evidence";
 import { submitPlaytestEvidence } from "../../src/lib/journey/playtest-evidence";
 
@@ -240,9 +245,112 @@ describe("TASK-L.17b playtest-evidence", () => {
       ),
     ).rejects.toThrow(/原话/);
   });
+  it("OP-38: 多次认可追加写入 .history.jsonl，主文件保留最新，history 提供全量审计链", () => {
+    const verdict1 = "第一次认可：主流程通了";
+    const verdict2 = "第二次认可：微调样式后完美";
+
+    // 第一次提交
+    const r1 = handlePlaytestEvidenceRequest(repo, {
+      contract_id: CONTRACT_ID,
+      user_verdict: verdict1,
+    });
+    expect(r1.status).toBe(201);
+
+    // 第二次提交
+    const r2 = handlePlaytestEvidenceRequest(repo, {
+      contract_id: CONTRACT_ID,
+      user_verdict: verdict2,
+    });
+    expect(r2.status).toBe(201);
+
+    // 主文件只存最新
+    const raw = readPlaytestEvidenceRaw(repo, CONTRACT_ID);
+    expect(raw.exists).toBe(true);
+    expect((raw.value as { user_verdict: string }).user_verdict).toBe(verdict2);
+
+    // history 文件追加了两次，每条为合规单行 JSON
+    const histPath = playtestHistoryPath(repo, CONTRACT_ID);
+    expect(fs.existsSync(histPath)).toBe(true);
+    const histLines = fs.readFileSync(histPath, "utf-8").trim().split("\n");
+    expect(histLines.length).toBe(2);
+
+    // 验证每行均为单行且包含正确 verdict
+    const line0 = histLines[0];
+    const line1 = histLines[1];
+    expect(line0).toBeDefined();
+    expect(line1).toBeDefined();
+    const parsedLine1 = JSON.parse(line0!) as { user_verdict: string };
+    const parsedLine2 = JSON.parse(line1!) as { user_verdict: string };
+    expect(parsedLine1.user_verdict).toBe(verdict1);
+    expect(parsedLine2.user_verdict).toBe(verdict2);
+
+    // 通过 readPlaytestEvidenceHistory 读取结构化序列
+    const historyRecords = readPlaytestEvidenceHistory(repo, CONTRACT_ID);
+    expect(historyRecords.length).toBe(2);
+    expect(historyRecords[0]?.user_verdict).toBe(verdict1);
+    expect(historyRecords[1]?.user_verdict).toBe(verdict2);
+  });
+
+  it("OP-37: 含特殊字符的 contract_id 路径安全归一与读写一致性", () => {
+    const specialContractId = "feat/special:login#99@test";
+    const normalized = normalizeContractId(specialContractId);
+    expect(normalized).toBe("feat_special_login_99_test");
+
+    // 为该特殊合同准备 LIVE release
+    const relDir = path.join(repo, ".stagent", "releases");
+    const specialRelId = "rel-special-01";
+    fs.writeFileSync(
+      path.join(relDir, `${specialRelId}.json`),
+      JSON.stringify({
+        schema_version: "1.0.0",
+        release_id: specialRelId,
+        target_id: "local",
+        commit_sha: "bbbbbbb1",
+        contract_ids: [specialContractId],
+        state: "LIVE",
+        previous_live_release_id: null,
+        steps: [],
+        created_at: "2026-11-02T12:00:00.000Z",
+        triggered_by: "USER",
+      }),
+    );
+
+    const verdict = "特殊字符合同试玩通过";
+    const res = handlePlaytestEvidenceRequest(repo, {
+      contract_id: specialContractId,
+      user_verdict: verdict,
+    });
+    expect(res.status).toBe(201);
+
+    // 文件路径经过同一归一函数
+    const expectedPath = playtestEvidencePath(repo, specialContractId);
+    expect(expectedPath).toContain("playtest-feat_special_login_99_test.json");
+    expect(fs.existsSync(expectedPath)).toBe(true);
+
+    const raw = readPlaytestEvidenceRaw(repo, specialContractId);
+    expect(raw.exists).toBe(true);
+    expect((raw.value as { contract_id: string }).contract_id).toBe(
+      specialContractId,
+    );
+  });
+
+  it("OP-36: 多合同隔离 —— resolveCurrentLiveReleaseId 在无匹配时不回退其它合同的 LIVE", () => {
+    // 仓库只有 CONTRACT_ID 的 LIVE release（seedLiveRelease 创建）
+    // 检查另一个不存在对应 release 的合同
+    const otherContractId = "ctr-other-unrelated";
+    const liveRelease = resolveCurrentLiveReleaseId(repo, otherContractId);
+    expect(liveRelease).toBeNull();
+
+    // 试图为无匹配 release 的合同提交证据 → 显式 409 拒绝（E_NO_ACTIVE_RELEASE），不跨合同串绑
+    const res = handlePlaytestEvidenceRequest(repo, {
+      contract_id: otherContractId,
+      user_verdict: "不应该绑到别的合同的发布上",
+    });
+    expect(res.status).toBe(409);
+    expect((res.body as { code: string }).code).toBe(E_NO_ACTIVE_RELEASE);
+  });
 });
 
-/** HTTP 层接线：证明路由真挂载、鉴权生效、服务端装配 / 拒绝在真实通道上成立 */
 describe("TASK-L.17b POST /api/playtest/evidence HTTP 接线", () => {
   let repo = "";
   let daemon: StagentDaemon | null = null;

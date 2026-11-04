@@ -186,7 +186,7 @@ describe("M4 / TASK-D.1 Local IPC / WebSocket 通信桥", () => {
       ws.send(
         JSON.stringify({ type: "PING", timestamp: new Date().toISOString() }),
       );
-      const frame = await nextFrame(ws);
+      const frame = await waitForFrameType(ws, "PONG");
       expect(frame.type).toBe("PONG");
     } finally {
       ws.close();
@@ -224,11 +224,11 @@ describe("M4 / TASK-D.1 Local IPC / WebSocket 通信桥", () => {
     const ws = await connect(port, { token });
     try {
       ws.send(JSON.stringify({ type: "CUSTOM_FRAME", timestamp: "" }));
-      const first = await nextFrame(ws);
+      const first = await waitForFrameType(ws, "ERROR");
       expect(first.type).toBe("ERROR");
 
       ws.send("not-json");
-      const second = await nextFrame(ws);
+      const second = await waitForFrameType(ws, "ERROR");
       expect(second.type).toBe("ERROR");
     } finally {
       ws.close();

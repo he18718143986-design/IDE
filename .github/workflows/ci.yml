@@ -18,6 +18,17 @@ on:
 # 是刻意保留的：不抽 composite action，是为了不改动 runner 默认 shell 的
 # 行为（原配置在 Windows 上用 pwsh 已验证可用），避免引入平台差异。
 #
+# docs-only 豁免（工程修复，非 docs 流水）：
+# 一个前置 job `changes` 判断 PR 是否只改了 docs/ 下的文件。
+# - 仅 docs/** 改动 → code=false → lint/typecheck/test 三个矩阵 job 照常展开并成功结束，
+#   但每个 step 都由 `if: needs.changes.outputs.code == 'true'` 跳过。
+#   条件放在 step 级而非 job 级：job 级 if 会让矩阵在展开前被跳过，GitHub 报出字面名
+#   `Lint (${{ matrix.os }})`，required checks 的 `Lint (ubuntu-latest)` 等名字永远不出现。
+#   不用 paths-ignore，因为 workflow 不触发时 required check 永远 pending，PR 仍被 blocked。
+# - 其它任何文件（含 .github/workflows/*、package.json、根目录文件）或混合改动 → code=true → 全量跑。
+# - 非 pull_request 事件（push 到 main、workflow_dispatch）恒全量跑。
+# - `changes` 本身不带 if，必须恒跑，否则下游拿不到输出；矩阵 job 只保留 needs: changes。
+#
 # Windows 目前**不阻断合并**：README 的「平台矩阵」写明 Windows 尚未完成
 # 真机验证（路径分隔符、autocrlf 换行、符号链接需管理员权限、文件锁导致
 # 清理 EBUSY —— 多数属平台适配而非逻辑缺陷）。把它留在这里是为了持续
@@ -26,8 +37,49 @@ on:
 # continue-on-error 行。
 
 jobs:
+  changes:
+    name: Detect code changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify changed files
+        id: classify
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -u
+          emit() { echo "code=$1" >> "$GITHUB_OUTPUT"; echo "decision: code=$1 ($2)"; }
+          if [ "$EVENT" != "pull_request" ]; then
+            emit true "non-PR event, always full run"; exit 0
+          fi
+          # 三点语法 = 相对 merge-base 的 PR 改动；任何异常一律 fail-safe 为全量跑
+          if ! files=$(git diff --name-only "$BASE_SHA...$HEAD_SHA" 2>/dev/null); then
+            emit true "diff failed, fail-safe full run"; exit 0
+          fi
+          if [ -z "$files" ]; then
+            emit true "empty diff, fail-safe full run"; exit 0
+          fi
+          non_docs=$(printf '%s\n' "$files" | grep -v '^docs/' | grep -c . || true)
+          echo "changed files:"; printf '%s\n' "$files"
+          if [ "$non_docs" -gt 0 ]; then
+            emit true "$non_docs non-docs file(s)"
+          else
+            emit false "docs-only change"
+          fi
+
   lint:
     name: Lint (${{ matrix.os }})
+    needs: changes
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -36,24 +88,30 @@ jobs:
     continue-on-error: ${{ matrix.os == 'windows-latest' }}
     steps:
       - uses: actions/checkout@v4
+        if: needs.changes.outputs.code == 'true'
 
       - uses: actions/setup-node@v4
+        if: needs.changes.outputs.code == 'true'
         with:
           # 22 = 当前 LTS，同时与开发机一致；20 已在 runner 上标记弃用
           node-version: 22
           cache: npm
 
       - name: Verify environment (Node >= 20, Git >= 2.30)
+        if: needs.changes.outputs.code == 'true'
         run: node scripts/verify-env.mjs --env-only
 
       - name: Install dependencies (locked)
+        if: needs.changes.outputs.code == 'true'
         run: npm ci
 
       - name: Lint
+        if: needs.changes.outputs.code == 'true'
         run: npm run lint
 
   typecheck:
     name: Typecheck (${{ matrix.os }})
+    needs: changes
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -62,23 +120,29 @@ jobs:
     continue-on-error: ${{ matrix.os == 'windows-latest' }}
     steps:
       - uses: actions/checkout@v4
+        if: needs.changes.outputs.code == 'true'
 
       - uses: actions/setup-node@v4
+        if: needs.changes.outputs.code == 'true'
         with:
           node-version: 22
           cache: npm
 
       - name: Verify environment (Node >= 20, Git >= 2.30)
+        if: needs.changes.outputs.code == 'true'
         run: node scripts/verify-env.mjs --env-only
 
       - name: Install dependencies (locked)
+        if: needs.changes.outputs.code == 'true'
         run: npm ci
 
       - name: Typecheck
+        if: needs.changes.outputs.code == 'true'
         run: npm run typecheck
 
   test:
     name: Unit tests (${{ matrix.os }})
+    needs: changes
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -87,17 +151,22 @@ jobs:
     continue-on-error: ${{ matrix.os == 'windows-latest' }}
     steps:
       - uses: actions/checkout@v4
+        if: needs.changes.outputs.code == 'true'
 
       - uses: actions/setup-node@v4
+        if: needs.changes.outputs.code == 'true'
         with:
           node-version: 22
           cache: npm
 
       - name: Verify environment (Node >= 20, Git >= 2.30)
+        if: needs.changes.outputs.code == 'true'
         run: node scripts/verify-env.mjs --env-only
 
       - name: Install dependencies (locked)
+        if: needs.changes.outputs.code == 'true'
         run: npm ci
 
       - name: Unit tests
+        if: needs.changes.outputs.code == 'true'
         run: npm test

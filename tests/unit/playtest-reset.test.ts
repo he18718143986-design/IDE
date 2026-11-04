@@ -201,6 +201,81 @@ describe("TASK-L.17b playtest-reset 跨版本重置", () => {
     expect(v.ok).toBe(false);
     expect(v.status).toBe("EVIDENCE_INVALID");
   });
+
+  it("OP-37: evaluatePlaytestGuard 支持含特殊字符 contract_id 的读写一致性", () => {
+    const specialId = "feat/special:check#7";
+    // 合同文件落盘采用归一名（feat_special_check_7.json）
+    const dir = path.join(repo, ".stagent", "contracts");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "feat_special_check_7.json"),
+      JSON.stringify({
+        contract_id: specialId,
+        references: ["https://ref.example.com"],
+      }),
+    );
+    writeRelease(repo, "rel-special-live", "LIVE", "2026-11-02T05:00:00.000Z", [
+      specialId,
+    ]);
+
+    const evFile = playtestEvidencePath(repo, specialId);
+    fs.mkdirSync(path.dirname(evFile), { recursive: true });
+    fs.writeFileSync(
+      evFile,
+      JSON.stringify({
+        schema_version: "1.0.0",
+        contract_id: specialId,
+        release_id: "rel-special-live",
+        user_verdict: "特殊字符合同试玩通过",
+        operator: "user",
+        timestamp: "2026-11-02T05:30:00.000Z",
+      }),
+    );
+
+    const v = evaluatePlaytestGuard({
+      repoRoot: repo,
+      contractId: specialId,
+    });
+    expect(v.ok).toBe(true);
+    expect(v.status).toBe("APPROVED");
+  });
+
+  it("OP-36: evaluatePlaytestGuard 在无匹配 release 时返回 STALE_VERSION 且 current_release_id 为 null，不串用其它合同", () => {
+    const ctrB = "ctr-playtest-b";
+    writeContract(repo, ["https://ref.example.com"]);
+    const dir = path.join(repo, ".stagent", "contracts");
+    fs.writeFileSync(
+      path.join(dir, `${ctrB}.json`),
+      JSON.stringify({
+        contract_id: ctrB,
+        references: ["https://ref.example.com"],
+      }),
+    );
+    // 仓库只有 REL_A (contract_ids: [CONTRACT_ID])
+    // 伪造一份 ctrB 的旧证据，release_id 设为 REL_A
+    const evFile = playtestEvidencePath(repo, ctrB);
+    fs.mkdirSync(path.dirname(evFile), { recursive: true });
+    fs.writeFileSync(
+      evFile,
+      JSON.stringify({
+        schema_version: "1.0.0",
+        contract_id: ctrB,
+        release_id: REL_A,
+        user_verdict: "B的旧认可",
+        operator: "user",
+        timestamp: "2026-11-01T02:00:00.000Z",
+      }),
+    );
+
+    const v = evaluatePlaytestGuard({
+      repoRoot: repo,
+      contractId: ctrB,
+    });
+    expect(v.ok).toBe(false);
+    expect(v.status).toBe("STALE_VERSION");
+    expect(v.current_release_id).toBeNull();
+    expect(v.reset_approval).toBe(true);
+  });
 });
 
 describe("TASK-L.17b check playtest CLI 门禁委托", () => {

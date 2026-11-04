@@ -11,7 +11,7 @@
 #### 【Task D.1e】桌面壳 / 本机助手：真·选文件夹（Import 与工作台同壳）`[DEFERRED → v0.2+ · P5.8 · 2026-10-24]`
 * **任务编号**：`TASK-D.1e`
 * **前置依赖**：`TASK-D.1d`（建议 v0.2 开工前先完成生产可用单窗口；并行亦须满足 D.1 鉴权）
-* **任务状态**：**[DEFERRED → v0.2+]**（架构路线 **P5.8**；**不阻塞** v0.1 / `TASK-D.1d` / 八步旅程验收；2026-10-24 经 Tina 口径对齐为正式推迟，本轮仅文档占位）
+* **任务状态**：**[DEFERRED → v0.2+]**（架构路线 **P5.8**；**不阻塞** v0.1 / `TASK-D.1d` / 八步旅程验收；2026-10-24 经 Tina 口径对齐为正式推迟，本轮仅文档占位；**维持 DEFERRED，桌面形态另立 RFC · D-6 / P-141**）
 * **对照痛点**：浏览器无法弹出系统级「选任意本地文件夹」；D.1c 只有最近列表；用户仍觉「第一次打开很麻烦」，期望接近 Cursor Open / Import。
 * **v0.1+ 范围（可延后到桌面壳里程碑）**：提供本机助手或 Electron/Tauri（或等价）能力：在**同一产品壳**内「打开项目 / Import / New Project」→ 系统对话框选文件夹或创建空项目 → 自动启动/复用 Daemon 并进入已带钥匙的工作台。安全模型仍落在 D.1：loopback、`#token=` / 安全等价注入、AUTH、Origin；Demo 仍独立 Origin。
 * **明确不包含（本卡立项时仍禁止偷换）**：
@@ -39,7 +39,7 @@
 #### 【Task S.3】Supervisor HUD 建议流与 WebSocket 广播
 * **任务编号**：`TASK-S.3`
 * **前置依赖**：`TASK-S.2`, `TASK-D.1`
-* **任务状态**：**[DEFERRED → v0.2+]** / **[REWORK]**（旧设计实现——含 `SUPERVISOR_MATURITY_UPDATED` 成熟度帧——**存于未合并分支 `wip/s2-s3-supervisor-old-design`，未进入 main，非 v0.1 验收依据**）
+* **任务状态**：**[DEFERRED → v0.2+]** / **[REWORK]**（旧设计实现——含 `SUPERVISOR_MATURITY_UPDATED` 成熟度帧——**存于未合并分支 `wip/s2-s3-supervisor-old-design`，未进入 main，非 v0.1 验收依据**；**v0.2 评审未激活 · D-5 / P-141 维持 DEFERRED**）
 * **v0.1 保留范围**：仅脱敏模块 `src/lib/ipc/redaction.ts`（键名/真实值/形态三层脱敏、先脱敏后截断），随 TASK-S.2 精简版移植并独立验收；「仅鉴权连接可收帧」作为既有 D.1 原则继续生效。其余广播能力（成熟度帧、Snooze、HUD 上行 action）推迟 v0.2+ 重新评审，状态/草案推送需改接 L0 规则引擎后再评估。
 * **核心目标**：
   1. 通过 WebSocket 广播 Supervisor 建议流至已认证客户端。**实现口径**：在 §6.1「类型至少包括」下扩展 `SUPERVISOR_MATURITY_UPDATED`（成熟度快照）、`SUPERVISOR_DRAFT_PROPOSED`（草案提案）、`SUPERVISOR_STATUS_CHANGED`（运行状态）三类下行帧；既有 `SUPERVISOR_SUGGESTION` 保持兼容。
@@ -740,47 +740,15 @@
 
 > Tina 授权将第一类六项写成任务卡。Sprint：主序实现卡 **`L.16` 已 COMPLETED**（#62/`e4dfe1c`）；**`L.17a` 已 COMPLETED**（#70/`8516c3d`）；**`TASK-L.17b` 已 COMPLETED**（#72/`d26def6`）——**M5 北极星主序（L.16 → L.17a → L.17b）全部落完，主序收官**。本节目的：把 ledger 待立卡改代码项变成可排期卡；`A.7`/`H.9`/`L.18`/`J.19`/`J.20`/`C.22`/`W.8`/`L.17a`/`L.17b` 已 COMPLETED（见 completed / #58/#60/#69/#70/#72）；**主序收官后债卡区推进**：`W.6` 已 COMPLETED（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`，见 completed §3.4g）。**Sprint 排程已裁决写死（2026-11-02 · P-114）：`W.5c`（OpenHands 容器沙箱实测，兼作 `W.7` 探测沙箱地基）→ `W.7`（自助注册/自动验证 · 硬前置 W.6 已解除）→ `W.5b`（cursor-agent 实测，作 `W.7` 回归基准）**；`W.5b/c` 保留队列、不再列为待定项。**`ruling 3`（`check playtest` 接验收档）已于 P-114 落盘裁决**：北极星合同（带 `references[]`）的 `verification_spec.commands` 自动附加 `{alias:"playtest", executable:"stagent", args:["check","playtest","<contract_id>"]}`，试玩认可成为合并门禁；非北极星合同不附加；实现属小卡（合同装配段 + 测试），另行立卡或挂账（本轮未立卡、未开工）。裁决原文见 completed §3.4f、changelog P-114、ledger consistency-audit P-114。
 
-### 3.5 架构感知、监听与差异审阅（C.5 落 Sprint 2；B.1/B.2/C.4 推迟至 v0.2+）
+### 3.5 架构感知、监听与差异审阅（C.5 落 Sprint 2；B.1/B.2 已 COMPLETED，C.4 激活待 DoR 重写）
 
 <a id="task-b.1"></a>
-
-#### 【Task B.1】本地 AST 增量依赖图分析引擎
-* **任务编号**：`TASK-B.1`
-* **前置依赖**：`TASK-D.1`
-* **任务状态**：**[DEFERRED → v0.2+]** `[用户已确认 D4 · 2026-10-20]`（2026-10-21 状态校正：与 §1.1 总表对齐，本卡不作 v0.1 验收项）
-* **核心目标**：
-  1. **统一路径前缀 (G-16)**：解析 `src/**/*.{ts,tsx,js,jsx,mjs,cjs,json}`，构建文件级依赖拓扑。
-  2. 达成性能门槛：1000 节点冷启动 ≤ 1.5s，单文件增量修补 ≤ 20ms。
-* **涉及核心文件**：
-  - 新增：`daemon/arch/ast-parser.ts`
-  - 新增：`daemon/arch/dependency-graph.ts`
-  - 测试：`tests/unit/ast-dependency-graph.test.ts`
-* **Pass/Fail 验收判定**：
-  - **PASS**：冷启动 ≤1500ms，增量 ≤20ms，支持 JSON/MJS/CJS。
-  - **FAIL**：解析内存泄漏或循环依赖死锁。
-
----
 
 ---
 
 <a id="task-b.2"></a>
 
-#### 【Task B.2】多活跃 Worktree 监听与 Evidence 状态联动
-* **任务编号**：`TASK-B.2`
-* **前置依赖**：`TASK-B.1`, `TASK-A.1` (COMPLETED), `TASK-A.6` (COMPLETED)
-* **任务状态**：**[DEFERRED → v0.2+]** `[用户已确认 D4 · 2026-10-20]`（2026-10-21 状态校正：原标 `[INCREMENTAL_UPGRADE]` 与总表 DEFERRED 冲突，按 D4 决议统一为推迟；本卡不作 v0.1 验收项）
-* **核心目标**：
-  1. 监听多个活跃 Worktree，排除 `.git/`, `.stagent/`, `node_modules/`, `dist/`, `build/`, `coverage/`。
-  2. **工作树外部变更检测与失效联动**：外部文件修改后，在配置的 watcher debounce 窗口内（性能目标 ≤50ms）触发 Evidence `STALE`（携带错误码 `E_EVIDENCE_STALE`），置 `can_merge = false`，广播 `EVIDENCE_STATUS_CHANGED`；即使监听事件因系统负载丢包，合并前指纹复核兜底机制亦强制撤销 `can_merge`。
-* **涉及核心文件**：
-  - 修改：`daemon/watcher/fs-watcher.ts`
-  - 修改：`daemon/watcher/invalidation-engine.ts`
-  - 测试：`tests/unit/multi-worktree-watcher-stale.test.ts`
-* **Pass/Fail 验收判定**：
-  - **PASS**：外部改动在 watcher debounce 窗口内（性能目标 ≤50ms）将 Evidence 标为 STALE（携带 `E_EVIDENCE_STALE`）且 `can_merge` 为 false，广播 `EVIDENCE_STATUS_CHANGED`；合并前指纹复核兜底有效；忽略目录写入不误报。
-  - **FAIL**：外部改动后 Evidence 仍为 PASSED，或合并前绕过快照复核。
-
----
+> **归档注记（2026-11-04 · P-145）**：`TASK-B.2` 已 `[COMPLETED]`（[#128](https://github.com/he18718143986-design/IDE/pull/128)/`b1aa44f`，squash）。完整卡正文（交付清单、实测、挂账、未宣称边界）迁入 [`development-tasks-completed.md` §3.4s](./development-tasks-completed.md#task-b.2)。
 
 ---
 
@@ -788,19 +756,82 @@
 
 #### 【Task C.4】架构雷达视图与 Scope 圈选抽屉
 * **任务编号**：`TASK-C.4`
-* **前置依赖**：`TASK-C.3`, `TASK-B.1`
-* **任务状态**：**[DEFERRED → v0.2+]** `[用户已确认 D4 · 2026-10-20]`（2026-10-21 状态校正：与 §1.1 总表对齐，本卡不作 v0.1 验收项）
-* **核心目标**：
-  1. Cytoscape 渲染架构雷达，1000 节点局部 patch ≤ 16ms (60 FPS)，内存 ≤ 30MB。
-  2. 交互圈选 Scope；已批准合同圈选强制派生新版本并重新审批，禁止原地扩权。
-* **涉及核心文件**：
-  - 新增：`src/components/ArchitectureRadar.tsx`
-  - 新增：`src/components/ScopeSelectorDrawer.tsx`
-  - 测试：`tests/ui/architecture-radar.test.tsx`
-* **Pass/Fail 验收判定**：
-  - **PASS**：大图流畅；已批准合同修改 Scope 强制触发 Revision 递增与重新审批。
-  - **FAIL**：允许在原合同上原地修改 Scope。
-
+* **前置依赖（R-3）**：`TASK-B.1`（**COMPLETED** · 硬依赖，交付 `/api/arch/graph` 契约超集）；`TASK-B.2`（**COMPLETED** · 软依赖，交付多 worktree watcher 与 `EVIDENCE_STATUS_CHANGED` 广播）；`TASK-C.1`（**COMPLETED**）、`TASK-C.2`（**COMPLETED**）、`TASK-C.3`（**COMPLETED**）。
+* **任务状态**：**[READY · 待 DoR 重写]**（Tina 拍板 D-4 / P-141 激活；本轮按 R-1～R-12 完成卡正文 DoR 重写；**激活 ≠ 开工**，重写后状态保持 `[READY · 待 DoR 重写]`，施工授权由 Tina 单卡拍。）
+* **DoR 正文重写记录（存量对账矩阵与纠偏注记）**：基于 main@`78ae73b`（含 #128 B.2、#129 P-145 与 #136 P-146 门禁③数字修正 B.2 与 #129 P-145 回写）实存代码只读对账重写，严禁按空白实现写卡：
+  - **纠偏注记（非零调用方）**：此前核查曾误假设雷达组件「零调用方」，经实存源码核实纠偏：`src/components/radar/RadarGraph.tsx`、`FilterToolbar.tsx` 与 `ScopeSelector.tsx` **已实际挂载**于 `src/routes/index.tsx:3040-3085` 的 `SupervisorTab` 架构视图区域中（固定高度约 520px），选择路径可填入新建需求范围。本卡重写与后续实现必须基于现有挂载点平滑重构演进，不得脱离调用上下文凭空新建平行页面或破坏现有挂载。
+  - **已存在**：
+    1. `src/components/radar/RadarGraph.tsx`：基于 Cytoscape 实现，节点期望 `filePath`、`exports`，边期望 `{from, to}`；支持单点点击选中、多选同步、搜索节点居中定位及环路高亮；节点数 > 600 时切 `grid` 布局，否则为 `cose` 布局；
+    2. `src/components/radar/FilterToolbar.tsx`：提供搜索输入框、环路高亮切换开关及节点/边数统计指标（搜索当前仅计数并居中定位首个匹配项，未做子图裁剪过滤）；
+    3. `src/components/radar/ScopeSelector.tsx`：展示已选路径徽标列表、支持清空与调用 `onApply`；
+    4. `daemon/server.ts` 与 `daemon/arch/graph.ts`：`GET /api/arch/graph` 端点已交付旧契约超集：`nodes` 包含 `filePath`/`exports`/`imports`，`edges` 为扁平 `{from, to}` 数组，外加 `durationMs`、`stats`、`cycles`；前端 payload 类型虽漏写 `imports`，但雷达当前不读取该字段，硬依赖完全满足；
+    5. `src/routes/index.tsx`：包含 `loadArchGraph` 手动 fetch 与 Task Graph 联动重新拉取机制；
+    6. WebSocket 订阅基建：已存在 `EVIDENCE_STATUS_CHANGED`（更新合同 stale）与 `SCOPE_ALERT` 帧订阅分发点；
+    7. `src/lib/contract.schema.ts::bumpContractRevision`：已提供递增 revision 并清空 approvals 的状态机辅助函数（生产零调用方）。
+  - **需重构**：
+    1. `src/components/radar/RadarGraph.tsx`：**局部 patch 路径重构（核心性能治理）**。当前实现中拓扑变更、搜索高亮或环路开关均无条件触发 `cy.destroy()` 并全量重新 `cytoscape(...)` 初始化，造成严重性能抖动且无法满足 1000 节点局部更新 ≤16ms 门禁！必须重构为持有持久 `cy` 实例，所有节点/边/属性/新鲜度状态更新一律使用 `cy.batch()` 进行元素级增量 patch（增、删、改样式 class 与 data），禁止因任何状态变化销毁重建 Cytoscape 实例；
+    2. `src/components/radar/ScopeSelector.tsx`：当前为页面内简单列表组件，需重构为交互式 Scope 圈选抽屉（`ScopeSelectorDrawer`），支持滑出抽屉、多选圈选路径树、影响范围预览、以及与已批准合同变更的联动逻辑；
+    3. `src/routes/index.tsx`：重构雷达数据获取与事件订阅，将全量重建改为接收增量变更并调用雷达 patch 接口。
+  - **需新建**：
+    1. **新鲜度着色数据源接线（二选一写死）**：当前 WS `EVIDENCE_STATUS_CHANGED` 帧仅含合同级状态，缺乏节点级文件路径映射。采用**推荐路径（首选）**：扩展 `EVIDENCE_STATUS_CHANGED` 帧结构携带 `worktree_path` / 变更文件相对路径列表；若在当前帧协议冻结约束下，采用**备选路径**：前端收到帧后通过轻量 API 请求获取合同受影响路径映射。雷达根据路径映射通过 `cy.batch()` 快速为对应节点施加新鲜度（FRESH/STALE/CHANGED）着色；
+    2. **Scope → Revision 派生生产路径**：将 `src/lib/contract.schema.ts::bumpContractRevision` 接入生产调用链，新建 Scope 变更派生处理逻辑：已批准合同（`APPROVED` / `DELIVERED`）一旦圈选变更 Scope，强制调用 `bumpContractRevision` 派生新版本，重置审批记录（`approvals: []`），使旧 revision 的审批对新 revision 确定性失效；
+    3. `tests/components/RadarGraph.perf.test.tsx`：前端雷达专项性能基准测试（包含 1000 节点局部 patch 耗时与内存增量断言）；
+    4. `tests/unit/contract-scope-revision.test.ts`：Scope 变更强制派生新 Revision 及旧审批被拒测试。
+* **对应规格（R-1）**：[`../rfc/v0.2-scope.md`](../rfc/v0.2-scope.md) §2、§4.3（C.4 架构雷达与 Scope 圈选抽屉）；[`system-architecture.md`](./system-architecture.md) §11 注记 9、§3.2.1；[`task-card-standard.md`](./task-card-standard.md) R-1～R-12；[`development-tasks.md`](./development-tasks.md) §1.1 与 §2 DAG（P-141）。
+* **目标（R-2）**：Supervisor 工作台用户可通过流畅的架构雷达（Cytoscape 渲染）观察 1000 模块拓扑关系与新鲜度实时着色；用户可通过 Scope 圈选抽屉交互式挑选修改范围，对已批准合同圈选修改 Scope 时系统强制派生新 Revision 并清空旧审批，杜绝在已获批合同上原地扩权。
+* **代码事实与落差（R-4）**：
+  1. `src/components/radar/RadarGraph.tsx:100-240` 每次依赖图数据变动或环路切换均无条件调用 `cy.destroy()` 销毁实例并重新全量构建，不满足 1000 节点局部 patch ≤16ms；
+  2. `src/components/radar/ScopeSelector.tsx` 当前仅为静态徽标列表展示，无抽屉交互与影响面预览能力；
+  3. `src/lib/contract.schema.ts::bumpContractRevision` 存在但为孤立辅助函数（生产零调用方），合同更新路径未阻断原地修改 Scope；
+  4. WS 订阅已有 `EVIDENCE_STATUS_CHANGED` 与 `SCOPE_ALERT`，但帧内缺少文件级变更路径，无法直连雷达节点新鲜度着色；
+  5. 现有 `tests/components/RadarGraph.test.tsx` 仅覆盖基本挂载，无 1000 节点前端局部更新性能与内存门禁测试。
+* **范围与接口（R-5）**：
+  - **重构 `src/components/radar/RadarGraph.tsx`**：
+    - 持久 Cytoscape 实例管理：组件挂载期只执行一次 `cytoscape(...)` 初始化，卸载期执行唯一一次 `cy.destroy()`；
+    - 局部增量 Diff 更新：实现 `patchGraphElements(diff: GraphElementsDiff): void`，利用 `cy.batch()` 批量执行元素增删改与类名修补；
+    - 新鲜度着色接口：提供 `applyFreshnessClasses(statusMap: Map<string, FreshnessStatus>): void`，在 `cy.batch()` 内为节点添加/移除 `stale` / `fresh` / `changed` 样式类；
+    - >1000 节点降级策略：节点数 >1000 时，强制禁用 cose 物理动效，降级为预计算 `grid` 或 `preset` 静态轻量布局，禁用昂贵的连带动画。
+  - **重构 `src/components/radar/ScopeSelector.tsx`（或增强为 `ScopeSelectorDrawer.tsx`）**：
+    - 抽屉形态呈现：采用 Drawer / Sheet 交互容器，展示选中模块路径树、直接依赖与被依赖关系统计；
+    - 圈选应用回调：提供 `onApplyScope(selectedPaths: string[], mode: "draft" | "derive_revision"): Promise<void>`，对已批准合同明确提示将派生新版本重新审批。
+  - **接线 `src/routes/index.tsx`（SupervisorTab）**：
+    - 雷达数据加载与 WS 事件联动：复用现有挂载点，拉取图数据后首次初始化持久雷达实例；后续图谱变更或新鲜度 WS 广播仅触发增量 patch，不重绘整页或重建实例；
+    - Scope 变更治理分流：草稿合同（`DRAFT`）允许原地更新 Scope；已获批合同（`APPROVED` / `DELIVERED` 等）调用 `bumpContractRevision` 派生新合同修订版并提交。
+  - **新建治理与测试文件**：
+    - `tests/components/RadarGraph.perf.test.tsx`
+    - `tests/unit/contract-scope-revision.test.ts`
+* **非目标（R-6）**：
+  - 不修改 Daemon 图分析引擎算法本体（`TASK-B.1` 已完工并冻结）；
+  - 不替换 Cytoscape 底层渲染引擎为 Canvas/WebGL 或其他平行图库（Cytoscape 在 batch patch 机制下经估算达标，避免无谓重构）；
+  - 不修改 Daemon API 鉴权规则、Demo Origin 隔离、点亮三证或网关写范围；
+  - 不在本卡内实现复杂的任意多边形套索（lasso）几何物理算法，交互圈选以节点多选点选、目录树勾选、邻域连带扩散选择为主。
+* **PASS 断言清单（R-7）**：
+  1. **性能门禁①（1000 节点局部 patch 耗时）**：在 `tests/components/RadarGraph.perf.test.tsx` 中，预置 1000 节点 2000 边图实例，执行单批次状态/新鲜度/单节点增量局部更新，`cy.batch()` 执行耗时 ≤ 16ms（满足 60 FPS 帧率要求）；
+  2. **性能门禁②（前端增量内存上限）**：同测试中，加载 1000 节点并连续执行 50 次局部 patch 更新，前后增量堆内存占用 ≤ 30MB；
+  3. **性能门禁③（>1000 节点降级行为明确）**：节点规模超过 1000 时，自动降级为轻量布局（禁用连续 cose 力导向动效，切换为预计算 grid/preset 静态布局），且搜索与过滤不发生卡死；
+  4. **性能门禁④（组件卸载资源彻底释放）**：`RadarGraph` 组件卸载或抽屉关闭时，仅在此时调用 `cy.destroy()`，解绑所有全局事件监听器，多次挂载/卸载后无内存泄漏；
+  5. **持久实例与批处理更新**：图数据变化、环路高亮开关、搜索过滤变更时，复用既有 Cytoscape 实例，通过 `cy.batch()` 元素级 diff 增删改节点与边，零全量销毁重建；
+  6. **新鲜度实时着色连通**：收到新鲜度事件（WS 扩展帧或路径映射响应）后，雷达图精准为受影响节点添加 STALE / CHANGED 样式类，无刷新闪烁；
+  7. **Scope 圈选与路径回填**：在抽屉中圈选目录或文件集合，确认应用后正确回填至需求 Scope 列表，并能正确反显选中态；
+  8. **Scope 变更强制派生 Revision**：在 `tests/unit/contract-scope-revision.test.ts` 中，对处于已批准状态（`APPROVED` / `DELIVERED` 等）的合同圈选修改 Scope，系统自动调用 `bumpContractRevision` 派生新版本，合同 `revision` 递增；
+  9. **旧 Revision 审批失效被拒**：同测试中，Scope 变更后旧 Revision 的审批记录被清空，旧审批签名在当前 Revision 提交合并时被校验逻辑拒绝（`E_APPROVAL_REVISION_MISMATCH`），必须重新发起审批；
+  10. **未批准草案原地修改允许**：处于 `DRAFT` 阶段未获批准的合同，修改 Scope 允许在原 Revision 原地更新，不产生多余版本碎片。
+* **FAIL 红线清单（R-8）**：出现以下任一情况即判定为不合格：
+  1. **任何局部状态变化触发 `cy.destroy()` 重建**：拓扑更新、环路切换、搜索高亮或新鲜度变化时销毁重建 Cytoscape 实例；
+  2. **已批准合同允许原地修改 Scope**：在已获批准合同上原地扩大或变更 Scope 而不递增 Revision，构成越权逃逸；
+  3. **旧 Revision 审批仍对新 Revision 有效**：Scope 派生新版本后，旧审批凭证仍被允许用于放行合并；
+  4. **性能门禁超限**：1000 节点局部 patch 耗时 > 16ms，或增量内存占用 > 30MB；
+  5. **超 1000 节点缺乏降级策略**：大图场景下未触发降级保护，导致浏览器主线程冻结；
+  6. **错误映射新鲜度数据源**：将整图无差别全量标为 STALE，而非按工作树变动文件路径做局部节点映射着色；
+  7. 破坏既有 SupervisorTab 挂载点或破坏鉴权安全门禁。
+* **安全 / ADR（R-9）**：遵循 ADR-0001（防越权安全门禁完全不变）、ADR-0004（双状态机与合同版本治理不可旁路）与 ADR-0014；不修改任何 ADR。已批准合同修改 Scope 必须重跑审批是系统防越权核心红线。
+* **默认值与未决项（R-10）**：
+  - 新鲜度着色数据源写死：首选扩展 WS 帧携带变动路径；备选拉取合同路径映射；
+  - 1000 节点降级阈值写死为 1000；>1000 时默认禁用 cose 动效切换为 grid/preset；
+  - 圈选抽屉默认展示当前合同已锁定的 Scope 文件与直接关联边；
+  - 本卡经 P-141 拍板激活，存量对账矩阵与治理断言已批，无未决产品问题。
+* **估算（R-11）**：**M（≤2 天）**。聚焦于前端雷达组件增量 patch 性能重构、Scope 抽屉交互与合同 Revision 派生接线及专项测试；单一前端呈现层与调用集成，未越层。
+* **不变声明（R-12）**：**不改变** Daemon API 鉴权规则、Demo Origin 隔离、点亮三证、网关写范围；不放宽合同状态机审批门禁（`bumpContractRevision` 严格清空审批）；不破坏 SupervisorTab 架构视图宿主结构。
 ---
 
 ---
