@@ -4040,9 +4040,9 @@
   2. **单文件 `updateFile` 增量修补**：**平均 0.080ms / 最大 0.122ms**（门禁目标值 ≤20ms，达标）。
   3. **全量图常驻内存增量**：强制 GC 后 `heapUsed` 差值三次中位数 **1.00 MiB**（门禁目标值 ≤40 MiB，达标）。
   4. **10000 节点高深度环 Tarjan 环检测**：**17.11ms** 收敛且不爆栈（门禁目标值 ≤100ms，达标）。
-* **残余边界 / 后续挂账（共 4 条，3 条在账 + 1 条已核销）**：
+* **残余边界 / 后续挂账（共 4 条；P-145 后：挂账②已销项，在账 ①③ 共 2 条，已核销 ④ 与挂账② 共 2 条）**：
   1. **挂账①（CI 环境 GC 暴露）**：`tests/perf/arch-graph-benchmark.test.ts` 在未注入 `--expose-gc` 参数的 CI 环境下，`global.gc` 不存在导致内存门禁退化为空真；需在后续专用性能基准工作流或启动参数中补显式配置。
-  2. **挂账②（Scan-root 边界收敛）**：`updateRepoGraphFile(repoRoot, filePath)` 当前未对 `filePath` 前置执行 `isUnderScanRoot()` 过滤收敛；若外部 watcher 传入 `src/` 之外的文件变更，仍会进入单文件解析流程，需后续补前缀守卫。
+  2. **挂账②（Scan-root 边界收敛）**：`updateRepoGraphFile(repoRoot, filePath)` 当前未对 `filePath` 前置执行 `isUnderScanRoot()` 过滤收敛；若外部 watcher 传入 `src/` 之外的文件变更，仍会进入单文件解析流程，需后续补前缀守卫。**【已销项 · P-145】**：#128（`b1aa44f`）已在 `updateRepoGraphFile` 前置 `isUnderScanRoot` 守卫，并对移出 `src/` 的文件执行 `purgeDeletedModule` 完整 purge，无僵尸节点残留（见 §3.4s）。
   3. **挂账③（目录遍历过滤防御）**：`walkSourceFiles` 递归收集源码时仅基于简单子目录扫描，未对 `.git`、`node_modules`、`dist` 等配置显式 `IGNORED_DIRS` 集合做剪枝过滤；当前因受限于固定 `SCAN_SUBDIR = "src"` 暂不引发问题，但在根路径或非标子树下存在潜在冗余扫描风险。
   4. **挂账④（addModule 覆盖式语义 · 已核销）**：经源码走查 `daemon/arch/graph.ts` 确认，`addModule` 在向 `modules` 插入前显式执行 `this.clearModuleEdges(key)`，先清空目标节点旧出边并从所有被引节点的 `reverse` 索引中剔除该源节点，再按新解析模块建立正反向边；文件 import 减少时不会残留悬空废旧边，本条挂账确认闭合核销。
 * **未宣称 / 不宣称端到端闭环**：
@@ -4051,3 +4051,38 @@
   - **不改变**：Daemon API 鉴权、Demo Origin、点亮三证、网关写范围（ADR-0001 纪律）；`src/` 扫描前缀限制（G-16）；P-141 DAG 拓扑关系。
 * **关键文件**：`daemon/arch/parser.ts`（增强）、`daemon/arch/graph.ts`（增强）、`daemon/server.ts`（接入端点缓存）、`tests/perf/arch-graph-benchmark.test.ts`（新）、`tests/unit/arch-graph-boundaries.test.ts`（新）、`tests/unit/arch-graph-cache.test.ts`（增强）、`tests/integration/contract-api.test.ts`（增强契约断言）；**只读复用**：`daemon/knowledge/bootstrap-draft.ts`、`tests/daemon/arch-graph.test.ts`。
 
+
+### 3.4s 多活跃 Worktree 监听与 Evidence 状态联动（B.2 · 架构感知层第二卡）
+
+<a id="task-b.2"></a>
+
+#### 【Task B.2】多活跃 Worktree 监听与 Evidence 状态联动 `[COMPLETED]`
+* **任务编号**：`TASK-B.2`
+* **状态与证据**：`[COMPLETED]`（[#128](https://github.com/he18718143986-design/IDE/pull/128)/`b1aa44f320a33f0c61197f63550e8c0f173a3a82`，squash merge；分支 `feat/b2-multi-worktree-watcher`）。
+* **对应规格**：[`../rfc/v0.2-scope.md`](../rfc/v0.2-scope.md) §2、§4.2；[`system-architecture.md`](./system-architecture.md) §3.2.1、§4.2.3 P-4、§5.2；[`task-card-standard.md`](./task-card-standard.md) R-1～R-12；[`development-tasks.md`](./development-tasks.md) §1.1 与 §2 DAG（P-141）。
+* **前置依赖**：`TASK-A.1`（**COMPLETED**）、`TASK-A.6`（**COMPLETED**）、`TASK-D.1`（**COMPLETED**）；与 `TASK-B.1` 无依赖、可并行；为 `TASK-C.4` 的软前置。
+* **交付清单**：
+  1. **多任务并发监听 Map**：`armedWatchers`（key = `contractId`）替代单实例退化点；重复武装同一合同时先释放旧资源再重建；`stopEvidenceWatcher` 精确解除指定合同，不踢掉其他任务的 watcher。
+  2. **指纹单点统一**：`computeWorktreeFingerprint` 与 `computeWorktreeFingerprintSync` 共享同一套 git + 降级口径；`invalidation-engine` 与 `merger` 合并前复核同源，杜绝算法不一致导致的假失效或漏失效。
+  3. **合并前兜底复核**：合并前快照指纹复核独立于 watcher 状态；watcher 未启动、被关闭或丢包时仍强制执行。
+  4. **`isUnderScanRoot` 守卫**：事件路径先过 scan-root 守卫；移出 `src/` 的文件执行 purge，清理僵尸节点（同时销项 B.1 挂账②）。
+  5. **`waitUntilReady` 生产路径集成**：默认 5s 超时，超时 warn 后降级继续、不挂死；`armEvidenceWatcher` 未就绪时 warn 但不阻断武装，合并前兜底仍在。
+  6. **`shouldIgnore` 精确段匹配**：忽略判定按相对路径段精确匹配 `IGNORED_SEGMENTS`；越界判断精确为「`..` 本身或 `..` + 分隔符开头」，不再误伤合法的 `..cache` 类目录。
+  7. **macOS 修复链留痕**：`waitUntilReady` 超时兜底；root 构造期 `realpathSync` 归一；`.git/HEAD` 直读，worktree 的 gitdir / commondir / packed-refs 不可直读时回退 `git rev-parse`。
+* **实测性能（实测值，非目标值）**：
+  1. **门禁①（外部修改 → STALE 响应）**：中位 **67.9ms**。过门禁上限 ≤100ms；**未达 ≤50ms 体验目标，如实记为已知边界**。
+  2. **门禁③（合并前指纹复核）**：中位 **8.37ms**。
+  3. **门禁②（≥5 worktree 并发常驻内存增量）**、**门禁④（句柄 / 定时器 100% 释放）**：达标。
+* **门禁①口径统一**：卡内原「≤50ms」标题与「≤100ms」断言不一致。本卡统一为「体验目标 ≤50ms，门禁上限 ≤100ms」；67.9ms 按门禁判定通过，按体验目标记为未达。
+* **残余挂账与注记（共 6 条）**：
+  1. **B.1 挂账②（`updateRepoGraphFile` 无 scan-root 收敛）→ 已销项**：#128 已补 `isUnderScanRoot` 前置守卫与 purge，见 `daemon/arch/graph.ts`。
+  2. **`record.fingerprint` 死字段（待裁决）**：`daemon/watcher/invalidation-engine.ts` 的增量判定记录写入 `fingerprint` 字段，`daemon/` 内无读取方。二选一：保留并注明意图，或删除。本次文档 PR 不改代码，裁决挂入后续代码卡。
+  3. **降级语义放宽（口径变化）**：非 Git 目录由「抛错」改为「降级哈希」（`daemon/guard/evidence-integrity.ts` 的 `fallback:v1` 口径）。调用方不应再依赖抛错作为非 Git 判定。
+  4. **`shouldIgnore` 语义变化**：`..` 前缀目录（如 `..cache`）现纳入指纹范围，此前被误排除。
+  5. **门禁①标题与断言不一致**：已按上文「门禁①口径统一」对齐。
+  6. **`readyState` 迟到 ready 不翻回（注释级小项）**：`timeout` 之后迟到的 `ready` 事件不会把状态翻回 `ready`，`isReady` 永久为 `false`；`waitUntilReady` 的超时降级语义不受影响。记一笔，暂不修。
+* **未宣称 / 不宣称端到端闭环**：
+  - 不宣称架构雷达联动已完成（`TASK-C.4` 未开工）。
+  - 不宣称 Windows 单测全绿：`Unit tests (windows-latest)` 在 head `81fe18c` 上仍红，该 job 不在必需检查内（挂账，见 PR #128 记录）。
+  - 不改变 Daemon API 鉴权、Demo Origin 隔离、点亮三证、网关写范围；不改变 P-141 DAG 拓扑。
+* **关键文件**：`daemon/watcher/fs-watcher.ts`（`shouldIgnore`、`WorktreeWatcher`、`waitUntilReady`）；`daemon/watcher/invalidation-engine.ts`（增量判定与 record）；`daemon/guard/evidence-integrity.ts`（`computeWorktreeFingerprint` 单点与降级口径）；`daemon/server.ts`（`armedWatchers` Map、`armEvidenceWatcher`）；`daemon/pipeline/merger.ts`（合并前复核）；`daemon/arch/graph.ts`（`isUnderScanRoot`、`purgeDeletedModule`）；测试 `tests/unit/multi-worktree-watcher.test.ts`、`tests/unit/multi-worktree-cross-talk.test.ts`、`tests/unit/pre-merge-fingerprint-fallback.test.ts`。

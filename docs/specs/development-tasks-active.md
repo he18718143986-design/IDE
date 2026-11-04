@@ -740,7 +740,7 @@
 
 > Tina 授权将第一类六项写成任务卡。Sprint：主序实现卡 **`L.16` 已 COMPLETED**（#62/`e4dfe1c`）；**`L.17a` 已 COMPLETED**（#70/`8516c3d`）；**`TASK-L.17b` 已 COMPLETED**（#72/`d26def6`）——**M5 北极星主序（L.16 → L.17a → L.17b）全部落完，主序收官**。本节目的：把 ledger 待立卡改代码项变成可排期卡；`A.7`/`H.9`/`L.18`/`J.19`/`J.20`/`C.22`/`W.8`/`L.17a`/`L.17b` 已 COMPLETED（见 completed / #58/#60/#69/#70/#72）；**主序收官后债卡区推进**：`W.6` 已 COMPLETED（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`，见 completed §3.4g）。**Sprint 排程已裁决写死（2026-11-02 · P-114）：`W.5c`（OpenHands 容器沙箱实测，兼作 `W.7` 探测沙箱地基）→ `W.7`（自助注册/自动验证 · 硬前置 W.6 已解除）→ `W.5b`（cursor-agent 实测，作 `W.7` 回归基准）**；`W.5b/c` 保留队列、不再列为待定项。**`ruling 3`（`check playtest` 接验收档）已于 P-114 落盘裁决**：北极星合同（带 `references[]`）的 `verification_spec.commands` 自动附加 `{alias:"playtest", executable:"stagent", args:["check","playtest","<contract_id>"]}`，试玩认可成为合并门禁；非北极星合同不附加；实现属小卡（合同装配段 + 测试），另行立卡或挂账（本轮未立卡、未开工）。裁决原文见 completed §3.4f、changelog P-114、ledger consistency-audit P-114。
 
-### 3.5 架构感知、监听与差异审阅（C.5 落 Sprint 2；B.1/B.2/C.4 激活待 DoR 重写）
+### 3.5 架构感知、监听与差异审阅（C.5 落 Sprint 2；B.1/B.2 已 COMPLETED，C.4 激活待 DoR 重写）
 
 <a id="task-b.1"></a>
 
@@ -748,86 +748,7 @@
 
 <a id="task-b.2"></a>
 
-#### 【Task B.2】多活跃 Worktree 监听与 Evidence 状态联动
-* **任务编号**：`TASK-B.2`
-* **前置依赖（R-3）**：`TASK-A.1`（**COMPLETED**）, `TASK-A.6`（**COMPLETED**）, `TASK-D.1`（**COMPLETED**）；与 `TASK-B.1`（**COMPLETED**）无依赖，可并行；本卡为 `TASK-C.4` 的软前置（沿用 P-141 DAG）。
-* **任务状态**：**[READY · 待 DoR 重写]**（Tina 拍板 D-3 / P-141 激活；本轮按 R-1～R-12 重写卡正文，**激活 ≠ 开工**，重写后状态保持 `[READY · 待 DoR 重写]`，施工授权由 Tina 单卡拍。）
-* **DoR 正文重写记录（存量对账矩阵）**：按 main@`5b0a8cd0` 实存代码对账重写，严禁按空白实现写卡：
-  - **已存在**：
-    1. `daemon/watcher/fs-watcher.ts`：提供 `WorktreeWatcher` 类，封装 chokidar 监听、`debounceMs` 防抖批处理（默认 60ms）、`awaitWriteFinish` 写入稳定配置（stabilityThreshold 40ms, pollInterval 20ms）及 `IGNORED_SEGMENTS` 忽略集（`.git`, `.stagent`, `node_modules`, `dist`, `.output`, `.next`, `.turbo`, `.cache`, `coverage`）；
-    2. `daemon/watcher/invalidation-engine.ts`：提供 `EvidenceInvalidationEngine` 类，包含 `computeFingerprint()` 全量递归同步计算指纹、`register(contractId, evidencePath)`、`handleChanges(changedPaths)` 及 `markStale(record)` 原子重写磁盘证据文件；
-    3. `daemon/server.ts`：已有 `armEvidenceWatcher` / `stopEvidenceWatcher` 私有方法，并在 `POST /api/contracts/:id/execute` 验证通过后自动调用 `armEvidenceWatcher`。
-  - **需重构**：
-    1. `daemon/server.ts`：**单实例退化点消除**。当前 `this.worktreeWatcher`、`this.invalidationEngine` 与 `this.armedContractId` 为单一引用，`armEvidenceWatcher` 首行无条件执行 `await this.stopEvidenceWatcher()`，导致武装新任务时强行踢掉并关闭旧任务 watcher！必须升级为并发多任务监听 Map（如 `Map<string, { watcher: WorktreeWatcher; engine: EvidenceInvalidationEngine; evidenceId: string }>`），支持多任务 worktree 并发监听、精准按 contractId 解除与整机销毁；
-    2. `daemon/pipeline/merger.ts`：**合并前快照指纹复核兜底补强**。当前合并流程虽然在 3.6 节调用 `assertEvidenceIntegrity`，但缺乏针对「watcher 被杀、异常挂掉或事件丢包」场景的防御闭环声明；必须确保即使 watcher 未运行或全挂，合并前无条件执行全量快照指纹复核，指纹不一致一律阻断合并并落盘 STALE。
-  - **需新建**：
-    1. `tests/unit/multi-worktree-watcher.test.ts`：多 worktree 并发监听与独立 STALE 触发测试（验证 ≥5 个 worktree 并发监听）；
-    2. `tests/unit/multi-worktree-cross-talk.test.ts`：跨任务 Worktree 串扰负例测试（task-A 变更不影响 task-B，task-A 解除武装不干扰 task-B）；
-    3. `tests/unit/pre-merge-fingerprint-fallback.test.ts`：指纹复核兜底测试（模拟 watcher 关闭/全挂/未武装场景，外部篡改工作树后调用合并，验证兜底机制强制拦截并判负）。
-* **对应规格（R-1）**：[`../rfc/v0.2-scope.md`](../rfc/v0.2-scope.md) §2、§4.2（P-141 拍板后的 B.2 范围与门禁口径）；[`system-architecture.md`](./system-architecture.md) §3.2.1（Evidence 失效广播）、§4.2.3 P-4、§5.2；[`task-card-standard.md`](./task-card-standard.md) R-1～R-12；[`development-tasks.md`](./development-tasks.md) §1.1 `TASK-B.2` 与 §2 DAG（P-141）。
-* **目标（R-2）**：Daemon 为所有活跃任务 Worktree 提供互不串扰的独立文件变更监听，外部改动在门禁时限内自动将证据标记为 `STALE`（置 `can_merge = false`）并广播失效通知；当 watcher 异常或丢包时，合并前快照复核兜底仍 100% 阻断篡改代码合入。
-* **代码事实与落差（R-4）**：
-  1. `daemon/server.ts::armEvidenceWatcher` 当前为单实例逻辑，新任务武装必踢掉旧任务，无法支持多活跃任务并行；
-  2. `daemon/watcher/invalidation-engine.ts::computeFingerprint` 为全量递归读取全量非忽略文件内容哈希，每次 `handleChanges` 都对整个 worktree 重算指纹，在大型项目或频繁变动下造成大量同步 IO 与 CPU 尖峰；且其算法与 `daemon/guard/evidence-integrity.ts::computeWorktreeFingerprint` 口径不一致（后者基于 git rev-parse HEAD + git status porcelain）；
-  3. 缺乏多 worktree 并发、跨任务隔离及 watcher 全挂时合并兜底的自动化测试套件。
-* **范围与接口（R-5）**：
-  - **指纹算法与优化口径（写死）**：
-    1. **变更路径增量比对**：watcher 捕获到具体 `changedPaths` 时，仅针对变更路径执行增量状态/哈希核验与比对，严禁在 debounce 事件中对整树递归扫盘；
-    2. **全量指纹仅在两处使用**：① 验证通过生成证据时的 `register` 记录；② 合并前快照指纹复核兜底（Pre-merge Verification）；
-    3. **两处算法口径必须完全一致**：`invalidation-engine.ts` 与 `daemon/guard/evidence-integrity.ts` 彻底统一指纹算法口径（基于规范化文件内容哈希与工作树状态，排除 `IGNORED_SEGMENTS`），杜绝因算法不一致引发的假失效或漏失效。
-  - **重构 `daemon/server.ts`**：
-    - 将单实例属性替换为多任务监听 Map：`armedWatchers: Map<string, { watcher: WorktreeWatcher; engine: EvidenceInvalidationEngine; evidenceId: string }>`；
-    - `armEvidenceWatcher(contractId: string, evidenceId: string): Promise<void>`：仅武装指定合同，不关闭其他任务的 watcher；若同一合同重复武装，先安全释放该合同旧资源再重建；
-    - `stopEvidenceWatcher(contractId: string): Promise<void>`：精确释放指定合同的 watcher 与引擎；
-    - `stopAllEvidenceWatchers(): Promise<void>`：服务关闭或重置时释放全部 watcher。
-  - **重构 `daemon/watcher/fs-watcher.ts`**：
-    - 维持 `WorktreeWatcher` 类和导出方法 `shouldIgnore(absolutePath: string, root: string): boolean`；
-    - 强化 `stop(): Promise<void>`，确保 `chokidar.close()` 完全释放、清空 pending 集合与 timer、将 `isWatching` 设为 `false`；
-    - 提供句柄/状态自省能力供测试与健康检查断言。
-  - **重构 `daemon/watcher/invalidation-engine.ts`**：
-    - 增加基于变动路径的增量判定方法 `handleIncrementalChanges(changedPaths: string[]): InvalidationResult[]`；
-    - 全量指纹计算逻辑与 `evidence-integrity.ts` 口径完全对齐，`register` 记录基线指纹。
-  - **重构 `daemon/pipeline/merger.ts`**：
-    - 确保 `squashMerge` 在执行合并动作前，无条件执行快照指纹复核（复用统一口径的证据完整性断言）；
-    - 若指纹不匹配或工作树被外部篡改，必须抛出 `EvidenceIntegrityError`（`E_EVIDENCE_FINGERPRINT_MISMATCH`），标记证据为 `STALE` 并拒绝合并。
-  - **新建测试套件**：
-    - `tests/unit/multi-worktree-watcher.test.ts`
-    - `tests/unit/multi-worktree-cross-talk.test.ts`
-    - `tests/unit/pre-merge-fingerprint-fallback.test.ts`
-* **非目标（R-6）**：
-  - 不触碰前端架构雷达 UI、Scope 抽屉或 Cytoscape 渲染（归 `TASK-C.4`）；
-  - 不修改 AST 依赖图分析引擎本体（`TASK-B.1` 已完工）；
-  - 不改动 Daemon API 鉴权规则（维持 `isAuthorized`）、Demo Origin 隔离、点亮三证或网关写范围；
-  - 不改动 Git worktree 底层生命周期管理（`worktree-manager.ts`）与合同状态机流转。
-* **PASS 断言清单（R-7）**：
-  1. **性能门禁①（外部修改→STALE 响应）**：在 `tests/unit/multi-worktree-watcher.test.ts` 中，外部文件修改写盘完成后，在配置的 debounce 窗口内触发 `EVIDENCE_STATUS_CHANGED` 广播帧并将证据落盘为 `STALE`，端到端耗时体验目标 ≤50ms（门禁硬上限 ≤100ms）；
-  2. **性能门禁②（并发监听常驻内存增量）**：同文件验证同时武装 ≥5 个独立 Worktree 进行文件监听，在强制 GC 后常驻内存（`heapUsed` 差值）增量 ≤30MB；
-  3. **性能门禁③（合并前指纹复核耗时）**：在 `tests/unit/pre-merge-fingerprint-fallback.test.ts` 中，对含典型代码规模的工作树执行合并前全量指纹复核，耗时 ≤50ms；
-  4. **性能门禁④（解除武装句柄/定时器 100% 释放）**：同文件验证调用 `stopEvidenceWatcher` 后，`isWatching === false` 且定时器清空；重复执行 `arm` 与 `stop` 20 次，系统句柄数与活跃定时器不随次数增长（零泄漏）；
-  5. **并发监听多 Worktree 独立触发**：同时存在 5 个活跃 worktree，分别修改不同 worktree 的业务文件，各自准确触发对应 contractId 的 `STALE` 状态与广播，互不遗漏；
-  6. **跨任务串扰负例**：在 `tests/unit/multi-worktree-cross-talk.test.ts` 中，修改 task-A 目录下的任意文件，task-B 的 Evidence 保持 `PASSED` / `can_merge === true`；为 task-B 武装新 watcher 时，task-A 的 watcher 保持正常工作，不被静默踢掉；
-  7. **忽略目录写入不误报**：在已武装的 worktree 内部修改 `.git/`、`.stagent/`、`node_modules/`、`dist/`、`coverage/` 等目录内的文件，Evidence 保持 `PASSED`，不触发误失效；
-  8. **Watcher 全挂时合并前兜底仍拒**：在 `tests/unit/pre-merge-fingerprint-fallback.test.ts` 中，模拟 watcher 从未启动、被异常关闭或丢包，外部手动修改 worktree 文件后调用 `squashMerge`，合并前快照复核兜底机制强制拦截，抛出 `EvidenceIntegrityError`（`E_EVIDENCE_FINGERPRINT_MISMATCH`），标记 `STALE` 且拒绝合并；
-  9. **证据落盘格式与原子写入**：失效触发后，磁盘证据文件经 `markStale` 原子重写，保持符合 `evidenceBundleSchema`，`verdict.status === "STALE"`、`can_merge === false`、`reason_code === "EVIDENCE_STALE"`；
-  10. **广播双通道兼容**：Evidence 失效时，同时向 WS 广播标准的 `EVIDENCE_STATUS_CHANGED` 帧与历史兼容的 `SCOPE_ALERT`（code: `E_EVIDENCE_STALE`）帧。
-* **FAIL 红线清单（R-8）**：出现以下任一情况即判定为不合格：
-  1. 外部修改已武装 Worktree 业务文件后，Evidence 仍为 `PASSED` / `can_merge === true`，或未在门禁上限（100ms）内转为 `STALE`；
-  2. 发生跨任务串扰：修改 task-A 导致 task-B 误失效，或武装 task-B 时静默踢掉 task-A 的 watcher；
-  3. 忽略段（如 `node_modules`、`.git`、`dist`）内部写入误触发 Evidence 失效；
-  4. 未采用变更路径增量比对，每次 debounce 触发全量递归扫盘导致性能门禁超时；
-  5. 解除武装后 watcher 或定时器未完全释放，存在资源泄漏；
-  6. **Watcher 全挂时合并前兜底失效**：watcher 未运行或丢失事件时，外部篡改的代码能够绕过合并门禁成功合入主干；
-  7. 触碰或放宽非目标中声明的安全门禁、鉴权机制与目录限制。
-* **安全 / ADR（R-9）**：严格遵循 ADR-0001（只读鉴权与安全门禁纪律）、ADR-0004（双状态机与 Evidence 闭环）与 ADR-0014；不修改任何 ADR。若施工中发现需调整鉴权或放宽目录边界，必须停工上报，不得自行放宽。
-* **默认值与未决项（R-10）**：
-  - debounce 默认 60ms；awaitWriteFinish stabilityThreshold 默认 40ms，pollInterval 默认 20ms；
-  - 忽略段固定为 `IGNORED_SEGMENTS`；
-  - 指纹算法统一为规范化内容哈希；
-  - 本卡已由 Tina 在 P-141 拍板激活，需求边界与性能门禁均已清晰，无未决产品问题。
-* **估算（R-11）**：**M（≤2 天）**。范围聚焦于 Daemon 层多 Worktree 文件监听管理、失效引擎增量比对、合并前兜底及定向测试套件；不含前端 UI。
-* **不变声明（R-12）**：**不改变** Daemon API 鉴权机制、Demo Origin 隔离、点亮三证、网关写范围；不改变 P-141 DAG 拓扑结构。
-
----
+> **归档注记（2026-11-04 · P-145）**：`TASK-B.2` 已 `[COMPLETED]`（[#128](https://github.com/he18718143986-design/IDE/pull/128)/`b1aa44f`，squash）。完整卡正文（交付清单、实测、挂账、未宣称边界）迁入 [`development-tasks-completed.md` §3.4s](./development-tasks-completed.md#task-b.2)。
 
 ---
 
@@ -836,7 +757,7 @@
 #### 【Task C.4】架构雷达视图与 Scope 圈选抽屉
 * **任务编号**：`TASK-C.4`
 * **前置依赖**：`TASK-C.3`, `TASK-B.1`（硬依赖）
-* **任务状态**：**[READY · 待 DoR 重写]**（Tina 拍板 D-4 / P-141 激活；硬依赖 B.1、软依赖 B.2；**激活 ≠ 开工**，重写后待 Tina 单卡授权方可施工）
+* **任务状态**：**[READY · 待 DoR 重写]**（Tina 拍板 D-4 / P-141 激活；硬依赖 B.1（COMPLETED，P-143）、软依赖 B.2（COMPLETED，P-145）；**激活 ≠ 开工**，重写后待 Tina 单卡授权方可施工）
 * **核心目标**：
   1. Cytoscape 渲染架构雷达，1000 节点局部 patch ≤ 16ms (60 FPS)，内存 ≤ 30MB。
   2. 交互圈选 Scope；已批准合同圈选强制派生新版本并重新审批，禁止原地扩权。
