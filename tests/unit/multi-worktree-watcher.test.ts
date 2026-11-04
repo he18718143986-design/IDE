@@ -528,7 +528,7 @@ describe("TASK-B.2 启动基线与启动后修改（路径判定，不依赖 mti
     fs.writeFileSync(path.join(wt, "node_modules", "pkg", "i.js"), "i\n");
 
     const root = fs.realpathSync(wt);
-    const rels = [...snapshotExistingFiles(root)].map((p) =>
+    const rels = [...snapshotExistingFiles(root).keys()].map((p) =>
       path.relative(root, p),
     );
     expect(rels).toEqual([path.join("src", "deep", "er", "x.ts")]);

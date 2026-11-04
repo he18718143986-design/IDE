@@ -56,14 +56,20 @@ export function shouldIgnore(absolutePath: string, root: string): boolean {
     .some((segment) => IGNORED_SEGMENTS.has(segment));
 }
 
+export interface FileStamp {
+  size: number;
+  mtimeMs: number;
+}
+
 /**
- * 启动时同步快照 root 下已存在的文件路径（跳过忽略目录，不跟随符号链接）。
- * 用于区分“启动前已存在的文件”与真正的新增：chokidar 的初始扫描可能晚于 ready 才上报
- * 既有文件的 add 事件（macOS fs.watch 子目录扫描），这些不是变更。
- * 只依赖路径集合，不依赖 mtime 与时钟精度；路径判定是确定性的。
+ * 启动时同步快照 root 下已存在文件的 (size, mtimeMs)（跳过忽略目录，不跟随符号链接）。
+ * 用途：区分“启动前已存在”与“启动后真正变化”。
+ * - macOS 上 FSEvents 可能迟到地投递启动前写入的事件（既有文件的 add / change），
+ *   这些事件的文件状态与快照一致，应视为基线。
+ * - 不依赖“mtime 早于启动时刻”这类时间比较，只比较快照时记录的状态。
  */
-export function snapshotExistingFiles(root: string): Set<string> {
-  const out = new Set<string>();
+export function snapshotExistingFiles(root: string): Map<string, FileStamp> {
+  const out = new Map<string, FileStamp>();
   const stack: string[] = [root];
   while (stack.length > 0) {
     const dir = stack.pop()!;
@@ -77,7 +83,14 @@ export function snapshotExistingFiles(root: string): Set<string> {
       if (IGNORED_SEGMENTS.has(entry.name)) continue;
       const abs = path.join(dir, entry.name);
       if (entry.isDirectory()) stack.push(abs);
-      else if (entry.isFile()) out.add(path.resolve(abs));
+      else if (entry.isFile()) {
+        try {
+          const st = fs.statSync(abs);
+          out.set(path.resolve(abs), { size: st.size, mtimeMs: st.mtimeMs });
+        } catch {
+          // 竞态删除：不纳入基线，其后的事件按变更处理（保守）
+        }
+      }
     }
   }
   return out;
@@ -95,7 +108,7 @@ export class WorktreeWatcher {
   private readyPromise: Promise<void> | null = null;
   private readyState: ReadyState = "idle";
   /** start() 时刻的既有文件路径基线：其上的 add 事件是基线，不是变更。 */
-  private baseline = new Set<string>();
+  private baseline = new Map<string, FileStamp>();
 
   constructor(options: WorktreeWatcherOptions) {
     // 规范收紧点 2：在构造函数中一次性执行 fs.realpathSync 归一化工作树根路径（例如 macOS /var 与 /private/var）
@@ -133,11 +146,26 @@ export class WorktreeWatcher {
       });
     });
 
+    /**
+     * 基线内的文件，若当前 (size, mtimeMs) 与快照一致，则事件是启动前写入的迟到投递，不计为变更。
+     * 删除后重建会先产生 unlink（已计入），不会因此漏报。
+     * 已知边界：同尺寸、同 mtime 粒度内的改写可能被判为未变；合并前指纹复核是兜底（红线 5）。
+     */
+    const isUnchangedBaseline = (abs: string): boolean => {
+      const stamp = this.baseline.get(abs);
+      if (!stamp) return false;
+      try {
+        const st = fs.statSync(abs);
+        return st.size === stamp.size && st.mtimeMs === stamp.mtimeMs;
+      } catch {
+        return false;
+      }
+    };
+
     const enqueue = (filePath: string, kind: "add" | "change" | "unlink") => {
       if (shouldIgnore(filePath, this.root)) return;
       const abs = path.resolve(filePath);
-      // 基线内的 add 不是变更；删除后重建会先产生 unlink（已计入），不会因此漏报。
-      if (kind === "add" && this.baseline.has(abs)) return;
+      if (kind !== "unlink" && isUnchangedBaseline(abs)) return;
       this.pending.add(abs);
       if (this.timer) clearTimeout(this.timer);
       this.timer = setTimeout(() => {
