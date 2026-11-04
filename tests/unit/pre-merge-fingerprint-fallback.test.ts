@@ -7,6 +7,7 @@ import { safeRmSync } from "../helpers/tmp";
 import {
   computeWorktreeFingerprint,
   computeWorktreeFingerprintSync,
+  tryReadHeadShaDirect,
   assertEvidenceIntegrity,
   EvidenceIntegrityError,
   E_EVIDENCE_FINGERPRINT_MISMATCH,
@@ -119,6 +120,18 @@ describe("TASK-B.2 合并前快照指纹复核兜底与算法收敛测试", () =
     const medDuration = median(durations);
     console.log(
       `[B.2 PERF] 合并前指纹复核耗时 5次采样 (ms): [${durations.map((d) => d.toFixed(2)).join(", ")}], 中位数: ${medDuration.toFixed(2)}ms (门禁要求 <= 50ms)`,
+    );
+
+    // 分段诊断（不改阈值）：确认 HEAD 是否走直读，以及直读与完整指纹的耗时构成
+    const directOk = tryReadHeadShaDirect(gitRepo) !== null;
+    const directDurations: number[] = [];
+    for (let round = 0; round < 5; round++) {
+      const t0 = performance.now();
+      tryReadHeadShaDirect(gitRepo);
+      directDurations.push(performance.now() - t0);
+    }
+    console.log(
+      `[B.2 PERF-DIAG] platform=${process.platform} headDirect=${directOk} headReadMedian=${median(directDurations).toFixed(2)}ms fullMedian=${medDuration.toFixed(2)}ms`,
     );
 
     expect(medDuration).toBeLessThanOrEqual(50);
