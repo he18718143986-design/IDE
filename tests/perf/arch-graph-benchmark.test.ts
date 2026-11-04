@@ -115,8 +115,7 @@ describe("TASK-B.1 AST 增量依赖图性能基准测试", () => {
       measurements.push(Math.min(elapsed, res.durationMs));
     }
 
-    const avgMs =
-      measurements.reduce((a, b) => a + b, 0) / measurements.length;
+    const avgMs = measurements.reduce((a, b) => a + b, 0) / measurements.length;
     const maxMs = Math.max(...measurements);
 
     console.log(

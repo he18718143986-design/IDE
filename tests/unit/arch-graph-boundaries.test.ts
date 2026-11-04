@@ -7,7 +7,11 @@ import {
   clearArchGraphCache,
   DependencyGraph,
 } from "../../daemon/arch/graph";
-import { loadPathAliases, parseFile, parseSource } from "../../daemon/arch/parser";
+import {
+  loadPathAliases,
+  parseFile,
+  parseSource,
+} from "../../daemon/arch/parser";
 
 /**
  * JSON/CJS/MJS 边界恶魔测试与防御用例
@@ -161,19 +165,23 @@ describe("TASK-B.1 依赖图边界与异常防御测试", () => {
 
   it("purgeDeletedModule 彻底清理出边与悬空反向边（dangling reverse edges）", () => {
     const graph = new DependencyGraph();
-    const a = "/repo/src/a.ts";
-    const b = "/repo/src/b.ts";
-    const c = "/repo/src/c.ts";
+    const a = path.resolve(root, "src/a.ts");
+    const b = path.resolve(root, "src/b.ts");
+    const c = path.resolve(root, "src/c.ts");
 
     graph.addModule({
       filePath: a,
-      imports: [{ specifier: "./b", resolved: b, typeOnly: false, dynamic: false }],
+      imports: [
+        { specifier: "./b", resolved: b, typeOnly: false, dynamic: false },
+      ],
       exports: ["a"],
     });
 
     graph.addModule({
       filePath: b,
-      imports: [{ specifier: "./c", resolved: c, typeOnly: false, dynamic: false }],
+      imports: [
+        { specifier: "./c", resolved: c, typeOnly: false, dynamic: false },
+      ],
       exports: ["b"],
     });
 

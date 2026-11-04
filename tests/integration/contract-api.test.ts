@@ -295,14 +295,18 @@ describe("M5 / 合同 HTTP API（Bearer 保护）", () => {
     // 加强契约防线：断言节点包含完整 filePath/exports/imports，且 edges 为扁平数组
     const firstNode = body.graph.nodes[0];
     expect(firstNode).toBeDefined();
-    expect(typeof firstNode.filePath).toBe("string");
-    expect(Array.isArray(firstNode.exports)).toBe(true);
-    expect(Array.isArray(firstNode.imports)).toBe(true);
+    if (firstNode) {
+      expect(typeof firstNode.filePath).toBe("string");
+      expect(Array.isArray(firstNode.exports)).toBe(true);
+      expect(Array.isArray(firstNode.imports)).toBe(true);
+    }
     expect(Array.isArray(body.graph.edges)).toBe(true);
     if (body.graph.edges.length > 0) {
       const firstEdge = body.graph.edges[0];
-      expect(typeof firstEdge.from).toBe("string");
-      expect(typeof firstEdge.to).toBe("string");
+      if (firstEdge) {
+        expect(typeof firstEdge.from).toBe("string");
+        expect(typeof firstEdge.to).toBe("string");
+      }
     }
   });
 
