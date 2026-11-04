@@ -14,6 +14,11 @@ export interface WorktreeWatcherOptions {
   readyTimeoutMs?: number;
   /** ready 之后的武装窗口（默认：macOS 300ms，其他平台 0）。 */
   armSettleMs?: number;
+  /**
+   * chokidar awaitWriteFinish 参数（默认 stabilityThreshold 40ms / pollInterval 20ms）。
+   * 仅供测试口径调参；生产路径不传，保持默认值。
+   */
+  awaitWriteFinish?: { stabilityThreshold?: number; pollInterval?: number };
 }
 
 type ReadyState = "idle" | "pending" | "ready" | "timeout";
@@ -56,25 +61,61 @@ export function shouldIgnore(absolutePath: string, root: string): boolean {
     .some((segment) => IGNORED_SEGMENTS.has(segment));
 }
 
+export interface FileStamp {
+  size: number;
+  mtimeMs: number;
+}
+
+/**
+ * 启动时同步快照 root 下已存在文件的 (size, mtimeMs)（跳过忽略目录，不跟随符号链接）。
+ * 用途：区分“启动前已存在”与“启动后真正变化”。
+ * - macOS 上 FSEvents 可能迟到地投递启动前写入的事件（既有文件的 add / change），
+ *   这些事件的文件状态与快照一致，应视为基线。
+ * - 不依赖“mtime 早于启动时刻”这类时间比较，只比较快照时记录的状态。
+ */
+export function snapshotExistingFiles(root: string): Map<string, FileStamp> {
+  const out = new Map<string, FileStamp>();
+  const stack: string[] = [root];
+  while (stack.length > 0) {
+    const dir = stack.pop()!;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue; // 不可读目录：不纳入基线（其后的 add 会按变更处理，保守）
+    }
+    for (const entry of entries) {
+      if (IGNORED_SEGMENTS.has(entry.name)) continue;
+      const abs = path.join(dir, entry.name);
+      if (entry.isDirectory()) stack.push(abs);
+      else if (entry.isFile()) {
+        try {
+          const st = fs.statSync(abs);
+          out.set(path.resolve(abs), { size: st.size, mtimeMs: st.mtimeMs });
+        } catch {
+          // 竞态删除：不纳入基线，其后的事件按变更处理（保守）
+        }
+      }
+    }
+  }
+  return out;
+}
+
 export class WorktreeWatcher {
   private readonly root: string;
   private readonly debounceMs: number;
   private readonly readyTimeoutMs: number;
   private readonly armSettleMs: number;
+  private readonly stabilityThreshold: number;
+  private readonly pollInterval: number;
   private readonly onChange: (paths: string[]) => void;
   private watcher: FSWatcher | null = null;
   private pending = new Set<string>();
   private timer: NodeJS.Timeout | null = null;
   private readyPromise: Promise<void> | null = null;
   private readyState: ReadyState = "idle";
-  /** start() 调用时刻（小数毫秒，与文件 mtime 同为墙钟口径）；早于它的修改属于基线。 */
-  private startedAtMs = 0;
-  /**
-   * 武装完成标志：ready + armSettleMs 之后才为 true。武装前的 add 事件多为 chokidar
-   * 延迟扫描到的既有文件（macOS fs.watch 子目录扫描可能晚于 ready），不是变更，不计入。
-   */
-  private armed = false;
-  private armTimer: NodeJS.Timeout | null = null;
+  /** start() 时刻的既有文件路径基线：其上的 add 事件是基线，不是变更。 */
+  private baseline = new Map<string, FileStamp>();
 
   constructor(options: WorktreeWatcherOptions) {
     // 规范收紧点 2：在构造函数中一次性执行 fs.realpathSync 归一化工作树根路径（例如 macOS /var 与 /private/var）
@@ -85,22 +126,23 @@ export class WorktreeWatcher {
     this.debounceMs = options.debounceMs ?? 60;
     this.readyTimeoutMs = options.readyTimeoutMs ?? 5000;
     this.armSettleMs = options.armSettleMs ?? ARM_SETTLE_MS;
+    this.stabilityThreshold =
+      options.awaitWriteFinish?.stabilityThreshold ?? 40;
+    this.pollInterval = options.awaitWriteFinish?.pollInterval ?? 20;
     this.onChange = options.onChange;
   }
 
   start(): void {
     if (this.watcher) return;
-    this.startedAtMs = performance.timeOrigin + performance.now();
-    this.armed = false;
-    // 兜底：ready 始终未到时（降级路径），超时后也视为武装，避免永久丢弃 add 事件
-    this.armTimer = setTimeout(() => {
-      this.armed = true;
-    }, this.readyTimeoutMs + this.armSettleMs);
-    this.armTimer.unref?.();
+    // 先快照再挂载：挂载后出现的新文件才会进入 add 事件，快照之前已存在的文件属于基线。
+    this.baseline = snapshotExistingFiles(this.root);
     this.watcher = chokidar.watch(this.root, {
       ignoreInitial: true,
       ignored: (p: string) => shouldIgnore(p, this.root),
-      awaitWriteFinish: { stabilityThreshold: 40, pollInterval: 20 },
+      awaitWriteFinish: {
+        stabilityThreshold: this.stabilityThreshold,
+        pollInterval: this.pollInterval,
+      },
     });
 
     this.readyState = "pending";
@@ -110,8 +152,6 @@ export class WorktreeWatcher {
         const finish = () => {
           if (this.watcher !== watcher) return; // 已 stop，不再翻转状态
           if (this.readyState !== "timeout") this.readyState = "ready";
-          this.armed = true;
-          if (this.armTimer) clearTimeout(this.armTimer);
           resolve();
         };
         if (this.armSettleMs > 0) setTimeout(finish, this.armSettleMs);
@@ -119,24 +159,27 @@ export class WorktreeWatcher {
       });
     });
 
-    /** 启动前已写入的文件（macOS FSEvents 可能延迟投递其事件）不计为变更。 */
-    const predatesStart = (filePath: string): boolean => {
+    /**
+     * 基线内的文件，若当前 (size, mtimeMs) 与快照一致，则事件是启动前写入的迟到投递，不计为变更。
+     * 删除后重建会先产生 unlink（已计入），不会因此漏报。
+     * 已知边界：同尺寸、同 mtime 粒度内的改写可能被判为未变；合并前指纹复核是兜底（红线 5）。
+     */
+    const isUnchangedBaseline = (abs: string): boolean => {
+      const stamp = this.baseline.get(abs);
+      if (!stamp) return false;
       try {
-        const { mtimeMs } = fs.statSync(filePath);
-        // 只有亚秒精度的 mtime 才能可靠地与启动时刻比较；整秒 mtime（如 HFS+）无法判定，
-        // 保守视为变更。误报只会让证据偏保守，漏报才危险。
-        const hasSubSecond = mtimeMs % 1 !== 0;
-        return hasSubSecond && mtimeMs < this.startedAtMs;
+        const st = fs.statSync(abs);
+        return st.size === stamp.size && st.mtimeMs === stamp.mtimeMs;
       } catch {
-        return false; // 已删除或不可读：保守视为变更
+        return false;
       }
     };
 
     const enqueue = (filePath: string, kind: "add" | "change" | "unlink") => {
       if (shouldIgnore(filePath, this.root)) return;
-      if (kind === "add" && !this.armed) return;
-      if (kind !== "unlink" && predatesStart(filePath)) return;
-      this.pending.add(path.resolve(filePath));
+      const abs = path.resolve(filePath);
+      if (kind !== "unlink" && isUnchangedBaseline(abs)) return;
+      this.pending.add(abs);
       if (this.timer) clearTimeout(this.timer);
       this.timer = setTimeout(() => {
         const batch = [...this.pending];
@@ -197,16 +240,12 @@ export class WorktreeWatcher {
   }
 
   async stop(): Promise<void> {
-    if (this.armTimer) {
-      clearTimeout(this.armTimer);
-      this.armTimer = null;
-    }
-    this.armed = false;
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = null;
     }
     this.pending.clear();
+    this.baseline.clear();
     this.readyPromise = null;
     this.readyState = "idle";
     if (this.watcher) {
