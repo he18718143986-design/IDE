@@ -6,6 +6,7 @@ import {
   buildDependencyGraph,
   clearArchGraphCache,
   DependencyGraph,
+  updateRepoGraphFile,
 } from "../../daemon/arch/graph";
 import {
   loadPathAliases,
@@ -206,5 +207,34 @@ describe("TASK-B.1 依赖图边界与异常防御测试", () => {
     expect(graph.getDependents(b)).toEqual([]);
     // c 不再被 b 依赖
     expect(graph.getDependents(c)).toEqual([]);
+  });
+  it("updateRepoGraphFile isUnderScanRoot 守卫：非 src/ 下文件拒入图；若此前入图被移出则彻底 purge", () => {
+    const outsideFile = path.join(root, "outside.ts");
+    fs.writeFileSync(outsideFile, "export const out = 1;\n", "utf-8");
+
+    // 1. 外部文件初次尝试更新，被 isUnderScanRoot 拦截，不注入单例图
+    const res1 = updateRepoGraphFile(root, outsideFile);
+    expect(res1.graph.hasNode(outsideFile)).toBe(false);
+
+    // 2. 正常 src/ 内部文件入图
+    const insideFile = path.join(srcDir, "valid.ts");
+    fs.writeFileSync(insideFile, "export const valid = 1;\n", "utf-8");
+    const res2 = updateRepoGraphFile(root, insideFile);
+    expect(res2.graph.hasNode(insideFile)).toBe(true);
+
+    // 3. 模拟文件被移出 src/ 到外部路径，通过 updateRepoGraphFile 更新外部路径时拒入；
+    // 若原内部节点被标记为移出或路径指向外部，单例图不会出现外部僵尸节点
+    expect(res2.graph.hasNode(outsideFile)).toBe(false);
+
+    // 4. 若某个外部节点曾被强行注入图中，随后通过 updateRepoGraphFile 触发时将被彻底 purge
+    res2.graph.addModule({
+      filePath: outsideFile,
+      imports: [],
+      exports: ["out"],
+    });
+    expect(res2.graph.hasNode(outsideFile)).toBe(true);
+
+    updateRepoGraphFile(root, outsideFile);
+    expect(res2.graph.hasNode(outsideFile)).toBe(false);
   });
 });

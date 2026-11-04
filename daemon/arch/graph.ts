@@ -578,6 +578,22 @@ export function updateRepoGraphFile(
     graph = res.graph;
   }
 
+  // 挂账②前缀收敛（TASK-B.1 挂账销项）：校验路径是否在 scanRoot (src/) 下
+  const scanRoot = path.resolve(normalizedRoot, SCAN_SUBDIR);
+  const isUnderScanRoot =
+    normalizedFile === scanRoot ||
+    normalizedFile.startsWith(scanRoot + path.sep);
+
+  if (!isUnderScanRoot) {
+    // 边界闭环：若文件此前已在图中（如被移出 src/），必须完整 purge 清理，杜绝僵尸节点残留
+    if (graph.has(normalizedFile)) {
+      graph.purgeDeletedModule(normalizedFile);
+      fileCache.delete(normalizedFile);
+    }
+    const durationMs = performance.now() - start;
+    return { durationMs, graph };
+  }
+
   const aliases = getOrLoadAliases(normalizedRoot);
 
   if (content !== undefined) {

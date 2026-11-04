@@ -75,13 +75,24 @@ export class WorktreeWatcher {
     return this.watcher !== null;
   }
 
+  get pendingCount(): number {
+    return this.pending.size;
+  }
+
+  get hasActiveTimer(): boolean {
+    return this.timer !== null;
+  }
+
   async stop(): Promise<void> {
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = null;
     }
     this.pending.clear();
-    await this.watcher?.close();
-    this.watcher = null;
+    if (this.watcher) {
+      const w = this.watcher;
+      this.watcher = null;
+      await w.close();
+    }
   }
 }

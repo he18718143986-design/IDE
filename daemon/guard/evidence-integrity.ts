@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { execGit } from "../git/worktree-manager";
+import { execGit, execGitSync } from "../git/worktree-manager";
 import { shouldIgnore } from "../watcher/fs-watcher";
 import {
   evidenceBundleSchema,
@@ -61,32 +61,59 @@ function parsePorcelainEntries(
 }
 
 /**
- * 计算 Worktree 当前指纹。
- * 失败（目录丢失 / git 不可用）时抛出，由调用方判定为 WORKTREE_LOST 而非放行。
+ * 递归收集工作树下所有未被 IGNORED_SEGMENTS 排除的文件相对路径（排序以保证跨平台确定性）
  */
-export async function computeWorktreeFingerprint(
-  worktreePath: string,
-): Promise<string> {
-  if (!fs.existsSync(worktreePath)) {
-    throw new Error(`Worktree missing: ${worktreePath}`);
-  }
+export function listNonIgnoredFiles(worktreePath: string): string[] {
+  const files: string[] = [];
+  const walk = (dir: string): void => {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const abs = path.join(dir, entry.name);
+      if (shouldIgnore(abs, worktreePath)) continue;
+      if (entry.isDirectory()) walk(abs);
+      else if (entry.isFile()) files.push(path.relative(worktreePath, abs));
+    }
+  };
+  walk(worktreePath);
+  return files.sort();
+}
 
-  const [head, status] = [
-    await execGit(["rev-parse", "HEAD"], worktreePath),
-    await execGit(["status", "--porcelain", "-uall"], worktreePath),
-  ];
-  if (status.exitCode !== 0) {
-    throw new Error(
-      `git status failed in worktree: ${status.stderr || status.stdout}`,
-    );
-  }
-
+/**
+ * 非 Git 目录或 Git 环境异常降级指纹算法（规范 TASK-B.2 单点收敛）
+ */
+export function computeFallbackFingerprint(worktreePath: string): string {
   const hash = createHash("sha256");
-  hash.update(`head:${head.stdout.trim()}\n`);
+  hash.update("fallback:v1\n");
+  for (const rel of listNonIgnoredFiles(worktreePath)) {
+    const abs = path.join(worktreePath, rel);
+    hash.update(`file:${rel}\n`);
+    try {
+      const content = fs.readFileSync(abs);
+      hash.update(createHash("sha256").update(content).digest("hex"));
+    } catch {
+      hash.update("<unreadable>");
+    }
+  }
+  return hash.digest("hex");
+}
 
-  // 逐条计入（而非整体哈希 stdout），这样忽略表内的路径（node_modules 等）
-  // 可以从指纹里彻底剔除，依赖安装/构建产物不会造成假性 STALE。
-  for (const { line, rel } of parsePorcelainEntries(status.stdout)) {
+/**
+ * Git 工作树输出哈希计算核心（保证异步与同步 100% 同源口径）
+ */
+function computeGitFingerprintFromOutput(
+  worktreePath: string,
+  headStdout: string,
+  statusStdout: string,
+): string {
+  const hash = createHash("sha256");
+  hash.update(`head:${headStdout.trim()}\n`);
+
+  for (const { line, rel } of parsePorcelainEntries(statusStdout)) {
     const abs = path.join(worktreePath, rel);
     if (shouldIgnore(abs, worktreePath)) continue;
     hash.update(`entry:${line}\n`);
@@ -100,6 +127,80 @@ export async function computeWorktreeFingerprint(
   }
 
   return hash.digest("hex");
+}
+
+/**
+ * 计算 Worktree 当前指纹（异步）。
+ * 优先按 Git HEAD + porcelain 差异及变更内容哈希计算；若非 Git 目录或 Git 命令失败，
+ * 走单点收敛的 computeFallbackFingerprint。
+ */
+export async function computeWorktreeFingerprint(
+  worktreePath: string,
+): Promise<string> {
+  if (!fs.existsSync(worktreePath)) {
+    throw new Error(`Worktree missing: ${worktreePath}`);
+  }
+
+  const gitMarker = path.join(worktreePath, ".git");
+  if (!fs.existsSync(gitMarker)) {
+    return computeFallbackFingerprint(worktreePath);
+  }
+
+  try {
+    const [head, status] = await Promise.all([
+      execGit(["rev-parse", "HEAD"], worktreePath),
+      execGit(["status", "--porcelain", "-uall"], worktreePath, { raw: true }),
+    ]);
+    if (head.exitCode !== 0 || status.exitCode !== 0) {
+      return computeFallbackFingerprint(worktreePath);
+    }
+
+    return computeGitFingerprintFromOutput(
+      worktreePath,
+      head.stdout,
+      status.stdout,
+    );
+  } catch {
+    return computeFallbackFingerprint(worktreePath);
+  }
+}
+
+/**
+ * 计算 Worktree 当前指纹（同步）。
+ * 与异步版本口径 100% 一致，供 invalidation-engine 及同步登记场景调用。
+ */
+export function computeWorktreeFingerprintSync(worktreePath: string): string {
+  if (!fs.existsSync(worktreePath)) {
+    throw new Error(`Worktree missing: ${worktreePath}`);
+  }
+
+  const gitMarker = path.join(worktreePath, ".git");
+  if (!fs.existsSync(gitMarker)) {
+    return computeFallbackFingerprint(worktreePath);
+  }
+
+  try {
+    const headRes = execGitSync(["rev-parse", "HEAD"], worktreePath);
+    if (headRes.exitCode !== 0) {
+      return computeFallbackFingerprint(worktreePath);
+    }
+    const statusRes = execGitSync(
+      ["status", "--porcelain", "-uall"],
+      worktreePath,
+      { raw: true },
+    );
+    if (statusRes.exitCode !== 0) {
+      return computeFallbackFingerprint(worktreePath);
+    }
+
+    return computeGitFingerprintFromOutput(
+      worktreePath,
+      headRes.stdout,
+      statusRes.stdout,
+    );
+  } catch {
+    return computeFallbackFingerprint(worktreePath);
+  }
 }
 
 /** 把磁盘上的证据快照改写为 STALE（保持 §9.2 Schema 合法） */

@@ -450,10 +450,16 @@ export class StagentDaemon {
   private readonly supervisorEnrich:
     | ((prompt: string) => Promise<DraftEnrichment> | DraftEnrichment)
     | undefined;
-  private worktreeWatcher: WorktreeWatcher | null = null;
-  private invalidationEngine: EvidenceInvalidationEngine | null = null;
-  /** 当前武装监听的合同（用于 abort 时精确解除，避免误停其他任务的监听） */
-  private armedContractId: string | null = null;
+  /** TASK-B.2：并发多任务 Worktree 监听与失效引擎 Map（按 contractId 寻址） */
+  private armedWatchers = new Map<
+    string,
+    {
+      watcher: WorktreeWatcher;
+      engine: EvidenceInvalidationEngine;
+      evidenceId: string;
+      worktreePath: string;
+    }
+  >();
   /** TASK-D.3：五类死锁自愈看门狗（D-1~D-5） */
   private readonly deadlock: DeadlockResilience;
   /** TASK-C.12b：STATE_CHANGED 的 session_epoch + state_seq */
@@ -806,7 +812,7 @@ export class StagentDaemon {
       this.heartbeatTimer = null;
     }
 
-    await this.stopEvidenceWatcher();
+    await this.stopAllEvidenceWatchers();
     if (this.intentCompilerHost) {
       this.intentCompilerHost.dispose();
       this.intentCompilerHost = null;
@@ -2081,7 +2087,11 @@ export class StagentDaemon {
     contractId: string,
     evidenceId: string,
   ): Promise<void> {
-    await this.stopEvidenceWatcher();
+    // 关键收紧点 1：同 contractId 重复武装时先释放旧资源，杜绝同 key 双 watcher 泄漏
+    if (this.armedWatchers.has(contractId)) {
+      await this.stopEvidenceWatcher(contractId);
+    }
+
     const worktreePath = path.join(
       this.repoRoot,
       ".stagent",
@@ -2098,7 +2108,6 @@ export class StagentDaemon {
 
     const engine = new EvidenceInvalidationEngine(worktreePath);
     engine.register(contractId, evidencePath);
-    this.invalidationEngine = engine;
 
     const watcher = new WorktreeWatcher({
       worktreePath,
@@ -2129,15 +2138,35 @@ export class StagentDaemon {
       },
     });
     watcher.start();
-    this.worktreeWatcher = watcher;
-    this.armedContractId = contractId;
+    this.armedWatchers.set(contractId, {
+      watcher,
+      engine,
+      evidenceId,
+      worktreePath,
+    });
   }
 
-  private async stopEvidenceWatcher(): Promise<void> {
-    await this.worktreeWatcher?.stop();
-    this.worktreeWatcher = null;
-    this.invalidationEngine = null;
-    this.armedContractId = null;
+  private async stopEvidenceWatcher(contractId?: string): Promise<void> {
+    if (contractId !== undefined) {
+      const entry = this.armedWatchers.get(contractId);
+      if (entry) {
+        await entry.watcher.stop();
+        this.armedWatchers.delete(contractId);
+      }
+      return;
+    }
+    await this.stopAllEvidenceWatchers();
+  }
+
+  private async stopAllEvidenceWatchers(): Promise<void> {
+    const entries = [...this.armedWatchers.values()];
+    this.armedWatchers.clear();
+    await Promise.all(entries.map((e) => e.watcher.stop()));
+  }
+
+  /** 测试自省：当前受武装监听的 contractId 列表 */
+  getArmedContractIds(): string[] {
+    return [...this.armedWatchers.keys()];
   }
 
   private fileContext(
@@ -5919,7 +5948,7 @@ export class StagentDaemon {
               this.sendJson(res, 404, { error: "Evidence not found" });
               return;
             }
-            await this.stopEvidenceWatcher();
+            await this.stopEvidenceWatcher(contractId);
             const result = await squashMerge({
               repoRoot: this.repoRoot,
               contractId,
@@ -6129,9 +6158,7 @@ export class StagentDaemon {
             // TASK-L.5：ABORTED 时回收预览进程组
             await this.stopRealPlaytest(contractId);
             // 中止的合同若正被证据监听武装，立即解除（其 Worktree 已清理）
-            if (this.armedContractId === contractId) {
-              await this.stopEvidenceWatcher();
-            }
+            await this.stopEvidenceWatcher(contractId);
             this.targetAdvancedContracts.delete(contractId);
             this.emitContractUpdate(contract);
             // TASK-L.9：ABORTED → 桩 aborted；必要时触发重新分解
