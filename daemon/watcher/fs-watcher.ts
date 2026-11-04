@@ -67,7 +67,7 @@ export class WorktreeWatcher {
   private timer: NodeJS.Timeout | null = null;
   private readyPromise: Promise<void> | null = null;
   private readyState: ReadyState = "idle";
-  /** start() 调用时刻；早于它的文件修改属于基线，不是“监听期间的变更”。 */
+  /** start() 调用时刻（小数毫秒，与文件 mtime 同为墙钟口径）；早于它的修改属于基线。 */
   private startedAtMs = 0;
 
   constructor(options: WorktreeWatcherOptions) {
@@ -84,7 +84,7 @@ export class WorktreeWatcher {
 
   start(): void {
     if (this.watcher) return;
-    this.startedAtMs = Date.now();
+    this.startedAtMs = performance.timeOrigin + performance.now();
     this.watcher = chokidar.watch(this.root, {
       ignoreInitial: true,
       ignored: (p: string) => shouldIgnore(p, this.root),
@@ -108,7 +108,11 @@ export class WorktreeWatcher {
     /** 启动前已写入的文件（macOS FSEvents 可能延迟投递其事件）不计为变更。 */
     const predatesStart = (filePath: string): boolean => {
       try {
-        return fs.statSync(filePath).mtimeMs < this.startedAtMs;
+        const { mtimeMs } = fs.statSync(filePath);
+        // 只有亚秒精度的 mtime 才能可靠地与启动时刻比较；整秒 mtime（如 HFS+）无法判定，
+        // 保守视为变更。误报只会让证据偏保守，漏报才危险。
+        const hasSubSecond = mtimeMs % 1 !== 0;
+        return hasSubSecond && mtimeMs < this.startedAtMs;
       } catch {
         return false; // 已删除或不可读：保守视为变更
       }
