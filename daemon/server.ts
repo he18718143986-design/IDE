@@ -2139,7 +2139,13 @@ export class StagentDaemon {
     });
     watcher.start();
     // 关键收紧点 1：生产路径武装后等待 Watcher 底层就绪，杜绝武装即写入时的事件遗漏与竞态盲区
-    await watcher.waitUntilReady();
+    // 就绪超时不阻断武装：降级继续，合并前兜底（证据指纹复核）仍在
+    const ready = await watcher.waitUntilReady();
+    if (!ready) {
+      console.warn(
+        `[evidence-watcher] 武装未就绪（contract=${contractId}, root=${worktreePath}），降级继续，合并前兜底仍在`,
+      );
+    }
     this.armedWatchers.set(contractId, {
       watcher,
       engine,

@@ -55,6 +55,18 @@ function createPassedEvidence(contractId: string, evidenceId = "evi_1") {
   });
 }
 
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  return Promise.race([
+    p,
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(label)), ms);
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
 function median(values: number[]): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -120,12 +132,19 @@ describe("TASK-B.2 多 Worktree Watcher 性能与并发监听测试", () => {
       });
       watchersToClean.push(watcher);
       watcher.start();
-      await watcher.waitUntilReady();
+      expect(
+        await watcher.waitUntilReady(),
+        "watcher 未在超时内就绪（ready 未触发）",
+      ).toBe(true);
 
       startTime.current = performance.now();
       fs.writeFileSync(testFile, `export const x = ${round + 1};\n`);
 
-      const latency = await hitPromise;
+      const latency = await withTimeout(
+        hitPromise,
+        3000,
+        `round ${round}：3s 内未收到 STALE 回调（事件丢失或被误滤）`,
+      );
       latencies.push(latency);
       await watcher.stop();
     }
@@ -259,7 +278,10 @@ describe("TASK-B.2 多 Worktree Watcher 性能与并发监听测试", () => {
       });
       watchersToClean.push(watcher);
       watcher.start();
-      await watcher.waitUntilReady();
+      expect(
+        await watcher.waitUntilReady(),
+        "watcher 未在超时内就绪（ready 未触发）",
+      ).toBe(true);
     }
 
     // 修改前，全量 can_merge 均为 true
@@ -313,17 +335,23 @@ describe("TASK-B.2 多 Worktree Watcher 性能与并发监听测试", () => {
     engine.register("task-ignore", evPath);
 
     let fired = false;
+    const seen: string[] = [];
+    const realRoot = fs.realpathSync(wtDir);
     const watcher = new WorktreeWatcher({
       worktreePath: wtDir,
       debounceMs: 30,
       onChange: (paths) => {
+        seen.push(...paths);
         const results = engine.handleChanges(paths);
         if (results.some((r) => r.stale)) fired = true;
       },
     });
     watchersToClean.push(watcher);
     watcher.start();
-    await watcher.waitUntilReady();
+    expect(
+        await watcher.waitUntilReady(),
+        "watcher 未在超时内就绪（ready 未触发）",
+      ).toBe(true);
     fired = false;
 
     // 修改忽略目录里的内容
@@ -337,9 +365,33 @@ describe("TASK-B.2 多 Worktree Watcher 性能与并发监听测试", () => {
 
     await new Promise((r) => setTimeout(r, 150));
 
+    // 失败时打印诊断：root（realpath）、事件路径、归一后的相对路径与忽略判定
+    const diag = seen.map(
+      (p) =>
+        `event=${p} rel=${path.relative(realRoot, p)} ignored=${shouldIgnore(p, realRoot)}`,
+    );
+    expect(
+      seen,
+      `root=${realRoot} tmp=${wtDir}\n${diag.join("\n")}`,
+    ).toEqual([]);
     expect(fired).toBe(false);
     const content = JSON.parse(fs.readFileSync(evPath, "utf-8"));
     expect(content.verdict.status).toBe("PASSED");
     expect(content.verdict.can_merge).toBe(true);
+  });
+});
+
+describe("shouldIgnore 段匹配边界", () => {
+  const root = path.resolve("/repo/wt");
+  it("忽略目录的任一段命中即忽略（含嵌套）", () => {
+    expect(shouldIgnore(path.join(root, ".git", "index"), root)).toBe(true);
+    expect(shouldIgnore(path.join(root, "src", "node_modules", "x.js"), root)).toBe(true);
+  });
+  it("以 .. 开头的合法目录名不被误判为越界", () => {
+    expect(shouldIgnore(path.join(root, "..cache", "a.ts"), root)).toBe(false);
+  });
+  it("普通源码路径不忽略；越界路径忽略", () => {
+    expect(shouldIgnore(path.join(root, "src", "a.ts"), root)).toBe(false);
+    expect(shouldIgnore(path.resolve("/elsewhere/a.ts"), root)).toBe(true);
   });
 });
