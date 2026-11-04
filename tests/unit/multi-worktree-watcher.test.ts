@@ -349,9 +349,9 @@ describe("TASK-B.2 多 Worktree Watcher 性能与并发监听测试", () => {
     watchersToClean.push(watcher);
     watcher.start();
     expect(
-        await watcher.waitUntilReady(),
-        "watcher 未在超时内就绪（ready 未触发）",
-      ).toBe(true);
+      await watcher.waitUntilReady(),
+      "watcher 未在超时内就绪（ready 未触发）",
+    ).toBe(true);
     fired = false;
 
     // 修改忽略目录里的内容
@@ -370,10 +370,9 @@ describe("TASK-B.2 多 Worktree Watcher 性能与并发监听测试", () => {
       (p) =>
         `event=${p} rel=${path.relative(realRoot, p)} ignored=${shouldIgnore(p, realRoot)}`,
     );
-    expect(
-      seen,
-      `root=${realRoot} tmp=${wtDir}\n${diag.join("\n")}`,
-    ).toEqual([]);
+    expect(seen, `root=${realRoot} tmp=${wtDir}\n${diag.join("\n")}`).toEqual(
+      [],
+    );
     expect(fired).toBe(false);
     const content = JSON.parse(fs.readFileSync(evPath, "utf-8"));
     expect(content.verdict.status).toBe("PASSED");
@@ -385,7 +384,9 @@ describe("shouldIgnore 段匹配边界", () => {
   const root = path.resolve("/repo/wt");
   it("忽略目录的任一段命中即忽略（含嵌套）", () => {
     expect(shouldIgnore(path.join(root, ".git", "index"), root)).toBe(true);
-    expect(shouldIgnore(path.join(root, "src", "node_modules", "x.js"), root)).toBe(true);
+    expect(
+      shouldIgnore(path.join(root, "src", "node_modules", "x.js"), root),
+    ).toBe(true);
   });
   it("以 .. 开头的合法目录名不被误判为越界", () => {
     expect(shouldIgnore(path.join(root, "..cache", "a.ts"), root)).toBe(false);
