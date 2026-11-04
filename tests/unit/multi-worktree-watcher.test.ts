@@ -3,7 +3,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { safeRmSync } from "../helpers/tmp";
-import { WorktreeWatcher, shouldIgnore } from "../../daemon/watcher/fs-watcher";
+import {
+  WorktreeWatcher,
+  shouldIgnore,
+  snapshotExistingFiles,
+} from "../../daemon/watcher/fs-watcher";
 import { EvidenceInvalidationEngine } from "../../daemon/watcher/invalidation-engine";
 import { evidenceBundleSchema } from "../../src/lib/evidence.schema";
 import {
@@ -497,5 +501,92 @@ describe("shouldIgnore 段匹配边界", () => {
   it("普通源码路径不忽略；越界路径忽略", () => {
     expect(shouldIgnore(path.join(root, "src", "a.ts"), root)).toBe(false);
     expect(shouldIgnore(path.resolve("/elsewhere/a.ts"), root)).toBe(true);
+  });
+});
+
+describe("TASK-B.2 启动基线与启动后修改（路径判定，不依赖 mtime）", () => {
+  let base: string;
+  const cleanup: WorktreeWatcher[] = [];
+
+  beforeEach(() => {
+    base = fs.mkdtempSync(path.join(os.tmpdir(), "stagent-b2-baseline-"));
+  });
+
+  afterEach(async () => {
+    for (const w of cleanup) await w.stop();
+    cleanup.length = 0;
+    safeRmSync(base);
+  });
+
+  it("基线快照：包含既有源文件（含深层），跳过忽略目录", () => {
+    const wt = path.join(base, "wt-snap");
+    fs.mkdirSync(path.join(wt, "src", "deep", "er"), { recursive: true });
+    fs.mkdirSync(path.join(wt, ".git"), { recursive: true });
+    fs.mkdirSync(path.join(wt, "node_modules", "pkg"), { recursive: true });
+    fs.writeFileSync(path.join(wt, "src", "deep", "er", "x.ts"), "x\n");
+    fs.writeFileSync(path.join(wt, ".git", "HEAD"), "ref\n");
+    fs.writeFileSync(path.join(wt, "node_modules", "pkg", "i.js"), "i\n");
+
+    const root = fs.realpathSync(wt);
+    const rels = [...snapshotExistingFiles(root)].map((p) =>
+      path.relative(root, p),
+    );
+    expect(rels).toEqual([path.join("src", "deep", "er", "x.ts")]);
+  });
+
+  it("启动后立即修改既有文件（无额外等待）必须计为变更", async () => {
+    const wt = path.join(base, "wt-immediate");
+    fs.mkdirSync(path.join(wt, "src"), { recursive: true });
+    const f = path.join(wt, "src", "code.ts");
+    fs.writeFileSync(f, "export const v = 1;\n");
+
+    const seen: string[] = [];
+    const w = new WorktreeWatcher({
+      worktreePath: wt,
+      debounceMs: 10,
+      onChange: (paths) => seen.push(...paths),
+    });
+    cleanup.push(w);
+    w.start();
+    expect(await w.waitUntilReady()).toBe(true);
+
+    fs.writeFileSync(f, "export const v = 22222;\n");
+    const got = await waitFor(
+      () => seen.some((p) => p.endsWith(path.join("src", "code.ts"))),
+      5000,
+    );
+    expect(got).toBe(true);
+  });
+
+  it("启动后在新建的深层目录中创建文件计为变更；基线内文件不计", async () => {
+    const wt = path.join(base, "wt-deep-new");
+    fs.mkdirSync(path.join(wt, "src"), { recursive: true });
+    fs.writeFileSync(path.join(wt, "src", "old.ts"), "old\n");
+
+    const seen: string[] = [];
+    const w = new WorktreeWatcher({
+      worktreePath: wt,
+      debounceMs: 20,
+      onChange: (paths) => seen.push(...paths),
+    });
+    cleanup.push(w);
+    w.start();
+    expect(await w.waitUntilReady()).toBe(true);
+
+    fs.mkdirSync(path.join(wt, "src", "feature", "nested"), {
+      recursive: true,
+    });
+    fs.writeFileSync(
+      path.join(wt, "src", "feature", "nested", "new.ts"),
+      "new\n",
+    );
+    const got = await waitFor(
+      () => seen.some((p) => p.endsWith("new.ts")),
+      5000,
+    );
+    expect(got).toBe(true);
+    expect(seen.some((p) => p.endsWith(path.join("src", "old.ts")))).toBe(
+      false,
+    );
   });
 });
