@@ -14,6 +14,11 @@ export interface WorktreeWatcherOptions {
   readyTimeoutMs?: number;
   /** ready 之后的武装窗口（默认：macOS 300ms，其他平台 0）。 */
   armSettleMs?: number;
+  /**
+   * chokidar awaitWriteFinish 参数（默认 stabilityThreshold 40ms / pollInterval 20ms）。
+   * 仅供测试口径调参；生产路径不传，保持默认值。
+   */
+  awaitWriteFinish?: { stabilityThreshold?: number; pollInterval?: number };
 }
 
 type ReadyState = "idle" | "pending" | "ready" | "timeout";
@@ -101,6 +106,8 @@ export class WorktreeWatcher {
   private readonly debounceMs: number;
   private readonly readyTimeoutMs: number;
   private readonly armSettleMs: number;
+  private readonly stabilityThreshold: number;
+  private readonly pollInterval: number;
   private readonly onChange: (paths: string[]) => void;
   private watcher: FSWatcher | null = null;
   private pending = new Set<string>();
@@ -119,6 +126,9 @@ export class WorktreeWatcher {
     this.debounceMs = options.debounceMs ?? 60;
     this.readyTimeoutMs = options.readyTimeoutMs ?? 5000;
     this.armSettleMs = options.armSettleMs ?? ARM_SETTLE_MS;
+    this.stabilityThreshold =
+      options.awaitWriteFinish?.stabilityThreshold ?? 40;
+    this.pollInterval = options.awaitWriteFinish?.pollInterval ?? 20;
     this.onChange = options.onChange;
   }
 
@@ -129,7 +139,10 @@ export class WorktreeWatcher {
     this.watcher = chokidar.watch(this.root, {
       ignoreInitial: true,
       ignored: (p: string) => shouldIgnore(p, this.root),
-      awaitWriteFinish: { stabilityThreshold: 40, pollInterval: 20 },
+      awaitWriteFinish: {
+        stabilityThreshold: this.stabilityThreshold,
+        pollInterval: this.pollInterval,
+      },
     });
 
     this.readyState = "pending";

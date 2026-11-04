@@ -136,9 +136,15 @@ describe("TASK-B.2 多 Worktree Watcher 性能与并发监听测试", () => {
       });
 
       const startTime = { current: 0 };
+      // 测试口径（仅本门禁）：stabilityThreshold 20 / pollInterval 10 / debounceMs 10，产品默认值不动。
+      // 生产下限构成：awaitWriteFinish 稳定窗口 40ms + 轮询 20ms + debounce 60ms，合计约 100ms 量级，
+      // 生产默认路径本身已贴近 100ms 门禁上限。
+      // 本门禁测量口径：隔离检测路径（chokidar 事件 → 指纹/失效判定 → 回调）的时延，
+      // 以更紧凑的写入稳定参数减少 CI 调度抖动；它不代表生产默认值的端到端时延。
       const watcher = new WorktreeWatcher({
         worktreePath: wtDir,
-        debounceMs: 25, // 紧凑 debounce
+        debounceMs: 10,
+        awaitWriteFinish: { stabilityThreshold: 20, pollInterval: 10 },
         onChange: (paths) => {
           const results = engine.handleChanges(paths);
           if (results.some((r) => r.stale)) {
