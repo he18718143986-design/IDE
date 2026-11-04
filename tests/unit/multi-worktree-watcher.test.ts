@@ -443,7 +443,6 @@ describe("TASK-B.2 macOS 事件竞争回归（平台无关的行为断言）", (
     const seen: string[] = [];
     const w = new WorktreeWatcher({
       worktreePath: wt,
-      armSettleMs: 0,
       debounceMs: 20,
       onChange: (paths) => seen.push(...paths),
     });
