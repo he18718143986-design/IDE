@@ -69,6 +69,12 @@ export class WorktreeWatcher {
   private readyState: ReadyState = "idle";
   /** start() 调用时刻（小数毫秒，与文件 mtime 同为墙钟口径）；早于它的修改属于基线。 */
   private startedAtMs = 0;
+  /**
+   * 武装完成标志：ready + armSettleMs 之后才为 true。武装前的 add 事件多为 chokidar
+   * 延迟扫描到的既有文件（macOS fs.watch 子目录扫描可能晚于 ready），不是变更，不计入。
+   */
+  private armed = false;
+  private armTimer: NodeJS.Timeout | null = null;
 
   constructor(options: WorktreeWatcherOptions) {
     // 规范收紧点 2：在构造函数中一次性执行 fs.realpathSync 归一化工作树根路径（例如 macOS /var 与 /private/var）
@@ -85,6 +91,12 @@ export class WorktreeWatcher {
   start(): void {
     if (this.watcher) return;
     this.startedAtMs = performance.timeOrigin + performance.now();
+    this.armed = false;
+    // 兜底：ready 始终未到时（降级路径），超时后也视为武装，避免永久丢弃 add 事件
+    this.armTimer = setTimeout(() => {
+      this.armed = true;
+    }, this.readyTimeoutMs + this.armSettleMs);
+    this.armTimer.unref?.();
     this.watcher = chokidar.watch(this.root, {
       ignoreInitial: true,
       ignored: (p: string) => shouldIgnore(p, this.root),
@@ -98,6 +110,8 @@ export class WorktreeWatcher {
         const finish = () => {
           if (this.watcher !== watcher) return; // 已 stop，不再翻转状态
           if (this.readyState !== "timeout") this.readyState = "ready";
+          this.armed = true;
+          if (this.armTimer) clearTimeout(this.armTimer);
           resolve();
         };
         if (this.armSettleMs > 0) setTimeout(finish, this.armSettleMs);
@@ -120,6 +134,7 @@ export class WorktreeWatcher {
 
     const enqueue = (filePath: string, kind: "add" | "change" | "unlink") => {
       if (shouldIgnore(filePath, this.root)) return;
+      if (kind === "add" && !this.armed) return;
       if (kind !== "unlink" && predatesStart(filePath)) return;
       this.pending.add(path.resolve(filePath));
       if (this.timer) clearTimeout(this.timer);
@@ -182,6 +197,11 @@ export class WorktreeWatcher {
   }
 
   async stop(): Promise<void> {
+    if (this.armTimer) {
+      clearTimeout(this.armTimer);
+      this.armTimer = null;
+    }
+    this.armed = false;
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = null;
