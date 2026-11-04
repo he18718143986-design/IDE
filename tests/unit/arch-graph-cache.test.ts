@@ -87,4 +87,14 @@ describe("4.2 /api/arch/graph：src 收敛与 mtime 缓存", () => {
     }
     expect(Math.max(...samples)).toBeLessThanOrEqual(50);
   });
+
+  it("连续两次构建命中单例缓存，不重复执行全量重构且返回同一图实例", () => {
+    const res1 = buildDependencyGraph({ root });
+    expect(res1.graph.getStats().nodes).toBe(2);
+
+    // 第二次构建由于 mtime/size 未变，直接复用图单例与解析结果
+    const res2 = buildDependencyGraph({ root });
+    expect(res2.graph).toBe(res1.graph);
+    expect(res2.graph.getStats().nodes).toBe(2);
+  });
 });

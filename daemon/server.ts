@@ -215,7 +215,7 @@ import type { SoftwareContract } from "../src/lib/contract.schema";
 import type { EvidenceBundle } from "../src/lib/evidence.schema";
 import { WorktreeWatcher } from "./watcher/fs-watcher";
 import { EvidenceInvalidationEngine } from "./watcher/invalidation-engine";
-import { buildDependencyGraph } from "./arch/graph";
+import { buildDependencyGraph, getOrCreateRepoGraph } from "./arch/graph";
 import { readDiffFiles } from "./diff/diff-files";
 import { launchEditor } from "./editor/launcher";
 import { getModelSettings, setRuntimeKey } from "./worker/key-store";
@@ -4697,9 +4697,7 @@ export class StagentDaemon {
         return;
       }
       try {
-        const { graph, durationMs } = buildDependencyGraph({
-          root: this.repoRoot,
-        });
+        const { graph, durationMs } = getOrCreateRepoGraph(this.repoRoot);
         this.sendJson(res, 200, {
           durationMs,
           stats: graph.getStats(),

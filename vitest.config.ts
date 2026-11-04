@@ -46,6 +46,7 @@ export default defineConfig({
           setupFiles: ["./src/tests/setup.ts"],
           include: [
             "tests/daemon/**/*.{test,spec}.{ts,tsx}",
+            "tests/perf/**/*.{test,spec}.{ts,tsx}",
             "tests/lib/**/*.{test,spec}.{ts,tsx}",
             "tests/integration/**/*.{test,spec}.{ts,tsx}",
             "tests/e2e/**/*.{test,spec}.{ts,tsx}",
