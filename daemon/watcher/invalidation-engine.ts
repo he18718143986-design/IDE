@@ -27,7 +27,9 @@ export class EvidenceInvalidationEngine {
   private readonly records = new Map<string, RegisteredEvidence>();
 
   constructor(worktreePath: string) {
-    this.worktreePath = path.resolve(worktreePath);
+    this.worktreePath = fs.existsSync(worktreePath)
+      ? fs.realpathSync(worktreePath)
+      : path.resolve(worktreePath);
   }
 
   /**

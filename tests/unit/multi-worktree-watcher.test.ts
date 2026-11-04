@@ -120,9 +120,7 @@ describe("TASK-B.2 多 Worktree Watcher 性能与并发监听测试", () => {
       });
       watchersToClean.push(watcher);
       watcher.start();
-
-      // 等待 chokidar 就绪
-      await new Promise((r) => setTimeout(r, 80));
+      await watcher.waitUntilReady();
 
       startTime.current = performance.now();
       fs.writeFileSync(testFile, `export const x = ${round + 1};\n`);
@@ -261,9 +259,8 @@ describe("TASK-B.2 多 Worktree Watcher 性能与并发监听测试", () => {
       });
       watchersToClean.push(watcher);
       watcher.start();
+      await watcher.waitUntilReady();
     }
-
-    await new Promise((r) => setTimeout(r, 120));
 
     // 修改前，全量 can_merge 均为 true
     for (const evPath of evidencePaths) {
@@ -326,8 +323,8 @@ describe("TASK-B.2 多 Worktree Watcher 性能与并发监听测试", () => {
     });
     watchersToClean.push(watcher);
     watcher.start();
-
-    await new Promise((r) => setTimeout(r, 100));
+    await watcher.waitUntilReady();
+    fired = false;
 
     // 修改忽略目录里的内容
     fs.writeFileSync(path.join(wtDir, ".git", "index.lock"), "locked\n");

@@ -103,6 +103,9 @@ describe("TASK-B.2 合并前快照指纹复核兜底与算法收敛测试", () =
       stdio: "ignore",
     });
 
+    // 预热 Git 状态与文件系统缓存，消除冷启动瞬态调度抖动
+    await computeWorktreeFingerprint(gitRepo);
+
     const durations: number[] = [];
     for (let round = 0; round < 5; round++) {
       const t0 = performance.now();

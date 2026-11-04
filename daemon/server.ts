@@ -2138,6 +2138,8 @@ export class StagentDaemon {
       },
     });
     watcher.start();
+    // 关键收紧点 1：生产路径武装后等待 Watcher 底层就绪，杜绝武装即写入时的事件遗漏与竞态盲区
+    await watcher.waitUntilReady();
     this.armedWatchers.set(contractId, {
       watcher,
       engine,
