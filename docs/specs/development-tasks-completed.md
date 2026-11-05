@@ -4092,6 +4092,96 @@
 <a id="task-c.4"></a>
 
 #### 【Task C.4】架构雷达视图与 Scope 圈选抽屉
+
+```yaml task-card
+id: TASK-C.4
+title: 架构雷达视图与 Scope 圈选抽屉
+status: COMPLETED
+spec_refs:
+  - docs/rfc/v0.2-scope.md#43-task-c4--架构雷达--scope-圈选抽屉建议激活排在-b1-之后
+  - docs/specs/system-architecture.md#321-节点生命周期七态表-v152-统一
+  - docs/specs/task-card-standard.md
+goal: 用户在 Supervisor 工作台流畅查看 1000 模块拓扑与新鲜度着色；对已批准合同圈选修改 Scope 时强制派生新 Revision 并清空旧审批。
+depends_on:
+  - { id: TASK-B.1, kind: hard }
+  - { id: TASK-B.2, kind: soft }
+  - { id: TASK-C.1, kind: hard }
+  - { id: TASK-C.2, kind: hard }
+  - { id: TASK-C.3, kind: hard }
+code_facts:
+  - { ref: "src/components/radar/RadarGraph.tsx:100-240", note: 任何数据变化都 cy.destroy() 后全量重建 }
+  - { ref: "src/components/radar/ScopeSelector.tsx::ScopeSelector", note: 只是静态徽标列表，无抽屉与影响面预览 }
+  - { ref: "src/lib/contract.schema.ts::bumpContractRevision", note: 生产零调用方，Scope 可原地修改 }
+touches:
+  - path: src/components/radar/RadarGraph.tsx
+    action: modify
+    symbols: [patchGraphElements, applyFreshnessClasses, updateCycleHighlight, GraphElementsDiff, FreshnessStatus]
+  - path: src/components/radar/ScopeSelector.tsx
+    action: modify
+    symbols: [ScopeSelector, onApplyScope]
+  - path: src/lib/contract.schema.ts
+    action: modify
+    symbols: [evaluateScopeChange, applyContractScopeChange, ScopeChangeForbiddenError, E_SCOPE_CHANGE_FORBIDDEN]
+  - path: src/lib/state-machine.ts
+    action: modify
+    symbols: [assertApprovalBinding]
+  - path: daemon/pipeline/merger.ts
+    action: modify
+    symbols: [mergeInternal]
+  - path: daemon/server.ts
+    action: modify
+  - path: src/lib/daemon-api.ts
+    action: modify
+    symbols: [updateContractScopeRevision]
+  - path: src/routes/index.tsx
+    action: modify
+  - path: tests/components/RadarGraph.perf.test.tsx
+    action: create
+  - path: tests/unit/contract-scope-revision.test.ts
+    action: create
+  - path: tests/daemon/contract-scope-revision-store.test.ts
+    action: create
+  - path: tests/daemon/scope-revision-api.test.ts
+    action: create
+non_goals:
+  - 不改 Daemon 图分析引擎（TASK-B.1 已冻结）
+  - 不替换 Cytoscape
+  - 不做任意多边形套索
+  - 不支持 AUDITED 合同退回待批（需先在 runtime §9.1.1 补受控边）
+pass:
+  - { id: C4-P1, test: tests/components/RadarGraph.perf.test.tsx, case: "性能门禁①", assert: 1000 节点 2000 边单批次局部 patch ≤16ms }
+  - { id: C4-P2, test: tests/components/RadarGraph.perf.test.tsx, case: "性能门禁②", assert: 50 次连续 patch 后元素数与图模型一致（jsdom 实体计数代理；真实堆内存待 Playwright） }
+  - { id: C4-P3, test: tests/components/RadarGraph.perf.test.tsx, case: "性能门禁③", assert: ">1000 节点降级为 grid/preset 静态布局" }
+  - { id: C4-P4, test: tests/components/RadarGraph.perf.test.tsx, case: "性能门禁④", assert: 仅卸载时 cy.destroy() 一次 }
+  - { id: C4-P5, test: tests/components/RadarGraph.test.tsx, case: "局部状态更新不调用 cy.destroy()", assert: 数据 / 环路 / 搜索变化复用同一 Cytoscape 实例 }
+  - id: C4-P6
+    test: tests/components/RadarGraph.test.tsx
+    case: "新鲜度着色"
+    assert: applyFreshnessClasses 只给 changed_paths 对应节点加 stale / changed 类，其余节点不变
+    debt: 交付时只把 applyFreshnessClasses 当 perf 负载调用，没有断言着色结果（P-148 未登记）
+  - id: C4-P7
+    test: tests/components/RadarGraph.test.tsx
+    case: "圈选抽屉"
+    assert: 抽屉内确认后以 (paths, mode) 调用 onApplyScope；已批准合同 mode 为 derive_revision
+    debt: 现有用例只覆盖 C.2 时期的 onApply，抽屉与 onApplyScope 无测试（P-148 未登记）
+  - { id: C4-P8, test: tests/unit/contract-scope-revision.test.ts, case: "已批准且处于 PREPARING", assert: 派生新 Revision 并清空旧审批 }
+  - { id: C4-P9, test: tests/unit/contract-scope-revision.test.ts, case: "旧 Revision 审批失效", assert: assertApprovalBinding 判定 APPROVAL_REVISION_STALE }
+  - { id: C4-P10, test: tests/daemon/contract-scope-revision-store.test.ts, case: "合并生产门禁", assert: 合并时旧 revision 审批被 APPROVAL_REVISION_STALE 拒绝 }
+  - { id: C4-P11, test: tests/unit/contract-scope-revision.test.ts, case: "未批准草案（DRAFT）", assert: 草案原地更新不自增 revision }
+  - { id: C4-P12, test: tests/daemon/scope-revision-api.test.ts, case: "EXECUTING 执行中合同", assert: 409 E_SCOPE_CHANGE_FORBIDDEN 且磁盘不变 }
+fail:
+  - 任何局部状态变化触发 cy.destroy() 重建
+  - 已批准合同原地修改 Scope
+  - 旧 Revision 审批对新 Revision 仍有效
+estimate: M
+invariants:
+  auth: unchanged
+  demo_origin: unchanged
+  illumination: unchanged
+  gateway_write_scope: unchanged
+delivered: { pr: 138, commit: 993e3e9 }
+```
+
 * **任务编号**：`TASK-C.4`
 * **前置依赖（R-3）**：`TASK-B.1`（**COMPLETED** · 硬依赖，交付 `/api/arch/graph` 契约超集）；`TASK-B.2`（**COMPLETED** · 软依赖，交付多 worktree watcher 与 `EVIDENCE_STATUS_CHANGED` 广播）；`TASK-C.1`（**COMPLETED**）、`TASK-C.2`（**COMPLETED**）、`TASK-C.3`（**COMPLETED**）。
 * **任务状态**：**[COMPLETED]**（[#138](https://github.com/he18718143986-design/IDE/pull/138) squash `993e3e9`；代码提交 `a445f95` 主体 + `9bf2ccb` 返工；P-148 回写迁入 completed §3.4t）。

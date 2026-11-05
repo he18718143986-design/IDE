@@ -82,3 +82,24 @@ Stagent 给 Worker 的合同 + DesignNote，必须满足本标准的产品化版
 | R-8 FAIL | 网关越界、`TEST_WEAKENED`、`KNOWLEDGE_DRIFT` 等确定性拒绝 |
 | R-10 无未决问题 | 可编译判定「可冻结」（delivery-lifecycle §3） |
 | R-11 估算 | 合同桩 `size_estimate` ≤ D-1 上限（project-decomposition §3） |
+
+---
+
+## 6. 卡头（机器可读）与文档门禁
+
+卡正文是给人读的；R-1～R-12 里能被机器核对的部分，写进卡内一个 ` ```yaml task-card ` 代码块，作为卡的机器权威。Schema 在 `scripts/docs-check/card-header.schema.ts`，填法见 [`../templates/05-task-card.md`](../templates/05-task-card.md)，样板是 `TASK-C.4`（[`development-tasks-completed.md`](./development-tasks-completed.md#task-c.4)）。
+
+| 字段 | 对应 | 门禁怎么核对 |
+| :--- | :--- | :--- |
+| `spec_refs` | R-1 | 文件与锚点真实存在 |
+| `depends_on` | R-3 | 卡号存在；卡在 `READY` 及之后时，`hard` 依赖必须 `COMPLETED`；卡头之间不成环 |
+| `code_facts` | R-4 | 未完成的卡：`path::symbol` 的符号、`path:行号` 的行号对得上今天的代码 |
+| `touches` | R-5 | 未开工：要改的文件存在；已完成：文件存在、`symbols` 在文件里有声明 |
+| `pass` | R-7 | 测试文件落在 vitest 收录范围内；已完成：文件里有标题含 `case` 的 `it` / `test` 且未 skip |
+| `open_questions` / `estimate` | R-10 / R-11 | `READY` 及之后不得有未决问题、不得是 L |
+| `status` | D-3 | 与 §1.1 矩阵、卡号索引三处一致 |
+| `delivered` | D-3 | `COMPLETED` 必填 PR 号与 commit |
+
+`pass[].debt`：已知没有测试兑现的断言，写明原因后降为告警，不再阻断；测试补上后门禁会要求删掉 `debt`，挂账因此不会悄悄留下。
+
+门禁命令 `npm run check:docs`（CI `Docs check` job，纯文档 PR 同样运行），同时检查 `docs/` 全部链接与锚点、§1.1 矩阵与索引的状态同步，以及 [`../scheme.md`](../scheme.md) 中 `user_said` 条目能否追到 §0 原话（引用缺失报错；不是逐字子串只告警，对应 acc-4）。
