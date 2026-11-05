@@ -77,8 +77,15 @@ export const CURSOR_AGENT_MEASUREMENT = {
  * `CLAUDE_CODE_VERIFIED_ON` 同一纪律）。填值前必须同时给出 CLI 版本与实测日期；
  * 未实测就填 = 卡内 FAIL。
  */
+/**
+ * CA-06 实测回填：run 41959697673（main cec8c6c5d，#141 合入后，ca06-real 手动触发全绿）。
+ * cli_version 取安装包构建号 2026.10.22-27dcf5f（来自 job 日志下载地址），非 `cursor-agent --version` 自报字符串。
+ */
 export const CURSOR_AGENT_VERIFIED_ON:
-  { cli_version: string; verified_at: string } | undefined = undefined;
+  { cli_version: string; verified_at: string } | undefined = {
+    cli_version: "2026.10.22-27dcf5f",
+    verified_at: "2026-11-05",
+  };
 
 /**
  * 允许传给 cursor-agent 的旗标（白名单）。只准出现这些；其余一律视为注入面。
