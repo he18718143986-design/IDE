@@ -190,6 +190,9 @@ const AGENT_TRANSCRIPT_FILE = "CURSOR_AGENT_MEASUREMENT-ca06-agent.log";
 /** 认证失败特征：命中即 FAIL（只对 agent 的 stdout/stderr 断言，不对 status 前置检查） */
 const AUTH_FAILURE =
   /not logged in|authentication required|invalid.*key|\b401\b|unauthorized/i;
+/** 工作区信任提示特征：命中即 FAIL（信任记录未预置/未生效）；与 cursor-agent 源码中的对话框文案一致 */
+const TRUST_REQUIRED =
+  /workspace trust required|do you trust the contents of this directory/i;
 /** 仅解析失败时的兜底阈值：认证失败报错通常很短 */
 const UNPARSED_MIN_CHARS = 200;
 const MODEL_TURN_TYPES = new Set(["assistant", "result"]);
@@ -250,6 +253,47 @@ function parseStreamJson(stdout: string): {
     }
   }
   return { events, unparsedLines };
+}
+
+/**
+ * cursor-agent 工作区目录名（与 CLI 的 workspace-paths `r_` 一致：非 [A-Za-z0-9] 替换为 `-`，
+ * 合并连续 `-`，去掉首尾 `-`）。路径每次都是临时目录，必须动态计算，不能写死。
+ */
+function cursorProjectDirName(workspacePath: string): string {
+  return workspacePath
+    .replace(/[^a-zA-Z0-9]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/**
+ * 在隔离 HOME（configDir）预置工作区信任记录。
+ *
+ * 格式来源：cursor-agent 2026.10.22 bundle 中交互式「Trust this workspace」的写入逻辑——
+ *   <CURSOR_DATA_DIR 或 $HOME/.cursor>/projects/<cursorProjectDirName(ws)>/.workspace-trusted
+ *   内容：{ "trustedAt": ISO8601, "workspacePath": ws }
+ * 信任检查见同一 bundle 的 `b()`：标记文件存在即 `already_approved`，不再弹对话框。
+ *
+ * 边界：只写测试自己的隔离 HOME；不加 `--trust`，不改 CURSOR_AGENT_FORBIDDEN_FLAGS，
+ * 不触碰产品代码。项目级 MCP 批准是另一份状态，不由本标记批准（负例 4 仍会检出）。
+ * 同时写 realpath 与原路径两份，防止 CLI 对 --workspace 做了规范化。
+ */
+function preseedWorkspaceTrust(configDir: string, workspacePath: string): void {
+  const candidates = new Set([workspacePath, fs.realpathSync(workspacePath)]);
+  for (const ws of candidates) {
+    const dir = path.join(
+      configDir,
+      ".cursor",
+      "projects",
+      cursorProjectDirName(ws),
+    );
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, ".workspace-trusted"),
+      `${JSON.stringify({ trustedAt: new Date().toISOString(), workspacePath: ws }, null, 2)}\n`,
+      "utf8",
+    );
+  }
 }
 
 /**
@@ -371,6 +415,8 @@ describe.skipIf(!HAS_KEY)(
         apiKey: () => apiKey,
         mode: "plan",
       }).buildLaunch({ prompt, cwd: plant.proj });
+      // 预置工作区信任，避免 CLI 停在 Workspace Trust Required 对话框
+      preseedWorkspaceTrust(launch.configDir, plant.proj);
 
       // 前置：隔离 HOME 必须未登录（禁止用订阅会话凑数）
       // 注意：这里的 "Not logged in" 是隔离 HOME 的预期，不参与认证失败判定
@@ -464,6 +510,13 @@ describe.skipIf(!HAS_KEY)(
           "utf8",
         );
       }
+
+      // —— P0) 正向：不得停在工作区信任对话框（预置记录应已覆盖）——
+      const trustHit = combined.match(TRUST_REQUIRED);
+      expect(
+        trustHit,
+        `agent 停在工作区信任提示「${trustHit?.[0] ?? ""}」：信任记录未生效，本次 CA-06 不计为通过`,
+      ).toBeNull();
 
       // —— P1) 正向：agent 输出不得含认证失败特征（只看 run 的 stdout/stderr）——
       const authHit = combined.match(AUTH_FAILURE);
