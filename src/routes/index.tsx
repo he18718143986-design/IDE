@@ -1922,8 +1922,13 @@ ${trimmed}`
       if (p.status === "STALE" && Array.isArray(p.changed_paths)) {
         setFreshnessMap((prev) => {
           const next = { ...prev };
+          // key 必须与 RadarGraph 节点 id 同口径：/api/arch/graph 的 filePath 为 repoRoot 下绝对路径
           for (const relativePath of p.changed_paths ?? []) {
-            if (relativePath) next[relativePath] = "STALE";
+            if (!relativePath) continue;
+            const radarNodeId = repoRoot
+              ? `${repoRoot.replace(/\/+$/, "")}/${relativePath}`
+              : relativePath;
+            next[radarNodeId] = "STALE";
           }
           return next;
         });
@@ -2360,7 +2365,7 @@ ${trimmed}`
   }, [connected, taskGraph, graph, loadRepoTree, loadArchGraph]);
 
   const handleApplyRadarScope = useCallback(
-    (paths: string[], _mode: "draft" | "derive_revision") => {
+    (paths: string[]) => {
       if (!selected) {
         openNewRequirement(paths);
         setSelectedPaths([]);

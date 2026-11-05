@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { FAST_PATH_APPROVER, validateStatePair } from "./state-machine";
+import {
+  FAST_PATH_APPROVER,
+  isTerminalState,
+  validateStatePair,
+  validateTransition,
+} from "./state-machine";
 
 /**
  * 软件合同 Schema (v1.3.2)
@@ -891,37 +896,110 @@ export interface ApplyScopeChangeResult {
   newRevision: number;
 }
 
+export const E_SCOPE_CHANGE_FORBIDDEN = "E_SCOPE_CHANGE_FORBIDDEN";
+
+/** Scope 变更被生命周期 / 审批状态拒绝（Fail-Closed，不得持久化） */
+export class ScopeChangeForbiddenError extends Error {
+  readonly code = E_SCOPE_CHANGE_FORBIDDEN;
+  readonly lifecycleState: LifecycleState;
+  readonly approvalStatus: ApprovalStatus;
+
+  constructor(
+    message: string,
+    lifecycleState: LifecycleState,
+    approvalStatus: ApprovalStatus,
+  ) {
+    super(`[${E_SCOPE_CHANGE_FORBIDDEN}] ${message}`);
+    this.name = "ScopeChangeForbiddenError";
+    this.lifecycleState = lifecycleState;
+    this.approvalStatus = approvalStatus;
+  }
+}
+
+export type ScopeChangeDecision =
+  | { ok: true; mode: "draft" }
+  | { ok: true; mode: "derive_revision" }
+  | {
+      ok: false;
+      code: typeof E_SCOPE_CHANGE_FORBIDDEN;
+      message: string;
+    };
+
 /**
- * 依据 C.4 规范应用 Scope 可写范围变更：
+ * Scope 变更的 Fail-Closed 裁决（生产唯一事实源，路由与 applyContractScopeChange 共用）。
+ *
+ * - 终态（MERGED / ABORTED）：拒绝；
+ * - 未批准且处于 DRAFT / PENDING_APPROVAL：原地更新，不改生命周期，不经跃迁；
+ * - 已批准：必须经 §9.1.1 的 → PENDING_APPROVAL(PENDING_REVIEW) 边派生新 Revision，
+ *   边合法性由 validateTransition 判定。当前表中仅 PREPARING 可达该边；
+ *   EXECUTING / VERIFYING / AUDITED / PENDING_RESUME 等均拒绝。
+ *   若规范要支持「已批准合同回退待批」，须先在 §9.1.1 与 LIFECYCLE_TRANSITIONS 补受控边。
+ * - 其余未列明组合一律拒绝。
+ */
+export function evaluateScopeChange(
+  contract: Pick<SoftwareContractV12, "lifecycle_state" | "approval">,
+): ScopeChangeDecision {
+  const lifecycle = contract.lifecycle_state;
+  const approval = contract.approval.status;
+
+  if (isTerminalState(lifecycle)) {
+    return forbidScopeChange(
+      `lifecycle_state=${lifecycle} 为终态，不允许变更 Scope`,
+    );
+  }
+
+  if (approval !== "APPROVED") {
+    if (lifecycle === "DRAFT" || lifecycle === "PENDING_APPROVAL") {
+      return { ok: true, mode: "draft" };
+    }
+    return forbidScopeChange(
+      `未批准（approval=${approval}）的合同仅允许在 DRAFT / PENDING_APPROVAL 修改 Scope，当前 lifecycle_state=${lifecycle}`,
+    );
+  }
+
+  if (lifecycle === "EXECUTING" || lifecycle === "VERIFYING") {
+    return forbidScopeChange(
+      `执行中（lifecycle_state=${lifecycle}）不允许变更 Scope，请先中止或等待挂起`,
+    );
+  }
+
+  const verdict = validateTransition(
+    { lifecycle_state: lifecycle, approval_status: approval },
+    { lifecycle_state: "PENDING_APPROVAL", approval_status: "PENDING_REVIEW" },
+  );
+  if (!verdict.ok) {
+    return forbidScopeChange(
+      `已批准合同从 ${lifecycle} 派生新 Revision 的跃迁被拒绝：${verdict.message}`,
+    );
+  }
+  return { ok: true, mode: "derive_revision" };
+}
+
+function forbidScopeChange(message: string): ScopeChangeDecision {
+  return { ok: false, code: E_SCOPE_CHANGE_FORBIDDEN, message };
+}
+
+/**
+ * 依据 C.4 规范应用 Scope 可写范围变更（纯函数，不落盘）：
  * - 未批准（DRAFT / PENDING_APPROVAL）：原地更新，不产生版本碎片；
- * - 已批准（approval.status=APPROVED）：强制派生新 Revision（contract_revision + 1），清空旧审批并回置为 PENDING_APPROVAL / PENDING_REVIEW。
+ * - 已批准且处于允许派生的生命周期：强制派生新 Revision（contract_revision + 1），
+ *   清空旧审批人 / 时间 / approved_revision，回置为 PENDING_APPROVAL / PENDING_REVIEW；
+ * - 其余组合：抛出 ScopeChangeForbiddenError（不产生任何输出合同）。
  */
 export function applyContractScopeChange(
   contract: SoftwareContractV12,
   newWritablePaths: string[],
 ): ApplyScopeChangeResult {
-  const isApprovedOrDelivered = contract.approval.status === "APPROVED";
-
-  if (!isApprovedOrDelivered) {
-    const updated = softwareContractSchema.parse({
-      ...contract,
-      authorization: {
-        ...contract.authorization,
-        file_system_scope: {
-          ...contract.authorization.file_system_scope,
-          writable_paths: [...newWritablePaths],
-        },
-      },
-    });
-    return {
-      contract: updated,
-      mode: "draft",
-      previousRevision: contract.contract_revision,
-      newRevision: contract.contract_revision,
-    };
+  const decision = evaluateScopeChange(contract);
+  if (!decision.ok) {
+    throw new ScopeChangeForbiddenError(
+      decision.message,
+      contract.lifecycle_state,
+      contract.approval.status,
+    );
   }
 
-  const updatedScope: SoftwareContractV12 = {
+  const scoped = softwareContractSchema.parse({
     ...contract,
     authorization: {
       ...contract.authorization,
@@ -930,43 +1008,22 @@ export function applyContractScopeChange(
         writable_paths: [...newWritablePaths],
       },
     },
-  };
+  });
 
-  const bumped = bumpContractRevision(updatedScope);
+  if (decision.mode === "draft") {
+    return {
+      contract: scoped,
+      mode: "draft",
+      previousRevision: contract.contract_revision,
+      newRevision: contract.contract_revision,
+    };
+  }
 
+  const bumped = bumpContractRevision(scoped);
   return {
     contract: bumped,
     mode: "derive_revision",
     previousRevision: contract.contract_revision,
     newRevision: bumped.contract_revision,
   };
-}
-
-export const E_APPROVAL_REVISION_MISMATCH = "E_APPROVAL_REVISION_MISMATCH";
-
-/**
- * 校验审批记录是否与当前合同版本严格绑定。
- * 若审批记录绑定的版本与当前 contract.contract_revision 不一致，或者审批非 APPROVED，返回 E_APPROVAL_REVISION_MISMATCH。
- */
-export function validateApprovalRevision(
-  contract: { contract_revision: number },
-  approval: { status: string; approved_revision?: number },
-):
-  | { ok: true }
-  | { ok: false; code: typeof E_APPROVAL_REVISION_MISMATCH; message: string } {
-  if (approval.status !== "APPROVED") {
-    return {
-      ok: false,
-      code: E_APPROVAL_REVISION_MISMATCH,
-      message: `Approval status is ${approval.status}, required APPROVED`,
-    };
-  }
-  if (approval.approved_revision !== contract.contract_revision) {
-    return {
-      ok: false,
-      code: E_APPROVAL_REVISION_MISMATCH,
-      message: `Approval revision ${approval.approved_revision ?? "unset"} does not match current contract revision ${contract.contract_revision}`,
-    };
-  }
-  return { ok: true };
 }

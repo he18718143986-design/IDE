@@ -324,7 +324,7 @@ export function validateTransition(
  */
 export function isApprovalCurrent(contract: {
   contract_revision: number;
-  approval: { status: ApprovalStatus; approved_revision?: number };
+  approval: { status: ApprovalStatus; approved_revision?: number | undefined };
 }): boolean {
   if (contract.approval.status !== "APPROVED") return false;
   return contract.approval.approved_revision === contract.contract_revision;
@@ -333,7 +333,7 @@ export function isApprovalCurrent(contract: {
 /** `isApprovalCurrent` 的断言版本，失败时抛出带 code 的异常 */
 export function assertApprovalBinding(contract: {
   contract_revision: number;
-  approval: { status: ApprovalStatus; approved_revision?: number };
+  approval: { status: ApprovalStatus; approved_revision?: number | undefined };
 }): ValidationResult {
   if (isApprovalCurrent(contract)) return OK;
   return {

@@ -6,6 +6,7 @@ import { archiveContractRecords } from "./records-archive";
 import { publicDeliveryCopy } from "../../src/lib/state/terminal-delivery-closure";
 import { readStateFile } from "../guard/state-store";
 import type { SoftwareContract } from "../../src/lib/contract.schema";
+import { assertApprovalBinding } from "../../src/lib/state-machine";
 import {
   evidenceBundleSchema,
   type EvidenceBundle,
@@ -468,6 +469,13 @@ async function mergeInternal(
       "E_NOT_AUDITED",
       `Contract must be AUDITED before merge (state=${contract.lifecycle_state})`,
     );
+  }
+
+  // 1b. 审批版本绑定（防 TOCTOU，§9.1）：审批必须绑定当前 contract_revision。
+  // 旧 revision 的审批在 Scope 派生新版本后即失效，不得授权本次合并。
+  const approvalBinding = assertApprovalBinding(contract);
+  if (!approvalBinding.ok) {
+    throw new MergeGateError(approvalBinding.code, approvalBinding.message);
   }
 
   // 2. Evidence 门禁（以磁盘快照为准，避免内存伪造）

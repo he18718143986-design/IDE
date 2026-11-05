@@ -140,6 +140,7 @@ import {
 } from "./guard/gateway-violation-store";
 import { projectDeliveryState } from "../src/lib/state/delivery-state";
 import { ContractOrchestrator } from "./pipeline/orchestrator";
+import { IllegalContractTransitionError } from "./pipeline/contract-store";
 import { TaskGraphEngine } from "./graph/graph-engine";
 import { collectWorktreeEvidence } from "./graph/evidence-collector";
 import type { IlluminationInput } from "./graph/illumination-verifier";
@@ -201,6 +202,7 @@ import {
 import {
   softwareContractSchema,
   applyContractScopeChange,
+  ScopeChangeForbiddenError,
 } from "../src/lib/contract.schema";
 import { DeadlockResilience } from "./state/deadlock-resilience";
 import {
@@ -5602,8 +5604,17 @@ export class StagentDaemon {
             return;
           }
           assertContractScopeAllowed(this.repoRoot, body.writable_paths);
+          // Fail-Closed 裁决在 applyContractScopeChange 内（终态 / 执行中 / 非法边 → 抛错，不落盘）
           const result = applyContractScopeChange(current, body.writable_paths);
-          const saved = store.save(result.contract);
+          const saved =
+            result.mode === "draft"
+              ? store.save(result.contract)
+              : store.transition({
+                  contractId,
+                  lifecycleState: "PENDING_APPROVAL",
+                  approvalStatus: "PENDING_REVIEW",
+                  nextContract: result.contract,
+                });
           this.emitContractUpdate(saved);
           this.sendJson(res, 200, {
             contract: saved,
@@ -5618,6 +5629,13 @@ export class StagentDaemon {
               code: err.code,
               rejected: err.rejected,
             });
+            return;
+          }
+          if (
+            err instanceof ScopeChangeForbiddenError ||
+            err instanceof IllegalContractTransitionError
+          ) {
+            this.sendJson(res, 409, { error: err.message, code: err.code });
             return;
           }
           this.sendJson(res, 400, { error: (err as Error).message });

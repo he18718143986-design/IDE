@@ -221,6 +221,12 @@ export class ContractStore {
      * 不能因为"调用方忘了传"就默默放行一条本应带理由的边。
      */
     transitionContext?: TransitionContext;
+    /**
+     * TASK-C.4：完整替换合同（如 Scope 变更派生的新 Revision）。
+     * 提供时其 approval 原样落盘（已清空旧审批字段），且 lifecycle_state / approval.status
+     * 必须与本次跃迁目标一致；跃迁合法性仍由 validateTransition 裁决，不因替换而豁免。
+     */
+    nextContract?: SoftwareContract;
   }): SoftwareContract {
     const current = this.get(params.contractId);
     if (!current) {
@@ -228,6 +234,30 @@ export class ContractStore {
     }
 
     const nextApprovalStatus = params.approvalStatus ?? current.approval.status;
+
+    if (params.nextContract !== undefined) {
+      const next = params.nextContract;
+      if (next.contract_id !== current.contract_id) {
+        throw new Error(
+          `nextContract.contract_id mismatch: ${next.contract_id} != ${current.contract_id}`,
+        );
+      }
+      if (next.contract_revision < current.contract_revision) {
+        throw new Error(
+          `nextContract.contract_revision ${next.contract_revision} regresses from ${current.contract_revision}`,
+        );
+      }
+      if (
+        next.lifecycle_state !== params.lifecycleState ||
+        next.approval.status !== nextApprovalStatus
+      ) {
+        throw new IllegalContractTransitionError(
+          current.lifecycle_state,
+          LIFECYCLE_TRANSITIONS[current.lifecycle_state],
+          `nextContract 的 lifecycle/approval 与跃迁目标不一致`,
+        );
+      }
+    }
 
     const from: ContractStatePair = {
       lifecycle_state: current.lifecycle_state,
@@ -245,6 +275,11 @@ export class ContractStore {
         LIFECYCLE_TRANSITIONS[current.lifecycle_state],
         `${params.lifecycleState} (${verdict.message})`,
       );
+    }
+
+    if (params.nextContract !== undefined) {
+      // 上方已校验 lifecycle/approval 与跃迁目标一致，整体替换落盘
+      return this.save(params.nextContract);
     }
 
     const approval = {

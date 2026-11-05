@@ -72,11 +72,8 @@ export function ScopeSelector({
   }, [selected, edges]);
 
   // 判断合同审批与生命周期状态
-  const isApproved = Boolean(
-    contract &&
-    (contract.approval === "APPROVED" ||
-      (contract.state && contract.state !== "DRAFT")),
-  );
+  // 以审批状态为准（生命周期 state 不代表是否已批准，例如 PENDING_APPROVAL 仍未批准）
+  const isApproved = contract?.approval === "APPROVED";
 
   const applyMode: "draft" | "derive_revision" = isApproved
     ? "derive_revision"
