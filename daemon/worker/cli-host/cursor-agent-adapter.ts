@@ -68,6 +68,14 @@ export const CURSOR_AGENT_MEASUREMENT = {
   negative_cases_executed: false,
   negative_cases_reason:
     "无有效 CURSOR_API_KEY：越权写 / 保护区写 / 白名单外命令 / MCP 面越权 四类负例需要模型驱动工具调用，本机未执行",
+  /** CI 实测记录（ca06-real 手动触发全绿）；与上面的本机记录分开保存，不覆盖本机事实 */
+  ci_measurement: {
+    cli_version: "2026.10.22-27dcf5f",
+    run_id: 41959697673,
+    commit: "cec8c6c5d",
+    measured_at: "2026-11-05",
+    negative_cases_executed: true,
+  },
 } as const;
 
 /**

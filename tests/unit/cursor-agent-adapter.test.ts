@@ -8,7 +8,7 @@
  *
  * 两重身份在断言里是**分开**的：
  * - 身份①（外部适配器实测）：`CA-01`～`CA-05`、`CA-08` —— 声明如实、档位与门禁、
- *   argv / env / MCP 面、`verified_on` 不虚填；
+ *   argv / env / MCP 面、`verified_on` 与实测记录一致；
  * - 身份②（探测包非容器回归基准）：`CA-07` —— 探测包必须**拒绝**这一类适配器。
  *   断言方向是负向：`capability_declaration` 判 `fail` 才算对，出 `pass` 是缺陷。
  */
@@ -610,17 +610,27 @@ describe("CA-07 探测包负向回归：必须拒绝这类适配器", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 身份①：verified_on 不虚填 + 升格拒绝（CA-08）
+// 身份①：verified_on 已回填（CI 实测）+ 升格拒绝（CA-08）
 // ---------------------------------------------------------------------------
 
-describe("CA-08 verified_on 不虚填，升格被拒", () => {
-  it("4 类绕过负例未执行 ⇒ verified_on 恒为 undefined，但实测环境有记录", () => {
-    expect(CURSOR_AGENT_VERIFIED_ON).toBeUndefined();
+describe("CA-08 负例已实测 ⇒ verified_on 已回填，升格仍被拒", () => {
+  it("verified_on 非空、字段齐全，且与 CI 实测记录一致", () => {
+    const on = CURSOR_AGENT_VERIFIED_ON;
+    expect(on).toBeDefined();
+    if (!on) throw new Error("verified_on 未回填");
+    expect(on.cli_version).toMatch(/^\d{4}\.\d{2}\.\d{2}-/);
+    expect(on.verified_at).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    const ci = CURSOR_AGENT_MEASUREMENT.ci_measurement;
+    expect(ci.negative_cases_executed).toBe(true);
+    expect(on.cli_version).toBe(ci.cli_version);
+    expect(on.verified_at).toBe(ci.measured_at);
+  });
+
+  it("本机实测记录保持诚实：本机未跑负例，环境三要素齐全", () => {
     expect(CURSOR_AGENT_MEASUREMENT.negative_cases_executed).toBe(false);
     expect(
       CURSOR_AGENT_MEASUREMENT.negative_cases_reason.length,
     ).toBeGreaterThan(0);
-    // 实测环境三要素必须齐全
     expect(CURSOR_AGENT_MEASUREMENT.cli_version).toMatch(
       /^\d{4}\.\d{2}\.\d{2}-/,
     );

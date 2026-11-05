@@ -180,9 +180,9 @@ describe.skipIf(!REAL)("TASK-W.5b cursor-agent 真实 CLI 观测", () => {
     expect(entries[0]).toContain("stagent");
   });
 
-  it("CA-08 一致性：4 类负例未执行 ⇒ verified_on 仍为空", () => {
-    // 本 PR 只落地驱动器；verified_on 仍空，等 Tina 见绿后再 docs 回写
-    expect(CURSOR_AGENT_VERIFIED_ON).toBeUndefined();
+  it("CA-08 一致性：负例已实测 ⇒ verified_on 已回填", () => {
+    // run 41959697673 见绿后已回填
+    expect(CURSOR_AGENT_VERIFIED_ON).toBeDefined();
   });
 });
 
@@ -306,7 +306,7 @@ function preseedWorkspaceTrust(configDir: string, workspacePath: string): void {
  *   专用 HOME、仅 stagent MCP、禁用旗标不进 argv。
  * - `HAS_KEY` 门控启用；未设 `STAGENT_REAL_CURSOR=1` 时显式抛错
  *   （禁止「有 key 但没开 REAL 旗」冒充跑过）。
- * - **不**修改 `CURSOR_AGENT_VERIFIED_ON`（常量仍 undefined）。
+ * - `CURSOR_AGENT_VERIFIED_ON` 已由 run 41959697673 回填（见 CA-08 用例）。
  * - 正向门禁（先于负向断言）：输出不含认证失败特征、确有模型回合、会话自然结束
  *   （非 spawnSync 超时杀死）。负向断言为空也会在认证失败时通过，故必须先过正向门禁。
  * - 可观测性：脱敏后的 agent stdout/stderr 写入 `CURSOR_AGENT_MEASUREMENT-ca06-agent.log`
