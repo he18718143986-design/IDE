@@ -4095,91 +4095,128 @@
 
 ```yaml task-card
 id: TASK-C.4
-title: 架构雷达视图与 Scope 圈选抽屉
 status: COMPLETED
-spec_refs:
-  - docs/rfc/v0.2-scope.md#43-task-c4--架构雷达--scope-圈选抽屉建议激活排在-b1-之后
-  - docs/specs/system-architecture.md#321-节点生命周期七态表-v152-统一
-  - docs/specs/task-card-standard.md
-goal: 用户在 Supervisor 工作台流畅查看 1000 模块拓扑与新鲜度着色；对已批准合同圈选修改 Scope 时强制派生新 Revision 并清空旧审批。
-depends_on:
-  - { id: TASK-B.1, kind: hard }
-  - { id: TASK-B.2, kind: soft }
-  - { id: TASK-C.1, kind: hard }
-  - { id: TASK-C.2, kind: hard }
-  - { id: TASK-C.3, kind: hard }
-code_facts:
-  - { ref: "src/components/radar/RadarGraph.tsx:100-240", note: 任何数据变化都 cy.destroy() 后全量重建 }
-  - { ref: "src/components/radar/ScopeSelector.tsx::ScopeSelector", note: 只是静态徽标列表，无抽屉与影响面预览 }
-  - { ref: "src/lib/contract.schema.ts::bumpContractRevision", note: 生产零调用方，Scope 可原地修改 }
-touches:
-  - path: src/components/radar/RadarGraph.tsx
-    action: modify
-    symbols: [patchGraphElements, applyFreshnessClasses, updateCycleHighlight, GraphElementsDiff, FreshnessStatus]
-  - path: src/components/radar/ScopeSelector.tsx
-    action: modify
-    symbols: [ScopeSelector, onApplyScope]
-  - path: src/lib/contract.schema.ts
-    action: modify
-    symbols: [evaluateScopeChange, applyContractScopeChange, ScopeChangeForbiddenError, E_SCOPE_CHANGE_FORBIDDEN]
-  - path: src/lib/state-machine.ts
-    action: modify
-    symbols: [assertApprovalBinding]
-  - path: daemon/pipeline/merger.ts
-    action: modify
-    symbols: [mergeInternal]
-  - path: daemon/server.ts
-    action: modify
-  - path: src/lib/daemon-api.ts
-    action: modify
-    symbols: [updateContractScopeRevision]
-  - path: src/routes/index.tsx
-    action: modify
-  - path: tests/components/RadarGraph.perf.test.tsx
-    action: create
-  - path: tests/unit/contract-scope-revision.test.ts
-    action: create
-  - path: tests/daemon/contract-scope-revision-store.test.ts
-    action: create
-  - path: tests/daemon/scope-revision-api.test.ts
-    action: create
-non_goals:
-  - 不改 Daemon 图分析引擎（TASK-B.1 已冻结）
-  - 不替换 Cytoscape
-  - 不做任意多边形套索
-  - 不支持 AUDITED 合同退回待批（需先在 runtime §9.1.1 补受控边）
-pass:
-  - { id: C4-P1, test: tests/components/RadarGraph.perf.test.tsx, case: "性能门禁①", assert: 1000 节点 2000 边单批次局部 patch ≤16ms }
-  - { id: C4-P2, test: tests/components/RadarGraph.perf.test.tsx, case: "性能门禁②", assert: 50 次连续 patch 后元素数与图模型一致（jsdom 实体计数代理；真实堆内存待 Playwright） }
-  - { id: C4-P3, test: tests/components/RadarGraph.perf.test.tsx, case: "性能门禁③", assert: ">1000 节点降级为 grid/preset 静态布局" }
-  - { id: C4-P4, test: tests/components/RadarGraph.perf.test.tsx, case: "性能门禁④", assert: 仅卸载时 cy.destroy() 一次 }
-  - { id: C4-P5, test: tests/components/RadarGraph.test.tsx, case: "局部状态更新不调用 cy.destroy()", assert: 数据 / 环路 / 搜索变化复用同一 Cytoscape 实例 }
-  - id: C4-P6
-    test: tests/components/RadarGraph.test.tsx
-    case: "新鲜度着色"
-    assert: applyFreshnessClasses 只给 changed_paths 对应节点加 stale / changed 类，其余节点不变
-    debt: 交付时只把 applyFreshnessClasses 当 perf 负载调用，没有断言着色结果（P-148 未登记）
-  - id: C4-P7
-    test: tests/components/RadarGraph.test.tsx
-    case: "圈选抽屉"
-    assert: 抽屉内确认后以 (paths, mode) 调用 onApplyScope；已批准合同 mode 为 derive_revision
-    debt: 现有用例只覆盖 C.2 时期的 onApply，抽屉与 onApplyScope 无测试（P-148 未登记）
-  - { id: C4-P8, test: tests/unit/contract-scope-revision.test.ts, case: "已批准且处于 PREPARING", assert: 派生新 Revision 并清空旧审批 }
-  - { id: C4-P9, test: tests/unit/contract-scope-revision.test.ts, case: "旧 Revision 审批失效", assert: assertApprovalBinding 判定 APPROVAL_REVISION_STALE }
-  - { id: C4-P10, test: tests/daemon/contract-scope-revision-store.test.ts, case: "合并生产门禁", assert: 合并时旧 revision 审批被 APPROVAL_REVISION_STALE 拒绝 }
-  - { id: C4-P11, test: tests/unit/contract-scope-revision.test.ts, case: "未批准草案（DRAFT）", assert: 草案原地更新不自增 revision }
-  - { id: C4-P12, test: tests/daemon/scope-revision-api.test.ts, case: "EXECUTING 执行中合同", assert: 409 E_SCOPE_CHANGE_FORBIDDEN 且磁盘不变 }
-fail:
-  - 任何局部状态变化触发 cy.destroy() 重建
-  - 已批准合同原地修改 Scope
-  - 旧 Revision 审批对新 Revision 仍有效
-estimate: M
-invariants:
-  auth: unchanged
-  demo_origin: unchanged
-  illumination: unchanged
-  gateway_write_scope: unchanged
-delivered: { pr: 138, commit: 993e3e9 }
+contract:
+  intent:
+    title: 架构雷达视图与 Scope 圈选抽屉
+    description: 用户在 Supervisor 工作台流畅查看 1000 模块拓扑与新鲜度着色；对已批准合同圈选修改 Scope 时强制派生新 Revision 并清空旧审批。
+    risk_level: HIGH
+  acceptance:
+    - { id: C4-P1, check: auto, text: 1000 节点 2000 边单批次局部 patch ≤16ms }
+    - { id: C4-P2, check: auto, text: 50 次连续 patch 后元素数与图模型一致（jsdom 实体计数代理；真实堆内存待 Playwright） }
+    - { id: C4-P3, check: auto, text: ">1000 节点降级为 grid/preset 静态布局" }
+    - { id: C4-P4, check: auto, text: 仅卸载时 cy.destroy() 一次 }
+    - { id: C4-P5, check: auto, text: 数据 / 环路 / 搜索变化复用同一 Cytoscape 实例 }
+    - { id: C4-P6, check: auto, text: applyFreshnessClasses 只给 changed_paths 对应节点加 stale / changed 类，其余节点不变 }
+    - { id: C4-P7, check: auto, text: "抽屉内确认后以 (paths, mode) 调用 onApplyScope；已批准合同 mode 为 derive_revision" }
+    - { id: C4-P8, check: auto, text: 已批准且处于 PREPARING 的合同改 Scope 时派生新 Revision 并清空旧审批 }
+    - { id: C4-P9, check: auto, text: 旧 Revision 审批被 assertApprovalBinding 判定为 APPROVAL_REVISION_STALE }
+    - { id: C4-P10, check: auto, text: 合并时旧 revision 审批被 APPROVAL_REVISION_STALE 拒绝 }
+    - { id: C4-P11, check: auto, text: DRAFT 草案原地更新 Scope，不自增 revision }
+    - { id: C4-P12, check: auto, text: 执行中合同改 Scope 返回 409 E_SCOPE_CHANGE_FORBIDDEN 且磁盘不变 }
+  scope:
+    writable_paths:
+      - src/components/radar/**
+      - src/lib/contract.schema.ts
+      - src/lib/state-machine.ts
+      - src/lib/daemon-api.ts
+      - src/routes/index.tsx
+      - daemon/pipeline/merger.ts
+      - daemon/pipeline/contract-store.ts
+      - daemon/server.ts
+      - tests/components/RadarGraph.test.tsx
+      - tests/components/RadarGraph.perf.test.tsx
+      - tests/unit/contract-scope-revision.test.ts
+      - tests/daemon/contract-scope-revision-store.test.ts
+      - tests/daemon/scope-revision-api.test.ts
+    readonly_paths:
+      - daemon/arch/**
+  verification:
+    commands:
+      - alias: radar
+        executable: npx
+        args: [vitest, run, tests/components/RadarGraph.test.tsx, tests/components/RadarGraph.perf.test.tsx]
+      - alias: scope-revision
+        executable: npx
+        args: [vitest, run, tests/unit/contract-scope-revision.test.ts, tests/daemon/contract-scope-revision-store.test.ts, tests/daemon/scope-revision-api.test.ts]
+      - alias: typecheck
+        executable: npm
+        args: [run, typecheck]
+design:
+  approach: >-
+    RadarGraph 改为挂载期创建一次的持久 Cytoscape 实例，数据变化经 patchGraphElements 在 cy.batch() 内按
+    删 → 增 → 更新做元素级 patch；ScopeSelector 原地升级为抽屉。Scope 变更走 applyContractScopeChange：
+    已批准且处于 PREPARING 的合同派生新 Revision、经 ContractStore.transition 落盘并清空审批，其余组合
+    Fail-Closed；合并门禁复用 state-machine.ts 的 assertApprovalBinding，不另造错误码。
+  touches:
+    - { path: src/components/radar/RadarGraph.tsx, change: modify, why: 持久实例与增量 patch, symbols: [patchGraphElements, applyFreshnessClasses, updateCycleHighlight, GraphElementsDiff, FreshnessStatus] }
+    - { path: src/components/radar/ScopeSelector.tsx, change: modify, why: 升级为圈选抽屉, symbols: [ScopeSelector, onApplyScope] }
+    - { path: src/lib/contract.schema.ts, change: modify, why: Scope 变更治理, symbols: [evaluateScopeChange, applyContractScopeChange, ScopeChangeForbiddenError, E_SCOPE_CHANGE_FORBIDDEN] }
+    - { path: src/lib/state-machine.ts, change: modify, why: 审批与 revision 绑定判定, symbols: [assertApprovalBinding] }
+    - { path: daemon/pipeline/merger.ts, change: modify, why: 合并前审批绑定门禁, symbols: [mergeInternal] }
+    - { path: daemon/server.ts, change: modify, why: POST /api/contracts/:id/scope-revision }
+    - { path: src/lib/daemon-api.ts, change: modify, why: 前端调用派生接口, symbols: [updateContractScopeRevision] }
+    - { path: src/routes/index.tsx, change: modify, why: SupervisorTab 接线 }
+    - { path: tests/components/RadarGraph.perf.test.tsx, change: create, why: 性能门禁 }
+    - { path: tests/unit/contract-scope-revision.test.ts, change: create, why: 治理裁决矩阵 }
+    - { path: tests/daemon/contract-scope-revision-store.test.ts, change: create, why: transition 落盘与合并门禁 }
+    - { path: tests/daemon/scope-revision-api.test.ts, change: create, why: HTTP 200 / 409 }
+  interfaces:
+    - name: POST /api/contracts/:id/scope-revision
+      kind: http
+      signature: "{ writable_paths: string[] } → 200 { mode: 'draft' | 'derive_revision', contract } | 409 E_SCOPE_CHANGE_FORBIDDEN"
+      consumers: []
+  test_plan:
+    - { acceptance_id: C4-P1, test_path: tests/components/RadarGraph.perf.test.tsx, level: unit, case: "性能门禁①" }
+    - { acceptance_id: C4-P2, test_path: tests/components/RadarGraph.perf.test.tsx, level: unit, case: "性能门禁②" }
+    - { acceptance_id: C4-P3, test_path: tests/components/RadarGraph.perf.test.tsx, level: unit, case: "性能门禁③" }
+    - { acceptance_id: C4-P4, test_path: tests/components/RadarGraph.perf.test.tsx, level: unit, case: "性能门禁④" }
+    - { acceptance_id: C4-P5, test_path: tests/components/RadarGraph.test.tsx, level: unit, case: "局部状态更新不调用 cy.destroy()" }
+    - acceptance_id: C4-P6
+      test_path: tests/components/RadarGraph.test.tsx
+      level: unit
+      case: 新鲜度着色
+      debt: 交付时只把 applyFreshnessClasses 当 perf 负载调用，没有断言着色结果（P-148 未登记）
+    - acceptance_id: C4-P7
+      test_path: tests/components/RadarGraph.test.tsx
+      level: unit
+      case: 圈选抽屉
+      debt: 现有用例只覆盖 C.2 时期的 onApply，抽屉与 onApplyScope 无测试（P-148 未登记）
+    - { acceptance_id: C4-P8, test_path: tests/unit/contract-scope-revision.test.ts, level: unit, case: "已批准且处于 PREPARING" }
+    - { acceptance_id: C4-P9, test_path: tests/unit/contract-scope-revision.test.ts, level: unit, case: "旧 Revision 审批失效" }
+    - { acceptance_id: C4-P10, test_path: tests/daemon/contract-scope-revision-store.test.ts, level: integration, case: "合并生产门禁" }
+    - { acceptance_id: C4-P11, test_path: tests/unit/contract-scope-revision.test.ts, level: unit, case: "未批准草案（DRAFT）" }
+    - { acceptance_id: C4-P12, test_path: tests/daemon/scope-revision-api.test.ts, level: integration, case: "EXECUTING 执行中合同" }
+governance:
+  spec_refs:
+    - docs/rfc/v0.2-scope.md#43-task-c4--架构雷达--scope-圈选抽屉建议激活排在-b1-之后
+    - docs/specs/system-architecture.md#321-节点生命周期七态表-v152-统一
+  depends_on:
+    - { id: TASK-B.1, kind: hard }
+    - { id: TASK-B.2, kind: soft }
+    - { id: TASK-C.1, kind: hard }
+    - { id: TASK-C.2, kind: hard }
+    - { id: TASK-C.3, kind: hard }
+  code_facts:
+    - { ref: "src/components/radar/RadarGraph.tsx:100-240", note: 任何数据变化都 cy.destroy() 后全量重建 }
+    - { ref: "src/components/radar/ScopeSelector.tsx::ScopeSelector", note: 只是静态徽标列表，无抽屉与影响面预览 }
+    - { ref: "src/lib/contract.schema.ts::bumpContractRevision", note: 生产零调用方，Scope 可原地修改 }
+  non_goals:
+    - 不改 Daemon 图分析引擎（TASK-B.1 已冻结）
+    - 不替换 Cytoscape
+    - 不做任意多边形套索
+    - 不支持 AUDITED 合同退回待批（需先在 runtime §9.1.1 补受控边）
+  fail:
+    - 任何局部状态变化触发 cy.destroy() 重建
+    - 已批准合同原地修改 Scope
+    - 旧 Revision 审批对新 Revision 仍有效
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 138, commit: 993e3e9 }
 ```
 
 * **任务编号**：`TASK-C.4`
