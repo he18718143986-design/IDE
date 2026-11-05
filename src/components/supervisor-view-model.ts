@@ -135,6 +135,7 @@ export function toSupervisorContractView(
     description: contract.intent.description || "（该合同未填写描述）",
     state: contract.lifecycle_state,
     approval: contract.approval.status,
+    revision: contract.contract_revision,
     acceptance: [...contract.intent.acceptance_criteria],
     writable: [...scope.writable_paths],
     forbidden: [...(scope.strictly_forbidden_paths ?? [])],

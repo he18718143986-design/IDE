@@ -2206,3 +2206,25 @@ export async function verifyWorker(
     },
   );
 }
+
+export interface ScopeRevisionResponse {
+  contract: SoftwareContract;
+  mode: "draft" | "derive_revision";
+  previous_revision: number;
+  new_revision: number;
+}
+
+export async function updateContractScopeRevision(
+  conn: DaemonConnection,
+  contractId: string,
+  writablePaths: string[],
+): Promise<ScopeRevisionResponse> {
+  return request<ScopeRevisionResponse>(
+    conn,
+    `/api/contracts/${encodeURIComponent(contractId)}/scope-revision`,
+    {
+      method: "POST",
+      body: JSON.stringify({ writable_paths: writablePaths }),
+    },
+  );
+}

@@ -7,13 +7,46 @@ const destroy = vi.fn();
 const selectNode = vi.fn();
 const unselectAll = vi.fn();
 const on = vi.fn();
+const off = vi.fn();
+const batch = vi.fn((fn: () => void) => fn());
+const layout = vi.fn(() => ({ run: vi.fn() }));
+const add = vi.fn();
+const remove = vi.fn();
 
 vi.mock("cytoscape", () => ({
   default: vi.fn(() => ({
     on,
+    off,
     animate,
     destroy,
-    nodes: () => ({ unselect: unselectAll }),
+    batch,
+    layout,
+    add,
+    remove,
+    nodes: () => ({
+      unselect: unselectAll,
+      forEach: (
+        fn: (n: {
+          id: () => string;
+          selected: () => boolean;
+          select: () => void;
+          unselect: () => void;
+          data: () => void;
+          removeClass: () => void;
+          addClass: () => void;
+        }) => void,
+      ) => {
+        fn({
+          id: () => "src/a.ts",
+          selected: () => false,
+          select: selectNode,
+          unselect: unselectAll,
+          data: vi.fn(),
+          removeClass: vi.fn(),
+          addClass: vi.fn(),
+        });
+      },
+    }),
     $: () => ({
       map: (fn: (n: { id: () => string }) => unknown) => [
         fn({ id: () => "a" }),
@@ -22,6 +55,7 @@ vi.mock("cytoscape", () => ({
     getElementById: (id: string) => ({
       nonempty: () => id === "src/a.ts",
       select: selectNode,
+      data: vi.fn(),
     }),
   })),
 }));
@@ -68,8 +102,39 @@ describe("M7 / TASK-C.2 架构雷达组件", () => {
         onSelectionChange={() => {}}
       />,
     );
-    expect(unselectAll).toHaveBeenCalled();
-    expect(selectNode).toHaveBeenCalled();
+    expect(batch).toHaveBeenCalled();
+  });
+
+  it("局部状态更新不调用 cy.destroy()，仅在卸载时调用一次", () => {
+    const { rerender, unmount } = render(
+      <RadarGraph
+        nodes={nodes}
+        edges={edges}
+        cycles={[]}
+        selected={[]}
+        onSelectionChange={() => {}}
+      />,
+    );
+
+    expect(destroy).toHaveBeenCalledTimes(0);
+
+    // 局部状态更新：更新节点与边
+    rerender(
+      <RadarGraph
+        nodes={[...nodes, { filePath: "src/c.ts", exports: ["c"] }]}
+        edges={edges}
+        cycles={[]}
+        selected={[]}
+        onSelectionChange={() => {}}
+      />,
+    );
+
+    // FAIL 红线验证：局部状态更新绝不调用 destroy
+    expect(destroy).toHaveBeenCalledTimes(0);
+
+    // 卸载组件：仅在此时调用唯一一次 destroy
+    unmount();
+    expect(destroy).toHaveBeenCalledTimes(1);
   });
 
   it("过滤器展示统计并触发搜索与环路开关", () => {

@@ -883,3 +883,90 @@ export function bumpContractRevision(
     },
   });
 }
+
+export interface ApplyScopeChangeResult {
+  contract: SoftwareContractV12;
+  mode: "draft" | "derive_revision";
+  previousRevision: number;
+  newRevision: number;
+}
+
+/**
+ * 依据 C.4 规范应用 Scope 可写范围变更：
+ * - 未批准（DRAFT / PENDING_APPROVAL）：原地更新，不产生版本碎片；
+ * - 已批准（approval.status=APPROVED）：强制派生新 Revision（contract_revision + 1），清空旧审批并回置为 PENDING_APPROVAL / PENDING_REVIEW。
+ */
+export function applyContractScopeChange(
+  contract: SoftwareContractV12,
+  newWritablePaths: string[],
+): ApplyScopeChangeResult {
+  const isApprovedOrDelivered = contract.approval.status === "APPROVED";
+
+  if (!isApprovedOrDelivered) {
+    const updated = softwareContractSchema.parse({
+      ...contract,
+      authorization: {
+        ...contract.authorization,
+        file_system_scope: {
+          ...contract.authorization.file_system_scope,
+          writable_paths: [...newWritablePaths],
+        },
+      },
+    });
+    return {
+      contract: updated,
+      mode: "draft",
+      previousRevision: contract.contract_revision,
+      newRevision: contract.contract_revision,
+    };
+  }
+
+  const updatedScope: SoftwareContractV12 = {
+    ...contract,
+    authorization: {
+      ...contract.authorization,
+      file_system_scope: {
+        ...contract.authorization.file_system_scope,
+        writable_paths: [...newWritablePaths],
+      },
+    },
+  };
+
+  const bumped = bumpContractRevision(updatedScope);
+
+  return {
+    contract: bumped,
+    mode: "derive_revision",
+    previousRevision: contract.contract_revision,
+    newRevision: bumped.contract_revision,
+  };
+}
+
+export const E_APPROVAL_REVISION_MISMATCH = "E_APPROVAL_REVISION_MISMATCH";
+
+/**
+ * 校验审批记录是否与当前合同版本严格绑定。
+ * 若审批记录绑定的版本与当前 contract.contract_revision 不一致，或者审批非 APPROVED，返回 E_APPROVAL_REVISION_MISMATCH。
+ */
+export function validateApprovalRevision(
+  contract: { contract_revision: number },
+  approval: { status: string; approved_revision?: number },
+):
+  | { ok: true }
+  | { ok: false; code: typeof E_APPROVAL_REVISION_MISMATCH; message: string } {
+  if (approval.status !== "APPROVED") {
+    return {
+      ok: false,
+      code: E_APPROVAL_REVISION_MISMATCH,
+      message: `Approval status is ${approval.status}, required APPROVED`,
+    };
+  }
+  if (approval.approved_revision !== contract.contract_revision) {
+    return {
+      ok: false,
+      code: E_APPROVAL_REVISION_MISMATCH,
+      message: `Approval revision ${approval.approved_revision ?? "unset"} does not match current contract revision ${contract.contract_revision}`,
+    };
+  }
+  return { ok: true };
+}

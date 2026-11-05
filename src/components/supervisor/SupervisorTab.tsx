@@ -32,6 +32,7 @@ export interface SupervisorContractView {
   unresolved: string[];
   /** 草案尚未提交给 Daemon（只存在于本次会话内存中，未落盘） */
   isDraft?: boolean;
+  revision?: number;
 }
 
 export interface SupervisorProtectionView {

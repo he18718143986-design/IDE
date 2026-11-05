@@ -13,6 +13,7 @@ import {
 import {
   createContractDraft,
   softwareContractSchema,
+  applyContractScopeChange,
   type SoftwareContract,
 } from "@/lib/contract.schema";
 import type { EvidenceBundle } from "@/lib/evidence.schema";
@@ -78,6 +79,7 @@ import {
   saveOpenAiKey,
   undoProtectionRound,
   unlockProtectionEntry,
+  updateContractScopeRevision,
   type ArchGraphPayload,
   type BaselineArchivePayload,
   type AdmissionView,
@@ -1847,6 +1849,9 @@ ${trimmed}`
   const [reloadKeys, setReloadKeys] = useState<Record<string, number>>({});
   const pendingEdits = useRef(new Map<string, string>());
   const [staleContracts, setStaleContracts] = useState<Set<string>>(new Set());
+  const [freshnessMap, setFreshnessMap] = useState<
+    Record<string, "FRESH" | "STALE" | "CHANGED">
+  >({});
   const toRepoRelative = useCallback(
     (p: string) => {
       if (repoRoot && p.startsWith(repoRoot + "/"))
@@ -1913,6 +1918,16 @@ ${trimmed}`
         else next.delete(p.contract_id);
         return next;
       });
+      // C.4：将文件级 STALE 帧映射为 Radar 节点新鲜度类名；旧帧仍安全处理合同级状态。
+      if (p.status === "STALE" && Array.isArray(p.changed_paths)) {
+        setFreshnessMap((prev) => {
+          const next = { ...prev };
+          for (const relativePath of p.changed_paths ?? []) {
+            if (relativePath) next[relativePath] = "STALE";
+          }
+          return next;
+        });
+      }
     },
     onEvidenceReady: (p: EvidenceReadyPayload) => {
       if (p.contract_id !== selectedId) return;
@@ -2343,6 +2358,32 @@ ${trimmed}`
     void loadRepoTree();
     if (graph) void loadArchGraph();
   }, [connected, taskGraph, graph, loadRepoTree, loadArchGraph]);
+
+  const handleApplyRadarScope = useCallback(
+    (paths: string[], _mode: "draft" | "derive_revision") => {
+      if (!selected) {
+        openNewRequirement(paths);
+        setSelectedPaths([]);
+        return;
+      }
+
+      // 无论草稿还是已批准合同，通过权威接口执行（同 ID + 新 Revision 派生）
+      void runAction("scope-revision", async () => {
+        const res = await updateContractScopeRevision(
+          conn,
+          selected.contract_id,
+          paths,
+        );
+        setSelectedId(res.contract.contract_id);
+        setSelectedPaths([]);
+        if (draft && draft.contract.contract_id === selected.contract_id) {
+          setDraft({ ...draft, contract: res.contract });
+        }
+        await refresh();
+      });
+    },
+    [selected, draft, openNewRequirement, conn, refresh],
+  );
 
   const runAction = async (label: string, action: () => Promise<void>) => {
     setBusy(label);
@@ -3075,12 +3116,21 @@ ${trimmed}`
                         onSelectionChange={setSelectedPaths}
                         focusPath={focusPath}
                         showCycles={showCycles}
+                        freshnessMap={freshnessMap}
                         className="min-h-0 flex-1"
                       />
                       <ScopeSelector
                         selected={selectedPaths}
+                        contract={supervisorContract}
+                        edges={graph.graph.edges}
                         onApply={(paths) => openNewRequirement(paths)}
+                        onApplyScope={handleApplyRadarScope}
                         onClear={() => setSelectedPaths([])}
+                        onRemovePath={(path) =>
+                          setSelectedPaths((prev) =>
+                            prev.filter((p) => p !== path),
+                          )
+                        }
                       />
                     </div>
                   ) : (

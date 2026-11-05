@@ -8,6 +8,7 @@ import {
   isIpcFrame,
   MAX_FRAME_BYTES,
   type IpcFrameType,
+  type EvidenceStatusChangedPayload,
 } from "../../src/lib/ipc/frames";
 
 /**
@@ -93,5 +94,29 @@ describe("WS 帧字典（§6.1 十三类规范帧）", () => {
     expect(getFrameSpec("TERMINAL_STREAM").direction).toBe("server->client");
     expect(getFrameSpec("EVIDENCE_STATUS_CHANGED").spec).toBe("v1.2.1");
     expect(getFrameSpec("WORKER_LOG").spec).toBe("extension");
+  });
+
+  it("EVIDENCE_STATUS_CHANGED 载荷扩展（C.4 超集向后兼容）：支持工作树与变更文件相对路径列表", () => {
+    // 兼容历史旧帧契约（不含扩展字段）
+    const legacyPayload: EvidenceStatusChangedPayload = {
+      contract_id: "c-1",
+      evidence_id: "evi-1",
+      status: "STALE",
+      reason_code: "EVIDENCE_STALE",
+      message: "stale notification",
+    };
+    expect(legacyPayload.contract_id).toBe("c-1");
+    expect(legacyPayload.worktree_path).toBeUndefined();
+    expect(legacyPayload.changed_paths).toBeUndefined();
+
+    // 扩展新帧契约（包含 worktree_path 与 changed_paths 列表）
+    const extendedPayload: EvidenceStatusChangedPayload = {
+      ...legacyPayload,
+      worktree_path: "/tmp/repo/worktree-1",
+      changed_paths: ["src/a.ts", "src/components/radar/RadarGraph.tsx"],
+    };
+    expect(extendedPayload.worktree_path).toBe("/tmp/repo/worktree-1");
+    expect(extendedPayload.changed_paths).toHaveLength(2);
+    expect(extendedPayload.changed_paths?.[0]).toBe("src/a.ts");
   });
 });

@@ -167,6 +167,10 @@ export interface EvidenceStatusChangedPayload {
   status: string;
   reason_code?: string;
   message?: string;
+  /** C.4 扩展字段（超集向后兼容）：工作树根路径 */
+  worktree_path?: string;
+  /** C.4 扩展字段（超集向后兼容）：触发失效的变更文件相对路径列表 */
+  changed_paths?: string[];
 }
 
 export interface TerminalStreamPayload {
