@@ -43,7 +43,7 @@
 | `TASK-H.9` | `COMPLETED` | 废止 `.stagent/metadata/` 写入（DLV-4 · ADR-0011） | [打开](./development-tasks-completed.md#task-h.9) |
 | `TASK-B.1` | `COMPLETED` | 本地 AST 增量依赖图分析引擎（parser/graph 增强 + 性能基准 + 恶魔测试 + 契约兼容超集；#124/9c177e9） | [打开](./development-tasks-completed.md#task-b.1) |
 | `TASK-B.2` | `COMPLETED` | 多活跃 Worktree 监听与 Evidence 状态联动（Map 监听、指纹单点、合并前兜底；门禁①中位 67.9ms，未达 50ms 体验目标；[#128](https://github.com/he18718143986-design/IDE/pull/128)/`b1aa44f`） | [打开](./development-tasks-completed.md#task-b.2) |
-| `TASK-C.4` | `READY · 待 DoR 重写` | 架构雷达视图与 Scope 圈选抽屉（v0.2 激活；DoR 已按存量对账重写 P-147，待 Tina 单卡授权开工） | [打开](./development-tasks-active.md#task-c.4) |
+| `TASK-C.4` | `COMPLETED` | 架构雷达视图与 Scope 圈选抽屉（v0.2 激活；[#138](https://github.com/he18718143986-design/IDE/pull/138)/`993e3e9`，P-148 回写） |
 | `TASK-0.2b` | `COMPLETED` | Schema v1.2.0 增量演进、双状态机联动与存量迁移 | [打开](./development-tasks-completed.md#task-0.2b) |
 | `TASK-0.2c` | `COMPLETED` | Schema v1.3.0 增量演进、Fast Path 与自愈迁移边实现 [认领架构 P0.2c / C-01] | [打开](./development-tasks-completed.md#task-0.2c) |
 | `TASK-D.1` | `COMPLETED` | CLI 引导入口与安全 WebSocket 通信桥 | [打开](./development-tasks-completed.md#task-d.1) |

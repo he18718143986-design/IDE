@@ -301,3 +301,4 @@
 
 > **P-145 现行物理指针（2026-11-04）**：main@`b1aa44f320a33f0c61197f63550e8c0f173a3a82`（[#128](https://github.com/he18718143986-design/IDE/pull/128) TASK-B.2 代码 squash；其下 #125 `5b0a8cd0` 为 P-143 回写，#124 `9c177e9` 为 B.1 代码 squash）。`TASK-B.2` 已 `[COMPLETED]` 并迁入 completed §3.4s；B.1 挂账② 已销项。Sprint 首要转为 `TASK-C.4`（待 DoR 重写；硬依赖 B.1、软依赖 B.2 均已满足；激活 ≠ 开工，须 Tina 单卡授权）。不新增 OP 号。
 > **P-147 现行物理指针（2026-11-04）**：main@`78ae73b2924e4854b4c4c5b7e6dce157ccdd1896`（[#129](https://github.com/he18718143986-design/IDE/pull/129) P-145 TASK-B.2 回写 squash；其下 #128 `b1aa44f` 为 B.2 代码 squash）。`TASK-C.4` 已按 R-1～R-12 与存量对账矩阵完成卡正文重写，状态保持 `[READY · 待 DoR 重写]`，施工授权待 Tina 单卡拍板。物理指针链推进至 `78ae73b`。不新增 OP 号。
+> **P-148 现行物理指针（2026-11-05）**：main@`993e3e9c62bf86d11ce1f9b684a5ac276a2ee5eb`（[#138](https://github.com/he18718143986-design/IDE/pull/138) TASK-C.4 代码 squash；其下 #137 `a8481bc` 为 C.4 DoR 重写，#136 `78ae73b` 为 P-146 门禁③回写）。
