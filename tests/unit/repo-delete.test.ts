@@ -3,7 +3,10 @@ import { safeRmSync } from "../helpers/tmp";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { deleteRepoPath } from "../../daemon/editor/repo-delete";
+import {
+  deleteRepoPath,
+  tryMoveToTrash,
+} from "../../daemon/editor/repo-delete";
 import { deleteMenuLabel } from "../../src/lib/file-tree-delete";
 import {
   addProtectionEntry,
@@ -27,8 +30,36 @@ describe("deleteRepoPath (TASK-C.10h)", () => {
     return root;
   }
 
-  it("删普通文件成功（废纸篓或永久删除），并诚实返回 method", () => {
+  it("注入废纸篓替身 → method=trash，盘上文件消失", () => {
     const repo = makeRepo();
+    const trashed: string[] = [];
+    const out = deleteRepoPath({
+      protectionRoot: repo,
+      fileRoot: repo,
+      relPath: "src/a.ts",
+      // 替身：搬到自己记的数组里，绝不碰真实 ~/.Trash（见下一条回归用例）
+      moveToTrash: (abs) => {
+        trashed.push(abs);
+        fs.rmSync(abs, { force: true });
+        return true;
+      },
+    });
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.method).toBe("trash");
+    expect(out.message).toMatch(/废纸篓/);
+    expect(trashed).toEqual([path.join(repo, "src", "a.ts")]);
+    expect(fs.existsSync(path.join(repo, "src", "a.ts"))).toBe(false);
+  });
+
+  it("防回归：测试环境下默认实现绝不调用真实废纸篓", () => {
+    // 历史事故：用例调 deleteRepoPath 时夹具被 /usr/bin/trash 搬进用户真实废纸篓，
+    // 累积数千条并污染回收站。默认 tryMoveToTrash 在 VITEST 下必须直接放弃，
+    // 让流程回退到 unlink（只在本用例自己的临时目录里删）。
+    const repo = makeRepo();
+    // 传一个不存在的路径：即使将来闸门被人删掉，也绝不会把任何真实文件送进废纸篓
+    const probe = path.join(repo, "not-a-real-file.md");
+
     const out = deleteRepoPath({
       protectionRoot: repo,
       fileRoot: repo,
@@ -36,14 +67,11 @@ describe("deleteRepoPath (TASK-C.10h)", () => {
     });
     expect(out.ok).toBe(true);
     if (!out.ok) return;
-    expect(["trash", "unlink"]).toContain(out.method);
+    expect(out.method).toBe("unlink");
+    expect(out.message).toMatch(/永久删除/);
     expect(fs.existsSync(path.join(repo, "src", "a.ts"))).toBe(false);
-    expect(out.message.length).toBeGreaterThan(0);
-    if (out.method === "unlink") {
-      expect(out.message).toMatch(/永久删除/);
-    } else {
-      expect(out.message).toMatch(/废纸篓/);
-    }
+    // 兜底闸门本身也必须拒绝，避免将来有人绕过 deleteRepoPath 直接调它
+    expect(tryMoveToTrash(probe)).toBe(false);
   });
 
   it("保护清单命中 → 拒绝 + 白话，文件仍在", () => {
