@@ -91,9 +91,9 @@ export const CURSOR_AGENT_MEASUREMENT = {
  */
 export const CURSOR_AGENT_VERIFIED_ON:
   { cli_version: string; verified_at: string } | undefined = {
-    cli_version: "2026.10.22-27dcf5f",
-    verified_at: "2026-11-05",
-  };
+  cli_version: "2026.10.22-27dcf5f",
+  verified_at: "2026-11-05",
+};
 
 /**
  * 允许传给 cursor-agent 的旗标（白名单）。只准出现这些；其余一律视为注入面。
