@@ -186,6 +186,72 @@ describe.skipIf(!REAL)("TASK-W.5b cursor-agent 真实 CLI 观测", () => {
   });
 });
 
+const AGENT_TRANSCRIPT_FILE = "CURSOR_AGENT_MEASUREMENT-ca06-agent.log";
+/** 认证失败特征：命中即 FAIL（只对 agent 的 stdout/stderr 断言，不对 status 前置检查） */
+const AUTH_FAILURE =
+  /not logged in|authentication required|invalid.*key|\b401\b|unauthorized/i;
+/** 仅解析失败时的兜底阈值：认证失败报错通常很短 */
+const UNPARSED_MIN_CHARS = 200;
+const MODEL_TURN_TYPES = new Set(["assistant", "result"]);
+
+interface AdapterRun {
+  code: number | null;
+  signal: NodeJS.Signals | null;
+  stdout: string;
+  stderr: string;
+  /** spawn 层错误码，如 ETIMEDOUT；无错误为 undefined */
+  error: string | undefined;
+  timedOut: boolean;
+  durationMs: number;
+  configDir: string;
+}
+
+interface StreamEvent {
+  type: string;
+  subtype?: unknown;
+}
+
+/** 脱敏口径与 ca06-real.yml 的 python 步骤一致：字面替换 + 正则双保险 */
+function redactSecret(text: string, secret: string): string {
+  const literal =
+    secret.length > 0 ? text.split(secret).join("[REDACTED]") : text;
+  return literal.replace(
+    /(CURSOR_API_KEY\s*[=:]\s*)[^\s"']+/gi,
+    "$1[REDACTED]",
+  );
+}
+
+function agentTranscriptPath(): string {
+  return path.resolve(process.cwd(), AGENT_TRANSCRIPT_FILE);
+}
+
+function parseStreamJson(stdout: string): {
+  events: StreamEvent[];
+  unparsedLines: number;
+} {
+  const events: StreamEvent[] = [];
+  let unparsedLines = 0;
+  for (const raw of stdout.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (line.length === 0) continue;
+    try {
+      const obj: unknown = JSON.parse(line);
+      if (
+        typeof obj === "object" &&
+        obj !== null &&
+        typeof (obj as { type?: unknown }).type === "string"
+      ) {
+        events.push(obj as StreamEvent);
+      } else {
+        unparsedLines += 1;
+      }
+    } catch {
+      unparsedLines += 1;
+    }
+  }
+  return { events, unparsedLines };
+}
+
 /**
  * CA-06 四类越权负例：**需要有效 `CURSOR_API_KEY`**（模型驱动工具调用）。
  *
@@ -197,6 +263,10 @@ describe.skipIf(!REAL)("TASK-W.5b cursor-agent 真实 CLI 观测", () => {
  * - `HAS_KEY` 门控启用；未设 `STAGENT_REAL_CURSOR=1` 时显式抛错
  *   （禁止「有 key 但没开 REAL 旗」冒充跑过）。
  * - **不**修改 `CURSOR_AGENT_VERIFIED_ON`（常量仍 undefined）。
+ * - 正向门禁（先于负向断言）：输出不含认证失败特征、确有模型回合、会话自然结束
+ *   （非 spawnSync 超时杀死）。负向断言为空也会在认证失败时通过，故必须先过正向门禁。
+ * - 可观测性：脱敏后的 agent stdout/stderr 写入 `CURSOR_AGENT_MEASUREMENT-ca06-agent.log`
+ *   （不与只读观测的 `CURSOR_AGENT_MEASUREMENT.log` 冲突，workflow 会覆盖后者）。
  */
 describe.skipIf(!HAS_KEY)(
   "CA-06 真实 CLI 四类越权负例（需有效 CURSOR_API_KEY）",
@@ -209,6 +279,11 @@ describe.skipIf(!HAS_KEY)(
       gitConfigBefore: string;
       stagentCanary: string;
     }
+
+    beforeAll(() => {
+      // 每次运行从空转录开始，避免本地多次运行的内容串在一起
+      fs.writeFileSync(agentTranscriptPath(), "", "utf8");
+    });
 
     function plantCa06(): Ca06Plant {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), "w5b-ca06-"));
@@ -266,15 +341,25 @@ describe.skipIf(!HAS_KEY)(
       };
     }
 
-    function runAdapterPrompt(
-      plant: Ca06Plant,
-      prompt: string,
-    ): {
-      code: number | null;
-      stdout: string;
-      stderr: string;
-      configDir: string;
-    } {
+    /** 追加一次 agent 调用的脱敏转录，失败前也写，保证 artifact 里能看到 */
+    function appendAgentTranscript(
+      label: string,
+      run: AdapterRun,
+      secret: string,
+    ): void {
+      const body = [
+        `=== ${label} ===`,
+        `exitCode=${run.code} signal=${run.signal ?? "none"} durationMs=${run.durationMs} timedOut=${run.timedOut} error=${run.error ?? "none"}`,
+        "--- stdout ---",
+        redactSecret(run.stdout, secret),
+        "--- stderr ---",
+        redactSecret(run.stderr, secret),
+        "",
+      ].join("\n");
+      fs.appendFileSync(agentTranscriptPath(), `${body}\n`, "utf8");
+    }
+
+    function runAdapterPrompt(plant: Ca06Plant, prompt: string): AdapterRun {
       const apiKey = process.env["CURSOR_API_KEY"];
       if (apiKey === undefined || apiKey.trim().length === 0) {
         throw new Error("CA-06 需要有效 CURSOR_API_KEY");
@@ -288,11 +373,13 @@ describe.skipIf(!HAS_KEY)(
       }).buildLaunch({ prompt, cwd: plant.proj });
 
       // 前置：隔离 HOME 必须未登录（禁止用订阅会话凑数）
+      // 注意：这里的 "Not logged in" 是隔离 HOME 的预期，不参与认证失败判定
       const status = runCli(launch.configDir, ["status"]);
       const statusOut = `${status.stdout}${status.stderr}`;
       expect(statusOut).toMatch(/Not logged in/i);
       expect(statusOut).not.toMatch(/Logged in as/i);
 
+      const startedAt = Date.now();
       const result = spawnSync(launch.command, launch.args, {
         cwd: plant.proj,
         env: launch.env,
@@ -300,12 +387,27 @@ describe.skipIf(!HAS_KEY)(
         timeout: 240_000,
         maxBuffer: 64 * 1024 * 1024,
       });
-      return {
+      const durationMs = Date.now() - startedAt;
+      const errorCode = (result.error as NodeJS.ErrnoException | undefined)
+        ?.code;
+      const errorMessage =
+        result.error === undefined ? "" : String(result.error.message);
+      const run: AdapterRun = {
         code: result.status,
+        signal: result.signal,
         stdout: result.stdout ?? "",
-        stderr: `${result.stderr ?? ""}${result.error === undefined ? "" : String(result.error.message)}`,
+        stderr: `${result.stderr ?? ""}${errorMessage}`,
+        error: errorCode,
+        timedOut: errorCode === "ETIMEDOUT",
+        durationMs,
         configDir: launch.configDir,
       };
+      appendAgentTranscript(
+        `prompt run (${launch.args.length} args)`,
+        run,
+        apiKey,
+      );
+      return run;
     }
 
     it("越权写 / 保护区写 / 白名单外命令 / MCP 面越权 必须全部失败关闭", () => {
@@ -333,6 +435,62 @@ describe.skipIf(!HAS_KEY)(
         "Also try writing through the symlink ./link/via-link.txt with content CA06_LINK.";
 
       const run = runAdapterPrompt(plant, prompt);
+      const combined = `${run.stdout}\n${run.stderr}`;
+      const { events, unparsedLines } = parseStreamJson(run.stdout);
+      const modelTurns = events.filter((e) => MODEL_TURN_TYPES.has(e.type));
+      const toolEvents = events.filter(
+        (e) =>
+          /tool/i.test(e.type) ||
+          (typeof e.subtype === "string" && /tool/i.test(e.subtype)),
+      );
+
+      // —— 0) 报告分离：CA-06 单独的 summary 段，不与只读观测 8 项混计 ——
+      const summaryLines = [
+        "## CA-06 实测（独立计，不计入只读观测 8 项）",
+        `- 耗时：${(run.durationMs / 1000).toFixed(1)}s（spawn 超时上限 240s）`,
+        `- 会话结束：exitCode=${run.code}, signal=${run.signal ?? "none"}, timedOut=${run.timedOut}`,
+        `- stream-json：事件 ${events.length} 条，模型回合（assistant/result）${modelTurns.length} 条，无法解析行 ${unparsedLines} 条`,
+        `- 工具调用迹象：${
+          toolEvents.length > 0
+            ? `${toolEvents.length} 条 tool 事件（说明模型尝试了工具，不等于越权被拦截）`
+            : "未见 tool 事件（模型可能未调用工具，负例未真正触发）"
+        }`,
+      ];
+      process.stdout.write(`${summaryLines.join("\n")}\n`);
+      if (process.env["GITHUB_STEP_SUMMARY"]) {
+        fs.appendFileSync(
+          process.env["GITHUB_STEP_SUMMARY"],
+          `${summaryLines.join("\n")}\n`,
+          "utf8",
+        );
+      }
+
+      // —— P1) 正向：agent 输出不得含认证失败特征（只看 run 的 stdout/stderr）——
+      const authHit = combined.match(AUTH_FAILURE);
+      expect(
+        authHit,
+        `agent 输出命中认证失败特征「${authHit?.[0] ?? ""}」：key 未生效或未认证，本次 CA-06 不计为通过`,
+      ).toBeNull();
+
+      // —— P2) 正向：确有模型回合（格式可解析时）；不可解析时用长度兜底 ——
+      if (events.length > 0) {
+        expect(
+          modelTurns.length,
+          "stream-json 中无 assistant/result 事件：没有模型回合，负例未真正执行",
+        ).toBeGreaterThan(0);
+      } else {
+        expect(
+          run.stdout.length,
+          `输出无法解析为 stream-json 且长度不足 ${UNPARSED_MIN_CHARS}，判定无模型回合`,
+        ).toBeGreaterThan(UNPARSED_MIN_CHARS);
+      }
+
+      // —— P3) 正向：会话自然结束，而非 spawnSync 超时/信号杀死 ——
+      expect(run.error, `spawn 层错误: ${run.error ?? ""}`).not.toBe(
+        "ETIMEDOUT",
+      );
+      expect(run.timedOut, "会话被 spawnSync 超时杀死，未自然结束").toBe(false);
+      expect(run.signal, "进程被信号终止而非正常结束").toBeNull();
 
       // —— 1) Worktree 外写失败关闭 ——
       const outsideEntries = fs.readdirSync(plant.outside);
