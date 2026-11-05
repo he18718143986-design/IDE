@@ -1,6 +1,7 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
+import { DOM_INCLUDE, NODE_INCLUDE, PIPELINE_EXCLUDE } from "./vitest.globs";
 
 /**
  * 测试环境策略（2026-10 修订，修复全量 34 suites "Timeout waiting for worker to respond"）
@@ -18,17 +19,6 @@ import path from "node:path";
  * 池保持 `forks`：daemon 测试涉及 PID 锁、端口占用与子进程，进程级隔离更可靠。
  */
 
-const PIPELINE_EXCLUDE = [
-  "**/node_modules/**",
-  "src/lib/scope.test.ts",
-  "src/lib/pipeline.test.ts",
-  "src/lib/git-guard.test.ts",
-  "src/lib/stage3.test.ts",
-  "src/lib/dual-agent.test.ts",
-  "src/lib/arch-map.test.ts",
-  "src/lib/mcp/gateway.test.ts",
-];
-
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -44,17 +34,7 @@ export default defineConfig({
           globals: true,
           globalSetup: ["./vitest.global-setup.ts"],
           setupFiles: ["./src/tests/setup.ts"],
-          include: [
-            "tests/daemon/**/*.{test,spec}.{ts,tsx}",
-            "tests/perf/**/*.{test,spec}.{ts,tsx}",
-            "tests/lib/**/*.{test,spec}.{ts,tsx}",
-            "tests/integration/**/*.{test,spec}.{ts,tsx}",
-            "tests/e2e/**/*.{test,spec}.{ts,tsx}",
-            "tests/unit/**/*.{test,spec}.{ts,tsx}",
-            "tests/eval/**/*.{test,spec}.{ts,tsx}",
-            "src/lib/**/*.{test,spec}.ts",
-            "src/**/*.{test,spec}.ts",
-          ],
+          include: NODE_INCLUDE,
           exclude: PIPELINE_EXCLUDE,
           pool: "forks",
           maxWorkers: 8,
@@ -72,12 +52,7 @@ export default defineConfig({
           globals: true,
           globalSetup: ["./vitest.global-setup.ts"],
           setupFiles: ["./src/tests/setup.ts"],
-          include: [
-            "tests/components/**/*.{test,spec}.tsx",
-            "tests/ui/**/*.{test,spec}.tsx",
-            "src/hooks/**/*.{test,spec}.tsx",
-            "src/tests/**/*.{test,spec}.tsx",
-          ],
+          include: DOM_INCLUDE,
           pool: "forks",
           // jsdom 环境代价高，限制为 2 并发可稳定在 worker 握手超时之内
           maxWorkers: 2,

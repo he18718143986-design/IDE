@@ -18,6 +18,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "verify-env": "node scripts/verify-env.mjs",
+    "check:docs": "tsx scripts/check-docs.ts",
     "stagent": "tsx bin/stagent.ts",
     "test:mainline": "node scripts/mainline-regression.mjs"
   },

@@ -8,6 +8,7 @@
     "tests/**/*.ts",
     "vite.config.ts",
     "vitest.config.ts",
+    "vitest.globs.ts",
     "vitest.global-setup.ts",
     "eslint.config.js"
   ],
