@@ -3,7 +3,6 @@ import os from "node:os";
 import path from "node:path";
 import yaml from "js-yaml";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cardHeaderSchema } from "../../scripts/docs-check/card-header.schema";
 import {
   CARD_FENCE_INFO,
   INDEX_FILE,
@@ -14,7 +13,6 @@ import {
   checkScheme,
   declaresSymbol,
   findTestCase,
-  makeTestMatcher,
   runAllChecks,
   type Finding,
 } from "../../scripts/docs-check/checks";
@@ -24,8 +22,6 @@ import {
   githubSlug,
 } from "../../scripts/docs-check/markdown";
 
-const isTestFile = makeTestMatcher(["tests/unit/**/*.test.ts"], []);
-
 let root: string;
 
 function write(rel: string, content: string) {
@@ -34,35 +30,70 @@ function write(rel: string, content: string) {
   fs.writeFileSync(p, content);
 }
 
-function baseCard(overrides: Record<string, unknown> = {}) {
+interface CardOverrides {
+  id?: string;
+  status?: string;
+  touches?: Record<string, unknown>[];
+  test_plan?: Record<string, unknown>[];
+  commands?: Record<string, unknown>[];
+  writable_paths?: string[];
+  governance?: Record<string, unknown>;
+}
+
+function baseCard(o: CardOverrides = {}) {
+  const status = o.status ?? "COMPLETED";
   return {
-    id: "TASK-X.1",
-    title: "示例卡",
-    status: "COMPLETED",
-    spec_refs: ["docs/specs/spec.md#目标"],
-    goal: "用户能看见示例",
-    depends_on: [],
-    code_facts: [{ ref: "src/a.ts::foo", note: "旧实现" }],
-    touches: [{ path: "src/a.ts", action: "modify", symbols: ["foo"] }],
-    non_goals: ["不做别的"],
-    pass: [
-      {
-        id: "P1",
-        test: "tests/unit/a.test.ts",
-        case: "foo 返回 1",
-        assert: "foo() === 1",
+    id: o.id ?? "TASK-X.1",
+    status,
+    contract: {
+      intent: {
+        title: "示例卡",
+        description: "用户能看见示例",
+        risk_level: "LOW",
       },
-    ],
-    fail: ["foo 抛错"],
-    estimate: "S",
-    invariants: {
-      auth: "unchanged",
-      demo_origin: "unchanged",
-      illumination: "unchanged",
-      gateway_write_scope: "unchanged",
+      acceptance: [{ id: "P1", text: "foo() === 1", check: "auto" }],
+      scope: { writable_paths: o.writable_paths ?? ["src/**", "tests/**"] },
+      verification: {
+        commands: o.commands ?? [
+          {
+            alias: "unit",
+            executable: "npx",
+            args: ["vitest", "run", "tests/unit"],
+          },
+        ],
+      },
     },
-    delivered: { pr: 1, commit: "abcdef0" },
-    ...overrides,
+    design: {
+      approach: "改 foo",
+      touches: o.touches ?? [
+        { path: "src/a.ts", change: "modify", why: "x", symbols: ["foo"] },
+      ],
+      test_plan: o.test_plan ?? [
+        {
+          acceptance_id: "P1",
+          test_path: "tests/unit/a.test.ts",
+          level: "unit",
+          case: "foo 返回 1",
+        },
+      ],
+    },
+    governance: {
+      spec_refs: ["docs/specs/spec.md#目标"],
+      code_facts: [{ ref: "src/a.ts::foo", note: "旧实现" }],
+      non_goals: ["不做别的"],
+      fail: ["foo 抛错"],
+      estimate: "S",
+      invariants: {
+        auth: "unchanged",
+        demo_origin: "unchanged",
+        illumination: "unchanged",
+        gateway_write_scope: "unchanged",
+      },
+      ...(status === "COMPLETED"
+        ? { delivered: { pr: 1, commit: "abcdef0" } }
+        : {}),
+      ...o.governance,
+    },
   };
 }
 
@@ -90,7 +121,10 @@ function statusTables(rows: [string, string][]) {
 }
 
 function run(): Finding[] {
-  return runAllChecks(new Repo(root), { isTestFile }).findings;
+  return runAllChecks(new Repo(root), {
+    testInclude: ["tests/unit/**/*.test.ts"],
+    testExclude: [],
+  }).findings;
 }
 
 function messages(findings: Finding[], rule?: string): string[] {
@@ -141,76 +175,119 @@ describe("链接与锚点", () => {
   });
 });
 
-describe("卡头 Schema", () => {
-  it("合法卡头通过", () => {
-    expect(cardHeaderSchema.safeParse(baseCard()).success).toBe(true);
+describe("卡的就绪字段与 Schema", () => {
+  it("缺就绪字段、id 不是任务卡号都报 error", () => {
+    write(
+      "docs/specs/cards.md",
+      cardDoc(
+        baseCard({
+          governance: {
+            non_goals: [],
+            fail: [],
+            estimate: undefined,
+            delivered: undefined,
+          },
+        }),
+        { ...baseCard(), id: "contract_123" },
+      ),
+    );
+    const msgs = messages(run());
+    expect(msgs).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("R-6：non_goals 为空"),
+        expect.stringContaining("R-8：fail 为空"),
+        expect.stringContaining("R-11：缺 estimate"),
+        expect.stringContaining("COMPLETED 必须写 governance.delivered"),
+        expect.stringContaining("卡号形如 TASK-C.4"),
+      ]),
+    );
   });
 
-  it("COMPLETED 缺 delivered、READY 估算为 L、PASS 超过 12 条都被拒", () => {
-    const { delivered: _d, ...noDelivered } = baseCard();
-    expect(cardHeaderSchema.safeParse(noDelivered).success).toBe(false);
-    expect(
-      cardHeaderSchema.safeParse(baseCard({ status: "READY", estimate: "L" }))
-        .success,
-    ).toBe(false);
-    const pass = Array.from({ length: 13 }, (_, i) => ({
-      id: `P${i}`,
-      test: "t.ts",
-      case: "c",
-      assert: "a",
-    }));
-    expect(cardHeaderSchema.safeParse(baseCard({ pass })).success).toBe(false);
-  });
-
-  it("READY 卡仍有未决问题被拒", () => {
-    expect(
-      cardHeaderSchema.safeParse(
-        baseCard({ status: "READY", open_questions: ["谁来定"] }),
-      ).success,
-    ).toBe(false);
+  it("READY 估算为 L 被 Schema 拒绝", () => {
+    statusTables([["TASK-X.1", "READY"]]);
+    write(
+      "docs/specs/cards.md",
+      cardDoc(baseCard({ status: "READY", governance: { estimate: "L" } })),
+    );
+    expect(messages(run(), "card-schema")).toEqual([
+      expect.stringContaining("估算 L"),
+    ]);
   });
 });
 
-describe("卡头对照代码", () => {
+describe("卡对照代码", () => {
   it("合规的已完成卡零发现", () => {
     write("docs/specs/cards.md", cardDoc(baseCard()));
     expect(run()).toEqual([]);
   });
 
-  it("交付符号未声明、用例标题找不到、测试不在 vitest 收录范围内都报 error", () => {
+  it("交付符号未声明、用例标题找不到、测试不在收录范围内都报 error", () => {
+    write("tests/elsewhere/a.test.ts", 'it("foo 返回 1", () => {});\n');
     write(
       "docs/specs/cards.md",
       cardDoc(
         baseCard({
           touches: [
-            { path: "src/a.ts", action: "modify", symbols: ["foo", "bar"] },
-          ],
-          pass: [
             {
-              id: "P1",
-              test: "tests/unit/a.test.ts",
+              path: "src/a.ts",
+              change: "modify",
+              why: "x",
+              symbols: ["foo", "bar"],
+            },
+          ],
+          commands: [
+            { alias: "t", executable: "npx", args: ["vitest", "run", "tests"] },
+          ],
+          test_plan: [
+            {
+              acceptance_id: "P1",
+              test_path: "tests/unit/a.test.ts",
+              level: "unit",
               case: "不存在的标题",
-              assert: "x",
             },
             {
-              id: "P2",
-              test: "tests/elsewhere/a.test.ts",
+              acceptance_id: "P1",
+              test_path: "tests/elsewhere/a.test.ts",
+              level: "unit",
               case: "foo 返回 1",
-              assert: "x",
             },
           ],
         }),
       ),
     );
-    write("tests/elsewhere/a.test.ts", 'it("foo 返回 1", () => {});\n');
-    const msgs = messages(run());
-    expect(msgs).toEqual(
+    expect(messages(run())).toEqual(
       expect.arrayContaining([
         expect.stringContaining("交付的符号 bar"),
         expect.stringContaining("找不到标题含「不存在的标题」"),
         expect.stringContaining("不在 vitest include 范围内"),
       ]),
     );
+  });
+
+  it("DN-1：改动落在写范围之外；测试没被任何验证命令跑到", () => {
+    write(
+      "docs/specs/cards.md",
+      cardDoc(baseCard({ writable_paths: ["lib/**", "tests/**"] })),
+    );
+    expect(messages(run(), "card-design")).toEqual([
+      expect.stringContaining(
+        "DN-1：touches path out of writable_paths: src/a.ts",
+      ),
+    ]);
+
+    write(
+      "docs/specs/cards.md",
+      cardDoc(
+        baseCard({
+          commands: [
+            { alias: "lint", executable: "npm", args: ["run", "lint"] },
+          ],
+        }),
+      ),
+    );
+    expect(messages(run(), "card-verification")).toEqual([
+      expect.stringContaining("没有被任何验证命令跑到"),
+    ]);
   });
 
   it("被 skip 的用例不算兑现", () => {
@@ -222,16 +299,16 @@ describe("卡头对照代码", () => {
   });
 
   it("debt：没有用例时降为 warn；用例补上后要求删掉 debt", () => {
-    const debtPass = [
+    const test_plan = [
       {
-        id: "P1",
-        test: "tests/unit/a.test.ts",
+        acceptance_id: "P1",
+        test_path: "tests/unit/a.test.ts",
+        level: "unit",
         case: "着色",
-        assert: "x",
         debt: "未测",
       },
     ];
-    write("docs/specs/cards.md", cardDoc(baseCard({ pass: debtPass })));
+    write("docs/specs/cards.md", cardDoc(baseCard({ test_plan })));
     expect(messages(run())).toEqual([
       expect.stringMatching(/^warn:.*挂账：未测/),
     ]);
@@ -242,7 +319,7 @@ describe("卡头对照代码", () => {
     ]);
   });
 
-  it("卡头状态与矩阵不一致、硬依赖未完成却已 READY 都报 error", () => {
+  it("卡状态与矩阵不一致、硬依赖未完成却已 READY 都报 error", () => {
     statusTables([
       ["TASK-X.1", "NEW_TASK"],
       ["TASK-X.2", "NEW_TASK"],
@@ -253,15 +330,13 @@ describe("卡头对照代码", () => {
         baseCard({
           id: "TASK-X.2",
           status: "READY",
-          delivered: undefined,
-          depends_on: [{ id: "TASK-X.1", kind: "hard" }],
+          governance: { depends_on: [{ id: "TASK-X.1", kind: "hard" }] },
         }),
       ),
     );
-    const msgs = messages(run());
-    expect(msgs).toEqual(
+    expect(messages(run())).toEqual(
       expect.arrayContaining([
-        expect.stringContaining("卡头状态 READY ≠"),
+        expect.stringContaining("卡状态 READY ≠"),
         expect.stringContaining("硬依赖 TASK-X.1 状态为 NEW_TASK"),
       ]),
     );
@@ -274,11 +349,12 @@ describe("卡头对照代码", () => {
       cardDoc(
         baseCard({
           status: "NEW_TASK",
-          delivered: undefined,
-          code_facts: [
-            { ref: "src/a.ts::gone", note: "x" },
-            { ref: "src/a.ts:2-99", note: "x" },
-          ],
+          governance: {
+            code_facts: [
+              { ref: "src/a.ts::gone", note: "x" },
+              { ref: "src/a.ts:2-99", note: "x" },
+            ],
+          },
         }),
       ),
     );
@@ -293,19 +369,18 @@ describe("卡头对照代码", () => {
       ["TASK-X.1", "NEW_TASK"],
       ["TASK-X.2", "NEW_TASK"],
     ]);
-    const common = { status: "NEW_TASK", delivered: undefined };
     write(
       "docs/specs/cards.md",
       cardDoc(
         baseCard({
-          ...common,
+          status: "NEW_TASK",
           id: "TASK-X.1",
-          depends_on: [{ id: "TASK-X.2" }],
+          governance: { depends_on: [{ id: "TASK-X.2" }] },
         }),
         baseCard({
-          ...common,
+          status: "NEW_TASK",
           id: "TASK-X.2",
-          depends_on: [{ id: "TASK-X.1" }],
+          governance: { depends_on: [{ id: "TASK-X.1" }] },
         }),
       ),
     );

@@ -4,10 +4,14 @@ import yaml from "js-yaml";
 import picomatch from "picomatch";
 import {
   COMMITTED_STATUSES,
-  cardHeaderSchema,
-  type CardHeader,
+  CONTRACT_CARD_FENCE_INFO,
+  contractCardSchema,
+  designContractViewOfCard,
+  designNoteFromCard,
   type CardStatus,
-} from "./card-header.schema";
+  type ContractCard,
+} from "../../src/lib/contract-card";
+import { validateDesignNote } from "../../src/lib/design/design-note";
 import { collectAnchors, collectLinks, fencedBlocks } from "./markdown";
 
 export type Severity = "error" | "warn";
@@ -20,7 +24,10 @@ export interface Finding {
   message: string;
 }
 
-export const CARD_FENCE_INFO = "yaml task-card";
+export const CARD_FENCE_INFO = CONTRACT_CARD_FENCE_INFO;
+
+/** docs/ 里的卡用任务卡号当合同号。 */
+const TASK_ID = /^TASK-[A-Z0-9]+(\.[0-9a-z-]+)*$/;
 
 /** 读仓库文件的唯一入口；测试里换成临时目录。 */
 export class Repo {
@@ -228,7 +235,7 @@ export function checkStatusSync(
 // ── 卡头 ───────────────────────────────────────────────────────────────────
 
 export interface LocatedCard {
-  card: CardHeader;
+  card: ContractCard;
   file: string;
   line: number;
 }
@@ -257,7 +264,7 @@ export function parseCardHeaders(
         });
         continue;
       }
-      const parsed = cardHeaderSchema.safeParse(raw);
+      const parsed = contractCardSchema.safeParse(raw);
       if (!parsed.success) {
         for (const issue of parsed.error.issues) {
           findings.push({
@@ -268,6 +275,16 @@ export function parseCardHeaders(
             message: `${issue.path.join(".") || "(root)"}：${issue.message}`,
           });
         }
+        continue;
+      }
+      if (!TASK_ID.test(parsed.data.id)) {
+        findings.push({
+          severity: "error",
+          rule: "card-schema",
+          file,
+          line: block.line,
+          message: `id：卡号形如 TASK-C.4 / TASK-W.5c-iii，得到 ${parsed.data.id}`,
+        });
         continue;
       }
       cards.push({ card: parsed.data, file, line: block.line });
@@ -350,15 +367,28 @@ export interface CardCheckContext {
   matrix: Map<string, StatusSource>;
   index: Map<string, StatusSource>;
   isTestFile: TestGlobMatcher;
+  /** DN-3 的测试目录（本仓即 vitest include） */
+  testPathPatterns: readonly string[];
+}
+
+const GLOB_CHARS = /[*?[\]{}]/;
+
+/** 验证命令的 argv 是否会跑到这个测试文件：同名，或是它的上级目录。 */
+function commandCovers(args: readonly string[], testPath: string): boolean {
+  return args.some((a) => {
+    const arg = a.replace(/^\.\//, "").replace(/\/$/, "");
+    return arg === testPath || testPath.startsWith(`${arg}/`);
+  });
 }
 
 export function checkCard(
   ctx: CardCheckContext,
   located: LocatedCard,
-  all: Map<string, CardHeader>,
+  all: Map<string, ContractCard>,
 ): Finding[] {
   const { repo } = ctx;
   const { card, file, line } = located;
+  const { contract, design, governance: gov } = card;
   const findings: Finding[] = [];
   const err = (rule: string, message: string) =>
     findings.push({
@@ -383,23 +413,34 @@ export function checkCard(
     card.status === "READY" ||
     card.status === "BLOCKED";
 
-  // 卡头是状态的第三份副本：必须与矩阵、索引一致
+  // 卡是状态的第三份副本：必须与矩阵、索引一致
   for (const src of [ctx.matrix.get(card.id), ctx.index.get(card.id)]) {
     if (src && src.status !== card.status) {
       err(
         "card-status",
-        `卡头状态 ${card.status} ≠ ${src.file}:${src.line} 的 ${src.status ?? "?"}`,
+        `卡状态 ${card.status} ≠ ${src.file}:${src.line} 的 ${src.status ?? "?"}`,
       );
     }
   }
   if (!ctx.matrix.has(card.id)) err("card-status", "不在 §1.1 矩阵里");
 
-  for (const ref of card.spec_refs) {
+  // 合同能导出卡，但入库的任务卡还要满足就绪标准里合同不承载的那几条
+  if (gov.spec_refs.length === 0 && contract.scheme_item_ids.length === 0)
+    err("card-dor", "R-1：spec_refs 与 contract.scheme_item_ids 至少写一项");
+  if (gov.code_facts.length === 0) err("card-dor", "R-4：code_facts 为空");
+  if (gov.non_goals.length === 0) err("card-dor", "R-6：non_goals 为空");
+  if (gov.fail.length === 0) err("card-dor", "R-8：fail 为空");
+  if (gov.estimate === undefined) err("card-dor", "R-11：缺 estimate");
+  if (gov.invariants === undefined) err("card-dor", "R-12：缺 invariants");
+  if (done && gov.delivered === undefined)
+    err("card-dor", "COMPLETED 必须写 governance.delivered（PR 与 commit）");
+
+  for (const ref of gov.spec_refs) {
     const problem = checkDocRef(repo, ref);
     if (problem) err("card-spec-ref", problem);
   }
 
-  for (const dep of card.depends_on) {
+  for (const dep of gov.depends_on) {
     const depStatus =
       all.get(dep.id)?.status ??
       ctx.index.get(dep.id)?.status ??
@@ -420,7 +461,7 @@ export function checkCard(
 
   // 代码事实描述的是开工前的代码；卡完成后它本该过期，所以只在开工前核验
   if (!done) {
-    for (const fact of card.code_facts) {
+    for (const fact of gov.code_facts) {
       const sym = /^(.*?)::(.+)$/.exec(fact.ref);
       const lines = /^(.*?):(\d+)(?:-(\d+))?$/.exec(fact.ref);
       const target = sym?.[1] ?? lines?.[1] ?? fact.ref;
@@ -446,14 +487,30 @@ export function checkCard(
     }
   }
 
-  for (const t of card.touches) {
+  // DN-1～DN-5：与 Worker 交付时 Daemon 跑的是同一套校验
+  const dn = validateDesignNote(
+    designNoteFromCard(card),
+    designContractViewOfCard(card),
+    [],
+    { testPathPatterns: ctx.testPathPatterns },
+  );
+  if (!dn.ok) err("card-design", `${dn.rule}：${dn.message}`);
+
+  if (notStarted) {
+    for (const p of contract.scope.readonly_paths) {
+      if (!GLOB_CHARS.test(p) && !repo.exists(p))
+        err("card-scope", `只读范围里的文件不存在：${p}`);
+    }
+  }
+
+  for (const t of design.touches) {
     const exists = repo.exists(t.path);
     if (done) {
-      if (t.action === "delete" && exists)
+      if (t.change === "delete" && exists)
         err("card-touches", `声明删除的文件仍存在：${t.path}`);
-      if (t.action !== "delete" && !exists)
+      if (t.change !== "delete" && !exists)
         err("card-touches", `交付的文件不存在：${t.path}`);
-      if (exists && t.action !== "delete") {
+      if (exists && t.change !== "delete") {
         const src = repo.read(t.path) ?? "";
         for (const s of t.symbols) {
           if (!declaresSymbol(src, s))
@@ -461,46 +518,49 @@ export function checkCard(
         }
       }
     } else if (notStarted) {
-      if (t.action !== "create" && !exists)
-        err(
-          "card-touches",
-          `要${t.action === "read" ? "读" : "改"}的文件不存在：${t.path}`,
-        );
-      if (t.action === "create" && exists)
+      if (t.change !== "create" && !exists)
+        err("card-touches", `要改的文件不存在：${t.path}`);
+      if (t.change === "create" && exists)
         warn("card-touches", `声明新建的文件已经存在：${t.path}`);
     }
   }
 
-  for (const p of card.pass) {
-    if (!ctx.isTestFile(p.test)) {
-      err(
-        "card-pass",
-        `${p.id} 的测试文件不在 vitest include 范围内，CI 永远不会跑它：${p.test}`,
-      );
+  const commands = contract.verification.commands;
+  for (const t of design.test_plan) {
+    const label = `${t.acceptance_id}（${t.test_path}）`;
+    if (!ctx.isTestFile(t.test_path)) {
+      err("card-test", `${label} 不在 vitest include 范围内，CI 永远不会跑它`);
+    }
+    if (
+      t.debt === undefined &&
+      !commands.some((c) => commandCovers(c.args, t.test_path))
+    ) {
+      err("card-verification", `${label} 没有被任何验证命令跑到`);
     }
     if (!done) continue;
-    const src = repo.read(p.test);
-    if (src === null && p.debt === undefined) {
-      err("card-pass", `${p.id} 的测试文件不存在：${p.test}`);
+    if (t.case === undefined && t.debt === undefined) {
+      err("card-test", `${label} 已完成的卡必须写 case，指明兑现它的用例`);
+      continue;
+    }
+    const src = repo.read(t.test_path);
+    if (src === null && t.debt === undefined) {
+      err("card-test", `${label} 测试文件不存在`);
       continue;
     }
     const hit =
-      src === null
+      src === null || t.case === undefined
         ? { found: false, skipped: false }
-        : findTestCase(src, p.case);
-    if (p.debt !== undefined) {
+        : findTestCase(src, t.case);
+    if (t.debt !== undefined) {
       if (hit.found && !hit.skipped)
-        err("card-pass", `${p.id} 的用例已存在，删掉 debt 字段以销账`);
-      else warn("card-pass-debt", `${p.id} 没有测试兑现，挂账：${p.debt}`);
+        err("card-test", `${label} 的用例已存在，删掉 debt 字段以销账`);
+      else warn("card-test-debt", `${label} 没有测试兑现，挂账：${t.debt}`);
       continue;
     }
     if (!hit.found)
-      err(
-        "card-pass",
-        `${p.id} 在 ${p.test} 中找不到标题含「${p.case}」的用例`,
-      );
+      err("card-test", `${label} 找不到标题含「${t.case}」的用例`);
     else if (hit.skipped)
-      err("card-pass", `${p.id} 对应用例被 skip / todo：「${p.case}」`);
+      err("card-test", `${label} 对应用例被 skip / todo：「${t.case}」`);
   }
 
   return findings;
@@ -526,7 +586,7 @@ export function checkDependencyCycles(cards: LocatedCard[]): Finding[] {
       return;
     }
     state.set(id, "visiting");
-    for (const dep of graph.get(id)?.card.depends_on ?? []) {
+    for (const dep of graph.get(id)?.card.governance.depends_on ?? []) {
       if (graph.has(dep.id)) visit(dep.id, [...stack, id]);
     }
     state.set(id, "done");
@@ -626,7 +686,9 @@ export function checkScheme(repo: Repo): Finding[] {
 // ── 汇总 ───────────────────────────────────────────────────────────────────
 
 export interface RunOptions {
-  isTestFile: TestGlobMatcher;
+  /** 测试收录范围（本仓为 vitest.globs.ts） */
+  testInclude: string[];
+  testExclude: string[];
 }
 
 export function runAllChecks(
@@ -642,7 +704,8 @@ export function runAllChecks(
     repo,
     matrix,
     index,
-    isTestFile: opts.isTestFile,
+    isTestFile: makeTestMatcher(opts.testInclude, opts.testExclude),
+    testPathPatterns: opts.testInclude,
   };
   const findings = [
     ...checkLinks(repo, docs),

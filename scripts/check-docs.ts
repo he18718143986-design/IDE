@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * 文档门禁：链接与锚点、§1.1 矩阵与索引状态同步、任务卡头（Schema / 依赖 DAG /
+ * 文档门禁：链接与锚点、§1.1 矩阵与索引状态同步、任务卡（= 导出的合同；Schema / DN-1～5 / 依赖 DAG /
  * 交付文件与符号 / PASS 用例）、scheme.md 的 user_said 溯源。
  *
  *   npm run check:docs            # 有 error 时退出码 1
@@ -10,12 +10,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DOM_INCLUDE, NODE_INCLUDE, PIPELINE_EXCLUDE } from "../vitest.globs";
-import {
-  makeTestMatcher,
-  Repo,
-  runAllChecks,
-  type Finding,
-} from "./docs-check/checks";
+import { Repo, runAllChecks, type Finding } from "./docs-check/checks";
 
 function main(argv: string[]): number {
   const json = argv.includes("--json");
@@ -24,10 +19,8 @@ function main(argv: string[]): number {
 
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   const { findings: all, cards } = runAllChecks(new Repo(root), {
-    isTestFile: makeTestMatcher(
-      [...NODE_INCLUDE, ...DOM_INCLUDE],
-      PIPELINE_EXCLUDE,
-    ),
+    testInclude: [...NODE_INCLUDE, ...DOM_INCLUDE],
+    testExclude: PIPELINE_EXCLUDE,
   });
   const findings = rulePrefix
     ? all.filter((f) => f.rule.startsWith(rulePrefix))
