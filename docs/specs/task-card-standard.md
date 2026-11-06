@@ -113,4 +113,4 @@ Stagent 给 Worker 的合同 + DesignNote，必须满足本标准的产品化版
 
 `READY` 及之后的卡不得是 L、不得有 `open_questions`，由 Schema 直接拒绝。`test_plan[].debt`：已知没有测试兑现的验收，写明原因后降为告警；测试补上后门禁会要求删掉 `debt`，挂账因此不会悄悄留下。
 
-同一个命令还检查 `docs/` 全部链接与锚点、§1.1 矩阵与索引的状态同步，以及 [`../scheme.md`](../scheme.md) 中 `user_said` 条目能否追到 §0 原话（引用缺失报错；不是逐字子串只告警，对应 acc-4）。
+同一个命令还检查 `docs/` 全部链接与锚点、§1.1 矩阵与索引的状态同步，以及 [`../scheme.md`](../scheme.md) 中 `user_said` 条目能否追到 §0 原话（引用缺失报错；正文与原话没有共同词素只告警，与 `scheme-patch-engine` 的 `W_SOURCE_DOWNGRADED_UNTETHERED` 同口径，对应 acc-4）。

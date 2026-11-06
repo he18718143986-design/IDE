@@ -421,7 +421,7 @@ describe("声明识别", () => {
 });
 
 describe("scheme.md 溯源", () => {
-  it("缺 qid 报 error，转述报 warn，逐字摘录无发现", () => {
+  it("缺 qid / 引用不存在报 error，与原话无共同词素报 warn，栓住即无发现", () => {
     write(
       SCHEME_FILE,
       [
@@ -432,7 +432,7 @@ describe("scheme.md 溯源", () => {
         "| id | text | source | evidence |",
         "| :--- | :--- | :--- | :--- |",
         "| goal-1 | 用户只提需求 | `user_said` | q1 |",
-        "| goal-2 | 用户只说需求。 | `user_said` | q1 |",
+        "| goal-2 | 完全无关的表述 | `user_said` | q1 |",
         "| goal-3 | 没有出处 | `user_said` | — |",
         "| goal-4 | 引用不存在 | `user_said` | q9 |",
         "| goal-5 | 推断 | `ai_inferred` | — |",

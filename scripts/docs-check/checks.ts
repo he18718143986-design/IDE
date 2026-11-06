@@ -12,6 +12,7 @@ import {
   type ContractCard,
 } from "../../src/lib/contract-card";
 import { validateDesignNote } from "../../src/lib/design/design-note";
+import { lexemes } from "../../src/lib/journey/graveyard-match";
 import { collectAnchors, collectLinks, fencedBlocks } from "./markdown";
 
 export type Severity = "error" | "warn";
@@ -669,14 +670,28 @@ export function checkScheme(repo: Repo): Finding[] {
       });
       continue;
     }
-    const text = plain(cells["text"] ?? "");
-    if (!cited.some((q) => plain(quotes.get(q)!).includes(text))) {
+    // 与产品引擎同口径（scheme-patch-engine 的 mainTextOf）：目标类取 text，
+    // 模块类取 name + purpose，决策类取 question + 选中项。
+    const mainText = [
+      cells["text"],
+      cells["name"],
+      cells["purpose"],
+      cells["question"],
+      cells["recommended"],
+    ]
+      .filter((v): v is string => typeof v === "string" && v.length > 0)
+      .join(" ");
+    const textLex = new Set(lexemes(plain(mainText)));
+    const tethered = cited.some((q) =>
+      lexemes(plain(quotes.get(q)!)).some((x) => textLex.has(x)),
+    );
+    if (!tethered) {
       findings.push({
         severity: "warn",
-        rule: "scheme-verbatim",
+        rule: "scheme-tether",
         file: SCHEME_FILE,
         line,
-        message: `${id} 标为 user_said，但 text 不是 ${cited.join("/")} 的逐字子串（acc-4 / INV-LEDGER-01）`,
+        message: `${id} 标为 user_said，但 text 与 ${cited.join("/")} 没有共同词素，应改标 ai_inferred（W_SOURCE_DOWNGRADED_UNTETHERED）`,
       });
     }
   }
