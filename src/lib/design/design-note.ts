@@ -145,8 +145,21 @@ export type ValidateDesignNoteResult =
 
 const STAGENT_TEST_PATTERNS = ["tests/stagent/**", "tests/stagent/*"];
 
-function isUnderStagentTests(testPath: string): boolean {
-  return matchesAnyPattern(testPath, STAGENT_TEST_PATTERNS).matches;
+/** validateDesignNote 只读合同的这几个字段；任务卡（contract-card.ts）不经运行时也能校验。 */
+export interface DesignNoteContractView {
+  contract_id: string;
+  authorization: {
+    file_system_scope: { writable_paths: readonly string[] };
+    execution_permissions: { dependency_changes_allowed: boolean };
+  };
+  supervisor_metadata?: {
+    acceptance_refs?: ReadonlyArray<{ id: string; check: string }> | undefined;
+  };
+}
+
+export interface ValidateDesignNoteOptions {
+  /** DN-3 允许的测试目录；默认是目标项目的 tests/stagent/** */
+  testPathPatterns?: readonly string[];
 }
 
 /**
@@ -155,9 +168,13 @@ function isUnderStagentTests(testPath: string): boolean {
  */
 export function validateDesignNote(
   note: DesignNote,
-  contract: SoftwareContract,
+  contract: DesignNoteContractView | SoftwareContract,
   modules: readonly ModuleEntry[],
+  options: ValidateDesignNoteOptions = {},
 ): ValidateDesignNoteResult {
+  const testPathPatterns = [
+    ...(options.testPathPatterns ?? STAGENT_TEST_PATTERNS),
+  ];
   const parsed = designNoteSchema.safeParse(note);
   if (!parsed.success) {
     return {
@@ -178,8 +195,9 @@ export function validateDesignNote(
   }
 
   // DN-1：touches 全部落在 writable_paths
-  const writable =
-    contract.authorization.file_system_scope.writable_paths ?? [];
+  const writable = [
+    ...(contract.authorization.file_system_scope.writable_paths ?? []),
+  ];
   for (const touch of note.touches) {
     const check = matchesAnyPattern(touch.path, writable);
     if (!check.matches) {
@@ -224,12 +242,12 @@ export function validateDesignNote(
     }
   }
   for (const t of note.test_plan) {
-    if (!isUnderStagentTests(t.test_path)) {
+    if (!matchesAnyPattern(t.test_path, testPathPatterns).matches) {
       return {
         ok: false,
         code: "DESIGN_INVALID",
         rule: "DN-3",
-        message: `test_path must be under tests/stagent/**: ${t.test_path}`,
+        message: `test_path must be under ${options.testPathPatterns ? testPathPatterns.join(" | ") : "tests/stagent/**"}: ${t.test_path}`,
       };
     }
   }

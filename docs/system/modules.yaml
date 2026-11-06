@@ -1,0 +1,80 @@
+schema_version: 1.0.0
+modules:
+  - id: bin
+    name: CLI 入口
+    purpose: stagent 命令入口：open / start / check 子命令，负责启动 Daemon 并把控制台交给浏览器
+    paths:
+      - bin/**
+    depends_on:
+      - daemon
+      - src
+    interfaces:
+      - stagent open
+      - stagent check knowledge
+    introduced_by: repo-knowledge-baseline
+    updated_by: []
+
+  - id: daemon
+    name: 确定性宿主
+    purpose: 状态机、合同落盘、Worktree、证据与合并放行；三个 Agent 都无权自批自判
+    paths:
+      - daemon/**
+    depends_on:
+      - src
+    interfaces:
+      - GET /api/arch/graph
+      - POST /api/contracts
+      - GET /api/projects
+    introduced_by: repo-knowledge-baseline
+    updated_by: []
+
+  - id: src
+    name: 前端工作台与共享库
+    purpose: 三栏工作台、方案画布、架构雷达与合同 Schema；同时被 daemon 复用的类型与纯函数
+    paths:
+      - src/**
+    depends_on: []
+    interfaces:
+      - ContractCard
+      - ScopePlan
+      - patchGraphElements
+    introduced_by: repo-knowledge-baseline
+    updated_by: []
+
+  - id: tests
+    name: 测试套件
+    purpose: 单元 / 集成 / daemon / UI / e2e 分层用例；黄金切片 E2E 是主链回归入口
+    paths:
+      - tests/**
+    depends_on:
+      - daemon
+      - src
+    interfaces: []
+    introduced_by: repo-knowledge-baseline
+    updated_by: []
+
+  - id: scripts
+    name: 构建与门禁脚本
+    purpose: 打包、环境校验、主链回归与文档门禁（check:docs / 卡头 Schema）
+    paths:
+      - scripts/**
+    depends_on:
+      - daemon
+      - src
+    interfaces:
+      - npm run check:docs
+    introduced_by: repo-knowledge-baseline
+    updated_by: []
+
+  - id: repo-config
+    name: 根级构建配置
+    purpose: Vite / Vitest / ESLint 配置与测试收录范围；决定门禁实际跑到哪些用例
+    paths:
+      - "*.ts"
+      - "*.js"
+      - "*.mjs"
+      - "*.cjs"
+    depends_on: []
+    interfaces: []
+    introduced_by: repo-knowledge-baseline
+    updated_by: []

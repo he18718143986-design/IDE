@@ -26,6 +26,7 @@
 | **L3 任务卡** | 交给 Worker 的机器指令 | 合同 + 任务图节点 | [`specs/development-tasks.md`](./specs/development-tasks.md)（就绪标准 [`specs/task-card-standard.md`](./specs/task-card-standard.md)） | 按卡施工；开工前过就绪标准；按 supervisor §10 判定口径回写状态 |
 | **L4 证据** | 做到了没有，凭什么说做到了 | `EvidenceBundle` | [`reports/`](./reports/README.md)、[`specs/evidence-and-acceptance-criteria.md`](./specs/evidence-and-acceptance-criteria.md)（现行规格） | 只追加；证据绑定 head SHA |
 | **L5 台账** | 还欠什么、谁来定 | `conflicts` / `open_questions` / 挂账 | [`ledger/`](./ledger/README.md) | 只追加；销项要注明 PR |
+| **L6 系统知识** | 系统由哪些模块组成、每次改动动了谁 | `KnowledgeDelta` | [`system/`](./system/overview.md)（ADR-0016） | 随合同同步；`changelog.md` 由本次合同追加 |
 | 旁支 | 未批准的远期提案 | — | `rfc/`（见 §6） | 立项后才进 L1 / L2 |
 | 旁支 | 空白格式 | — | `templates/`（见 §7） | — |
 

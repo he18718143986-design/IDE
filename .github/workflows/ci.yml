@@ -77,6 +77,46 @@ jobs:
             emit false "docs-only change"
           fi
 
+  docs:
+    # 不挂 docs-only 豁免：纯文档 PR 正是最需要它的时候。
+    # 卡头会核对代码里的符号与测试用例，所以代码改动同样要跑。
+    name: Docs check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies (locked)
+        run: npm ci
+
+      - name: Check docs (links, status sync, task-card headers, scheme)
+        run: npm run check:docs
+
+  knowledge:
+    # ADR-0016 自举：本仓也要证明 docs/system 不是摆设。
+    name: Knowledge check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # KB-2 要从 candidate 提交里读 changelog；至少两个提交更接近本地
+          fetch-depth: 2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies (locked)
+        run: npm ci
+
+      - name: Check knowledge base (docs/system)
+        run: npm run check:knowledge
+
   lint:
     name: Lint (${{ matrix.os }})
     needs: changes

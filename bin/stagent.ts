@@ -33,6 +33,7 @@ import {
   type TestIntegrityLang,
 } from "../daemon/guard/test-integrity";
 import { checkKnowledge } from "../daemon/knowledge/check-knowledge";
+import { exportContractCard } from "../daemon/pipeline/contract-card-export";
 import type { DesignNote } from "../src/lib/design/design-note";
 
 import process from "node:process";
@@ -65,7 +66,7 @@ export {
 };
 
 export type CliCommand =
-  "open" | "start" | "status" | "help" | "version" | "check";
+  "open" | "start" | "status" | "help" | "version" | "check" | "export-card";
 
 export interface CliOptions {
   command: CliCommand;
@@ -75,7 +76,7 @@ export interface CliOptions {
   uiUrl: string;
   /** 启动后不唤起浏览器（或 STAGENT_NO_BROWSER=1） */
   noBrowser: boolean;
-  /** `stagent check ...` 时，"check" 之后的剩余 argv */
+  /** `stagent check ...` / `stagent export-card ...` 时，子命令之后的剩余 argv */
   checkArgv?: string[];
 }
 
@@ -91,7 +92,8 @@ export function parseArgs(argv: string[]): CliOptions {
     rawCommand === "status" ||
     rawCommand === "help" ||
     rawCommand === "version" ||
-    rawCommand === "check"
+    rawCommand === "check" ||
+    rawCommand === "export-card"
   ) {
     command = rawCommand;
     cursor = 1;
@@ -107,7 +109,7 @@ export function parseArgs(argv: string[]): CliOptions {
     cursor = 0;
   }
 
-  if (command === "check") {
+  if (command === "check" || command === "export-card") {
     const base: Omit<CliOptions, "command"> = {
       repo: process.cwd(),
       uiUrl: process.env["STAGENT_UI_URL"] ?? DEFAULT_UI_URL,
@@ -199,6 +201,8 @@ function printHelp(): void {
   stagent check playtest --contract-id <id> [--repo <path>]
                                    试玩认可门禁：证据完整性 + release_id 与当前 LIVE 匹配
                                    （不匹配 STALE_VERSION 重置认可；退出码 0=认可有效）
+  stagent export-card --contract-id <id> [--repo <path>]
+                                   把合同 + DesignNote 导出为可入库的任务卡（yaml task-card 代码块）
   stagent version                  显示版本号
   stagent help                     显示帮助
 
@@ -422,6 +426,24 @@ function parseCheckFlag(
  * TASK-L.3：`stagent check` 子命令（纯本地，不启 Daemon）。
  * 返回进程退出码；JSON 结果写入 stdout（测试可捕获）。
  */
+export function runExportCardCommand(argv: readonly string[]): {
+  exitCode: number;
+  stdout: string;
+} {
+  const contractId = parseCheckFlag(argv, "--contract-id");
+  if (!contractId) {
+    return {
+      exitCode: 2,
+      stdout: "用法：stagent export-card --contract-id <id> [--repo <path>]",
+    };
+  }
+  const repo = path.resolve(parseCheckFlag(argv, "--repo") ?? process.cwd());
+  const result = exportContractCard(repo, contractId);
+  if (!result.ok)
+    return { exitCode: 1, stdout: `${result.reason}: ${result.message}` };
+  return { exitCode: 0, stdout: result.markdown };
+}
+
 export function runCheckCommand(checkArgv: readonly string[]): {
   exitCode: number;
   stdout: string;
@@ -661,6 +683,13 @@ async function main(): Promise<void> {
 
   if (options.command === "check") {
     const result = runCheckCommand(options.checkArgv ?? []);
+    console.log(result.stdout);
+    process.exitCode = result.exitCode;
+    return;
+  }
+
+  if (options.command === "export-card") {
+    const result = runExportCardCommand(options.checkArgv ?? []);
     console.log(result.stdout);
     process.exitCode = result.exitCode;
     return;

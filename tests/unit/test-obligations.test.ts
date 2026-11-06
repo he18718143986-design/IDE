@@ -2,6 +2,8 @@
  * TASK-L.3 验收：合同元数据 1.3.2、义务派生、withSystemScope、削弱检测、stagent check。
  */
 import { describe, it, expect } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -266,21 +268,56 @@ describe("TASK-L.3 withSystemScope", () => {
     expect(aliases).toContain("check-test-integrity");
   });
 
-  it("无 auto 条目时不变", () => {
+  it("无 auto 条目且无知识库时不变", () => {
     const base = minimalPlan();
     const before = base.plan_digest;
-    const next = withSystemScope(base, {
-      repoRoot: process.cwd(),
-      scheme: schemeWithAcceptance([
-        { id: "acc-p", text: "试玩", check: "playtest" },
-      ]),
-      runner: { kind: "vitest", reportArgs: ["--reporter=json"] },
-    });
-    expect(next).toBe(base);
-    expect(next.plan_digest).toBe(before);
-    expect(scopePlanToContractScope(next).writable_paths).not.toContain(
-      "tests/stagent/**",
-    );
+    // 隔离到没有 docs/system/modules.yaml 的空目录：本仓自举知识库后，
+    // process.cwd() 会触发 knowledgeNeeded，不再是 identity 场景。
+    const emptyRoot = fs.mkdtempSync(path.join(os.tmpdir(), "scope-none-"));
+    try {
+      const next = withSystemScope(base, {
+        repoRoot: emptyRoot,
+        scheme: schemeWithAcceptance([
+          { id: "acc-p", text: "试玩", check: "playtest" },
+        ]),
+        runner: { kind: "vitest", reportArgs: ["--reporter=json"] },
+      });
+      expect(next).toBe(base);
+      expect(next.plan_digest).toBe(before);
+      expect(scopePlanToContractScope(next).writable_paths).not.toContain(
+        "tests/stagent/**",
+      );
+    } finally {
+      fs.rmSync(emptyRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("目标仓已有 docs/system：无 auto 也并入 docs/system/** 与 check-knowledge", () => {
+    const base = minimalPlan();
+    const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "scope-kb-"));
+    try {
+      fs.mkdirSync(path.join(repoRoot, "docs", "system"), { recursive: true });
+      fs.writeFileSync(
+        path.join(repoRoot, "docs", "system", "modules.yaml"),
+        "schema_version: 1.0.0\nmodules: []\n",
+      );
+      const next = withSystemScope(base, {
+        repoRoot,
+        scheme: schemeWithAcceptance([
+          { id: "acc-p", text: "试玩", check: "playtest" },
+        ]),
+        runner: { kind: "vitest", reportArgs: ["--reporter=json"] },
+      });
+      expect(scopePlanToContractScope(next).writable_paths).toContain(
+        "docs/system/**",
+      );
+      expect(next.verification.commands.map((c) => c.alias)).toContain(
+        "check-knowledge",
+      );
+      expect(next.verification.plain).toContain("系统知识库检查全部通过");
+    } finally {
+      fs.rmSync(repoRoot, { recursive: true, force: true });
+    }
   });
 });
 

@@ -427,7 +427,7 @@
 * **任务编号**：`TASK-W.9`
 * **任务名称**：自注册/外部 Worker 执行器接线
 * **对应规格（R-1）**：
-  * 架构规范 [`system-architecture.md`](../system-architecture.md) §9.1（`worker_spec` 目标数据模型与受控派工机制）、§4.2.3 P-17（沙箱与外部 CLI 隔离）、§0.6.1（执行模式）；
+  * 架构规范 [`system-architecture.md`](./system-architecture.md) §9.1（`worker_spec` 目标数据模型与受控派工机制）、§4.2.3 P-17（沙箱与外部 CLI 隔离）、§0.6.1（执行模式）；
   * 核心接口 [`daemon/worker/worker-adapter.interface.ts`](../../daemon/worker/worker-adapter.interface.ts)（`CodingWorkerAdapter` 规范、`resolveEvidenceControlMode`）；
   * 注册与门禁 [`daemon/worker/adapter-registry.ts`](../../daemon/worker/adapter-registry.ts)（`AdapterRegistry`、`promoteControlMode`）；
   * 派工中枢 [`daemon/worker/worker-dispatch.ts`](../../daemon/worker/worker-dispatch.ts)（`requireControlledDispatch`、`WorkerDispatchFactory`、`WorkerDispatchContext`）；
