@@ -4107,7 +4107,7 @@ contract:
     - { id: C4-P3, check: auto, text: ">1000 节点降级为 grid/preset 静态布局" }
     - { id: C4-P4, check: auto, text: 仅卸载时 cy.destroy() 一次 }
     - { id: C4-P5, check: auto, text: 数据 / 环路 / 搜索变化复用同一 Cytoscape 实例 }
-    - { id: C4-P6, check: auto, text: applyFreshnessClasses 只给 changed_paths 对应节点加 stale / changed 类，其余节点不变 }
+    - { id: C4-P6, check: auto, text: applyFreshnessClasses 先清 fresh/stale/changed 类，再按 freshnessMap 为节点加对应类（STALE → stale，CHANGED → changed） }
     - { id: C4-P7, check: auto, text: "抽屉内确认后以 (paths, mode) 调用 onApplyScope；已批准合同 mode 为 derive_revision" }
     - { id: C4-P8, check: auto, text: 已批准且处于 PREPARING 的合同改 Scope 时派生新 Revision 并清空旧审批 }
     - { id: C4-P9, check: auto, text: 旧 Revision 审批被 assertApprovalBinding 判定为 APPROVAL_REVISION_STALE }
@@ -4175,13 +4175,11 @@ design:
     - acceptance_id: C4-P6
       test_path: tests/components/RadarGraph.test.tsx
       level: unit
-      case: 新鲜度着色
-      debt: 交付时只把 applyFreshnessClasses 当 perf 负载调用，没有断言着色结果（P-148 未登记）
+      case: 新鲜度着色：STALE / CHANGED 落到节点 class
     - acceptance_id: C4-P7
       test_path: tests/components/RadarGraph.test.tsx
       level: unit
-      case: 圈选抽屉
-      debt: 现有用例只覆盖 C.2 时期的 onApply，抽屉与 onApplyScope 无测试（P-148 未登记）
+      case: 圈选抽屉：已批准合同强制派生 Revision
     - { acceptance_id: C4-P8, test_path: tests/unit/contract-scope-revision.test.ts, level: unit, case: "已批准且处于 PREPARING" }
     - { acceptance_id: C4-P9, test_path: tests/unit/contract-scope-revision.test.ts, level: unit, case: "旧 Revision 审批失效" }
     - { acceptance_id: C4-P10, test_path: tests/daemon/contract-scope-revision-store.test.ts, level: integration, case: "合并生产门禁" }

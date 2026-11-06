@@ -12,6 +12,8 @@ const batch = vi.fn((fn: () => void) => fn());
 const layout = vi.fn(() => ({ run: vi.fn() }));
 const add = vi.fn();
 const remove = vi.fn();
+const addClass = vi.fn();
+const removeClass = vi.fn();
 
 vi.mock("cytoscape", () => ({
   default: vi.fn(() => ({
@@ -42,8 +44,8 @@ vi.mock("cytoscape", () => ({
           select: selectNode,
           unselect: unselectAll,
           data: vi.fn(),
-          removeClass: vi.fn(),
-          addClass: vi.fn(),
+          removeClass,
+          addClass,
         });
       },
     }),
@@ -176,5 +178,102 @@ describe("M7 / TASK-C.2 架构雷达组件", () => {
     expect(onApply).toHaveBeenCalledWith(["src/a.ts", "src/b.ts"]);
     fireEvent.click(screen.getByRole("button", { name: "清空" }));
     expect(onClear).toHaveBeenCalled();
+  });
+
+  // C4-P6：新鲜度着色必须真的落到节点 class 上，而不只是「被调用过」
+  it("新鲜度着色：STALE / CHANGED 落到节点 class，切回后清掉旧类", () => {
+    const { rerender } = render(
+      <RadarGraph
+        nodes={nodes}
+        edges={edges}
+        cycles={[]}
+        selected={[]}
+        onSelectionChange={() => {}}
+        freshnessMap={{ "src/a.ts": "STALE" }}
+      />,
+    );
+    expect(removeClass).toHaveBeenCalledWith("fresh stale changed");
+    expect(addClass).toHaveBeenCalledWith("stale");
+    expect(addClass).not.toHaveBeenCalledWith("fresh");
+
+    addClass.mockClear();
+    rerender(
+      <RadarGraph
+        nodes={nodes}
+        edges={edges}
+        cycles={[]}
+        selected={[]}
+        onSelectionChange={() => {}}
+        freshnessMap={{ "src/a.ts": "CHANGED" }}
+      />,
+    );
+    expect(addClass).toHaveBeenCalledWith("changed");
+    expect(addClass).not.toHaveBeenCalledWith("stale");
+  });
+
+  // C4-P7：圈选抽屉按合同状态分流——草稿原地更新，已批准强制派生新 Revision
+  it("圈选抽屉：已批准合同强制派生 Revision 并重新审批", () => {
+    const onApplyScope = vi.fn();
+    const contract = {
+      id: "c1",
+      title: "示例",
+      description: "",
+      state: "APPROVED",
+      approval: "APPROVED",
+      acceptance: [],
+      writable: [],
+      forbidden: [],
+      commands: [],
+      rationale: [],
+      unresolved: [],
+      revision: 2,
+    };
+    render(
+      <ScopeSelector
+        selected={["src/a.ts"]}
+        onApply={() => {}}
+        onClear={() => {}}
+        contract={contract}
+        edges={edges}
+        onApplyScope={onApplyScope}
+        drawerOpen
+      />,
+    );
+    expect(screen.getByTestId("scope-governance-alert")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "派生新 Revision 并重新审批" }),
+    );
+    expect(onApplyScope).toHaveBeenCalledWith(["src/a.ts"], "derive_revision");
+  });
+
+  it("圈选抽屉：草稿合同原地更新 Scope", () => {
+    const onApplyScope = vi.fn();
+    const contract = {
+      id: "c2",
+      title: "草稿",
+      description: "",
+      state: "DRAFT",
+      approval: "PENDING",
+      acceptance: [],
+      writable: [],
+      forbidden: [],
+      commands: [],
+      rationale: [],
+      unresolved: [],
+      revision: 1,
+    };
+    render(
+      <ScopeSelector
+        selected={["src/a.ts"]}
+        onApply={() => {}}
+        onClear={() => {}}
+        contract={contract}
+        onApplyScope={onApplyScope}
+        drawerOpen
+      />,
+    );
+    expect(screen.getByTestId("scope-governance-info")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "确认应用 Scope" }));
+    expect(onApplyScope).toHaveBeenCalledWith(["src/a.ts"], "draft");
   });
 });
