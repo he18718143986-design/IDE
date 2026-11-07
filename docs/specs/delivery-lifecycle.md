@@ -175,4 +175,5 @@ q<n>（原话） → scheme item id（goal-* / mod-* / acc-*） → milestone_id
 
 > **P-134（2026-11-03 · W.9c 完成与在队清零）**：W.9a / W.9b / W.9c 均已 COMPLETED；W.9 母卡实质闭合，但 active 仍保留 `[SPLIT]` 作拆分追溯。自注册派工 factory、版本绑定、共享判据与 witness 复用细节见 [`development-tasks-completed.md` §3.4q](./development-tasks-completed.md#task-w.9c)。W.9b 的四项后续挂账仍未销项；不宣称整体端到端闭环。Sprint 首要回到「在队清零」，下一张卡由 Tina 指定。
 
-> **P-153（2026-11-07 · W.9 四项挂账立卡）**：Tina 授权立卡 `TASK-W.9d` / `W.9e` / `W.9f` / `W.9g`（`[NEW_TASK]`）兑现 §3.4q 四项挂账；Sprint 首要 → `TASK-W.9d`（序 d→e→f→g）。**立卡≠销项**；不宣称闭环；不碰 macOS CI / CA-06。
+> **P-153（2026-11-07 · W.9 四项挂账立卡 · 保留作溯源）**：Tina 授权立卡 `TASK-W.9d` / `W.9e` / `W.9f` / `W.9g`（`[NEW_TASK]`）兑现 §3.4q 四项挂账；Sprint 首要当时 → `TASK-W.9d`（序 d→e→f→g）。**立卡≠销项**；不宣称闭环；不碰 macOS CI / CA-06。
+> **P-154（2026-11-07 · W.9d 合入回写）**：`TASK-W.9d` → `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`；见 completed §3.4x）；**§3.4q 挂账①销项**；Sprint 首要 → `TASK-W.9e`（序 e→f→g）。挂账②/③/④仍立卡未销；不宣称闭环；不碰 macOS CI / CA-06。

@@ -224,3 +224,10 @@
 - **立卡**：Tina 授权按 W.9c §3.4q 四项挂账顺序立卡 — `W.9d`（probe 成本 · S）、`W.9e`（拒绝码穿透 · S）、`W.9f`（容器 env 明文 key · M）、`W.9g`（Cursor 容器协议实证 · M），状态均为 `[NEW_TASK]`。
 - **Sprint**：当前首要 → `TASK-W.9d`（序 d→e→f→g）。立卡 ≠ 开工；不宣称端到端闭环；不碰 macOS CI / CA-06。
 - **物理 tip**：立卡基线 `1ac8dfa`（#150）；P-152 代码 tip 仍为 #149/`86da495`。
+
+### TASK-W.9d（P-154 · 2026-11-07 · 非 OP）
+
+- **状态回写**：W.9d 已 COMPLETED（PR [#152](https://github.com/he18718143986-design/IDE/pull/152) / `f5577de`）；`resolveSharedContainerHost()` 服务单例；SANDBOX 同行投影至多一次探测；GATEWAY/UNCONTROLLED 不构造 host；probe-cost 4/4；零改 docker-container-host。
+- **销项**：兑现 W.9c §3.4q **挂账①**。挂账②/③/④仍立卡未销。
+- **Sprint**：当前首要 → `TASK-W.9e`（序 e→f→g）。不宣称端到端闭环；不新增 OP。
+- **物理 tip**：`f5577de`（#152）。
