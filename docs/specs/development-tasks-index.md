@@ -14,8 +14,8 @@
 | `TASK-A.6` | `COMPLETED` | Daemon 崩溃自愈、Git 锁清理与 TOCTOU 校验 | [矩阵行](./development-tasks.md)（无独立详细卡；正文时代已收口进矩阵） |
 | `TASK-A.7` | `COMPLETED` | Worktree seal 路径前缀对齐 | [打开](./development-tasks-completed.md#task-a.7) |
 | `TASK-S.6b` | `COMPLETED` | 真机试玩收口（S.6 降级项；无独立详细卡，见矩阵 S.6 行与 changelog P-22） | [矩阵/流水](./development-tasks.md)（无独立详细卡） |
-| `TASK-D.1e` | `DEFERRED` | 桌面壳 / 本机助手：维持 DEFERRED；**（P-166）由 [`TASK-DS.1`](./development-tasks-active.md#task-ds.1) 承接 RFC 切片；本卡不激活**；DoR 已入队（P-165）·未改出 DEFERRED·未开工（D-6 / P-141） | [打开](./development-tasks-active.md#task-d.1e) |
-| `TASK-DS.1` | `NEW_TASK` | macOS 本机助手 · 选文件夹开项目（RFC 切片；P-166 立卡；与 open/最近/粘贴共存；≠ 激活 D.1e） | [打开](./development-tasks-active.md#task-ds.1) |
+| `TASK-D.1e` | `DEFERRED` | 桌面壳 / 本机助手：维持 DEFERRED；**（P-167）选夹切片由 [`TASK-DS.1`](./development-tasks-completed.md#task-ds.1) `[COMPLETED]`（#171/`1701cab`）承接；本卡不激活；DS.1≠D.1e**；DoR 已入队（P-165）·未改出 DEFERRED（D-6 / P-141） | [打开](./development-tasks-active.md#task-d.1e) |
+| `TASK-DS.1` | `COMPLETED` | macOS 本机助手 · 选文件夹开项目（[#171](https://github.com/he18718143986-design/IDE/pull/171)/`1701cab`；P-167 回写；选夹增强；完成≠D.1e；不宣称闭环） | [打开](./development-tasks-completed.md#task-ds.1) |
 | `TASK-S.3` | `DEFERRED` | Supervisor HUD 建议流与 WebSocket 广播（v0.2 评审未激活 · D-5 / P-141） | [打开](./development-tasks-active.md#task-s.3) |
 | `TASK-W.5b` | `COMPLETED` | cursor-agent 适配器黑盒实测 (v1.3.3 新增) · [#92](https://github.com/he18718143986-design/IDE/pull/92)/`bdac805`；`UNCONTROLLED_EXTERNAL` 登记 + W.7 探测包非容器负向回归；**（P-160）** `CURSOR_AGENT_VERIFIED_ON` 已回填（`cli_version: "2026.10.22-27dcf5f"` / `verified_at: "2026-11-05"`；run 41959697673）；档位不变；`verified_on` ≠ 已受控 / 可派工；P-125「CA-06 未执行」保留作溯源 | [打开](./development-tasks-completed.md#task-w.5b) |
 | `TASK-W.5c` | `SPLIT` | OpenHands 适配器（容器隔离）· 拆分母卡（P-118 经授权拆为 i/ii/iii，保留追溯） | [打开](./development-tasks-active.md#task-w.5c) |
