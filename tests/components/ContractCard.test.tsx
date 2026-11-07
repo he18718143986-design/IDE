@@ -71,3 +71,42 @@ describe("M7 / TASK-C.1 合同审批组件", () => {
     expect(screen.getByText(/账单模式不可用/)).toBeInTheDocument();
   });
 });
+
+
+describe("TASK-AUDITED.2 / 退回待批按钮", () => {
+  const audited = softwareContractSchema.parse({
+    ...contract,
+    lifecycle_state: "AUDITED",
+    approval: {
+      status: "APPROVED",
+      approved_by: "t",
+      approved_at: new Date().toISOString(),
+    },
+  });
+
+  it("AUDITED+APPROVED 显示「退回待批」并可点击", () => {
+    const onReturnToPending = vi.fn();
+    render(
+      <ContractCard
+        contract={audited}
+        onReturnToPending={onReturnToPending}
+      />,
+    );
+    const btn = screen.getByTestId("contract-return-to-pending");
+    expect(btn).toHaveTextContent("退回待批");
+    fireEvent.click(btn);
+    expect(onReturnToPending).toHaveBeenCalledWith(audited.contract_id);
+  });
+
+  it("PENDING_APPROVAL 不显示「退回待批」", () => {
+    render(<ContractCard contract={contract} />);
+    expect(screen.queryByTestId("contract-return-to-pending")).toBeNull();
+    expect(screen.getByRole("button", { name: "批准并开工" })).toBeEnabled();
+  });
+
+  it("AUDITED+APPROVED 时「批准并开工」仍禁用", () => {
+    render(<ContractCard contract={audited} />);
+    expect(screen.getByRole("button", { name: "批准并开工" })).toBeDisabled();
+    expect(screen.getByTestId("contract-return-to-pending")).toBeInTheDocument();
+  });
+});

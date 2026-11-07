@@ -5937,7 +5937,7 @@ export class StagentDaemon {
       }
 
       const match = pathname.match(
-        /^\/api\/contracts\/([^/]+)(?:\/(admit|approve|execute|run-worker|open-editor|diff-files|diff|merge-decision|merge|evidence|resume|abort)(?:\/([^/]+))?)?$/,
+        /^\/api\/contracts\/([^/]+)(?:\/(admit|approve|execute|run-worker|open-editor|diff-files|diff|merge-decision|merge|evidence|resume|abort|return-to-pending)(?:\/([^/]+))?)?$/,
       );
       if (match) {
         // W.3：非法百分号编码（如 %E0%A4%A）会让 decodeURIComponent 抛 URIError，
@@ -6353,6 +6353,24 @@ export class StagentDaemon {
         if (method === "POST" && action === "resume") {
           try {
             const contract = await this.orchestrator.resume(contractId);
+            this.emitContractUpdate(contract);
+            this.sendJson(res, 200, { contract });
+          } catch (err) {
+            this.sendActionError(res, err);
+          }
+          return;
+        }
+
+        if (method === "POST" && action === "return-to-pending") {
+          // TASK-AUDITED.2：AUDITED+APPROVED → 退回待批
+          try {
+            const body = (await this.readJsonBody(req)) as {
+              reviewer?: string;
+            };
+            const contract = await this.orchestrator.returnToPending(
+              contractId,
+              typeof body.reviewer === "string" ? body.reviewer : undefined,
+            );
             this.emitContractUpdate(contract);
             this.sendJson(res, 200, { contract });
           } catch (err) {

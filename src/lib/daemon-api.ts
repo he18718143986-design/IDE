@@ -551,6 +551,25 @@ export async function approveContract(
   return body.contract;
 }
 
+/** TASK-AUDITED.2：AUDITED+APPROVED → 退回待批（PENDING_APPROVAL + PENDING_REVIEW） */
+export async function returnContractToPending(
+  conn: DaemonConnection,
+  contractId: string,
+  reviewer?: string,
+): Promise<SoftwareContract> {
+  const body = await request<{ contract: SoftwareContract }>(
+    conn,
+    `/api/contracts/${encodeURIComponent(contractId)}/return-to-pending`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...(reviewer === undefined ? {} : { reviewer }),
+      }),
+    },
+  );
+  return body.contract;
+}
+
 /** 断点续跑：PENDING_RESUME → EXECUTING（Daemon 侧校验 Worktree 健康） */
 export async function resumeContract(
   conn: DaemonConnection,

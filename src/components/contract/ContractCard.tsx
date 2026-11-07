@@ -15,6 +15,8 @@ const STATE_LABEL: Record<string, string> = {
 export interface ContractCardProps {
   contract: SoftwareContract;
   onApprove?: (contractId: string) => void;
+  /** TASK-AUDITED.2：AUDITED+APPROVED 时「退回待批」 */
+  onReturnToPending?: (contractId: string) => void;
   busy?: boolean;
   readonly?: boolean;
 }
@@ -23,6 +25,7 @@ export interface ContractCardProps {
 export function ContractCard({
   contract,
   onApprove,
+  onReturnToPending,
   busy = false,
   readonly = false,
 }: ContractCardProps) {
@@ -33,6 +36,10 @@ export function ContractCard({
     !readonly &&
     contract.lifecycle_state === "PENDING_APPROVAL" &&
     contract.approval.status === "PENDING_REVIEW";
+  const canReturnToPending =
+    !readonly &&
+    contract.lifecycle_state === "AUDITED" &&
+    contract.approval.status === "APPROVED";
 
   return (
     <section className="rounded border border-border bg-card p-3">
@@ -107,10 +114,23 @@ export function ContractCard({
         >
           {busy ? "处理中…" : "批准并开工"}
         </button>
+        {canReturnToPending ? (
+          <button
+            type="button"
+            data-testid="contract-return-to-pending"
+            disabled={busy}
+            onClick={() => onReturnToPending?.(contract.contract_id)}
+            className="rounded border border-border px-3 py-1.5 text-xs disabled:opacity-40"
+          >
+            {busy ? "处理中…" : "退回待批"}
+          </button>
+        ) : null}
         <span className="text-[10px] text-muted-foreground">
           {canApprove
             ? "批准后合同进入只读锁定态，重新修改需再次审批"
-            : "当前状态不可审批"}
+            : canReturnToPending
+              ? "退回后可再次「批准并开工」"
+              : "当前状态不可审批"}
         </span>
       </div>
     </section>

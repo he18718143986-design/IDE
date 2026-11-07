@@ -6,6 +6,7 @@ import path from "node:path";
 
 import { ContractStore } from "../../daemon/pipeline/contract-store";
 import { ContractOrchestrator } from "../../daemon/pipeline/orchestrator";
+import { InvalidStateTransitionError } from "../../daemon/core/contract-mutex";
 import {
   createContractDraft,
   softwareContractSchema,
@@ -263,5 +264,112 @@ describe("M5 / Test Integrity：Evidence tests_modified 留痕", () => {
     expect(outcome.evidence.verdict.can_merge).toBe(false);
     expect(outcome.contract.lifecycle_state).toBe("PENDING_RESUME");
     expect(outcome.contract.lifecycle_state).not.toBe("AUDITED");
+  });
+});
+
+
+describe("TASK-AUDITED.2 / returnToPending", () => {
+  let repo: string;
+  let store: ContractStore;
+  let orchestrator: ContractOrchestrator;
+
+  beforeEach(() => {
+    repo = fs.mkdtempSync(path.join(os.tmpdir(), "stagent-audited2-"));
+    git(repo, ["init", "-q", "-b", "main"]);
+    git(repo, ["config", "user.email", "t@example.com"]);
+    git(repo, ["config", "user.name", "T"]);
+    fs.mkdirSync(path.join(repo, "src"), { recursive: true });
+    fs.writeFileSync(path.join(repo, "src", "a.ts"), "export const a = 1;\n");
+    git(repo, ["add", "."]);
+    git(repo, ["commit", "-q", "-m", "init"]);
+
+    store = new ContractStore(repo);
+    orchestrator = new ContractOrchestrator({ repoRoot: repo });
+  });
+
+  afterEach(() => {
+    safeRmSync(repo);
+  });
+
+  it("正例：AUDITED+APPROVED → PENDING_APPROVAL+PENDING_REVIEW（USER_RETURN_TO_PENDING）", async () => {
+    const contract = pendingContract({
+      title: "audited2-happy",
+      command: { executable: "node", args: ["-e", "process.exit(0)"] },
+    });
+    store.save(contract);
+    await orchestrator.approve(contract.contract_id, "tina");
+    const outcome = await orchestrator.execute(contract.contract_id);
+    expect(outcome.contract.lifecycle_state).toBe("AUDITED");
+    expect(outcome.contract.approval.status).toBe("APPROVED");
+
+    const returned = await orchestrator.returnToPending(
+      contract.contract_id,
+      "tina",
+    );
+    expect(returned.lifecycle_state).toBe("PENDING_APPROVAL");
+    expect(returned.approval.status).toBe("PENDING_REVIEW");
+    expect(store.get(contract.contract_id)?.lifecycle_state).toBe(
+      "PENDING_APPROVAL",
+    );
+    expect(store.get(contract.contract_id)?.approval.status).toBe(
+      "PENDING_REVIEW",
+    );
+  });
+
+  it("负例：PENDING_APPROVAL 拒绝 returnToPending", async () => {
+    const contract = pendingContract({
+      title: "audited2-pending",
+      command: { executable: "node", args: ["-e", "process.exit(0)"] },
+    });
+    store.save(contract);
+    await expect(
+      orchestrator.returnToPending(contract.contract_id),
+    ).rejects.toBeInstanceOf(InvalidStateTransitionError);
+  });
+
+  it("负例：MERGED 拒绝 returnToPending", async () => {
+    const draft = createContractDraft({
+      title: "audited2-merged",
+      description: "merged guard",
+      acceptanceCriteria: ["ok"],
+      writablePaths: ["src/**"],
+      commands: [
+        {
+          alias: "verify",
+          executable: "node",
+          args: ["-e", "process.exit(0)"],
+          expected_exit_code: 0,
+          timeout_seconds: 30,
+        },
+      ],
+    });
+    const contract = softwareContractSchema.parse({
+      ...draft,
+      lifecycle_state: "MERGED",
+      approval: {
+        status: "APPROVED",
+        approved_by: "tina",
+        approved_at: new Date().toISOString(),
+      },
+    });
+    store.save(contract);
+    await expect(
+      orchestrator.returnToPending(contract.contract_id),
+    ).rejects.toBeInstanceOf(InvalidStateTransitionError);
+  });
+
+  it("负例：EXECUTING+APPROVED（非 AUDITED）拒绝 returnToPending", async () => {
+    const contract = pendingContract({
+      title: "audited2-executing",
+      command: { executable: "node", args: ["-e", "process.exit(0)"] },
+    });
+    store.save(contract);
+    await orchestrator.approve(contract.contract_id, "tina");
+    const current = store.get(contract.contract_id);
+    expect(current?.lifecycle_state).toBe("EXECUTING");
+    expect(current?.approval.status).toBe("APPROVED");
+    await expect(
+      orchestrator.returnToPending(contract.contract_id),
+    ).rejects.toBeInstanceOf(InvalidStateTransitionError);
   });
 });
