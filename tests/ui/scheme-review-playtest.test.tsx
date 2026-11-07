@@ -9,6 +9,10 @@
  *  - 读侧拒绝态反映到按钮/结果区
  *  - 不自动把引导文案填进原话框
  *  - 无多视口 Tab / 右栏入口复活
+ *
+ * TASK-L.17e 追加：
+ *  - 有候选时 DOM 出现 playtest-verbatim-candidates；默认输入框仍空（L17E-P2）
+ *  - 点引用后输入框值为候选原文（L17E-P3）
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -244,7 +248,28 @@ describe("TASK-L.17c 中栏试玩认可", () => {
     expect(screen.getByTestId("playtest-accept-submit")).toBeDisabled();
   });
 
-  it("引用会话原话原样写入；不改写", () => {
+  it("候选可见且默认空（L17E-P2）", () => {
+    const raw = "用户原话：一模一样，可以上线";
+    render(
+      <SchemeReviewPane
+        scheme={makeScheme()}
+        playtest={{
+          contractId: "ctr-1",
+          conn: CONN,
+          sessionVerbatimCandidates: [raw, "另一句用户原话"],
+        }}
+      />,
+    );
+    expect(screen.getByTestId("playtest-verbatim-candidates")).toBeTruthy();
+    expect(screen.getAllByTestId("playtest-verbatim-cite")).toHaveLength(2);
+    const input = screen.getByTestId(
+      "playtest-verbatim-input",
+    ) as HTMLTextAreaElement;
+    expect(input.value).toBe("");
+    expect(input.value).not.toContain(raw);
+  });
+
+  it("引用写入原文（L17E-P3）", () => {
     const raw = "用户原话：一模一样，可以上线";
     render(
       <SchemeReviewPane
@@ -256,6 +281,7 @@ describe("TASK-L.17c 中栏试玩认可", () => {
         }}
       />,
     );
+    expect(screen.getByTestId("playtest-verbatim-input")).toHaveValue("");
     fireEvent.click(screen.getByTestId("playtest-verbatim-cite"));
     expect(screen.getByTestId("playtest-verbatim-input")).toHaveValue(raw);
   });
