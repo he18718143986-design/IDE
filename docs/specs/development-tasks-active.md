@@ -695,6 +695,8 @@
 #### 【Task L.17c】中栏方案审阅页嵌入试玩认可提交 `[COMPLETED]`
 
 > **归档注记（2026-11-03 · P-133）**：本卡已 COMPLETED（[#104](https://github.com/he18718143986-design/IDE/pull/104)/`06661be` squash）。交付、三项挂账与边界见 [`development-tasks-completed.md`](./development-tasks-completed.md#task-l.17c)。**立卡原文（P-132）保留作溯源**：兑现 L.17b / C.23 已声明的端到端 UI 挂账；**不抢 Sprint 首要**（现行首要仍为 `TASK-W.9c`）；不碰 W.9c / orchestrator / AdapterRegistry；**不宣称**端到端闭环。
+>
+> **（P-149）** 三项挂账已立卡 [`L.17d`](#task-l.17d) / [`L.17e`](#task-l.17e) / [`L.17f`](#task-l.17f)（`[NEW_TASK]` · 未销项、未开工）；Sprint 首要现为 `TASK-L.17d`。
 
 * **任务编号**：`TASK-L.17c`
 * **任务名称**：中栏方案审阅页嵌入试玩认可提交
@@ -734,6 +736,289 @@
   4. 提交路径绕过 `submitPlaytestEvidence` 直连 evidence 存储（浏览器直写 `.stagent/` 或自造 POST 体带 `release_id`/`operator`/`timestamp`）→ FAIL。
 * **关键文件**：`src/components/studio/SchemeReviewPane.tsx`（改）、`src/routes/index.tsx`（改·传参，若需要）、`src/components/project/CompareView.tsx`（**只读复用**）、`src/lib/journey/playtest-evidence.ts`（**只读复用**）、`daemon/supervisor/preview/playtest-guard.ts`（**只读复用**）、`daemon/server.ts`（改·薄读侧路由，若采用 HTTP）、`tests/ui/scheme-review-playtest.test.tsx`（新）与/或 `tests/unit/playtest-status-wiring.test.ts`（新）
 * **估算**（R-11）：**S/M**（同页挂载 + 表单 + 薄读侧；单层 UI/接线，不跨 orchestrator）
+
+
+<a id="task-l.17d"></a>
+
+#### 【Task L.17d】L.17a 参考站抓取成果接入 CompareView `snapshots` `[NEW_TASK]`
+
+> **立卡（2026-11-07 · P-149）**：兑现 L.17c completed §3.4p 挂账①。Tina 授权按挂账顺序销项立卡；**本轮仅文档**，不开工产品代码。不宣称端到端闭环；不碰 W.9 挂账。
+
+```yaml task-card
+id: TASK-L.17d
+status: NEW_TASK
+contract:
+  intent:
+    title: L.17a 参考站抓取成果接入 CompareView snapshots
+    description: >-
+      用户在中栏对照试玩左栏看见合同 references[] 经 L.17a 受控摄取得到的参考站抓取成果
+      （至少 HTML/摘要），不再长期空白；缺成果时仍诚实空态。
+    risk_level: MEDIUM
+  acceptance:
+    - { id: L17D-P1, check: auto, text: "有 references[] 时 GET /api/playtest/reference-snapshots 返回与 references 对齐的 ReferenceSnapshotView 列表（reference_url 一一对应）" }
+    - { id: L17D-P2, check: auto, text: "摄取走 WebIngestProxy（白名单/禁域与 L.17a 同口径）；非白名单域名不得出现在成功结果中" }
+    - { id: L17D-P3, check: auto, text: "index/SchemeReview 把 snapshots 传入 PlaytestAcceptBlock → CompareView；有成果时 DOM 出现 compare-view-reference，不再仅空左栏" }
+    - { id: L17D-P4, check: auto, text: "无 references / 摄取失败时左栏保持诚实空态或逐条错误说明，不得伪造截图或摘要" }
+  scheme_item_ids: [acc-6, gap-11, goal-2]
+  scope:
+    writable_paths:
+      - daemon/server.ts
+      - daemon/playtest/**
+      - src/lib/daemon-api.ts
+      - src/lib/journey/**
+      - src/routes/index.tsx
+      - tests/unit/playtest-reference-snapshots.test.ts
+      - tests/ui/scheme-review-playtest.test.tsx
+    readonly_paths:
+      - daemon/web-ingest/proxy.ts
+      - daemon/web-ingest/types.ts
+      - src/components/project/CompareView.tsx
+      - src/components/studio/PlaytestAcceptBlock.tsx
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/playtest-reference-snapshots.test.ts] }
+      - { alias: ui, executable: npx, args: [vitest, run, tests/ui/scheme-review-playtest.test.tsx] }
+design:
+  approach: >-
+    新增薄读侧 GET /api/playtest/reference-snapshots?contract_id=：读合同 references[]，
+    对每个 URL 经既有 WebIngestProxy.fetch 受控 GET（format 优先 html/summary），映射为
+    CompareView.ReferenceSnapshotView（reference_url + html_snapshot 与/或 dom_summary；
+    screenshot_url 本卡可为 null，不新开截图管线）。前端 daemon-api 拉数后由
+    src/routes/index.tsx 写入 playtest.snapshots。不改 CompareView / PlaytestAcceptBlock
+    props 契约；不改 WebIngestProxy 白名单语义；不持久化新快照库（本卡默认即时拉数，
+    落盘缓存若需要另立卡）。
+  touches:
+    - { path: daemon/server.ts, change: modify, why: 挂薄读侧路由, symbols: [] }
+    - { path: daemon/playtest/reference-snapshots.ts, change: create, why: 合同 references → ReferenceSnapshotView 装配, symbols: [buildReferenceSnapshots, handleReferenceSnapshotsRequest] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: 前端拉数客户端, symbols: [fetchPlaytestReferenceSnapshots] }
+    - { path: src/routes/index.tsx, change: modify, why: 把 snapshots 传入 playtest, symbols: [] }
+    - { path: tests/unit/playtest-reference-snapshots.test.ts, change: create, why: 路由/映射/白名单负例, symbols: [] }
+    - { path: tests/ui/scheme-review-playtest.test.tsx, change: modify, why: 有 snapshots 时左栏非空断言, symbols: [] }
+  interfaces:
+    - name: GET /api/playtest/reference-snapshots
+      kind: http
+      signature: "{ contract_id } → 200 { snapshots: ReferenceSnapshotView[] } | 4xx"
+      consumers: []
+  test_plan:
+    - { acceptance_id: L17D-P1, test_path: tests/unit/playtest-reference-snapshots.test.ts, level: unit, case: "references 对齐返回" }
+    - { acceptance_id: L17D-P2, test_path: tests/unit/playtest-reference-snapshots.test.ts, level: unit, case: "禁域不得成功" }
+    - { acceptance_id: L17D-P3, test_path: tests/ui/scheme-review-playtest.test.tsx, level: unit, case: "snapshots 传入后左栏有 reference" }
+    - { acceptance_id: L17D-P4, test_path: tests/unit/playtest-reference-snapshots.test.ts, level: unit, case: "无 references 诚实空列表" }
+governance:
+  spec_refs:
+    - docs/specs/development-tasks-completed.md#task-l.17c
+    - docs/specs/development-tasks-completed.md#task-l.17a
+    - docs/scheme.md
+  depends_on:
+    - { id: TASK-L.17c, kind: hard }
+    - { id: TASK-L.17a, kind: hard }
+  code_facts:
+    - { ref: "src/routes/index.tsx:3623-3631", note: "playtest 传参有 contractId/references/preview/conn，无 snapshots" }
+    - { ref: "src/components/studio/PlaytestAcceptBlock.tsx::PlaytestAcceptBlockProps", note: "已声明可选 snapshots，透传 CompareView；今日调用方不灌数" }
+    - { ref: "daemon/web-ingest/proxy.ts::WebIngestProxy", note: "L.17a 受控摄取仅 MCP/代理路径可用；无面向 CompareView 的 HTTP 拉数" }
+    - { ref: "daemon/server.ts:5131-5161", note: "仅挂 /api/playtest/status 与 /api/playtest/evidence，无 reference-snapshots" }
+  non_goals:
+    - 不改 CompareView / PlaytestAcceptBlock 组件本体与 props 契约
+    - 不新开截图/像素管线，不复活 REJ-009
+    - 不碰 orchestrator / 派工 / AdapterRegistry（W.9 挂账另序）
+    - 不做真机整段 check playtest（TASK-L.17f）
+    - 不宣称端到端产品闭环
+  fail:
+    - 绕过 WebIngestProxy 用裸 fetch/WebFetch 拉参考站
+    - 伪造 screenshot_url / 摘要冒充抓取成功
+    - 修改 CompareView props 契约或重建对照组件
+  adr_revisions: []
+  defaults:
+    - "即时拉数、不新建持久快照库；screenshot_url 允许 null"
+    - "单 URL 失败不拖垮整表：成功项照常返回，失败项可省略或带错误说明（卡内测试写死一种）"
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：L.17c 合入后左栏可空渲染；挂账①要求把 L.17a 抓取成果接到 `snapshots`。
+* **取舍**：不在本卡做截图引擎；不先建缓存层。
+
+<a id="task-l.17e"></a>
+
+#### 【Task L.17e】会话原话候选接入试玩认可框 `[NEW_TASK]`
+
+> **立卡（2026-11-07 · P-149）**：兑现 L.17c completed §3.4p 挂账②。仅前端接线；**不**自动填入原话框；用户手点「引用」才写入（既有 UI 行为）。
+
+```yaml task-card
+id: TASK-L.17e
+status: NEW_TASK
+contract:
+  intent:
+    title: 会话原话候选接入试玩认可框
+    description: >-
+      中栏试玩认可区出现来自当前右栏会话的用户原话「引用」候选；默认输入框仍为空，
+      点选后原样写入，禁止把引导文案当候选。
+    risk_level: LOW
+  acceptance:
+    - { id: L17E-P1, check: auto, text: "index 将当前会话 role=user 消息文本（非空）传入 sessionVerbatimCandidates" }
+    - { id: L17E-P2, check: auto, text: "有候选时 DOM 出现 playtest-verbatim-candidates；默认 textarea/input 值为空" }
+    - { id: L17E-P3, check: auto, text: "点引用后输入框值为候选原文（不做摘要/改写）" }
+    - { id: L17E-P4, check: auto, text: "不得把 playtest-guidance / 系统提示文案塞进候选列表" }
+  scheme_item_ids: [acc-6, dec-12]
+  scope:
+    writable_paths:
+      - src/routes/index.tsx
+      - src/lib/journey/**
+      - tests/ui/scheme-review-playtest.test.tsx
+      - tests/unit/session-verbatim-candidates.test.ts
+    readonly_paths:
+      - src/components/studio/PlaytestAcceptBlock.tsx
+      - src/hooks/use-agent-session.ts
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/session-verbatim-candidates.test.ts] }
+      - { alias: ui, executable: npx, args: [vitest, run, tests/ui/scheme-review-playtest.test.tsx] }
+design:
+  approach: >-
+    从 useAgentSession()/foldChatEvents 得到的 messages 中筛选 role==="user" 且 trim 非空的 text，
+    经小纯函数（建议 src/lib/journey/session-verbatim-candidates.ts）去重保序后，
+    写入 SchemeReviewPane playtest.sessionVerbatimCandidates。不改 PlaytestAcceptBlock 引用按钮行为；
+    禁止把助手/系统/工具消息或引导常量放入候选。
+  touches:
+    - { path: src/lib/journey/session-verbatim-candidates.ts, change: create, why: 纯函数筛选用户原话, symbols: [selectSessionVerbatimCandidates] }
+    - { path: src/routes/index.tsx, change: modify, why: 接线 chatSession.messages → playtest, symbols: [] }
+    - { path: tests/unit/session-verbatim-candidates.test.ts, change: create, why: 筛选/去重/排除非 user, symbols: [] }
+    - { path: tests/ui/scheme-review-playtest.test.tsx, change: modify, why: 候选渲染与默认空框, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: L17E-P1, test_path: tests/unit/session-verbatim-candidates.test.ts, level: unit, case: "只收 user 非空原话" }
+    - { acceptance_id: L17E-P2, test_path: tests/ui/scheme-review-playtest.test.tsx, level: unit, case: "候选可见且默认空" }
+    - { acceptance_id: L17E-P3, test_path: tests/ui/scheme-review-playtest.test.tsx, level: unit, case: "引用写入原文" }
+    - { acceptance_id: L17E-P4, test_path: tests/unit/session-verbatim-candidates.test.ts, level: unit, case: "排除 system/assistant/引导" }
+governance:
+  spec_refs:
+    - docs/specs/development-tasks-completed.md#task-l.17c
+    - docs/scheme.md
+  depends_on:
+    - { id: TASK-L.17c, kind: hard }
+  code_facts:
+    - { ref: "src/routes/index.tsx:3623-3631", note: "playtest 未传 sessionVerbatimCandidates" }
+    - { ref: "src/components/studio/PlaytestAcceptBlock.tsx::PlaytestAcceptBlockProps", note: "已留 sessionVerbatimCandidates；有候选才渲染引用按钮" }
+    - { ref: "src/hooks/use-agent-session.ts::foldChatEvents", note: "会话消息已有 role/user 文本，今日未接到试玩块" }
+  non_goals:
+    - 不自动填入原话框、不改 submitPlaytestEvidence 契约
+    - 不做 L.17d snapshots 拉数
+    - 不碰 Daemon / 派工 / W.9
+    - 不宣称端到端闭环
+  fail:
+    - 页面加载即把候选或引导文案写入输入框
+    - 摘要/改写后再提交或再写入输入框
+    - 把 assistant/system 消息当作用户原话候选
+  adr_revisions: []
+  defaults:
+    - "候选 = 当前会话 user 消息原文去重保序；上限实现时可截断但须在测试写死"
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：挂账②——props 已留，index 未灌聊天原话。
+* **取舍**：只接当前会话，不做跨会话历史检索。
+
+<a id="task-l.17f"></a>
+
+#### 【Task L.17f】真机/门禁链 `check playtest` 执行债 `[NEW_TASK]`
+
+> **立卡（2026-11-07 · P-149）**：兑现 L.17c completed §3.4p 挂账③与 C.23「装配已兑现、门禁执行链路未实证」。证明北极星合同 verification 真正跑到 playtest 命令且 Fail-Closed；**仍不宣称**产品 e2e 闭环。
+
+```yaml task-card
+id: TASK-L.17f
+status: NEW_TASK
+contract:
+  intent:
+    title: 真机/门禁链 check playtest 执行债
+    description: >-
+      北极星合同在验证/合并门禁链上真实执行 alias=playtest（stagent check playtest），
+      无有效认可证据时不得合并通过；有匹配 release_id 的认可时可过该门禁项。
+    risk_level: HIGH
+  acceptance:
+    - { id: L17F-P1, check: auto, text: "北极为 references[] 非空的合同，verification 结果含 alias=playtest 且曾实际执行（非跳过空转）" }
+    - { id: L17F-P2, check: auto, text: "无 playtest 证据或 STALE_VERSION / UNCONFIRMED 时，该命令 passed=false，合并路径 Fail-Closed" }
+    - { id: L17F-P3, check: auto, text: "非北极星合同 verification 不含 playtest（与 C.23 装配一致）" }
+    - { id: L17F-P4, check: both, text: "本机或 CI 可复现：对一北极星合同跑验证，日志/结果可见 check playtest 出口（真机清单写入 PR）" }
+  scheme_item_ids: [acc-6, dec-12]
+  scope:
+    writable_paths:
+      - daemon/pipeline/orchestrator.ts
+      - daemon/supervisor/preview/**
+      - tests/integration/**
+      - tests/unit/playtest-gate-execution.test.ts
+      - docs/specs/development-tasks-completed.md
+    readonly_paths:
+      - bin/stagent.ts
+      - daemon/supervisor/preview/playtest-guard.ts
+      - src/lib/contract.schema.ts
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/playtest-gate-execution.test.ts] }
+      - { alias: integration, executable: npx, args: [vitest, run, tests/integration] }
+design:
+  approach: >-
+    以集成/单元测锁定「verification_spec 中的 playtest 命令进入 orchestrator 验证循环并产生
+    非跳过结果」；必要时仅补 stagent check playtest 的参数装配/工作目录旁路（对标
+    check-knowledge 特殊分支的最小对称处理），**零改** evaluatePlaytestGuard 判定本体与
+    C.23 装配 helper。真机段：PR 附本机命令与出口摘要（合同 id、exit code、status）。
+  touches:
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: 若需最小 playtest 执行旁路则改；否则仅被测, symbols: [] }
+    - { path: tests/unit/playtest-gate-execution.test.ts, change: create, why: 门禁执行与 Fail-Closed, symbols: [] }
+    - { path: tests/integration/playtest-gate-execution.test.ts, change: create, why: 真 Daemon/验证链实证, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: L17F-P1, test_path: tests/unit/playtest-gate-execution.test.ts, level: unit, case: "playtest 非跳过执行" }
+    - { acceptance_id: L17F-P2, test_path: tests/unit/playtest-gate-execution.test.ts, level: unit, case: "无证据 Fail-Closed" }
+    - { acceptance_id: L17F-P3, test_path: tests/unit/playtest-gate-execution.test.ts, level: unit, case: "非北极星无 playtest" }
+    - { acceptance_id: L17F-P4, test_path: tests/integration/playtest-gate-execution.test.ts, level: integration, case: "可复现执行出口", debt: "真机段以 PR 命令摘要为准；无容器/无 LIVE 时集成测可 mock LIVE+证据文件，但不得 skip 冒充通过" }
+governance:
+  spec_refs:
+    - docs/specs/development-tasks-completed.md#task-l.17c
+    - docs/specs/development-tasks-completed.md#task-c.23
+    - docs/scheme.md
+  depends_on:
+    - { id: TASK-L.17c, kind: hard }
+    - { id: TASK-C.23, kind: hard }
+    - { id: TASK-L.17b, kind: hard }
+  code_facts:
+    - { ref: "daemon/pipeline/orchestrator.ts:1035-1100", note: "验证循环会跑 verification_spec.commands；对 check-knowledge 有特殊参数装配，对 playtest 无对等旁路/实证测试" }
+    - { ref: "bin/stagent.ts:630-671", note: "check playtest 子命令已注册并委托 evaluatePlaytestGuard" }
+    - { ref: "docs/specs/development-tasks-completed.md:2339", note: "L.17c 明文挂账③：真机整段 check playtest 执行债" }
+  non_goals:
+    - 不改 playtest-guard 判定逻辑与 dec-12 口径
+    - 不改 C.23 withPlaytestCommand 装配语义
+    - 不销 W.9 四项挂账；不做 L.17d/e
+    - 不宣称端到端产品/UI 闭环
+  fail:
+    - skip/假绿冒充 playtest 已执行
+    - 无证据仍合并通过
+    - 改判定源使非北极星静默 PASS
+  adr_revisions: []
+  defaults:
+    - "优先加测证明既有通用执行路径；仅当实跑缺 contract_id/cwd 时才加最小旁路"
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：C.23 只做装配；挂账③要求执行链实证。
+* **取舍**：不把 L.17d/e UI 拉数塞进本卡。
+
 
 ### 3.4e 台账债立卡（2026-11-01 · NON_BLOCKER · 不抢主序）
 

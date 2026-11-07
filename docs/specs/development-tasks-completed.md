@@ -2337,6 +2337,7 @@
 - **状态与证据**：`[COMPLETED]`（[#104](https://github.com/he18718143986-design/IDE/pull/104)/`06661be`，squash；基线 #103/`8f33b73` P-132 立卡之后）。
 - **交付**：新增 `src/components/studio/PlaytestAcceptBlock.tsx`，在中栏 `SchemeReviewPane` **同页**嵌入既有 `CompareView`（**不改**组件本体 / props 契约）。原话框默认空（禁止引导文案自动填入）；「认可完成」**只**调用 `submitPlaytestEvidence(conn, { contract_id, user_verdict })`（请求体不含 `release_id`/`timestamp`/`operator`）。读侧选型为薄 HTTP：`GET /api/playtest/status?contract_id=` 委托既有 `evaluatePlaytestGuard`（**零改** `playtest-guard.ts`）；前端 `fetchPlaytestStatus` 反映拒绝态。`src/routes/index.tsx` 传 `contractId` / `references` / LIVE preview / `conn`。测试：`tests/ui/scheme-review-playtest.test.tsx` + `tests/unit/playtest-status-wiring.test.ts`（11 passed）；全量相对干净 main **零新增失败**。
 - **后续挂账（三项 · 不宣称关闭）**：① L.17a 参考站抓取成果 → CompareView `snapshots` 前端拉数（本卡可空左栏渲染）；② 会话原话候选列表接线（props 已留 `sessionVerbatimCandidates`；`index` 暂未灌聊天原话）；③ **真机整段 `check playtest` 执行债**（卡明文另挂，本卡不做门禁执行链路）。
+> **（P-149 立卡指针）**：挂账①→[`TASK-L.17d`](./development-tasks-active.md#task-l.17d) `[NEW_TASK]`；挂账②→[`TASK-L.17e`](./development-tasks-active.md#task-l.17e) `[NEW_TASK]`；挂账③→[`TASK-L.17f`](./development-tasks-active.md#task-l.17f) `[NEW_TASK]`。**立卡≠销项、未开工、不宣称闭环**。
 - **边界**：**窄口径**——UI 已挂 / 代码合入；**不**宣称端到端 UI/产品闭环；不碰 orchestrator / 派工 / AdapterRegistry（W.9c 施工面）；不复活多视口 Tab / 新设右栏入口；不改 CompareView / `submitPlaytestEvidence` / `playtest-guard` 判定与契约本体。
 
 ---
