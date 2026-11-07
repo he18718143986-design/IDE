@@ -3978,6 +3978,7 @@
 #### 【Task W.5b】cursor-agent 适配器黑盒实测（外部适配器实测 + W.7 探测包非容器回归基准）`[COMPLETED]`
 * **任务编号**：`TASK-W.5b`
 * **状态与证据**：`[COMPLETED]`（[#92](https://github.com/he18718143986-design/IDE/pull/92)/`bdac805`，squash merge；分支 `feat/w5b-cursor-agent-verify`，本地单提交 `33cf6c2`，parent `b8d53c5`；合入后 main 的 tree 与分支**完全一致**）。**口径经 Tina 2026-11-02 裁决：代码侧闭环 → `[COMPLETED]` + CA-06 挂账**（PASS 8 条中 `CA-06` 未执行，见挂账 1）；`verified_on` 保持空，**本卡不产出任何受控证据**。
+> **（P-160 现行）** §3.4m **挂账 1（CA-06）已销**：代码侧 `CURSOR_AGENT_VERIFIED_ON = { cli_version: "2026.10.22-27dcf5f", verified_at: "2026-11-05" }` 早已回填（`daemon/worker/cli-host/cursor-agent-adapter.ts`）。证据：GitHub Actions run [`41959697673`](https://github.com/he18718143986-design/IDE/actions/runs/41959697673)（`ca06-real`，main `cec8c6c5d` / #141 后）全绿；ledger README / consistency-audit 已有「CA-06 实测通过」非 OP 注记（2026-11-05）——本条**补卡账与矩阵对齐，不重复造假证据**。`cli_version` = 安装包构建号（job 日志下载地址），**不是** `cursor-agent --version` 自报。**档位不变**：仍 `UNCONTROLLED_EXTERNAL`（结构性上界）；`verified_on` ≠ 已受控 / 可派工；**不**宣称端到端闭环。拦截边界（ledger 已写）：写入/命令/MCP 由 CLI `plan` 只读档拒绝，非适配器白名单功劳；上游 plan mode 语义变化会击穿——如实保留。
 * **对应规格**：[`system-architecture.md`](./system-architecture.md) §2.3（`:393` Coding Worker Agent / `:394` 把 cursor-agent 列入 Worker 例）、§4.2.3 P-17（`:591` 术语纠偏：「沙箱」仅用于 OS 级隔离）、§0.6.1（`:265` VIBE vs PROTECTED —— 「仅 Vibe 可用」的出典）、§9.1（`:937` 三值 `control_mode` + `verified_on` 目标模型）、`:1374` **P5.5**（各 Adapter 记录真实 `verified_on`）；[ADR-0001](../adr/0001-target-user-positioning.md) / [ADR-0003](../adr/0003-worktree-capability-boundary.md)；[`../scheme.md`](../scheme.md) §10 墓地 **REJ-010**（能力声明不得按宿主修辞口径造假）
 * **前置依赖**：`TASK-W.5a`（**COMPLETED** · cli-host 黑盒实测先例与 env 白名单纪律）、`TASK-W.6`（**COMPLETED** · [#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53` · 派工门禁四码）、`TASK-W.7`（**COMPLETED** · [#89](https://github.com/he18718143986-design/IDE/pull/89)/`be480bb` · 探测包五类断言与被测对象）——三者均已在位
 * **交付内容**：
@@ -3996,8 +3997,10 @@
   4. `CA-04` env 白名单与凭证前置——**达成但判法调整**（见挂账 3）：键集合 ⊆ {`PATH`,`HOME`,`LANG`,`CURSOR_API_KEY`}；哨兵环境变量不透传；缺 key 与有 key 的错误**码**不同（证明凭证检查先于执行器检查）。
   5. `CA-05` MCP 面——**达成**（落点 `<HOME>/.cursor/mcp.json`；只有 `stagent` 一项；token 走 `Authorization: Bearer`；无 token 不写空 headers）。
   6. `CA-06` 真实 CLI 四类越权负例——**未执行**（挂账 1）：本机无有效 `CURSOR_API_KEY`，四类负例需模型驱动工具调用；e2e 里写成 `describe.skipIf(!HAS_KEY)` + **启用即显式失败**的桩，不用 skip 冒充通过。
+     > **（P-160 现行）** CA-06 **已执行并通过**：run [`41959697673`](https://github.com/he18718143986-design/IDE/actions/runs/41959697673) 全绿；四类越权负例（工作区外写、保护区写、白名单外命令、MCP 越权）及 symlink 写入逐项拒绝；`CURSOR_AGENT_VERIFIED_ON` 已回填。上句「未执行」为 P-125 当时事实，保留作溯源。
   7. `CA-07` 探测包非容器负向回归——**达成**（`capability_declaration` 判 `fail`；`dispatch_witness` 在 `GATEWAY_ENFORCED` 目标下 `not_verified` + `required:false`，换 `SANDBOX_ENFORCED` 目标即判 `fail`（说明 N/A 只对非容器档成立）；执行面不可用时 `runProbePack()` 抛 `E_PROBE_SANDBOX_UNAVAILABLE`）。
   8. `CA-08` `verified_on` 与升格拒绝——**达成**（`CURSOR_AGENT_VERIFIED_ON === undefined`；升格到 `GATEWAY_ENFORCED` 被严格档拒（`FILESYSTEM_DIRECT_UNCONTROLLED`）；无指纹升格被 `ADAPTER_PROMOTION_REFUSED` 拒）。
+     > **（P-160 现行）** `CURSOR_AGENT_VERIFIED_ON` **已非空**（`{ cli_version: "2026.10.22-27dcf5f", verified_at: "2026-11-05" }`）；升格拒绝口径不变（档位仍 `UNCONTROLLED_EXTERNAL`，严格档 / 无指纹升格仍拒）。上句 `=== undefined` 为 P-125 当时事实，保留作溯源。
 * **测试与证据**：
   - `npx vitest run tests/unit/cursor-agent-adapter.test.ts` → **33 passed**。
   - `STAGENT_REAL_CURSOR=1 npx vitest run tests/e2e/cursor-agent-real.real.test.ts` → **7 passed | 1 skipped**（跳过的是需有效 API Key 的 `CA-06`）。真跑到的观测：专用 `HOME` 下 `status` = `Not logged in`；无 key 直跑 = `Error: Authentication required...`（**未回落订阅会话**）；假 key = `The provided API key is invalid.` + 来源为 `CURSOR_API_KEY` 环境变量；`--help` 逐项核对白名单与禁用旗标**都是真旗标**；`mcp list` 只读到 `stagent` 一项。
@@ -4006,6 +4009,7 @@
   - 真实 CLI 版本与环境：`cursor-agent` `2026.10.01-e373342` @ `darwin-arm64`，实测日 `2026-11-02`（记录在 `CURSOR_AGENT_MEASUREMENT`）。
 * **残余边界 / 后续挂账（P-125 归拢，共 6 条）**：
   1. **`CA-06` 四类越权负例未执行（本卡唯一的 PASS 缺口）**：本机 `CURSOR_API_KEY` 未设置且 CLI 处于订阅登录态；按卡内 FAIL「凭证走订阅会话 = FAIL」，**没有**拿订阅会话凑数。因此 `CURSOR_AGENT_VERIFIED_ON` 恒 `undefined`、`CURSOR_AGENT_MEASUREMENT.negative_cases_executed: false`。补齐条件：有效 API Key + 隔离 `HOME`（断言 `status` 未登录）下跑完四类负例，**才能**填 `verified_on`。**在此之前不得把 cursor-agent 读成「已验证」**，它只是「已登记、未受控、不可派工」。
+     > **（P-160 现行 · 挂账 1 销项）** CA-06 **已执行**：run [`41959697673`](https://github.com/he18718143986-design/IDE/actions/runs/41959697673)（`ca06-real`，main `cec8c6c5d` / #141 后）全绿；`CURSOR_AGENT_VERIFIED_ON = { cli_version: "2026.10.22-27dcf5f", verified_at: "2026-11-05" }` 已回填（代码侧早已填好；本条对齐卡账）。`cli_version` = 安装包构建号，非 CLI 自报。**档位不变**：仍 `UNCONTROLLED_EXTERNAL`；`verified_on` ≠ 已受控 / 可派工；**不**宣称 Cursor 已受控或端到端闭环。拦截边界：写入/命令/MCP 由 CLI `plan` 只读档拒绝，非适配器白名单功劳；上游 plan mode 语义变化会击穿。上句「未执行 / 恒 undefined」为 P-125 当时事实，保留作溯源。证据详见 ledger README「CA-06 实测通过」非 OP 注记（2026-11-05）——**不重复造假证据**。
   2. **`WorkerSpecRegistry` 符号不存在**：施工指令里「注册（`WorkerSpecRegistry` 持久化 `.stagent/workers.json`）」与代码事实不符——全仓无该类，`.stagent/workers.json` 是 W.7 **自注册** worker 的持久层，内建项写进去会与注册表同 id 冲突（`E_WORKER_DUPLICATED` / 「已被内建适配器占用」）。故按卡正文走**内建登记**，并加断言证明「列表可见 + 显示未受控 + 不可派工 + 不写 `workers.json`」。
   3. **`CA-04` 的「spawn 零调用（spy 断言）」换成了顺序断言**：本卡无执行器，`run()` 物理上不启动任何进程，「spy 零调用」会变成永远为真的空断言。改为「缺 key 抛 A、有 key 抛 B」的错误码顺序断言——证明凭证检查先于执行器检查，且两条路径都不执行。
   4. **env 白名单比卡内更窄**：卡写 `PATH`/`HOME`/`LANG`/`CURSOR_API_KEY`/`STAGENT_*`，实现**没有**透传任何 `STAGENT_*`（无观测需求）；窄于卡内，不是放宽。
