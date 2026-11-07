@@ -696,7 +696,8 @@
 
 > **归档注记（2026-11-03 · P-133）**：本卡已 COMPLETED（[#104](https://github.com/he18718143986-design/IDE/pull/104)/`06661be` squash）。交付、三项挂账与边界见 [`development-tasks-completed.md`](./development-tasks-completed.md#task-l.17c)。**立卡原文（P-132）保留作溯源**：兑现 L.17b / C.23 已声明的端到端 UI 挂账；**不抢 Sprint 首要**（现行首要仍为 `TASK-W.9c`）；不碰 W.9c / orchestrator / AdapterRegistry；**不宣称**端到端闭环。
 >
-> **（P-149）** 三项挂账已立卡 [`L.17d`](#task-l.17d) / [`L.17e`](#task-l.17e) / [`L.17f`](#task-l.17f)（`[NEW_TASK]` · 未销项、未开工）；Sprint 首要现为 `TASK-L.17d`。
+> **（P-149 立卡指针 · 保留原文作溯源）** 三项挂账已立卡 [`L.17d`](#task-l.17d) / [`L.17e`](#task-l.17e) / [`L.17f`](#task-l.17f)（当时均 `[NEW_TASK]`）。
+> **（P-150 现行）** 挂账① → [`TASK-L.17d`](./development-tasks-completed.md#task-l.17d) `[COMPLETED]`（[#145](https://github.com/he18718143986-design/IDE/pull/145)/`e2b8dd3`）；挂账②/③仍由 [`L.17e`](#task-l.17e) / [`L.17f`](#task-l.17f) `[NEW_TASK]` 承接。Sprint 首要 → **`TASK-L.17e`**。**仍不宣称**端到端闭环。
 
 * **任务编号**：`TASK-L.17c`
 * **任务名称**：中栏方案审阅页嵌入试玩认可提交
@@ -740,108 +741,10 @@
 
 <a id="task-l.17d"></a>
 
-#### 【Task L.17d】L.17a 参考站抓取成果接入 CompareView `snapshots` `[NEW_TASK]`
+#### 【Task L.17d】L.17a 参考站抓取成果接入 CompareView `snapshots` `[COMPLETED]`
 
-> **立卡（2026-11-07 · P-149）**：兑现 L.17c completed §3.4p 挂账①。Tina 授权按挂账顺序销项立卡；**本轮仅文档**，不开工产品代码。不宣称端到端闭环；不碰 W.9 挂账。
+> **归档注记（2026-11-07 · P-150）**：本卡已 COMPLETED（[#145](https://github.com/he18718143986-design/IDE/pull/145)/`e2b8dd3`，squash）。完整卡正文（yaml + 交付清单、默认/未做边界）迁入 [`development-tasks-completed.md` §3.4u](./development-tasks-completed.md#task-l.17d)。**L.17c 挂账①销项**；挂账②/③仍由 L.17e / L.17f 承接。**不宣称**端到端闭环；不碰 W.9。
 
-```yaml task-card
-id: TASK-L.17d
-status: NEW_TASK
-contract:
-  intent:
-    title: L.17a 参考站抓取成果接入 CompareView snapshots
-    description: >-
-      用户在中栏对照试玩左栏看见合同 references[] 经 L.17a 受控摄取得到的参考站抓取成果
-      （至少 HTML/摘要），不再长期空白；缺成果时仍诚实空态。
-    risk_level: MEDIUM
-  acceptance:
-    - { id: L17D-P1, check: auto, text: "有 references[] 时 GET /api/playtest/reference-snapshots 返回与 references 对齐的 ReferenceSnapshotView 列表（reference_url 一一对应）" }
-    - { id: L17D-P2, check: auto, text: "摄取走 WebIngestProxy（白名单/禁域与 L.17a 同口径）；非白名单域名不得出现在成功结果中" }
-    - { id: L17D-P3, check: auto, text: "index/SchemeReview 把 snapshots 传入 PlaytestAcceptBlock → CompareView；有成果时 DOM 出现 compare-view-reference，不再仅空左栏" }
-    - { id: L17D-P4, check: auto, text: "无 references / 摄取失败时左栏保持诚实空态或逐条错误说明，不得伪造截图或摘要" }
-  scheme_item_ids: [acc-6, gap-11, goal-2]
-  scope:
-    writable_paths:
-      - daemon/server.ts
-      - daemon/playtest/**
-      - src/lib/daemon-api.ts
-      - src/lib/journey/**
-      - src/routes/index.tsx
-      - tests/unit/playtest-reference-snapshots.test.ts
-      - tests/ui/scheme-review-playtest.test.tsx
-    readonly_paths:
-      - daemon/web-ingest/proxy.ts
-      - daemon/web-ingest/types.ts
-      - src/components/project/CompareView.tsx
-      - src/components/studio/PlaytestAcceptBlock.tsx
-  verification:
-    commands:
-      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/playtest-reference-snapshots.test.ts] }
-      - { alias: ui, executable: npx, args: [vitest, run, tests/ui/scheme-review-playtest.test.tsx] }
-design:
-  approach: >-
-    新增薄读侧 GET /api/playtest/reference-snapshots?contract_id=：读合同 references[]，
-    对每个 URL 经既有 WebIngestProxy.fetch 受控 GET（format 优先 html/summary），映射为
-    CompareView.ReferenceSnapshotView（reference_url + html_snapshot 与/或 dom_summary；
-    screenshot_url 本卡可为 null，不新开截图管线）。前端 daemon-api 拉数后由
-    src/routes/index.tsx 写入 playtest.snapshots。不改 CompareView / PlaytestAcceptBlock
-    props 契约；不改 WebIngestProxy 白名单语义；不持久化新快照库（本卡默认即时拉数，
-    落盘缓存若需要另立卡）。
-  touches:
-    - { path: daemon/server.ts, change: modify, why: 挂薄读侧路由, symbols: [] }
-    - { path: daemon/playtest/reference-snapshots.ts, change: create, why: 合同 references → ReferenceSnapshotView 装配, symbols: [buildReferenceSnapshots, handleReferenceSnapshotsRequest] }
-    - { path: src/lib/daemon-api.ts, change: modify, why: 前端拉数客户端, symbols: [fetchPlaytestReferenceSnapshots] }
-    - { path: src/routes/index.tsx, change: modify, why: 把 snapshots 传入 playtest, symbols: [] }
-    - { path: tests/unit/playtest-reference-snapshots.test.ts, change: create, why: 路由/映射/白名单负例, symbols: [] }
-    - { path: tests/ui/scheme-review-playtest.test.tsx, change: modify, why: 有 snapshots 时左栏非空断言, symbols: [] }
-  interfaces:
-    - name: GET /api/playtest/reference-snapshots
-      kind: http
-      signature: "{ contract_id } → 200 { snapshots: ReferenceSnapshotView[] } | 4xx"
-      consumers: []
-  test_plan:
-    - { acceptance_id: L17D-P1, test_path: tests/unit/playtest-reference-snapshots.test.ts, level: unit, case: "references 对齐返回" }
-    - { acceptance_id: L17D-P2, test_path: tests/unit/playtest-reference-snapshots.test.ts, level: unit, case: "禁域不得成功" }
-    - { acceptance_id: L17D-P3, test_path: tests/ui/scheme-review-playtest.test.tsx, level: unit, case: "snapshots 传入后左栏有 reference" }
-    - { acceptance_id: L17D-P4, test_path: tests/unit/playtest-reference-snapshots.test.ts, level: unit, case: "无 references 诚实空列表" }
-governance:
-  spec_refs:
-    - docs/specs/development-tasks-completed.md#task-l.17c
-    - docs/specs/development-tasks-completed.md#task-l.17a
-    - docs/scheme.md
-  depends_on:
-    - { id: TASK-L.17c, kind: hard }
-    - { id: TASK-L.17a, kind: hard }
-  code_facts:
-    - { ref: "src/routes/index.tsx:3623-3631", note: "playtest 传参有 contractId/references/preview/conn，无 snapshots" }
-    - { ref: "src/components/studio/PlaytestAcceptBlock.tsx::PlaytestAcceptBlockProps", note: "已声明可选 snapshots，透传 CompareView；今日调用方不灌数" }
-    - { ref: "daemon/web-ingest/proxy.ts::WebIngestProxy", note: "L.17a 受控摄取仅 MCP/代理路径可用；无面向 CompareView 的 HTTP 拉数" }
-    - { ref: "daemon/server.ts:5131-5161", note: "仅挂 /api/playtest/status 与 /api/playtest/evidence，无 reference-snapshots" }
-  non_goals:
-    - 不改 CompareView / PlaytestAcceptBlock 组件本体与 props 契约
-    - 不新开截图/像素管线，不复活 REJ-009
-    - 不碰 orchestrator / 派工 / AdapterRegistry（W.9 挂账另序）
-    - 不做真机整段 check playtest（TASK-L.17f）
-    - 不宣称端到端产品闭环
-  fail:
-    - 绕过 WebIngestProxy 用裸 fetch/WebFetch 拉参考站
-    - 伪造 screenshot_url / 摘要冒充抓取成功
-    - 修改 CompareView props 契约或重建对照组件
-  adr_revisions: []
-  defaults:
-    - "即时拉数、不新建持久快照库；screenshot_url 允许 null"
-    - "单 URL 失败不拖垮整表：成功项照常返回，失败项可省略或带错误说明（卡内测试写死一种）"
-  open_questions: []
-  estimate: M
-  invariants:
-    auth: unchanged
-    demo_origin: unchanged
-    illumination: unchanged
-    gateway_write_scope: unchanged
-```
-
-* **背景**：L.17c 合入后左栏可空渲染；挂账①要求把 L.17a 抓取成果接到 `snapshots`。
-* **取舍**：不在本卡做截图引擎；不先建缓存层。
 
 <a id="task-l.17e"></a>
 

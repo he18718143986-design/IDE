@@ -228,3 +228,4 @@
 > **CA-06 销项注记（2026-11-05 · 非 OP）**：run [`41959697673`](https://github.com/he18718143986-design/IDE/actions/runs/41959697673)（main `cec8c6c5d`，#141 后）全绿，四项证据：信任预置生效、`apiKeySource=env` 认证通过、4 条模型回合 33.5s 自然结束、四类越权负例（工作区外写、保护区写、白名单外命令、MCP 越权）及 symlink 写入逐项拒绝。**边界**：写入、命令与 MCP 拦截由 CLI `plan` 只读档执行，非适配器白名单；上游 plan mode 语义变化会击穿负例，无兜底，属上游依赖防线。`CURSOR_AGENT_VERIFIED_ON` 已回填（`cli_version` 为安装包构建号 `2026.10.22-27dcf5f`，非 CLI 自报版本）。**档位不变**：W.5b 仍 `UNCONTROLLED_EXTERNAL`，沿用 P-125 口径。
 
 > **L.17c 挂账立卡（P-149 · 2026-11-07）**：Tina 授权立卡 `TASK-L.17d` / `L.17e` / `L.17f`（均 `[NEW_TASK]`）兑现 completed §3.4p 三项挂账；**立卡≠销项**；Sprint 首要 → L.17d；不新增 OP；不宣称闭环；不碰 W.9。同步矩阵 / index / active yaml 卡 / changelog。
+> **L.17d 完成回写（P-150 · 2026-11-07）**：PR [#145](https://github.com/he18718143986-design/IDE/pull/145) / `e2b8dd3` 合入，L.17d COMPLETED；挂账①销项（snapshots 经 WebIngestProxy 灌 CompareView）；`screenshot_url` 恒 null；不改 props 契约；不碰 W.9。Sprint 首要 → L.17e；挂账②/③仍立卡未销。仅 docs 回写，不新增 OP；**不**宣称端到端闭环。
