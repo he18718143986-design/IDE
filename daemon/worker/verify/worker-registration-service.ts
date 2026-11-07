@@ -148,6 +148,13 @@ export class WorkerRegistrationService {
   private readonly probePortFactory:
     WorkerRegistrationServiceOptions["probePortFactory"] | undefined;
   private readonly createContainerHost: () => ContainerHostPort;
+  /**
+   * TASK-W.9d：行投影共用的容器宿主（服务实例级单例）。
+   * list/get 对 N 行至多构造 / 探测一次；未解析前为未置位。
+   * 失效策略：随 WorkerRegistrationService 实例生命周期；新实例重新探测。
+   */
+  private sharedContainerHostResolved = false;
+  private sharedContainerHost: ContainerHostPort | undefined;
 
   constructor(options: WorkerRegistrationServiceOptions) {
     this.repoRoot = options.repoRoot;
@@ -519,17 +526,31 @@ export class WorkerRegistrationService {
     return new SandboxProbeExecutionPort({ host });
   }
 
+  /**
+   * TASK-W.9d：解析（并缓存）行投影用的 ContainerHostPort。
+   * 构造期探测仍可发生，但同服务实例至多一次；create 抛错则缓存为 undefined。
+   */
+  private resolveSharedContainerHost(): ContainerHostPort | undefined {
+    if (this.sharedContainerHostResolved) return this.sharedContainerHost;
+    this.sharedContainerHostResolved = true;
+    try {
+      this.sharedContainerHost = this.createContainerHost();
+    } catch {
+      this.sharedContainerHost = undefined;
+    }
+    return this.sharedContainerHost;
+  }
+
   private builtinView(entry: {
     adapter: CodingWorkerAdapter;
     control_mode: AdapterControlMode;
     declaration: AdapterCapabilityDeclaration;
   }): WorkerView {
-    let host: ContainerHostPort | undefined;
-    try {
-      host = this.createContainerHost();
-    } catch {
-      host = undefined;
-    }
+    // SANDBOX 才需要宿主可用性；GATEWAY/UNCONTROLLED 走静态形态，避免无谓探测。
+    const host =
+      entry.control_mode === "SANDBOX_ENFORCED"
+        ? this.resolveSharedContainerHost()
+        : undefined;
     const dispatchable = isControlledDispatchable(
       this.registry,
       entry.declaration.adapter_id,
@@ -554,12 +575,11 @@ export class WorkerRegistrationService {
 
   private storedView(record: WorkerRecord): WorkerView {
     const effective = effectiveControlMode(record);
-    let host: ContainerHostPort | undefined;
-    try {
-      host = this.createContainerHost();
-    } catch {
-      host = undefined;
-    }
+    // 与 builtinView 同口径：仅 SANDBOX 行投影解析共享宿主。
+    const host =
+      effective.mode === "SANDBOX_ENFORCED"
+        ? this.resolveSharedContainerHost()
+        : undefined;
     const dispatchable = isControlledDispatchable(
       this.registry,
       record.adapter_id,
