@@ -275,15 +275,16 @@
 - **Sprint**：首要当时 → **在队清零**（下一张按 Tina 顺序 → **桌面形态 RFC（为 D.1e）**；不偷偷开工 D.1e）。不新增 OP；不改产品代码。（P-163 现行见下节）
 - **物理 tip**：代码 tip `b390254`（#165）；立卡 docs tip `9067d40`（#164）；P-162 docs 本 PR。
 
-### 桌面形态 RFC（P-163 起草 · P-164 决议 · P-165 DoR 入队 · P-166 立卡 DS.1 · 为 D.1e · 2026-11-07 · 非 OP）
+### 桌面形态 RFC（P-163 起草 · P-164 决议 · P-165 DoR 入队 · P-166 立卡 DS.1 · P-167 切片落地 · 为 D.1e · 非 OP）
 
 - **动作（P-163）**：新增讨论稿 [`../rfc/desktop-shell-form.md`](../rfc/desktop-shell-form.md)；兑现 D-6/P-141「桌面形态另立 RFC」。
 - **决议（P-164 · Tina「按建议拍」）**：DS-1=**A 本机助手**；DS-2=**助手+系统浏览器**；DS-3=**进 DoR 队列，但仍 ≠ 开工**；DS-4=**只先 macOS**；DS-5=**`stagent open`+最近列表保留，选夹为增强**；DS-6=**先不排 DoR 重写窗口**。
 - **DoR 入队（P-165 · Tina「你直接按顺序执行」）**：兑现 DS-3——将「桌面形态 · 本机助手」登记入 DoR 队列（见下节 + RFC §10）。**入队 ≠ 激活 D.1e ≠ 立实现卡 ≠ 写代码**；**不**排 DoR 重写窗口（DS-6）。
 - **立卡（P-166 · Tina「继续自动执行」）**：另立 [`TASK-DS.1`](../specs/development-tasks-active.md#task-ds.1)（macOS 本机助手 · 选文件夹 · RFC 切片）。**`TASK-D.1e` 维持 DEFERRED**（由 DS.1 承接切片；**不激活**）。立卡 ≠ 开工；零产品代码。
 - **状态**：`TASK-D.1e` **维持** `[DEFERRED → v0.2+]`；**立决议 ≠ 激活 D.1e ≠ 开工**；入队/立切片卡均**不**改 D.1e 出 DEFERRED。
-- **Sprint**：首要 → **`TASK-DS.1`（在队 / NEW_TASK）** / D.1e 仍 DEFERRED。不偷偷激活 D.1e；不激活 S.3；不销 OP-34。
-- **物理 tip 基线**：docs tip `78febad`（#169 P-165）；代码 tip 仍 `b390254`（#165）。
+- **切片落地（P-167）**：`TASK-DS.1` → `[COMPLETED]`（#171/`1701cab`）。选夹增强已合入；**完成 ≠ D.1e 完成**；D.1e 仍 DEFERRED。
+- **Sprint**：首要 → **在队清零**（无 READY；下一张待 Tina 或既有债）。不偷偷激活 D.1e；不激活 S.3；不销 OP-34。
+- **物理 tip 基线**：代码 tip `1701cab`（#171）；立卡基线 `3dde462`（#170 P-166）。
 
 ### 桌面形态 DoR 入队（P-165 · 2026-11-07 · 非 OP）
 
@@ -299,12 +300,9 @@
 | **来源** | Tina「你直接按顺序执行」（兑现 DS-3） |
 | **判据（谁来做 / 做完）** | 入队本身以本表 + RFC §10 + Sprint tip 三处一致为「入队完成」；**（P-166）立实现卡已由 Tina「继续自动执行」兑现为 `TASK-DS.1`**；DoR 重写窗口仍不排（DS-6）；D.1e 仍不激活 |
 
-### 立卡 TASK-DS.1（P-166 · 2026-11-07 · 非 OP）
+### 立卡 / 回写 TASK-DS.1（P-166 立卡 · P-167 回写 · 非 OP）
 
-- **动作**：新增 `[NEW_TASK]` [`TASK-DS.1`](../specs/development-tasks-active.md#task-ds.1)——macOS 本机助手 · 选文件夹开项目（RFC 第一切片）。
-- **范围对齐**：DS-1=A；DS-2=助手+系统浏览器；DS-4=只先 macOS；DS-5=`stagent open`+最近列表保留、选夹增强。
-- **与 D.1e**：`TASK-D.1e` **维持** `[DEFERRED → v0.2+]`；桌面形态由 DS.1 承接 RFC 切片；**不激活** D.1e；本卡完成 ≠ D.1e 完成。
-- **明确不是**：开工产品代码 / Electron·Tauri / Win·Linux / 单窗 IDE / DoR 重写窗口 / 宣称闭环 / 销 OP-34。
-- **Sprint**：首要 → `TASK-DS.1`；立卡 ≠ 开工。
-- **基线**：`main`@`78febad`（#169）。
-
+- **动作（P-166）**：新增 `[NEW_TASK]` `TASK-DS.1`——macOS 本机助手 · 选文件夹开项目（RFC 第一切片）。
+- **回写（P-167）**：`TASK-DS.1` → `[COMPLETED]`（[#171](https://github.com/he18718143986-design/IDE/pull/171)/`1701cab`；见 completed §3.4ad）。交付选夹增强；与 open/最近/粘贴共存。
+- **与 D.1e**：`TASK-D.1e` **维持** `[DEFERRED → v0.2+]`；**完成 ≠ D.1e 完成**；不激活 D.1e。
+- **Sprint**：首要 → **在队清零**（无 READY；下一张待 Tina 或既有债）。

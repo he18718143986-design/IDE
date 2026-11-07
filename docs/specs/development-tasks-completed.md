@@ -5212,3 +5212,169 @@ governance:
     gateway_write_scope: unchanged
   delivered: { pr: 165, commit: b390254960104e53dae183db8b63ea0826690cb8 }
 ```
+
+
+### 3.4ad macOS 本机助手 · 选文件夹开项目（DS.1 · RFC 切片）
+
+<a id="task-ds.1"></a>
+
+#### 【Task DS.1】macOS 本机助手 · 选文件夹开项目（RFC 切片）`[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#171](https://github.com/he18718143986-design/IDE/pull/171)/`1701cab0b9bb73f5858f229c0851a6047455b5ad`，squash；立卡基线 #170/`3dde462` P-166 之后；含 prettier `f030171` + 端口区间 `5977a37`）。
+- **交付**：writable_paths 内 8 文件——`daemon/desktop/macos-folder-picker.ts`（注入 `execFileSync`，无 `child_process` 直 import；darwin `osascript choose folder`；取消→null；非 darwin→unsupported）+ `daemon/server.ts` `POST /api/desktop/pick-folder`（AUTH+loopback；响应不含 token/launchUrl）+ `src/lib/daemon-api.ts` + OpenProjectEntry/Welcome darwin 选夹入口；选中后复用既有 open/`#token=` / recent-projects；与 `stagent open`/最近/粘贴共存。三套单测 + tsc 0；回归 recent/open；spawn 白名单相关绿。
+- **销项**：兑现 RFC §7 DS-1/DS-2/DS-4/DS-5 第一切片（选夹增强）；DoR 入队后立卡→实现闭环。
+- **诚实口径 / grep 自证**：无 electron/tauri 依赖；pick 响应不含 token/launchUrl；无 `?token=` 旁路；**未**改 `TASK-D.1e` 出 DEFERRED；**本卡完成 ≠ D.1e 完成**；不宣称端到端闭环 / 已接近 Cursor。
+- **残余 / 默认未做（不宣称关闭）**：① Electron/Tauri/单窗 IDE；② Win/Linux 选夹；③ DoR 重写窗口（DS-6）；④ 打包/签名/自动更新完整桌面分发；⑤ D.1e 全量「同壳 Import/New」；⑥ **不**销 OP-34；⑦ **不**激活 S.3。
+- **边界**：**窄口径**——macOS 系统选夹增强 + 既有 open 通道；不是 D.1e 全量；不是桌面壳产品闭环。
+
+```yaml task-card
+id: TASK-DS.1
+status: COMPLETED
+contract:
+  intent:
+    title: macOS 本机助手 · 选文件夹开项目（RFC 切片）
+    description: >-
+      按 RFC desktop-shell-form §7 已拍决议，交付第一可施工切片：在 macOS 上用轻量本机助手
+      （系统文件夹选择器，非 Electron/Tauri）让用户从欢迎页/打开项目面板「选择文件夹」→
+      选中绝对路径 → 复用既有 openWorkspaceByPath / ensureWorkspaceSession / #token= 进入工作台；
+      与 stagent open、最近列表、粘贴路径（C.8c）共存。工作台仍主要是系统浏览器（DS-2）。
+      只先 macOS（DS-4）。不激活 TASK-D.1e；不宣称已接近 Cursor 或端到端闭环。
+    risk_level: MEDIUM
+  acceptance:
+    - id: DS1-P1
+      check: auto
+      text: >-
+        macOS 选夹模块（daemon/desktop/macos-folder-picker.ts）在 darwin 上可调起系统文件夹对话框
+        （osascript choose folder 或等价受控系统二进制）；用户取消返回 null；非 darwin 明确 unsupported
+        （不假装成功）
+    - id: DS1-P2
+      check: auto
+      text: >-
+        Daemon 控制面（如 POST /api/desktop/pick-folder）仅 loopback + 已鉴权可调；选中路径走既有
+        open / ensureWorkspaceSession / #token= 通道写入最近列表；stagent open、GET/POST
+        /api/recent-projects、粘贴路径打开仍可用（回归不回退 D.1b/c/C.8c）
+    - id: DS1-P3
+      check: auto
+      text: >-
+        欢迎页/OpenProjectEntry 在 darwin 呈现「选择文件夹」入口；与最近列表、粘贴路径同屏共存；
+        非 darwin 不展示假选夹或标已完成
+    - id: DS1-P4
+      check: auto
+      text: >-
+        单测/Daemon/UI 锁定正负例；grep 自证：未新增 electron/tauri 依赖；生产路径无 Token 进
+        query/localStorage 明文；日志无 Token 明文
+    - id: DS1-P5
+      check: auto
+      text: >-
+        鉴权 / Demo Origin / 点亮三证 / 网关写范围不变；不旁路 ADR-0018 Seal；不扩大 Supervisor
+        广播面；不激活 S.3；不改 TASK-D.1e 出 DEFERRED
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/desktop/macos-folder-picker.ts
+      - daemon/server.ts
+      - src/lib/daemon-api.ts
+      - src/components/layout/OpenProjectEntry.tsx
+      - src/components/layout/ProjectWelcomePage.tsx
+      - tests/unit/macos-folder-picker.test.ts
+      - tests/daemon/pick-folder-api.test.ts
+      - tests/ui/open-project-folder-picker.test.tsx
+    readonly_paths:
+      - docs/rfc/desktop-shell-form.md
+      - docs/specs/development-tasks-active.md
+      - docs/specs/supervisor.md
+      - docs/adr/0008-demo-isolated-origin.md
+      - docs/adr/0018-intent-to-executable-seal.md
+      - bin/stagent.ts
+      - daemon/core/open-workspace.ts
+      - daemon/core/recent-projects.ts
+      - src/lib/open-project-panel.ts
+  verification:
+    commands:
+      - { alias: unit-picker, executable: npx, args: [vitest, run, tests/unit/macos-folder-picker.test.ts] }
+      - { alias: daemon-pick, executable: npx, args: [vitest, run, tests/daemon/pick-folder-api.test.ts] }
+      - { alias: ui-picker, executable: npx, args: [vitest, run, tests/ui/open-project-folder-picker.test.tsx] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) 新建 daemon/desktop/macos-folder-picker.ts：darwin 上以受控 execFile(osascript,
+    choose folder)（对齐 repo-delete 废纸篓 osascript 纪律：固定系统二进制、超时、路径转义）；
+    取消→null；非 darwin→明确错误码。2) daemon/server.ts 增 POST /api/desktop/pick-folder
+    （AUTH + loopback；返回绝对路径；不把 Token 写入响应以外的可分享存储）。3) 选中后复用
+    既有 recent-projects/open / openWorkspaceByPath，禁止另起鉴权旁路。4) OpenProjectEntry /
+    ProjectWelcomePage 增「选择文件夹」按钮（仅 darwin 或能力探测后展示）。5) 单测 mock
+    osascript；Daemon/UI 锁共存与负例。冲突时 Supervisor / ADR-0018 / ADR-008 优先。
+  touches:
+    - { path: daemon/desktop/macos-folder-picker.ts, change: create, why: macOS 系统选夹本机助手内核, symbols: [pickFolderMacOS] }
+    - { path: daemon/server.ts, change: modify, why: 鉴权 loopback API 暴露选夹, symbols: [handleDesktopPickFolder] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: 前端调用 pick-folder, symbols: [pickFolderViaDaemon] }
+    - { path: src/components/layout/OpenProjectEntry.tsx, change: modify, why: 选夹入口与最近/粘贴共存, symbols: [] }
+    - { path: src/components/layout/ProjectWelcomePage.tsx, change: modify, why: 欢迎页文案/入口不抢 D.1e 全量, symbols: [] }
+    - { path: tests/unit/macos-folder-picker.test.ts, change: create, why: 正负例锁定选夹模块, symbols: [] }
+    - { path: tests/daemon/pick-folder-api.test.ts, change: create, why: API 鉴权与平台门禁, symbols: [] }
+    - { path: tests/ui/open-project-folder-picker.test.tsx, change: create, why: UI 共存与 darwin 入口, symbols: [] }
+  interfaces:
+    - kind: http
+      name: "POST /api/desktop/pick-folder"
+      signature: "() → 200 { path: string } | 200 { cancelled: true } | 501 { code: 'E_UNSUPPORTED_PLATFORM' } | 401"
+      consumers: []
+      note: "AUTH+loopback；body 空；Token 不进 query/localStorage；consumers 待实现接线（daemon-api + OpenProjectEntry）"
+  test_plan:
+    - { acceptance_id: DS1-P1, test_path: tests/unit/macos-folder-picker.test.ts, level: unit, case: "darwin：调起 /usr/bin/osascript choose folder" }
+    - { acceptance_id: DS1-P2, test_path: tests/daemon/pick-folder-api.test.ts, level: unit, case: "鉴权后选中路径可走 recent-projects/open" }
+    - { acceptance_id: DS1-P3, test_path: tests/ui/open-project-folder-picker.test.tsx, level: unit, case: "darwin：显示「选择文件夹」，与最近列表/粘贴路径共存" }
+    - { acceptance_id: DS1-P4, test_path: tests/unit/macos-folder-picker.test.ts, level: unit, case: "DS1-P4：源码无 electron/tauri 依赖导入" }
+    - { acceptance_id: DS1-P5, test_path: tests/daemon/pick-folder-api.test.ts, level: unit, case: "DS1-P5：不旁路鉴权；pick-folder 响应不含 token" }
+governance:
+  spec_refs:
+    - docs/rfc/desktop-shell-form.md#7-已拍决议tina--2026-11-07-按建议拍
+    - docs/specs/system-architecture.md
+    - docs/adr/0008-demo-isolated-origin.md
+    - docs/adr/0018-intent-to-executable-seal.md
+    - docs/specs/supervisor.md
+    - docs/specs/development-tasks-active.md#task-d.1e
+  depends_on:
+    - { id: TASK-D.1c, kind: hard }
+    - { id: TASK-D.1d, kind: hard }
+    - { id: TASK-C.8c, kind: soft }
+    - { id: TASK-D.1e, kind: soft }
+  code_facts:
+    - { ref: "daemon/server.ts:3595-3601", note: "recent-projects API 明文「明确不含系统文件夹选择器（D.1e）」——本卡新增独立 pick-folder，不假装改写该注释语义为 D.1e 完成" }
+    - { ref: "src/lib/daemon-api.ts:338-347", note: "openWorkspaceByPath = openRecentProject；选夹成功后应复用此通道" }
+    - { ref: "src/components/layout/OpenProjectEntry.tsx:13-16", note: "现有入口 = 最近重开 + 粘贴路径；不含系统选夹" }
+    - { ref: "bin/stagent.ts:6-20", note: "stagent open 保留（DS-5）；本卡不改 CLI 主路径为唯一入口" }
+    - { ref: "daemon/editor/repo-delete.ts:44-55", note: "osascript + execFileSync 固定系统二进制先例，选夹同纪律" }
+    - { ref: "daemon/core/recent-projects.ts:1-6", note: "最近列表落盘 ~/.stagent；选夹成功后 recordRecentProject" }
+    - { ref: "daemon/core/open-workspace.ts:1-4", note: "ensureWorkspaceSession + #token= 唤起；选夹后复用" }
+  non_goals:
+    - 不做 Electron / Tauri / 单窗 IDE 壳（DS-1/DS-2 已拍）
+    - 不做 Win / Linux 选夹（DS-4）
+    - 不排 DoR 重写窗口（DS-6）；不重写 TASK-D.1e 卡正文出 DEFERRED
+    - 不废除 stagent open / 最近列表 / 粘贴路径（DS-5：选夹为增强）
+    - 不推翻 D.1 鉴权；不把 Token 写入 query / localStorage 明文
+    - 不把 Demo 改 Daemon 同源（ADR-008）
+    - 不旁路 ADR-0018 Seal；不扩大 Supervisor 广播面；不激活 S.3
+    - 不销 OP-34；不宣称端到端闭环 / 已接近 Cursor Open
+    - 不打包 / 签名 / 自动更新完整桌面分发（另卡）
+  fail:
+    - 未做系统选夹却标完成，或用纯浏览器 File System Access API 冒充
+    - 新增 electron / tauri 依赖完成本卡
+    - 非 darwin 路径假装已支持选夹
+    - 回退 stagent open / 最近列表 / 粘贴路径
+    - 削弱鉴权或 Demo 隔离；Token 明文落盘/入日志
+    - 把 TASK-D.1e 偷偷改出 DEFERRED 或宣称 D.1e 已交付
+  adr_revisions: []
+  defaults:
+    - "选夹实现默认 osascript choose folder（固定 /usr/bin/osascript）；不引入新原生工具链"
+    - "选中后默认走 POST /api/recent-projects/open 等价通道（openWorkspaceByPath）"
+    - "UI 默认仅在 darwin 或能力探测成功后展示选夹按钮"
+    - "权威顺序：Supervisor/ADR > RFC §7 决议 > 本卡 > 实现"
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 171, commit: 1701cab0b9bb73f5858f229c0851a6047455b5ad }
+```
