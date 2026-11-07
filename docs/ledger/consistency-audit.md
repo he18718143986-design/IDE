@@ -237,3 +237,5 @@
 > **W.9e 完成回写（P-155 · 2026-11-07）**：PR [#154](https://github.com/he18718143986-design/IDE/pull/154) / `5d3d55b` 合入，W.9e COMPLETED；挂账②销项（`diagnoseControlledDispatch` 单一判定源；require/is 薄封装；`dispatch_blocked_code` 可选；门禁零放宽）；零改 server.ts；不销挂账③④。Sprint 首要 → **W.9f**。仅 docs 回写，不新增 OP；**不**宣称端到端闭环。
 
 > **P-156 · TASK-W.9f 合入回写（2026-11-07 · 非 OP）**：基于 `main`@`b92accc`（[#156](https://github.com/he18718143986-design/IDE/pull/156)）。W.9f → COMPLETED（§3.4z）；**挂账③销项**（①②③已销；④仍 W.9g）。四键离普通 Env；secret 挂载 + `SECRET_IN_PLAIN_ENV`；known_limitations 已改；**不**宣称绝对不可读 / 端到端闭环。Sprint 首要 → **W.9g**。仅 docs 回写，不新增 OP。
+
+> **P-157 · TASK-W.9g 合入回写（2026-11-07 · 非 OP）**：基于 `main`@`691b8b8`（[#158](https://github.com/he18718143986-design/IDE/pull/158)）。W.9g → COMPLETED（§3.4aa）；**挂账④销项**（①～④均已销）。钉协议 + fail-closed + 失败留证；`empirically_verified=false`；**销④ ≠ Cursor 已受控 / 可派工**；真跑容器仍待 KEY+Docker。Sprint 首要 → **在队清零**（下一挂账面为 macOS CI → CA-06）。仅 docs 回写，不新增 OP；**不**宣称端到端闭环 / Cursor 已受控。
