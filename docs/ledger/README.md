@@ -318,3 +318,8 @@
 - **Sprint**：首要 → **在队清零**（无 READY；下一张待 Tina 拍板）。
 - **基线**：`main`@`eacd101`（#174）；立卡 #173/`2a7c404` P-168。
 
+### TASK-AUDITED.2（P-170 · 2026-11-08 · 非 OP）
+
+- **立卡**：Tina 授权立卡 `TASK-AUDITED.2`（AUDITED 退回待批生产接线 · `[NEW_TASK]`）。兑现 AUDITED.1 残留①：orchestrator `returnToPending` + `POST /api/contracts/:id/return-to-pending` + daemon-api + ContractCard「退回待批」；仅 AUDITED+APPROVED；走 `USER_RETURN_TO_PENDING`。
+- **Sprint**：当前首要 → `TASK-AUDITED.2`。立卡 ≠ 开工；实现另开 code PR；不宣称端到端闭环；不碰 D.1e/S.3；不销 OP-34；不新增 OP；不发明产品方向；不做 DS-6 DoR。
+- **物理 tip**：立卡基线 docs `297c6ac`（#175 P-169）；代码 tip 仍 `eacd101`（#174）。
