@@ -2326,6 +2326,7 @@
 - **测试与验证**：定向 5 个派工 / 执行器 / 沙箱测试文件 **132/132 passed**（干净 main baseline 126）；全量 **2765 passed / 17 failed**（baseline 2759 / 17）。失败差异逐项比对：`ws-security` 曾在并发全量中失败、单跑复验 **9/9 passed**，记录为「曾观察到、未复现」；`scheme-confirm-scope-drift` 为既有环境快照漂移。TypeScript 检查 **54 条诊断**，与 baseline 按诊断内容一致、零新增（行号偏移属正常）；`git diff --check` 通过。
 - **后续挂账（W.9b 四项，仍未销项、不新增 OP）**：① `WorkerRegistrationService.builtinView()` / `storedView()` 为行投影构造 Docker host 并可能探测可用性，行数增长的 probe 成本与副作用仍待评估；② `isControlledDispatchable()` 仍捕获拒绝并仅返回 boolean，虽然部分服务层视图单独补有说明，API 诊断仍可能丢失具体拒绝原因；③ `LLM_API_KEY`、`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`CURSOR_API_KEY` 仍可能通过允许的容器 env 被容器内进程读取，日志脱敏不改变此事实；④ Cursor CLI 镜像与运行协议仍未实证，generic 容器桥不代表 Cursor 可执行。详情沿用 W.9b 归档 §3.4o。
 - **边界**：W.9 母卡仍以 `[SPLIT]` 保留拆分追溯；三张子卡 W.9a/b/c 均已 COMPLETED，母卡实质闭合。不得把四条 W.9b 挂账写作已解决；Cursor 保持 fail-closed。
+> **（P-153 立卡指针 · 保留原文作溯源）**：挂账①→[`TASK-W.9d`](./development-tasks-active.md#task-w.9d) `[NEW_TASK]`；挂账②→[`TASK-W.9e`](./development-tasks-active.md#task-w.9e) `[NEW_TASK]`；挂账③→[`TASK-W.9f`](./development-tasks-active.md#task-w.9f) `[NEW_TASK]`；挂账④→[`TASK-W.9g`](./development-tasks-active.md#task-w.9g) `[NEW_TASK]`。**立卡≠销项、未开工、不宣称闭环**。
 
 
 ### 3.4p 中栏方案审阅页嵌入试玩认可提交（L.17c · 产品验收挂账）

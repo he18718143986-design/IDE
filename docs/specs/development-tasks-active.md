@@ -592,6 +592,356 @@
 #### 【Task W.9c】自注册工厂闭环 `[COMPLETED]`
 
 > **归档注记（2026-11-03 · P-134）**：本卡已完成（[#107](https://github.com/he18718143986-design/IDE/pull/107)/`d3397a6`）；完整卡文与交付、验证、挂账见 [`development-tasks-completed.md` §3.4q](./development-tasks-completed.md#task-w.9c)。
+>
+> **（P-153）** 四项 W.9b 挂账已立卡 [`W.9d`](#task-w.9d) / [`W.9e`](#task-w.9e) / [`W.9f`](#task-w.9f) / [`W.9g`](#task-w.9g)（`[NEW_TASK]` · 未销项、未开工）；Sprint 首要现为 `TASK-W.9d`。
+
+
+
+<a id="task-w.9d"></a>
+
+#### 【Task W.9d】行投影 Docker host probe 成本收敛 `[NEW_TASK]`
+
+> **立卡（2026-11-07 · P-153）**：兑现 W.9c completed §3.4q 挂账①（沿用 W.9b §3.4o）。Tina 授权按挂账顺序销项立卡（序 W.9 → macOS CI → CA-06）；**本轮仅文档**，不开工产品代码。不宣称端到端闭环；不碰 L.17 / macOS CI / CA-06。
+
+```yaml task-card
+id: TASK-W.9d
+status: NEW_TASK
+contract:
+  intent:
+    title: 行投影 Docker host probe 成本收敛
+    description: >-
+      Worker 列表/行投影（builtinView / storedView）不再为每一行新建 DockerContainerHost
+      并触发可用性探测；行数增长时 probe 成本与副作用保持可预期（同进程同轮次至多一次真探测，或等价缓存）。
+    risk_level: MEDIUM
+  acceptance:
+    - { id: W9D-P1, check: auto, text: "list/get WorkerView 路径对 N 个内建+自注册条目，不得产生 N 次独立 docker info（或等价）真探测；同轮次真探测次数有上界且测试写死" }
+    - { id: W9D-P2, check: auto, text: "静态形态预检（工厂/档位/可执行面）在无宿主探测时仍诚实反映；不得因缓存把不可用宿主显示为可派工" }
+    - { id: W9D-P3, check: auto, text: "SANDBOX_ENFORCED 在宿主真实不可用时仍 dispatchable=false / 门禁拒绝（与 W.5c-ii 口径一致）" }
+    - { id: W9D-P4, check: auto, text: "既有 worker-registration / dispatch 单测回归绿；新增 probe 次数断言" }
+  scheme_item_ids: [gap-14]
+  scope:
+    writable_paths:
+      - daemon/worker/verify/worker-registration-service.ts
+      - daemon/worker/cli-host/docker-container-host.ts
+      - tests/unit/worker-registration*.ts
+      - tests/unit/*dispatch*.ts
+    readonly_paths:
+      - daemon/worker/worker-dispatch.ts
+      - daemon/worker/adapter-registry.ts
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/worker-registration-probe-cost.test.ts] }
+design:
+  approach: >-
+    收敛 builtinView/storedView：共享/缓存 createContainerHost() 结果（或惰性到 isAvailable 真调用），
+    避免「每行 new DockerContainerHost() → 构造期 probe()」。不得削弱 SANDBOX 门禁；
+    缓存失效策略须在测试写死（进程内单例或请求级均可，选一）。
+  touches:
+    - { path: daemon/worker/verify/worker-registration-service.ts, change: modify, why: 行投影共用宿主/惰性探测, symbols: [builtinView, storedView, createContainerHost] }
+    - { path: daemon/worker/cli-host/docker-container-host.ts, change: modify, why: 若需支持可复用 probe 结果则改；否则仅被测, symbols: [] }
+    - { path: tests/unit/worker-registration-probe-cost.test.ts, change: create, why: 探测次数上界与门禁负例, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: W9D-P1, test_path: tests/unit/worker-registration-probe-cost.test.ts, level: unit, case: "N 行探测次数有上界" }
+    - { acceptance_id: W9D-P2, test_path: tests/unit/worker-registration-probe-cost.test.ts, level: unit, case: "无探测时静态形态仍诚实" }
+    - { acceptance_id: W9D-P3, test_path: tests/unit/worker-registration-probe-cost.test.ts, level: unit, case: "宿主不可用仍拒派工" }
+    - { acceptance_id: W9D-P4, test_path: tests/unit/worker-registration-probe-cost.test.ts, level: unit, case: "回归既有视图字段" }
+governance:
+  spec_refs:
+    - docs/specs/development-tasks-completed.md#task-w.9c
+    - docs/specs/development-tasks-completed.md#task-w.9b
+  depends_on:
+    - { id: TASK-W.9c, kind: hard }
+    - { id: TASK-W.9b, kind: hard }
+  code_facts:
+    - { ref: "daemon/worker/verify/worker-registration-service.ts::builtinView", note: "每行 try createContainerHost()；缺省 new DockerContainerHost() 构造即 probe" }
+    - { ref: "daemon/worker/verify/worker-registration-service.ts::storedView", note: "同上每行建宿主" }
+    - { ref: "daemon/worker/cli-host/docker-container-host.ts::constructor", note: "this.probeResult = this.probe()；默认 spawnSync docker info" }
+    - { ref: "docs/specs/development-tasks-completed.md:2327", note: "§3.4q 挂账①：行投影构造 Docker host 并可能探测；行数增长 probe 成本待评估" }
+  non_goals:
+    - 不改 isControlledDispatchable 吞码问题（TASK-W.9e）
+    - 不改容器 env 明文 key（TASK-W.9f）
+    - 不做 Cursor 容器协议实证（TASK-W.9g）
+    - 不宣称端到端闭环 / 绝对隔离
+  fail:
+    - 为省探测而把不可用宿主显示为 dispatchable=true
+    - 静默降级 SANDBOX → 本地执行
+  adr_revisions: []
+  defaults:
+    - "优先请求级或服务级单例缓存 ContainerHostPort；构造期仍可探测一次"
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：§3.4q 挂账①——行投影放大 Docker probe。
+* **取舍**：只收敛探测次数，不改派工判定语义。
+
+<a id="task-w.9e"></a>
+
+#### 【Task W.9e】受控派工拒绝码穿透诊断 `[NEW_TASK]`
+
+> **立卡（2026-11-07 · P-153）**：兑现 W.9c completed §3.4q 挂账②（沿用 W.9b §3.4o）。仅诊断信息面；**不**放宽门禁。
+
+```yaml task-card
+id: TASK-W.9e
+status: NEW_TASK
+contract:
+  intent:
+    title: 受控派工拒绝码穿透诊断
+    description: >-
+      API/WorkerView 在派工被拒时能暴露与 requireControlledDispatch 同源的具体拒绝码
+      （如 E_ADAPTER_NOT_CONTROLLED / E_ADAPTER_SANDBOX_LOCKED / 缺工厂等），
+      不再仅因 isControlledDispatchable 吞异常而只剩泛化文案。
+    risk_level: LOW
+  acceptance:
+    - { id: W9E-P1, check: auto, text: "对可控负例（未注册 / UNCONTROLLED / SANDBOX 无宿主 / 缺工厂），诊断结果含稳定 machine-readable 拒绝码，与 requireControlledDispatch 抛出的 WorkerDispatchError.code 一致或可映射" }
+    - { id: W9E-P2, check: auto, text: "GET /api/workers（或现行 WorkerView 序列化）在 dispatchable=false 时带回该码（字段名在卡内测试写死；可新增可选字段，不得破坏旧客户端必填契约）" }
+    - { id: W9E-P3, check: auto, text: "isControlledDispatchable 若保留 boolean 语义，不得再作为 API 唯一诊断源；门禁放行条件零放宽" }
+    - { id: W9E-P4, check: auto, text: "单测覆盖至少三类不同拒绝码可区分" }
+  scheme_item_ids: [gap-14]
+  scope:
+    writable_paths:
+      - daemon/worker/worker-dispatch.ts
+      - daemon/worker/verify/worker-registration-service.ts
+      - daemon/server.ts
+      - tests/unit/worker-dispatch*.ts
+      - tests/unit/worker-registration*.ts
+    readonly_paths:
+      - daemon/worker/adapter-registry.ts
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/worker-dispatch-diagnostic.test.ts] }
+design:
+  approach: >-
+    新增与 requireControlledDispatch 同源的诊断助手（例如返回
+    { ok:true, factory } | { ok:false, code, message }），供 builtinView/storedView/API 使用；
+    isControlledDispatchable 可薄封装该助手。禁止只 catch 后丢 .code。
+  touches:
+    - { path: daemon/worker/worker-dispatch.ts, change: modify, why: 诊断助手暴露拒绝码, symbols: [isControlledDispatchable, requireControlledDispatch] }
+    - { path: daemon/worker/verify/worker-registration-service.ts, change: modify, why: 行投影/API 带出 code, symbols: [builtinView, storedView] }
+    - { path: tests/unit/worker-dispatch-diagnostic.test.ts, change: create, why: 多码可区分, symbols: [] }
+  interfaces:
+    - name: WorkerView.dispatch_blocked_code
+      kind: type
+      signature: "optional string error code when dispatchable=false"
+      consumers: []
+  test_plan:
+    - { acceptance_id: W9E-P1, test_path: tests/unit/worker-dispatch-diagnostic.test.ts, level: unit, case: "拒绝码与 requireControlledDispatch 同源" }
+    - { acceptance_id: W9E-P2, test_path: tests/unit/worker-dispatch-diagnostic.test.ts, level: unit, case: "View/API 带回 code" }
+    - { acceptance_id: W9E-P3, test_path: tests/unit/worker-dispatch-diagnostic.test.ts, level: unit, case: "门禁条件不放宽" }
+    - { acceptance_id: W9E-P4, test_path: tests/unit/worker-dispatch-diagnostic.test.ts, level: unit, case: "三类码可区分" }
+governance:
+  spec_refs:
+    - docs/specs/development-tasks-completed.md#task-w.9c
+    - docs/specs/development-tasks-completed.md#task-w.9b
+  depends_on:
+    - { id: TASK-W.9c, kind: hard }
+    - { id: TASK-W.9b, kind: hard }
+  code_facts:
+    - { ref: "daemon/worker/worker-dispatch.ts::isControlledDispatchable", note: "try requireControlledDispatch; catch { return false } —— 丢 .code" }
+    - { ref: "daemon/worker/verify/worker-registration-service.ts::builtinView", note: "dispatch_blocked_reason 为泛化中文，无 machine-readable code" }
+    - { ref: "daemon/worker/verify/worker-registration-service.ts::storedView", note: "部分分支补文案，仍非稳定码表" }
+    - { ref: "docs/specs/development-tasks-completed.md:2327", note: "§3.4q 挂账②：boolean helper 吞拒绝；API 诊断可能丢具体原因" }
+  non_goals:
+    - 不放宽 requireControlledDispatch / 不改档位语义
+    - 不做 probe 成本收敛（W.9d）/ env 明文（W.9f）/ Cursor 实证（W.9g）
+    - 不宣称端到端闭环
+  fail:
+    - 为「好看」把拒绝改成可派工
+    - 伪造与门禁不一致的成功码
+  adr_revisions: []
+  defaults:
+    - "新增可选字段优于改写既有 reason 字符串为唯一真相"
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：§3.4q 挂账②——诊断信息面收窄。
+* **取舍**：只穿透码，不改门禁。
+
+<a id="task-w.9f"></a>
+
+#### 【Task W.9f】容器环境 API key 明文可读面收敛 `[NEW_TASK]`
+
+> **立卡（2026-11-07 · P-153）**：兑现 W.9c completed §3.4q 挂账③（沿用 W.9b §3.4o 与 OpenHands `known_limitations`「未使用 secret 挂载」表述）。**不**把账密写入合同/日志/对话。
+
+```yaml task-card
+id: TASK-W.9f
+status: NEW_TASK
+contract:
+  intent:
+    title: 容器环境 API key 明文可读面收敛
+    description: >-
+      LLM_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY / CURSOR_API_KEY 不再经由
+      SAFE_CONTAINER_ENV_KEYS 普通环境变量直通，使容器进程 environ 与 docker inspect Env
+      默认可读明文；改为 secret/文件挂载或等价通道。日志脱敏纪律保持。
+    risk_level: HIGH
+  acceptance:
+    - { id: W9F-P1, check: auto, text: "默认 executeContainerCli / runInSandbox 路径下，上述四键不得出现在传入容器的普通 Env 映射中（测试断言 Env 不含明文值）" }
+    - { id: W9F-P2, check: auto, text: "CLI 仍能在受控通道读到所需凭据完成一次最小调用（可用桩宿主证明注入通道，不必真连模型）" }
+    - { id: W9F-P3, check: auto, text: "日志/错误字符串仍不对上述键值做明文回显（既有脱敏不回退）" }
+    - { id: W9F-P4, check: both, text: "OpenHands known_limitations 中「经容器环境变量注入…未使用 secret 挂载」表述随实现回写为现行事实；不得假装已绝对不可读" }
+  scheme_item_ids: [gap-12]
+  scope:
+    writable_paths:
+      - daemon/worker/sandbox/container-cli-executor.ts
+      - daemon/worker/cli-host/docker-container-host.ts
+      - daemon/worker/cli-host/openhands-adapter.ts
+      - daemon/worker/sandbox/**
+      - tests/unit/container-cli*.ts
+      - tests/unit/docker-container*.ts
+    readonly_paths:
+      - daemon/vault/**
+      - daemon/worker/cli-host/cursor-agent-adapter.ts
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/container-cli-secret-injection.test.ts] }
+design:
+  approach: >-
+    按 OpenHands known_limitations 已点名的缺口：停止把四类 key 放进 SAFE_CONTAINER_ENV_KEYS
+    普通 Env；改为文件/secret 挂载（或 Docker 支持的等价只读注入），容器内进程经约定路径读取。
+    日志侧 SENSITIVE_ENV_KEYS 脱敏保留。不把凭据写入合同、证据 JSON 或对话。
+  touches:
+    - { path: daemon/worker/sandbox/container-cli-executor.ts, change: modify, why: 收敛 SAFE_CONTAINER_ENV_KEYS 与注入, symbols: [SAFE_CONTAINER_ENV_KEYS, executeContainerCli] }
+    - { path: daemon/worker/cli-host/docker-container-host.ts, change: modify, why: 支持 secret/文件挂载参数, symbols: [runInSandbox] }
+    - { path: daemon/worker/cli-host/openhands-adapter.ts, change: modify, why: 改注入并回写 known_limitations, symbols: [] }
+    - { path: tests/unit/container-cli-secret-injection.test.ts, change: create, why: Env 无明文 + 通道可读, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: W9F-P1, test_path: tests/unit/container-cli-secret-injection.test.ts, level: unit, case: "普通 Env 无四键明文" }
+    - { acceptance_id: W9F-P2, test_path: tests/unit/container-cli-secret-injection.test.ts, level: unit, case: "受控通道可读凭据" }
+    - { acceptance_id: W9F-P3, test_path: tests/unit/container-cli-secret-injection.test.ts, level: unit, case: "日志不回显" }
+    - { acceptance_id: W9F-P4, test_path: tests/unit/container-cli-secret-injection.test.ts, level: unit, case: "known_limitations 与实现一致", debt: "文案回写可在同卡或紧随 docs 回写；实现 PR 须改 limitations 字符串" }
+governance:
+  spec_refs:
+    - docs/specs/development-tasks-completed.md#task-w.9c
+    - docs/specs/development-tasks-completed.md#task-w.9b
+    - docs/scheme.md
+  depends_on:
+    - { id: TASK-W.9c, kind: hard }
+    - { id: TASK-W.9b, kind: hard }
+  code_facts:
+    - { ref: "daemon/worker/sandbox/container-cli-executor.ts::SAFE_CONTAINER_ENV_KEYS", note: "四类 API key 在白名单，可进容器 Env" }
+    - { ref: "daemon/worker/cli-host/openhands-adapter.ts::OPENHANDS_CAPABILITY", note: "known_limitations 已写明经 LLM_API_KEY 环境变量注入、未使用 secret 挂载" }
+    - { ref: "docs/specs/development-tasks-completed.md:2327", note: "§3.4q 挂账③：四键仍可能被容器内进程读取；日志脱敏不改变该事实" }
+  non_goals:
+    - 不改 Vault 产品模型 / 不把账密写入合同或对话
+    - 不做 Cursor 容器协议实证（W.9g）
+    - 不宣称「绝对不可读」或端到端闭环
+  fail:
+    - 继续默认 Env 直通明文却宣称挂账已销
+    - 凭据进入证据 JSON / 合同 / 用户可见日志
+  adr_revisions: []
+  defaults:
+    - "注入通道优先文件挂载（tmpfs/只读）；具体旗标随 DockerContainerHost 现有 API 最小扩展"
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：§3.4q 挂账③——容器 env 明文 key。
+* **取舍**：沿用 known_limitations 已点名的 secret 挂载方向，不另开 Vault 大改。
+
+<a id="task-w.9g"></a>
+
+#### 【Task W.9g】Cursor CLI 容器镜像/运行协议实证 `[NEW_TASK]`
+
+> **立卡（2026-11-07 · P-153）**：兑现 W.9c completed §3.4q 挂账④（沿用 W.9b §3.4o）。**在实证完成前必须继续** `E_CURSOR_AGENT_NO_EXECUTOR` fail-closed；宿主侧 CA-06 / `CURSOR_AGENT_VERIFIED_ON` **不**等同容器协议已实证。
+
+```yaml task-card
+id: TASK-W.9g
+status: NEW_TASK
+contract:
+  intent:
+    title: Cursor CLI 容器镜像与运行协议实证
+    description: >-
+      以固定镜像摘要 + 可复现运行协议，证明 Cursor CLI 可经既有 runInSandbox /
+      executeContainerCli 桥在容器内受控调用；未实证前保持 NO_EXECUTOR fail-closed，
+      不得把 generic 容器桥宣称为 Cursor 已可执行。
+    risk_level: HIGH
+  acceptance:
+    - { id: W9G-P1, check: both, text: "存在钉死的 Cursor 容器镜像引用（digest 或等价不可漂标签）与最小 argv/cwd/挂载协议文档化在代码常量或卡内证据" }
+    - { id: W9G-P2, check: auto, text: "未通过实证前，Cursor 适配器仍 has_executor=false 且 run()→E_CURSOR_AGENT_NO_EXECUTOR；不得挂派工工厂冒充可派工" }
+    - { id: W9G-P3, check: both, text: "实证通过时：容器路径一次最小调用产出 SandboxWitness，证据面经 resolveEvidenceControlMode；失败则保持 fail-closed 并留下失败证据，不得 fallback 本地/Gateway" }
+    - { id: W9G-P4, check: auto, text: "档位不得因本卡升到 GATEWAY_ENFORCED；无 tool interception 时结构性上界仍受控于既有规则（宿主 CA-06 完成 ≠ 本卡完成）" }
+  scheme_item_ids: [gap-14]
+  scope:
+    writable_paths:
+      - daemon/worker/cli-host/cursor-agent-adapter.ts
+      - daemon/worker/sandbox/**
+      - daemon/worker/default-worker-registry.ts
+      - tests/unit/cursor-agent*.ts
+      - tests/integration/**
+    readonly_paths:
+      - daemon/worker/cli-host/docker-container-host.ts
+      - daemon/worker/sandbox/container-cli-executor.ts
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/cursor-agent-container-protocol.test.ts] }
+design:
+  approach: >-
+    先定镜像与协议并加负向锁（未实证 → NO_EXECUTOR）；再在可用 CURSOR_API_KEY + 容器
+    运行时下跑最小实证。成功才允许容器执行入口；禁止 generic 桥成功冒充 Cursor 协议成功。
+    宿主 plan-mode CA-06 证据不复用为本卡容器实证。
+  touches:
+    - { path: daemon/worker/cli-host/cursor-agent-adapter.ts, change: modify, why: 协议常量/实证后门禁, symbols: [E_CURSOR_AGENT_NO_EXECUTOR, run, has_executor] }
+    - { path: tests/unit/cursor-agent-container-protocol.test.ts, change: create, why: fail-closed 与实证门闩, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: W9G-P1, test_path: tests/unit/cursor-agent-container-protocol.test.ts, level: unit, case: "镜像引用钉死" }
+    - { acceptance_id: W9G-P2, test_path: tests/unit/cursor-agent-container-protocol.test.ts, level: unit, case: "未实证 NO_EXECUTOR" }
+    - { acceptance_id: W9G-P3, test_path: tests/integration/cursor-agent-container-protocol.test.ts, level: integration, case: "容器最小调用或失败留证", debt: "无 KEY/无容器时不得 skip 冒充通过；可走专用 workflow 如 ca06-real" }
+    - { acceptance_id: W9G-P4, test_path: tests/unit/cursor-agent-container-protocol.test.ts, level: unit, case: "不升 GATEWAY_ENFORCED" }
+governance:
+  spec_refs:
+    - docs/specs/development-tasks-completed.md#task-w.9c
+    - docs/specs/development-tasks-completed.md#task-w.9b
+    - docs/specs/development-tasks-completed.md#task-w.5b
+  depends_on:
+    - { id: TASK-W.9c, kind: hard }
+    - { id: TASK-W.9b, kind: hard }
+    - { id: TASK-W.5b, kind: soft }
+  code_facts:
+    - { ref: "daemon/worker/cli-host/cursor-agent-adapter.ts::has_executor", note: "false；run() 在有 KEY 时仍抛 E_CURSOR_AGENT_NO_EXECUTOR" }
+    - { ref: "docs/specs/development-tasks-completed.md:2327", note: "§3.4q 挂账④：Cursor CLI 镜像与运行协议仍未实证；generic 容器桥不代表 Cursor 可执行" }
+    - { ref: "docs/ledger/README.md:191", note: "CA-06 宿主 plan-mode 四类负例已实测；档位仍 UNCONTROLLED_EXTERNAL；≠ 容器协议实证" }
+  non_goals:
+    - 不把宿主 CA-06 冒充容器实证
+    - 不经本地 spawn / Gateway 会话绕过容器桥
+    - 不做 W.9d/e/f
+    - 不宣称 Cursor 受控或端到端闭环
+  fail:
+    - 无实证却移除 NO_EXECUTOR 或挂派工工厂
+    - 实证失败仍 fallback 本地执行
+  adr_revisions: []
+  defaults:
+    - "开工前置：可用容器运行时 + 有效 CURSOR_API_KEY（禁止订阅登录态凑数，同 W.5b FAIL）"
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：§3.4q 挂账④——Cursor 容器协议未实证。
+* **取舍**：先锁 fail-closed，再实证；不把 CA-06 当本卡完成。
+
 
 ### 3.4c 闭环旅程 v2.1 第一批（Journey · 规格 `supervisor.md` 第三部分 §13～§20；对应 §19 落差 L-01～L-10）
 
