@@ -4990,3 +4990,90 @@ governance:
     gateway_write_scope: unchanged
   delivered: { pr: 158, commit: 691b8b874d0af5f8c6f0e7999f7b01871962d284 }
 ```
+
+### 3.4ab B.1 Tarjan 门禁抗 macos CI 抖动（CI.1）
+
+<a id="task-ci.1"></a>
+
+#### 【Task CI.1】B.1 Tarjan 门禁抗 macos CI 抖动 `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#161](https://github.com/he18718143986-design/IDE/pull/161)/`bf971d5b23802aa25ce5ca17fb0f0fe9e577f7b3`，squash；基线 #160/`3766d28` P-158 立卡之后）。
+- **交付**：仅改 `tests/perf/arch-graph-benchmark.test.ts`（+9/−4）；门禁 4 中位上限 `toBeLessThanOrEqual(100)`→`150`；注释写明 Actions run 42369070606 / median 129.75ms；可选一轮预热丢弃（不得替代上限）；正确性断言未放宽（`lastCycles.length===1 && lastCycles[0].length===RING_SIZE`）；门禁 1/2/3 仍 ≤1500 / ≤20 / ≤40。本机 `npx vitest run tests/perf/arch-graph-benchmark.test.ts` → Test Files 1 passed · Tests 4 passed。**零改** `daemon/arch/*` / docs（本卡代码 PR）；**零扩** writable_paths。
+- **销项**：兑现挂账清扫序 **macOS CI** 面（B.1 门禁 4 Tarjan flake）。**诚实口径**：抗抖动门禁，**不**宣称 macOS CI 永久全绿；**不**销 OP-34；不碰 CA-06。
+- **残余 / 默认未做（不宣称关闭）**：① OP-34（平台侧 runner 不稳定）持续观察不销；② CA-06 文档债仍为下一挂账面（按 Tina 授权序）；③ **不**宣称端到端产品闭环 / 永久全绿。
+- **边界**：**窄口径**——perf 门禁 4 上限抗 macos runner 抖动；不是「CI 永久全绿」；不是算法改动；不是 OP-34 销项。
+
+```yaml task-card
+id: TASK-CI.1
+status: COMPLETED
+contract:
+  intent:
+    title: B.1 Tarjan 门禁抗 macos CI 抖动
+    description: >-
+      将 tests/perf/arch-graph-benchmark.test.ts 门禁 4（10000 节点高深度环 Tarjan SCC）
+      的中位耗时上限从 ≤100ms 调整为 ≤150ms，覆盖 GitHub macos-latest runner 上偶发
+      中位 ~130ms 的抖动（证据 run 42369070606 median 129.75ms），使 macOS unit CI
+      不再因该性能门禁假红；正确性断言（环长 / 不爆栈）不得放宽。
+    risk_level: LOW
+  acceptance:
+    - { id: CI1-P1, check: auto, text: "门禁 4 中位上限改为 ≤150ms；注释引用 GitHub Actions run 42369070606（median 129.75ms）" }
+    - { id: CI1-P2, check: auto, text: "正确性断言不变：仍检出且仅检出一个 RING_SIZE=10000 的 SCC；不爆栈" }
+    - { id: CI1-P3, check: auto, text: "writable_paths 仅 tests/perf/arch-graph-benchmark.test.ts；零改 daemon/arch/*" }
+    - { id: CI1-P4, check: auto, text: "门禁 1/2/3 上限与既有正确性断言不被本卡放宽；可选预热丢弃不得替代上限放宽为主验收" }
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - tests/perf/arch-graph-benchmark.test.ts
+    readonly_paths:
+      - daemon/arch/graph.ts
+      - daemon/arch/parser.ts
+      - docs/specs/development-tasks-completed.md
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/perf/arch-graph-benchmark.test.ts] }
+design:
+  approach: >-
+    仅改 perf 基准门禁 4 的 expect(medianDuration).toBeLessThanOrEqual 上限 100→150，
+    并在注释写明 run 42369070606 / median 129.75ms。可加一轮预热丢弃，但主验收仍是
+    ≤150ms 上限。禁止改 daemon/arch/*；禁止放宽环长/不爆栈正确性断言。
+  touches:
+    - { path: tests/perf/arch-graph-benchmark.test.ts, change: modify, why: 门禁 4 抗 macos CI 抖动上限, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: CI1-P1, test_path: tests/perf/arch-graph-benchmark.test.ts, level: unit, case: "门禁 4：10000 节点高深度环 Tarjan SCC ≤ 150ms" }
+    - { acceptance_id: CI1-P2, test_path: tests/perf/arch-graph-benchmark.test.ts, level: unit, case: "门禁 4：10000 节点高深度环 Tarjan SCC ≤ 150ms 收敛不爆栈" }
+    - { acceptance_id: CI1-P3, test_path: tests/perf/arch-graph-benchmark.test.ts, level: unit, case: "门禁 4：10000 节点高深度环 Tarjan SCC ≤ 150ms 收敛不爆栈（五次采样取中位数）" }
+    - { acceptance_id: CI1-P4, test_path: tests/perf/arch-graph-benchmark.test.ts, level: unit, case: "门禁 2：单文件 updateFile 增量更新 ≤ 20ms" }
+governance:
+  spec_refs:
+    - docs/specs/development-tasks-completed.md#task-b.1
+    - docs/specs/development-tasks.md
+  depends_on:
+    - { id: TASK-B.1, kind: hard }
+  code_facts:
+    - { ref: "tests/perf/arch-graph-benchmark.test.ts:204-254", note: "门禁 4：五次采样取中位；现行 expect(medianDuration).toBeLessThanOrEqual(150)；正确性断言 lastCycles.length===1 && lastCycles[0].length===RING_SIZE" }
+    - { ref: "tests/perf/arch-graph-benchmark.test.ts:253-254", note: "flake 证据：GitHub Actions run 42369070606 macos-latest unit job 实测 median 129.75ms，越过旧 ≤100ms 假红（非算法回退）；上限已调至 150" }
+    - { ref: "docs/specs/development-tasks-completed.md:4051-4051", note: "B.1 交付时本机 Tarjan 17.11ms（门禁 ≤100ms）；CI runner 抖动由本卡抗" }
+    - { ref: "docs/ledger/README.md:176-176", note: "OP-34 平台侧持续观察不销项；本卡不销 OP-34" }
+  non_goals:
+    - 不宣称 macOS CI 永久全绿 / 端到端闭环
+    - 不碰 CA-06（cursor-agent 四类越权负例）
+    - 不销 OP-34
+    - 不改 daemon/arch/* 算法或正确性门禁
+    - 不以预热丢弃替代上限放宽作为唯一验收
+  fail:
+    - 放宽环长 / SCC 个数 / 不爆栈等正确性断言
+    - 改动 daemon/arch/* 或扩大 writable_paths 到产品代码
+    - 把门禁 1/2/3 上限一并放宽却无证据
+  adr_revisions: []
+  defaults:
+    - "主验收=门禁 4 中位 ≤150ms；预热丢弃可选、不得替代上限"
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 161, commit: bf971d5b23802aa25ce5ca17fb0f0fe9e577f7b3 }
+```

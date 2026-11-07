@@ -241,3 +241,5 @@
 > **P-157 · TASK-W.9g 合入回写（2026-11-07 · 非 OP · 保留作溯源）**：基于 `main`@`691b8b8`（[#158](https://github.com/he18718143986-design/IDE/pull/158)）。W.9g → COMPLETED（§3.4aa）；**挂账④销项**（①～④均已销）。钉协议 + fail-closed + 失败留证；`empirically_verified=false`；**销④ ≠ Cursor 已受控 / 可派工**；真跑容器仍待 KEY+Docker。Sprint 首要当时 → **在队清零**（下一挂账面为 macOS CI → CA-06）。仅 docs 回写，不新增 OP；**不**宣称端到端闭环 / Cursor 已受控。
 
 > **P-158 · TASK-CI.1 立卡（2026-11-07 · 非 OP）**：Tina 授权立卡 `TASK-CI.1`（`[NEW_TASK]`）兑现挂账清扫序 macOS CI 面；门禁 4 ≤150ms 覆盖 run 42369070606；**立卡≠销项**；Sprint 首要 → CI.1；不新增 OP；不宣称永久全绿 / 闭环；不碰 CA-06；不销 OP-34。同步矩阵 / index / active yaml 卡 / changelog。
+
+> **P-159 · TASK-CI.1 合入回写（2026-11-07 · 非 OP）**：基于 `main`@`bf971d5`（[#161](https://github.com/he18718143986-design/IDE/pull/161)）。CI.1 → COMPLETED（§3.4ab）；macOS CI hang 已用抗抖动门禁销（门禁 4 ≤150ms；run 42369070606）；正确性断言未放宽；零改 `daemon/arch/*`。**诚实**：不宣称永久全绿；不销 OP-34；不碰 CA-06。Sprint 首要 → **在队清零**（下一挂账面 → **CA-06 文档债**）。仅 docs 回写，不新增 OP；**不**宣称端到端闭环。
