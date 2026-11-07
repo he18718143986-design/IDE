@@ -150,6 +150,7 @@ import { orchestrateJourney } from "./supervisor/journey/orchestrate";
 import { buildJourneyLiveIncidentContext } from "../src/lib/journey/live-incident-context";
 import { findTarget, loadReleaseTargets } from "./release/targets-store";
 import { handlePlaytestEvidenceRequest } from "./playtest/evidence";
+import { handleReferenceSnapshotsRequest } from "./playtest/reference-snapshots";
 import { evaluatePlaytestGuard } from "./supervisor/preview/playtest-guard";
 import {
   exportRedactedRecordsZip,
@@ -5178,6 +5179,26 @@ export class StagentDaemon {
         return;
       }
       const result = handlePlaytestEvidenceRequest(this.repoRoot, rawBody);
+      this.sendJson(res, result.status, result.body);
+      return;
+    }
+
+    // TASK-L.17d：参考站抓取成果 → CompareView snapshots（薄读侧）。
+    // 经 WebIngestProxy 受控 GET；screenshot_url 本卡恒 null；不持久化快照库。
+    if (pathname === "/api/playtest/reference-snapshots") {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      if (method !== "GET") {
+        this.sendJson(res, 405, { error: "Method not allowed" });
+        return;
+      }
+      const contractId = parsedUrl.searchParams.get("contract_id");
+      const result = await handleReferenceSnapshotsRequest(
+        this.repoRoot,
+        contractId,
+      );
       this.sendJson(res, result.status, result.body);
       return;
     }

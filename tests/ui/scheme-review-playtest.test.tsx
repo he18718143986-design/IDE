@@ -260,6 +260,37 @@ describe("TASK-L.17c 中栏试玩认可", () => {
     expect(screen.getByTestId("playtest-verbatim-input")).toHaveValue(raw);
   });
 
+  it("L17D-P3: snapshots 传入后左栏出现 compare-view-reference，不再仅空左栏", () => {
+    render(
+      <SchemeReviewPane
+        scheme={makeScheme()}
+        playtest={{
+          contractId: "ctr-1",
+          references: ["https://ref.example.com/"],
+          snapshots: [
+            {
+              reference_url: "https://ref.example.com/",
+              html_snapshot: "<html><title>Ref</title></html>",
+              dom_summary: "标题：Ref",
+              screenshot_url: null,
+            },
+          ],
+          conn: CONN,
+        }}
+      />,
+    );
+    expect(screen.getByTestId("compare-view")).toBeTruthy();
+    expect(screen.getByTestId("compare-view-reference")).toBeTruthy();
+    expect(screen.getByTestId("compare-view-reference-link")).toHaveAttribute(
+      "href",
+      "https://ref.example.com/",
+    );
+    expect(
+      screen.getByTestId("compare-view-dom-summary").textContent,
+    ).toContain("Ref");
+    expect(screen.queryByTestId("compare-view-left-empty")).toBeNull();
+  });
+
   it("静态：Studio 外壳仍无多视口 Tab（W.5a）", () => {
     render(
       <StudioViewportShell

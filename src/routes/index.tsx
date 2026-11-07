@@ -80,6 +80,8 @@ import {
   undoProtectionRound,
   unlockProtectionEntry,
   updateContractScopeRevision,
+  fetchPlaytestReferenceSnapshots,
+  type PlaytestReferenceSnapshotView,
   type ArchGraphPayload,
   type BaselineArchivePayload,
   type AdmissionView,
@@ -304,6 +306,10 @@ function Console() {
   const [realPlaytestError, setRealPlaytestError] = useState<string | null>(
     null,
   );
+  /** TASK-L.17d：对照试玩左栏参考站抓取成果 */
+  const [playtestSnapshots, setPlaytestSnapshots] = useState<
+    PlaytestReferenceSnapshotView[]
+  >([]);
   const [disputeReport, setDisputeReport] = useState<DisputeReportView | null>(
     null,
   );
@@ -2194,6 +2200,31 @@ ${trimmed}`
     };
   }, [connected, conn, selectedId, selectedLifecycle, selectedTitle]);
 
+  // TASK-L.17d：合同切换时拉参考站抓取成果写入 CompareView snapshots
+  useEffect(() => {
+    if (!connected || !conn || !selectedId) {
+      setPlaytestSnapshots([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetchPlaytestReferenceSnapshots(conn, selectedId);
+        if (!cancelled) {
+          setPlaytestSnapshots(res.snapshots ?? []);
+        }
+      } catch {
+        if (!cancelled) {
+          // 诚实空态：拉数失败不伪造摘要/截图
+          setPlaytestSnapshots([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [connected, conn, selectedId]);
+
   const loadBaseline = useCallback(
     async (opts?: { quiet?: boolean }) => {
       if (!connected || !conn) return;
@@ -3623,6 +3654,7 @@ ${trimmed}`
                     playtest={{
                       contractId: selectedId,
                       references: selected?.references,
+                      snapshots: playtestSnapshots,
                       previewUrl: realPlaytest?.url ?? null,
                       previewStatus: realPlaytest?.status ?? null,
                       previewError: realPlaytestError,
