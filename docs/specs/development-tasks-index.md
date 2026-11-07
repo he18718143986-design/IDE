@@ -38,7 +38,10 @@
 | `TASK-L.17` | `SPLIT` | 受控只读外网摄取（北极星前置 · 已拆分） | [打开](./development-tasks-active.md#task-l.17) |
 | `TASK-L.17a` | `COMPLETED` | 受控摄取与代登代理 | [打开](./development-tasks-completed.md#task-l.17a) |
 | `TASK-L.17b` | `COMPLETED` | 对比视图与试玩证据桩（M5 主序收官 · dec-12 证据桩） | [打开](./development-tasks-completed.md#task-l.17b) |
-| `TASK-L.17c` | `COMPLETED` | 中栏同页 CompareView + 原话「认可完成」+ `GET /api/playtest/status`（[#104](https://github.com/he18718143986-design/IDE/pull/104)/`06661be`；三项挂账仍挂） | [打开](./development-tasks-completed.md#task-l.17c) |
+| `TASK-L.17c` | `COMPLETED` | 中栏同页 CompareView + 原话「认可完成」+ `GET /api/playtest/status`（[#104](https://github.com/he18718143986-design/IDE/pull/104)/`06661be`；三项挂账已立卡 L.17d/e/f，未销项） | [打开](./development-tasks-completed.md#task-l.17c) |
+| `TASK-L.17d` | `NEW_TASK` | L.17a 参考站抓取 → CompareView `snapshots` 前端拉数（P-149 立卡 · M · 未开工） | [打开](./development-tasks-active.md#task-l.17d) |
+| `TASK-L.17e` | `NEW_TASK` | 会话原话候选接入试玩认可框（P-149 立卡 · S · 未开工） | [打开](./development-tasks-active.md#task-l.17e) |
+| `TASK-L.17f` | `NEW_TASK` | 真机/门禁链 `check playtest` 执行债（P-149 立卡 · M · 未开工） | [打开](./development-tasks-active.md#task-l.17f) |
 | `TASK-L.18` | `COMPLETED` | 系统地图 UI +「改这里会影响什么」（DLV-5） | [打开](./development-tasks-completed.md#task-l.18) |
 | `TASK-H.9` | `COMPLETED` | 废止 `.stagent/metadata/` 写入（DLV-4 · ADR-0011） | [打开](./development-tasks-completed.md#task-h.9) |
 | `TASK-B.1` | `COMPLETED` | 本地 AST 增量依赖图分析引擎（parser/graph 增强 + 性能基准 + 恶魔测试 + 契约兼容超集；#124/9c177e9） | [打开](./development-tasks-completed.md#task-b.1) |

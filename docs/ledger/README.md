@@ -189,3 +189,9 @@
 > **P-148 · TASK-C.4 合入回写（2026-11-05 · 非 OP）**：基于最新 `main`@`993e3e9c62bf86d11ce1f9b684a5ac276a2ee5eb`（[#138](https://github.com/he18718143986-design/IDE/pull/138) C.4 代码 squash）。C.4 → COMPLETED 并迁入 completed §3.4t；**入账挂账**：①`freshnessMap` 拼接 `${repoRoot}/${relativePath}` 的 Windows 分隔符未归一（修法 `path.join` 或统一正斜杠），与 `path.resolve` 节点 id 口径可能不一致；②`ContractStore.transition()` 的 revision 回退抛通用 `Error`，server 兜底 400（语义可接受，仅记录）；③内存门禁 jsdom 实体计数为代理，**待 Playwright 真实浏览器真测**，本回写不宣称已验证。门禁①（1000 节点 ≤16ms）断言通过，未记录实测中位数。v0.2 主链 `B.1→B.2→C.4` 全部落地。
 
 > **CA-06 实测通过与 `CURSOR_AGENT_VERIFIED_ON` 回填（2026-11-05 · 非 OP）**：基于 main `cec8c6c5d`（#141 合入后），`ca06-real` 手动触发 run [`41959697673`](https://github.com/he18718143986-design/IDE/actions/runs/41959697673) 全绿。四项证据（artifact `ca06-measurement`）：① 信任预置生效：stderr 无 `Workspace Trust Required`，同一步骤在 `528e159` 曾因此失败；② `apiKeySource=env`，认证通过；③ 4 条 assistant/result 模型回合，耗时 33.5s，会话自然结束（`exitCode=0`，未超时）；④ 工作区外写、保护区写（`.git/config`、`.stagent/canary.txt`）、白名单外命令（`npm install -g`、`curl`）、MCP 越权（`evil`）及 symlink 写入，逐项被拒绝。**边界如实声明**：写入、命令与 MCP 的拦截由 CLI `plan` 只读档执行（报错 `Cannot edit non markdown files in plan mode`），不是适配器白名单的功劳；适配器负责以 `--mode plan` 构造 argv 并禁用 `FORBIDDEN_FLAGS`。若上游 plan mode 语义变化，负例会失败且无兜底，属上游依赖防线。**回填**：`CURSOR_AGENT_VERIFIED_ON = { cli_version: "2026.10.22-27dcf5f", verified_at: "2026-11-05" }`（`daemon/worker/cli-host/cursor-agent-adapter.ts`）。`cli_version` 为安装包构建号（取自 job 日志下载地址），不是 `cursor-agent --version` 自报字符串。**档位不变**：W.5b 仍为 `UNCONTROLLED_EXTERNAL`（外部 CLI 不受控是结构性上界），实测不改档，沿用 P-125 口径。W.5b 卡原注记「不产出任何受控证据」更新为：`verified_on` 已有实测证据，但档位不变。
+
+### TASK-L.17d / L.17e / L.17f（P-149 · 2026-11-07 · 非 OP）
+
+- **立卡**：Tina 授权按 L.17c §3.4p 三项挂账顺序立卡 — `L.17d`（snapshots · M）、`L.17e`（会话原话候选 · S）、`L.17f`（check playtest 执行债 · M），状态均为 `[NEW_TASK]`。
+- **Sprint**：当前首要 → `TASK-L.17d`（序 d→e→f）。立卡 ≠ 开工；不宣称端到端闭环；不碰 W.9 挂账。
+- **物理 tip**：立卡基线 `b03c97f`（#143）；P-148 代码 tip 仍为 #138/`993e3e9`。
