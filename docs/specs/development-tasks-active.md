@@ -9,26 +9,139 @@
 <a id="task-d.1e"></a>
 
 #### 【Task D.1e】桌面壳 / 本机助手：真·选文件夹（Import 与工作台同壳）`[DEFERRED → v0.2+ · P5.8 · 2026-10-24]`
-* **任务编号**：`TASK-D.1e`
-* **前置依赖**：`TASK-D.1d`（建议 v0.2 开工前先完成生产可用单窗口；并行亦须满足 D.1 鉴权）
-* **任务状态**：**[DEFERRED → v0.2+]**（架构路线 **P5.8**；**不阻塞** v0.1 / `TASK-D.1d` / 八步旅程验收；2026-10-24 经 Tina 口径对齐为正式推迟；**维持 DEFERRED · D-6 / P-141**；**（P-169 现行）桌面形态切片：[`TASK-DS.1`](./development-tasks-completed.md#task-ds.1) `[COMPLETED]`（#171/`1701cab`）已承接选夹增强；[`TASK-DS.2`](./development-tasks-completed.md#task-ds.2) `[COMPLETED]`（#174/`eacd101`）已承接「新建空项目」切片；**本卡（D.1e）仍不激活**；DoR 已入队（P-165）·DS-6 不排重写窗口·**未改出 DEFERRED**·D.1e 全量仍待后续）
-* **对照痛点**：浏览器无法弹出系统级「选任意本地文件夹」；D.1c 只有最近列表；用户仍觉「第一次打开很麻烦」，期望接近 Cursor Open / Import。
-* **v0.1+ 范围（可延后到桌面壳里程碑）**：提供本机助手或 Electron/Tauri（或等价）能力：在**同一产品壳**内「打开项目 / Import / New Project」→ 系统对话框选文件夹或创建空项目 → 自动启动/复用 Daemon 并进入已带钥匙的工作台。安全模型仍落在 D.1：loopback、`#token=` / 安全等价注入、AUTH、Origin；Demo 仍独立 Origin。
-* **明确不包含（本卡立项时仍禁止偷换）**：
-  - 在未做桌面壳的纯浏览器里假装已支持任意路径选择器并标完成
-  - 推翻 D.1 鉴权或把 Token 长期写入可分享的 query/localStorage 明文
-  - 将 Demo 改为 Daemon 同源
-* **核心目标**：
-  1. **真·选文件夹**：用户在产品 UI 内触发系统文件夹选择器（或受控本机助手），选中路径后进入工作台。
-  2. **同壳**：Import/New/最近/工作台在同一产品表面，而不是「终端命令 + 另一个空白浏览器页」心智。
-  3. **正式推迟**：v0.1 仅文档占位；排期在 v0.2+（P5.8），不得把缺口塞回已完成的 D.1c，亦不得阻塞 D.1d。
-* **Pass/Fail 验收断言（≤5；若本卡 defer 则实施当轮再测）**：
-  1. **选文件夹可进**：产品内一点「打开项目」→ 系统选夹 → 工作台已连上可聊（不手拷 Token）。
-  2. **同壳**：选夹与聊天在同一应用表面（桌面壳或明确的本机助手 UX），而非仅 README 教用户开终端。
-  3. **鉴权与 Demo 不回退**：无钥匙拒连；Demo 独立 Origin；日志无 Token 明文。
-* **Pass/Fail 验收判定**：
-  - **PASS（实施轮 / v0.2+）**：断言 1–3 成立；v0.1 保持 DEFERRED 且未伪称已交付即为合规。
-  - **FAIL**：无桌面能力却标完成；削弱 D.1/Demo 隔离。
+
+> **DoR 重写（2026-11-08 · P-172）**：Tina 拍板 DS-6「开窗」后，本卡正文按 [`task-card-standard.md`](./task-card-standard.md) R-1～R-12 与 [`../templates/05-task-card.md`](../templates/05-task-card.md) 样板重写（先例 P-115 / P-124 / P-142 / P-144 / P-147）。**状态仍 `[DEFERRED → v0.2+]`；本次不改矩阵语义、不排程、不开工。** **DoR 重写完成 ≠ 激活 ≠ 可开工**：仍待 Tina 单卡授权后才可改出 DEFERRED。2026-10-24 原正文（对照痛点 / 范围 / 非包含 / 核心目标 / Pass-Fail）已并入下方卡块与本段，原文保留于 git 历史 `297c6ac`。
+
+```yaml task-card
+id: TASK-D.1e
+status: DEFERRED
+contract:
+  intent:
+    title: 桌面壳 / 本机助手：真·选文件夹（Import 与工作台同壳）
+    description: >-
+      做完后，macOS 用户在产品内即可「打开项目 / 新建空项目」：系统选夹 → 自动进入已鉴权工作台；
+      Import / New / 最近 / 工作台处于同一产品表面（助手 + 系统浏览器，RFC DS-2），不手拷 Token、
+      不要求先开终端。本卡承接 RFC desktop-shell-form 的 D.1e 全量口径；DS.1 / DS.2 切片完成不计入本卡。
+    risk_level: MEDIUM
+  acceptance:
+    - id: D1E-P1
+      check: auto
+      text: >-
+        darwin 上产品内一点「打开项目」→ 系统选夹 → 选中路径后工作台已连上可聊（不手拷 Token、不需先开终端）；
+        用户取消选夹时不进入工作台。
+    - id: D1E-P2
+      check: auto
+      text: >-
+        同壳：选夹、新建空项目、最近列表与工作台位于同一产品表面（助手 + 系统浏览器口径，RFC DS-2）；
+        用户首次打开项目无需在终端执行命令。
+    - id: D1E-P3
+      check: auto
+      text: >-
+        鉴权与 Demo 不回退：无钥匙拒连（AUTH / loopback / Origin 仍生效）；Token 不进 query 与 localStorage 明文；
+        日志无 Token 明文；Demo 仍独立 Origin（ADR-0008）。
+    - id: D1E-P4
+      check: auto
+      text: >-
+        不回退既有入口：stagent open、最近列表、粘贴绝对路径（C.8c）仍可用；选夹与新建为增强，不替代上述路径（RFC DS-5）。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/desktop/**
+      - daemon/server.ts
+      - src/lib/daemon-api.ts
+      - src/components/layout/OpenProjectEntry.tsx
+      - src/components/layout/ProjectWelcomePage.tsx
+      - tests/unit/desktop-shell-*.test.ts
+      - tests/daemon/desktop-shell-*.test.ts
+      - tests/ui/desktop-shell-*.test.tsx
+    readonly_paths:
+      - docs/rfc/desktop-shell-form.md
+      - docs/specs/development-tasks-completed.md
+      - docs/adr/0008-demo-isolated-origin.md
+      - docs/adr/0018-intent-to-executable-seal.md
+      - bin/stagent.ts
+      - daemon/core/open-workspace.ts
+      - daemon/core/recent-projects.ts
+  verification:
+    commands:
+      - { alias: regression-ds, executable: npx, args: [vitest, run, tests/unit/macos-folder-picker.test.ts, tests/unit/create-empty-project.test.ts, tests/daemon/pick-folder-api.test.ts, tests/daemon/create-empty-project-api.test.ts, tests/ui/open-project-folder-picker.test.tsx] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) 内核复用：选夹复用 DS.1 的 pickFolderMacOS（daemon/desktop/macos-folder-picker.ts），新建复用 DS.2 的 createEmptyProject
+    （daemon/desktop/create-empty-project.ts）；不另起选夹或 mkdir 实现。2) 鉴权：两条 API 已是 AUTH + loopback，
+    本卡沿用，不新增旁路。3) 同壳：入口统一收敛到 OpenProjectEntry / ProjectWelcomePage（打开项目、新建、最近、粘贴路径同屏）。
+    4) 进入工作台仍只经 D.1 既有 openWorkspaceByPath / #token= 通道。5) 「助手自动启动 / 复用 Daemon」不在 DS.1 / DS.2 范围内，
+    见 open_questions 1，未决前不得实现。激活后按当时代码重核下列 touches 与 symbols。
+  touches:
+    - { path: daemon/server.ts, change: modify, why: 同壳入口的既有鉴权 API 汇聚与回归, symbols: [handleDesktopPickFolder, handleDesktopCreateEmptyProject] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: 前端统一调用面（选夹 / 新建）, symbols: [pickFolderViaDaemon, createEmptyProjectViaDaemon] }
+    - { path: src/components/layout/OpenProjectEntry.tsx, change: modify, why: 打开项目 / 新建 / 最近 / 粘贴路径同屏呈现, symbols: [] }
+    - { path: src/components/layout/ProjectWelcomePage.tsx, change: modify, why: 首次打开入口与同壳文案, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: D1E-P1, test_path: tests/daemon/desktop-shell-open-flow.test.ts, level: unit, debt: "D.1e 未激活、未施工；待单卡授权后由实现轮补测试（见 open_questions）" }
+    - { acceptance_id: D1E-P2, test_path: tests/ui/desktop-shell-same-surface.test.tsx, level: unit, debt: "D.1e 未激活、未施工；待单卡授权后由实现轮补测试" }
+    - { acceptance_id: D1E-P3, test_path: tests/daemon/desktop-shell-auth.test.ts, level: unit, debt: "D.1e 未激活、未施工；待单卡授权后由实现轮补测试" }
+    - { acceptance_id: D1E-P4, test_path: tests/daemon/desktop-shell-regression.test.ts, level: unit, debt: "D.1e 未激活、未施工；待单卡授权后由实现轮补测试" }
+governance:
+  spec_refs:
+    - docs/rfc/desktop-shell-form.md#7-已拍决议tina--2026-11-07-按建议拍
+    - docs/rfc/desktop-shell-form.md#12-立卡--回写-task-ds2p-168-立卡--p-169-回写--2026-11-08
+    - docs/specs/development-tasks-completed.md#task-ds.1
+    - docs/specs/development-tasks-completed.md#task-ds.2
+    - docs/adr/0008-demo-isolated-origin.md
+    - docs/adr/0018-intent-to-executable-seal.md
+    - docs/specs/supervisor.md
+  depends_on:
+    - { id: TASK-D.1c, kind: hard }
+    - { id: TASK-D.1d, kind: hard }
+    # TASK-DS.1 / DS.2 是本卡的切片，其 yaml 已把本卡列为 soft 依赖；反向再列会成环（card-deps），关系写在正文
+  code_facts:
+    - { ref: "daemon/desktop/macos-folder-picker.ts::pickFolderMacOS", note: "DS.1 已落地的系统选夹内核（darwin osascript；取消返回 CANCELLED）；本卡复用，不另起实现" }
+    - { ref: "daemon/desktop/create-empty-project.ts::createEmptyProject", note: "DS.2 已落地的新建空项目内核（名校验 + 非 recursive mkdir）；本卡复用" }
+    - { ref: "daemon/server.ts::handleDesktopPickFolder", note: "AUTH + loopback 的选夹 API，是 D.1e 入口鉴权基线；不改变鉴权语义" }
+    - { ref: "src/lib/daemon-api.ts::pickFolderViaDaemon", note: "前端选夹调用面（DS.1）" }
+    - { ref: "src/components/layout/OpenProjectEntry.tsx::OpenProjectEntry", note: "现入口已含最近 + 粘贴路径 + 选夹 / 新建增强；同壳呈现的统一仍待本卡" }
+  non_goals:
+    - 不做 Electron / Tauri 壳（RFC DS-1 已拍 A 本机助手；壳技术以后另议）
+    - 不做 Windows / Linux 选夹（RFC DS-4）
+    - 不做打包 / 签名 / 公证 / 自动更新（另卡）
+    - 不把 TASK-DS.1 / TASK-DS.2 切片完成计为本卡完成
+    - 不推翻 D.1 鉴权；Token 不进 query / localStorage 明文
+    - 不把 Demo 改为 Daemon 同源（ADR-0008）
+    - 不旁路 ADR-0018 Seal；不扩大 Supervisor 广播面；不激活 TASK-S.3
+    - 不销 OP-34；不宣称端到端闭环或已接近 Cursor Open
+    - 不把 DoR 重写当作激活；激活须 Tina 单卡授权
+  fail:
+    - 用纯浏览器 File System Access API 或终端说明书冒充「真·选文件夹」并标完成
+    - 仅 DS.1 / DS.2 切片落地即宣称 D.1e 完成
+    - 削弱 D.1 鉴权或 Demo 隔离；Token 明文落盘或写入日志
+    - 回退 stagent open / 最近列表 / 粘贴路径
+    - 新增 electron / tauri 依赖以完成本卡
+    - 未经 Tina 单卡授权把 D.1e 改出 DEFERRED 或开工
+  adr_revisions: []
+  defaults:
+    - "形态 = A 本机助手（RFC DS-1）；同壳 = 助手 + 系统浏览器（RFC DS-2）"
+    - "首发平台 = 只先 macOS（RFC DS-4）；stagent open + 最近 + 粘贴保留（RFC DS-5）"
+    - "内核复用 DS.1 pickFolderMacOS 与 DS.2 createEmptyProject，不另起实现"
+  open_questions:
+    - "助手是否负责自动启动 / 复用 Daemon（卡原文「自动启动/复用 Daemon 并进入已带钥匙的工作台」）？DS.1 / DS.2 仅复用既有 open 通道，未覆盖此项。需 Tina 决定纳入本卡还是另立卡。"
+    - "「Import」是否包含压缩包导入、git clone 与模板脚手架？（DS.2 残余 ⑥，未在 RFC §7 决议中。）需 Tina 决定边界。"
+  estimate: L
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **代码事实（部分已落地 ≠ 本卡完成）**：`TASK-DS.1`（[#171](https://github.com/he18718143986-design/IDE/pull/171)/`1701cab`）已落 macOS 系统选夹与 `POST /api/desktop/pick-folder`；`TASK-DS.2`（[#174](https://github.com/he18718143986-design/IDE/pull/174)/`eacd101`）已落新建空项目与 `POST /api/desktop/create-empty-project`。两张切片卡 `[COMPLETED]` **不计入本卡完成**；D1E-P1～P4 须按全量口径重新核验。
+* **取舍（已拍，见 RFC §7）**：形态选 A 本机助手（DS-1）；「同壳」定义为助手 + 系统浏览器，不做单窗 IDE（DS-2）；只先 macOS（DS-4）；`stagent open` 与最近列表保留，选夹与新建为增强（DS-5）。Electron / Tauri 不作为候选。
+* **估算 L（R-11）**：剩余口径含「助手自启 / 复用 Daemon」（open_questions 1）与「Import」边界（open_questions 2），涉及跨进程编排与多入口同壳，判为 L。**L 卡不得开工，须 Tina 另行授权拆卡；本 PR 不拆、不立子卡。**
+* **R-9 / R-10**：与 ADR-0001、ADR-0008、ADR-0018 不冲突，`adr_revisions` 为空。两条未决问题未关闭，故本卡**不得**进入 READY；它们关闭或写明默认值之前，不得开工。
+* **R-12**：鉴权、Demo Origin、点亮三证、网关写范围均 unchanged；入口仍经 D.1 既有鉴权通道。
+* **诚实口径**：DoR 重写 ≠ 激活 ≠ 开工；不宣称端到端闭环或已接近 Cursor Open；不销 OP-34；不激活 TASK-S.3；不立实现卡。
 
 ---
 
@@ -622,7 +735,8 @@
 > **（P-168 · 保留作溯源）** Tina「听你的建议」（2026-11-08）：另立实现卡 [`TASK-DS.2`](#task-ds.2) 当时 `[NEW_TASK]`（macOS 本机助手 · 新建空项目开进工作台 · RFC 切片；基线 [#172](https://github.com/he18718143986-design/IDE/pull/172)/`7f6ce54` P-167）。**`TASK-D.1e` 维持 `[DEFERRED → v0.2+]`**——由 DS.2 承接「新建空项目」切片；**本卡（D.1e）不激活**。立卡 ≠ 开工；零产品代码；不排 DoR 重写窗口（DS-6）；不销 OP-34；不激活 S.3。
 > **（P-169 · 保留作溯源）** [`TASK-DS.2`](./development-tasks-completed.md#task-ds.2) → **`[COMPLETED]`**（[#174](https://github.com/he18718143986-design/IDE/pull/174)/`eacd101`）。交付：`create-empty-project` + `POST /api/desktop/create-empty-project` + daemon-api + OpenProjectEntry/Welcome darwin「新建空项目」；名→pick-folder→mkdir→open；取消不 create；200 仅 `{ path }`。**`TASK-D.1e` 仍 `[DEFERRED → v0.2+]`**；**本卡完成 ≠ D.1e 完成**；不宣称 Electron/端到端闭环。Sprint 首要 → **在队清零**。不销 OP-34；不激活 S.3。
 > **（P-170 · 保留作溯源）** Tina 授权立卡 [`TASK-AUDITED.2`](./development-tasks-completed.md#task-audited.2) 当时 `[NEW_TASK]`（AUDITED 退回待批生产接线）。Sprint 首要当时 → **`TASK-AUDITED.2`**。**立卡≠销项、未开工**；不宣称端到端闭环；不碰 D.1e / S.3；不销 OP-34。
-> **（P-171 现行）** [`TASK-AUDITED.2`](./development-tasks-completed.md#task-audited.2) → **`[COMPLETED]`**（[#178](https://github.com/he18718143986-design/IDE/pull/178)/`71684d4`）。交付：`returnToPending` + `POST .../return-to-pending` + daemon-api + ContractCard「退回待批」。**诚实**：#178 合入时 `src/routes/index.tsx` 父级未接；Tina 已授权 follow-up code PR（**进行中**）——非永久挂账、不另立产品卡；**不**宣称端到端闭环 / e2e。Sprint 首要 → **在队清零**。不销 OP-34；D.1e / S.3 维持 DEFERRED；不做 DS-6。
+> **（P-171 · 保留作溯源）** [`TASK-AUDITED.2`](./development-tasks-completed.md#task-audited.2) → **`[COMPLETED]`**（[#178](https://github.com/he18718143986-design/IDE/pull/178)/`71684d4`）。交付：`returnToPending` + `POST .../return-to-pending` + daemon-api + ContractCard「退回待批」。**诚实**：#178 合入时 `src/routes/index.tsx` 父级未接；Tina 已授权 follow-up code PR（**进行中**）——非永久挂账、不另立产品卡；**不**宣称端到端闭环 / e2e。Sprint 首要 → **在队清零**。不销 OP-34；D.1e / S.3 维持 DEFERRED；不做 DS-6。
+> **（P-172 现行）** Tina「DS-6 开窗，按 P-172 流水做纯 docs 改法」：`TASK-D.1e` DoR 重写已落（卡正文按 R-1～R-12 重写为 yaml 卡，见 §3.1）。**状态仍 `[DEFERRED → v0.2+]`**；DoR 重写 ≠ 激活 ≠ 可开工；估算 L，须另授权拆卡，本 PR 不拆、不立子卡；`open_questions` 两条（助手自启 / 复用 Daemon；Import 边界）未决。**不改产品代码**；不激活 S.3；不销 OP-34；不宣称闭环。
 
 
 

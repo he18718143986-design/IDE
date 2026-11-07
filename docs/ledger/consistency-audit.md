@@ -262,3 +262,4 @@
 > **P-170 · TASK-AUDITED.2 立卡（2026-11-08 · 非 OP）**：Tina 授权立卡 `TASK-AUDITED.2`（`[NEW_TASK]`）承接 AUDITED.1 生产接线残留①；Sprint 首要 → AUDITED.2；**立卡≠销项**；不新增 OP；不宣称闭环；不碰 D.1e/S.3；不销 OP-34。同步矩阵 / index / active yaml 卡 / changelog。
 
 > **P-171 · TASK-AUDITED.2 合入回写（2026-11-08 · 非 OP）**：基于 `main`@`71684d4`（[#178](https://github.com/he18718143986-design/IDE/pull/178)）。AUDITED.2 → COMPLETED（§3.4af）；orchestrator/API/ContractCard 退回待批落地；本机 24 passed；ubuntu+macOS CI 绿；Windows unit 仍红（无关套件）。**诚实**：#178 合入时 `index.tsx` 父级未接；Tina 已授权 follow-up code PR（进行中）——非永久挂账、不另立产品卡；不宣称闭环 / e2e；不销 OP-34。Sprint → **在队清零**。仅 docs 回写，不新增 OP。
+> **P-172 · DS-6 开窗 · D.1e DoR 重写（2026-11-08 · 非 OP）**：基于 `main`@`49fe592`（[#180](https://github.com/he18718143986-design/IDE/pull/180)）。`TASK-D.1e` 卡正文按 R-1～R-12 重写为 yaml 卡；**状态仍 `[DEFERRED → v0.2+]`**；DoR 重写 ≠ 激活 ≠ 可开工；两条未决问题（助手自启 / 复用 Daemon；Import 边界）如实保留；估算 L，须另授权拆卡。Sprint → **在队清零**。不改产品代码；不激活 D.1e / S.3；不销 OP-34；不新增 OP。
