@@ -5,8 +5,8 @@ import type { CommandWelcomeVariant } from "../../lib/command-surface";
 /**
  * TASK-C.10e：Cursor 式欢迎页——打开/切换项目的主阵地。
  *
- * 最近项目一键重开 + 粘贴路径（保留 C.8c）；macOS 系统选夹由 OpenProjectEntry
- * 承接（TASK-DS.1 RFC 切片）。本页完成 ≠ TASK-D.1e 全量桌面壳。
+ * 最近项目一键重开 + 粘贴路径（保留 C.8c）；macOS 系统选夹（DS.1）与新建空项目
+ * （DS.2）由 OpenProjectEntry 承接。本页完成 ≠ TASK-D.1e 全量桌面壳。
  * 指挥话术仍走 WelcomePane（C.9a），开项目区为整页展开，不再塞 IDE 左栏。
  */
 export interface ProjectWelcomePageProps {
