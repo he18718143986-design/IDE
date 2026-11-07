@@ -272,5 +272,12 @@
 
 - **状态回写**：AUDITED.1 已 COMPLETED（PR [#165](https://github.com/he18718143986-design/IDE/pull/165) / `b390254`）；`USER_RETURN_TO_PENDING` + `AUDITED→PENDING_APPROVAL` Guard（落点 `PENDING_REVIEW`）；两份 unit；**未**改 orchestrator；规范 §11.3 / §9.1.1.1 与代码逐字对齐（AR1-P1 / P-162）。
 - **销项**：兑现 Sprint「AUDITED 退回待批为另立议题」与 C.4「不宣称」债源（库层受控边已补）。**诚实口径**：生产路径暂无 `USER_RETURN_TO_PENDING` 接线（grep 自证）；**不**宣称端到端闭环 / UI 接线；不销 OP-34。
-- **Sprint**：首要 → **在队清零**（下一张按 Tina 顺序 → **桌面形态 RFC（为 D.1e）**；不偷偷开工 D.1e）。不新增 OP；不改产品代码。
+- **Sprint**：首要当时 → **在队清零**（下一张按 Tina 顺序 → **桌面形态 RFC（为 D.1e）**；不偷偷开工 D.1e）。不新增 OP；不改产品代码。（P-163 现行见下节）
 - **物理 tip**：代码 tip `b390254`（#165）；立卡 docs tip `9067d40`（#164）；P-162 docs 本 PR。
+
+### 桌面形态 RFC（P-163 · 为 D.1e · 2026-11-07 · 非 OP）
+
+- **动作**：新增讨论稿 [`../rfc/desktop-shell-form.md`](../rfc/desktop-shell-form.md)；兑现 D-6/P-141「桌面形态另立 RFC」。
+- **状态**：`TASK-D.1e` **维持** `[DEFERRED → v0.2+]`；**立 RFC ≠ 激活 ≠ 开工**；候选 A 本机助手 / B Electron / C Tauri；开放问题 DS-1～DS-6 待 Tina 拍板。
+- **Sprint**：首要 → **桌面形态 RFC 在队 / 待拍板**。不偷偷开工 D.1e；不激活 S.3；不销 OP-34；不发明产品方向。
+- **物理 tip 基线**：docs tip `c097522`（#166 P-162）；代码 tip 仍 `b390254`（#165）。
