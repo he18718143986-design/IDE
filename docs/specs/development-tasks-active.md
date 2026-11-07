@@ -608,7 +608,9 @@
 >
 > **（P-159 · 保留作溯源）** [`TASK-CI.1`](./development-tasks-completed.md#task-ci.1) → **`[COMPLETED]`**（[#161](https://github.com/he18718143986-design/IDE/pull/161)/`bf971d5`）。macOS CI hang（B.1 门禁 4 Tarjan flake）已用 CI.1 **抗抖动门禁**销（≤150ms；依据 run 42369070606 median 129.75ms）；正确性断言未放宽；零改 `daemon/arch/*`。**诚实口径**：抗抖动门禁，**不**宣称永久全绿；**不**销 OP-34。Sprint 首要当时 → **在队清零**（下一挂账面 → **CA-06 文档债**）。**仍不宣称**端到端闭环。
 > **（P-160 · 保留作溯源）** CA-06 文档债对齐完成：卡账/矩阵/active 与代码 `CURSOR_AGENT_VERIFIED_ON` 对齐；§3.4m 挂账 1 销项；挂账清扫序（L.17 → W.9 → macOS CI → CA-06）**收完**。Sprint 首要当时 → **在队清零**（下一张待 Tina 拍板）。**档位不变** `UNCONTROLLED_EXTERNAL`；`verified_on` ≠ 已受控 / 可派工；**不**宣称 Cursor 已受控 / 端到端闭环；不销 OP-34；D.1e / S.3 维持 DEFERRED。
-> **（P-161 现行）** Tina 授权立卡 [`TASK-AUDITED.1`](#task-audited.1) `[NEW_TASK]`（AUDITED 合同退回待批受控边）。Sprint 首要 → **`TASK-AUDITED.1`**（建议序①；实现另开 code PR；本卡不碰桌面形态 RFC）。**立卡≠销项、未开工**；不宣称端到端闭环；不碰 D.1e / S.3；不销 OP-34；不发明产品方向。
+> **（P-161 · 保留作溯源）** Tina 授权立卡 [`TASK-AUDITED.1`](#task-audited.1) 当时 `[NEW_TASK]`（AUDITED 合同退回待批受控边）。Sprint 首要当时 → **`TASK-AUDITED.1`**（建议序①；实现另开 code PR；本卡不碰桌面形态 RFC）。**立卡≠销项、未开工**；不宣称端到端闭环；不碰 D.1e / S.3；不销 OP-34；不发明产品方向。
+>
+> **（P-162 现行）** [`TASK-AUDITED.1`](./development-tasks-completed.md#task-audited.1) → **`[COMPLETED]`**（[#165](https://github.com/he18718143986-design/IDE/pull/165)/`b390254`）。库层受控边 `AUDITED→PENDING_APPROVAL` + Guard（落点 `PENDING_REVIEW`；`reason=USER_RETURN_TO_PENDING`）已落地；规范 §11.3 / §9.1.1.1 与代码逐字对齐（AR1-P1）；**未**改 orchestrator；生产路径暂无 `USER_RETURN_TO_PENDING` 接线（grep 自证）。Sprint 首要 → **在队清零**（下一张按 Tina 顺序 → **桌面形态 RFC（为 D.1e）**；**不**偷偷开工 D.1e）。**仍不宣称**端到端闭环；不销 OP-34；D.1e / S.3 维持 DEFERRED。
 
 
 
@@ -842,136 +844,8 @@
 
 <a id="task-audited.1"></a>
 
-#### 【Task AUDITED.1】AUDITED 合同退回待批受控边 `[NEW_TASK]`
+#### 【Task AUDITED.1】AUDITED 合同退回待批受控边 `[COMPLETED]`
 
-> **立卡（2026-11-07 · P-161）**：Tina 授权按建议序①立卡（挂账清扫序收完后下一张）。兑现 Sprint v0.2 行「AUDITED 退回待批为另立议题」与 C.4 completed「不宣称 AUDITED 合同可退回待批（需先在 §9.1.1 补受控边，另立议题）」。**本轮仅文档**，不开工产品代码；实现另开 code PR。立卡≠销项；不宣称端到端闭环；不碰 D.1e / S.3；不销 OP-34；不发明产品方向。与 Supervisor / ADR 冲突时以 Supervisor / ADR 为准。
+> **归档注记（2026-11-07 · P-162）**：本卡已 COMPLETED（[#165](https://github.com/he18718143986-design/IDE/pull/165)/`b390254`，squash；立卡基线 #164/`9067d40` P-161）。完整卡正文（yaml + 交付清单、默认/未做边界）迁入 [`development-tasks-completed.md` §3.4ac](./development-tasks-completed.md#task-audited.1)。**交付**：`state-machine.ts` 增 `USER_RETURN_TO_PENDING`；`LIFECYCLE_TRANSITIONS.AUDITED` 含 `PENDING_APPROVAL`；`EDGE_GUARDS["AUDITED->PENDING_APPROVAL"]`（落点 `PENDING_REVIEW` + reason Fail-Closed）；两份 unit 单测锁定；**未**改 orchestrator（卡标可选，刻意不做）；规范 §11.3 / §9.1.1.1 本回写与代码逐字对齐（AR1-P1）。**诚实口径**：库层边已落地；生产路径暂无 `USER_RETURN_TO_PENDING` 接线（grep 自证）；**不**宣称端到端闭环 / UI 接线；不销 OP-34；不碰 D.1e / S.3。
 
-```yaml task-card
-id: TASK-AUDITED.1
-status: NEW_TASK
-contract:
-  intent:
-    title: AUDITED 合同退回待批受控边
-    description: >-
-      在 runtime §11.3 / 架构 §9.1.1.1 与 src/lib/state-machine.ts 增补受控边
-      AUDITED → PENDING_APPROVAL，并使落点 approval.status 强制回置为 PENDING_REVIEW
-      （对齐既有 PREPARING → PENDING_APPROVAL 回置纪律），从而允许试玩阶段（AUDITED+APPROVED）
-      的合同在用户显式要求下退回待批，而不是只能 MERGED / EXECUTING / VERIFYING / ABORTED。
-      当前代码 LIFECYCLE_TRANSITIONS.AUDITED 不含 PENDING_APPROVAL；缺边时拒绝为默认。
-    risk_level: MEDIUM
-  acceptance:
-    - id: AR1-P1
-      check: auto
-      text: >-
-        规范先于代码：runtime-contract-and-safety.md §11.3 与 system-architecture.md §9.1.1.1
-        写明受控边 AUDITED→PENDING_APPROVAL 及 Guard（落点 PENDING_REVIEW；建议 reason=USER_RETURN_TO_PENDING）
-    - id: AR1-P2
-      check: auto
-      text: >-
-        LIFECYCLE_TRANSITIONS.AUDITED 含 PENDING_APPROVAL；EDGE_GUARDS["AUDITED->PENDING_APPROVAL"]
-        在落点 approval.status≠PENDING_REVIEW 时 Fail-Closed（ILLEGAL_TRANSITION）
-    - id: AR1-P3
-      check: auto
-      text: >-
-        validateTransition(AUDITED+APPROVED → PENDING_APPROVAL+PENDING_REVIEW, reason=USER_RETURN_TO_PENDING) 合法；
-        同边落点仍 APPROVED / 缺 reason / 错 reason 均拒绝；AUDITED→PREPARING 仍非法
-    - id: AR1-P4
-      check: auto
-      text: >-
-        state-machine-matrix.test.ts 与 state-machine-v13-transitions.test.ts 同步锁定新边与负例；
-        grep 自证：生产路径无静默把 AUDITED 合同标回 APPROVED 待批
-    - id: AR1-P5
-      check: auto
-      text: >-
-        退回待批后 §9.1.1 配对成立（PENDING_APPROVAL↔PENDING_REVIEW）；合并门禁对非 AUDITED 合同仍拒绝；
-        不放宽鉴权 / Demo Origin / 点亮三证 / 网关写范围
-  scheme_item_ids: []
-  scope:
-    writable_paths:
-      - docs/specs/runtime-contract-and-safety.md
-      - docs/specs/system-architecture.md
-      - src/lib/state-machine.ts
-      - tests/unit/state-machine-matrix.test.ts
-      - tests/unit/state-machine-v13-transitions.test.ts
-      - daemon/pipeline/orchestrator.ts
-    readonly_paths:
-      - docs/specs/supervisor.md
-      - docs/specs/development-tasks-completed.md
-      - src/lib/contract.schema.ts
-      - daemon/pipeline/merger.ts
-  verification:
-    commands:
-      - { alias: unit-matrix, executable: npx, args: [vitest, run, tests/unit/state-machine-matrix.test.ts] }
-      - { alias: unit-v13, executable: npx, args: [vitest, run, tests/unit/state-machine-v13-transitions.test.ts] }
-      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
-design:
-  approach: >-
-    1) 先改规范：runtime §11.3 允许迁移表 AUDITED 行增 PENDING_APPROVAL；架构 §9.1.1.1 增受控边条目
-    （建议编号延续 C-0x 叙事或明示「用户退回待批」），写明 Guard：落点 approval.status 必须 PENDING_REVIEW，
-    建议 TransitionContext.reason="USER_RETURN_TO_PENDING"（Fail-Closed）。
-    2) 再改 src/lib/state-machine.ts：LIFECYCLE_TRANSITIONS.AUDITED 增 "PENDING_APPROVAL"；
-    EDGE_GUARDS 增 "AUDITED->PENDING_APPROVAL"（对齐 PREPARING→PENDING_APPROVAL 回置断言 + reason Guard）。
-    3) 单测锁定正/负例；可选薄接线：orchestrator 暴露显式「退回待批」控制面方法（仅用户触发、
-    原子改 lifecycle+approval），禁止旁路 validateTransition。
-    4) 冲突时以 Supervisor / ADR 为准；本卡不发明试玩 UI 文案或新展示态产品方向。
-  touches:
-    - { path: docs/specs/runtime-contract-and-safety.md, change: modify, why: §11.3 允许迁移表补边, symbols: [] }
-    - { path: docs/specs/system-architecture.md, change: modify, why: §9.1.1.1 受控边规约, symbols: [] }
-    - { path: src/lib/state-machine.ts, change: modify, why: LIFECYCLE_TRANSITIONS + EDGE_GUARDS, symbols: [LIFECYCLE_TRANSITIONS, EDGE_GUARDS, validateTransition] }
-    - { path: tests/unit/state-machine-matrix.test.ts, change: modify, why: 正负例锁定新边, symbols: [] }
-    - { path: tests/unit/state-machine-v13-transitions.test.ts, change: modify, why: 迁移表快照同步, symbols: [] }
-    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: 可选薄控制面接线（用户显式退回待批）, symbols: [] }
-  interfaces: []
-  test_plan:
-    - { acceptance_id: AR1-P1, test_path: tests/unit/state-machine-matrix.test.ts, level: unit, case: "规范与代码边一致：AUDITED 允许 PENDING_APPROVAL（规范 diff + 迁移表断言）" }
-    - { acceptance_id: AR1-P2, test_path: tests/unit/state-machine-matrix.test.ts, level: unit, case: "Guard：落点非 PENDING_REVIEW 拒绝" }
-    - { acceptance_id: AR1-P3, test_path: tests/unit/state-machine-matrix.test.ts, level: unit, case: "正例 + 缺/错 reason + AUDITED→PREPARING 仍非法" }
-    - { acceptance_id: AR1-P4, test_path: tests/unit/state-machine-v13-transitions.test.ts, level: unit, case: "LIFECYCLE_TRANSITIONS 快照含新边" }
-    - { acceptance_id: AR1-P5, test_path: tests/unit/state-machine-matrix.test.ts, level: unit, case: "配对矩阵 PENDING_APPROVAL↔PENDING_REVIEW；合并仍要求 AUDITED" }
-governance:
-  spec_refs:
-    - docs/specs/runtime-contract-and-safety.md#113-允许迁移与-lifecycle_transitions-逐字一致
-    - docs/specs/system-architecture.md#911-合同生命周期与审批子状态联动规则
-    - docs/specs/development-tasks-completed.md#task-c.4
-    - docs/specs/supervisor.md
-  depends_on:
-    - { id: TASK-0.2c, kind: hard }
-    - { id: TASK-C.4, kind: soft }
-  code_facts:
-    - { ref: "src/lib/state-machine.ts:181-181", note: "现行 AUDITED: [MERGED, EXECUTING, VERIFYING, ABORTED] — 无 PENDING_APPROVAL" }
-    - { ref: "src/lib/state-machine.ts:215-223", note: "PREPARING→PENDING_APPROVAL 已要求 approval 回置 PENDING_REVIEW；本卡同纪律套到 AUDITED→PENDING_APPROVAL" }
-    - { ref: "src/lib/state-machine.ts:256-266", note: "AUDITED→VERIFYING 仅 EXTERNAL_MUTATION；新边不得与降级边混淆" }
-    - { ref: "docs/specs/runtime-contract-and-safety.md:395-395", note: "§11.3 AUDITED 允许迁移现行无 PENDING_APPROVAL" }
-    - { ref: "docs/specs/development-tasks-completed.md:4219-4219", note: "C.4 non_goals：不支持 AUDITED 退回待批（需先在 runtime §9.1.1 补受控边）" }
-    - { ref: "docs/specs/development-tasks-completed.md:4326-4326", note: "C.4 不宣称：支持需先在 §9.1.1 补受控边，另立议题" }
-    - { ref: "docs/specs/development-tasks.md:722-722", note: "Sprint v0.2 行点名 AUDITED 退回待批为另立议题（P-161 立为本卡）" }
-  non_goals:
-    - 不碰 TASK-D.1e / 桌面形态 RFC（建议序②另卡）
-    - 不碰 TASK-S.3；不销 OP-34
-    - 不发明试玩 UI 文案 / 新展示态产品方向（UI 入口另卡或本卡实现 PR 经 Tina 明示才做）
-    - 不放宽合并门禁、不绕过 validateTransition、不静默授权
-    - 不宣称端到端闭环 / 试玩体验已完成
-    - 不把 AUDITED→VERIFYING（EXTERNAL_MUTATION）改语义或与退回待批混用
-  fail:
-    - 只改代码不改规范，或只改单边规范 / 单测漏锁
-    - 落点仍 APPROVED 却进入 PENDING_APPROVAL（静默授权 / 配对破坏）
-    - 无用户显式触发即可退回待批（自动旁路）
-    - 放宽鉴权 / Demo Origin / 点亮三证 / 网关写范围
-    - 扩大 writable_paths 到无关产品面却无授权
-  adr_revisions: []
-  defaults:
-    - "reason 默认候选字符串 USER_RETURN_TO_PENDING（施工时若与既有 TransitionContext 枚举冲突，以代码事实为准并回写卡面）"
-    - "规范权威顺序：Supervisor/ADR > 架构 §9.1.1 > runtime §11 > state-machine.ts；冲突停工升级"
-    - "orchestrator 薄接线可选但若做必须走 validateTransition；UI 默认不做"
-  open_questions: []
-  estimate: M
-  invariants:
-    auth: unchanged
-    demo_origin: unchanged
-    illumination: unchanged
-    gateway_write_scope: unchanged
-```
-
-* **背景**：C.4 Scope 派生路径已要求已批准合同改 Scope 必须重批，但 **AUDITED 合同直接退回待批** 仍缺受控边；Sprint 与 completed 均点名为另立议题。现行 `AUDITED` 只允许 `MERGED` / `EXECUTING` / `VERIFYING` / `ABORTED`。
-* **取舍**：本卡只补「规范 + 状态机受控边 + 单测（+ 可选薄控制面）」；不做桌面壳、不做 S.3、不销 OP-34、不宣称闭环。实现必须另开 code PR。
 

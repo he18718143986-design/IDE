@@ -268,8 +268,9 @@
 - **Sprint**：首要当时 → **在队清零**（下一张待 Tina 拍板）。不新增 OP；不改产品代码。
 - **物理 tip 基线**：`c8ebbc3`（#162 P-159）。
 
-### TASK-AUDITED.1（P-161 · 2026-11-07 · 非 OP）
+### TASK-AUDITED.1（P-161 立卡 · P-162 回写 · 2026-11-07 · 非 OP）
 
-- **立卡**：Tina 授权按建议序①立卡 `TASK-AUDITED.1`（AUDITED 合同退回待批受控边 · `[NEW_TASK]`）。兑现 Sprint「AUDITED 退回待批为另立议题」与 C.4「不宣称」债；受控边 `AUDITED→PENDING_APPROVAL` + Guard 落点 `approval.status=PENDING_REVIEW`；规范（runtime §11.3 / 架构 §9.1.1.1）先于 `state-machine.ts`。
-- **Sprint**：当前首要 → `TASK-AUDITED.1`。立卡 ≠ 开工；实现另开 code PR；不宣称端到端闭环；不碰 D.1e/S.3；不销 OP-34；不新增 OP；不发明产品方向。
-- **物理 tip**：立卡基线 `29fc0ad`（#163 P-160）。
+- **状态回写**：AUDITED.1 已 COMPLETED（PR [#165](https://github.com/he18718143986-design/IDE/pull/165) / `b390254`）；`USER_RETURN_TO_PENDING` + `AUDITED→PENDING_APPROVAL` Guard（落点 `PENDING_REVIEW`）；两份 unit；**未**改 orchestrator；规范 §11.3 / §9.1.1.1 与代码逐字对齐（AR1-P1 / P-162）。
+- **销项**：兑现 Sprint「AUDITED 退回待批为另立议题」与 C.4「不宣称」债源（库层受控边已补）。**诚实口径**：生产路径暂无 `USER_RETURN_TO_PENDING` 接线（grep 自证）；**不**宣称端到端闭环 / UI 接线；不销 OP-34。
+- **Sprint**：首要 → **在队清零**（下一张按 Tina 顺序 → **桌面形态 RFC（为 D.1e）**；不偷偷开工 D.1e）。不新增 OP；不改产品代码。
+- **物理 tip**：代码 tip `b390254`（#165）；立卡 docs tip `9067d40`（#164）；P-162 docs 本 PR。

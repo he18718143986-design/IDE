@@ -392,11 +392,13 @@ TERMINAL_STATES = MERGED | ABORTED;
 | `EXECUTING` | `VERIFYING`, `PENDING_RESUME`, `ABORTED` |
 | `VERIFYING` | `AUDITED`, `EXECUTING`, `PENDING_RESUME`, `ABORTED` |
 | `PENDING_RESUME` | `EXECUTING`, `PREPARING`, `ABORTED` |
-| `AUDITED` | `MERGED`, `EXECUTING`, `VERIFYING`, `ABORTED` |
+| `AUDITED` | `MERGED`, `EXECUTING`, `VERIFYING`, `PENDING_APPROVAL`, `ABORTED` |
 | `MERGED` | （无） |
 | `ABORTED` | （无） |
 
 未列出的边一律禁止（`canTransition` / 附加 Guard 见代码）。`DRAFT → PREPARING` 仅 Fast Path（带 Guard）；**不存在** `DRAFT → EXECUTING`。
+
+**`AUDITED → PENDING_APPROVAL`（TASK-AUDITED.1 / P-162）**：用户显式退回待批受控边。Guard（与 `EDGE_GUARDS["AUDITED->PENDING_APPROVAL"]` 逐字一致）：落点 `approval.status` 必须为 `PENDING_REVIEW`；`TransitionContext.reason` 必须为 `USER_RETURN_TO_PENDING`（缺/错 reason 或落点仍 `APPROVED` → `ILLEGAL_TRANSITION` Fail-Closed）。对齐既有 `PREPARING → PENDING_APPROVAL` 回置纪律；**不得**与 `AUDITED → VERIFYING`（`EXTERNAL_MUTATION`）混用。**诚实口径**：库层（`src/lib/state-machine.ts`）边已落地 + 单测锁定；生产路径（orchestrator / daemon / UI）**暂无** `USER_RETURN_TO_PENDING` 接线（全仓 grep 自证：除 `state-machine.ts` 与单测外无引用）——**不**宣称端到端「退回待批」产品闭环。
 
 ### 11.4 升格差异
 

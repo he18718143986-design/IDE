@@ -1088,6 +1088,11 @@ export interface SoftwareContractV13 {
 3. **增补外部改码级联降级边 (C-08)**：
    - **边定义**：`AUDITED → VERIFYING`；
    - **转移 Guard 判定**：仅当 Task Graph 出现 `STALE_REVERIFY` 节点时原子触发，同步将 Evidence 标记为 `STALE`，关闭合并门禁。
+4. **增补用户显式退回待批受控边（TASK-AUDITED.1 / P-162）**：
+   - **边定义**：`AUDITED → PENDING_APPROVAL`；
+   - **转移 Guard 判定**：落点 `approval.status` 必须为 `PENDING_REVIEW`；`TransitionContext.reason` 必须为 `USER_RETURN_TO_PENDING`（与 `PREPARING → PENDING_APPROVAL` 回置纪律对齐；缺/错 reason 或落点仍 `APPROVED` → Fail-Closed `ILLEGAL_TRANSITION`）；
+   - **执行纪律**：仅用户显式触发；**不得**与 C-08 `AUDITED → VERIFYING`（`EXTERNAL_MUTATION`）混用；合并门禁对非 `AUDITED` 合同仍拒绝；
+   - **诚实口径**：库层 `LIFECYCLE_TRANSITIONS` / `EDGE_GUARDS` 已落地（`src/lib/state-machine.ts`）+ 单测锁定；生产路径（orchestrator / daemon / UI）**暂无** `USER_RETURN_TO_PENDING` 接线——**不**宣称端到端产品闭环。
 
 ---
 
