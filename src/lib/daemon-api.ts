@@ -347,6 +347,57 @@ export async function openWorkspaceByPath(
 }
 
 /**
+ * TASK-DS.1：浏览器侧是否展示「选择文件夹」入口。
+ * 仅启发式识别 macOS（UA / platform）；真实能力以 Daemon 501 为准。
+ * 非 Mac 不展示假选夹。
+ */
+export function canOfferMacFolderPicker(
+  env: { platform?: string; userAgent?: string } = typeof navigator !==
+  "undefined"
+    ? {
+        platform: navigator.platform,
+        userAgent: navigator.userAgent,
+      }
+    : {},
+): boolean {
+  const platform = env.platform ?? "";
+  const ua = env.userAgent ?? "";
+  return /^Mac/i.test(platform) || /Mac OS X|Macintosh|Mac OS/i.test(ua);
+}
+
+export type PickFolderViaDaemonResult = { cancelled: true } | { path: string };
+
+/**
+ * TASK-DS.1：经已鉴权 Daemon 调起系统选夹；成功只回绝对路径。
+ * 打开工作区请再调 openWorkspaceByPath（复用 #token= / 最近列表通道）。
+ * Token 不进 query / localStorage 明文；调用方勿把 Token 打进日志。
+ */
+export async function pickFolderViaDaemon(
+  conn: DaemonConnection,
+): Promise<PickFolderViaDaemonResult> {
+  const body = await request<{
+    path?: string;
+    cancelled?: boolean;
+    code?: string;
+    error?: string;
+  }>(conn, "/api/desktop/pick-folder", {
+    method: "POST",
+    body: "{}",
+  });
+  if (body.cancelled === true) {
+    return { cancelled: true };
+  }
+  if (typeof body.path === "string" && body.path.trim()) {
+    return { path: body.path.trim() };
+  }
+  throw new DaemonApiError(
+    500,
+    body.error ?? "系统选夹返回异常",
+    body.code ? { code: body.code, body } : { body },
+  );
+}
+
+/**
  * TASK-C.8c：无钥匙冷开自救——不带 Authorization，仅唤起「当前」Daemon 工作区。
  * 成功后用返回的 launchUrl（含 #token=）整页跳转；调用方勿把 Token 打进日志/UI。
  */

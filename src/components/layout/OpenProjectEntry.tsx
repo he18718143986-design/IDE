@@ -1,19 +1,22 @@
 import { useCallback, useEffect, useState } from "react";
 import { FolderOpen } from "lucide-react";
 import {
+  canOfferMacFolderPicker,
   fetchRecentProjects,
   loadConnection,
   openWorkspaceByPath,
+  pickFolderViaDaemon,
   relaunchCurrentSession,
   type RecentProjectItem,
 } from "../../lib/daemon-api";
 import { resolveOpenProjectEntryPresentation } from "../../lib/open-project-panel";
 
 /**
- * 「打开/切换项目」入口（TASK-D.1c + C.8c + C.9c）：
+ * 「打开/切换项目」入口（TASK-D.1c + C.8c + C.9c + DS.1）：
  * - 最近列表一点带钥匙重开；成功即关面板
  * - 无钥匙：一键重开当前会话；成功即关
- * - 粘贴绝对路径打开（C.8c；不含系统文件夹选择器 / D.1e）
+ * - 粘贴绝对路径打开（C.8c）
+ * - macOS：系统选夹（DS.1 本机助手；≠ D.1e 全量桌面壳）→ 再走 openWorkspaceByPath
  * - 已连接降级为「切换项目」；默认收起（C.9a/C.9c）
  */
 export interface OpenProjectEntryProps {
@@ -46,7 +49,9 @@ export function OpenProjectEntry({
   const [loading, setLoading] = useState(false);
   const [openingPath, setOpeningPath] = useState<string | null>(null);
   const [pastePath, setPastePath] = useState("");
+  const [pickingFolder, setPickingFolder] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const offerFolderPicker = canOfferMacFolderPicker();
   const [hasToken, setHasToken] = useState(() =>
     Boolean(loadConnection().token),
   );
@@ -147,7 +152,30 @@ export function OpenProjectEntry({
     await reopen(trimmed);
   };
 
-  const busy = openingPath !== null;
+  const pickFolder = async () => {
+    setPickingFolder(true);
+    setError(null);
+    try {
+      const conn = loadConnection();
+      if (!conn.token) {
+        setError("还没连上。请先点「一键重开（带钥匙）」。");
+        return;
+      }
+      const picked = await pickFolderViaDaemon(conn);
+      if ("cancelled" in picked && picked.cancelled) {
+        return;
+      }
+      if ("path" in picked) {
+        await reopen(picked.path);
+      }
+    } catch (err) {
+      setError((err as Error).message || "选择文件夹失败");
+    } finally {
+      setPickingFolder(false);
+    }
+  };
+
+  const busy = openingPath !== null || pickingFolder;
   const presentation = resolveOpenProjectEntryPresentation({
     hasSession: hasToken,
   });
@@ -251,7 +279,7 @@ export function OpenProjectEntry({
             ) : null}
             {!loading && hasToken && items && items.length === 0 ? (
               <p className="opacity-70" data-testid="recent-projects-empty">
-                还没有最近项目。可在下方粘贴文件夹路径打开；成功后会出现在这里。
+                还没有最近项目。可用「选择文件夹」或粘贴路径打开；成功后会出现在这里。
               </p>
             ) : null}
             {!loading && hasToken && items && items.length > 0 ? (
@@ -288,6 +316,30 @@ export function OpenProjectEntry({
             ) : null}
           </div>
 
+          {offerFolderPicker ? (
+            <div data-testid="pick-folder-open" className="space-y-1">
+              <p className="font-medium opacity-90">选择文件夹</p>
+              <p className="opacity-70">
+                用 macOS
+                系统对话框选本机文件夹，选中后与最近列表、粘贴路径一样带钥匙打开（DS.1
+                本机助手切片；≠ 完整桌面壳）。
+              </p>
+              <button
+                type="button"
+                data-testid="pick-folder-button"
+                disabled={!hasToken || busy}
+                onClick={() => void pickFolder()}
+                className="w-full rounded border border-border bg-background px-2 py-1.5 text-left hover:bg-accent disabled:opacity-50"
+              >
+                {pickingFolder
+                  ? "正在选择…"
+                  : hasToken
+                    ? "选择文件夹…"
+                    : "先一键重开后再选择文件夹"}
+              </button>
+            </div>
+          ) : null}
+
           <div data-testid="paste-path-open" className="space-y-1">
             <p className="font-medium opacity-90">打开其他文件夹</p>
             <p className="opacity-70">
@@ -295,7 +347,8 @@ export function OpenProjectEntry({
               <code className="rounded bg-muted px-1">
                 /Users/你/Desktop/某项目
               </code>
-              ），一点即可打开。不含系统选夹（那是后续桌面壳）。
+              ），一点即可打开
+              {offerFolderPicker ? "；也可使用上方「选择文件夹」" : ""}。
             </p>
             <div className="flex items-center gap-1">
               <input

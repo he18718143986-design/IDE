@@ -112,6 +112,7 @@ import {
   buildWorkspaceLaunchUrl,
   ensureWorkspaceSession,
 } from "./core/open-workspace";
+import { pickFolderMacOS } from "./desktop/macos-folder-picker";
 import {
   appendClientTrace,
   appendDaemonLog,
@@ -3593,12 +3594,52 @@ export class StagentDaemon {
   }
 
   /**
+   * TASK-DS.1：macOS 本机助手 · 系统选夹。
+   * - POST /api/desktop/pick-folder  → 200 { path } | 200 { cancelled: true }
+   *                                   | 501 { code: E_UNSUPPORTED_PLATFORM } | 401
+   * 仅返回绝对路径；打开工作区仍走 /api/recent-projects/open（不另起鉴权旁路）。
+   * 本切片 ≠ TASK-D.1e 完成；不宣称桌面壳闭环。
+   */
+  private handleDesktopPickFolder(
+    _req: http.IncomingMessage,
+    res: http.ServerResponse,
+    method: string,
+    pathname: string,
+  ): void {
+    if (method !== "POST" || pathname !== "/api/desktop/pick-folder") {
+      this.sendJson(res, 404, { error: "Not found" });
+      return;
+    }
+    const result = pickFolderMacOS({ execFileSync });
+    if (!result.ok && result.code === "E_UNSUPPORTED_PLATFORM") {
+      this.sendJson(res, 501, {
+        code: "E_UNSUPPORTED_PLATFORM",
+        error: result.message,
+      });
+      return;
+    }
+    if (!result.ok && result.code === "CANCELLED") {
+      this.sendJson(res, 200, { cancelled: true });
+      return;
+    }
+    if (!result.ok) {
+      this.sendJson(res, 500, {
+        code: result.code,
+        error: result.message,
+      });
+      return;
+    }
+    // 只回路径；Token 不进本响应；后续 open 仍走已鉴权 recent-projects/open
+    this.sendJson(res, 200, { path: result.path });
+  }
+
+  /**
    * TASK-D.1c / C.8c：最近项目列表与打开。
    * - GET  /api/recent-projects
    * - POST /api/recent-projects/open  { path }
    *   · 当前工作区 / 最近列表：一点重开（D.1c）
    *   · 其它已存在的绝对目录：粘贴路径打开（C.8c；仍需 AUTH + 回环）
-   *   · 明确不含系统文件夹选择器（D.1e）
+   *   · 明确不含系统文件夹选择器（D.1e）——DS.1 选夹走独立 /api/desktop/pick-folder，不改写本注释语义为 D.1e 完成
    */
   private async handleRecentProjects(
     req: http.IncomingMessage,
@@ -5326,6 +5367,15 @@ export class StagentDaemon {
         return;
       }
       await this.handleRealPlaytest(req, res, method, pathname, parsedUrl);
+      return;
+    }
+
+    if (pathname === "/api/desktop/pick-folder") {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      this.handleDesktopPickFolder(req, res, method, pathname);
       return;
     }
 
