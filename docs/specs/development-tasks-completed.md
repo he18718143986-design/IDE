@@ -4384,9 +4384,9 @@ design:
       consumers: []
   test_plan:
     - { acceptance_id: L17D-P1, test_path: tests/unit/playtest-reference-snapshots.test.ts, level: unit, case: "references 对齐返回" }
-    - { acceptance_id: L17D-P2, test_path: tests/unit/playtest-reference-snapshots.test.ts, level: unit, case: "禁域不得成功" }
-    - { acceptance_id: L17D-P3, test_path: tests/ui/scheme-review-playtest.test.tsx, level: unit, case: "snapshots 传入后左栏有 reference" }
-    - { acceptance_id: L17D-P4, test_path: tests/unit/playtest-reference-snapshots.test.ts, level: unit, case: "无 references 诚实空列表" }
+    - { acceptance_id: L17D-P2, test_path: tests/unit/playtest-reference-snapshots.test.ts, level: unit, case: "禁域不得出现成功内容" }
+    - { acceptance_id: L17D-P3, test_path: tests/ui/scheme-review-playtest.test.tsx, level: unit, case: "snapshots 传入后左栏出现 compare-view-reference" }
+    - { acceptance_id: L17D-P4, test_path: tests/unit/playtest-reference-snapshots.test.ts, level: unit, case: "无 references → 诚实空列表" }
 governance:
   spec_refs:
     - docs/specs/development-tasks-completed.md#task-l.17c
@@ -4421,5 +4421,6 @@ governance:
     demo_origin: unchanged
     illumination: unchanged
     gateway_write_scope: unchanged
+  delivered: { pr: 145, commit: e2b8dd35cbcde6a750881fe435e115c11fe16cac }
 ```
 
