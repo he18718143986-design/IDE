@@ -265,5 +265,11 @@
 - **对齐**：卡账 / 矩阵 / active 注记已与代码 `CURSOR_AGENT_VERIFIED_ON = { cli_version: "2026.10.22-27dcf5f", verified_at: "2026-11-05" }` 对齐；§3.4m 挂账 1 销项（保留 P-125 原文 +「（P-160 现行）」块）。
 - **证据引用**：既有「CA-06 实测通过与 `CURSOR_AGENT_VERIFIED_ON` 回填（2026-11-05 · 非 OP）」注记（本文件上文；run [`41959697673`](https://github.com/he18718143986-design/IDE/actions/runs/41959697673)）——**不重复造假证据**。`cli_version` = 安装包构建号，非 CLI 自报。
 - **口径**：档位仍 `UNCONTROLLED_EXTERNAL`；`verified_on` ≠ 已受控 / 可派工；拦截边界（CLI `plan` 只读档）如实保留；**不**宣称 Cursor 已受控 / 端到端闭环；不销 OP-34。
-- **Sprint**：挂账清扫序收完 → **在队清零**（下一张待 Tina 拍板）。不新增 OP；不改产品代码。
+- **Sprint**：首要当时 → **在队清零**（下一张待 Tina 拍板）。不新增 OP；不改产品代码。
 - **物理 tip 基线**：`c8ebbc3`（#162 P-159）。
+
+### TASK-AUDITED.1（P-161 · 2026-11-07 · 非 OP）
+
+- **立卡**：Tina 授权按建议序①立卡 `TASK-AUDITED.1`（AUDITED 合同退回待批受控边 · `[NEW_TASK]`）。兑现 Sprint「AUDITED 退回待批为另立议题」与 C.4「不宣称」债；受控边 `AUDITED→PENDING_APPROVAL` + Guard 落点 `approval.status=PENDING_REVIEW`；规范（runtime §11.3 / 架构 §9.1.1.1）先于 `state-machine.ts`。
+- **Sprint**：当前首要 → `TASK-AUDITED.1`。立卡 ≠ 开工；实现另开 code PR；不宣称端到端闭环；不碰 D.1e/S.3；不销 OP-34；不新增 OP；不发明产品方向。
+- **物理 tip**：立卡基线 `29fc0ad`（#163 P-160）。
