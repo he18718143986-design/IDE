@@ -4324,7 +4324,8 @@ governance:
   2. `ContractStore.transition()` 的 revision 回退抛通用 `Error`，server 兜底返回 400（语义可接受，仅记录）。
   3. 内存门禁真测待 Playwright 真实浏览器验证。
 * **不宣称**：不宣称 AUDITED 合同可退回待批（当前拒绝为默认；支持需先在 §9.1.1 补受控边，另立议题）；不宣称真实浏览器内的渲染性能与内存已验证。
-> **（P-162 现行）** 库层受控边已由 [`TASK-AUDITED.1`](#task-audited.1) 补齐（[#165](https://github.com/he18718143986-design/IDE/pull/165)/`b390254`；规范 §11.3 / §9.1.1.1 对齐）。**诚实**：生产路径暂无 `USER_RETURN_TO_PENDING` 接线——**仍不宣称**端到端「退回待批」产品闭环；上句「拒绝为默认 / 另立议题」保留作溯源。
+> **（P-162 · 保留作溯源）** 库层受控边已由 [`TASK-AUDITED.1`](#task-audited.1) 补齐（[#165](https://github.com/he18718143986-design/IDE/pull/165)/`b390254`；规范 §11.3 / §9.1.1.1 对齐）。当时生产路径暂无接线。
+> **（P-171 现行）** 生产接线已由 [`TASK-AUDITED.2`](#task-audited.2) 补齐（[#178](https://github.com/he18718143986-design/IDE/pull/178)/`71684d4`）。#178 合入时 `index.tsx` 父级未接；Tina 已授权 follow-up（进行中）。**仍不宣称**端到端「退回待批」产品闭环；上句「拒绝为默认 / 另立议题」保留作溯源。
 
 
 ### 3.4u L.17a 参考站抓取成果接入 CompareView snapshots（L.17d · 产品验收挂账①）
@@ -5092,8 +5093,8 @@ governance:
 - **状态与证据**：`[COMPLETED]`（[#165](https://github.com/he18718143986-design/IDE/pull/165)/`b390254960104e53dae183db8b63ea0826690cb8`，squash；立卡基线 #164/`9067d40` P-161 之后）。
 - **交付**：仅 3 文件均在 writable_paths 内——`src/lib/state-machine.ts`（`TransitionReason` += `USER_RETURN_TO_PENDING`；`LIFECYCLE_TRANSITIONS.AUDITED` 增 `PENDING_APPROVAL`；`EDGE_GUARDS["AUDITED->PENDING_APPROVAL"]`：落点必须 `PENDING_REVIEW` + `reason=USER_RETURN_TO_PENDING` Fail-Closed）；`tests/unit/state-machine-matrix.test.ts` + `tests/unit/state-machine-v13-transitions.test.ts`（正例 + 缺/错 reason + 落点仍 APPROVED 拒绝 + `AUDITED→PREPARING` 仍非法）。本机 vitest matrix+v13：**85 passed**；`tsc` 0。**未**改 `daemon/pipeline/orchestrator.ts`（卡标可选，刻意不做）。**规范（AR1-P1，本 docs 回写）**：`runtime-contract-and-safety.md` §11.3 AUDITED 行增 `PENDING_APPROVAL` + Guard 注；`system-architecture.md` §9.1.1.1 增第 4 条受控边条目——与代码逐字对齐。
 - **销项**：兑现 Sprint「AUDITED 退回待批为另立议题」与 C.4「不宣称」债源（库层受控边已补）。
-- **诚实口径 / grep 自证**：全仓生产路径（`daemon/` / `src/` 除 `state-machine.ts`）**无** `USER_RETURN_TO_PENDING` 引用；merger 仍要求 `AUDITED`；**不**宣称端到端「退回待批」产品闭环 / UI 接线。
-- **残余 / 默认未做（不宣称关闭）**：① orchestrator / daemon / UI「退回待批」控制面未接线（另卡或明示授权）；② 桌面形态 RFC / D.1e / S.3 未碰；③ **不**销 OP-34；④ **不**宣称试玩体验或端到端闭环。
+- **诚实口径 / grep 自证（P-162 当时）**：合入时生产路径暂无 `USER_RETURN_TO_PENDING` 接线；merger 仍要求 `AUDITED`。**（P-171）** 生产接线见 [`TASK-AUDITED.2`](#task-audited.2)；**仍不**宣称端到端闭环。
+- **残余 / 默认未做（不宣称关闭）**：① 生产 orchestrator/HTTP/ContractCard 已由 [`TASK-AUDITED.2`](#task-audited.2) 承接（#178/`71684d4`）；#178 合入时 `index.tsx` 父级未接 · Tina 已授权 follow-up（进行中）；② 桌面形态 RFC / D.1e / S.3 未碰；③ **不**销 OP-34；④ **不**宣称试玩体验或端到端闭环。
 - **边界**：**窄口径**——库层受控边 + Guard + 单测 + 规范对齐；不是生产路径闭环；不是 UI；不是合并门禁放宽。
 
 ```yaml task-card
@@ -5557,4 +5558,169 @@ governance:
     illumination: unchanged
     gateway_write_scope: unchanged
   delivered: { pr: 174, commit: eacd1012438638ea58c3cfd292026aa6b1abd03c }
+```
+
+
+### 3.4af AUDITED 退回待批生产接线（AUDITED.2）
+
+<a id="task-audited.2"></a>
+
+#### 【Task AUDITED.2】AUDITED 退回待批生产接线 `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#178](https://github.com/he18718143986-design/IDE/pull/178)/`71684d482500e623bc469a96a8ed907642297192`，squash；立卡基线 #177/`7d9fc2b` P-170；分支 tip 含 prettier `735ca06`）。
+- **交付**：writable_paths 内 7 文件——`daemon/pipeline/orchestrator.ts`（`returnToPending`：`withContractLock` + AUDITED/APPROVED 前置 + `USER_RETURN_TO_PENDING`；非法态 `InvalidStateTransitionError`）+ `daemon/server.ts` `POST /api/contracts/:id/return-to-pending` + `src/lib/daemon-api.ts` `returnContractToPending` + `ContractCard`「退回待批」/`data-testid="contract-return-to-pending"`（仅 AUDITED+APPROVED；PENDING_APPROVAL 仍只「批准并开工」）+ 三份测试。本机 vitest 3 files / **24 passed**；`tsc` 0。CI：ubuntu+macOS unit+lint+typecheck 绿；Windows unit 仍红（无关套件 worker-adapter / cli-host / merger 等既有红）；**AUDITED.2 orchestrator 用例在 Windows 亦通过**——不宣称 Windows 全套件绿。**零**改 `state-machine` / docs / `src/routes/index.tsx`（卡 writable_paths 未含父级）。
+- **销项**：兑现 AUDITED.1 完成口径残留①（库层边已有 → 生产 orchestrator / HTTP / ContractCard 接线）。
+- **诚实口径 / grep 自证**：生产路径出现 `returnToPending` / `return-to-pending` / `returnContractToPending` / `contract-return-to-pending`；合并门禁仍要求 `AUDITED`；**不**宣称端到端「退回待批」产品闭环 / e2e。
+- **残余 / 默认未做（不宣称关闭）**：① **#178 合入时** `src/routes/index.tsx` 父级 `onReturnToPending` **未接线**（卡外路径；按卡停工）。按钮 + API 已齐；Tina 已授权另开 **follow-up code PR** 补父级接线（**进行中**）——**非**永久挂账、**不**另立产品卡。② 桌面形态 / D.1e / S.3 未碰；③ **不**销 OP-34；④ **不**宣称试玩体验或端到端闭环；⑤ 不做 DS-6 DoR。
+- **边界**：**窄口径**——卡内 writable_paths 生产接线 + 单测；不是主路径父级装配闭环；不是 e2e；不是合并门禁放宽。
+
+```yaml task-card
+id: TASK-AUDITED.2
+status: COMPLETED
+contract:
+  intent:
+    title: AUDITED 退回待批生产接线
+    description: >-
+      在 AUDITED.1 已落地的库层受控边之上，把「用户显式退回待批」接到生产主路径：
+      orchestrator 薄方法 → Daemon HTTP → daemon-api → ContractCard 按钮。
+      仅当 lifecycle=AUDITED 且 approval.status=APPROVED 时可点；成功后合同为
+      PENDING_APPROVAL + PENDING_REVIEW（reason=USER_RETURN_TO_PENDING），可再次「批准并开工」。
+    risk_level: MEDIUM
+  acceptance:
+    - id: AR2-P1
+      check: auto
+      text: >-
+        PipelineOrchestrator.returnToPending(contractId, reviewer?) 在 AUDITED+APPROVED 下
+        经 store.transition（lifecycleState=PENDING_APPROVAL, approvalStatus=PENDING_REVIEW,
+        transitionContext.reason=USER_RETURN_TO_PENDING）成功；非 AUDITED 或非 APPROVED 抛
+        InvalidStateTransitionError（或等价 Fail-Closed）；持有合同排他锁，与 approve 同纪律
+    - id: AR2-P2
+      check: auto
+      text: >-
+        POST /api/contracts/:id/return-to-pending 挂入 server contracts 路由正则；
+        200 返回 { contract }；非法态 / 未找到走既有 sendActionError 口径；不绕过 validateTransition
+    - id: AR2-P3
+      check: auto
+      text: >-
+        src/lib/daemon-api.ts 导出 returnContractToPending(conn, contractId, reviewer?)；
+        ContractCard 在 AUDITED+APPROVED 显示「退回待批」按钮（可测 testid）；
+        点击调用 API 并向上游回传更新后的合同；PENDING_APPROVAL 仍只显示「批准并开工」
+    - id: AR2-P4
+      check: auto
+      text: >-
+        集成/组件测覆盖主路径：AUDITED+APPROVED → 点退回待批 → 状态 PENDING_APPROVAL+PENDING_REVIEW；
+        负例：PENDING_APPROVAL / MERGED / 缺边 reason 被拒；grep 自证生产路径出现 returnToPending /
+        return-to-pending / returnContractToPending 调用点
+    - id: AR2-P5
+      check: auto
+      text: >-
+        不放宽合并门禁（仍要求 AUDITED）、不改 state-machine 边表语义、不静默授权、
+        不碰鉴权 / Demo Origin / 点亮三证 / 网关写范围；不宣称试玩或合并闭环
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/pipeline/orchestrator.ts
+      - daemon/server.ts
+      - src/lib/daemon-api.ts
+      - src/components/contract/ContractCard.tsx
+      - tests/daemon/orchestrator.test.ts
+      - tests/components/ContractCard.test.tsx
+      - tests/unit/audited-return-to-pending-wiring.test.ts
+    readonly_paths:
+      - src/lib/state-machine.ts
+      - daemon/pipeline/contract-store.ts
+      - docs/specs/runtime-contract-and-safety.md
+      - docs/specs/system-architecture.md
+      - docs/specs/development-tasks-completed.md
+      - docs/specs/supervisor.md
+  verification:
+    commands:
+      - { alias: unit-orch, executable: npx, args: [vitest, run, tests/daemon/orchestrator.test.ts] }
+      - { alias: unit-card, executable: npx, args: [vitest, run, tests/components/ContractCard.test.tsx] }
+      - { alias: unit-wire, executable: npx, args: [vitest, run, tests/unit/audited-return-to-pending-wiring.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) orchestrator 新增 returnToPending：withContractLock → store.get → 断言 AUDITED+APPROVED →
+    store.transition({ lifecycleState: PENDING_APPROVAL, approvalStatus: PENDING_REVIEW,
+    transitionContext: { reason: "USER_RETURN_TO_PENDING" } })；禁止手改 JSON 旁路。
+    2) server.ts contracts 正则增 return-to-pending；POST 调 orchestrator.returnToPending，
+    emitContractUpdate + 200 { contract }；错误走 sendActionError。
+    3) daemon-api.returnContractToPending 镜像 approveContract 形状（POST JSON reviewer 可选）。
+    4) ContractCard：canReturnToPending = AUDITED && APPROVED；按钮「退回待批」；
+    onReturnToPending 回调；不改「批准并开工」语义。
+    5) 单测：orchestrator 正负例 + ContractCard 可见性 + 接线测；grep 自证生产调用点。
+    父级 src/routes/index.tsx 不在 writable_paths，#178 未改——follow-up 另授权。
+  touches:
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: 用户显式退回待批控制面, symbols: [returnToPending] }
+    - { path: daemon/server.ts, change: modify, why: 挂 POST return-to-pending, symbols: [] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: 前端客户端, symbols: [returnContractToPending] }
+    - { path: src/components/contract/ContractCard.tsx, change: modify, why: AUDITED+APPROVED 显示退回待批, symbols: [ContractCard] }
+    - { path: tests/daemon/orchestrator.test.ts, change: modify, why: returnToPending 正负例, symbols: [] }
+    - { path: tests/components/ContractCard.test.tsx, change: modify, why: 按钮可见性与点击, symbols: [] }
+    - { path: tests/unit/audited-return-to-pending-wiring.test.ts, change: create, why: HTTP/装配或 grep 级接线锁定, symbols: [] }
+  interfaces:
+    - name: POST /api/contracts/:id/return-to-pending
+      kind: http
+      signature: "{ reviewer? } → 200 { contract } | 4xx/409"
+      consumers: []
+      note: "server → orchestrator.returnToPending；daemon-api.returnContractToPending 消费；持合同锁；必带 USER_RETURN_TO_PENDING"
+  test_plan:
+    - { acceptance_id: AR2-P1, test_path: tests/daemon/orchestrator.test.ts, level: unit, case: "正例：AUDITED+APPROVED → PENDING_APPROVAL+PENDING_REVIEW（USER_RETURN_TO_PENDING）" }
+    - { acceptance_id: AR2-P1, test_path: tests/daemon/orchestrator.test.ts, level: unit, case: "负例：PENDING_APPROVAL 拒绝 returnToPending" }
+    - { acceptance_id: AR2-P1, test_path: tests/daemon/orchestrator.test.ts, level: unit, case: "负例：MERGED 拒绝 returnToPending" }
+    - { acceptance_id: AR2-P1, test_path: tests/daemon/orchestrator.test.ts, level: unit, case: "负例：EXECUTING+APPROVED（非 AUDITED）拒绝 returnToPending" }
+    - { acceptance_id: AR2-P2, test_path: tests/unit/audited-return-to-pending-wiring.test.ts, level: unit, case: "server contracts 正则与 POST 处理器挂 return-to-pending" }
+    - { acceptance_id: AR2-P3, test_path: tests/components/ContractCard.test.tsx, level: unit, case: "AUDITED+APPROVED 显示「退回待批」并可点击" }
+    - { acceptance_id: AR2-P3, test_path: tests/components/ContractCard.test.tsx, level: unit, case: "PENDING_APPROVAL 不显示「退回待批」" }
+    - { acceptance_id: AR2-P4, test_path: tests/unit/audited-return-to-pending-wiring.test.ts, level: unit, case: "orchestrator 暴露 returnToPending 且必带 USER_RETURN_TO_PENDING" }
+    - { acceptance_id: AR2-P4, test_path: tests/unit/audited-return-to-pending-wiring.test.ts, level: unit, case: "daemon-api 导出 returnContractToPending 指向 return-to-pending" }
+    - { acceptance_id: AR2-P4, test_path: tests/unit/audited-return-to-pending-wiring.test.ts, level: unit, case: "ContractCard 在 AUDITED+APPROVED 路径暴露退回待批" }
+    - { acceptance_id: AR2-P5, test_path: tests/daemon/orchestrator.test.ts, level: unit, case: "正例：AUDITED+APPROVED → PENDING_APPROVAL+PENDING_REVIEW（USER_RETURN_TO_PENDING）" }
+    - { acceptance_id: AR2-P5, test_path: tests/unit/audited-return-to-pending-wiring.test.ts, level: unit, case: "orchestrator 暴露 returnToPending 且必带 USER_RETURN_TO_PENDING" }
+governance:
+  spec_refs:
+    - docs/specs/runtime-contract-and-safety.md#113-允许迁移与-lifecycle_transitions-逐字一致
+    - docs/specs/system-architecture.md#911-合同生命周期与审批子状态联动规则
+    - docs/specs/development-tasks-completed.md#task-audited.1
+    - docs/specs/supervisor.md
+  depends_on:
+    - { id: TASK-AUDITED.1, kind: hard }
+  code_facts:
+    - { ref: "daemon/pipeline/orchestrator.ts:638-670", note: "returnToPending：withContractLock + AUDITED/APPROVED + USER_RETURN_TO_PENDING" }
+    - { ref: "daemon/server.ts:5940-5940", note: "contracts 正则含 return-to-pending" }
+    - { ref: "daemon/server.ts:6364-6375", note: "POST return-to-pending → orchestrator.returnToPending" }
+    - { ref: "src/lib/daemon-api.ts:555-570", note: "returnContractToPending POST" }
+    - { ref: "src/components/contract/ContractCard.tsx:120-122", note: "testid contract-return-to-pending；onReturnToPending 回调" }
+    - { ref: "src/routes/index.tsx:1-1", note: "#178 合入时未传 onReturnToPending（卡外；Tina 已授权 follow-up 进行中）" }
+    - { ref: "src/lib/state-machine.ts:274-292", note: "EDGE_GUARDS AUDITED→PENDING_APPROVAL 未改（只消费 AUDITED.1）" }
+  non_goals:
+    - 不改 state-machine 边表 / Guard 语义（只消费 AUDITED.1）
+    - 不碰 TASK-D.1e / 桌面形态 / DS-6 DoR
+    - 不碰 TASK-S.3；不销 OP-34
+    - 不发明新试玩展示态 / 合并产品向 / 重开 EXECUTING 捷径
+    - 不放宽合并门禁、不绕过 validateTransition、不静默授权
+    - 不宣称端到端闭环 / 试玩体验已完成 / e2e
+    - 不把 #178 未接的 index 父级写成永久挂账或另立产品卡（follow-up 另授权）
+  fail:
+    - 只改 UI 不改 orchestrator/HTTP，或只改后端无生产按钮
+    - 旁路 validateTransition / 手改合同 JSON
+    - 非 AUDITED 或非 APPROVED 仍可退回待批
+    - 落点仍 APPROVED 却进入 PENDING_APPROVAL
+    - 放宽鉴权 / Demo Origin / 点亮三证 / 网关写范围
+    - 扩大 writable_paths 到无关产品面却无授权
+  adr_revisions: []
+  defaults:
+    - "reason 固定 USER_RETURN_TO_PENDING（与 AUDITED.1 Guard 一致）"
+    - "reviewer 可选，缺省与 approve 类似可用 local-user"
+    - "规范权威：Supervisor/ADR > 架构 §9.1.1 > runtime §11 > state-machine.ts；冲突停工升级"
+    - "按钮文案「退回待批」；testid contract-return-to-pending"
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 178, commit: 71684d482500e623bc469a96a8ed907642297192 }
 ```
