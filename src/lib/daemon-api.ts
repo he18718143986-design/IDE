@@ -2228,3 +2228,35 @@ export async function updateContractScopeRevision(
     },
   );
 }
+
+/** TASK-L.17d：CompareView 左栏参考站抓取成果 */
+export interface PlaytestReferenceSnapshotView {
+  reference_url: string;
+  html_snapshot?: string | null | undefined;
+  dom_summary?: string | null | undefined;
+  screenshot_url?: string | null | undefined;
+}
+
+export interface PlaytestReferenceSnapshotsResponse {
+  snapshots: PlaytestReferenceSnapshotView[];
+}
+
+/**
+ * 读侧：GET /api/playtest/reference-snapshots?contract_id=
+ * Daemon 经 WebIngestProxy 拉合同 references[]；screenshot_url 本卡可为 null。
+ */
+export async function fetchPlaytestReferenceSnapshots(
+  conn: DaemonConnection,
+  contractId: string,
+): Promise<PlaytestReferenceSnapshotsResponse> {
+  const id = contractId.trim();
+  if (id.length === 0) {
+    throw new Error("contract_id 不能为空");
+  }
+  const q = encodeURIComponent(id);
+  return request<PlaytestReferenceSnapshotsResponse>(
+    conn,
+    `/api/playtest/reference-snapshots?contract_id=${q}`,
+    { method: "GET" },
+  );
+}
