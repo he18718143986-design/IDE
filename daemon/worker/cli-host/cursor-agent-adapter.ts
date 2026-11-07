@@ -7,6 +7,7 @@ import type {
   AdapterTaskInput,
   CodingWorkerAdapter,
 } from "../worker-adapter.interface";
+import { isCursorAgentContainerProtocolProven } from "../sandbox/cursor-agent-container-protocol";
 
 /**
  * TASK-W.5b：cursor-agent 外部适配器（`UNCONTROLLED_EXTERNAL`，**无执行入口**）。
@@ -23,6 +24,10 @@ import type {
  *    `tool_interception_supported === true`（本进程没有拦截点），`SANDBOX_ENFORCED`
  *    要求派工经 `runInSandbox()` 并携 `SandboxWitness`（宿主进程不经该入口），
  *    故唯一合法档位是 `UNCONTROLLED_EXTERNAL`。**实测不改变档位**。
+ * 4. **TASK-W.9g 容器协议门闩**：镜像/argv/cwd/挂载协议钉在
+ *    `CURSOR_AGENT_CONTAINER_PROTOCOL`；未 `empirically_verified` 前
+ *    `has_executor` 恒 false、`run()` 仍抛 `E_CURSOR_AGENT_NO_EXECUTOR`。
+ *    宿主 CA-06 / `CURSOR_AGENT_VERIFIED_ON` **不等于**容器协议已实证。
  *
  * 实测事实（2026-11-02，本机 `cursor-agent --version` = `2026.10.01-e373342`）：
  * - 凭证：`--api-key <key>` 或 `CURSOR_API_KEY`；实测「The API key was loaded from
@@ -170,6 +175,7 @@ export const CURSOR_AGENT_CAPABILITY: AdapterCapabilityDeclaration = {
     "因此只能登记为 UNCONTROLLED_EXTERNAL：其产物不得作为受控执行或可合并证据",
     "MCP 面仅挂 Stagent 受管端点（写入专用 HOME 的 `~/.cursor/mcp.json`）；无 `--strict-mcp-config` 等价开关，项目级 `.cursor/mcp.json` 需人工批准才会加载",
     "`--resume` 会话恢复与取消语义均未接执行入口，未实测",
+    "TASK-W.9g：Cursor 容器镜像/运行协议尚未经 stagent runInSandbox/executeContainerCli 实证（见 CURSOR_AGENT_CONTAINER_PROTOCOL.empirically_verified）；generic 容器桥可用 ≠ Cursor 可在容器内执行；宿主 CA-06 verified_on ≠ 本协议证明；未实证前无执行入口、不挂派工工厂",
   ],
 };
 
@@ -417,9 +423,17 @@ export class CursorAgentAdapter implements CodingWorkerAdapter {
         "cursor-agent 适配器只支持 API Key：请设置 CURSOR_API_KEY（不使用官方登录 / 订阅会话）",
       );
     }
+    // TASK-W.9g：容器协议未实证前禁止执行；宿主 CA-06 verified_on 不得开此门。
+    if (!isCursorAgentContainerProtocolProven()) {
+      throw new CursorAgentAdapterError(
+        E_CURSOR_AGENT_NO_EXECUTOR,
+        "capability carrier is not executable (cursor-agent): container image/run protocol not empirically verified via runInSandbox/executeContainerCli (TASK-W.9g); host CA-06 / CURSOR_AGENT_VERIFIED_ON is not this proof; no local/Gateway fallback",
+      );
+    }
+    // 协议常量翻 true 后才允许接容器执行入口；当前常量 false，此分支不可达。
     throw new CursorAgentAdapterError(
       E_CURSOR_AGENT_NO_EXECUTOR,
-      "capability carrier is not executable (cursor-agent): 4 类绕过负例尚未在真实 CLI 上实测（无有效 API Key），本卡不提供执行入口",
+      "capability carrier is not executable (cursor-agent): protocol marked verified but executor wiring not enabled in this build",
     );
   }
 }
