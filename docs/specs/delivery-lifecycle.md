@@ -177,4 +177,5 @@ q<n>（原话） → scheme item id（goal-* / mod-* / acc-*） → milestone_id
 
 > **P-153（2026-11-07 · W.9 四项挂账立卡 · 保留作溯源）**：Tina 授权立卡 `TASK-W.9d` / `W.9e` / `W.9f` / `W.9g`（`[NEW_TASK]`）兑现 §3.4q 四项挂账；Sprint 首要当时 → `TASK-W.9d`（序 d→e→f→g）。**立卡≠销项**；不宣称闭环；不碰 macOS CI / CA-06。
 > **P-154（2026-11-07 · W.9d 合入回写 · 保留作溯源）**：`TASK-W.9d` → `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`；见 completed §3.4x）；**§3.4q 挂账①销项**；Sprint 首要当时 → `TASK-W.9e`（序 e→f→g）。挂账②/③/④当时仍立卡未销；不宣称闭环；不碰 macOS CI / CA-06。
-> **P-155（2026-11-07 · W.9e 合入回写）**：`TASK-W.9e` → `[COMPLETED]`（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`；见 completed §3.4y）；**§3.4q 挂账②销项**（①②已销）；Sprint 首要 → `TASK-W.9f`（序 f→g）。挂账③/④仍立卡未销；不宣称闭环；不碰 macOS CI / CA-06。
+> **P-155（2026-11-07 · W.9e 合入回写 · 保留作溯源）**：`TASK-W.9e` → `[COMPLETED]`（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`；见 completed §3.4y）；**§3.4q 挂账②销项**（①②已销）；Sprint 首要当时 → `TASK-W.9f`（序 f→g）。挂账③/④当时仍立卡未销；不宣称闭环；不碰 macOS CI / CA-06。
+> **P-156（2026-11-07 · W.9f 合入回写）**：`TASK-W.9f` → `[COMPLETED]`（[#156](https://github.com/he18718143986-design/IDE/pull/156)/`b92accc`；见 completed §3.4z）；**§3.4q 挂账③销项**（①②③已销）；Sprint 首要 → `TASK-W.9g`。挂账④仍立卡未销；不宣称闭环 / 绝对不可读；不碰 macOS CI / CA-06。

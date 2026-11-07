@@ -238,3 +238,10 @@
 - **销项**：兑现 W.9c §3.4q **挂账②**。挂账①②已销；③④仍立卡未销。
 - **Sprint**：当前首要 → `TASK-W.9f`（序 f→g）。不宣称端到端闭环；不新增 OP。
 - **物理 tip**：`5d3d55b`（#154）。
+
+### TASK-W.9f（P-156 · 2026-11-07 · 非 OP）
+
+- **状态回写**：W.9f 已 COMPLETED（PR [#156](https://github.com/he18718143986-design/IDE/pull/156) / `b92accc`）；四键移出 `SAFE_CONTAINER_ENV_KEYS`；`secretFiles`→`/run/secrets/:ro` + `*_FILE`；`SECRET_IN_PLAIN_ENV`；known_limitations 已改（不宣称绝对不可读）；secret-injection 4/4；零改 vault / cursor-agent-adapter。
+- **销项**：兑现 W.9c §3.4q **挂账③**。挂账①②③已销；④仍立卡未销。
+- **Sprint**：当前首要 → `TASK-W.9g`。不宣称端到端闭环 / 绝对不可读；不新增 OP。
+- **物理 tip**：代码 tip `b92accc`（#156）；P-156 文档回写本 PR。
