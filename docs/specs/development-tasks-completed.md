@@ -2328,7 +2328,8 @@
 - **边界**：W.9 母卡仍以 `[SPLIT]` 保留拆分追溯；三张子卡 W.9a/b/c 均已 COMPLETED，母卡实质闭合。不得把四条 W.9b 挂账写作已解决；Cursor 保持 fail-closed。
 > **（P-153 立卡指针 · 保留原文作溯源）**：挂账①→[`TASK-W.9d`](./development-tasks-active.md#task-w.9d) `[NEW_TASK]`；挂账②→[`TASK-W.9e`](./development-tasks-active.md#task-w.9e) `[NEW_TASK]`；挂账③→[`TASK-W.9f`](./development-tasks-active.md#task-w.9f) `[NEW_TASK]`；挂账④→[`TASK-W.9g`](./development-tasks-active.md#task-w.9g) `[NEW_TASK]`。**立卡≠销项、未开工、不宣称闭环**。
 > **（P-154 · 保留作溯源）**：挂账① → [`TASK-W.9d`](#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账②/③/④当时仍立卡未销。
-> **（P-155 现行）**：挂账① → [`TASK-W.9d`](#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账② → [`TASK-W.9e`](#task-w.9e) `[COMPLETED]`（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`）；挂账③ → [`TASK-W.9f`](./development-tasks-active.md#task-w.9f) `[NEW_TASK]`；挂账④ → [`TASK-W.9g`](./development-tasks-active.md#task-w.9g) `[NEW_TASK]`。**挂账①②已销（P-154 · W.9d；P-155 · W.9e）**；③④仍立卡未销。**仍不宣称**端到端闭环。
+> **（P-155 · 保留作溯源）**：挂账① → [`TASK-W.9d`](#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账② → [`TASK-W.9e`](#task-w.9e) `[COMPLETED]`（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`）；挂账③/④当时仍立卡未销。
+> **（P-156 现行）**：挂账① → [`TASK-W.9d`](#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账② → [`TASK-W.9e`](#task-w.9e) `[COMPLETED]`（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`）；挂账③ → [`TASK-W.9f`](#task-w.9f) `[COMPLETED]`（[#156](https://github.com/he18718143986-design/IDE/pull/156)/`b92accc`）；挂账④ → [`TASK-W.9g`](./development-tasks-active.md#task-w.9g) `[NEW_TASK]`。**挂账①②③已销（P-154 · W.9d；P-155 · W.9e；P-156 · W.9f）**；④仍立卡未销。**仍不宣称**端到端闭环。
 
 
 ### 3.4p 中栏方案审阅页嵌入试玩认可提交（L.17c · 产品验收挂账）
@@ -4627,7 +4628,7 @@ governance:
 - **状态与证据**：`[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de26bf6a34d8377039eb26d71ef6bf506a8`，squash；基线 #151/`2115d5d` P-153 立卡之后）。
 - **交付**：`daemon/worker/verify/worker-registration-service.ts` 新增服务实例单例 `resolveSharedContainerHost()`：仅 **SANDBOX** 行投影解析共享宿主（`list`/`get` 同轮次 `createContainerHost` 至多一次）；**GATEWAY / UNCONTROLLED** 行不构造 host。宿主真实不可用时仍 `dispatchable=false`（不因缓存放行）。新增 `tests/unit/worker-registration-probe-cost.test.ts`（W9D 4/4）；相关回归 61/61；`tsc` 0。**零改** `docker-container-host.ts` / docs / W.9e–g。
 - **销项**：兑现 W.9c completed §3.4q **挂账①**（行投影 Docker host probe 成本）。挂账②/③/④仍由 W.9e/f/g 承接。
-- **残余 / 默认未做（不宣称关闭）**：① 不改 `isControlledDispatchable` 吞码 → [`TASK-W.9e`](#task-w.9e) `[COMPLETED]`（P-155 · #154/`5d3d55b`）；② 不改容器 env 明文 key（→ [`TASK-W.9f`](./development-tasks-active.md#task-w.9f)）；③ 不做 Cursor 容器协议实证（→ [`TASK-W.9g`](./development-tasks-active.md#task-w.9g)）；④ **不**宣称端到端产品闭环。
+- **残余 / 默认未做（不宣称关闭）**：① 不改 `isControlledDispatchable` 吞码 → [`TASK-W.9e`](#task-w.9e) `[COMPLETED]`（P-155 · #154/`5d3d55b`）；② 不改容器 env 明文 key → [`TASK-W.9f`](#task-w.9f) `[COMPLETED]`（P-156 · #156/`b92accc`）；③ 不做 Cursor 容器协议实证（→ [`TASK-W.9g`](./development-tasks-active.md#task-w.9g)）；④ **不**宣称端到端产品闭环。
 - **边界**：**窄口径**——服务级单例共享 SANDBOX 宿主探测；门禁语义零放宽；无 e2e 闭环宣称。
 
 ```yaml task-card
@@ -4712,8 +4713,8 @@ governance:
 
 - **状态与证据**：`[COMPLETED]`（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55bb13383cb30265f80df4dd489120bbf9d9`，squash；基线 #153/`f4b4b17` P-154 回写之后）。
 - **交付**：`daemon/worker/worker-dispatch.ts` 新增 `diagnoseControlledDispatch()` 为单一判定/诊断源；`requireControlledDispatch` / `isControlledDispatchable` 薄封装其上（同源、门禁零放宽）。`WorkerView` 可选字段 `dispatch_blocked_code`；`builtinView` / `storedView` 在 `dispatchable=false` 时带回与 `WorkerDispatchError.code` 同源的 machine-readable 拒绝码。新增 `tests/unit/worker-dispatch-diagnostic.test.ts`（W9E-P1～P4）；相关回归 62/62；`tsc` 0。**零改** `daemon/server.ts`（API 已回传 WorkerView）/ docs / W.9f–g。
-- **销项**：兑现 W.9c completed §3.4q **挂账②**（boolean helper 吞拒绝码；API 诊断信息面收窄）。挂账③/④仍由 W.9f/g 承接。
-- **残余 / 默认未做（不宣称关闭）**：① 不改容器 env 明文 key（→ [`TASK-W.9f`](./development-tasks-active.md#task-w.9f)）；② 不做 Cursor 容器协议实证（→ [`TASK-W.9g`](./development-tasks-active.md#task-w.9g)）；③ **不**宣称端到端产品闭环；④ 不放宽 `requireControlledDispatch` / 档位语义。
+- **销项**：兑现 W.9c completed §3.4q **挂账②**（boolean helper 吞拒绝码；API 诊断信息面收窄）。挂账③ → [`TASK-W.9f`](#task-w.9f) `[COMPLETED]`（P-156）；挂账④仍由 W.9g 承接。
+- **残余 / 默认未做（不宣称关闭）**：① 不改容器 env 明文 key → [`TASK-W.9f`](#task-w.9f) `[COMPLETED]`（P-156 · #156/`b92accc`）；② 不做 Cursor 容器协议实证（→ [`TASK-W.9g`](./development-tasks-active.md#task-w.9g)）；③ **不**宣称端到端产品闭环；④ 不放宽 `requireControlledDispatch` / 档位语义。
 - **边界**：**窄口径**——只穿透拒绝码诊断；boolean 语义保留；门禁放行条件零放宽；无 e2e 闭环宣称。
 
 ```yaml task-card
@@ -4793,4 +4794,98 @@ governance:
     illumination: unchanged
     gateway_write_scope: unchanged
   delivered: { pr: 154, commit: 5d3d55bb13383cb30265f80df4dd489120bbf9d9 }
+```
+
+
+### 3.4z 容器环境 API key 明文可读面收敛（W.9f · W.9c 挂账③）
+
+<a id="task-w.9f"></a>
+
+#### 【Task W.9f】容器环境 API key 明文可读面收敛 `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#156](https://github.com/he18718143986-design/IDE/pull/156)/`b92accc1194c1b4b2417f63ad2baccbcce85355b`，squash；基线 #155/`b7bba0f` P-155 回写之后）。
+- **交付**：四类 API key（`LLM_API_KEY` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `CURSOR_API_KEY`）移出 `SAFE_CONTAINER_ENV_KEYS` 普通 Env 白名单（现仅 `PATH`/`HOME`/`LANG`）；改走 `secretFiles` → 容器内 `/run/secrets/<KEY>:ro` 挂载，并以 `*_FILE` 指针注入约定路径。Docker 宿主拒明文 `-e`（`SECRET_IN_PLAIN_ENV`）。OpenHands `known_limitations` 已回写现行事实，并写明「打开该文件的容器进程仍可读明文……**不宣称绝对不可读**」。新增 `tests/unit/container-cli-secret-injection.test.ts`（W9F-P1～P4）；相关回归 65/65；`tsc`/`eslint` 0；日志脱敏不回退。**零改** vault / cursor-agent-adapter / docs / W.9g。
+- **销项**：兑现 W.9c completed §3.4q **挂账③**（四键仍可能经普通 Env 被容器内进程读取）。挂账④仍由 W.9g 承接。
+- **残余 / 默认未做（不宣称关闭）**：① 不做 Cursor 容器协议实证（→ [`TASK-W.9g`](./development-tasks-active.md#task-w.9g)）；② **不**宣称绝对不可读或端到端产品闭环；③ 不改 Vault 产品模型 / 不把账密写入合同或对话。
+- **边界**：**窄口径**——只收敛明文 Env 可读面；secret 文件挂载通道仍可被容器进程读取；无 e2e 闭环宣称；无绝对不可读宣称。
+
+```yaml task-card
+id: TASK-W.9f
+status: COMPLETED
+contract:
+  intent:
+    title: 容器环境 API key 明文可读面收敛
+    description: >-
+      LLM_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY / CURSOR_API_KEY 不再经由
+      SAFE_CONTAINER_ENV_KEYS 普通环境变量直通，使容器进程 environ 与 docker inspect Env
+      默认可读明文；改为 secret/文件挂载或等价通道。日志脱敏纪律保持。
+    risk_level: HIGH
+  acceptance:
+    - { id: W9F-P1, check: auto, text: "默认 executeContainerCli / runInSandbox 路径下，上述四键不得出现在传入容器的普通 Env 映射中（测试断言 Env 不含明文值）" }
+    - { id: W9F-P2, check: auto, text: "CLI 仍能在受控通道读到所需凭据完成一次最小调用（可用桩宿主证明注入通道，不必真连模型）" }
+    - { id: W9F-P3, check: auto, text: "日志/错误字符串仍不对上述键值做明文回显（既有脱敏不回退）" }
+    - { id: W9F-P4, check: both, text: "OpenHands known_limitations 中「经容器环境变量注入…未使用 secret 挂载」表述随实现回写为现行事实；不得假装已绝对不可读" }
+  scheme_item_ids: [gap-12]
+  scope:
+    writable_paths:
+      - daemon/worker/sandbox/container-cli-executor.ts
+      - daemon/worker/cli-host/docker-container-host.ts
+      - daemon/worker/cli-host/openhands-adapter.ts
+      - daemon/worker/sandbox/container-host.ts
+      - tests/unit/container-cli-secret-injection.test.ts
+    readonly_paths:
+      - daemon/vault/**
+      - daemon/worker/cli-host/cursor-agent-adapter.ts
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/container-cli-secret-injection.test.ts] }
+design:
+  approach: >-
+    SAFE_CONTAINER_ENV_KEYS 仅 PATH/HOME/LANG；四键走 secretFiles→/run/secrets/:ro + *_FILE 指针；
+    Docker SECRET_IN_PLAIN_ENV 拒明文 -e；OpenHands known_limitations 回写且不宣称绝对不可读。
+  touches:
+    - { path: daemon/worker/sandbox/container-cli-executor.ts, change: modify, why: 收敛 SAFE_CONTAINER_ENV_KEYS 与注入, symbols: [SAFE_CONTAINER_ENV_KEYS, executeContainerCli] }
+    - { path: daemon/worker/cli-host/docker-container-host.ts, change: modify, why: 支持 secret/文件挂载参数 + 拒明文 -e, symbols: [materializeSecretFiles, DockerContainerHost] }
+    - { path: daemon/worker/sandbox/container-host.ts, change: modify, why: secretFiles 类型与拒明文校验, symbols: [SandboxSecretFile, CONTAINER_SECRET_ENV_KEYS, validateSandboxInput, containerSecretFile] }
+    - { path: daemon/worker/cli-host/openhands-adapter.ts, change: modify, why: 改注入并回写 known_limitations, symbols: [secretFilesForKey] }
+    - { path: tests/unit/container-cli-secret-injection.test.ts, change: create, why: Env 无明文 + 通道可读, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: W9F-P1, test_path: tests/unit/container-cli-secret-injection.test.ts, level: unit, case: "W9F-P1: 普通 Env 无四键明文" }
+    - { acceptance_id: W9F-P2, test_path: tests/unit/container-cli-secret-injection.test.ts, level: unit, case: "W9F-P2: 受控通道可读凭据" }
+    - { acceptance_id: W9F-P3, test_path: tests/unit/container-cli-secret-injection.test.ts, level: unit, case: "W9F-P3: 日志不回显" }
+    - { acceptance_id: W9F-P4, test_path: tests/unit/container-cli-secret-injection.test.ts, level: unit, case: "W9F-P4: known_limitations 与实现一致" }
+governance:
+  spec_refs:
+    - docs/specs/development-tasks-completed.md#task-w.9c
+    - docs/specs/development-tasks-completed.md#task-w.9b
+    - docs/scheme.md
+  depends_on:
+    - { id: TASK-W.9c, kind: hard }
+    - { id: TASK-W.9b, kind: hard }
+  code_facts:
+    - { ref: "daemon/worker/sandbox/container-cli-executor.ts::SAFE_CONTAINER_ENV_KEYS", note: "仅 PATH/HOME/LANG；四键不再进普通 Env" }
+    - { ref: "daemon/worker/sandbox/container-host.ts::CONTAINER_SECRET_ENV_KEYS", note: "四键只进 secretFiles；validateSandboxInput 拒明文 Env" }
+    - { ref: "daemon/worker/sandbox/container-host.ts::containerSecretFile", note: "约定 /run/secrets/<KEY> + *_FILE 指针" }
+    - { ref: "daemon/worker/cli-host/docker-container-host.ts::materializeSecretFiles", note: "宿主临时文件 :ro 挂载；明文 -e 四键拒 SECRET_IN_PLAIN_ENV" }
+    - { ref: "daemon/worker/cli-host/openhands-adapter.ts::OPENHANDS_CAPABILITY", note: "known_limitations 已改；写明不宣称绝对不可读" }
+    - { ref: "docs/specs/development-tasks-completed.md:2327", note: "§3.4q 挂账③：四键仍可能被容器内进程读取；日志脱敏不改变该事实——本卡销项" }
+  non_goals:
+    - 不改 Vault 产品模型 / 不把账密写入合同或对话
+    - 不做 Cursor 容器协议实证（W.9g）
+    - 不宣称「绝对不可读」或端到端闭环
+  fail:
+    - 继续默认 Env 直通明文却宣称挂账已销
+    - 凭据进入证据 JSON / 合同 / 用户可见日志
+  adr_revisions: []
+  defaults:
+    - "注入通道优先文件挂载（tmpfs/只读）；具体旗标随 DockerContainerHost 现有 API 最小扩展"
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 156, commit: b92accc1194c1b4b2417f63ad2baccbcce85355b }
 ```

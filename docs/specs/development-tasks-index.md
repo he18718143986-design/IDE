@@ -27,10 +27,10 @@
 | `TASK-W.9` | `COMPLETED（实质闭合）` | 自注册/外部 Worker 执行器接线 · 母卡（历史 `[SPLIT]` 标记保留追溯） | [打开](./development-tasks-active.md#task-w.9) |
 | `TASK-W.9a` | `COMPLETED` | 探测报告指纹升格 + launch 解耦（[#99](https://github.com/he18718143986-design/IDE/pull/99)/`22168ee`） | [打开](./development-tasks-completed.md#task-w.9a) |
 | `TASK-W.9b` | `COMPLETED` | `ContainerCliAdapter` + `runInSandbox()` + witness 证据面接线；Cursor 容器协议未实证（[#101](https://github.com/he18718143986-design/IDE/pull/101)/`b98e463`） | [打开](./development-tasks-completed.md#task-w.9b) |
-| `TASK-W.9c` | `COMPLETED` | 自注册工厂闭环（[#107](https://github.com/he18718143986-design/IDE/pull/107)/`d3397a6`；挂账①已销 P-154；②③④仍立卡未销） | [打开](./development-tasks-completed.md#task-w.9c) |
+| `TASK-W.9c` | `COMPLETED` | 自注册工厂闭环（[#107](https://github.com/he18718143986-design/IDE/pull/107)/`d3397a6`；挂账①②③已销 P-154/P-155/P-156；④仍立卡未销） | [打开](./development-tasks-completed.md#task-w.9c) |
 | `TASK-W.9d` | `COMPLETED` | 行投影 Docker host probe 成本收敛（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`；P-154 回写） | [打开](./development-tasks-completed.md#task-w.9d) |
 | `TASK-W.9e` | `COMPLETED` | 受控派工拒绝码穿透诊断（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`；P-155 回写） | [打开](./development-tasks-completed.md#task-w.9e) |
-| `TASK-W.9f` | `NEW_TASK` | 容器环境 API key 明文可读面收敛（P-153 立卡 · 挂账③） | [打开](./development-tasks-active.md#task-w.9f) |
+| `TASK-W.9f` | `COMPLETED` | 容器环境 API key 明文可读面收敛（[#156](https://github.com/he18718143986-design/IDE/pull/156)/`b92accc`；P-156 回写） | [打开](./development-tasks-completed.md#task-w.9f) |
 | `TASK-W.9g` | `NEW_TASK` | Cursor CLI 容器镜像/运行协议实证（P-153 立卡 · 挂账④） | [打开](./development-tasks-active.md#task-w.9g) |
 | `TASK-J.18` | `SPLIT` | Worker 派工墓地门禁（INV-LEDGER-03 工地侧）· 拆分母卡 | [打开](./development-tasks-active.md#task-j.18) |
 | `TASK-J.19` | `COMPLETED` | DN-2「可以」HTTP/画布入口（DLV-6） | [打开](./development-tasks-completed.md#task-j.19) |

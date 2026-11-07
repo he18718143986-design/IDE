@@ -597,7 +597,9 @@
 >
 > **（P-154 · 保留作溯源）** 挂账① → [`TASK-W.9d`](./development-tasks-completed.md#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账②/③/④当时仍由 W.9e/f/g `[NEW_TASK]` 承接；Sprint 首要当时 → `TASK-W.9e`。
 >
-> **（P-155 现行）** 挂账① → [`TASK-W.9d`](./development-tasks-completed.md#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账② → [`TASK-W.9e`](./development-tasks-completed.md#task-w.9e) `[COMPLETED]`（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`）；挂账③/④仍由 [`W.9f`](#task-w.9f) / [`W.9g`](#task-w.9g) `[NEW_TASK]` 承接。Sprint 首要 → **`TASK-W.9f`**（序 f→g）。**仍不宣称**端到端闭环。
+> **（P-155 · 保留作溯源）** 挂账① → [`TASK-W.9d`](./development-tasks-completed.md#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账② → [`TASK-W.9e`](./development-tasks-completed.md#task-w.9e) `[COMPLETED]`（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`）；挂账③/④当时仍由 W.9f/g `[NEW_TASK]` 承接；Sprint 首要当时 → `TASK-W.9f`。
+>
+> **（P-156 现行）** 挂账① → [`TASK-W.9d`](./development-tasks-completed.md#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账② → [`TASK-W.9e`](./development-tasks-completed.md#task-w.9e) `[COMPLETED]`（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`）；挂账③ → [`TASK-W.9f`](./development-tasks-completed.md#task-w.9f) `[COMPLETED]`（[#156](https://github.com/he18718143986-design/IDE/pull/156)/`b92accc`）；挂账④仍由 [`W.9g`](#task-w.9g) `[NEW_TASK]` 承接。Sprint 首要 → **`TASK-W.9g`**。**仍不宣称**端到端闭环。
 
 
 
@@ -617,90 +619,10 @@
 
 <a id="task-w.9f"></a>
 
-#### 【Task W.9f】容器环境 API key 明文可读面收敛 `[NEW_TASK]`
+#### 【Task W.9f】容器环境 API key 明文可读面收敛 `[COMPLETED]`
 
-> **立卡（2026-11-07 · P-153）**：兑现 W.9c completed §3.4q 挂账③（沿用 W.9b §3.4o 与 OpenHands `known_limitations`「未使用 secret 挂载」表述）。**不**把账密写入合同/日志/对话。
+> **归档注记（2026-11-07 · P-156）**：本卡已 COMPLETED（[#156](https://github.com/he18718143986-design/IDE/pull/156)/`b92accc`，squash）。完整卡正文（yaml + 交付清单、默认/未做边界）迁入 [`development-tasks-completed.md` §3.4z](./development-tasks-completed.md#task-w.9f)。**W.9c §3.4q 挂账③销项**。挂账④仍由 W.9g 承接。**不宣称**端到端闭环 / 绝对不可读；零改 vault / cursor-agent-adapter / W.9g。
 
-```yaml task-card
-id: TASK-W.9f
-status: NEW_TASK
-contract:
-  intent:
-    title: 容器环境 API key 明文可读面收敛
-    description: >-
-      LLM_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY / CURSOR_API_KEY 不再经由
-      SAFE_CONTAINER_ENV_KEYS 普通环境变量直通，使容器进程 environ 与 docker inspect Env
-      默认可读明文；改为 secret/文件挂载或等价通道。日志脱敏纪律保持。
-    risk_level: HIGH
-  acceptance:
-    - { id: W9F-P1, check: auto, text: "默认 executeContainerCli / runInSandbox 路径下，上述四键不得出现在传入容器的普通 Env 映射中（测试断言 Env 不含明文值）" }
-    - { id: W9F-P2, check: auto, text: "CLI 仍能在受控通道读到所需凭据完成一次最小调用（可用桩宿主证明注入通道，不必真连模型）" }
-    - { id: W9F-P3, check: auto, text: "日志/错误字符串仍不对上述键值做明文回显（既有脱敏不回退）" }
-    - { id: W9F-P4, check: both, text: "OpenHands known_limitations 中「经容器环境变量注入…未使用 secret 挂载」表述随实现回写为现行事实；不得假装已绝对不可读" }
-  scheme_item_ids: [gap-12]
-  scope:
-    writable_paths:
-      - daemon/worker/sandbox/container-cli-executor.ts
-      - daemon/worker/cli-host/docker-container-host.ts
-      - daemon/worker/cli-host/openhands-adapter.ts
-      - daemon/worker/sandbox/**
-      - tests/unit/container-cli*.ts
-      - tests/unit/docker-container*.ts
-    readonly_paths:
-      - daemon/vault/**
-      - daemon/worker/cli-host/cursor-agent-adapter.ts
-  verification:
-    commands:
-      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/container-cli-secret-injection.test.ts] }
-design:
-  approach: >-
-    按 OpenHands known_limitations 已点名的缺口：停止把四类 key 放进 SAFE_CONTAINER_ENV_KEYS
-    普通 Env；改为文件/secret 挂载（或 Docker 支持的等价只读注入），容器内进程经约定路径读取。
-    日志侧 SENSITIVE_ENV_KEYS 脱敏保留。不把凭据写入合同、证据 JSON 或对话。
-  touches:
-    - { path: daemon/worker/sandbox/container-cli-executor.ts, change: modify, why: 收敛 SAFE_CONTAINER_ENV_KEYS 与注入, symbols: [SAFE_CONTAINER_ENV_KEYS, executeContainerCli] }
-    - { path: daemon/worker/cli-host/docker-container-host.ts, change: modify, why: 支持 secret/文件挂载参数, symbols: [runInSandbox] }
-    - { path: daemon/worker/cli-host/openhands-adapter.ts, change: modify, why: 改注入并回写 known_limitations, symbols: [] }
-    - { path: tests/unit/container-cli-secret-injection.test.ts, change: create, why: Env 无明文 + 通道可读, symbols: [] }
-  interfaces: []
-  test_plan:
-    - { acceptance_id: W9F-P1, test_path: tests/unit/container-cli-secret-injection.test.ts, level: unit, case: "普通 Env 无四键明文" }
-    - { acceptance_id: W9F-P2, test_path: tests/unit/container-cli-secret-injection.test.ts, level: unit, case: "受控通道可读凭据" }
-    - { acceptance_id: W9F-P3, test_path: tests/unit/container-cli-secret-injection.test.ts, level: unit, case: "日志不回显" }
-    - { acceptance_id: W9F-P4, test_path: tests/unit/container-cli-secret-injection.test.ts, level: unit, case: "known_limitations 与实现一致", debt: "文案回写可在同卡或紧随 docs 回写；实现 PR 须改 limitations 字符串" }
-governance:
-  spec_refs:
-    - docs/specs/development-tasks-completed.md#task-w.9c
-    - docs/specs/development-tasks-completed.md#task-w.9b
-    - docs/scheme.md
-  depends_on:
-    - { id: TASK-W.9c, kind: hard }
-    - { id: TASK-W.9b, kind: hard }
-  code_facts:
-    - { ref: "daemon/worker/sandbox/container-cli-executor.ts::SAFE_CONTAINER_ENV_KEYS", note: "四类 API key 在白名单，可进容器 Env" }
-    - { ref: "daemon/worker/cli-host/openhands-adapter.ts::OPENHANDS_CAPABILITY", note: "known_limitations 已写明经 LLM_API_KEY 环境变量注入、未使用 secret 挂载" }
-    - { ref: "docs/specs/development-tasks-completed.md:2327", note: "§3.4q 挂账③：四键仍可能被容器内进程读取；日志脱敏不改变该事实" }
-  non_goals:
-    - 不改 Vault 产品模型 / 不把账密写入合同或对话
-    - 不做 Cursor 容器协议实证（W.9g）
-    - 不宣称「绝对不可读」或端到端闭环
-  fail:
-    - 继续默认 Env 直通明文却宣称挂账已销
-    - 凭据进入证据 JSON / 合同 / 用户可见日志
-  adr_revisions: []
-  defaults:
-    - "注入通道优先文件挂载（tmpfs/只读）；具体旗标随 DockerContainerHost 现有 API 最小扩展"
-  open_questions: []
-  estimate: M
-  invariants:
-    auth: unchanged
-    demo_origin: unchanged
-    illumination: unchanged
-    gateway_write_scope: unchanged
-```
-
-* **背景**：§3.4q 挂账③——容器 env 明文 key。
-* **取舍**：沿用 known_limitations 已点名的 secret 挂载方向，不另开 Vault 大改。
 
 <a id="task-w.9g"></a>
 
