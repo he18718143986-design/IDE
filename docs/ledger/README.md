@@ -257,5 +257,13 @@
 
 - **状态回写**：CI.1 已 COMPLETED（PR [#161](https://github.com/he18718143986-design/IDE/pull/161) / `bf971d5`）；仅改 `tests/perf/arch-graph-benchmark.test.ts`；门禁 4 ≤150ms（run 42369070606 median 129.75ms）；正确性断言未放宽；零改 `daemon/arch/*`。
 - **销项**：兑现挂账清扫序 **macOS CI** 面（B.1 Tarjan flake）。**诚实口径**：抗抖动门禁，**不**宣称永久全绿；**不**销 OP-34；不碰 CA-06。
-- **Sprint**：首要 → **在队清零**（下一挂账面 → **CA-06 文档债**，按 Tina 授权序）。不宣称端到端闭环；不新增 OP。
-- **物理 tip**：代码 tip `bf971d5`（#161）；立卡 docs tip `3766d28`（#160）。
+- **Sprint**：首要当时 → **在队清零**（下一挂账面 → **CA-06 文档债**，按 Tina 授权序）。不宣称端到端闭环；不新增 OP。
+- **物理 tip**：代码 tip `bf971d5`（#161）；立卡 docs tip `3766d28`（#160）；P-159 docs tip `c8ebbc3`（#162）。
+
+### CA-06 文档债对齐（P-160 · 2026-11-07 · 非 OP）
+
+- **对齐**：卡账 / 矩阵 / active 注记已与代码 `CURSOR_AGENT_VERIFIED_ON = { cli_version: "2026.10.22-27dcf5f", verified_at: "2026-11-05" }` 对齐；§3.4m 挂账 1 销项（保留 P-125 原文 +「（P-160 现行）」块）。
+- **证据引用**：既有「CA-06 实测通过与 `CURSOR_AGENT_VERIFIED_ON` 回填（2026-11-05 · 非 OP）」注记（本文件上文；run [`41959697673`](https://github.com/he18718143986-design/IDE/actions/runs/41959697673)）——**不重复造假证据**。`cli_version` = 安装包构建号，非 CLI 自报。
+- **口径**：档位仍 `UNCONTROLLED_EXTERNAL`；`verified_on` ≠ 已受控 / 可派工；拦截边界（CLI `plan` 只读档）如实保留；**不**宣称 Cursor 已受控 / 端到端闭环；不销 OP-34。
+- **Sprint**：挂账清扫序收完 → **在队清零**（下一张待 Tina 拍板）。不新增 OP；不改产品代码。
+- **物理 tip 基线**：`c8ebbc3`（#162 P-159）。
