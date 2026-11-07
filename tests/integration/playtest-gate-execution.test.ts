@@ -204,7 +204,9 @@ describe("L17F-P4：可复现执行出口（orchestrator 验证链）", () => {
     await orchestrator.approve(contract.contract_id, "tina");
     const outcome = await orchestrator.execute(contract.contract_id);
     expect(
-      outcome.evidence.verification_results.some((r) => r.command_alias === "playtest"),
+      outcome.evidence.verification_results.some(
+        (r) => r.command_alias === "playtest",
+      ),
     ).toBe(false);
     expect(outcome.evidence.verdict.status).toBe("PASSED");
   });

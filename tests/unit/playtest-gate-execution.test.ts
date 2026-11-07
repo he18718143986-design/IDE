@@ -172,7 +172,9 @@ describe("L17F-P1：playtest 非跳过执行（参数旁路）", () => {
 
 describe("L17F-P1b：worktree 视图挂载（威胁边界内 --repo）", () => {
   it("ensurePlaytestStagentView 把 contracts/evidence/releases 链到仓根", () => {
-    const repo = fs.mkdtempSync(path.join(os.tmpdir(), "stagent-l17f-view-repo-"));
+    const repo = fs.mkdtempSync(
+      path.join(os.tmpdir(), "stagent-l17f-view-repo-"),
+    );
     const wt = fs.mkdtempSync(path.join(os.tmpdir(), "stagent-l17f-view-wt-"));
     try {
       const srcContracts = path.join(repo, ".stagent", "contracts");
@@ -182,18 +184,26 @@ describe("L17F-P1b：worktree 视图挂载（威胁边界内 --repo）", () => {
         JSON.stringify({ contract_id: CONTRACT_ID, references: [REF] }),
       );
       ensurePlaytestStagentView(wt, repo);
-      const linked = path.join(wt, ".stagent", "contracts", `${CONTRACT_ID}.json`);
-      expect(fs.existsSync(linked)).toBe(true);
-      expect(fs.lstatSync(path.join(wt, ".stagent", "contracts")).isSymbolicLink()).toBe(
-        true,
+      const linked = path.join(
+        wt,
+        ".stagent",
+        "contracts",
+        `${CONTRACT_ID}.json`,
       );
+      expect(fs.existsSync(linked)).toBe(true);
+      expect(
+        fs.lstatSync(path.join(wt, ".stagent", "contracts")).isSymbolicLink(),
+      ).toBe(true);
       // 经视图 + --repo=worktree 真执行到 guard
       writeRelease(repo, REL_LIVE, "LIVE");
       ensurePlaytestStagentView(wt, repo); // evidence/releases 目录亦挂上
-      const args = resolvePlaytestCheckArgs(["check", "playtest", CONTRACT_ID], {
-        contractId: CONTRACT_ID,
-        repoRoot: wt,
-      });
+      const args = resolvePlaytestCheckArgs(
+        ["check", "playtest", CONTRACT_ID],
+        {
+          contractId: CONTRACT_ID,
+          repoRoot: wt,
+        },
+      );
       const res = runCheckCommand(args.slice(1));
       expect(res.exitCode).toBe(1);
       const body = JSON.parse(res.stdout) as { status: string };
@@ -303,10 +313,6 @@ describe("L17F-P3：非北极星无 playtest", () => {
       (x) => x.alias === "playtest",
     );
     expect(pts).toHaveLength(1);
-    expect(pts[0]!.args).toEqual([
-      "check",
-      "playtest",
-      c.contract_id,
-    ]);
+    expect(pts[0]!.args).toEqual(["check", "playtest", c.contract_id]);
   });
 });
