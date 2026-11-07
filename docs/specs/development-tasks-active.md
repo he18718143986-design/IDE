@@ -697,7 +697,8 @@
 > **归档注记（2026-11-03 · P-133）**：本卡已 COMPLETED（[#104](https://github.com/he18718143986-design/IDE/pull/104)/`06661be` squash）。交付、三项挂账与边界见 [`development-tasks-completed.md`](./development-tasks-completed.md#task-l.17c)。**立卡原文（P-132）保留作溯源**：兑现 L.17b / C.23 已声明的端到端 UI 挂账；**不抢 Sprint 首要**（现行首要仍为 `TASK-W.9c`）；不碰 W.9c / orchestrator / AdapterRegistry；**不宣称**端到端闭环。
 >
 > **（P-149 立卡指针 · 保留原文作溯源）** 三项挂账已立卡 [`L.17d`](#task-l.17d) / [`L.17e`](#task-l.17e) / [`L.17f`](#task-l.17f)（当时均 `[NEW_TASK]`）。
-> **（P-150 现行）** 挂账① → [`TASK-L.17d`](./development-tasks-completed.md#task-l.17d) `[COMPLETED]`（[#145](https://github.com/he18718143986-design/IDE/pull/145)/`e2b8dd3`）；挂账②/③仍由 [`L.17e`](#task-l.17e) / [`L.17f`](#task-l.17f) `[NEW_TASK]` 承接。Sprint 首要 → **`TASK-L.17e`**。**仍不宣称**端到端闭环。
+> **（P-150 · 保留作溯源）** 挂账① → [`TASK-L.17d`](./development-tasks-completed.md#task-l.17d) `[COMPLETED]`（[#145](https://github.com/he18718143986-design/IDE/pull/145)/`e2b8dd3`）；挂账②/③当时仍 `[NEW_TASK]`。
+> **（P-151 现行）** 挂账① → [`TASK-L.17d`](./development-tasks-completed.md#task-l.17d) `[COMPLETED]`（[#145](https://github.com/he18718143986-design/IDE/pull/145)/`e2b8dd3`）；挂账② → [`TASK-L.17e`](./development-tasks-completed.md#task-l.17e) `[COMPLETED]`（[#147](https://github.com/he18718143986-design/IDE/pull/147)/`aeedecd`）；挂账③仍由 [`L.17f`](#task-l.17f) `[NEW_TASK]` 承接。Sprint 首要 → **`TASK-L.17f`**。**仍不宣称**端到端闭环。
 
 * **任务编号**：`TASK-L.17c`
 * **任务名称**：中栏方案审阅页嵌入试玩认可提交
@@ -743,94 +744,15 @@
 
 #### 【Task L.17d】L.17a 参考站抓取成果接入 CompareView `snapshots` `[COMPLETED]`
 
-> **归档注记（2026-11-07 · P-150）**：本卡已 COMPLETED（[#145](https://github.com/he18718143986-design/IDE/pull/145)/`e2b8dd3`，squash）。完整卡正文（yaml + 交付清单、默认/未做边界）迁入 [`development-tasks-completed.md` §3.4u](./development-tasks-completed.md#task-l.17d)。**L.17c 挂账①销项**；挂账②/③仍由 L.17e / L.17f 承接。**不宣称**端到端闭环；不碰 W.9。
+> **归档注记（2026-11-07 · P-150）**：本卡已 COMPLETED（[#145](https://github.com/he18718143986-design/IDE/pull/145)/`e2b8dd3`，squash）。完整卡正文（yaml + 交付清单、默认/未做边界）迁入 [`development-tasks-completed.md` §3.4u](./development-tasks-completed.md#task-l.17d)。**L.17c 挂账①销项**。**（P-151）** 挂账② → [`TASK-L.17e`](./development-tasks-completed.md#task-l.17e) `[COMPLETED]`（#147/`aeedecd`）；挂账③仍由 L.17f 承接。**不宣称**端到端闭环；不碰 W.9。
 
 
 <a id="task-l.17e"></a>
 
-#### 【Task L.17e】会话原话候选接入试玩认可框 `[NEW_TASK]`
+#### 【Task L.17e】会话原话候选接入试玩认可框 `[COMPLETED]`
 
-> **立卡（2026-11-07 · P-149）**：兑现 L.17c completed §3.4p 挂账②。仅前端接线；**不**自动填入原话框；用户手点「引用」才写入（既有 UI 行为）。
+> **归档注记（2026-11-07 · P-151）**：本卡已 COMPLETED（[#147](https://github.com/he18718143986-design/IDE/pull/147)/`aeedecd`，squash）。完整卡正文（yaml + 交付清单、默认/未做边界）迁入 [`development-tasks-completed.md` §3.4v](./development-tasks-completed.md#task-l.17e)。**L.17c 挂账②销项**；挂账③仍由 L.17f 承接。**不宣称**端到端闭环；不碰 W.9；不改 PlaytestAcceptBlock。
 
-```yaml task-card
-id: TASK-L.17e
-status: NEW_TASK
-contract:
-  intent:
-    title: 会话原话候选接入试玩认可框
-    description: >-
-      中栏试玩认可区出现来自当前右栏会话的用户原话「引用」候选；默认输入框仍为空，
-      点选后原样写入，禁止把引导文案当候选。
-    risk_level: LOW
-  acceptance:
-    - { id: L17E-P1, check: auto, text: "index 将当前会话 role=user 消息文本（非空）传入 sessionVerbatimCandidates" }
-    - { id: L17E-P2, check: auto, text: "有候选时 DOM 出现 playtest-verbatim-candidates；默认 textarea/input 值为空" }
-    - { id: L17E-P3, check: auto, text: "点引用后输入框值为候选原文（不做摘要/改写）" }
-    - { id: L17E-P4, check: auto, text: "不得把 playtest-guidance / 系统提示文案塞进候选列表" }
-  scheme_item_ids: [acc-6, dec-12]
-  scope:
-    writable_paths:
-      - src/routes/index.tsx
-      - src/lib/journey/**
-      - tests/ui/scheme-review-playtest.test.tsx
-      - tests/unit/session-verbatim-candidates.test.ts
-    readonly_paths:
-      - src/components/studio/PlaytestAcceptBlock.tsx
-      - src/hooks/use-agent-session.ts
-  verification:
-    commands:
-      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/session-verbatim-candidates.test.ts] }
-      - { alias: ui, executable: npx, args: [vitest, run, tests/ui/scheme-review-playtest.test.tsx] }
-design:
-  approach: >-
-    从 useAgentSession()/foldChatEvents 得到的 messages 中筛选 role==="user" 且 trim 非空的 text，
-    经小纯函数（建议 src/lib/journey/session-verbatim-candidates.ts）去重保序后，
-    写入 SchemeReviewPane playtest.sessionVerbatimCandidates。不改 PlaytestAcceptBlock 引用按钮行为；
-    禁止把助手/系统/工具消息或引导常量放入候选。
-  touches:
-    - { path: src/lib/journey/session-verbatim-candidates.ts, change: create, why: 纯函数筛选用户原话, symbols: [selectSessionVerbatimCandidates] }
-    - { path: src/routes/index.tsx, change: modify, why: 接线 chatSession.messages → playtest, symbols: [] }
-    - { path: tests/unit/session-verbatim-candidates.test.ts, change: create, why: 筛选/去重/排除非 user, symbols: [] }
-    - { path: tests/ui/scheme-review-playtest.test.tsx, change: modify, why: 候选渲染与默认空框, symbols: [] }
-  interfaces: []
-  test_plan:
-    - { acceptance_id: L17E-P1, test_path: tests/unit/session-verbatim-candidates.test.ts, level: unit, case: "只收 user 非空原话" }
-    - { acceptance_id: L17E-P2, test_path: tests/ui/scheme-review-playtest.test.tsx, level: unit, case: "候选可见且默认空" }
-    - { acceptance_id: L17E-P3, test_path: tests/ui/scheme-review-playtest.test.tsx, level: unit, case: "引用写入原文" }
-    - { acceptance_id: L17E-P4, test_path: tests/unit/session-verbatim-candidates.test.ts, level: unit, case: "排除 system/assistant/引导" }
-governance:
-  spec_refs:
-    - docs/specs/development-tasks-completed.md#task-l.17c
-    - docs/scheme.md
-  depends_on:
-    - { id: TASK-L.17c, kind: hard }
-  code_facts:
-    - { ref: "src/routes/index.tsx:3623-3631", note: "playtest 未传 sessionVerbatimCandidates" }
-    - { ref: "src/components/studio/PlaytestAcceptBlock.tsx::PlaytestAcceptBlockProps", note: "已留 sessionVerbatimCandidates；有候选才渲染引用按钮" }
-    - { ref: "src/hooks/use-agent-session.ts::foldChatEvents", note: "会话消息已有 role/user 文本，今日未接到试玩块" }
-  non_goals:
-    - 不自动填入原话框、不改 submitPlaytestEvidence 契约
-    - 不做 L.17d snapshots 拉数
-    - 不碰 Daemon / 派工 / W.9
-    - 不宣称端到端闭环
-  fail:
-    - 页面加载即把候选或引导文案写入输入框
-    - 摘要/改写后再提交或再写入输入框
-    - 把 assistant/system 消息当作用户原话候选
-  adr_revisions: []
-  defaults:
-    - "候选 = 当前会话 user 消息原文去重保序；上限实现时可截断但须在测试写死"
-  open_questions: []
-  estimate: S
-  invariants:
-    auth: unchanged
-    demo_origin: unchanged
-    illumination: unchanged
-    gateway_write_scope: unchanged
-```
-
-* **背景**：挂账②——props 已留，index 未灌聊天原话。
-* **取舍**：只接当前会话，不做跨会话历史检索。
 
 <a id="task-l.17f"></a>
 
