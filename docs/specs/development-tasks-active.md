@@ -698,7 +698,8 @@
 >
 > **（P-149 立卡指针 · 保留原文作溯源）** 三项挂账已立卡 [`L.17d`](#task-l.17d) / [`L.17e`](#task-l.17e) / [`L.17f`](#task-l.17f)（当时均 `[NEW_TASK]`）。
 > **（P-150 · 保留作溯源）** 挂账① → [`TASK-L.17d`](./development-tasks-completed.md#task-l.17d) `[COMPLETED]`（[#145](https://github.com/he18718143986-design/IDE/pull/145)/`e2b8dd3`）；挂账②/③当时仍 `[NEW_TASK]`。
-> **（P-151 现行）** 挂账① → [`TASK-L.17d`](./development-tasks-completed.md#task-l.17d) `[COMPLETED]`（[#145](https://github.com/he18718143986-design/IDE/pull/145)/`e2b8dd3`）；挂账② → [`TASK-L.17e`](./development-tasks-completed.md#task-l.17e) `[COMPLETED]`（[#147](https://github.com/he18718143986-design/IDE/pull/147)/`aeedecd`）；挂账③仍由 [`L.17f`](#task-l.17f) `[NEW_TASK]` 承接。Sprint 首要 → **`TASK-L.17f`**。**仍不宣称**端到端闭环。
+> **（P-151 · 保留作溯源）** 挂账①/②已销；挂账③当时仍由 L.17f `[NEW_TASK]` 承接。
+> **（P-152 现行）** 挂账① → [`TASK-L.17d`](./development-tasks-completed.md#task-l.17d) `[COMPLETED]`（[#145](https://github.com/he18718143986-design/IDE/pull/145)/`e2b8dd3`）；挂账② → [`TASK-L.17e`](./development-tasks-completed.md#task-l.17e) `[COMPLETED]`（[#147](https://github.com/he18718143986-design/IDE/pull/147)/`aeedecd`）；挂账③ → [`TASK-L.17f`](./development-tasks-completed.md#task-l.17f) `[COMPLETED]`（[#149](https://github.com/he18718143986-design/IDE/pull/149)/`86da495`）。Sprint 首要 → **在队清零**（下一挂账面为 W.9c §3.4q 四项未销挂账，立卡/排程待 Tina 指定）。**仍不宣称**端到端闭环。
 
 * **任务编号**：`TASK-L.17c`
 * **任务名称**：中栏方案审阅页嵌入试玩认可提交
@@ -744,105 +745,21 @@
 
 #### 【Task L.17d】L.17a 参考站抓取成果接入 CompareView `snapshots` `[COMPLETED]`
 
-> **归档注记（2026-11-07 · P-150）**：本卡已 COMPLETED（[#145](https://github.com/he18718143986-design/IDE/pull/145)/`e2b8dd3`，squash）。完整卡正文（yaml + 交付清单、默认/未做边界）迁入 [`development-tasks-completed.md` §3.4u](./development-tasks-completed.md#task-l.17d)。**L.17c 挂账①销项**。**（P-151）** 挂账② → [`TASK-L.17e`](./development-tasks-completed.md#task-l.17e) `[COMPLETED]`（#147/`aeedecd`）；挂账③仍由 L.17f 承接。**不宣称**端到端闭环；不碰 W.9。
+> **归档注记（2026-11-07 · P-150）**：本卡已 COMPLETED（[#145](https://github.com/he18718143986-design/IDE/pull/145)/`e2b8dd3`，squash）。完整卡正文（yaml + 交付清单、默认/未做边界）迁入 [`development-tasks-completed.md` §3.4u](./development-tasks-completed.md#task-l.17d)。**L.17c 挂账①销项**。**（P-151）** 挂账② → [`TASK-L.17e`](./development-tasks-completed.md#task-l.17e) `[COMPLETED]`（#147/`aeedecd`）。**（P-152）** 挂账③ → [`TASK-L.17f`](./development-tasks-completed.md#task-l.17f) `[COMPLETED]`（#149/`86da495`）。**不宣称**端到端闭环；不碰 W.9。
 
 
 <a id="task-l.17e"></a>
 
 #### 【Task L.17e】会话原话候选接入试玩认可框 `[COMPLETED]`
 
-> **归档注记（2026-11-07 · P-151）**：本卡已 COMPLETED（[#147](https://github.com/he18718143986-design/IDE/pull/147)/`aeedecd`，squash）。完整卡正文（yaml + 交付清单、默认/未做边界）迁入 [`development-tasks-completed.md` §3.4v](./development-tasks-completed.md#task-l.17e)。**L.17c 挂账②销项**；挂账③仍由 L.17f 承接。**不宣称**端到端闭环；不碰 W.9；不改 PlaytestAcceptBlock。
+> **归档注记（2026-11-07 · P-151）**：本卡已 COMPLETED（[#147](https://github.com/he18718143986-design/IDE/pull/147)/`aeedecd`，squash）。完整卡正文（yaml + 交付清单、默认/未做边界）迁入 [`development-tasks-completed.md` §3.4v](./development-tasks-completed.md#task-l.17e)。**L.17c 挂账②销项**。**（P-152）** 挂账③ → [`TASK-L.17f`](./development-tasks-completed.md#task-l.17f) `[COMPLETED]`（#149/`86da495`）。**不宣称**端到端闭环；不碰 W.9；不改 PlaytestAcceptBlock。
 
 
 <a id="task-l.17f"></a>
 
-#### 【Task L.17f】真机/门禁链 `check playtest` 执行债 `[NEW_TASK]`
+#### 【Task L.17f】真机/门禁链 `check playtest` 执行债 `[COMPLETED]`
 
-> **立卡（2026-11-07 · P-149）**：兑现 L.17c completed §3.4p 挂账③与 C.23「装配已兑现、门禁执行链路未实证」。证明北极星合同 verification 真正跑到 playtest 命令且 Fail-Closed；**仍不宣称**产品 e2e 闭环。
-
-```yaml task-card
-id: TASK-L.17f
-status: NEW_TASK
-contract:
-  intent:
-    title: 真机/门禁链 check playtest 执行债
-    description: >-
-      北极星合同在验证/合并门禁链上真实执行 alias=playtest（stagent check playtest），
-      无有效认可证据时不得合并通过；有匹配 release_id 的认可时可过该门禁项。
-    risk_level: HIGH
-  acceptance:
-    - { id: L17F-P1, check: auto, text: "北极为 references[] 非空的合同，verification 结果含 alias=playtest 且曾实际执行（非跳过空转）" }
-    - { id: L17F-P2, check: auto, text: "无 playtest 证据或 STALE_VERSION / UNCONFIRMED 时，该命令 passed=false，合并路径 Fail-Closed" }
-    - { id: L17F-P3, check: auto, text: "非北极星合同 verification 不含 playtest（与 C.23 装配一致）" }
-    - { id: L17F-P4, check: both, text: "本机或 CI 可复现：对一北极星合同跑验证，日志/结果可见 check playtest 出口（真机清单写入 PR）" }
-  scheme_item_ids: [acc-6, dec-12]
-  scope:
-    writable_paths:
-      - daemon/pipeline/orchestrator.ts
-      - daemon/supervisor/preview/**
-      - tests/integration/**
-      - tests/unit/playtest-gate-execution.test.ts
-      - docs/specs/development-tasks-completed.md
-    readonly_paths:
-      - bin/stagent.ts
-      - daemon/supervisor/preview/playtest-guard.ts
-      - src/lib/contract.schema.ts
-  verification:
-    commands:
-      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/playtest-gate-execution.test.ts] }
-      - { alias: integration, executable: npx, args: [vitest, run, tests/integration] }
-design:
-  approach: >-
-    以集成/单元测锁定「verification_spec 中的 playtest 命令进入 orchestrator 验证循环并产生
-    非跳过结果」；必要时仅补 stagent check playtest 的参数装配/工作目录旁路（对标
-    check-knowledge 特殊分支的最小对称处理），**零改** evaluatePlaytestGuard 判定本体与
-    C.23 装配 helper。真机段：PR 附本机命令与出口摘要（合同 id、exit code、status）。
-  touches:
-    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: 若需最小 playtest 执行旁路则改；否则仅被测, symbols: [] }
-    - { path: tests/unit/playtest-gate-execution.test.ts, change: create, why: 门禁执行与 Fail-Closed, symbols: [] }
-    - { path: tests/integration/playtest-gate-execution.test.ts, change: create, why: 真 Daemon/验证链实证, symbols: [] }
-  interfaces: []
-  test_plan:
-    - { acceptance_id: L17F-P1, test_path: tests/unit/playtest-gate-execution.test.ts, level: unit, case: "playtest 非跳过执行" }
-    - { acceptance_id: L17F-P2, test_path: tests/unit/playtest-gate-execution.test.ts, level: unit, case: "无证据 Fail-Closed" }
-    - { acceptance_id: L17F-P3, test_path: tests/unit/playtest-gate-execution.test.ts, level: unit, case: "非北极星无 playtest" }
-    - { acceptance_id: L17F-P4, test_path: tests/integration/playtest-gate-execution.test.ts, level: integration, case: "可复现执行出口", debt: "真机段以 PR 命令摘要为准；无容器/无 LIVE 时集成测可 mock LIVE+证据文件，但不得 skip 冒充通过" }
-governance:
-  spec_refs:
-    - docs/specs/development-tasks-completed.md#task-l.17c
-    - docs/specs/development-tasks-completed.md#task-c.23
-    - docs/scheme.md
-  depends_on:
-    - { id: TASK-L.17c, kind: hard }
-    - { id: TASK-C.23, kind: hard }
-    - { id: TASK-L.17b, kind: hard }
-  code_facts:
-    - { ref: "daemon/pipeline/orchestrator.ts:1035-1100", note: "验证循环会跑 verification_spec.commands；对 check-knowledge 有特殊参数装配，对 playtest 无对等旁路/实证测试" }
-    - { ref: "bin/stagent.ts:630-671", note: "check playtest 子命令已注册并委托 evaluatePlaytestGuard" }
-    - { ref: "docs/specs/development-tasks-completed.md:2339", note: "L.17c 明文挂账③：真机整段 check playtest 执行债" }
-  non_goals:
-    - 不改 playtest-guard 判定逻辑与 dec-12 口径
-    - 不改 C.23 withPlaytestCommand 装配语义
-    - 不销 W.9 四项挂账；不做 L.17d/e
-    - 不宣称端到端产品/UI 闭环
-  fail:
-    - skip/假绿冒充 playtest 已执行
-    - 无证据仍合并通过
-    - 改判定源使非北极星静默 PASS
-  adr_revisions: []
-  defaults:
-    - "优先加测证明既有通用执行路径；仅当实跑缺 contract_id/cwd 时才加最小旁路"
-  open_questions: []
-  estimate: M
-  invariants:
-    auth: unchanged
-    demo_origin: unchanged
-    illumination: unchanged
-    gateway_write_scope: unchanged
-```
-
-* **背景**：C.23 只做装配；挂账③要求执行链实证。
-* **取舍**：不把 L.17d/e UI 拉数塞进本卡。
+> **归档注记（2026-11-07 · P-152）**：本卡已 COMPLETED（[#149](https://github.com/he18718143986-design/IDE/pull/149)/`86da495`，squash）。完整卡正文（yaml + 交付清单、默认/未做边界）迁入 [`development-tasks-completed.md` §3.4w](./development-tasks-completed.md#task-l.17f)。**L.17c 挂账③销项**（L.17c 三项挂账均已销）。**不宣称**端到端闭环；不碰 W.9 四项挂账；零改 playtest-guard / C.23 装配 / bin/stagent。
 
 
 ### 3.4e 台账债立卡（2026-11-01 · NON_BLOCKER · 不抢主序）
