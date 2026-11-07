@@ -11,7 +11,7 @@
 #### 【Task D.1e】桌面壳 / 本机助手：真·选文件夹（Import 与工作台同壳）`[DEFERRED → v0.2+ · P5.8 · 2026-10-24]`
 * **任务编号**：`TASK-D.1e`
 * **前置依赖**：`TASK-D.1d`（建议 v0.2 开工前先完成生产可用单窗口；并行亦须满足 D.1 鉴权）
-* **任务状态**：**[DEFERRED → v0.2+]**（架构路线 **P5.8**；**不阻塞** v0.1 / `TASK-D.1d` / 八步旅程验收；2026-10-24 经 Tina 口径对齐为正式推迟，本轮仅文档占位；**维持 DEFERRED，桌面形态另立 RFC · D-6 / P-141**）
+* **任务状态**：**[DEFERRED → v0.2+]**（架构路线 **P5.8**；**不阻塞** v0.1 / `TASK-D.1d` / 八步旅程验收；2026-10-24 经 Tina 口径对齐为正式推迟；**维持 DEFERRED · D-6 / P-141**；**（P-163）桌面形态 RFC 已立** [`../rfc/desktop-shell-form.md`](../rfc/desktop-shell-form.md)·**未开工 / 待 Tina 拍板**）
 * **对照痛点**：浏览器无法弹出系统级「选任意本地文件夹」；D.1c 只有最近列表；用户仍觉「第一次打开很麻烦」，期望接近 Cursor Open / Import。
 * **v0.1+ 范围（可延后到桌面壳里程碑）**：提供本机助手或 Electron/Tauri（或等价）能力：在**同一产品壳**内「打开项目 / Import / New Project」→ 系统对话框选文件夹或创建空项目 → 自动启动/复用 Daemon 并进入已带钥匙的工作台。安全模型仍落在 D.1：loopback、`#token=` / 安全等价注入、AUTH、Origin；Demo 仍独立 Origin。
 * **明确不包含（本卡立项时仍禁止偷换）**：
@@ -610,7 +610,9 @@
 > **（P-160 · 保留作溯源）** CA-06 文档债对齐完成：卡账/矩阵/active 与代码 `CURSOR_AGENT_VERIFIED_ON` 对齐；§3.4m 挂账 1 销项；挂账清扫序（L.17 → W.9 → macOS CI → CA-06）**收完**。Sprint 首要当时 → **在队清零**（下一张待 Tina 拍板）。**档位不变** `UNCONTROLLED_EXTERNAL`；`verified_on` ≠ 已受控 / 可派工；**不**宣称 Cursor 已受控 / 端到端闭环；不销 OP-34；D.1e / S.3 维持 DEFERRED。
 > **（P-161 · 保留作溯源）** Tina 授权立卡 [`TASK-AUDITED.1`](#task-audited.1) 当时 `[NEW_TASK]`（AUDITED 合同退回待批受控边）。Sprint 首要当时 → **`TASK-AUDITED.1`**（建议序①；实现另开 code PR；本卡不碰桌面形态 RFC）。**立卡≠销项、未开工**；不宣称端到端闭环；不碰 D.1e / S.3；不销 OP-34；不发明产品方向。
 >
-> **（P-162 现行）** [`TASK-AUDITED.1`](./development-tasks-completed.md#task-audited.1) → **`[COMPLETED]`**（[#165](https://github.com/he18718143986-design/IDE/pull/165)/`b390254`）。库层受控边 `AUDITED→PENDING_APPROVAL` + Guard（落点 `PENDING_REVIEW`；`reason=USER_RETURN_TO_PENDING`）已落地；规范 §11.3 / §9.1.1.1 与代码逐字对齐（AR1-P1）；**未**改 orchestrator；生产路径暂无 `USER_RETURN_TO_PENDING` 接线（grep 自证）。Sprint 首要 → **在队清零**（下一张按 Tina 顺序 → **桌面形态 RFC（为 D.1e）**；**不**偷偷开工 D.1e）。**仍不宣称**端到端闭环；不销 OP-34；D.1e / S.3 维持 DEFERRED。
+> **（P-162 · 保留作溯源）** [`TASK-AUDITED.1`](./development-tasks-completed.md#task-audited.1) → **`[COMPLETED]`**（[#165](https://github.com/he18718143986-design/IDE/pull/165)/`b390254`）。库层受控边 `AUDITED→PENDING_APPROVAL` + Guard（落点 `PENDING_REVIEW`；`reason=USER_RETURN_TO_PENDING`）已落地；规范 §11.3 / §9.1.1.1 与代码逐字对齐（AR1-P1）；**未**改 orchestrator；生产路径暂无 `USER_RETURN_TO_PENDING` 接线（grep 自证）。Sprint 首要当时 → **在队清零**（下一张按 Tina 顺序 → **桌面形态 RFC（为 D.1e）**）。**仍不宣称**端到端闭环；不销 OP-34；D.1e / S.3 维持 DEFERRED。
+>
+> **（P-163 现行）** 桌面形态 RFC 已立：[`../rfc/desktop-shell-form.md`](../rfc/desktop-shell-form.md)（基线 [#166](https://github.com/he18718143986-design/IDE/pull/166)/`c097522`）。兑现 D-6/P-141「另立 RFC」；候选 A 本机助手 / B Electron / C Tauri；开放问题 DS-1～DS-6 待 Tina 拍板。**`TASK-D.1e` 维持 `[DEFERRED → v0.2+]`**；**立 RFC ≠ 激活 ≠ 开工**；**不**偷偷开工 D.1e。Sprint 首要 → **桌面形态 RFC 在队 / 待拍板**。**仍不宣称**端到端闭环；不销 OP-34；不激活 S.3；不发明产品方向。
 
 
 
