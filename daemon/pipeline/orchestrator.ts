@@ -631,6 +631,40 @@ export class ContractOrchestrator {
   }
 
   /**
+   * TASK-AUDITED.2：用户显式「退回待批」。
+   * AUDITED + APPROVED → PENDING_APPROVAL + PENDING_REVIEW（reason=USER_RETURN_TO_PENDING）。
+   * 与 approve 同合同排他锁纪律；经 store.transition / validateTransition，禁止旁路。
+   */
+  async returnToPending(
+    contractId: string,
+    _reviewer?: string,
+  ): Promise<SoftwareContract> {
+    return withContractLock(
+      contractLockPath(this.repoRoot, contractId),
+      async () => {
+        const current = this.store.get(contractId);
+        if (!current) throw new Error(`Contract not found: ${contractId}`);
+        if (
+          current.lifecycle_state !== "AUDITED" ||
+          current.approval.status !== "APPROVED"
+        ) {
+          throw new InvalidStateTransitionError(
+            `${current.lifecycle_state}/${current.approval.status}`,
+            ["AUDITED/APPROVED"],
+            "returnToPending",
+          );
+        }
+        return this.store.transition({
+          contractId,
+          lifecycleState: "PENDING_APPROVAL",
+          approvalStatus: "PENDING_REVIEW",
+          transitionContext: { reason: "USER_RETURN_TO_PENDING" },
+        });
+      },
+    );
+  }
+
+  /**
    * TASK-D.2 核心目标 1：审批准入裁决（合同 Scope × 全局保护清单）。
    *
    * - **无交集**：写 `.stagent/silent-contracts.jsonl` 备案后直接自动批准并推进到
