@@ -245,3 +245,5 @@
 > **P-159 · TASK-CI.1 合入回写（2026-11-07 · 非 OP · 保留作溯源）**：基于 `main`@`bf971d5`（[#161](https://github.com/he18718143986-design/IDE/pull/161)）。CI.1 → COMPLETED（§3.4ab）；macOS CI hang 已用抗抖动门禁销（门禁 4 ≤150ms；run 42369070606）；正确性断言未放宽；零改 `daemon/arch/*`。**诚实**：不宣称永久全绿；不销 OP-34；不碰 CA-06。Sprint 首要当时 → **在队清零**（下一挂账面 → **CA-06 文档债**）。仅 docs 回写，不新增 OP；**不**宣称端到端闭环。
 
 > **P-160 · CA-06 文档债对齐（2026-11-07 · 非 OP）**：基于 `main`@`c8ebbc3`（[#162](https://github.com/he18718143986-design/IDE/pull/162)）。**卡账/矩阵已与代码 `verified_on` 对齐**：`CURSOR_AGENT_VERIFIED_ON = { cli_version: "2026.10.22-27dcf5f", verified_at: "2026-11-05" }`；§3.4m 挂账 1 销项（保留 P-125 原文）。引用既有「CA-06 销项注记（2026-11-05 · 非 OP）」与 README「CA-06 实测通过」注记（run 41959697673）——**不重复造假证据**。**档位不变** `UNCONTROLLED_EXTERNAL`；`verified_on` ≠ 已受控 / 可派工；**不**宣称 Cursor 已受控。挂账清扫序收完；Sprint → **在队清零**（下一张待 Tina 拍板）。仅 docs 对齐，不新增 OP；不销 OP-34。
+
+> **P-161 · TASK-AUDITED.1 立卡（2026-11-07 · 非 OP）**：Tina 授权立卡 `TASK-AUDITED.1`（`[NEW_TASK]`）兑现 Sprint「AUDITED 退回待批为另立议题」；受控边 `AUDITED→PENDING_APPROVAL` + `PENDING_REVIEW` Guard；**立卡≠销项**；Sprint 首要 → AUDITED.1；不新增 OP；不宣称闭环；不碰 D.1e/S.3；不销 OP-34。同步矩阵 / index / active yaml 卡 / changelog。
