@@ -26,7 +26,8 @@ const EXPECTED_EDGES: Record<LifecycleState, readonly LifecycleState[]> = {
   // §9.1.1.1 C-07：Worktree 丢失自愈回 PREPARING
   PENDING_RESUME: ["EXECUTING", "PREPARING", "ABORTED"],
   // §9.1.1.1 C-08：外部改码级联降级回 VERIFYING
-  AUDITED: ["MERGED", "EXECUTING", "VERIFYING", "ABORTED"],
+  // TASK-AUDITED.1：用户显式退回待批（带 Guard：PENDING_REVIEW + USER_RETURN_TO_PENDING）
+  AUDITED: ["MERGED", "EXECUTING", "VERIFYING", "PENDING_APPROVAL", "ABORTED"],
   MERGED: [],
   ABORTED: [],
 };
@@ -159,6 +160,7 @@ describe("C-07 自愈边与 C-08 降级边的触发原因", () => {
     for (const reason of [
       "EXTERNAL_MUTATION",
       "FAST_PATH_ADMISSION",
+      "USER_RETURN_TO_PENDING",
       undefined,
     ] as const) {
       const result =
@@ -175,7 +177,11 @@ describe("C-07 自愈边与 C-08 降级边的触发原因", () => {
         reason: "EXTERNAL_MUTATION",
       }).ok,
     ).toBe(true);
-    for (const reason of ["WORKTREE_MISSING_HEAL", undefined] as const) {
+    for (const reason of [
+      "WORKTREE_MISSING_HEAL",
+      "USER_RETURN_TO_PENDING",
+      undefined,
+    ] as const) {
       const result =
         reason === undefined
           ? validateTransition(audited, verifying)
@@ -192,6 +198,54 @@ describe("C-07 自愈边与 C-08 降级边的触发原因", () => {
     if (!result.ok) {
       expect(result.code).toBe("ILLEGAL_TRANSITION");
     }
+  });
+});
+
+describe("TASK-AUDITED.1：AUDITED → PENDING_APPROVAL 退回待批", () => {
+  const audited: ContractStatePair = {
+    lifecycle_state: "AUDITED",
+    approval_status: "APPROVED",
+  };
+  const pending: ContractStatePair = {
+    lifecycle_state: "PENDING_APPROVAL",
+    approval_status: "PENDING_REVIEW",
+  };
+
+  it("结构边存在：canTransition(AUDITED, PENDING_APPROVAL) === true", () => {
+    expect(canTransition("AUDITED", "PENDING_APPROVAL")).toBe(true);
+  });
+
+  it("正例：落点 PENDING_REVIEW + reason=USER_RETURN_TO_PENDING", () => {
+    expect(
+      validateTransition(audited, pending, {
+        reason: "USER_RETURN_TO_PENDING",
+      }).ok,
+    ).toBe(true);
+  });
+
+  it("负例：落点仍 APPROVED / 缺 reason / 错 reason 拒绝", () => {
+    const stillApproved = validateTransition(
+      audited,
+      {
+        lifecycle_state: "PENDING_APPROVAL",
+        approval_status: "APPROVED",
+      },
+      { reason: "USER_RETURN_TO_PENDING" },
+    );
+    expect(stillApproved.ok).toBe(false);
+    if (!stillApproved.ok) {
+      expect(stillApproved.code).toBe("ILLEGAL_TRANSITION");
+      expect(stillApproved.message).toContain("PENDING_REVIEW");
+    }
+
+    expect(validateTransition(audited, pending).ok).toBe(false);
+    expect(
+      validateTransition(audited, pending, { reason: "EXTERNAL_MUTATION" }).ok,
+    ).toBe(false);
+  });
+
+  it("负例：AUDITED → PREPARING 仍不在表内", () => {
+    expect(canTransition("AUDITED", "PREPARING")).toBe(false);
   });
 });
 

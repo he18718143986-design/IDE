@@ -415,6 +415,85 @@ describe("§9.1.1.1 v1.3.0 受控边（TASK-0.2c）", () => {
   });
 });
 
+describe("§9.1.1.1 TASK-AUDITED.1：AUDITED → PENDING_APPROVAL 退回待批", () => {
+  const AUDITED_PAIR: ContractStatePair = {
+    lifecycle_state: "AUDITED",
+    approval_status: "APPROVED",
+  };
+  const PENDING_PAIR: ContractStatePair = {
+    lifecycle_state: "PENDING_APPROVAL",
+    approval_status: "PENDING_REVIEW",
+  };
+  const PREPARING_PAIR: ContractStatePair = {
+    lifecycle_state: "PREPARING",
+    approval_status: "APPROVED",
+  };
+
+  it("正例：AUDITED+APPROVED → PENDING_APPROVAL+PENDING_REVIEW + USER_RETURN_TO_PENDING 合法", () => {
+    const result = validateTransition(AUDITED_PAIR, PENDING_PAIR, {
+      reason: "USER_RETURN_TO_PENDING",
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("负例：落点仍 APPROVED 被拒绝（Fail-Closed，不得静默授权）", () => {
+    const result = validateTransition(
+      AUDITED_PAIR,
+      {
+        lifecycle_state: "PENDING_APPROVAL",
+        approval_status: "APPROVED",
+      },
+      { reason: "USER_RETURN_TO_PENDING" },
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("ILLEGAL_TRANSITION");
+      expect(result.message).toContain("PENDING_REVIEW");
+    }
+  });
+
+  it("负例：缺 reason / 错 reason 一律拒绝", () => {
+    const missing = validateTransition(AUDITED_PAIR, PENDING_PAIR);
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) {
+      expect(missing.code).toBe("ILLEGAL_TRANSITION");
+      expect(missing.message).toContain("USER_RETURN_TO_PENDING");
+    }
+
+    for (const reason of [
+      "EXTERNAL_MUTATION",
+      "WORKTREE_MISSING_HEAL",
+      "FAST_PATH_ADMISSION",
+    ] as const) {
+      const wrong = validateTransition(AUDITED_PAIR, PENDING_PAIR, { reason });
+      expect(wrong.ok, `reason=${reason} 必须被拒绝`).toBe(false);
+      if (!wrong.ok) {
+        expect(wrong.code).toBe("ILLEGAL_TRANSITION");
+      }
+    }
+  });
+
+  it("负例：AUDITED → PREPARING 仍非法（退回待批不得拓宽为跳回 PREPARING）", () => {
+    const result = validateTransition(AUDITED_PAIR, PREPARING_PAIR, {
+      reason: "USER_RETURN_TO_PENDING",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("ILLEGAL_TRANSITION");
+    }
+  });
+
+  it("配对矩阵：退回待批后 PENDING_APPROVAL↔PENDING_REVIEW 成立", () => {
+    const result = validateTransition(AUDITED_PAIR, PENDING_PAIR, {
+      reason: "USER_RETURN_TO_PENDING",
+    });
+    expect(result.ok).toBe(true);
+    // 落点本身必须是合法组合（validateTransition 末步已走 validateStatePair）
+    expect(PENDING_PAIR.lifecycle_state).toBe("PENDING_APPROVAL");
+    expect(PENDING_PAIR.approval_status).toBe("PENDING_REVIEW");
+  });
+});
+
 describe("§6.3.1 展示状态矩阵的 lifecycle 必须存在于状态机枚举", () => {
   it("15 展示态表格使用的每个 lifecycle 都是合法枚举值", () => {
     // 规范 §6.3.1「CI 不变式门禁」：防止展示层悄悄引用底层已废弃的状态名

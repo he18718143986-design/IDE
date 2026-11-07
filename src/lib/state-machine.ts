@@ -127,11 +127,14 @@ export function validateStatePair(pair: ContractStatePair): ValidationResult {
 export const FAST_PATH_APPROVER = "system:fast-path" as const;
 
 /**
- * 受控跃迁的触发原因（§9.1.1.1 C-02 / C-07 / C-08）。
+ * 受控跃迁的触发原因（§9.1.1.1 C-02 / C-07 / C-08 / TASK-AUDITED.1）。
  * 这些边不是通用回边：缺少对应原因时必须 Fail-Closed，避免被当成捷径。
  */
 export type TransitionReason =
-  "FAST_PATH_ADMISSION" | "WORKTREE_MISSING_HEAL" | "EXTERNAL_MUTATION";
+  | "FAST_PATH_ADMISSION"
+  | "WORKTREE_MISSING_HEAL"
+  | "EXTERNAL_MUTATION"
+  | "USER_RETURN_TO_PENDING";
 
 /**
  * 受控跃迁的上下文事实。
@@ -177,8 +180,9 @@ export const LIFECYCLE_TRANSITIONS: Readonly<
   VERIFYING: ["AUDITED", "EXECUTING", "PENDING_RESUME", "ABORTED"],
   // 用户显式续跑；或 Worktree 丢失时自愈重建（§9.1.1.1 C-07，带 Guard）；或放弃
   PENDING_RESUME: ["EXECUTING", "PREPARING", "ABORTED"],
-  // 用户核销合并；Evidence 失效需重新验证；外部改码级联降级（§9.1.1.1 C-08，带 Guard）；或放弃
-  AUDITED: ["MERGED", "EXECUTING", "VERIFYING", "ABORTED"],
+  // 用户核销合并；Evidence 失效需重新验证；外部改码级联降级（§9.1.1.1 C-08，带 Guard）；
+  // 用户显式退回待批（§9.1.1.1 / TASK-AUDITED.1，带 Guard）；或放弃
+  AUDITED: ["MERGED", "EXECUTING", "VERIFYING", "PENDING_APPROVAL", "ABORTED"],
   // 终态
   MERGED: [],
   ABORTED: [],
@@ -194,13 +198,15 @@ export function canTransition(
 /**
  * 逐边附加约束：某些跃迁除了「边存在」还要求落点组合满足额外条件。
  *
- * 三类：
+ * 四类：
  * 1. PREPARING → PENDING_APPROVAL：§9.1.1 要求同时把 approval.status 回置为
  *    PENDING_REVIEW，只有用户再次确认才能重建 Worktree；
  * 2. DRAFT → PREPARING：Fast Path 专用（§9.1.1.1 C-02），必须持有
  *    `system:fast-path` 审批凭证且风险等级为 LOW；
  * 3. PENDING_RESUME → PREPARING 与 AUDITED → VERIFYING：自愈/降级专用
- *    （§9.1.1.1 C-07 / C-08），必须携带对应触发原因。
+ *    （§9.1.1.1 C-07 / C-08），必须携带对应触发原因；
+ * 4. AUDITED → PENDING_APPROVAL：用户显式退回待批（TASK-AUDITED.1），必须
+ *    落点 approval.status=PENDING_REVIEW，且 reason=USER_RETURN_TO_PENDING。
  *
  * Guard 一律 Fail-Closed：上下文缺省即视为条件不成立。
  */
@@ -264,6 +270,28 @@ const EDGE_GUARDS: Partial<
             `(§9.1.1.1 C-08), got ${context.reason ?? "unset"}. ` +
             `Evidence must be marked STALE in the same atomic step.`,
         },
+
+  "AUDITED->PENDING_APPROVAL": (to, context) => {
+    if (to.approval_status !== "PENDING_REVIEW") {
+      return {
+        ok: false,
+        code: "ILLEGAL_TRANSITION",
+        message:
+          "AUDITED -> PENDING_APPROVAL must reset approval.status to " +
+          `PENDING_REVIEW (§9.1.1 / TASK-AUDITED.1), got ${to.approval_status}`,
+      };
+    }
+    if (context.reason !== "USER_RETURN_TO_PENDING") {
+      return {
+        ok: false,
+        code: "ILLEGAL_TRANSITION",
+        message:
+          `AUDITED -> PENDING_APPROVAL requires reason="USER_RETURN_TO_PENDING" ` +
+          `(§9.1.1.1 / TASK-AUDITED.1), got ${context.reason ?? "unset"}`,
+      };
+    }
+    return null;
+  },
 };
 
 /**
@@ -275,8 +303,8 @@ const EDGE_GUARDS: Partial<
  * 3. 边附加约束不满足 → ILLEGAL_TRANSITION；
  * 4. 落点组合违反 §9.1.1 → ILLEGAL_STATE_PAIR。
  *
- * `context` 只对三条受控边（DRAFT→PREPARING、PENDING_RESUME→PREPARING、
- * AUDITED→VERIFYING）有影响；其余边忽略。
+ * `context` 只对四条受控边（DRAFT→PREPARING、PENDING_RESUME→PREPARING、
+ * AUDITED→VERIFYING、AUDITED→PENDING_APPROVAL）有影响；其余边忽略。
  */
 export function validateTransition(
   from: ContractStatePair,
