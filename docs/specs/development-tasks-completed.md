@@ -2327,7 +2327,8 @@
 - **后续挂账（W.9b 四项，仍未销项、不新增 OP）**：① `WorkerRegistrationService.builtinView()` / `storedView()` 为行投影构造 Docker host 并可能探测可用性，行数增长的 probe 成本与副作用仍待评估；② `isControlledDispatchable()` 仍捕获拒绝并仅返回 boolean，虽然部分服务层视图单独补有说明，API 诊断仍可能丢失具体拒绝原因；③ `LLM_API_KEY`、`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`CURSOR_API_KEY` 仍可能通过允许的容器 env 被容器内进程读取，日志脱敏不改变此事实；④ Cursor CLI 镜像与运行协议仍未实证，generic 容器桥不代表 Cursor 可执行。详情沿用 W.9b 归档 §3.4o。
 - **边界**：W.9 母卡仍以 `[SPLIT]` 保留拆分追溯；三张子卡 W.9a/b/c 均已 COMPLETED，母卡实质闭合。不得把四条 W.9b 挂账写作已解决；Cursor 保持 fail-closed。
 > **（P-153 立卡指针 · 保留原文作溯源）**：挂账①→[`TASK-W.9d`](./development-tasks-active.md#task-w.9d) `[NEW_TASK]`；挂账②→[`TASK-W.9e`](./development-tasks-active.md#task-w.9e) `[NEW_TASK]`；挂账③→[`TASK-W.9f`](./development-tasks-active.md#task-w.9f) `[NEW_TASK]`；挂账④→[`TASK-W.9g`](./development-tasks-active.md#task-w.9g) `[NEW_TASK]`。**立卡≠销项、未开工、不宣称闭环**。
-> **（P-154 现行）**：挂账① → [`TASK-W.9d`](#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账② → [`TASK-W.9e`](./development-tasks-active.md#task-w.9e) `[NEW_TASK]`；挂账③ → [`TASK-W.9f`](./development-tasks-active.md#task-w.9f) `[NEW_TASK]`；挂账④ → [`TASK-W.9g`](./development-tasks-active.md#task-w.9g) `[NEW_TASK]`。**挂账①已销（P-154 · W.9d）**；②③④仍立卡未销。**仍不宣称**端到端闭环。
+> **（P-154 · 保留作溯源）**：挂账① → [`TASK-W.9d`](#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账②/③/④当时仍立卡未销。
+> **（P-155 现行）**：挂账① → [`TASK-W.9d`](#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账② → [`TASK-W.9e`](#task-w.9e) `[COMPLETED]`（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`）；挂账③ → [`TASK-W.9f`](./development-tasks-active.md#task-w.9f) `[NEW_TASK]`；挂账④ → [`TASK-W.9g`](./development-tasks-active.md#task-w.9g) `[NEW_TASK]`。**挂账①②已销（P-154 · W.9d；P-155 · W.9e）**；③④仍立卡未销。**仍不宣称**端到端闭环。
 
 
 ### 3.4p 中栏方案审阅页嵌入试玩认可提交（L.17c · 产品验收挂账）
@@ -4626,7 +4627,7 @@ governance:
 - **状态与证据**：`[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de26bf6a34d8377039eb26d71ef6bf506a8`，squash；基线 #151/`2115d5d` P-153 立卡之后）。
 - **交付**：`daemon/worker/verify/worker-registration-service.ts` 新增服务实例单例 `resolveSharedContainerHost()`：仅 **SANDBOX** 行投影解析共享宿主（`list`/`get` 同轮次 `createContainerHost` 至多一次）；**GATEWAY / UNCONTROLLED** 行不构造 host。宿主真实不可用时仍 `dispatchable=false`（不因缓存放行）。新增 `tests/unit/worker-registration-probe-cost.test.ts`（W9D 4/4）；相关回归 61/61；`tsc` 0。**零改** `docker-container-host.ts` / docs / W.9e–g。
 - **销项**：兑现 W.9c completed §3.4q **挂账①**（行投影 Docker host probe 成本）。挂账②/③/④仍由 W.9e/f/g 承接。
-- **残余 / 默认未做（不宣称关闭）**：① 不改 `isControlledDispatchable` 吞码（→ [`TASK-W.9e`](./development-tasks-active.md#task-w.9e)）；② 不改容器 env 明文 key（→ [`TASK-W.9f`](./development-tasks-active.md#task-w.9f)）；③ 不做 Cursor 容器协议实证（→ [`TASK-W.9g`](./development-tasks-active.md#task-w.9g)）；④ **不**宣称端到端产品闭环。
+- **残余 / 默认未做（不宣称关闭）**：① 不改 `isControlledDispatchable` 吞码 → [`TASK-W.9e`](#task-w.9e) `[COMPLETED]`（P-155 · #154/`5d3d55b`）；② 不改容器 env 明文 key（→ [`TASK-W.9f`](./development-tasks-active.md#task-w.9f)）；③ 不做 Cursor 容器协议实证（→ [`TASK-W.9g`](./development-tasks-active.md#task-w.9g)）；④ **不**宣称端到端产品闭环。
 - **边界**：**窄口径**——服务级单例共享 SANDBOX 宿主探测；门禁语义零放宽；无 e2e 闭环宣称。
 
 ```yaml task-card
@@ -4702,3 +4703,94 @@ governance:
   delivered: { pr: 152, commit: f5577de26bf6a34d8377039eb26d71ef6bf506a8 }
 ```
 
+
+### 3.4y 受控派工拒绝码穿透诊断（W.9e · W.9c 挂账②）
+
+<a id="task-w.9e"></a>
+
+#### 【Task W.9e】受控派工拒绝码穿透诊断 `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55bb13383cb30265f80df4dd489120bbf9d9`，squash；基线 #153/`f4b4b17` P-154 回写之后）。
+- **交付**：`daemon/worker/worker-dispatch.ts` 新增 `diagnoseControlledDispatch()` 为单一判定/诊断源；`requireControlledDispatch` / `isControlledDispatchable` 薄封装其上（同源、门禁零放宽）。`WorkerView` 可选字段 `dispatch_blocked_code`；`builtinView` / `storedView` 在 `dispatchable=false` 时带回与 `WorkerDispatchError.code` 同源的 machine-readable 拒绝码。新增 `tests/unit/worker-dispatch-diagnostic.test.ts`（W9E-P1～P4）；相关回归 62/62；`tsc` 0。**零改** `daemon/server.ts`（API 已回传 WorkerView）/ docs / W.9f–g。
+- **销项**：兑现 W.9c completed §3.4q **挂账②**（boolean helper 吞拒绝码；API 诊断信息面收窄）。挂账③/④仍由 W.9f/g 承接。
+- **残余 / 默认未做（不宣称关闭）**：① 不改容器 env 明文 key（→ [`TASK-W.9f`](./development-tasks-active.md#task-w.9f)）；② 不做 Cursor 容器协议实证（→ [`TASK-W.9g`](./development-tasks-active.md#task-w.9g)）；③ **不**宣称端到端产品闭环；④ 不放宽 `requireControlledDispatch` / 档位语义。
+- **边界**：**窄口径**——只穿透拒绝码诊断；boolean 语义保留；门禁放行条件零放宽；无 e2e 闭环宣称。
+
+```yaml task-card
+id: TASK-W.9e
+status: COMPLETED
+contract:
+  intent:
+    title: 受控派工拒绝码穿透诊断
+    description: >-
+      API/WorkerView 在派工被拒时能暴露与 requireControlledDispatch 同源的具体拒绝码
+      （如 E_ADAPTER_NOT_CONTROLLED / E_ADAPTER_SANDBOX_LOCKED / 缺工厂等），
+      不再仅因 isControlledDispatchable 吞异常而只剩泛化文案。
+    risk_level: LOW
+  acceptance:
+    - { id: W9E-P1, check: auto, text: "对可控负例（未注册 / UNCONTROLLED / SANDBOX 无宿主 / 缺工厂），诊断结果含稳定 machine-readable 拒绝码，与 requireControlledDispatch 抛出的 WorkerDispatchError.code 一致或可映射" }
+    - { id: W9E-P2, check: auto, text: "GET /api/workers（或现行 WorkerView 序列化）在 dispatchable=false 时带回该码（字段名在卡内测试写死；可新增可选字段，不得破坏旧客户端必填契约）" }
+    - { id: W9E-P3, check: auto, text: "isControlledDispatchable 若保留 boolean 语义，不得再作为 API 唯一诊断源；门禁放行条件零放宽" }
+    - { id: W9E-P4, check: auto, text: "单测覆盖至少三类不同拒绝码可区分" }
+  scheme_item_ids: [gap-14]
+  scope:
+    writable_paths:
+      - daemon/worker/worker-dispatch.ts
+      - daemon/worker/verify/worker-registration-service.ts
+      - tests/unit/worker-dispatch-diagnostic.test.ts
+    readonly_paths:
+      - daemon/server.ts
+      - daemon/worker/adapter-registry.ts
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/worker-dispatch-diagnostic.test.ts] }
+design:
+  approach: >-
+    diagnoseControlledDispatch 为单一判定源；requireControlledDispatch / isControlledDispatchable
+    薄封装；WorkerView 可选 dispatch_blocked_code；builtinView/storedView 接线。零改 server.ts。
+  touches:
+    - { path: daemon/worker/worker-dispatch.ts, change: modify, why: 诊断助手暴露拒绝码, symbols: [diagnoseControlledDispatch, requireControlledDispatch, isControlledDispatchable] }
+    - { path: daemon/worker/verify/worker-registration-service.ts, change: modify, why: 行投影/API 带出 code, symbols: [builtinView, storedView] }
+    - { path: tests/unit/worker-dispatch-diagnostic.test.ts, change: create, why: 多码可区分, symbols: [] }
+  interfaces:
+    - name: WorkerView.dispatch_blocked_code
+      kind: type
+      signature: "optional string error code when dispatchable=false"
+      consumers: []
+  test_plan:
+    - { acceptance_id: W9E-P1, test_path: tests/unit/worker-dispatch-diagnostic.test.ts, level: unit, case: "W9E-P1: 拒绝码与 requireControlledDispatch 同源（未注册 / 非受控 / 无工厂 / 沙箱锁 / 无执行器）" }
+    - { acceptance_id: W9E-P2, test_path: tests/unit/worker-dispatch-diagnostic.test.ts, level: unit, case: "W9E-P2: View/API 在 dispatchable=false 时带回 dispatch_blocked_code" }
+    - { acceptance_id: W9E-P3, test_path: tests/unit/worker-dispatch-diagnostic.test.ts, level: unit, case: "W9E-P3: 门禁条件不放宽——boolean 与 diagnose/require 一致，放行仍需完整条件" }
+    - { acceptance_id: W9E-P4, test_path: tests/unit/worker-dispatch-diagnostic.test.ts, level: unit, case: "W9E-P4: 三类以上拒绝码可区分（NOT_CONTROLLED / SANDBOX_LOCKED / NO_DISPATCH_FACTORY）" }
+governance:
+  spec_refs:
+    - docs/specs/development-tasks-completed.md#task-w.9c
+    - docs/specs/development-tasks-completed.md#task-w.9b
+  depends_on:
+    - { id: TASK-W.9c, kind: hard }
+    - { id: TASK-W.9b, kind: hard }
+  code_facts:
+    - { ref: "daemon/worker/worker-dispatch.ts::diagnoseControlledDispatch", note: "单一判定/诊断源；返回 ok+factory 或 ok:false+code" }
+    - { ref: "daemon/worker/worker-dispatch.ts::requireControlledDispatch", note: "薄封装 diagnose；失败抛带 .code 的 WorkerDispatchError" }
+    - { ref: "daemon/worker/worker-dispatch.ts::isControlledDispatchable", note: "薄封装 diagnose.ok；保留 boolean 语义" }
+    - { ref: "daemon/worker/verify/worker-registration-service.ts::builtinView", note: "dispatch_blocked_code 可选；dispatchable=false 时带回同源 code" }
+    - { ref: "docs/specs/development-tasks-completed.md:2327", note: "§3.4q 挂账②：boolean helper 吞拒绝；API 诊断可能丢具体原因" }
+  non_goals:
+    - 不放宽 requireControlledDispatch / 不改档位语义
+    - 不做 probe 成本收敛（W.9d 已销）/ env 明文（W.9f）/ Cursor 实证（W.9g）
+    - 不宣称端到端闭环
+  fail:
+    - 为「好看」把拒绝改成可派工
+    - 伪造与门禁不一致的成功码
+  adr_revisions: []
+  defaults:
+    - "新增可选字段优于改写既有 reason 字符串为唯一真相"
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 154, commit: 5d3d55bb13383cb30265f80df4dd489120bbf9d9 }
+```

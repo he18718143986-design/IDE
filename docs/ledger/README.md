@@ -231,3 +231,10 @@
 - **销项**：兑现 W.9c §3.4q **挂账①**。挂账②/③/④仍立卡未销。
 - **Sprint**：当前首要 → `TASK-W.9e`（序 e→f→g）。不宣称端到端闭环；不新增 OP。
 - **物理 tip**：`f5577de`（#152）。
+
+### TASK-W.9e（P-155 · 2026-11-07 · 非 OP）
+
+- **状态回写**：W.9e 已 COMPLETED（PR [#154](https://github.com/he18718143986-design/IDE/pull/154) / `5d3d55b`）；`diagnoseControlledDispatch` 单一判定源；require/is 薄封装；`dispatch_blocked_code` 可选；builtinView/storedView 接线；diagnostic 4/4；零改 server.ts。
+- **销项**：兑现 W.9c §3.4q **挂账②**。挂账①②已销；③④仍立卡未销。
+- **Sprint**：当前首要 → `TASK-W.9f`（序 f→g）。不宣称端到端闭环；不新增 OP。
+- **物理 tip**：`5d3d55b`（#154）。
