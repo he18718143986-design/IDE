@@ -318,8 +318,10 @@
 - **Sprint**：首要 → **在队清零**（无 READY；下一张待 Tina 拍板）。
 - **基线**：`main`@`eacd101`（#174）；立卡 #173/`2a7c404` P-168。
 
-### TASK-AUDITED.2（P-170 · 2026-11-08 · 非 OP）
+### TASK-AUDITED.2（P-170 立卡 · P-171 回写 · 2026-11-08 · 非 OP）
 
-- **立卡**：Tina 授权立卡 `TASK-AUDITED.2`（AUDITED 退回待批生产接线 · `[NEW_TASK]`）。兑现 AUDITED.1 残留①：orchestrator `returnToPending` + `POST /api/contracts/:id/return-to-pending` + daemon-api + ContractCard「退回待批」；仅 AUDITED+APPROVED；走 `USER_RETURN_TO_PENDING`。
-- **Sprint**：当前首要 → `TASK-AUDITED.2`。立卡 ≠ 开工；实现另开 code PR；不宣称端到端闭环；不碰 D.1e/S.3；不销 OP-34；不新增 OP；不发明产品方向；不做 DS-6 DoR。
-- **物理 tip**：立卡基线 docs `297c6ac`（#175 P-169）；代码 tip 仍 `eacd101`（#174）。
+- **立卡（P-170 · 保留作溯源）**：Tina 授权立卡 `TASK-AUDITED.2`（AUDITED 退回待批生产接线 · 当时 `[NEW_TASK]`）。兑现 AUDITED.1 残留①。
+- **回写（P-171）**：`TASK-AUDITED.2` → `[COMPLETED]`（[#178](https://github.com/he18718143986-design/IDE/pull/178)/`71684d4`；见 completed §3.4af）。交付：`returnToPending` + `POST .../return-to-pending` + `returnContractToPending` + ContractCard「退回待批」；本机 24 passed；ubuntu+macOS CI 绿。
+- **诚实口径**：#178 合入时 `src/routes/index.tsx` 父级 `onReturnToPending` **未接线**（卡外；按卡停工）。Tina 已授权 follow-up code PR 补接线（**进行中**）——**非**永久挂账、**不**另立产品卡；**不**宣称端到端闭环 / e2e；不销 OP-34。
+- **Sprint**：首要 → **在队清零**（无 READY；父级接线 follow-up 进行中；下一张待 Tina 拍板）。不碰 D.1e/S.3；不做 DS-6 DoR；不新增 OP；不改产品代码（本条 docs）。
+- **物理 tip**：代码 tip `71684d4`（#178）；立卡 docs tip `7d9fc2b`（#177 P-170）；P-171 docs 本 PR。
