@@ -73,8 +73,10 @@ describe("TASK-DS.1 POST /api/desktop/pick-folder (DS1-P2 / DS1-P5)", () => {
   async function boot() {
     daemon = createDaemon({
       repoRoot: repo,
-      startPort: 3651,
-      endPort: 3670,
+      // 端口必须与 chat-session.test.ts（3646–3655）错开：曾用 3651–3670 与之重叠，
+      // 被 test-port-map 检出。固定到 3656–3675（chat 之后、contract-api 3680 之前）。
+      startPort: 3656,
+      endPort: 3675,
       consolePublicDir: null,
     });
     return daemon.start();
