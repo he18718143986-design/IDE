@@ -263,10 +263,11 @@ export function createDefaultWorkerRegistry(): AdapterRegistry {
   // 登记 Claude Code worker，但明确标为非受控、不挂派工工厂（红线）
   registry.register(claudeCodeWorkerRegistration(), "UNCONTROLLED_EXTERNAL");
 
-  // TASK-W.5b：登记 cursor-agent worker。档位是**结构性上界**而不是「还没测出来」：
-  // 严格档要求 tool_interception_supported === true（本进程无拦截点），沙箱档要求
-  // 派工经 runInSandbox() 并携 SandboxWitness（宿主进程不经该入口）——故唯一合法
-  // 档位是 UNCONTROLLED_EXTERNAL，且不挂派工工厂（派工恒被门禁拒绝）。
+  // TASK-W.5b + TASK-W.9g：登记 cursor-agent worker。档位是**结构性上界**而不是
+  // 「还没测出来」：严格档要求 tool_interception_supported === true（本进程无拦截点），
+  // 沙箱档要求派工经 runInSandbox() 并携 SandboxWitness——故唯一合法档位是
+  // UNCONTROLLED_EXTERNAL。W.9g 容器协议未 empirically_verified 前不挂派工工厂
+  // （不得冒充可派工）；宿主 CA-06 verified_on ≠ 容器协议实证。
   registry.register(new CursorAgentAdapter(), "UNCONTROLLED_EXTERNAL");
 
   // TASK-W.5c-iii：登记 OpenHands 容器 Worker。档位按「是否已有实测记录」判定：
