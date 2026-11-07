@@ -599,7 +599,9 @@
 >
 > **（P-155 · 保留作溯源）** 挂账① → [`TASK-W.9d`](./development-tasks-completed.md#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账② → [`TASK-W.9e`](./development-tasks-completed.md#task-w.9e) `[COMPLETED]`（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`）；挂账③/④当时仍由 W.9f/g `[NEW_TASK]` 承接；Sprint 首要当时 → `TASK-W.9f`。
 >
-> **（P-156 现行）** 挂账① → [`TASK-W.9d`](./development-tasks-completed.md#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账② → [`TASK-W.9e`](./development-tasks-completed.md#task-w.9e) `[COMPLETED]`（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`）；挂账③ → [`TASK-W.9f`](./development-tasks-completed.md#task-w.9f) `[COMPLETED]`（[#156](https://github.com/he18718143986-design/IDE/pull/156)/`b92accc`）；挂账④仍由 [`W.9g`](#task-w.9g) `[NEW_TASK]` 承接。Sprint 首要 → **`TASK-W.9g`**。**仍不宣称**端到端闭环。
+> **（P-156 · 保留作溯源）** 挂账① → [`TASK-W.9d`](./development-tasks-completed.md#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账② → [`TASK-W.9e`](./development-tasks-completed.md#task-w.9e) `[COMPLETED]`（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`）；挂账③ → [`TASK-W.9f`](./development-tasks-completed.md#task-w.9f) `[COMPLETED]`（[#156](https://github.com/he18718143986-design/IDE/pull/156)/`b92accc`）；挂账④当时仍由 W.9g `[NEW_TASK]` 承接；Sprint 首要当时 → `TASK-W.9g`。
+>
+> **（P-157 现行）** 挂账① → [`TASK-W.9d`](./development-tasks-completed.md#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账② → [`TASK-W.9e`](./development-tasks-completed.md#task-w.9e) `[COMPLETED]`（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`）；挂账③ → [`TASK-W.9f`](./development-tasks-completed.md#task-w.9f) `[COMPLETED]`（[#156](https://github.com/he18718143986-design/IDE/pull/156)/`b92accc`）；挂账④ → [`TASK-W.9g`](./development-tasks-completed.md#task-w.9g) `[COMPLETED]`（[#158](https://github.com/he18718143986-design/IDE/pull/158)/`691b8b8`）。**四项挂账均已销**；④口径=**钉协议 + fail-closed + 失败留证**（`empirically_verified=false`），**≠ Cursor 已受控 / 可派工**；真跑容器仍待 KEY+Docker。Sprint 首要 → **在队清零**（下一挂账面为 macOS CI → CA-06，按 Tina 授权序；不发明产品方向）。**仍不宣称**端到端闭环。
 
 
 
@@ -607,109 +609,28 @@
 
 #### 【Task W.9d】行投影 Docker host probe 成本收敛 `[COMPLETED]`
 
-> **归档注记（2026-11-07 · P-154）**：本卡已 COMPLETED（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`，squash）。完整卡正文（yaml + 交付清单、默认/未做边界）迁入 [`development-tasks-completed.md` §3.4x](./development-tasks-completed.md#task-w.9d)。**W.9c §3.4q 挂账①销项**。挂账②/③/④仍由 W.9e/f/g 承接。**不宣称**端到端闭环；零改 docker-container-host / W.9e–g。
+> **归档注记（2026-11-07 · P-154）**：本卡已 COMPLETED（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`，squash）。完整卡正文（yaml + 交付清单、默认/未做边界）迁入 [`development-tasks-completed.md` §3.4x](./development-tasks-completed.md#task-w.9d)。**W.9c §3.4q 挂账①销项**。**（P-157）** 挂账②/③/④均已销（W.9e/f/g）；④口径见 W.9g（钉协议+fail-closed，非真跑通）。**不宣称**端到端闭环；零改 docker-container-host / W.9e–g。
 
 
 <a id="task-w.9e"></a>
 
 #### 【Task W.9e】受控派工拒绝码穿透诊断 `[COMPLETED]`
 
-> **归档注记（2026-11-07 · P-155）**：本卡已 COMPLETED（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`，squash）。完整卡正文（yaml + 交付清单、默认/未做边界）迁入 [`development-tasks-completed.md` §3.4y](./development-tasks-completed.md#task-w.9e)。**W.9c §3.4q 挂账②销项**。挂账③/④仍由 W.9f/g 承接。**不宣称**端到端闭环；零改 server.ts / W.9f–g；门禁零放宽。
+> **归档注记（2026-11-07 · P-155）**：本卡已 COMPLETED（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`，squash）。完整卡正文（yaml + 交付清单、默认/未做边界）迁入 [`development-tasks-completed.md` §3.4y](./development-tasks-completed.md#task-w.9e)。**W.9c §3.4q 挂账②销项**。**（P-157）** 挂账③/④均已销（W.9f/g）；④口径见 W.9g（钉协议+fail-closed，非真跑通）。**不宣称**端到端闭环；零改 server.ts / W.9f–g；门禁零放宽。
 
 
 <a id="task-w.9f"></a>
 
 #### 【Task W.9f】容器环境 API key 明文可读面收敛 `[COMPLETED]`
 
-> **归档注记（2026-11-07 · P-156）**：本卡已 COMPLETED（[#156](https://github.com/he18718143986-design/IDE/pull/156)/`b92accc`，squash）。完整卡正文（yaml + 交付清单、默认/未做边界）迁入 [`development-tasks-completed.md` §3.4z](./development-tasks-completed.md#task-w.9f)。**W.9c §3.4q 挂账③销项**。挂账④仍由 W.9g 承接。**不宣称**端到端闭环 / 绝对不可读；零改 vault / cursor-agent-adapter / W.9g。
+> **归档注记（2026-11-07 · P-156）**：本卡已 COMPLETED（[#156](https://github.com/he18718143986-design/IDE/pull/156)/`b92accc`，squash）。完整卡正文（yaml + 交付清单、默认/未做边界）迁入 [`development-tasks-completed.md` §3.4z](./development-tasks-completed.md#task-w.9f)。**W.9c §3.4q 挂账③销项**。**（P-157）** 挂账④ → [`TASK-W.9g`](./development-tasks-completed.md#task-w.9g) `[COMPLETED]`（#158/`691b8b8`；钉协议+fail-closed，**≠ Cursor 已受控**）。**不宣称**端到端闭环 / 绝对不可读；零改 vault / cursor-agent-adapter / W.9g。
 
 
 <a id="task-w.9g"></a>
 
-#### 【Task W.9g】Cursor CLI 容器镜像/运行协议实证 `[NEW_TASK]`
+#### 【Task W.9g】Cursor CLI 容器镜像/运行协议实证 `[COMPLETED]`
 
-> **立卡（2026-11-07 · P-153）**：兑现 W.9c completed §3.4q 挂账④（沿用 W.9b §3.4o）。**在实证完成前必须继续** `E_CURSOR_AGENT_NO_EXECUTOR` fail-closed；宿主侧 CA-06 / `CURSOR_AGENT_VERIFIED_ON` **不**等同容器协议已实证。
-
-```yaml task-card
-id: TASK-W.9g
-status: NEW_TASK
-contract:
-  intent:
-    title: Cursor CLI 容器镜像与运行协议实证
-    description: >-
-      以固定镜像摘要 + 可复现运行协议，证明 Cursor CLI 可经既有 runInSandbox /
-      executeContainerCli 桥在容器内受控调用；未实证前保持 NO_EXECUTOR fail-closed，
-      不得把 generic 容器桥宣称为 Cursor 已可执行。
-    risk_level: HIGH
-  acceptance:
-    - { id: W9G-P1, check: both, text: "存在钉死的 Cursor 容器镜像引用（digest 或等价不可漂标签）与最小 argv/cwd/挂载协议文档化在代码常量或卡内证据" }
-    - { id: W9G-P2, check: auto, text: "未通过实证前，Cursor 适配器仍 has_executor=false 且 run()→E_CURSOR_AGENT_NO_EXECUTOR；不得挂派工工厂冒充可派工" }
-    - { id: W9G-P3, check: both, text: "实证通过时：容器路径一次最小调用产出 SandboxWitness，证据面经 resolveEvidenceControlMode；失败则保持 fail-closed 并留下失败证据，不得 fallback 本地/Gateway" }
-    - { id: W9G-P4, check: auto, text: "档位不得因本卡升到 GATEWAY_ENFORCED；无 tool interception 时结构性上界仍受控于既有规则（宿主 CA-06 完成 ≠ 本卡完成）" }
-  scheme_item_ids: [gap-14]
-  scope:
-    writable_paths:
-      - daemon/worker/cli-host/cursor-agent-adapter.ts
-      - daemon/worker/sandbox/**
-      - daemon/worker/default-worker-registry.ts
-      - tests/unit/cursor-agent*.ts
-      - tests/integration/**
-    readonly_paths:
-      - daemon/worker/cli-host/docker-container-host.ts
-      - daemon/worker/sandbox/container-cli-executor.ts
-  verification:
-    commands:
-      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/cursor-agent-container-protocol.test.ts] }
-design:
-  approach: >-
-    先定镜像与协议并加负向锁（未实证 → NO_EXECUTOR）；再在可用 CURSOR_API_KEY + 容器
-    运行时下跑最小实证。成功才允许容器执行入口；禁止 generic 桥成功冒充 Cursor 协议成功。
-    宿主 plan-mode CA-06 证据不复用为本卡容器实证。
-  touches:
-    - { path: daemon/worker/cli-host/cursor-agent-adapter.ts, change: modify, why: 协议常量/实证后门禁, symbols: [E_CURSOR_AGENT_NO_EXECUTOR, run, has_executor] }
-    - { path: tests/unit/cursor-agent-container-protocol.test.ts, change: create, why: fail-closed 与实证门闩, symbols: [] }
-  interfaces: []
-  test_plan:
-    - { acceptance_id: W9G-P1, test_path: tests/unit/cursor-agent-container-protocol.test.ts, level: unit, case: "镜像引用钉死" }
-    - { acceptance_id: W9G-P2, test_path: tests/unit/cursor-agent-container-protocol.test.ts, level: unit, case: "未实证 NO_EXECUTOR" }
-    - { acceptance_id: W9G-P3, test_path: tests/integration/cursor-agent-container-protocol.test.ts, level: integration, case: "容器最小调用或失败留证", debt: "无 KEY/无容器时不得 skip 冒充通过；可走专用 workflow 如 ca06-real" }
-    - { acceptance_id: W9G-P4, test_path: tests/unit/cursor-agent-container-protocol.test.ts, level: unit, case: "不升 GATEWAY_ENFORCED" }
-governance:
-  spec_refs:
-    - docs/specs/development-tasks-completed.md#task-w.9c
-    - docs/specs/development-tasks-completed.md#task-w.9b
-    - docs/specs/development-tasks-completed.md#task-w.5b
-  depends_on:
-    - { id: TASK-W.9c, kind: hard }
-    - { id: TASK-W.9b, kind: hard }
-    - { id: TASK-W.5b, kind: soft }
-  code_facts:
-    - { ref: "daemon/worker/cli-host/cursor-agent-adapter.ts::has_executor", note: "false；run() 在有 KEY 时仍抛 E_CURSOR_AGENT_NO_EXECUTOR" }
-    - { ref: "docs/specs/development-tasks-completed.md:2327", note: "§3.4q 挂账④：Cursor CLI 镜像与运行协议仍未实证；generic 容器桥不代表 Cursor 可执行" }
-    - { ref: "docs/ledger/README.md:191", note: "CA-06 宿主 plan-mode 四类负例已实测；档位仍 UNCONTROLLED_EXTERNAL；≠ 容器协议实证" }
-  non_goals:
-    - 不把宿主 CA-06 冒充容器实证
-    - 不经本地 spawn / Gateway 会话绕过容器桥
-    - 不做 W.9d/e/f
-    - 不宣称 Cursor 受控或端到端闭环
-  fail:
-    - 无实证却移除 NO_EXECUTOR 或挂派工工厂
-    - 实证失败仍 fallback 本地执行
-  adr_revisions: []
-  defaults:
-    - "开工前置：可用容器运行时 + 有效 CURSOR_API_KEY（禁止订阅登录态凑数，同 W.5b FAIL）"
-  open_questions: []
-  estimate: M
-  invariants:
-    auth: unchanged
-    demo_origin: unchanged
-    illumination: unchanged
-    gateway_write_scope: unchanged
-```
-
-* **背景**：§3.4q 挂账④——Cursor 容器协议未实证。
-* **取舍**：先锁 fail-closed，再实证；不把 CA-06 当本卡完成。
-
+> **归档注记（2026-11-07 · P-157）**：本卡已 COMPLETED（[#158](https://github.com/he18718143986-design/IDE/pull/158)/`691b8b8`，squash）。完整卡正文（yaml + 交付清单、默认/未做边界）迁入 [`development-tasks-completed.md` §3.4aa](./development-tasks-completed.md#task-w.9g)。**W.9c §3.4q 挂账④销项**（四项均已销）。**诚实口径**：`empirically_verified=false`；真跑容器仍待 KEY+Docker；**销挂账④ ≠ Cursor 已受控 / 可派工**；仍 `has_executor=false` / `NO_EXECUTOR`；无派工工厂；档位 `UNCONTROLLED_EXTERNAL`；宿主 CA-06 ≠ 本卡。**不宣称**端到端闭环 / Cursor 已受控；零改 docker-container-host / container-cli-executor。
 
 ### 3.4c 闭环旅程 v2.1 第一批（Journey · 规格 `supervisor.md` 第三部分 §13～§20；对应 §19 落差 L-01～L-10）
 

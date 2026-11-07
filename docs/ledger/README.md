@@ -245,3 +245,10 @@
 - **销项**：兑现 W.9c §3.4q **挂账③**。挂账①②③已销；④仍立卡未销。
 - **Sprint**：当前首要 → `TASK-W.9g`。不宣称端到端闭环 / 绝对不可读；不新增 OP。
 - **物理 tip**：代码 tip `b92accc`（#156）；P-156 文档回写本 PR。
+
+### TASK-W.9g（P-157 · 2026-11-07 · 非 OP）
+
+- **状态回写**：W.9g 已 COMPLETED（PR [#158](https://github.com/he18718143986-design/IDE/pull/158) / `691b8b8`）；钉死 Cursor 容器协议常量；`empirically_verified=false`；仍 `NO_EXECUTOR`；无派工工厂；P3 失败留证；W9G-P1～P4；零改 docker-container-host / container-cli-executor。
+- **销项**：兑现 W.9c §3.4q **挂账④**。**四项挂账均已销**；④口径=钉协议+fail-closed，**≠ Cursor 已受控 / 可派工**；真跑容器仍待 KEY+Docker。
+- **Sprint**：当前首要 → **在队清零**（下一挂账面为 macOS CI → CA-06，按 Tina 授权序）。不宣称端到端闭环 / Cursor 已受控；不新增 OP。
+- **物理 tip**：代码 tip `691b8b8`（#158）；P-157 文档回写本 PR。
