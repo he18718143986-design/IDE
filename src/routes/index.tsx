@@ -32,6 +32,7 @@ import {
   readWorktreeFile,
   saveWorktreeFile,
   approveContract,
+  returnContractToPending,
   createContractWithAdmission,
   admitContract,
   executeContract,
@@ -2651,10 +2652,15 @@ ${trimmed}`
         <div className="space-y-4 p-4">
           <ContractCard
             contract={selected}
-            busy={busy === "approve"}
+            busy={busy === "approve" || busy === "return-to-pending"}
             onApprove={(id) =>
               void runAction("approve", async () => {
                 await approveContract(conn, id, "local-user");
+              })
+            }
+            onReturnToPending={(id) =>
+              void runAction("return-to-pending", async () => {
+                await returnContractToPending(conn, id, "local-user");
               })
             }
           />
