@@ -233,3 +233,4 @@
 > **L.17f 完成回写（P-152 · 2026-11-07）**：PR [#149](https://github.com/he18718143986-design/IDE/pull/149) / `86da495` 合入，L.17f COMPLETED；挂账③销项（verification 真跑 `alias=playtest` 且 Fail-Closed；`resolve-playtest-check-args` + orchestrator 最小旁路）；零改 playtest-guard / C.23 / bin/stagent；不销 W.9 四项挂账。Sprint 首要 → **在队清零**（下一挂账面为 W.9c §3.4q 四项未销挂账）。L.17c 三项挂账均已销。仅 docs 回写，不新增 OP；**不**宣称端到端闭环。
 
 > **W.9c 挂账立卡（P-153 · 2026-11-07）**：Tina 授权立卡 `TASK-W.9d` / `W.9e` / `W.9f` / `W.9g`（均 `[NEW_TASK]`）兑现 completed §3.4q 四项挂账；**立卡≠销项**；Sprint 首要 → W.9d；不新增 OP；不宣称闭环；不碰 macOS CI / CA-06。同步矩阵 / index / active yaml 卡 / changelog。
+> **W.9d 完成回写（P-154 · 2026-11-07）**：PR [#152](https://github.com/he18718143986-design/IDE/pull/152) / `f5577de` 合入，W.9d COMPLETED；挂账①销项（`resolveSharedContainerHost` 服务单例；SANDBOX 探测上界=1；GATEWAY/UNCONTROLLED 不构造 host）；零改 docker-container-host；不销挂账②③④。Sprint 首要 → **W.9e**。仅 docs 回写，不新增 OP；**不**宣称端到端闭环。

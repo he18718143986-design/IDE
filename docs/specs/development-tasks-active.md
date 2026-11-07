@@ -593,93 +593,18 @@
 
 > **归档注记（2026-11-03 · P-134）**：本卡已完成（[#107](https://github.com/he18718143986-design/IDE/pull/107)/`d3397a6`）；完整卡文与交付、验证、挂账见 [`development-tasks-completed.md` §3.4q](./development-tasks-completed.md#task-w.9c)。
 >
-> **（P-153）** 四项 W.9b 挂账已立卡 [`W.9d`](#task-w.9d) / [`W.9e`](#task-w.9e) / [`W.9f`](#task-w.9f) / [`W.9g`](#task-w.9g)（`[NEW_TASK]` · 未销项、未开工）；Sprint 首要现为 `TASK-W.9d`。
+> **（P-153 · 保留作溯源）** 四项 W.9b 挂账已立卡 [`W.9d`](#task-w.9d) / [`W.9e`](#task-w.9e) / [`W.9f`](#task-w.9f) / [`W.9g`](#task-w.9g)（当时均 `[NEW_TASK]` · 立卡≠销项）。
+>
+> **（P-154 现行）** 挂账① → [`TASK-W.9d`](./development-tasks-completed.md#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账②/③/④仍由 [`W.9e`](#task-w.9e) / [`W.9f`](#task-w.9f) / [`W.9g`](#task-w.9g) `[NEW_TASK]` 承接。Sprint 首要 → **`TASK-W.9e`**（序 e→f→g）。**仍不宣称**端到端闭环。
 
 
 
 <a id="task-w.9d"></a>
 
-#### 【Task W.9d】行投影 Docker host probe 成本收敛 `[NEW_TASK]`
+#### 【Task W.9d】行投影 Docker host probe 成本收敛 `[COMPLETED]`
 
-> **立卡（2026-11-07 · P-153）**：兑现 W.9c completed §3.4q 挂账①（沿用 W.9b §3.4o）。Tina 授权按挂账顺序销项立卡（序 W.9 → macOS CI → CA-06）；**本轮仅文档**，不开工产品代码。不宣称端到端闭环；不碰 L.17 / macOS CI / CA-06。
+> **归档注记（2026-11-07 · P-154）**：本卡已 COMPLETED（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`，squash）。完整卡正文（yaml + 交付清单、默认/未做边界）迁入 [`development-tasks-completed.md` §3.4x](./development-tasks-completed.md#task-w.9d)。**W.9c §3.4q 挂账①销项**。挂账②/③/④仍由 W.9e/f/g 承接。**不宣称**端到端闭环；零改 docker-container-host / W.9e–g。
 
-```yaml task-card
-id: TASK-W.9d
-status: NEW_TASK
-contract:
-  intent:
-    title: 行投影 Docker host probe 成本收敛
-    description: >-
-      Worker 列表/行投影（builtinView / storedView）不再为每一行新建 DockerContainerHost
-      并触发可用性探测；行数增长时 probe 成本与副作用保持可预期（同进程同轮次至多一次真探测，或等价缓存）。
-    risk_level: MEDIUM
-  acceptance:
-    - { id: W9D-P1, check: auto, text: "list/get WorkerView 路径对 N 个内建+自注册条目，不得产生 N 次独立 docker info（或等价）真探测；同轮次真探测次数有上界且测试写死" }
-    - { id: W9D-P2, check: auto, text: "静态形态预检（工厂/档位/可执行面）在无宿主探测时仍诚实反映；不得因缓存把不可用宿主显示为可派工" }
-    - { id: W9D-P3, check: auto, text: "SANDBOX_ENFORCED 在宿主真实不可用时仍 dispatchable=false / 门禁拒绝（与 W.5c-ii 口径一致）" }
-    - { id: W9D-P4, check: auto, text: "既有 worker-registration / dispatch 单测回归绿；新增 probe 次数断言" }
-  scheme_item_ids: [gap-14]
-  scope:
-    writable_paths:
-      - daemon/worker/verify/worker-registration-service.ts
-      - daemon/worker/cli-host/docker-container-host.ts
-      - tests/unit/worker-registration*.ts
-      - tests/unit/*dispatch*.ts
-    readonly_paths:
-      - daemon/worker/worker-dispatch.ts
-      - daemon/worker/adapter-registry.ts
-  verification:
-    commands:
-      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/worker-registration-probe-cost.test.ts] }
-design:
-  approach: >-
-    收敛 builtinView/storedView：共享/缓存 createContainerHost() 结果（或惰性到 isAvailable 真调用），
-    避免「每行 new DockerContainerHost() → 构造期 probe()」。不得削弱 SANDBOX 门禁；
-    缓存失效策略须在测试写死（进程内单例或请求级均可，选一）。
-  touches:
-    - { path: daemon/worker/verify/worker-registration-service.ts, change: modify, why: 行投影共用宿主/惰性探测, symbols: [builtinView, storedView, createContainerHost] }
-    - { path: daemon/worker/cli-host/docker-container-host.ts, change: modify, why: 若需支持可复用 probe 结果则改；否则仅被测, symbols: [] }
-    - { path: tests/unit/worker-registration-probe-cost.test.ts, change: create, why: 探测次数上界与门禁负例, symbols: [] }
-  interfaces: []
-  test_plan:
-    - { acceptance_id: W9D-P1, test_path: tests/unit/worker-registration-probe-cost.test.ts, level: unit, case: "N 行探测次数有上界" }
-    - { acceptance_id: W9D-P2, test_path: tests/unit/worker-registration-probe-cost.test.ts, level: unit, case: "无探测时静态形态仍诚实" }
-    - { acceptance_id: W9D-P3, test_path: tests/unit/worker-registration-probe-cost.test.ts, level: unit, case: "宿主不可用仍拒派工" }
-    - { acceptance_id: W9D-P4, test_path: tests/unit/worker-registration-probe-cost.test.ts, level: unit, case: "回归既有视图字段" }
-governance:
-  spec_refs:
-    - docs/specs/development-tasks-completed.md#task-w.9c
-    - docs/specs/development-tasks-completed.md#task-w.9b
-  depends_on:
-    - { id: TASK-W.9c, kind: hard }
-    - { id: TASK-W.9b, kind: hard }
-  code_facts:
-    - { ref: "daemon/worker/verify/worker-registration-service.ts::builtinView", note: "每行 try createContainerHost()；缺省 new DockerContainerHost() 构造即 probe" }
-    - { ref: "daemon/worker/verify/worker-registration-service.ts::storedView", note: "同上每行建宿主" }
-    - { ref: "daemon/worker/cli-host/docker-container-host.ts::constructor", note: "this.probeResult = this.probe()；默认 spawnSync docker info" }
-    - { ref: "docs/specs/development-tasks-completed.md:2327", note: "§3.4q 挂账①：行投影构造 Docker host 并可能探测；行数增长 probe 成本待评估" }
-  non_goals:
-    - 不改 isControlledDispatchable 吞码问题（TASK-W.9e）
-    - 不改容器 env 明文 key（TASK-W.9f）
-    - 不做 Cursor 容器协议实证（TASK-W.9g）
-    - 不宣称端到端闭环 / 绝对隔离
-  fail:
-    - 为省探测而把不可用宿主显示为 dispatchable=true
-    - 静默降级 SANDBOX → 本地执行
-  adr_revisions: []
-  defaults:
-    - "优先请求级或服务级单例缓存 ContainerHostPort；构造期仍可探测一次"
-  open_questions: []
-  estimate: S
-  invariants:
-    auth: unchanged
-    demo_origin: unchanged
-    illumination: unchanged
-    gateway_write_scope: unchanged
-```
-
-* **背景**：§3.4q 挂账①——行投影放大 Docker probe。
-* **取舍**：只收敛探测次数，不改派工判定语义。
 
 <a id="task-w.9e"></a>
 

@@ -2327,6 +2327,7 @@
 - **后续挂账（W.9b 四项，仍未销项、不新增 OP）**：① `WorkerRegistrationService.builtinView()` / `storedView()` 为行投影构造 Docker host 并可能探测可用性，行数增长的 probe 成本与副作用仍待评估；② `isControlledDispatchable()` 仍捕获拒绝并仅返回 boolean，虽然部分服务层视图单独补有说明，API 诊断仍可能丢失具体拒绝原因；③ `LLM_API_KEY`、`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`CURSOR_API_KEY` 仍可能通过允许的容器 env 被容器内进程读取，日志脱敏不改变此事实；④ Cursor CLI 镜像与运行协议仍未实证，generic 容器桥不代表 Cursor 可执行。详情沿用 W.9b 归档 §3.4o。
 - **边界**：W.9 母卡仍以 `[SPLIT]` 保留拆分追溯；三张子卡 W.9a/b/c 均已 COMPLETED，母卡实质闭合。不得把四条 W.9b 挂账写作已解决；Cursor 保持 fail-closed。
 > **（P-153 立卡指针 · 保留原文作溯源）**：挂账①→[`TASK-W.9d`](./development-tasks-active.md#task-w.9d) `[NEW_TASK]`；挂账②→[`TASK-W.9e`](./development-tasks-active.md#task-w.9e) `[NEW_TASK]`；挂账③→[`TASK-W.9f`](./development-tasks-active.md#task-w.9f) `[NEW_TASK]`；挂账④→[`TASK-W.9g`](./development-tasks-active.md#task-w.9g) `[NEW_TASK]`。**立卡≠销项、未开工、不宣称闭环**。
+> **（P-154 现行）**：挂账① → [`TASK-W.9d`](#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账② → [`TASK-W.9e`](./development-tasks-active.md#task-w.9e) `[NEW_TASK]`；挂账③ → [`TASK-W.9f`](./development-tasks-active.md#task-w.9f) `[NEW_TASK]`；挂账④ → [`TASK-W.9g`](./development-tasks-active.md#task-w.9g) `[NEW_TASK]`。**挂账①已销（P-154 · W.9d）**；②③④仍立卡未销。**仍不宣称**端到端闭环。
 
 
 ### 3.4p 中栏方案审阅页嵌入试玩认可提交（L.17c · 产品验收挂账）
@@ -4613,5 +4614,91 @@ governance:
     illumination: unchanged
     gateway_write_scope: unchanged
   delivered: { pr: 149, commit: 86da4950c609ca07029d86e06c094f2bc044ce62 }
+```
+
+
+### 3.4x 行投影 Docker host probe 成本收敛（W.9d · W.9c 挂账①）
+
+<a id="task-w.9d"></a>
+
+#### 【Task W.9d】行投影 Docker host probe 成本收敛 `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de26bf6a34d8377039eb26d71ef6bf506a8`，squash；基线 #151/`2115d5d` P-153 立卡之后）。
+- **交付**：`daemon/worker/verify/worker-registration-service.ts` 新增服务实例单例 `resolveSharedContainerHost()`：仅 **SANDBOX** 行投影解析共享宿主（`list`/`get` 同轮次 `createContainerHost` 至多一次）；**GATEWAY / UNCONTROLLED** 行不构造 host。宿主真实不可用时仍 `dispatchable=false`（不因缓存放行）。新增 `tests/unit/worker-registration-probe-cost.test.ts`（W9D 4/4）；相关回归 61/61；`tsc` 0。**零改** `docker-container-host.ts` / docs / W.9e–g。
+- **销项**：兑现 W.9c completed §3.4q **挂账①**（行投影 Docker host probe 成本）。挂账②/③/④仍由 W.9e/f/g 承接。
+- **残余 / 默认未做（不宣称关闭）**：① 不改 `isControlledDispatchable` 吞码（→ [`TASK-W.9e`](./development-tasks-active.md#task-w.9e)）；② 不改容器 env 明文 key（→ [`TASK-W.9f`](./development-tasks-active.md#task-w.9f)）；③ 不做 Cursor 容器协议实证（→ [`TASK-W.9g`](./development-tasks-active.md#task-w.9g)）；④ **不**宣称端到端产品闭环。
+- **边界**：**窄口径**——服务级单例共享 SANDBOX 宿主探测；门禁语义零放宽；无 e2e 闭环宣称。
+
+```yaml task-card
+id: TASK-W.9d
+status: COMPLETED
+contract:
+  intent:
+    title: 行投影 Docker host probe 成本收敛
+    description: >-
+      Worker 列表/行投影（builtinView / storedView）不再为每一行新建 DockerContainerHost
+      并触发可用性探测；行数增长时 probe 成本与副作用保持可预期（同进程同轮次至多一次真探测，或等价缓存）。
+    risk_level: MEDIUM
+  acceptance:
+    - { id: W9D-P1, check: auto, text: "list/get WorkerView 路径对 N 个内建+自注册条目，不得产生 N 次独立 docker info（或等价）真探测；同轮次真探测次数有上界且测试写死" }
+    - { id: W9D-P2, check: auto, text: "静态形态预检（工厂/档位/可执行面）在无宿主探测时仍诚实反映；不得因缓存把不可用宿主显示为可派工" }
+    - { id: W9D-P3, check: auto, text: "SANDBOX_ENFORCED 在宿主真实不可用时仍 dispatchable=false / 门禁拒绝（与 W.5c-ii 口径一致）" }
+    - { id: W9D-P4, check: auto, text: "既有 worker-registration / dispatch 单测回归绿；新增 probe 次数断言" }
+  scheme_item_ids: [gap-14]
+  scope:
+    writable_paths:
+      - daemon/worker/verify/worker-registration-service.ts
+      - tests/unit/worker-registration-probe-cost.test.ts
+    readonly_paths:
+      - daemon/worker/cli-host/docker-container-host.ts
+      - daemon/worker/worker-dispatch.ts
+      - daemon/worker/adapter-registry.ts
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/worker-registration-probe-cost.test.ts] }
+design:
+  approach: >-
+    服务实例单例 resolveSharedContainerHost()：仅 SANDBOX 行投影解析共享宿主；
+    GATEWAY/UNCONTROLLED 不构造 host；不可用宿主仍 dispatchable=false。零改 docker-container-host.ts。
+  touches:
+    - { path: daemon/worker/verify/worker-registration-service.ts, change: modify, why: 行投影共用宿主单例, symbols: [resolveSharedContainerHost, builtinView, storedView] }
+    - { path: tests/unit/worker-registration-probe-cost.test.ts, change: create, why: 探测次数上界与门禁负例, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: W9D-P1, test_path: tests/unit/worker-registration-probe-cost.test.ts, level: unit, case: "W9D-P1: N 个 SANDBOX 行 list/get 至多一次 createContainerHost（探测上界=1）" }
+    - { acceptance_id: W9D-P2, test_path: tests/unit/worker-registration-probe-cost.test.ts, level: unit, case: "W9D-P2: 无宿主探测时静态形态仍诚实（UNCONTROLLED 不触发 createContainerHost）" }
+    - { acceptance_id: W9D-P3, test_path: tests/unit/worker-registration-probe-cost.test.ts, level: unit, case: "W9D-P3: SANDBOX_ENFORCED 宿主真实不可用时仍 dispatchable=false（不因缓存放行）" }
+    - { acceptance_id: W9D-P4, test_path: tests/unit/worker-registration-probe-cost.test.ts, level: unit, case: "W9D-P4: 回归既有视图字段；混合档位仍共用一次 SANDBOX 探测" }
+governance:
+  spec_refs:
+    - docs/specs/development-tasks-completed.md#task-w.9c
+    - docs/specs/development-tasks-completed.md#task-w.9b
+  depends_on:
+    - { id: TASK-W.9c, kind: hard }
+    - { id: TASK-W.9b, kind: hard }
+  code_facts:
+    - { ref: "daemon/worker/verify/worker-registration-service.ts::builtinView", note: "每行 try createContainerHost()；缺省 new DockerContainerHost() 构造即 probe" }
+    - { ref: "daemon/worker/verify/worker-registration-service.ts::storedView", note: "同上每行建宿主" }
+    - { ref: "daemon/worker/cli-host/docker-container-host.ts::constructor", note: "this.probeResult = this.probe()；默认 spawnSync docker info" }
+    - { ref: "docs/specs/development-tasks-completed.md:2327", note: "§3.4q 挂账①：行投影构造 Docker host 并可能探测；行数增长 probe 成本待评估" }
+  non_goals:
+    - 不改 isControlledDispatchable 吞码问题（TASK-W.9e）
+    - 不改容器 env 明文 key（TASK-W.9f）
+    - 不做 Cursor 容器协议实证（TASK-W.9g）
+    - 不宣称端到端闭环 / 绝对隔离
+  fail:
+    - 为省探测而把不可用宿主显示为 dispatchable=true
+    - 静默降级 SANDBOX → 本地执行
+  adr_revisions: []
+  defaults:
+    - "优先请求级或服务级单例缓存 ContainerHostPort；构造期仍可探测一次"
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 152, commit: f5577de26bf6a34d8377039eb26d71ef6bf506a8 }
 ```
 
