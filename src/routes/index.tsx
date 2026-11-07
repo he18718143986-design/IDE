@@ -167,6 +167,7 @@ import {
   partnerMessageMayRebuildScheme,
   type HandoffUiStepId,
 } from "@/lib/journey/handoff-progress";
+import { selectSessionVerbatimCandidates } from "@/lib/journey/session-verbatim-candidates";
 import {
   grayOutTaskGraphNodes,
   shouldGrayAfterDispute,
@@ -840,6 +841,12 @@ function Console() {
 
   // C.10l：右栏与设置「高级」共用同一会话实例
   const chatSession = useAgentSession(chatTransport);
+
+  /** TASK-L.17e：当前右栏会话 user 原话 → 试玩认可「引用」候选（默认不填框） */
+  const sessionVerbatimCandidates = useMemo(
+    () => selectSessionVerbatimCandidates(chatSession.messages),
+    [chatSession.messages],
+  );
 
   /** 把 Daemon 质疑报告压成控制台视图（TASK-S.6 / S.5） */
   const toDisputeView = useCallback(
@@ -3659,6 +3666,7 @@ ${trimmed}`
                       previewStatus: realPlaytest?.status ?? null,
                       previewError: realPlaytestError,
                       conn: connected ? conn : null,
+                      sessionVerbatimCandidates,
                     }}
                   />
                 </div>
