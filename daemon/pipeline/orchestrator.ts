@@ -89,6 +89,11 @@ import {
   type GatewayViolation,
 } from "../worker/runtime-interceptor";
 import { assessCommandThreat, isRepoTrusted } from "../worker/threat-guard";
+import {
+  ensurePlaytestStagentView,
+  isPlaytestCheckCommand,
+  resolvePlaytestCheckArgs,
+} from "../supervisor/preview/resolve-playtest-check-args";
 import { OpenAiWorkerClient } from "../worker/openai-client";
 import { planDependencyStrategy, runIsolatedInstall } from "../deps/strategy";
 import { mountDependencySymlink } from "../deps/resolver";
@@ -1070,6 +1075,20 @@ export class ContractOrchestrator {
           worktreePath,
           designNoteFile: fs.existsSync(dnFile) ? dnFile : null,
         });
+      }
+
+      // TASK-L.17f：playtest 位置参数 → CLI 旗标 + --repo（对称 check-knowledge）
+      // C.23 装配 args=["check","playtest",<id>]；CLI 要 --contract-id / --repo。
+      // 威胁守卫拒 Worktree 外绝对路径，故先在 worktree 挂 .stagent 视图，
+      // --repo 钉 worktreePath（边界内）；视图链到仓根 contracts/evidence/releases。
+      if (isPlaytestCheckCommand(command)) {
+        ensurePlaytestStagentView(worktreePath, this.repoRoot);
+        commandArgs = resolvePlaytestCheckArgs(commandArgs, {
+          contractId: current.contract_id,
+          repoRoot: worktreePath,
+        });
+        // 网关白名单精确匹配：就地改写本轮 playtest args（gateway 持同一合同引用）
+        command.args = commandArgs;
       }
 
       // W.4：威胁守卫必须在创建子进程之前；拒绝即跳过 gateway，不产生任何进程
