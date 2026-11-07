@@ -14,7 +14,7 @@
 | `TASK-A.6` | `COMPLETED` | Daemon 崩溃自愈、Git 锁清理与 TOCTOU 校验 | [矩阵行](./development-tasks.md)（无独立详细卡；正文时代已收口进矩阵） |
 | `TASK-A.7` | `COMPLETED` | Worktree seal 路径前缀对齐 | [打开](./development-tasks-completed.md#task-a.7) |
 | `TASK-S.6b` | `COMPLETED` | 真机试玩收口（S.6 降级项；无独立详细卡，见矩阵 S.6 行与 changelog P-22） | [矩阵/流水](./development-tasks.md)（无独立详细卡） |
-| `TASK-D.1e` | `DEFERRED` | 桌面壳 / 本机助手：维持 DEFERRED；**（P-164）RFC 决议已落** [`../rfc/desktop-shell-form.md`](../rfc/desktop-shell-form.md)（DS-1=A；进 DoR 仍 ≠ 开工）·未开工（D-6 / P-141） | [打开](./development-tasks-active.md#task-d.1e) |
+| `TASK-D.1e` | `DEFERRED` | 桌面壳 / 本机助手：维持 DEFERRED；**（P-165）DoR 已入队** [`../rfc/desktop-shell-form.md`](../rfc/desktop-shell-form.md) §10（DS-1=A；入队仍 ≠ 开工；DS-6 不排重写）·**入队 ≠ 激活 ≠ 立卡 ≠ 写代码**·未开工（D-6 / P-141） | [打开](./development-tasks-active.md#task-d.1e) |
 | `TASK-S.3` | `DEFERRED` | Supervisor HUD 建议流与 WebSocket 广播（v0.2 评审未激活 · D-5 / P-141） | [打开](./development-tasks-active.md#task-s.3) |
 | `TASK-W.5b` | `COMPLETED` | cursor-agent 适配器黑盒实测 (v1.3.3 新增) · [#92](https://github.com/he18718143986-design/IDE/pull/92)/`bdac805`；`UNCONTROLLED_EXTERNAL` 登记 + W.7 探测包非容器负向回归；**（P-160）** `CURSOR_AGENT_VERIFIED_ON` 已回填（`cli_version: "2026.10.22-27dcf5f"` / `verified_at: "2026-11-05"`；run 41959697673）；档位不变；`verified_on` ≠ 已受控 / 可派工；P-125「CA-06 未执行」保留作溯源 | [打开](./development-tasks-completed.md#task-w.5b) |
 | `TASK-W.5c` | `SPLIT` | OpenHands 适配器（容器隔离）· 拆分母卡（P-118 经授权拆为 i/ii/iii，保留追溯） | [打开](./development-tasks-active.md#task-w.5c) |

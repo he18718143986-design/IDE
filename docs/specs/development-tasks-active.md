@@ -11,7 +11,7 @@
 #### 【Task D.1e】桌面壳 / 本机助手：真·选文件夹（Import 与工作台同壳）`[DEFERRED → v0.2+ · P5.8 · 2026-10-24]`
 * **任务编号**：`TASK-D.1e`
 * **前置依赖**：`TASK-D.1d`（建议 v0.2 开工前先完成生产可用单窗口；并行亦须满足 D.1 鉴权）
-* **任务状态**：**[DEFERRED → v0.2+]**（架构路线 **P5.8**；**不阻塞** v0.1 / `TASK-D.1d` / 八步旅程验收；2026-10-24 经 Tina 口径对齐为正式推迟；**维持 DEFERRED · D-6 / P-141**；**（P-164）桌面形态 RFC 决议已落** [`../rfc/desktop-shell-form.md`](../rfc/desktop-shell-form.md)（DS-1=A 本机助手；进 DoR 队列仍 ≠ 开工）·**未开工**；立决议 ≠ 激活 ≠ 开工）
+* **任务状态**：**[DEFERRED → v0.2+]**（架构路线 **P5.8**；**不阻塞** v0.1 / `TASK-D.1d` / 八步旅程验收；2026-10-24 经 Tina 口径对齐为正式推迟；**维持 DEFERRED · D-6 / P-141**；**（P-165）DoR 已入队** [`../rfc/desktop-shell-form.md`](../rfc/desktop-shell-form.md) §10（DS-1=A 本机助手；入队仍 ≠ 开工；DS-6 不排重写窗口）·**入队 ≠ 激活 ≠ 立卡 ≠ 写代码**·未开工；立决议 ≠ 激活 ≠ 开工）
 * **对照痛点**：浏览器无法弹出系统级「选任意本地文件夹」；D.1c 只有最近列表；用户仍觉「第一次打开很麻烦」，期望接近 Cursor Open / Import。
 * **v0.1+ 范围（可延后到桌面壳里程碑）**：提供本机助手或 Electron/Tauri（或等价）能力：在**同一产品壳**内「打开项目 / Import / New Project」→ 系统对话框选文件夹或创建空项目 → 自动启动/复用 Daemon 并进入已带钥匙的工作台。安全模型仍落在 D.1：loopback、`#token=` / 安全等价注入、AUTH、Origin；Demo 仍独立 Origin。
 * **明确不包含（本卡立项时仍禁止偷换）**：
@@ -614,7 +614,8 @@
 >
 > **（P-163 · 保留作溯源）** 桌面形态 RFC 讨论稿已立：[`../rfc/desktop-shell-form.md`](../rfc/desktop-shell-form.md)（基线 [#166](https://github.com/he18718143986-design/IDE/pull/166)/`c097522`；合入 tip [#167](https://github.com/he18718143986-design/IDE/pull/167)/`8e5bad9`）。兑现 D-6/P-141「另立 RFC」；开放问题 DS-1～DS-6 当时待拍。**`TASK-D.1e` 维持 DEFERRED**；立 RFC ≠ 激活 ≠ 开工。
 >
-> **（P-164 现行）** Tina「按建议拍」：桌面形态 RFC **决议已落** [`../rfc/desktop-shell-form.md`](../rfc/desktop-shell-form.md)（基线 [#167](https://github.com/he18718143986-design/IDE/pull/167)/`8e5bad9`）。DS-1=A 本机助手；DS-2=助手+系统浏览器；DS-3=进 DoR 队列但仍 ≠ 开工；DS-4=只先 macOS；DS-5=`stagent open`+最近列表保留、选夹为增强；DS-6=先不排 DoR 重写窗口。**`TASK-D.1e` 维持 `[DEFERRED → v0.2+]`**；**立决议 ≠ 激活实现卡 ≠ 开工**。Sprint 首要 → **RFC 决议已落 / D.1e 仍 DEFERRED / 下一动待 Tina（DoR/立卡另说）**。**仍不宣称**端到端闭环；不销 OP-34；不激活 S.3；不偷偷开工 D.1e。
+> **（P-164 · 保留作溯源）** Tina「按建议拍」：桌面形态 RFC **决议已落** [`../rfc/desktop-shell-form.md`](../rfc/desktop-shell-form.md)（基线 [#167](https://github.com/he18718143986-design/IDE/pull/167)/`8e5bad9`；合入 tip [#168](https://github.com/he18718143986-design/IDE/pull/168)/`4741d98`）。DS-1=A 本机助手；DS-2=助手+系统浏览器；DS-3=进 DoR 队列但仍 ≠ 开工；DS-4=只先 macOS；DS-5=`stagent open`+最近列表保留、选夹为增强；DS-6=先不排 DoR 重写窗口。**`TASK-D.1e` 维持 `[DEFERRED → v0.2+]`**；**立决议 ≠ 激活实现卡 ≠ 开工**；零产品代码。
+> **（P-165 现行）** Tina「你直接按顺序执行」：兑现 DS-3——**DoR 已入队**（RFC §10 + ledger「桌面形态 DoR 入队」+ Sprint tip；基线 [#168](https://github.com/he18718143986-design/IDE/pull/168)/`4741d98`）。指向 DS-1～DS-5；**DS-6 不排**重写窗口。**`TASK-D.1e` 维持 `[DEFERRED → v0.2+]`**（**未**改出 DEFERRED）。**入队 ≠ 激活 D.1e ≠ 立实现卡 ≠ 写代码**；下一动仍待 Tina（是否立实现卡另拍）。不销 OP-34；不激活 S.3。
 
 
 
