@@ -275,9 +275,10 @@
 - **Sprint**：首要当时 → **在队清零**（下一张按 Tina 顺序 → **桌面形态 RFC（为 D.1e）**；不偷偷开工 D.1e）。不新增 OP；不改产品代码。（P-163 现行见下节）
 - **物理 tip**：代码 tip `b390254`（#165）；立卡 docs tip `9067d40`（#164）；P-162 docs 本 PR。
 
-### 桌面形态 RFC（P-163 · 为 D.1e · 2026-11-07 · 非 OP）
+### 桌面形态 RFC（P-163 起草 · P-164 决议 · 为 D.1e · 2026-11-07 · 非 OP）
 
-- **动作**：新增讨论稿 [`../rfc/desktop-shell-form.md`](../rfc/desktop-shell-form.md)；兑现 D-6/P-141「桌面形态另立 RFC」。
-- **状态**：`TASK-D.1e` **维持** `[DEFERRED → v0.2+]`；**立 RFC ≠ 激活 ≠ 开工**；候选 A 本机助手 / B Electron / C Tauri；开放问题 DS-1～DS-6 待 Tina 拍板。
-- **Sprint**：首要 → **桌面形态 RFC 在队 / 待拍板**。不偷偷开工 D.1e；不激活 S.3；不销 OP-34；不发明产品方向。
-- **物理 tip 基线**：docs tip `c097522`（#166 P-162）；代码 tip 仍 `b390254`（#165）。
+- **动作（P-163）**：新增讨论稿 [`../rfc/desktop-shell-form.md`](../rfc/desktop-shell-form.md)；兑现 D-6/P-141「桌面形态另立 RFC」。
+- **决议（P-164 · Tina「按建议拍」）**：DS-1=**A 本机助手**；DS-2=**助手+系统浏览器**；DS-3=**进 DoR 队列，但仍 ≠ 开工**；DS-4=**只先 macOS**；DS-5=**`stagent open`+最近列表保留，选夹为增强**；DS-6=**先不排 DoR 重写窗口**。
+- **状态**：`TASK-D.1e` **维持** `[DEFERRED → v0.2+]`；**立决议 ≠ 激活实现卡 ≠ 开工**。
+- **Sprint**：首要 → **RFC 决议已落 / D.1e 仍 DEFERRED / 下一动待 Tina（DoR/立卡另说）**。不偷偷开工 D.1e；不激活 S.3；不销 OP-34。
+- **物理 tip 基线**：docs tip `8e5bad9`（#167 P-163）；代码 tip 仍 `b390254`（#165）。

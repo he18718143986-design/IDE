@@ -11,7 +11,7 @@
 #### 【Task D.1e】桌面壳 / 本机助手：真·选文件夹（Import 与工作台同壳）`[DEFERRED → v0.2+ · P5.8 · 2026-10-24]`
 * **任务编号**：`TASK-D.1e`
 * **前置依赖**：`TASK-D.1d`（建议 v0.2 开工前先完成生产可用单窗口；并行亦须满足 D.1 鉴权）
-* **任务状态**：**[DEFERRED → v0.2+]**（架构路线 **P5.8**；**不阻塞** v0.1 / `TASK-D.1d` / 八步旅程验收；2026-10-24 经 Tina 口径对齐为正式推迟；**维持 DEFERRED · D-6 / P-141**；**（P-163）桌面形态 RFC 已立** [`../rfc/desktop-shell-form.md`](../rfc/desktop-shell-form.md)·**未开工 / 待 Tina 拍板**）
+* **任务状态**：**[DEFERRED → v0.2+]**（架构路线 **P5.8**；**不阻塞** v0.1 / `TASK-D.1d` / 八步旅程验收；2026-10-24 经 Tina 口径对齐为正式推迟；**维持 DEFERRED · D-6 / P-141**；**（P-164）桌面形态 RFC 决议已落** [`../rfc/desktop-shell-form.md`](../rfc/desktop-shell-form.md)（DS-1=A 本机助手；进 DoR 队列仍 ≠ 开工）·**未开工**；立决议 ≠ 激活 ≠ 开工）
 * **对照痛点**：浏览器无法弹出系统级「选任意本地文件夹」；D.1c 只有最近列表；用户仍觉「第一次打开很麻烦」，期望接近 Cursor Open / Import。
 * **v0.1+ 范围（可延后到桌面壳里程碑）**：提供本机助手或 Electron/Tauri（或等价）能力：在**同一产品壳**内「打开项目 / Import / New Project」→ 系统对话框选文件夹或创建空项目 → 自动启动/复用 Daemon 并进入已带钥匙的工作台。安全模型仍落在 D.1：loopback、`#token=` / 安全等价注入、AUTH、Origin；Demo 仍独立 Origin。
 * **明确不包含（本卡立项时仍禁止偷换）**：
@@ -612,7 +612,9 @@
 >
 > **（P-162 · 保留作溯源）** [`TASK-AUDITED.1`](./development-tasks-completed.md#task-audited.1) → **`[COMPLETED]`**（[#165](https://github.com/he18718143986-design/IDE/pull/165)/`b390254`）。库层受控边 `AUDITED→PENDING_APPROVAL` + Guard（落点 `PENDING_REVIEW`；`reason=USER_RETURN_TO_PENDING`）已落地；规范 §11.3 / §9.1.1.1 与代码逐字对齐（AR1-P1）；**未**改 orchestrator；生产路径暂无 `USER_RETURN_TO_PENDING` 接线（grep 自证）。Sprint 首要当时 → **在队清零**（下一张按 Tina 顺序 → **桌面形态 RFC（为 D.1e）**）。**仍不宣称**端到端闭环；不销 OP-34；D.1e / S.3 维持 DEFERRED。
 >
-> **（P-163 现行）** 桌面形态 RFC 已立：[`../rfc/desktop-shell-form.md`](../rfc/desktop-shell-form.md)（基线 [#166](https://github.com/he18718143986-design/IDE/pull/166)/`c097522`）。兑现 D-6/P-141「另立 RFC」；候选 A 本机助手 / B Electron / C Tauri；开放问题 DS-1～DS-6 待 Tina 拍板。**`TASK-D.1e` 维持 `[DEFERRED → v0.2+]`**；**立 RFC ≠ 激活 ≠ 开工**；**不**偷偷开工 D.1e。Sprint 首要 → **桌面形态 RFC 在队 / 待拍板**。**仍不宣称**端到端闭环；不销 OP-34；不激活 S.3；不发明产品方向。
+> **（P-163 · 保留作溯源）** 桌面形态 RFC 讨论稿已立：[`../rfc/desktop-shell-form.md`](../rfc/desktop-shell-form.md)（基线 [#166](https://github.com/he18718143986-design/IDE/pull/166)/`c097522`；合入 tip [#167](https://github.com/he18718143986-design/IDE/pull/167)/`8e5bad9`）。兑现 D-6/P-141「另立 RFC」；开放问题 DS-1～DS-6 当时待拍。**`TASK-D.1e` 维持 DEFERRED**；立 RFC ≠ 激活 ≠ 开工。
+>
+> **（P-164 现行）** Tina「按建议拍」：桌面形态 RFC **决议已落** [`../rfc/desktop-shell-form.md`](../rfc/desktop-shell-form.md)（基线 [#167](https://github.com/he18718143986-design/IDE/pull/167)/`8e5bad9`）。DS-1=A 本机助手；DS-2=助手+系统浏览器；DS-3=进 DoR 队列但仍 ≠ 开工；DS-4=只先 macOS；DS-5=`stagent open`+最近列表保留、选夹为增强；DS-6=先不排 DoR 重写窗口。**`TASK-D.1e` 维持 `[DEFERRED → v0.2+]`**；**立决议 ≠ 激活实现卡 ≠ 开工**。Sprint 首要 → **RFC 决议已落 / D.1e 仍 DEFERRED / 下一动待 Tina（DoR/立卡另说）**。**仍不宣称**端到端闭环；不销 OP-34；不激活 S.3；不偷偷开工 D.1e。
 
 
 
