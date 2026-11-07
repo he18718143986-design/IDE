@@ -195,3 +195,10 @@
 - **立卡**：Tina 授权按 L.17c §3.4p 三项挂账顺序立卡 — `L.17d`（snapshots · M）、`L.17e`（会话原话候选 · S）、`L.17f`（check playtest 执行债 · M），状态均为 `[NEW_TASK]`。
 - **Sprint**：当前首要 → `TASK-L.17d`（序 d→e→f）。立卡 ≠ 开工；不宣称端到端闭环；不碰 W.9 挂账。
 - **物理 tip**：立卡基线 `b03c97f`（#143）；P-148 代码 tip 仍为 #138/`993e3e9`。
+
+### TASK-L.17d（P-150 · 2026-11-07 · 非 OP）
+
+- **状态回写**：L.17d 已 COMPLETED（PR [#145](https://github.com/he18718143986-design/IDE/pull/145) / `e2b8dd3`）；`GET /api/playtest/reference-snapshots` 经 WebIngestProxy 灌 CompareView `snapshots`；`screenshot_url` 恒 null。
+- **销项**：兑现 L.17c §3.4p **挂账①**（snapshots 前端拉数）。挂账②/③仍由 L.17e / L.17f 承接。
+- **Sprint**：当前首要 → `TASK-L.17e`（序 e→f）。不宣称端到端闭环；不碰 W.9；不新增 OP。
+- **物理 tip**：`e2b8dd3`（#145）。
