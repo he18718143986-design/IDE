@@ -250,4 +250,6 @@
 
 > **P-162 · TASK-AUDITED.1 合入回写（2026-11-07 · 非 OP）**：基于 `main`@`b390254`（[#165](https://github.com/he18718143986-design/IDE/pull/165)）。AUDITED.1 → COMPLETED（§3.4ac）；库层受控边 + Guard；规范 §11.3 / §9.1.1.1 对齐；**未**改 orchestrator；生产路径暂无接线。**诚实**：不宣称端到端闭环 / UI；不销 OP-34。Sprint → **在队清零**（下一张 → **桌面形态 RFC（为 D.1e）**）。仅 docs 回写，不新增 OP。
 
-> **P-163 · 桌面形态 RFC 起草 · 为 D.1e（2026-11-07 · 非 OP）**：基于 `main`@`c097522`（[#166](https://github.com/he18718143986-design/IDE/pull/166)）。新增 [`../rfc/desktop-shell-form.md`](../rfc/desktop-shell-form.md)；兑现 D-6/P-141；**`TASK-D.1e` 维持 DEFERRED**；立 RFC ≠ 激活 ≠ 开工；开放问题 DS-1～DS-6 待 Tina 拍板。Sprint → **桌面形态 RFC 在队 / 待拍板**。仅 docs，不新增 OP；不偷偷开工 D.1e；不激活 S.3；不销 OP-34；不发明产品方向。
+> **P-163 · 桌面形态 RFC 起草 · 为 D.1e（2026-11-07 · 非 OP · 保留作溯源）**：基于 `main`@`c097522`（[#166](https://github.com/he18718143986-design/IDE/pull/166)；合入 tip #167/`8e5bad9`）。新增 [`../rfc/desktop-shell-form.md`](../rfc/desktop-shell-form.md)；兑现 D-6/P-141；**`TASK-D.1e` 维持 DEFERRED**；立 RFC ≠ 激活 ≠ 开工；开放问题当时待拍。仅 docs，不新增 OP。
+>
+> **P-164 · 桌面形态 RFC 决议落档 · DS-1～DS-6（2026-11-07 · 非 OP）**：基于 `main`@`8e5bad9`（[#167](https://github.com/he18718143986-design/IDE/pull/167)）。Tina「按建议拍」：DS-1=A 本机助手；DS-2=助手+系统浏览器；DS-3=进 DoR 队列仍 ≠ 开工；DS-4=只先 macOS；DS-5=`stagent open`+最近列表保留；DS-6=先不排 DoR 窗口。**`TASK-D.1e` 维持 DEFERRED**；**立决议 ≠ 激活 ≠ 开工**。Sprint → **RFC 决议已落 / D.1e 仍 DEFERRED / 下一动待 Tina（DoR/立卡另说）**。仅 docs，不新增 OP；不偷偷开工 D.1e；不激活 S.3；不销 OP-34。
