@@ -595,7 +595,9 @@
 >
 > **（P-153 · 保留作溯源）** 四项 W.9b 挂账已立卡 [`W.9d`](#task-w.9d) / [`W.9e`](#task-w.9e) / [`W.9f`](#task-w.9f) / [`W.9g`](#task-w.9g)（当时均 `[NEW_TASK]` · 立卡≠销项）。
 >
-> **（P-154 现行）** 挂账① → [`TASK-W.9d`](./development-tasks-completed.md#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账②/③/④仍由 [`W.9e`](#task-w.9e) / [`W.9f`](#task-w.9f) / [`W.9g`](#task-w.9g) `[NEW_TASK]` 承接。Sprint 首要 → **`TASK-W.9e`**（序 e→f→g）。**仍不宣称**端到端闭环。
+> **（P-154 · 保留作溯源）** 挂账① → [`TASK-W.9d`](./development-tasks-completed.md#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账②/③/④当时仍由 W.9e/f/g `[NEW_TASK]` 承接；Sprint 首要当时 → `TASK-W.9e`。
+>
+> **（P-155 现行）** 挂账① → [`TASK-W.9d`](./development-tasks-completed.md#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账② → [`TASK-W.9e`](./development-tasks-completed.md#task-w.9e) `[COMPLETED]`（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`）；挂账③/④仍由 [`W.9f`](#task-w.9f) / [`W.9g`](#task-w.9g) `[NEW_TASK]` 承接。Sprint 首要 → **`TASK-W.9f`**（序 f→g）。**仍不宣称**端到端闭环。
 
 
 
@@ -608,91 +610,10 @@
 
 <a id="task-w.9e"></a>
 
-#### 【Task W.9e】受控派工拒绝码穿透诊断 `[NEW_TASK]`
+#### 【Task W.9e】受控派工拒绝码穿透诊断 `[COMPLETED]`
 
-> **立卡（2026-11-07 · P-153）**：兑现 W.9c completed §3.4q 挂账②（沿用 W.9b §3.4o）。仅诊断信息面；**不**放宽门禁。
+> **归档注记（2026-11-07 · P-155）**：本卡已 COMPLETED（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`，squash）。完整卡正文（yaml + 交付清单、默认/未做边界）迁入 [`development-tasks-completed.md` §3.4y](./development-tasks-completed.md#task-w.9e)。**W.9c §3.4q 挂账②销项**。挂账③/④仍由 W.9f/g 承接。**不宣称**端到端闭环；零改 server.ts / W.9f–g；门禁零放宽。
 
-```yaml task-card
-id: TASK-W.9e
-status: NEW_TASK
-contract:
-  intent:
-    title: 受控派工拒绝码穿透诊断
-    description: >-
-      API/WorkerView 在派工被拒时能暴露与 requireControlledDispatch 同源的具体拒绝码
-      （如 E_ADAPTER_NOT_CONTROLLED / E_ADAPTER_SANDBOX_LOCKED / 缺工厂等），
-      不再仅因 isControlledDispatchable 吞异常而只剩泛化文案。
-    risk_level: LOW
-  acceptance:
-    - { id: W9E-P1, check: auto, text: "对可控负例（未注册 / UNCONTROLLED / SANDBOX 无宿主 / 缺工厂），诊断结果含稳定 machine-readable 拒绝码，与 requireControlledDispatch 抛出的 WorkerDispatchError.code 一致或可映射" }
-    - { id: W9E-P2, check: auto, text: "GET /api/workers（或现行 WorkerView 序列化）在 dispatchable=false 时带回该码（字段名在卡内测试写死；可新增可选字段，不得破坏旧客户端必填契约）" }
-    - { id: W9E-P3, check: auto, text: "isControlledDispatchable 若保留 boolean 语义，不得再作为 API 唯一诊断源；门禁放行条件零放宽" }
-    - { id: W9E-P4, check: auto, text: "单测覆盖至少三类不同拒绝码可区分" }
-  scheme_item_ids: [gap-14]
-  scope:
-    writable_paths:
-      - daemon/worker/worker-dispatch.ts
-      - daemon/worker/verify/worker-registration-service.ts
-      - daemon/server.ts
-      - tests/unit/worker-dispatch*.ts
-      - tests/unit/worker-registration*.ts
-    readonly_paths:
-      - daemon/worker/adapter-registry.ts
-  verification:
-    commands:
-      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/worker-dispatch-diagnostic.test.ts] }
-design:
-  approach: >-
-    新增与 requireControlledDispatch 同源的诊断助手（例如返回
-    { ok:true, factory } | { ok:false, code, message }），供 builtinView/storedView/API 使用；
-    isControlledDispatchable 可薄封装该助手。禁止只 catch 后丢 .code。
-  touches:
-    - { path: daemon/worker/worker-dispatch.ts, change: modify, why: 诊断助手暴露拒绝码, symbols: [isControlledDispatchable, requireControlledDispatch] }
-    - { path: daemon/worker/verify/worker-registration-service.ts, change: modify, why: 行投影/API 带出 code, symbols: [builtinView, storedView] }
-    - { path: tests/unit/worker-dispatch-diagnostic.test.ts, change: create, why: 多码可区分, symbols: [] }
-  interfaces:
-    - name: WorkerView.dispatch_blocked_code
-      kind: type
-      signature: "optional string error code when dispatchable=false"
-      consumers: []
-  test_plan:
-    - { acceptance_id: W9E-P1, test_path: tests/unit/worker-dispatch-diagnostic.test.ts, level: unit, case: "拒绝码与 requireControlledDispatch 同源" }
-    - { acceptance_id: W9E-P2, test_path: tests/unit/worker-dispatch-diagnostic.test.ts, level: unit, case: "View/API 带回 code" }
-    - { acceptance_id: W9E-P3, test_path: tests/unit/worker-dispatch-diagnostic.test.ts, level: unit, case: "门禁条件不放宽" }
-    - { acceptance_id: W9E-P4, test_path: tests/unit/worker-dispatch-diagnostic.test.ts, level: unit, case: "三类码可区分" }
-governance:
-  spec_refs:
-    - docs/specs/development-tasks-completed.md#task-w.9c
-    - docs/specs/development-tasks-completed.md#task-w.9b
-  depends_on:
-    - { id: TASK-W.9c, kind: hard }
-    - { id: TASK-W.9b, kind: hard }
-  code_facts:
-    - { ref: "daemon/worker/worker-dispatch.ts::isControlledDispatchable", note: "try requireControlledDispatch; catch { return false } —— 丢 .code" }
-    - { ref: "daemon/worker/verify/worker-registration-service.ts::builtinView", note: "dispatch_blocked_reason 为泛化中文，无 machine-readable code" }
-    - { ref: "daemon/worker/verify/worker-registration-service.ts::storedView", note: "部分分支补文案，仍非稳定码表" }
-    - { ref: "docs/specs/development-tasks-completed.md:2327", note: "§3.4q 挂账②：boolean helper 吞拒绝；API 诊断可能丢具体原因" }
-  non_goals:
-    - 不放宽 requireControlledDispatch / 不改档位语义
-    - 不做 probe 成本收敛（W.9d）/ env 明文（W.9f）/ Cursor 实证（W.9g）
-    - 不宣称端到端闭环
-  fail:
-    - 为「好看」把拒绝改成可派工
-    - 伪造与门禁不一致的成功码
-  adr_revisions: []
-  defaults:
-    - "新增可选字段优于改写既有 reason 字符串为唯一真相"
-  open_questions: []
-  estimate: S
-  invariants:
-    auth: unchanged
-    demo_origin: unchanged
-    illumination: unchanged
-    gateway_write_scope: unchanged
-```
-
-* **背景**：§3.4q 挂账②——诊断信息面收窄。
-* **取舍**：只穿透码，不改门禁。
 
 <a id="task-w.9f"></a>
 

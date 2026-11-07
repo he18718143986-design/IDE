@@ -29,7 +29,7 @@
 | `TASK-W.9b` | `COMPLETED` | `ContainerCliAdapter` + `runInSandbox()` + witness 证据面接线；Cursor 容器协议未实证（[#101](https://github.com/he18718143986-design/IDE/pull/101)/`b98e463`） | [打开](./development-tasks-completed.md#task-w.9b) |
 | `TASK-W.9c` | `COMPLETED` | 自注册工厂闭环（[#107](https://github.com/he18718143986-design/IDE/pull/107)/`d3397a6`；挂账①已销 P-154；②③④仍立卡未销） | [打开](./development-tasks-completed.md#task-w.9c) |
 | `TASK-W.9d` | `COMPLETED` | 行投影 Docker host probe 成本收敛（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`；P-154 回写） | [打开](./development-tasks-completed.md#task-w.9d) |
-| `TASK-W.9e` | `NEW_TASK` | 受控派工拒绝码穿透诊断（P-153 立卡 · 挂账②） | [打开](./development-tasks-active.md#task-w.9e) |
+| `TASK-W.9e` | `COMPLETED` | 受控派工拒绝码穿透诊断（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`；P-155 回写） | [打开](./development-tasks-completed.md#task-w.9e) |
 | `TASK-W.9f` | `NEW_TASK` | 容器环境 API key 明文可读面收敛（P-153 立卡 · 挂账③） | [打开](./development-tasks-active.md#task-w.9f) |
 | `TASK-W.9g` | `NEW_TASK` | Cursor CLI 容器镜像/运行协议实证（P-153 立卡 · 挂账④） | [打开](./development-tasks-active.md#task-w.9g) |
 | `TASK-J.18` | `SPLIT` | Worker 派工墓地门禁（INV-LEDGER-03 工地侧）· 拆分母卡 | [打开](./development-tasks-active.md#task-j.18) |
