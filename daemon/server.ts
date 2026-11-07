@@ -113,6 +113,7 @@ import {
   ensureWorkspaceSession,
 } from "./core/open-workspace";
 import { pickFolderMacOS } from "./desktop/macos-folder-picker";
+import { createEmptyProject } from "./desktop/create-empty-project";
 import {
   appendClientTrace,
   appendDaemonLog,
@@ -3634,6 +3635,57 @@ export class StagentDaemon {
   }
 
   /**
+   * TASK-DS.2：macOS 本机助手 · 新建空项目。
+   * - POST /api/desktop/create-empty-project
+   *     body { parentPath, name }
+   *     → 200 { path } | 4xx { code, error } | 501 E_UNSUPPORTED_PLATFORM | 401
+   * 只回绝对 path；打开工作区仍走 /api/recent-projects/open（不另起鉴权旁路）。
+   * 本切片 ≠ TASK-D.1e 完成；不宣称桌面壳闭环。
+   */
+  private async handleDesktopCreateEmptyProject(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    method: string,
+    pathname: string,
+  ): Promise<void> {
+    if (method !== "POST" || pathname !== "/api/desktop/create-empty-project") {
+      this.sendJson(res, 404, { error: "Not found" });
+      return;
+    }
+    let body: { parentPath?: unknown; name?: unknown };
+    try {
+      body = (await this.readJsonBody(req)) as {
+        parentPath?: unknown;
+        name?: unknown;
+      };
+    } catch (err) {
+      this.sendJson(res, 400, { error: (err as Error).message });
+      return;
+    }
+    const parentPath =
+      typeof body.parentPath === "string" ? body.parentPath : "";
+    const name = typeof body.name === "string" ? body.name : "";
+    const result = createEmptyProject({ parentPath, name });
+    if (!result.ok && result.code === "E_UNSUPPORTED_PLATFORM") {
+      this.sendJson(res, 501, {
+        code: "E_UNSUPPORTED_PLATFORM",
+        error: result.message,
+      });
+      return;
+    }
+    if (!result.ok) {
+      const status = result.code === "E_CREATE_FAILED" ? 500 : 400;
+      this.sendJson(res, status, {
+        code: result.code,
+        error: result.message,
+      });
+      return;
+    }
+    // 只回路径；Token 不进本响应；后续 open 仍走已鉴权 recent-projects/open
+    this.sendJson(res, 200, { path: result.path });
+  }
+
+  /**
    * TASK-D.1c / C.8c：最近项目列表与打开。
    * - GET  /api/recent-projects
    * - POST /api/recent-projects/open  { path }
@@ -5376,6 +5428,15 @@ export class StagentDaemon {
         return;
       }
       this.handleDesktopPickFolder(req, res, method, pathname);
+      return;
+    }
+
+    if (pathname === "/api/desktop/create-empty-project") {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      await this.handleDesktopCreateEmptyProject(req, res, method, pathname);
       return;
     }
 

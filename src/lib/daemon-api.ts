@@ -398,6 +398,38 @@ export async function pickFolderViaDaemon(
 }
 
 /**
+ * TASK-DS.2：经已鉴权 Daemon 在父目录下创建空项目目录；成功只回绝对路径。
+ * 打开工作区请再调 openWorkspaceByPath（复用 #token= / 最近列表通道）。
+ * 与 C.10i createRepoPath（工作区内新建）不同——本接口创建的是项目根空目录。
+ * Token 不进 query / localStorage 明文；调用方勿把 Token 打进日志。
+ */
+export async function createEmptyProjectViaDaemon(
+  conn: DaemonConnection,
+  args: { parentPath: string; name: string },
+): Promise<{ path: string }> {
+  const body = await request<{
+    path?: string;
+    cancelled?: boolean;
+    code?: string;
+    error?: string;
+  }>(conn, "/api/desktop/create-empty-project", {
+    method: "POST",
+    body: JSON.stringify({
+      parentPath: args.parentPath,
+      name: args.name,
+    }),
+  });
+  if (typeof body.path === "string" && body.path.trim()) {
+    return { path: body.path.trim() };
+  }
+  throw new DaemonApiError(
+    500,
+    body.error ?? "新建空项目返回异常",
+    body.code ? { code: body.code, body } : { body },
+  );
+}
+
+/**
  * TASK-C.8c：无钥匙冷开自救——不带 Authorization，仅唤起「当前」Daemon 工作区。
  * 成功后用返回的 launchUrl（含 #token=）整页跳转；调用方勿把 Token 打进日志/UI。
  */

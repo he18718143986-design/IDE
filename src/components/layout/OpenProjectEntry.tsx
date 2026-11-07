@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { FolderOpen } from "lucide-react";
 import {
   canOfferMacFolderPicker,
+  createEmptyProjectViaDaemon,
   fetchRecentProjects,
   loadConnection,
   openWorkspaceByPath,
@@ -12,11 +13,12 @@ import {
 import { resolveOpenProjectEntryPresentation } from "../../lib/open-project-panel";
 
 /**
- * 「打开/切换项目」入口（TASK-D.1c + C.8c + C.9c + DS.1）：
+ * 「打开/切换项目」入口（TASK-D.1c + C.8c + C.9c + DS.1 + DS.2）：
  * - 最近列表一点带钥匙重开；成功即关面板
  * - 无钥匙：一键重开当前会话；成功即关
  * - 粘贴绝对路径打开（C.8c）
- * - macOS：系统选夹（DS.1 本机助手；≠ D.1e 全量桌面壳）→ 再走 openWorkspaceByPath
+ * - macOS：系统选夹（DS.1）→ 再走 openWorkspaceByPath
+ * - macOS：新建空项目（DS.2：名 → 选父目录 → mkdir → open）；≠ D.1e 全量桌面壳
  * - 已连接降级为「切换项目」；默认收起（C.9a/C.9c）
  */
 export interface OpenProjectEntryProps {
@@ -50,6 +52,8 @@ export function OpenProjectEntry({
   const [openingPath, setOpeningPath] = useState<string | null>(null);
   const [pastePath, setPastePath] = useState("");
   const [pickingFolder, setPickingFolder] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [creatingEmpty, setCreatingEmpty] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const offerFolderPicker = canOfferMacFolderPicker();
   const [hasToken, setHasToken] = useState(() =>
@@ -175,7 +179,43 @@ export function OpenProjectEntry({
     }
   };
 
-  const busy = openingPath !== null || pickingFolder;
+  const createEmptyProject = async () => {
+    const name = newProjectName.trim();
+    if (!name) {
+      setError("请先填写新项目名称。");
+      return;
+    }
+    setCreatingEmpty(true);
+    setError(null);
+    try {
+      const conn = loadConnection();
+      if (!conn.token) {
+        setError("还没连上。请先点「一键重开（带钥匙）」。");
+        return;
+      }
+      // 复用 DS.1 选夹选父目录；取消则不创建
+      const picked = await pickFolderViaDaemon(conn);
+      if ("cancelled" in picked && picked.cancelled) {
+        return;
+      }
+      if (!("path" in picked)) {
+        setError("未选到父目录。");
+        return;
+      }
+      const created = await createEmptyProjectViaDaemon(conn, {
+        parentPath: picked.path,
+        name,
+      });
+      setNewProjectName("");
+      await reopen(created.path);
+    } catch (err) {
+      setError((err as Error).message || "新建空项目失败");
+    } finally {
+      setCreatingEmpty(false);
+    }
+  };
+
+  const busy = openingPath !== null || pickingFolder || creatingEmpty;
   const presentation = resolveOpenProjectEntryPresentation({
     hasSession: hasToken,
   });
@@ -279,7 +319,7 @@ export function OpenProjectEntry({
             ) : null}
             {!loading && hasToken && items && items.length === 0 ? (
               <p className="opacity-70" data-testid="recent-projects-empty">
-                还没有最近项目。可用「选择文件夹」或粘贴路径打开；成功后会出现在这里。
+                还没有最近项目。可用「新建空项目」「选择文件夹」或粘贴路径打开；成功后会出现在这里。
               </p>
             ) : null}
             {!loading && hasToken && items && items.length > 0 ? (
@@ -315,6 +355,42 @@ export function OpenProjectEntry({
               </ul>
             ) : null}
           </div>
+
+          {offerFolderPicker ? (
+            <div data-testid="create-empty-project-open" className="space-y-1">
+              <p className="font-medium opacity-90">新建空项目</p>
+              <p className="opacity-70">
+                填写名称后选父目录，在本机创建空文件夹并带钥匙打开（DS.2
+                本机助手切片；≠ 完整桌面壳 / ≠ D.1e）。
+              </p>
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  data-testid="create-empty-project-name"
+                  value={newProjectName}
+                  disabled={!hasToken || busy}
+                  placeholder={hasToken ? "新项目名称" : "先一键重开后再新建"}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void createEmptyProject();
+                    }
+                  }}
+                  className="min-w-0 flex-1 rounded border border-border bg-background px-2 py-1 disabled:opacity-50"
+                />
+                <button
+                  type="button"
+                  data-testid="create-empty-project-button"
+                  disabled={!hasToken || busy}
+                  onClick={() => void createEmptyProject()}
+                  className="shrink-0 rounded border border-border bg-background px-2 py-1 hover:bg-accent disabled:opacity-50"
+                >
+                  {creatingEmpty ? "正在创建…" : hasToken ? "新建…" : "先重开"}
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           {offerFolderPicker ? (
             <div data-testid="pick-folder-open" className="space-y-1">
