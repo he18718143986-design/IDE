@@ -17,11 +17,14 @@ import {
   type CodingWorkerAdapter,
 } from "../worker-adapter.interface";
 import {
+  CONTAINER_SECRET_ENV_KEYS,
+  containerSecretFile,
   runInSandbox,
   sandboxWitness,
   type ContainerHostPort,
   type SandboxRunInput,
   type SandboxRunOutcome,
+  type SandboxSecretFile,
 } from "./container-host";
 
 /**
@@ -49,21 +52,45 @@ export const WORKER_EXECUTION_PATH_COMPARISON = {
   },
 } as const;
 
-const SAFE_CONTAINER_ENV_KEYS = new Set([
-  "PATH",
-  "HOME",
-  "LANG",
-  "LLM_API_KEY",
-  "OPENAI_API_KEY",
-  "ANTHROPIC_API_KEY",
-  "CURSOR_API_KEY",
-]);
-const SENSITIVE_ENV_KEYS = new Set([
-  "LLM_API_KEY",
-  "OPENAI_API_KEY",
-  "ANTHROPIC_API_KEY",
-  "CURSOR_API_KEY",
-]);
+/** 允许以普通 Env 直通容器的键（W.9f：四类 API key 已移出） */
+const SAFE_CONTAINER_ENV_KEYS = new Set(["PATH", "HOME", "LANG"]);
+
+/**
+ * 把调用方 env 拆成「普通 Env」与「secret 文件挂载」。
+ * 四类 API key 只进 secretFiles；其它非白名单键仍拒绝。
+ */
+export function splitContainerEnvAndSecrets(
+  env: Record<string, string> | undefined,
+): {
+  plainEnv: Record<string, string> | undefined;
+  secretFiles: SandboxSecretFile[];
+  sensitiveValues: string[];
+} {
+  const plainEnv: Record<string, string> = {};
+  const secretFiles: SandboxSecretFile[] = [];
+  const sensitiveValues: string[] = [];
+  for (const [key, value] of Object.entries(env ?? {})) {
+    if (CONTAINER_SECRET_ENV_KEYS.has(key)) {
+      if (value.length > 0) {
+        secretFiles.push(containerSecretFile(key, value));
+        sensitiveValues.push(value);
+      }
+      continue;
+    }
+    if (!SAFE_CONTAINER_ENV_KEYS.has(key)) {
+      throw new ContainerCliExecutionError(
+        "E_SANDBOX_CLI_REJECTED",
+        `container CLI environment contains non-allowlisted key(s): ${key}`,
+      );
+    }
+    plainEnv[key] = value;
+  }
+  return {
+    plainEnv: Object.keys(plainEnv).length === 0 ? undefined : plainEnv,
+    secretFiles,
+    sensitiveValues,
+  };
+}
 
 export interface ContainerCliExecutionInput {
   host: ContainerHostPort;
@@ -193,21 +220,15 @@ function estimateTokens(text: string): number {
 export async function executeContainerCli(
   input: ContainerCliExecutionInput,
 ): Promise<ContainerCliExecutionResult> {
-  const unsafeEnv = Object.keys(input.env ?? {}).filter(
-    (key) => !SAFE_CONTAINER_ENV_KEYS.has(key),
-  );
-  if (unsafeEnv.length > 0) {
-    throw new ContainerCliExecutionError(
-      "E_SANDBOX_CLI_REJECTED",
-      `container CLI environment contains non-allowlisted key(s): ${unsafeEnv.join(", ")}`,
-    );
-  }
+  const { plainEnv, secretFiles, sensitiveValues } =
+    splitContainerEnvAndSecrets(input.env);
   const sandboxInput: SandboxRunInput = {
     worktreeRoot: input.worktreeRoot,
     argv: [...input.argv],
     networkPolicy: input.networkPolicy ?? "DENY",
     ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
-    ...(input.env === undefined ? {} : { env: input.env }),
+    ...(plainEnv === undefined ? {} : { env: plainEnv }),
+    ...(secretFiles.length === 0 ? {} : { secretFiles }),
     ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
     ...(input.allowedTargets === undefined
       ? {}
@@ -253,10 +274,8 @@ export async function executeContainerCli(
   }));
   const redact = (text: string): string => {
     let safe = text;
-    for (const [key, value] of Object.entries(input.env ?? {})) {
-      if (SENSITIVE_ENV_KEYS.has(key) && value.length > 0) {
-        safe = safe.split(value).join("[REDACTED]");
-      }
+    for (const value of sensitiveValues) {
+      if (value.length > 0) safe = safe.split(value).join("[REDACTED]");
     }
     return safe;
   };

@@ -1,13 +1,17 @@
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import {
+  CONTAINER_SECRET_ENV_KEYS,
   SandboxRejectedError,
   validateSandboxInput,
   type ContainerHostPort,
   type SandboxMount,
   type SandboxRunInput,
   type SandboxRunOutcome,
+  type SandboxSecretFile,
 } from "../sandbox/container-host";
 import { spawnManaged, type ManagedProcess } from "./process-host";
 
@@ -103,6 +107,60 @@ function clientEnv(): NodeJS.ProcessEnv {
   return out;
 }
 
+/** 宿主侧物化后的 secret 挂载（临时文件 → 容器只读） */
+export interface MaterializedSecretMount {
+  hostPath: string;
+  containerPath: string;
+  pathEnvKey?: string;
+  /** 临时目录；执行结束后整目录删除 */
+  tempDir: string;
+}
+
+/**
+ * 把 `secretFiles` 写成宿主临时文件（mode 0600）。
+ * 调用方必须在 finally 里 `cleanupMaterializedSecrets`。
+ */
+export function materializeSecretFiles(
+  files: readonly SandboxSecretFile[] | undefined,
+  containerWorkRoot: string,
+): MaterializedSecretMount[] {
+  const out: MaterializedSecretMount[] = [];
+  for (const file of files ?? []) {
+    const containerPath = assertMountTarget(
+      file.containerPath,
+      containerWorkRoot,
+    );
+    if (file.content.length === 0) continue;
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "stagent-sec-"));
+    const hostPath = path.join(tempDir, "value");
+    fs.writeFileSync(hostPath, file.content, { encoding: "utf8", mode: 0o600 });
+    try {
+      fs.chmodSync(hostPath, 0o600);
+    } catch {
+      // best-effort on platforms that ignore mode in writeFileSync
+    }
+    out.push({
+      hostPath,
+      containerPath,
+      tempDir,
+      ...(file.pathEnvKey === undefined ? {} : { pathEnvKey: file.pathEnvKey }),
+    });
+  }
+  return out;
+}
+
+export function cleanupMaterializedSecrets(
+  mounts: readonly MaterializedSecretMount[],
+): void {
+  for (const mount of mounts) {
+    try {
+      fs.rmSync(mount.tempDir, { recursive: true, force: true });
+    } catch {
+      // 清理失败不覆盖真实终止态
+    }
+  }
+}
+
 /** 容器内挂载目标必须是绝对路径，且不得覆盖 Worktree 挂载点（否则等于换根） */
 function assertMountTarget(target: string, containerWorkRoot: string): string {
   if (!target.startsWith("/")) {
@@ -190,8 +248,15 @@ export class DockerContainerHost implements ContainerHostPort {
     return this.opts.dockerPath ?? "docker";
   }
 
-  /** 构造 `docker run` argv（纯构建，便于逐字断言） */
-  buildArgs(input: SandboxRunInput, name: string): string[] {
+  /**
+   * 构造 `docker run` argv（纯构建，便于逐字断言）。
+   * `secrets` 为已物化的只读挂载；测试可不传。不得把 secret 明文塞进 `-e`。
+   */
+  buildArgs(
+    input: SandboxRunInput,
+    name: string,
+    secrets: readonly MaterializedSecretMount[] = [],
+  ): string[] {
     const hostRoot = path.resolve(input.worktreeRoot);
     const cwd = input.cwd;
     let containerCwd = this.containerWorkRoot;
@@ -247,7 +312,19 @@ export class DockerContainerHost implements ContainerHostPort {
     for (const mount of input.mounts ?? []) {
       args.push("-v", this.mountArg(mount));
     }
+    for (const secret of secrets) {
+      args.push("-v", `${secret.hostPath}:${secret.containerPath}:ro`);
+      if (secret.pathEnvKey !== undefined && secret.pathEnvKey.length > 0) {
+        args.push("-e", `${secret.pathEnvKey}=${secret.containerPath}`);
+      }
+    }
     for (const [key, value] of Object.entries(input.env ?? {})) {
+      if (CONTAINER_SECRET_ENV_KEYS.has(key)) {
+        throw new SandboxRejectedError(
+          "SECRET_IN_PLAIN_ENV",
+          `refusing to pass ${key} as plain docker -e; use secretFiles (TASK-W.9f)`,
+        );
+      }
       args.push("-e", `${key}=${value}`);
     }
     args.push(this.image, ...input.argv);
@@ -300,12 +377,18 @@ export class DockerContainerHost implements ContainerHostPort {
     const name = `${this.opts.namePrefix ?? "stagent-sbx"}-${randomUUID().slice(0, 12)}`;
     let safe: SandboxRunInput;
     let args: string[];
+    let materialized: MaterializedSecretMount[] = [];
     try {
       // 宿主侧再校验一次（纵深防御）：即便有人绕过 `runInSandbox()` 直接调本类，
       // 也拿不到「挂载宿主根 / cwd 越界」的容器。
       safe = validateSandboxInput(input);
-      args = this.buildArgs(safe, name);
+      materialized = materializeSecretFiles(
+        safe.secretFiles,
+        this.containerWorkRoot,
+      );
+      args = this.buildArgs(safe, name, materialized);
     } catch (err) {
+      cleanupMaterializedSecrets(materialized);
       if (err instanceof SandboxRejectedError) {
         return rejected(err.code, err.message);
       }
@@ -322,47 +405,52 @@ export class DockerContainerHost implements ContainerHostPort {
         ...(signal === undefined ? {} : { signal }),
       });
     } catch (err) {
+      cleanupMaterializedSecrets(materialized);
       return rejected(
         "HOST_UNAVAILABLE",
         `failed to launch docker client: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
 
-    const stdout: string[] = [];
-    const drain = (async () => {
-      for await (const line of proc.lines) stdout.push(line);
-    })();
+    try {
+      const stdout: string[] = [];
+      const drain = (async () => {
+        for await (const line of proc.lines) stdout.push(line);
+      })();
 
-    const timeoutMs = input.timeoutMs ?? 60_000;
-    const first = await Promise.race([
-      proc.exited.then(() => "exit" as const),
-      new Promise<"timeout">((resolve) =>
-        setTimeout(() => resolve("timeout"), timeoutMs),
-      ),
-    ]);
+      const timeoutMs = input.timeoutMs ?? 60_000;
+      const first = await Promise.race([
+        proc.exited.then(() => "exit" as const),
+        new Promise<"timeout">((resolve) =>
+          setTimeout(() => resolve("timeout"), timeoutMs),
+        ),
+      ]);
 
-    let via: SandboxRunOutcome["via"] = "exit";
-    if (first === "timeout") {
-      via = "timeout";
-      await proc.stop();
+      let via: SandboxRunOutcome["via"] = "exit";
+      if (first === "timeout") {
+        via = "timeout";
+        await proc.stop();
+      }
+      const { code } = await proc.exited;
+      await drain.catch(() => undefined);
+
+      if (via === "exit" && signal?.aborted === true) via = "SIGKILL";
+
+      if (via !== "exit") {
+        // docker 客户端被杀不会带走容器：显式清理，避免孤儿容器
+        this.cleanupContainer(name);
+      }
+
+      return {
+        exitCode: code,
+        stdout: stdout.join("\n"),
+        stderr: proc.stderr(),
+        via,
+        durationMs: Date.now() - started,
+      };
+    } finally {
+      cleanupMaterializedSecrets(materialized);
     }
-    const { code } = await proc.exited;
-    await drain.catch(() => undefined);
-
-    if (via === "exit" && signal?.aborted === true) via = "SIGKILL";
-
-    if (via !== "exit") {
-      // docker 客户端被杀不会带走容器：显式清理，避免孤儿容器
-      this.cleanupContainer(name);
-    }
-
-    return {
-      exitCode: code,
-      stdout: stdout.join("\n"),
-      stderr: proc.stderr(),
-      via,
-      durationMs: Date.now() - started,
-    };
   }
 
   private cleanupContainer(name: string): void {

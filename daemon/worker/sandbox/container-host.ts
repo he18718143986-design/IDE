@@ -27,7 +27,14 @@ export type SandboxRejectionCode =
    * 与门禁的 `E_ADAPTER_SANDBOX_LOCKED` 互补：门禁在派工前拒，本码在执行时拒；
    * 两者都失败关闭，任何一方都不得降级为「本地照常执行」。
    */
-  | "HOST_UNAVAILABLE";
+  | "HOST_UNAVAILABLE"
+  /**
+   * TASK-W.9f：模型/CLI API key 不得以普通 Env 明文进入容器；
+   * 必须走 `secretFiles` 只读挂载通道。
+   */
+  | "SECRET_IN_PLAIN_ENV"
+  /** TASK-W.9f：secret 挂载目标非法（非绝对路径 / 覆盖 Worktree 挂载点） */
+  | "SECRET_MOUNT_INVALID";
 
 export class SandboxRejectedError extends Error {
   readonly code: SandboxRejectionCode;
@@ -47,6 +54,46 @@ export interface SandboxMount {
   readonly?: boolean;
 }
 
+/**
+ * TASK-W.9f：只读 secret 文件挂载（由 DockerContainerHost 物化到宿主临时文件后 `-v :ro`）。
+ * 不走 `mounts`/`assertMountAllowed`（那些要求 source 落在 Worktree 内）；
+ * 凭据内容只进临时文件与容器内约定路径，不得进普通 Env / 见证 / 日志。
+ */
+export interface SandboxSecretFile {
+  /** 容器内绝对路径，例如 `/run/secrets/LLM_API_KEY` */
+  containerPath: string;
+  /** 明文内容（仅宿主侧临时文件与容器内文件；禁止写入日志/证据） */
+  content: string;
+  /**
+   * 可选：注入「路径指针」环境变量，值为 `containerPath`（不是密钥明文）。
+   * 例如 `LLM_API_KEY_FILE=/run/secrets/LLM_API_KEY`。
+   */
+  pathEnvKey?: string;
+}
+
+/** 不得再经普通 Env 直通的四类 API key（W.9f） */
+export const CONTAINER_SECRET_ENV_KEYS = new Set([
+  "LLM_API_KEY",
+  "OPENAI_API_KEY",
+  "ANTHROPIC_API_KEY",
+  "CURSOR_API_KEY",
+]);
+
+/** 容器内约定 secret 目录（只读挂载目标前缀） */
+export const CONTAINER_SECRET_MOUNT_DIR = "/run/secrets";
+
+/** 由 env 键名构造约定路径的 secret 文件描述 */
+export function containerSecretFile(
+  envKey: string,
+  content: string,
+): SandboxSecretFile {
+  return {
+    containerPath: `${CONTAINER_SECRET_MOUNT_DIR}/${envKey}`,
+    content,
+    pathEnvKey: `${envKey}_FILE`,
+  };
+}
+
 export interface SandboxRunInput {
   /** 任务 Worktree 绝对路径：唯一允许挂载进容器的宿主根 */
   worktreeRoot: string;
@@ -56,13 +103,22 @@ export interface SandboxRunInput {
   argv: string[];
   /** 额外挂载请求（逐项经围栏校验） */
   mounts?: SandboxMount[];
+  /**
+   * TASK-W.9f：只读 secret 文件（宿主物化后挂载；不经 Worktree mounts 围栏）。
+   * 与 `env` 互斥于 `CONTAINER_SECRET_ENV_KEYS`：那些键只能出现在这里。
+   */
+  secretFiles?: SandboxSecretFile[];
   /** 网络策略（缺省 DENY） */
   networkPolicy?: NetworkPolicy;
   /** `EXPLICIT_TARGETS` 时允许的出口目标 */
   allowedTargets?: string[];
   /** 超时毫秒（缺省 60_000） */
   timeoutMs?: number;
-  /** 容器内环境变量（不含任何宿主凭据） */
+  /**
+   * 容器内普通环境变量。
+   * 不得包含 `CONTAINER_SECRET_ENV_KEYS`（否则 `SECRET_IN_PLAIN_ENV`）；
+   * 密钥改走 `secretFiles`。
+   */
   env?: Record<string, string>;
 }
 
@@ -224,6 +280,35 @@ export function validateSandboxInput(input: SandboxRunInput): SandboxRunInput {
 
   for (const mount of input.mounts ?? []) {
     assertMountAllowed(root, mount.source);
+  }
+
+  for (const key of Object.keys(input.env ?? {})) {
+    if (CONTAINER_SECRET_ENV_KEYS.has(key)) {
+      throw new SandboxRejectedError(
+        "SECRET_IN_PLAIN_ENV",
+        `secret key ${key} must not be passed as plain container Env; use secretFiles (TASK-W.9f)`,
+      );
+    }
+  }
+
+  for (const secret of input.secretFiles ?? []) {
+    if (
+      typeof secret.containerPath !== "string" ||
+      !secret.containerPath.startsWith("/") ||
+      secret.containerPath === "/" ||
+      path.posix.normalize(secret.containerPath) !== secret.containerPath
+    ) {
+      throw new SandboxRejectedError(
+        "SECRET_MOUNT_INVALID",
+        `secret containerPath must be a normalized absolute path: ${String(secret.containerPath)}`,
+      );
+    }
+    if (typeof secret.content !== "string") {
+      throw new SandboxRejectedError(
+        "SECRET_MOUNT_INVALID",
+        "secret content must be a string",
+      );
+    }
   }
 
   assertNetworkAllowed(input.networkPolicy ?? "DENY", input.allowedTargets);
