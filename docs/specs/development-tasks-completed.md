@@ -5378,3 +5378,183 @@ governance:
     gateway_write_scope: unchanged
   delivered: { pr: 171, commit: 1701cab0b9bb73f5858f229c0851a6047455b5ad }
 ```
+
+### 3.4ae macOS 本机助手 · 新建空项目开进工作台（DS.2 · RFC 切片）
+
+<a id="task-ds.2"></a>
+
+#### 【Task DS.2】macOS 本机助手 · 新建空项目开进工作台（RFC 切片）`[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#174](https://github.com/he18718143986-design/IDE/pull/174)/`eacd1012438638ea58c3cfd292026aa6b1abd03c`，squash；立卡基线 #173/`2a7c404` P-168 之后）。
+- **交付**：writable_paths 内 8 文件——`daemon/desktop/create-empty-project.ts`（名校验 + mkdir 非 recursive；E_EXISTS/非法名/父不存在明确失败）+ `daemon/server.ts` `POST /api/desktop/create-empty-project`（AUTH+loopback，同 pick-folder 门禁；200 仅 `{ path }`，无 token/launchUrl）+ `src/lib/daemon-api.ts` + OpenProjectEntry/Welcome darwin「新建空项目」入口；流程 名→pick-folder 选父目录→create→reopen/openWorkspaceByPath；取消选夹不 create；与 `stagent open`/最近/粘贴/DS.1 选夹共存。三套单测 16 passed（unit 6 + daemon 5 + UI 5）；tsc 0；回归 port-map+DS.1 UI 8 passed；端口 3700–3719；CI：ubuntu+macOS unit 绿（flake 重跑后）；windows unit 仍红（同 DS.1）。
+- **销项**：兑现 RFC §7 DS-1/DS-2/DS-4/DS-5 第二切片（新建空项目增强）；DoR 入队后立卡→实现闭环。
+- **诚实口径 / grep 自证**：无 electron/tauri 依赖；create 响应不含 token/launchUrl；无 `?token=` 旁路；**未**改 `TASK-D.1e` 出 DEFERRED；**本卡完成 ≠ D.1e 完成**；未碰 orchestrator/supervisor/Seal；不宣称端到端闭环 / 已接近 Cursor。
+- **残余 / 默认未做（不宣称关闭）**：① Electron/Tauri/单窗 IDE；② Win/Linux；③ DoR 重写窗口（DS-6）；④ 打包/签名/自动更新完整桌面分发；⑤ D.1e 全量「同壳 Import/New」；⑥ Import 压缩包/git clone/模板脚手架；⑦ **不**销 OP-34；⑧ **不**激活 S.3。
+- **边界**：**窄口径**——macOS 新建空项目增强 + 既有 open 通道；不是 D.1e 全量；不是桌面壳产品闭环。
+
+```yaml task-card
+id: TASK-DS.2
+status: COMPLETED
+contract:
+  intent:
+    title: macOS 本机助手 · 新建空项目开进工作台（RFC 切片）
+    description: >-
+      按 RFC desktop-shell-form §7 已拍决议，交付第二可施工切片：在 macOS 欢迎页/打开项目面板提供
+      「新建空项目」——用户输入项目名 → 调系统选夹选父目录（复用 DS.1 的 POST /api/desktop/pick-folder /
+      macos-folder-picker）→ Daemon 在父目录下创建空目录（已存在则明确失败、不覆盖、不半创建）→
+      复用既有 open / ensureWorkspaceSession / #token= / recent-projects 进入工作台。与 stagent open、
+      最近列表、粘贴路径、DS.1「选择文件夹」共存。工作台仍主要是系统浏览器（DS-2）。只先 macOS（DS-4）。
+      不激活 TASK-D.1e；不宣称已接近 Cursor 或端到端闭环。
+    risk_level: MEDIUM
+  acceptance:
+    - id: DS2-P1
+      check: auto
+      text: >-
+        darwin：「新建空项目」可走完——合法名 → 选父目录 → 空目录创建成功；取消选夹不创建；非法名 /
+        父目录不存在 / 目标已存在 → 明确失败且不半创建
+    - id: DS2-P2
+      check: auto
+      text: >-
+        创建成功后走既有 open / ensureWorkspaceSession / #token= / 写入最近列表；AUTH+loopback；
+        响应与日志无 Token 明文；不另起鉴权旁路
+    - id: DS2-P3
+      check: auto
+      text: >-
+        欢迎页/OpenProjectEntry 在 darwin 呈现「新建空项目」，与最近/粘贴/「选择文件夹」同屏共存；
+        非 darwin 不展示假入口或标已完成
+    - id: DS2-P4
+      check: auto
+      text: >-
+        单测锁定 mkdir 正负例 + API 鉴权/平台门禁 + UI 共存；grep：无 electron/tauri 新依赖；
+        无 Token 进 query/localStorage
+    - id: DS2-P5
+      check: auto
+      text: >-
+        鉴权/Demo Origin/点亮三证/网关写范围不变；不旁路 ADR-0018；不扩大 Supervisor 广播面；
+        不激活 S.3；不改 D.1e 出 DEFERRED
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/desktop/create-empty-project.ts
+      - daemon/server.ts
+      - src/lib/daemon-api.ts
+      - src/components/layout/OpenProjectEntry.tsx
+      - src/components/layout/ProjectWelcomePage.tsx
+      - tests/unit/create-empty-project.test.ts
+      - tests/daemon/create-empty-project-api.test.ts
+      - tests/ui/open-project-new-empty.test.tsx
+    readonly_paths:
+      - daemon/desktop/macos-folder-picker.ts
+      - daemon/core/open-workspace.ts
+      - daemon/core/recent-projects.ts
+      - docs/rfc/desktop-shell-form.md
+      - docs/specs/development-tasks-active.md
+      - docs/specs/supervisor.md
+      - docs/adr/0008-demo-isolated-origin.md
+      - docs/adr/0018-intent-to-executable-seal.md
+      - bin/stagent.ts
+      - src/lib/open-project-panel.ts
+  verification:
+    commands:
+      - { alias: unit-create, executable: npx, args: [vitest, run, tests/unit/create-empty-project.test.ts] }
+      - { alias: daemon-create, executable: npx, args: [vitest, run, tests/daemon/create-empty-project-api.test.ts] }
+      - { alias: ui-create, executable: npx, args: [vitest, run, tests/ui/open-project-new-empty.test.tsx] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) 新建 daemon/desktop/create-empty-project.ts：校验项目名（禁空/路径分隔/相对段）；
+    在已解析的父目录下 mkdir（recursive:false 或显式存在检查）；目标已存在→明确错误；
+    失败不半创建。2) daemon/server.ts 增 create-empty-project 控制面（AUTH+loopback；
+    父目录可先经 DS.1 pick-folder 取得）；创建成功后复用 recent-projects/open /
+    openWorkspaceByPath，禁止另起鉴权旁路。3) daemon-api 增 createEmptyProjectViaDaemon
+    （或等价）；UI 调 pick-folder 选父目录后再调 create。4) OpenProjectEntry /
+    ProjectWelcomePage 增「新建空项目」入口（仅 darwin / 与 canOfferMacFolderPicker 同门禁），
+    与最近/粘贴/「选择文件夹」同屏共存。5) 单测锁 mkdir 正负例；Daemon/UI 锁鉴权、
+    平台门禁与共存。冲突时 Supervisor / ADR-0018 / ADR-008 优先。
+  touches:
+    - { path: daemon/desktop/create-empty-project.ts, change: create, why: 空项目目录创建内核（名校验+mkdir 正负例）, symbols: [createEmptyProject] }
+    - { path: daemon/server.ts, change: modify, why: 鉴权 loopback API 暴露新建空项目, symbols: [handleDesktopCreateEmptyProject] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: 前端调用 create-empty-project, symbols: [createEmptyProjectViaDaemon] }
+    - { path: src/components/layout/OpenProjectEntry.tsx, change: modify, why: 新建空项目入口与最近/粘贴/选夹共存, symbols: [] }
+    - { path: src/components/layout/ProjectWelcomePage.tsx, change: modify, why: 欢迎页文案/入口不抢 D.1e 全量, symbols: [] }
+    - { path: tests/unit/create-empty-project.test.ts, change: create, why: mkdir 正负例锁定, symbols: [] }
+    - { path: tests/daemon/create-empty-project-api.test.ts, change: create, why: API 鉴权与平台门禁, symbols: [] }
+    - { path: tests/ui/open-project-new-empty.test.tsx, change: create, why: UI 共存与 darwin 入口, symbols: [] }
+  interfaces:
+    - kind: http
+      name: "POST /api/desktop/create-empty-project"
+      signature: "{ parentPath: string, name: string } → 200 { path: string } | 4xx { code, error } | 501 { code: 'E_UNSUPPORTED_PLATFORM' } | 401"
+      consumers: []
+      note: "AUTH+loopback；父目录绝对路径；目标已存在/非法名明确失败；Token 不进 query/localStorage；200 仅 { path }"
+  test_plan:
+    - { acceptance_id: DS2-P1, test_path: tests/unit/create-empty-project.test.ts, level: unit, case: "合法名：在父目录下创建空目录并回绝对 path" }
+    - { acceptance_id: DS2-P1, test_path: tests/unit/create-empty-project.test.ts, level: unit, case: "非法名：空 / 分隔符 / . / .. → E_INVALID_NAME，且不创建" }
+    - { acceptance_id: DS2-P1, test_path: tests/unit/create-empty-project.test.ts, level: unit, case: "父目录不存在 → E_PARENT_NOT_FOUND；父路径是文件 → E_PARENT_NOT_DIR" }
+    - { acceptance_id: DS2-P1, test_path: tests/unit/create-empty-project.test.ts, level: unit, case: "目标已存在 → E_EXISTS，不覆盖、不半创建" }
+    - { acceptance_id: DS2-P1, test_path: tests/ui/open-project-new-empty.test.tsx, level: unit, case: "选夹取消：不调用 create-empty-project" }
+    - { acceptance_id: DS2-P2, test_path: tests/daemon/create-empty-project-api.test.ts, level: unit, case: "未鉴权拒绝 create-empty-project（401）" }
+    - { acceptance_id: DS2-P2, test_path: tests/daemon/create-empty-project-api.test.ts, level: unit, case: "鉴权后创建成功可走 recent-projects/open；#token=；响应无 Token" }
+    - { acceptance_id: DS2-P2, test_path: tests/ui/open-project-new-empty.test.tsx, level: unit, case: "新建：名 → pick-folder → create-empty-project → open（#token=）" }
+    - { acceptance_id: DS2-P3, test_path: tests/ui/open-project-new-empty.test.tsx, level: unit, case: "darwin：显示「新建空项目」，与最近/粘贴/选择文件夹共存" }
+    - { acceptance_id: DS2-P3, test_path: tests/ui/open-project-new-empty.test.tsx, level: unit, case: "非 darwin：不展示假新建空项目入口" }
+    - { acceptance_id: DS2-P3, test_path: tests/ui/open-project-new-empty.test.tsx, level: unit, case: "欢迎页经 OpenProjectEntry 露出新建空项目（≠ 宣称 D.1e 完成）" }
+    - { acceptance_id: DS2-P4, test_path: tests/unit/create-empty-project.test.ts, level: unit, case: "DS2-P4：源码无 electron/tauri 依赖导入；无 Token 明文落盘字面量" }
+    - { acceptance_id: DS2-P5, test_path: tests/daemon/create-empty-project-api.test.ts, level: unit, case: "DS2-P5：不旁路鉴权；create 响应不含 token / launchUrl" }
+governance:
+  spec_refs:
+    - docs/rfc/desktop-shell-form.md#7-已拍决议tina--2026-11-07-按建议拍
+    - docs/specs/system-architecture.md
+    - docs/adr/0008-demo-isolated-origin.md
+    - docs/adr/0018-intent-to-executable-seal.md
+    - docs/specs/supervisor.md
+    - docs/specs/development-tasks-active.md#task-d.1e
+    - docs/specs/development-tasks-completed.md#task-ds.1
+  depends_on:
+    - { id: TASK-DS.1, kind: hard }
+    - { id: TASK-D.1c, kind: soft }
+    - { id: TASK-D.1d, kind: soft }
+    - { id: TASK-C.8c, kind: soft }
+    - { id: TASK-D.1e, kind: soft }
+  code_facts:
+    - { ref: "daemon/desktop/macos-folder-picker.ts:101-147", note: "DS.1 选夹内核已落地；本卡复用 pickFolderMacOS 选父目录，不重写选夹" }
+    - { ref: "daemon/desktop/create-empty-project.ts:86-193", note: "名校验 + mkdir 非 recursive；E_EXISTS / E_INVALID_NAME / E_PARENT_* / E_UNSUPPORTED_PLATFORM" }
+    - { ref: "daemon/server.ts:3645-3700", note: "POST /api/desktop/create-empty-project AUTH+loopback；200 仅 { path }" }
+    - { ref: "src/lib/daemon-api.ts:406-430", note: "createEmptyProjectViaDaemon；与 canOfferMacFolderPicker 同门禁；成功后 openWorkspaceByPath" }
+    - { ref: "src/components/layout/OpenProjectEntry.tsx:182-220", note: "darwin「新建空项目」与最近/粘贴/选夹共存" }
+    - { ref: "bin/stagent.ts:6-20", note: "stagent open 保留（DS-5）；本卡不改 CLI 主路径为唯一入口" }
+  non_goals:
+    - 不做 Electron / Tauri / 单窗 IDE 壳（DS-1/DS-2 已拍）
+    - 不做 Win / Linux（DS-4）
+    - 不排 DoR 重写窗口（DS-6）；不重写 TASK-D.1e 卡正文出 DEFERRED
+    - 不废除 stagent open / 最近列表 / 粘贴路径 / DS.1 选夹（DS-5：新建为增强）
+    - 不做 Import 压缩包 / git clone / 模板脚手架
+    - 不推翻 D.1 鉴权；不把 Token 写入 query / localStorage 明文
+    - 不把 Demo 改 Daemon 同源（ADR-008）
+    - 不旁路 ADR-0018 Seal；不扩大 Supervisor 广播面；不激活 S.3
+    - 不销 OP-34；不宣称端到端闭环 / 已接近 Cursor Open
+    - 不打包 / 签名 / 自动更新完整桌面分发（另卡）
+    - 不改 orchestrator / supervisor / Seal 本体
+  fail:
+    - 未做空目录创建却标完成，或覆盖已有目录
+    - 新增 electron / tauri 依赖完成本卡
+    - 非 darwin 路径假装已支持新建空项目入口
+    - 回退 stagent open / 最近列表 / 粘贴路径 / DS.1 选夹
+    - 削弱鉴权或 Demo 隔离；Token 明文落盘/入日志
+    - 把 TASK-D.1e 偷偷改出 DEFERRED 或宣称 D.1e 已交付
+    - 半创建（mkdir 失败留下残缺树）却标成功
+  adr_revisions: []
+  defaults:
+    - "父目录默认经 DS.1 pick-folder 取得；不引入新原生选夹工具链"
+    - "创建成功后默认走 POST /api/recent-projects/open 等价通道（openWorkspaceByPath）"
+    - "UI 默认仅在 darwin 或与 canOfferMacFolderPicker 同门禁后展示「新建空项目」"
+    - "目标已存在默认明确失败（不覆盖、不合并）"
+    - "权威顺序：Supervisor/ADR > RFC §7 决议 > 本卡 > 实现"
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 174, commit: eacd1012438638ea58c3cfd292026aa6b1abd03c }
+```
