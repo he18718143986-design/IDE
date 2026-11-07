@@ -142,57 +142,72 @@ export interface ControlledDispatchOptions {
 }
 
 /**
- * 单一判定源：解析受控派工工厂。
+ * TASK-W.9e：受控派工诊断结果——与门禁同源，但不吞 `.code`。
+ * `ok:true` 时附工厂；`ok:false` 时附稳定 machine-readable 拒绝码与消息。
+ */
+export type ControlledDispatchDiagnosis =
+  | { ok: true; factory: WorkerDispatchFactory }
+  | {
+      ok: false;
+      code: WorkerDispatchErrorCode;
+      message: string;
+    };
+
+/**
+ * 单一判定源：诊断受控派工是否可放行（TASK-W.9e）。
  *
+ * 与历史 `requireControlledDispatch` 判定严格同源，只是返回诊断对象而非抛错：
  * 0. TASK-W.5c-ii：`SANDBOX_ENFORCED` **按容器宿主可用性判定**——
  *    未注入 `ContainerHostPort` 或 `isAvailable()` 为 false → `E_ADAPTER_SANDBOX_LOCKED`；
  *    宿主可用 → 放行并继续工厂校验（窗口期「永远拒绝」语义已解除）。
  * 1. 再调 `registry.requireControlled(adapterId)` —— 未注册 → `ADAPTER_ID_INVALID`、
  *    非 GATEWAY_ENFORCED（含 `UNCONTROLLED_EXTERNAL`）→ `TOOL_INTERCEPTION_UNSUPPORTED`；
- * 2. 把 `AdapterRegistrationError.rejection` 映射为带 `code` 的 `WorkerDispatchError`；
+ * 2. 把 `AdapterRegistrationError.rejection` 映射为带 `code` 的诊断失败；
  * 3. 已注册但未挂工厂 → `E_ADAPTER_NO_DISPATCH_FACTORY`。
  *
  * 任何分支都不返回「裸执行」兜底——红线要求缺注册/非受控必须显式失败。
  */
-export function requireControlledDispatch(
+export function diagnoseControlledDispatch(
   registry: AdapterRegistry,
   adapterId: string,
   options?: ControlledDispatchOptions,
-): WorkerDispatchFactory {
+): ControlledDispatchDiagnosis {
   const entry = registry.get(adapterId);
   if (entry === undefined) {
-    throw new WorkerDispatchError(
-      E_ADAPTER_NOT_REGISTERED,
-      adapterId,
-      `adapter not registered: ${adapterId}`,
-    );
+    return {
+      ok: false,
+      code: E_ADAPTER_NOT_REGISTERED,
+      message: `adapter not registered: ${adapterId}`,
+    };
   }
 
   if (entry.control_mode === "UNCONTROLLED_EXTERNAL") {
     // 非受控档位：不得作为受控 / 可合并证据，门禁先拒（与 W.6 语义一致）
-    throw new WorkerDispatchError(
-      E_ADAPTER_NOT_CONTROLLED,
-      adapterId,
-      `adapter ${adapterId} is registered as UNCONTROLLED_EXTERNAL; it cannot be used for controlled execution`,
-    );
+    return {
+      ok: false,
+      code: E_ADAPTER_NOT_CONTROLLED,
+      message: `adapter ${adapterId} is registered as UNCONTROLLED_EXTERNAL; it cannot be used for controlled execution`,
+    };
   }
 
   if (entry.control_mode === "SANDBOX_ENFORCED") {
     // TASK-W.5c-ii：按容器宿主可用性判定放行与否（不再是窗口期「永远拒绝」）。
     const host = options?.containerHost;
     if (host === undefined) {
-      throw new WorkerDispatchError(
-        E_ADAPTER_SANDBOX_LOCKED,
-        adapterId,
-        "适配器登记为 SANDBOX_ENFORCED（容器隔离档位），但未注入容器宿主 ContainerHostPort；拒绝派工，不静默降级到无网关执行",
-      );
+      return {
+        ok: false,
+        code: E_ADAPTER_SANDBOX_LOCKED,
+        message:
+          "适配器登记为 SANDBOX_ENFORCED（容器隔离档位），但未注入容器宿主 ContainerHostPort；拒绝派工，不静默降级到无网关执行",
+      };
     }
     if (host.isAvailable() !== true) {
-      throw new WorkerDispatchError(
-        E_ADAPTER_SANDBOX_LOCKED,
-        adapterId,
-        "适配器登记为 SANDBOX_ENFORCED（容器隔离档位），但容器宿主不可用（isAvailable() 为 false）；拒绝派工，不静默降级到无网关执行",
-      );
+      return {
+        ok: false,
+        code: E_ADAPTER_SANDBOX_LOCKED,
+        message:
+          "适配器登记为 SANDBOX_ENFORCED（容器隔离档位），但容器宿主不可用（isAvailable() 为 false）；拒绝派工，不静默降级到无网关执行",
+      };
     }
     // 宿主可用 → 门禁自足（`registry.requireControlled()` 只放行 `GATEWAY_ENFORCED`，
     // 沙箱档不得再过它，否则会被误判为「非受控」）。
@@ -206,7 +221,7 @@ export function requireControlledDispatch(
           err.rejection === "ADAPTER_ID_INVALID"
             ? E_ADAPTER_NOT_REGISTERED
             : E_ADAPTER_NOT_CONTROLLED;
-        throw new WorkerDispatchError(code, adapterId, err.message);
+        return { ok: false, code, message: err.message };
       }
       throw err;
     }
@@ -217,44 +232,60 @@ export function requireControlledDispatch(
     entry.declaration?.protocol_version,
   );
   if (factory === undefined) {
-    throw new WorkerDispatchError(
-      E_ADAPTER_NO_DISPATCH_FACTORY,
-      adapterId,
-      "已注册为受控适配器，但未挂接派工工厂（或工厂版本失配）；拒绝派工以免绕过 Gateway",
-    );
+    return {
+      ok: false,
+      code: E_ADAPTER_NO_DISPATCH_FACTORY,
+      message:
+        "已注册为受控适配器，但未挂接派工工厂（或工厂版本失配）；拒绝派工以免绕过 Gateway",
+    };
   }
 
   // TASK-W.9c：核验真实 CodingWorkerAdapter.run() 契约（升格不等于自动派工）
   if (!isAdapterExecutable(entry.adapter)) {
-    throw new WorkerDispatchError(
-      E_WORKER_NO_EXECUTOR,
-      adapterId,
-      `适配器 ${adapterId} 缺少合规执行器（无真实 run() 实现，仅有能力声明）；拒绝派工`,
-    );
+    return {
+      ok: false,
+      code: E_WORKER_NO_EXECUTOR,
+      message: `适配器 ${adapterId} 缺少合规执行器（无真实 run() 实现，仅有能力声明）；拒绝派工`,
+    };
   }
 
-  return factory;
+  return { ok: true, factory };
 }
 
 /**
- * TASK-W.9b：单一判定源复用——判定适配器当前是否满足受控派工门禁。
+ * 单一判定源：解析受控派工工厂。
  *
- * 与 requireControlledDispatch 判定严格同源：
+ * TASK-W.9e：薄封装 `diagnoseControlledDispatch`——失败时抛带 `.code` 的
+ * `WorkerDispatchError`；门禁放行条件零放宽。
+ */
+export function requireControlledDispatch(
+  registry: AdapterRegistry,
+  adapterId: string,
+  options?: ControlledDispatchOptions,
+): WorkerDispatchFactory {
+  const diagnosis = diagnoseControlledDispatch(registry, adapterId, options);
+  if (!diagnosis.ok) {
+    throw new WorkerDispatchError(diagnosis.code, adapterId, diagnosis.message);
+  }
+  return diagnosis.factory;
+}
+
+/**
+ * TASK-W.9b / W.9e：单一判定源复用——判定适配器当前是否满足受控派工门禁。
+ *
+ * 与 requireControlledDispatch / diagnoseControlledDispatch 判定严格同源：
  * - 未注册 / UNCONTROLLED_EXTERNAL → false
  * - SANDBOX_ENFORCED 且缺少可用 ContainerHostPort → false
  * - GATEWAY_ENFORCED 但未满足受控声明 → false
  * - 未挂接 dispatchFactory → false
  * - 满足门禁且有工厂 → true
+ *
+ * boolean 语义保留；**不得**再作为 API 唯一诊断源（请用 diagnose 的 `.code`）。
  */
 export function isControlledDispatchable(
   registry: AdapterRegistry,
   adapterId: string,
   options?: ControlledDispatchOptions,
 ): boolean {
-  try {
-    requireControlledDispatch(registry, adapterId, options);
-    return true;
-  } catch {
-    return false;
-  }
+  return diagnoseControlledDispatch(registry, adapterId, options).ok;
 }

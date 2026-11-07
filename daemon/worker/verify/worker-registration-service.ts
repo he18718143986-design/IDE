@@ -18,9 +18,8 @@
 
 import { AdapterRegistry, AdapterRegistrationError } from "../adapter-registry";
 import {
-  isControlledDispatchable,
+  diagnoseControlledDispatch,
   isAdapterExecutable,
-  requireControlledDispatch,
   WorkerDispatchError,
   E_ADAPTER_SANDBOX_LOCKED,
   type WorkerDispatchFactory,
@@ -77,6 +76,12 @@ export interface WorkerView {
   dispatchable: boolean;
   /** 不可派工的原因 */
   dispatch_blocked_reason?: string | undefined;
+  /**
+   * TASK-W.9e：不可派工时的 machine-readable 拒绝码，与
+   * `requireControlledDispatch` / `diagnoseControlledDispatch` 同源。
+   * 可选字段；旧客户端可忽略。dispatchable=true 时不设。
+   */
+  dispatch_blocked_code?: string | undefined;
   demoted_reason?: string | undefined;
   launch: WorkerLaunchSpec;
   verified_on?: WorkerRecord["verified_on"] | undefined;
@@ -551,11 +556,13 @@ export class WorkerRegistrationService {
       entry.control_mode === "SANDBOX_ENFORCED"
         ? this.resolveSharedContainerHost()
         : undefined;
-    const dispatchable = isControlledDispatchable(
+    // TASK-W.9e：诊断助手同源；boolean 不再是唯一诊断源。
+    const diagnosis = diagnoseControlledDispatch(
       this.registry,
       entry.declaration.adapter_id,
       { containerHost: host },
     );
+    const dispatchable = diagnosis.ok;
     return {
       adapter_id: entry.declaration.adapter_id,
       adapter_version: entry.declaration.protocol_version,
@@ -567,6 +574,7 @@ export class WorkerRegistrationService {
       dispatch_blocked_reason: dispatchable
         ? undefined
         : `档位为 ${entry.control_mode}，未通过派工门禁（门禁仅放行 GATEWAY_ENFORCED 或宿主可用的 SANDBOX_ENFORCED 且已挂接工厂）`,
+      dispatch_blocked_code: diagnosis.ok ? undefined : diagnosis.code,
       launch: BUILTIN_LAUNCH,
       created_at: "",
       updated_at: "",
@@ -580,11 +588,13 @@ export class WorkerRegistrationService {
       effective.mode === "SANDBOX_ENFORCED"
         ? this.resolveSharedContainerHost()
         : undefined;
-    const dispatchable = isControlledDispatchable(
+    // TASK-W.9e：诊断助手同源；reason 文案保持既有可读性，code 走稳定码表。
+    const diagnosis = diagnoseControlledDispatch(
       this.registry,
       record.adapter_id,
       { containerHost: host },
     );
+    const dispatchable = diagnosis.ok;
     let dispatchBlockedReason: string | undefined;
     if (!dispatchable) {
       const entry = this.registry.get(record.adapter_id);
@@ -606,14 +616,7 @@ export class WorkerRegistrationService {
         dispatchBlockedReason =
           "自注册 worker 缺少合规执行面（无真实 run() 实现，仅有能力声明）；不可派工";
       } else {
-        try {
-          requireControlledDispatch(this.registry, record.adapter_id, {
-            containerHost: host,
-          });
-        } catch (err) {
-          dispatchBlockedReason =
-            err instanceof Error ? err.message : String(err);
-        }
+        dispatchBlockedReason = diagnosis.message;
       }
     }
     return {
@@ -625,6 +628,7 @@ export class WorkerRegistrationService {
       kind: "CLI",
       dispatchable,
       dispatch_blocked_reason: dispatchBlockedReason,
+      dispatch_blocked_code: diagnosis.ok ? undefined : diagnosis.code,
       demoted_reason: effective.demoted_reason,
       launch: record.launch,
       verified_on: record.verified_on,
