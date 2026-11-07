@@ -53,6 +53,7 @@
 | `TASK-B.1` | `COMPLETED` | 本地 AST 增量依赖图分析引擎（parser/graph 增强 + 性能基准 + 恶魔测试 + 契约兼容超集；#124/9c177e9） | [打开](./development-tasks-completed.md#task-b.1) |
 | `TASK-CI.1` | `COMPLETED` | B.1 Tarjan 门禁抗 macos CI 抖动（[#161](https://github.com/he18718143986-design/IDE/pull/161)/`bf971d5`；P-159 回写；门禁 4 ≤150ms；抗抖动≠永久全绿） | [打开](./development-tasks-completed.md#task-ci.1) |
 | `TASK-AUDITED.1` | `COMPLETED` | AUDITED 合同退回待批受控边（[#165](https://github.com/he18718143986-design/IDE/pull/165)/`b390254`；P-162 回写；库层边+Guard；生产路径暂无接线；不宣称闭环） | [打开](./development-tasks-completed.md#task-audited.1)
+| `TASK-AUDITED.2` | `NEW_TASK` | AUDITED 退回待批生产接线（P-170 立卡；orchestrator/API/ContractCard；立卡≠开工） | [打开](./development-tasks-active.md#task-audited.2) |
 | `TASK-B.2` | `COMPLETED` | 多活跃 Worktree 监听与 Evidence 状态联动（Map 监听、指纹单点、合并前兜底；门禁①中位 67.9ms，未达 50ms 体验目标；[#128](https://github.com/he18718143986-design/IDE/pull/128)/`b1aa44f`） | [打开](./development-tasks-completed.md#task-b.2) |
 | `TASK-C.4` | `COMPLETED` | 架构雷达视图与 Scope 圈选抽屉（v0.2 激活；[#138](https://github.com/he18718143986-design/IDE/pull/138)/`993e3e9`，P-148 回写） |
 | `TASK-0.2b` | `COMPLETED` | Schema v1.2.0 增量演进、双状态机联动与存量迁移 | [打开](./development-tasks-completed.md#task-0.2b) |
