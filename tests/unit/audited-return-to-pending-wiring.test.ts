@@ -5,6 +5,7 @@
  * - orchestrator 含 returnToPending + USER_RETURN_TO_PENDING
  * - daemon-api 导出 returnContractToPending
  * - ContractCard 含退回待批 testid / 文案
+ * - index.tsx 生产入口 onReturnToPending → returnContractToPending
  *
  * 纪律：不宣称端到端闭环；不改 state-machine 语义。
  */
@@ -43,6 +44,18 @@ describe("TASK-AUDITED.2 production wiring self-proof", () => {
     const src = read("src/lib/daemon-api.ts");
     expect(src).toContain("export async function returnContractToPending");
     expect(src).toContain("/return-to-pending");
+  });
+
+  it("index.tsx 生产入口把 onReturnToPending 接到 returnContractToPending", () => {
+    const src = read("src/routes/index.tsx");
+    expect(src).toContain("returnContractToPending");
+    expect(src).toContain("onReturnToPending=");
+    expect(src).toMatch(
+      /onReturnToPending=\{\(id\) =>\s*void runAction\("return-to-pending"/,
+    );
+    expect(src).toContain(
+      'await returnContractToPending(conn, id, "local-user")',
+    );
   });
 
   it("ContractCard 在 AUDITED+APPROVED 路径暴露退回待批", () => {
