@@ -250,5 +250,11 @@
 
 - **状态回写**：W.9g 已 COMPLETED（PR [#158](https://github.com/he18718143986-design/IDE/pull/158) / `691b8b8`）；钉死 Cursor 容器协议常量；`empirically_verified=false`；仍 `NO_EXECUTOR`；无派工工厂；P3 失败留证；W9G-P1～P4；零改 docker-container-host / container-cli-executor。
 - **销项**：兑现 W.9c §3.4q **挂账④**。**四项挂账均已销**；④口径=钉协议+fail-closed，**≠ Cursor 已受控 / 可派工**；真跑容器仍待 KEY+Docker。
-- **Sprint**：当前首要 → **在队清零**（下一挂账面为 macOS CI → CA-06，按 Tina 授权序）。不宣称端到端闭环 / Cursor 已受控；不新增 OP。
-- **物理 tip**：代码 tip `691b8b8`（#158）；P-157 文档回写本 PR。
+- **Sprint**：首要当时 → **在队清零**（下一挂账面为 macOS CI → CA-06）。不宣称端到端闭环 / Cursor 已受控；不新增 OP。
+- **物理 tip**：代码 tip `691b8b8`（#158）；docs tip `aac69f5`（#159）。
+
+### TASK-CI.1（P-158 · 2026-11-07 · 非 OP）
+
+- **立卡**：Tina 授权按挂账清扫序立卡 `TASK-CI.1`（B.1 Tarjan 门禁抗 macos CI 抖动 · `[NEW_TASK]`）。writable_paths 仅 `tests/perf/arch-graph-benchmark.test.ts`；门禁 4 上限推荐 ≤150ms（覆盖 run 42369070606 median 129.75ms）；禁止改 `daemon/arch/*`；正确性断言不得放宽。
+- **Sprint**：当前首要 → `TASK-CI.1`（序 macOS CI → CA-06；本卡不碰 CA-06）。立卡 ≠ 开工；不宣称永久全绿 / 端到端闭环；不销 OP-34；不新增 OP。
+- **物理 tip**：立卡基线 `aac69f5`（#159）；代码 tip 仍 #158/`691b8b8`。

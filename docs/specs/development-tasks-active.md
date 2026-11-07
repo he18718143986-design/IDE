@@ -601,7 +601,8 @@
 >
 > **（P-156 · 保留作溯源）** 挂账① → [`TASK-W.9d`](./development-tasks-completed.md#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账② → [`TASK-W.9e`](./development-tasks-completed.md#task-w.9e) `[COMPLETED]`（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`）；挂账③ → [`TASK-W.9f`](./development-tasks-completed.md#task-w.9f) `[COMPLETED]`（[#156](https://github.com/he18718143986-design/IDE/pull/156)/`b92accc`）；挂账④当时仍由 W.9g `[NEW_TASK]` 承接；Sprint 首要当时 → `TASK-W.9g`。
 >
-> **（P-157 现行）** 挂账① → [`TASK-W.9d`](./development-tasks-completed.md#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账② → [`TASK-W.9e`](./development-tasks-completed.md#task-w.9e) `[COMPLETED]`（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`）；挂账③ → [`TASK-W.9f`](./development-tasks-completed.md#task-w.9f) `[COMPLETED]`（[#156](https://github.com/he18718143986-design/IDE/pull/156)/`b92accc`）；挂账④ → [`TASK-W.9g`](./development-tasks-completed.md#task-w.9g) `[COMPLETED]`（[#158](https://github.com/he18718143986-design/IDE/pull/158)/`691b8b8`）。**四项挂账均已销**；④口径=**钉协议 + fail-closed + 失败留证**（`empirically_verified=false`），**≠ Cursor 已受控 / 可派工**；真跑容器仍待 KEY+Docker。Sprint 首要 → **在队清零**（下一挂账面为 macOS CI → CA-06，按 Tina 授权序；不发明产品方向）。**仍不宣称**端到端闭环。
+> **（P-157 · 保留作溯源）** 挂账① → [`TASK-W.9d`](./development-tasks-completed.md#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账② → [`TASK-W.9e`](./development-tasks-completed.md#task-w.9e) `[COMPLETED]`（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`）；挂账③ → [`TASK-W.9f`](./development-tasks-completed.md#task-w.9f) `[COMPLETED]`（[#156](https://github.com/he18718143986-design/IDE/pull/156)/`b92accc`）；挂账④ → [`TASK-W.9g`](./development-tasks-completed.md#task-w.9g) `[COMPLETED]`（[#158](https://github.com/he18718143986-design/IDE/pull/158)/`691b8b8`）。**四项挂账均已销**；④口径=**钉协议 + fail-closed + 失败留证**（`empirically_verified=false`），**≠ Cursor 已受控 / 可派工**；真跑容器仍待 KEY+Docker。Sprint 首要当时 → **在队清零**（下一挂账面为 macOS CI → CA-06）。**仍不宣称**端到端闭环。
+> **（P-158 现行）** Tina 授权立卡 [`TASK-CI.1`](#task-ci.1) `[NEW_TASK]`（B.1 Tarjan 门禁抗 macos CI 抖动）。Sprint 首要 → **`TASK-CI.1`**（序 macOS CI → CA-06；本卡不碰 CA-06）。**立卡≠销项、未开工**；不宣称永久全绿 / 端到端闭环；不销 OP-34。
 
 
 
@@ -821,3 +822,89 @@
 <a id="task-c.4"></a>
 
 > **归档注记（2026-11-05 · P-148）**：`TASK-C.4` 已 `[COMPLETED]`（[#138](https://github.com/he18718143986-design/IDE/pull/138)/`993e3e9`，squash）。完整卡正文（交付清单、实测口径、挂账、未宣称边界）迁入 [`development-tasks-completed.md` §3.4t](./development-tasks-completed.md#task-c.4)。
+
+---
+
+<a id="task-ci.1"></a>
+
+#### 【Task CI.1】B.1 Tarjan 门禁抗 macos CI 抖动 `[NEW_TASK]`
+
+> **立卡（2026-11-07 · P-158）**：Tina 授权按挂账清扫序（L.17 → W.9 已完 → **macOS CI** → CA-06）立卡。**本轮仅文档**，不开工产品代码。立卡≠销项、未开工；不宣称端到端闭环 / 永久全绿；不碰 CA-06；不销 OP-34。
+
+```yaml task-card
+id: TASK-CI.1
+status: NEW_TASK
+contract:
+  intent:
+    title: B.1 Tarjan 门禁抗 macos CI 抖动
+    description: >-
+      将 tests/perf/arch-graph-benchmark.test.ts 门禁 4（10000 节点高深度环 Tarjan SCC）
+      的中位耗时上限从 ≤100ms 调整为 ≤150ms，覆盖 GitHub macos-latest runner 上偶发
+      中位 ~130ms 的抖动（证据 run 42369070606 median 129.75ms），使 macOS unit CI
+      不再因该性能门禁假红；正确性断言（环长 / 不爆栈）不得放宽。
+    risk_level: LOW
+  acceptance:
+    - { id: CI1-P1, check: auto, text: "门禁 4 中位上限改为 ≤150ms；注释引用 GitHub Actions run 42369070606（median 129.75ms）" }
+    - { id: CI1-P2, check: auto, text: "正确性断言不变：仍检出且仅检出一个 RING_SIZE=10000 的 SCC；不爆栈" }
+    - { id: CI1-P3, check: auto, text: "writable_paths 仅 tests/perf/arch-graph-benchmark.test.ts；零改 daemon/arch/*" }
+    - { id: CI1-P4, check: auto, text: "门禁 1/2/3 上限与既有正确性断言不被本卡放宽；可选预热丢弃不得替代上限放宽为主验收" }
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - tests/perf/arch-graph-benchmark.test.ts
+    readonly_paths:
+      - daemon/arch/graph.ts
+      - daemon/arch/parser.ts
+      - docs/specs/development-tasks-completed.md
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/perf/arch-graph-benchmark.test.ts] }
+design:
+  approach: >-
+    仅改 perf 基准门禁 4 的 expect(medianDuration).toBeLessThanOrEqual 上限 100→150，
+    并在注释写明 run 42369070606 / median 129.75ms。可加一轮预热丢弃，但主验收仍是
+    ≤150ms 上限。禁止改 daemon/arch/*；禁止放宽环长/不爆栈正确性断言。
+  touches:
+    - { path: tests/perf/arch-graph-benchmark.test.ts, change: modify, why: 门禁 4 抗 macos CI 抖动上限, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: CI1-P1, test_path: tests/perf/arch-graph-benchmark.test.ts, level: unit, case: "门禁 4：10000 节点高深度环 Tarjan SCC ≤ 150ms" }
+    - { acceptance_id: CI1-P2, test_path: tests/perf/arch-graph-benchmark.test.ts, level: unit, case: "必须检出且仅检出这一个 10000 节点的 SCC 大环" }
+    - { acceptance_id: CI1-P3, test_path: tests/perf/arch-graph-benchmark.test.ts, level: unit, case: "零改 daemon/arch；仅本文件 diff" }
+    - { acceptance_id: CI1-P4, test_path: tests/perf/arch-graph-benchmark.test.ts, level: unit, case: "门禁 1/2/3 上限未被动" }
+governance:
+  spec_refs:
+    - docs/specs/development-tasks-completed.md#task-b.1
+    - docs/specs/development-tasks.md
+  depends_on:
+    - { id: TASK-B.1, kind: hard }
+  code_facts:
+    - { ref: "tests/perf/arch-graph-benchmark.test.ts:202-250", note: "门禁 4：五次采样取中位；现行 expect(medianDuration).toBeLessThanOrEqual(100)；正确性断言 lastCycles.length===1 && lastCycles[0].length===RING_SIZE" }
+    - { ref: "tests/perf/arch-graph-benchmark.test.ts:249-249", note: "flake 证据：GitHub Actions run 42369070606 macos-latest unit job 实测 median 129.75ms，越过 ≤100ms 假红（非算法回退）" }
+    - { ref: "docs/specs/development-tasks-completed.md:4051-4051", note: "B.1 交付时本机 Tarjan 17.11ms（门禁 ≤100ms）；CI runner 抖动未入账" }
+    - { ref: "docs/ledger/README.md:176-176", note: "OP-34 平台侧持续观察不销项；本卡不销 OP-34" }
+  non_goals:
+    - 不宣称 macOS CI 永久全绿 / 端到端闭环
+    - 不碰 CA-06（cursor-agent 四类越权负例）
+    - 不销 OP-34
+    - 不改 daemon/arch/* 算法或正确性门禁
+    - 不以预热丢弃替代上限放宽作为唯一验收
+  fail:
+    - 放宽环长 / SCC 个数 / 不爆栈等正确性断言
+    - 改动 daemon/arch/* 或扩大 writable_paths 到产品代码
+    - 把门禁 1/2/3 上限一并放宽却无证据
+  adr_revisions: []
+  defaults:
+    - "主验收=门禁 4 中位 ≤150ms；预热丢弃可选、不得替代上限"
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：B.1 合入后本机 Tarjan ~17ms，但 GitHub macos-latest 偶发中位 ~130ms，撞上 ≤100ms 门禁形成 flake。Tina 授权清扫序下一张为 macOS CI。
+* **取舍**：只放宽抗抖动上限并留证；不碰算法、不销 OP-34、不碰 CA-06。
+
