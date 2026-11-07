@@ -1,5 +1,6 @@
 import type { NetworkPolicy } from "../../../src/lib/contract.schema";
 import {
+  containerSecretFile,
   runInSandbox,
   sandboxWitness,
   type ContainerHostPort,
@@ -87,7 +88,7 @@ export const OPENHANDS_CAPABILITY: AdapterCapabilityDeclaration = {
     "因出站被 DENY，容器内无法调用模型 API：本适配器可启动 headless CLI 并完成隔离负例，但「模型驱动的端到端改动」未实测，verified_on 不覆盖该场景",
     "变更由容器内进程直接写入挂载的 Worktree，适配器不回传逐文件内容，diff 与范围校验由后续网关侧采集",
     "usage 按字符数粗估（LOCAL_ESTIMATE），非 provider 回传计量，不能用于账单对账",
-    "模型 API Key 经容器环境变量注入（LLM_API_KEY），容器内进程与宿主侧 docker inspect 均可读，未使用 secret 挂载",
+    "模型 API Key 经只读 secret 文件挂载注入（约定路径 /run/secrets/LLM_API_KEY，并以 LLM_API_KEY_FILE 指向该路径；不以普通 Env 明文直通）；打开该文件的容器进程仍可读明文，docker inspect Env 不再承载该键值——不宣称绝对不可读",
     "镜像 /app 属 uid 42420 且 entrypoint.sh 为 0770，全量 cap-drop 会让容器起不来；故保留 DAC_OVERRIDE 一项（容器内 CapEff=0x2），NET_ADMIN / SYS_ADMIN / SYS_PTRACE 等仍全无",
     "任务 Worktree 的 .git 随根目录挂载进入容器（git worktree 指针文件内含宿主主仓路径字符串）；容器内该路径不可达，但路径信息可读",
     "仅在 darwin-arm64 + Docker Desktop 实测；其他平台未实测，不写入平台矩阵",
@@ -183,16 +184,24 @@ export class OpenHandsSandboxAdapter implements CodingWorkerAdapter {
     return argv;
   }
 
-  /** 容器内环境：只注入模型侧白名单变量 */
+  /**
+   * 容器内普通环境：只注入模型侧非密钥白名单变量。
+   * LLM_API_KEY 改走 secret 文件挂载（见 `secretFilesForKey`），不进普通 Env。
+   */
   containerEnv(): Record<string, string> {
     const env: Record<string, string> = { ...(this.opts.env ?? {}) };
     for (const name of FORWARD_ENV) {
       const value = process.env[name];
       if (value !== undefined && value.length > 0) env[name] = value;
     }
-    const key = this.opts.apiKey?.();
-    if (key !== undefined && key.length > 0) env["LLM_API_KEY"] = key;
+    // W.9f：故意不写 LLM_API_KEY / 其它 CONTAINER_SECRET_ENV_KEYS
     return env;
+  }
+
+  /** API key → 只读 secret 文件描述（无 key 则空） */
+  secretFilesForKey(key: string | undefined) {
+    if (key === undefined || key.length === 0) return [];
+    return [containerSecretFile("LLM_API_KEY", key)];
   }
 
   async run(
@@ -202,6 +211,7 @@ export class OpenHandsSandboxAdapter implements CodingWorkerAdapter {
     const key = this.opts.apiKey?.();
     const argv = this.buildArgv(input);
     const runSandbox = this.opts.runSandbox ?? runInSandbox;
+    const secretFiles = this.secretFilesForKey(key);
     const sandboxInput: SandboxRunInput = {
       worktreeRoot: input.worktree_root,
       argv,
@@ -213,6 +223,7 @@ export class OpenHandsSandboxAdapter implements CodingWorkerAdapter {
         ? {}
         : { timeoutMs: this.opts.timeoutMs }),
       env: this.containerEnv(),
+      ...(secretFiles.length === 0 ? {} : { secretFiles }),
     };
 
     // 唯一执行路径：进入容器围栏。此处没有 if/else 的本地分支。
