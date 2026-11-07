@@ -253,8 +253,9 @@
 - **Sprint**：首要当时 → **在队清零**（下一挂账面为 macOS CI → CA-06）。不宣称端到端闭环 / Cursor 已受控；不新增 OP。
 - **物理 tip**：代码 tip `691b8b8`（#158）；docs tip `aac69f5`（#159）。
 
-### TASK-CI.1（P-158 · 2026-11-07 · 非 OP）
+### TASK-CI.1（P-158 立卡 · P-159 回写 · 2026-11-07 · 非 OP）
 
-- **立卡**：Tina 授权按挂账清扫序立卡 `TASK-CI.1`（B.1 Tarjan 门禁抗 macos CI 抖动 · `[NEW_TASK]`）。writable_paths 仅 `tests/perf/arch-graph-benchmark.test.ts`；门禁 4 上限推荐 ≤150ms（覆盖 run 42369070606 median 129.75ms）；禁止改 `daemon/arch/*`；正确性断言不得放宽。
-- **Sprint**：当前首要 → `TASK-CI.1`（序 macOS CI → CA-06；本卡不碰 CA-06）。立卡 ≠ 开工；不宣称永久全绿 / 端到端闭环；不销 OP-34；不新增 OP。
-- **物理 tip**：立卡基线 `aac69f5`（#159）；代码 tip 仍 #158/`691b8b8`。
+- **状态回写**：CI.1 已 COMPLETED（PR [#161](https://github.com/he18718143986-design/IDE/pull/161) / `bf971d5`）；仅改 `tests/perf/arch-graph-benchmark.test.ts`；门禁 4 ≤150ms（run 42369070606 median 129.75ms）；正确性断言未放宽；零改 `daemon/arch/*`。
+- **销项**：兑现挂账清扫序 **macOS CI** 面（B.1 Tarjan flake）。**诚实口径**：抗抖动门禁，**不**宣称永久全绿；**不**销 OP-34；不碰 CA-06。
+- **Sprint**：首要 → **在队清零**（下一挂账面 → **CA-06 文档债**，按 Tina 授权序）。不宣称端到端闭环；不新增 OP。
+- **物理 tip**：代码 tip `bf971d5`（#161）；立卡 docs tip `3766d28`（#160）。
