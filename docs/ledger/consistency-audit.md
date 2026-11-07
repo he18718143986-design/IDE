@@ -229,3 +229,4 @@
 
 > **L.17c 挂账立卡（P-149 · 2026-11-07）**：Tina 授权立卡 `TASK-L.17d` / `L.17e` / `L.17f`（均 `[NEW_TASK]`）兑现 completed §3.4p 三项挂账；**立卡≠销项**；Sprint 首要 → L.17d；不新增 OP；不宣称闭环；不碰 W.9。同步矩阵 / index / active yaml 卡 / changelog。
 > **L.17d 完成回写（P-150 · 2026-11-07）**：PR [#145](https://github.com/he18718143986-design/IDE/pull/145) / `e2b8dd3` 合入，L.17d COMPLETED；挂账①销项（snapshots 经 WebIngestProxy 灌 CompareView）；`screenshot_url` 恒 null；不改 props 契约；不碰 W.9。Sprint 首要 → L.17e；挂账②/③仍立卡未销。仅 docs 回写，不新增 OP；**不**宣称端到端闭环。
+> **L.17e 完成回写（P-151 · 2026-11-07）**：PR [#147](https://github.com/he18718143986-design/IDE/pull/147) / `aeedecd` 合入，L.17e COMPLETED；挂账②销项（会话 user 原话候选经 `selectSessionVerbatimCandidates` 灌试玩认可框）；未改 PlaytestAcceptBlock；默认空框；不碰 W.9。Sprint 首要 → L.17f；挂账③仍立卡未销。仅 docs 回写，不新增 OP；**不**宣称端到端闭环。

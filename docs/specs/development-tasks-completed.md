@@ -2338,7 +2338,8 @@
 - **交付**：新增 `src/components/studio/PlaytestAcceptBlock.tsx`，在中栏 `SchemeReviewPane` **同页**嵌入既有 `CompareView`（**不改**组件本体 / props 契约）。原话框默认空（禁止引导文案自动填入）；「认可完成」**只**调用 `submitPlaytestEvidence(conn, { contract_id, user_verdict })`（请求体不含 `release_id`/`timestamp`/`operator`）。读侧选型为薄 HTTP：`GET /api/playtest/status?contract_id=` 委托既有 `evaluatePlaytestGuard`（**零改** `playtest-guard.ts`）；前端 `fetchPlaytestStatus` 反映拒绝态。`src/routes/index.tsx` 传 `contractId` / `references` / LIVE preview / `conn`。测试：`tests/ui/scheme-review-playtest.test.tsx` + `tests/unit/playtest-status-wiring.test.ts`（11 passed）；全量相对干净 main **零新增失败**。
 - **后续挂账（三项 · 不宣称关闭）**：① L.17a 参考站抓取成果 → CompareView `snapshots` 前端拉数（本卡可空左栏渲染）；② 会话原话候选列表接线（props 已留 `sessionVerbatimCandidates`；`index` 暂未灌聊天原话）；③ **真机整段 `check playtest` 执行债**（卡明文另挂，本卡不做门禁执行链路）。
 > **（P-149 立卡指针 · 保留原文作溯源）**：挂账①→[`TASK-L.17d`](./development-tasks-active.md#task-l.17d) `[NEW_TASK]`；挂账②→[`TASK-L.17e`](./development-tasks-active.md#task-l.17e) `[NEW_TASK]`；挂账③→[`TASK-L.17f`](./development-tasks-active.md#task-l.17f) `[NEW_TASK]`。**立卡≠销项、未开工、不宣称闭环**。
-> **（P-150 现行）**：挂账① → [`TASK-L.17d`](#task-l.17d) `[COMPLETED]`（[#145](https://github.com/he18718143986-design/IDE/pull/145)/`e2b8dd3`）；挂账②/③仍 `[NEW_TASK]`（L.17e / L.17f）。**仍不宣称**端到端闭环。
+> **（P-150 · 保留作溯源）**：挂账① → [`TASK-L.17d`](#task-l.17d) `[COMPLETED]`（[#145](https://github.com/he18718143986-design/IDE/pull/145)/`e2b8dd3`）；挂账②/③当时仍 `[NEW_TASK]`。
+> **（P-151 现行）**：挂账① → [`TASK-L.17d`](#task-l.17d) `[COMPLETED]`（[#145](https://github.com/he18718143986-design/IDE/pull/145)/`e2b8dd3`）；挂账② → [`TASK-L.17e`](#task-l.17e) `[COMPLETED]`（[#147](https://github.com/he18718143986-design/IDE/pull/147)/`aeedecd`）；挂账③仍 `[NEW_TASK]`（L.17f）。**仍不宣称**端到端闭环。
 - **边界**：**窄口径**——UI 已挂 / 代码合入；**不**宣称端到端 UI/产品闭环；不碰 orchestrator / 派工 / AdapterRegistry（W.9c 施工面）；不复活多视口 Tab / 新设右栏入口；不改 CompareView / `submitPlaytestEvidence` / `playtest-guard` 判定与契约本体。
 
 ---
@@ -4324,7 +4325,7 @@ governance:
 - **状态与证据**：`[COMPLETED]`（[#145](https://github.com/he18718143986-design/IDE/pull/145)/`e2b8dd3`，squash；代码 tip `ff0d6b5`；基线 #144/`a147168` P-149 立卡之后）。
 - **交付**：新增 `daemon/playtest/reference-snapshots.ts`（`buildReferenceSnapshots` / `handleReferenceSnapshotsRequest`）；`daemon/server.ts` 挂薄读侧 `GET /api/playtest/reference-snapshots?contract_id=`；前端 `src/lib/daemon-api.ts::fetchPlaytestReferenceSnapshots`；`src/routes/index.tsx` 合同切换时拉数写入 `playtest.snapshots` → `PlaytestAcceptBlock` → 既有 `CompareView`。摄取**只**走 `WebIngestProxy`（与 L.17a 白名单/禁域同口径）；**不改** CompareView / PlaytestAcceptBlock props 契约；`screenshot_url` **恒 null**（不新开截图管线）；不持久化快照库（即时拉数）；单 URL 失败保留占位 `dom_summary` 错误说明，不伪造 html/截图。测试：`tests/unit/playtest-reference-snapshots.test.ts` 7 passed；`tests/ui/scheme-review-playtest.test.tsx` 8 passed；`tsc` 0。
 - **销项**：兑现 L.17c completed §3.4p **挂账①**（snapshots 前端拉数）。
-- **残余 / 默认未做（不宣称关闭）**：① `screenshot_url` 恒 null（截图管线另卡）；② 无持久快照库（落盘缓存另卡）；③ 挂账② 会话原话候选 → [`TASK-L.17e`](./development-tasks-active.md#task-l.17e)；④ 挂账③ 真机 `check playtest` → [`TASK-L.17f`](./development-tasks-active.md#task-l.17f)；⑤ 不碰 W.9 / orchestrator。
+- **残余 / 默认未做（不宣称关闭）**：① `screenshot_url` 恒 null（截图管线另卡）；② 无持久快照库（落盘缓存另卡）；③ 挂账② 会话原话候选 → [`TASK-L.17e`](#task-l.17e) `[COMPLETED]`（P-151 · #147/`aeedecd`）；④ 挂账③ 真机 `check playtest` → [`TASK-L.17f`](./development-tasks-active.md#task-l.17f)；⑤ 不碰 W.9 / orchestrator。
 - **边界**：**窄口径**——snapshots 读侧 + 前端灌数已合入；**不**宣称端到端产品闭环；不复活 REJ-009；不绕过 WebIngestProxy。
 
 ```yaml task-card
@@ -4423,4 +4424,96 @@ governance:
     gateway_write_scope: unchanged
   delivered: { pr: 145, commit: e2b8dd35cbcde6a750881fe435e115c11fe16cac }
 ```
+
+
+### 3.4v 会话原话候选接入试玩认可框（L.17e · 产品验收挂账②）
+
+<a id="task-l.17e"></a>
+
+#### 【Task L.17e】会话原话候选接入试玩认可框 `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#147](https://github.com/he18718143986-design/IDE/pull/147)/`aeedecd`，squash；代码 tip `9f12b57`；基线 #146/`e46ee5a` P-150 回写之后）。
+- **交付**：新增 `src/lib/journey/session-verbatim-candidates.ts`（`selectSessionVerbatimCandidates` / `SESSION_VERBATIM_CANDIDATE_LIMIT=20`）：只收 `role==="user"` 且 trim 非空原文，去重保序，排除 system/assistant/引导文案，上限写死 20。`src/routes/index.tsx` 把筛选结果写入 `playtest.sessionVerbatimCandidates`。**未改** `PlaytestAcceptBlock.tsx` props/引用按钮行为；默认输入框仍为空，用户手点「引用」才写入原文。测试：`tests/unit/session-verbatim-candidates.test.ts` 5 passed；`tests/ui/scheme-review-playtest.test.tsx` 9 passed；`tsc` 0。
+- **销项**：兑现 L.17c completed §3.4p **挂账②**（会话原话候选接线）。
+- **残余 / 默认未做（不宣称关闭）**：① 不自动填入原话框；② 不做跨会话历史检索；③ 挂账③ 真机 `check playtest` → [`TASK-L.17f`](./development-tasks-active.md#task-l.17f)；④ 不碰 W.9 / orchestrator / daemon。
+- **边界**：**窄口径**——会话 user 原话候选已灌入试玩认可区；**不**宣称端到端产品闭环；不改 `submitPlaytestEvidence` 契约；无 e2e 闭环宣称。
+
+```yaml task-card
+id: TASK-L.17e
+status: COMPLETED
+contract:
+  intent:
+    title: 会话原话候选接入试玩认可框
+    description: >-
+      中栏试玩认可区出现来自当前右栏会话的用户原话「引用」候选；默认输入框仍为空，
+      点选后原样写入，禁止把引导文案当候选。
+    risk_level: LOW
+  acceptance:
+    - { id: L17E-P1, check: auto, text: "index 将当前会话 role=user 消息文本（非空）传入 sessionVerbatimCandidates" }
+    - { id: L17E-P2, check: auto, text: "有候选时 DOM 出现 playtest-verbatim-candidates；默认 textarea/input 值为空" }
+    - { id: L17E-P3, check: auto, text: "点引用后输入框值为候选原文（不做摘要/改写）" }
+    - { id: L17E-P4, check: auto, text: "不得把 playtest-guidance / 系统提示文案塞进候选列表" }
+  scheme_item_ids: [acc-6, dec-12]
+  scope:
+    writable_paths:
+      - src/routes/index.tsx
+      - src/lib/journey/**
+      - tests/ui/scheme-review-playtest.test.tsx
+      - tests/unit/session-verbatim-candidates.test.ts
+    readonly_paths:
+      - src/components/studio/PlaytestAcceptBlock.tsx
+      - src/hooks/use-agent-session.ts
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/session-verbatim-candidates.test.ts] }
+      - { alias: ui, executable: npx, args: [vitest, run, tests/ui/scheme-review-playtest.test.tsx] }
+design:
+  approach: >-
+    从 useAgentSession()/foldChatEvents 得到的 messages 中筛选 role==="user" 且 trim 非空的 text，
+    经小纯函数（建议 src/lib/journey/session-verbatim-candidates.ts）去重保序后，
+    写入 SchemeReviewPane playtest.sessionVerbatimCandidates。不改 PlaytestAcceptBlock 引用按钮行为；
+    禁止把助手/系统/工具消息或引导常量放入候选。
+  touches:
+    - { path: src/lib/journey/session-verbatim-candidates.ts, change: create, why: 纯函数筛选用户原话, symbols: [selectSessionVerbatimCandidates] }
+    - { path: src/routes/index.tsx, change: modify, why: 接线 chatSession.messages → playtest, symbols: [] }
+    - { path: tests/unit/session-verbatim-candidates.test.ts, change: create, why: 筛选/去重/排除非 user, symbols: [] }
+    - { path: tests/ui/scheme-review-playtest.test.tsx, change: modify, why: 候选渲染与默认空框, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: L17E-P1, test_path: tests/unit/session-verbatim-candidates.test.ts, level: unit, case: "只收 user 非空原话（L17E-P1）" }
+    - { acceptance_id: L17E-P2, test_path: tests/ui/scheme-review-playtest.test.tsx, level: unit, case: "候选可见且默认空（L17E-P2）" }
+    - { acceptance_id: L17E-P3, test_path: tests/ui/scheme-review-playtest.test.tsx, level: unit, case: "引用写入原文（L17E-P3）" }
+    - { acceptance_id: L17E-P4, test_path: tests/unit/session-verbatim-candidates.test.ts, level: unit, case: "排除 system/assistant/引导（L17E-P4）" }
+governance:
+  spec_refs:
+    - docs/specs/development-tasks-completed.md#task-l.17c
+    - docs/scheme.md
+  depends_on:
+    - { id: TASK-L.17c, kind: hard }
+  code_facts:
+    - { ref: "src/routes/index.tsx:3623-3631", note: "playtest 未传 sessionVerbatimCandidates" }
+    - { ref: "src/components/studio/PlaytestAcceptBlock.tsx::PlaytestAcceptBlockProps", note: "已留 sessionVerbatimCandidates；有候选才渲染引用按钮" }
+    - { ref: "src/hooks/use-agent-session.ts::foldChatEvents", note: "会话消息已有 role/user 文本，今日未接到试玩块" }
+  non_goals:
+    - 不自动填入原话框、不改 submitPlaytestEvidence 契约
+    - 不做 L.17d snapshots 拉数
+    - 不碰 Daemon / 派工 / W.9
+    - 不宣称端到端闭环
+  fail:
+    - 页面加载即把候选或引导文案写入输入框
+    - 摘要/改写后再提交或再写入输入框
+    - 把 assistant/system 消息当作用户原话候选
+  adr_revisions: []
+  defaults:
+    - "候选 = 当前会话 user 消息原文去重保序；上限实现时可截断但须在测试写死"
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 147, commit: aeedecd11e147c39a6685f2f5e628a5fc6170155 }
+```
+
 

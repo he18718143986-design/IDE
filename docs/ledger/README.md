@@ -202,3 +202,11 @@
 - **销项**：兑现 L.17c §3.4p **挂账①**（snapshots 前端拉数）。挂账②/③仍由 L.17e / L.17f 承接。
 - **Sprint**：当前首要 → `TASK-L.17e`（序 e→f）。不宣称端到端闭环；不碰 W.9；不新增 OP。
 - **物理 tip**：`e2b8dd3`（#145）。
+
+
+### TASK-L.17e（P-151 · 2026-11-07 · 非 OP）
+
+- **状态回写**：L.17e 已 COMPLETED（PR [#147](https://github.com/he18718143986-design/IDE/pull/147) / `aeedecd`）；`selectSessionVerbatimCandidates` + `index` 灌 `sessionVerbatimCandidates`；未改 PlaytestAcceptBlock；默认空框。
+- **销项**：兑现 L.17c §3.4p **挂账②**（会话原话候选）。挂账③仍由 L.17f 承接。
+- **Sprint**：当前首要 → `TASK-L.17f`。不宣称端到端闭环；不碰 W.9；不新增 OP。
+- **物理 tip**：`aeedecd`（#147）。
