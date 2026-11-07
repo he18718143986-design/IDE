@@ -1,10 +1,10 @@
 # RFC · 桌面形态（为 TASK-D.1e）：真·选文件夹 / Import 同壳
 
-> ## `[已拍板 · DoR 已入队 · 仍 ≠ 开工]` · 不是施工令
+> ## `[已拍板 · DoR 已入队 · 已立切片卡 TASK-DS.1 · 仍 ≠ 激活 D.1e / 仍 ≠ 本 RFC 开工令]`
 >
-> - **编号 / 流水**：P-165（2026-11-07）· DoR 入队；前序决议 = P-164（[#168](https://github.com/he18718143986-design/IDE/pull/168)/`4741d98`）；讨论稿 = P-163。基线 `main`@`4741d9844df8c946e713049a9de73dfa14d26a72`（#168 P-164 squash）。
-> - **性质**：兑现 DS-3「进 DoR 队列，但仍 ≠ 开工」。Tina「你直接按顺序执行」（2026-11-07）→ 本条把桌面形态（本机助手）**登记入 DoR 队列**。**仍不**改 `TASK-D.1e` 状态（维持 `[DEFERRED → v0.2+]`），**仍不**立实现卡、**仍不**排 DoR 重写窗口（DS-6）、**仍不**开工任何产品代码。**入队 ≠ 激活 D.1e ≠ 立实现卡 ≠ 写代码**。
-> - **决策人**：Tina。来源：「按建议拍」（P-164）+「你直接按顺序执行」（P-165 · DS-3 入队）。
+> - **编号 / 流水**：P-166（2026-11-07）· 立卡 `TASK-DS.1`；前序 DoR 入队 = P-165（[#169](https://github.com/he18718143986-design/IDE/pull/169)/`78febad`）；决议 = P-164；讨论稿 = P-163。基线 `main`@`78febad9c2c324749f6c8ad0722d82b6c3ac6f2e`（#169 P-165 squash）。
+> - **性质**：Tina「继续自动执行」（2026-11-07）→ **另立实现卡 `TASK-DS.1`** 承接 RFC 第一切片（macOS 选文件夹增强）。**仍不**改 `TASK-D.1e` 状态（维持 `[DEFERRED → v0.2+]`；由 DS.1 承接切片、**D.1e 不激活**），**仍不**排 DoR 重写窗口（DS-6），**本 RFC/本立卡 PR 仍不**开工产品代码。**立切片卡 ≠ 激活 D.1e ≠ 本 PR 写代码**。
+> - **决策人**：Tina。来源：「按建议拍」（P-164）+「你直接按顺序执行」（P-165 · DS-3 入队）+「继续自动执行」（P-166 · 立 `TASK-DS.1`）。
 > - **权威分层**：与 [`../specs/development-tasks.md`](../specs/development-tasks.md) §1.1 矩阵、[`../specs/development-tasks-active.md`](../specs/development-tasks-active.md)#task-d.1e、[`../adr/0008-demo-isolated-origin.md`](../adr/0008-demo-isolated-origin.md)、[`../adr/0018-intent-to-executable-seal.md`](../adr/0018-intent-to-executable-seal.md)、[`../specs/supervisor.md`](../specs/supervisor.md)、[`../scheme.md`](../scheme.md) 冲突时，一律以后者为准。架构感知层范围见 [`v0.2-scope.md`](./v0.2-scope.md)（D.1e **不在**该 RFC 展开）。
 > - **不新增 OP 号**（OP 范围仍 OP-1～OP-38）。
 > - **与既有 RFC 关系**：仓库内此前**无**同名「桌面形态 / D.1e」完整 RFC（仅 `v0.2-scope.md` §4.5 / D-6 占位指向「另立 RFC」）。P-163 立讨论稿；**本条（P-164）落决议**。
@@ -142,14 +142,15 @@ D.1e 状态全程维持 [DEFERRED → v0.2+]，直到 Tina 另开流水改状态
 ## 8. 建议下一步（仍不是写代码）
 
 1. **已完成（P-164）**：§7 DS-1～DS-6 决议落档。
-2. **已完成（本 PR · P-165）**：按 DS-3 将「桌面形态 · 本机助手」**登记入 DoR 队列**（见 §10 与 [`../ledger/README.md`](../ledger/README.md)「桌面形态 DoR 入队」）；**未**改 D.1e 状态、**未**立实现卡、**未**排 DoR 重写窗口（DS-6）。
-3. **下一动待 Tina**：是否另开流水排 DoR 重写窗口 / 立实现卡（DS-6 已拍「先不排」——不自动开窗；入队 ≠ 立卡）。
-4. **禁止（持续）**：未获 Tina 单卡授权前开 D.1e 实现分支、加 Electron/Tauri 依赖、改 Daemon 鉴权模型、动 Demo Origin；**不**因入队偷偷改 D.1e 出 DEFERRED。
+2. **已完成（P-165）**：按 DS-3 将「桌面形态 · 本机助手」**登记入 DoR 队列**（见 §10 与 [`../ledger/README.md`](../ledger/README.md)「桌面形态 DoR 入队」）。
+3. **已完成（本 PR · P-166）**：另立实现卡 [`TASK-DS.1`](../specs/development-tasks-active.md#task-ds.1)（macOS 选文件夹 · RFC 第一切片）；**未**改 D.1e 出 DEFERRED、**未**排 DoR 重写窗口（DS-6）、**本 PR 未**写产品代码。
+4. **下一动**：`TASK-DS.1` 实现另开 **code PR**（须经 Agent 审；单卡授权语境下「继续自动执行」已立卡，开工以 code PR 审过为准）；**禁止**把 D.1e 改出 DEFERRED 冒充完成。
+5. **禁止（持续）**：未授权前开 D.1e 全量实现、加 Electron/Tauri 依赖、改 Daemon 鉴权模型、动 Demo Origin；**不**因立切片卡偷偷改 D.1e 出 DEFERRED。
 
 ## 9. 请审阅时核对的诚实口径
 
 - 本 PR **仅 docs**；`TASK-D.1e` **维持** `[DEFERRED → v0.2+]`。
-- 「RFC 已立」≠「决议已落」≠「DoR 已入队」≠「可开工」≠「已交付选文件夹」。**入队 ≠ 激活 D.1e ≠ 立实现卡 ≠ 写代码**。
+- 「RFC 已立」≠「决议已落」≠「DoR 已入队」≠「已立切片卡」≠「可宣称 D.1e 完成」≠「已交付选文件夹」。**立 `TASK-DS.1` ≠ 激活 D.1e ≠ 本 PR 写代码**。
 - DS-3 入队 ≠ 已开 DoR 重写卡；DS-6 明确先不排窗口（本 PR 遵守）。
 - 不宣称已接近 Cursor Open；不销 OP-34；不激活 S.3。
 
@@ -166,4 +167,17 @@ D.1e 状态全程维持 [DEFERRED → v0.2+]，直到 Tina 另开流水改状态
 | **入队含义** | 形态已定、可进入后续 DoR 重写候选；**≠** 激活、**≠** 立实现卡、**≠** 写代码 |
 | **未做** | DoR 重写（R-1～R-12）；单卡授权；产品代码 / 打包 / 签名 |
 | **来源** | Tina「你直接按顺序执行」（兑现 DS-3） |
+| **日期** | 2026-11-07（Asia/Hong_Kong） |
+
+## 11. 立卡 TASK-DS.1（P-166 · 2026-11-07）
+
+| 字段 | 值 |
+| :--- | :--- |
+| **卡** | [`TASK-DS.1`](../specs/development-tasks-active.md#task-ds.1) `[NEW_TASK]` |
+| **切片** | macOS 本机助手 · 系统选文件夹开项目（增强路径） |
+| **对齐决议** | DS-1 A；DS-2 助手+系统浏览器；DS-4 只先 macOS；DS-5 open+最近保留、选夹增强 |
+| **与 D.1e** | `TASK-D.1e` **仍** `[DEFERRED → v0.2+]`；由 DS.1 承接 RFC 切片；**不激活** D.1e |
+| **DS-6** | **仍不排** DoR 重写窗口 |
+| **本 PR** | 仅 docs；零产品代码；立卡 ≠ 开工 |
+| **来源** | Tina「继续自动执行」 |
 | **日期** | 2026-11-07（Asia/Hong_Kong） |
