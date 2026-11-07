@@ -210,3 +210,11 @@
 - **销项**：兑现 L.17c §3.4p **挂账②**（会话原话候选）。挂账③仍由 L.17f 承接。
 - **Sprint**：当前首要 → `TASK-L.17f`。不宣称端到端闭环；不碰 W.9；不新增 OP。
 - **物理 tip**：`aeedecd`（#147）。
+
+
+### TASK-L.17f（P-152 · 2026-11-07 · 非 OP）
+
+- **状态回写**：L.17f 已 COMPLETED（PR [#149](https://github.com/he18718143986-design/IDE/pull/149) / `86da495`）；`resolve-playtest-check-args` + orchestrator 最小 playtest 旁路；零改 playtest-guard / C.23 / bin/stagent；unit+integration 14/14。
+- **销项**：兑现 L.17c §3.4p **挂账③**（真机/门禁链 check playtest）。L.17c 三项挂账均已销。
+- **Sprint**：当前首要 → **在队清零**（下一挂账面为 W.9c §3.4q 四项未销挂账，立卡/排程待 Tina 指定）。不宣称端到端闭环；不销 W.9 四项挂账；不新增 OP。
+- **物理 tip**：`86da495`（#149）。
