@@ -267,7 +267,6 @@ describe("M5 / Test Integrity：Evidence tests_modified 留痕", () => {
   });
 });
 
-
 describe("TASK-AUDITED.2 / returnToPending", () => {
   let repo: string;
   let store: ContractStore;

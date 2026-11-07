@@ -72,7 +72,6 @@ describe("M7 / TASK-C.1 合同审批组件", () => {
   });
 });
 
-
 describe("TASK-AUDITED.2 / 退回待批按钮", () => {
   const audited = softwareContractSchema.parse({
     ...contract,
@@ -87,10 +86,7 @@ describe("TASK-AUDITED.2 / 退回待批按钮", () => {
   it("AUDITED+APPROVED 显示「退回待批」并可点击", () => {
     const onReturnToPending = vi.fn();
     render(
-      <ContractCard
-        contract={audited}
-        onReturnToPending={onReturnToPending}
-      />,
+      <ContractCard contract={audited} onReturnToPending={onReturnToPending} />,
     );
     const btn = screen.getByTestId("contract-return-to-pending");
     expect(btn).toHaveTextContent("退回待批");
@@ -107,6 +103,8 @@ describe("TASK-AUDITED.2 / 退回待批按钮", () => {
   it("AUDITED+APPROVED 时「批准并开工」仍禁用", () => {
     render(<ContractCard contract={audited} />);
     expect(screen.getByRole("button", { name: "批准并开工" })).toBeDisabled();
-    expect(screen.getByTestId("contract-return-to-pending")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("contract-return-to-pending"),
+    ).toBeInTheDocument();
   });
 });
