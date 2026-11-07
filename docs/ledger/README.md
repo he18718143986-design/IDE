@@ -275,7 +275,7 @@
 - **Sprint**：首要当时 → **在队清零**（下一张按 Tina 顺序 → **桌面形态 RFC（为 D.1e）**；不偷偷开工 D.1e）。不新增 OP；不改产品代码。（P-163 现行见下节）
 - **物理 tip**：代码 tip `b390254`（#165）；立卡 docs tip `9067d40`（#164）；P-162 docs 本 PR。
 
-### 桌面形态 RFC（P-163 起草 · P-164 决议 · P-165 DoR 入队 · P-166/P-167 DS.1 · P-168/P-169 DS.2 · 为 D.1e · 非 OP）
+### 桌面形态 RFC（P-163 起草 · P-164 决议 · P-165 DoR 入队 · P-166/P-167 DS.1 · P-168/P-169 DS.2 · P-172 DS-6 开窗 / D.1e DoR 重写 · 为 D.1e · 非 OP）
 
 - **动作（P-163）**：新增讨论稿 [`../rfc/desktop-shell-form.md`](../rfc/desktop-shell-form.md)；兑现 D-6/P-141「桌面形态另立 RFC」。
 - **决议（P-164 · Tina「按建议拍」）**：DS-1=**A 本机助手**；DS-2=**助手+系统浏览器**；DS-3=**进 DoR 队列，但仍 ≠ 开工**；DS-4=**只先 macOS**；DS-5=**`stagent open`+最近列表保留，选夹为增强**；DS-6=**先不排 DoR 重写窗口**。
@@ -283,6 +283,7 @@
 - **立卡 / 落地（P-166 / P-167）**：[`TASK-DS.1`](../specs/development-tasks-completed.md#task-ds.1) 选夹切片 → `[COMPLETED]`（#171/`1701cab`）。**`TASK-D.1e` 维持 DEFERRED**。
 - **立卡（P-168 · Tina「听你的建议」· 保留作溯源）**：另立 [`TASK-DS.2`](../specs/development-tasks-completed.md#task-ds.2)（macOS 本机助手 · 新建空项目 · RFC 切片）。**`TASK-D.1e` 维持 DEFERRED**（由 DS.2 承接「新建」切片；**不激活**）。立卡 ≠ 开工；零产品代码。
 - **回写（P-169）**：[`TASK-DS.2`](../specs/development-tasks-completed.md#task-ds.2) → `[COMPLETED]`（#174/`eacd101`；见 completed §3.4ae）。交付新建空项目增强；与 open/最近/粘贴/选夹共存。**完成 ≠ D.1e**。
+- **DS-6 开窗 · DoR 重写已落（P-172 · Tina 2026-11-08）**：`TASK-D.1e` 卡正文按 R-1～R-12 重写为 yaml 卡（active §3.1）；**DoR 重写 ≠ 激活 ≠ 开工**；`TASK-D.1e` **仍** `[DEFERRED → v0.2+]`，待 Tina 单卡授权才可改出。未决两条（助手自启 / 复用 Daemon；Import 边界）如实保留，关闭前不得 READY；估算 L，须另授权拆卡。Sprint 仍可写在队清零。
 - **状态**：`TASK-D.1e` **维持** `[DEFERRED → v0.2+]`；**立决议 ≠ 激活 D.1e ≠ 开工**；入队/立切片卡/切片落地均**不**改 D.1e 出 DEFERRED。
 - **Sprint**：首要 → **在队清零** / D.1e 仍 DEFERRED。不偷偷激活 D.1e；不激活 S.3；不销 OP-34。
 - **物理 tip 基线**：代码 tip `eacd101`（#174）；立卡 docs tip `2a7c404`（#173 P-168）；其上 `7f6ce54`（#172 P-167）。
@@ -294,12 +295,12 @@
 | 字段 | 值 |
 | :--- | :--- |
 | **入队项** | 桌面形态 · 本机助手（为未来 `TASK-D.1e`） |
-| **决议指针** | RFC §7 DS-1～DS-5；DS-6=**不排**重写窗口 |
+| **决议指针** | RFC §7 DS-1～DS-5；DS-6=**不排**（P-165 时）；**P-172 已开窗**，见 RFC §13 |
 | **关联卡状态** | `TASK-D.1e` **仍** `[DEFERRED → v0.2+]`（本条**未**改） |
 | **入队含义** | 形态已定、可进入后续 DoR 重写候选 |
 | **明确不是** | 激活 D.1e / 立实现卡 / 写产品代码 / 开 DoR 重写窗口 |
 | **来源** | Tina「你直接按顺序执行」（兑现 DS-3） |
-| **判据（谁来做 / 做完）** | 入队本身以本表 + RFC §10 + Sprint tip 三处一致为「入队完成」；**（P-166）立实现卡已由 Tina「继续自动执行」兑现为 `TASK-DS.1`**；DoR 重写窗口仍不排（DS-6）；D.1e 仍不激活 |
+| **判据（谁来做 / 做完）** | 入队本身以本表 + RFC §10 + Sprint tip 三处一致为「入队完成」；**（P-166）立实现卡已由 Tina「继续自动执行」兑现为 `TASK-DS.1`**；DoR 重写窗口已开（P-172，DS-6）；D.1e 仍不激活 |
 
 ### 立卡 / 回写 TASK-DS.1（P-166 立卡 · P-167 回写 · 非 OP · 保留作溯源）
 

@@ -14,7 +14,7 @@
 | `TASK-A.6` | `COMPLETED` | Daemon 崩溃自愈、Git 锁清理与 TOCTOU 校验 | [矩阵行](./development-tasks.md)（无独立详细卡；正文时代已收口进矩阵） |
 | `TASK-A.7` | `COMPLETED` | Worktree seal 路径前缀对齐 | [打开](./development-tasks-completed.md#task-a.7) |
 | `TASK-S.6b` | `COMPLETED` | 真机试玩收口（S.6 降级项；无独立详细卡，见矩阵 S.6 行与 changelog P-22） | [矩阵/流水](./development-tasks.md)（无独立详细卡） |
-| `TASK-D.1e` | `DEFERRED` | 桌面壳 / 本机助手：维持 DEFERRED；**（P-169）选夹由 [`TASK-DS.1`](./development-tasks-completed.md#task-ds.1) `[COMPLETED]`；新建由 [`TASK-DS.2`](./development-tasks-completed.md#task-ds.2) `[COMPLETED]`（#174/`eacd101`）承接；本卡不激活；切片≠D.1e**；DoR 已入队（P-165）·未改出 DEFERRED（D-6 / P-141） | [打开](./development-tasks-active.md#task-d.1e) |
+| `TASK-D.1e` | `DEFERRED` | 桌面壳 / 本机助手：维持 DEFERRED；**（P-172）DoR 重写已落（未激活）**；**（P-169）选夹由 [`TASK-DS.1`](./development-tasks-completed.md#task-ds.1) `[COMPLETED]`；新建由 [`TASK-DS.2`](./development-tasks-completed.md#task-ds.2) `[COMPLETED]`（#174/`eacd101`）承接；本卡不激活；切片≠D.1e**；DoR 已入队（P-165）·未改出 DEFERRED（D-6 / P-141） | [打开](./development-tasks-active.md#task-d.1e) |
 | `TASK-DS.1` | `COMPLETED` | macOS 本机助手 · 选文件夹开项目（[#171](https://github.com/he18718143986-design/IDE/pull/171)/`1701cab`；P-167 回写；选夹增强；完成≠D.1e；不宣称闭环） | [打开](./development-tasks-completed.md#task-ds.1) |
 | `TASK-DS.2` | `COMPLETED` | macOS 本机助手 · 新建空项目开进工作台（[#174](https://github.com/he18718143986-design/IDE/pull/174)/`eacd101`；P-169 回写；新建增强；完成≠D.1e；不宣称闭环） | [打开](./development-tasks-completed.md#task-ds.2) |
 | `TASK-S.3` | `DEFERRED` | Supervisor HUD 建议流与 WebSocket 广播（v0.2 评审未激活 · D-5 / P-141） | [打开](./development-tasks-active.md#task-s.3) |
