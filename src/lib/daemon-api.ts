@@ -365,9 +365,7 @@ export function canOfferMacFolderPicker(
   return /^Mac/i.test(platform) || /Mac OS X|Macintosh|Mac OS/i.test(ua);
 }
 
-export type PickFolderViaDaemonResult =
-  | { cancelled: true }
-  | { path: string };
+export type PickFolderViaDaemonResult = { cancelled: true } | { path: string };
 
 /**
  * TASK-DS.1：经已鉴权 Daemon 调起系统选夹；成功只回绝对路径。

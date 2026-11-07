@@ -320,7 +320,8 @@ export function OpenProjectEntry({
             <div data-testid="pick-folder-open" className="space-y-1">
               <p className="font-medium opacity-90">选择文件夹</p>
               <p className="opacity-70">
-                用 macOS 系统对话框选本机文件夹，选中后与最近列表、粘贴路径一样带钥匙打开（DS.1
+                用 macOS
+                系统对话框选本机文件夹，选中后与最近列表、粘贴路径一样带钥匙打开（DS.1
                 本机助手切片；≠ 完整桌面壳）。
               </p>
               <button

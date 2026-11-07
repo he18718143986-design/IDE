@@ -11,7 +11,9 @@ import {
 
 describe("TASK-DS.1 macos-folder-picker (DS1-P1 / DS1-P4)", () => {
   it("darwin：调起 /usr/bin/osascript choose folder 并归一绝对路径", () => {
-    const execFileSync = vi.fn<SyncExecFile>(() => "/Users/tina/Desktop/demo/\n");
+    const execFileSync = vi.fn<SyncExecFile>(
+      () => "/Users/tina/Desktop/demo/\n",
+    );
     const result = pickFolderMacOS({
       platform: "darwin",
       execFileSync,

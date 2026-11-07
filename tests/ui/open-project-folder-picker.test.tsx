@@ -88,9 +88,7 @@ describe("TASK-DS.1 OpenProjectEntry folder picker UI (DS1-P3)", () => {
       }),
     );
 
-    render(
-      <OpenProjectEntry repoName="x" repoPath="/tmp/x" variant="page" />,
-    );
+    render(<OpenProjectEntry repoName="x" repoPath="/tmp/x" variant="page" />);
 
     await waitFor(() => {
       expect(screen.getByTestId("paste-path-open")).toBeInTheDocument();

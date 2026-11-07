@@ -22,7 +22,16 @@ export type SyncExecFile = (
   options?: {
     timeout?: number;
     encoding?: BufferEncoding;
-    stdio?: "pipe" | "ignore" | "inherit" | readonly ["pipe" | "ignore" | "inherit", ...Array<"pipe" | "ignore" | "inherit" | "ipc" | number | null | undefined>];
+    stdio?:
+      | "pipe"
+      | "ignore"
+      | "inherit"
+      | readonly [
+          "pipe" | "ignore" | "inherit",
+          ...Array<
+            "pipe" | "ignore" | "inherit" | "ipc" | number | null | undefined
+          >,
+        ];
   },
 ) => string | Buffer;
 
@@ -39,10 +48,7 @@ export type PickFolderFailed = {
   message: string;
 };
 export type PickFolderResult =
-  | PickFolderOk
-  | PickFolderCancelled
-  | PickFolderUnsupported
-  | PickFolderFailed;
+  PickFolderOk | PickFolderCancelled | PickFolderUnsupported | PickFolderFailed;
 
 export function escapeAppleScriptString(raw: string): string {
   return raw.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
