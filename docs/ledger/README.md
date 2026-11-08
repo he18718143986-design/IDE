@@ -33,6 +33,21 @@
 
 ---
 
+## 裁决落盘记录（持续追加）
+
+| 日期 | 裁决编号 | 裁决核心 | 落点 |
+| :--- | :--- | :--- | :--- |
+| 2026-10-30 | DEC-001～DEC-009 | 三 Agent 拓扑、审阅内容后置、系统知识库、凭据保险库等 9 项裁决 | [`../scheme.md`](../scheme.md) §6；ADR-0014～0017 |
+| 2026-11-01 | OP-1（洗白）、OP-13（第一印象窗口） | 确认路径 occurrence 机制生效；第一印象速记窗口不设等待时长、非阻塞、可跳过 | [`../scheme.md`](../scheme.md) dec-10/dec-11；supervisor §13.3 / §14.11 K-12 |
+| 2026-11-01 | oq-2（北极星判定）、oq-3（凭据保管） | 用户对话试玩 + 结构化证据桩；凭据存 Vault 至手动删、cookie 过期 Daemon 静默重登 | [`../scheme.md`](../scheme.md) dec-12/dec-13；L.17a/L.17b 前置解除 |
+| 2026-11-02 | ruling 3（check playtest） | 北极星合同（带 `references[]`）自动附加 `check playtest` 验收命令；非北极星不附加 | C.23 已实现；completed §3.4f / §3.4i |
+| 2026-11-02 | W.5c 拆分、W.5b/c 去留 | W.5c 拆为 i/ii/iii 三子卡；Sprint 排程 `W.5c → W.7 → W.5b` | P-114 / P-118 |
+| 2026-11-02 | ruling A（围栏档与 REJ-010） | `SANDBOX_ENFORCED` 为独立围栏档；能力声明不得按宿主侧修辞口径造假 | W.5c-iii；`scheme.md` §10 REJ-010 |
+| 2026-11-03 | v0.2 RFC 拍板（D-1～D-6） | B.1/B.2/C.4 激活并标 `[READY · 待 DoR 重写]`；S.3 与 D.1e 维持 `[DEFERRED → v0.2+]` | [`../rfc/v0.2-scope.md`](../rfc/v0.2-scope.md)；P-141 |
+| 2026-11-08 | 路线 B 拍板：受控施工台 | Stagent 定位为「受控施工台」，不追求替代 Cursor（`STAGENT_EDITOR="cursor {path}"` 并用设计维持）；路线 A（双模式：Vibe 直改 + Spec 隔离）否决 | [`../scheme.md`](../scheme.md) §9.1 验收线；P-174 |
+
+---
+
 ## 第 1 波遗留
 
 | 项 | 说明 |

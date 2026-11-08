@@ -183,6 +183,42 @@
 
 ## 9. 验收（`acceptance[]`）
 
+### 9.1 验收线（产品整体交付标准）
+
+**验收口径（路线 B：受控施工台）**：
+
+给定符合 DoR（Definition of Ready）的任务卡，Stagent 在**无人工干预**的情况下完成全链路：
+
+1. **派生合同**：Supervisor 基于任务卡生成合同（`ScopePlan` → 合同 JSON）
+2. **Agent 施工**：Worker 在 Worktree 隔离环境中按合同执行（写码/测试/文档）
+3. **产出 Evidence**：Daemon 运行真实验证命令，产出结构化证据（`verification_spec.commands` 执行结果）
+4. **通过合并前校验**：Evidence 状态为 `PASSED`，越权/漂移被门禁拦下
+5. **交付可审查 PR**：产出 Git 分支 + Commit，用户可在 GitHub 审阅后合并
+
+**通过判据**：
+
+- **N 个真实任务卡**全程无人工介入完成（N = **3**，**待 Tina 拍板**）
+- **越权/漂移被失败关闭拦下**：尝试写保护路径 / 超出范围的合同被 `FAILED` / `ABORTED` 拦截，不得产出可合并分支
+
+**明确排除项（不在验收线范围内）**：
+
+- **不要求替代 Cursor** 的编辑/补全/调试能力：`STAGENT_EDITOR="cursor {path}"` 的并用设计维持（路线 B 定位）
+- **不要求北极星「网址复刻」**：goal-2 仍标记「当前做不到」（见 gap-11、gap-12、conf-6）
+
+**前置条件（agent 施工档位）**：
+
+- 依赖 **P0b 拍板**：写码档开不开 / 控制档 / 越权防线归谁
+- 拍板前验收线**不生效**（Supervisor 只读档可测，Worker 写码档需授权）
+
+**现状缺口登记**：
+
+1. **Agent 写码档未开启**：当前仅 `plan` 只读档，CA-06 实测证明拦截靠 CLI `plan mode` 上游行为（Worker 自身无写能力）
+2. **端到端串联未验证**：`golden-slice` 用替身 Worker，真 Agent 全链路（Supervisor → 合同 → Worker → Evidence → PR）未跑过
+
+---
+
+### 9.2 单项验收条目
+
 | id | text | check | 绑定 | 状态 |
 | :--- | :--- | :--- | :--- | :--- |
 | acc-1 | 右栏 Agent 无法写文件、跑 shell、联网。 | `auto` | `tests/integration/partner-readonly.test.ts`；[`reports/J1-partner-cli-verification-2026-10-28.md`](./reports/J1-partner-cli-verification-2026-10-28.md) | PASS（替身模型）；真 Key 补验挂账 OP-28 |
