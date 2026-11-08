@@ -88,7 +88,7 @@ describe("合同 ⇄ 卡 互逆", () => {
   it("带 acceptance_refs 的合同：拆成卡与运行时，再拼回完全相等", () => {
     const c = contract();
     const { card, runtime } = splitContract(c, note(c.contract_id));
-    expect(card.contract.intent.acceptance_criteria).toBeUndefined();
+    expect(card.contract.intent["acceptance_criteria"]).toBeUndefined();
     expect(card.contract.acceptance.map((a) => a.id)).toEqual(["ac-1", "ac-2"]);
     expect(card.contract.scheme_item_ids).toEqual(["goal-9"]);
     expect(joinContract(card, runtime)).toEqual(c);
@@ -115,7 +115,9 @@ describe("合同 ⇄ 卡 互逆", () => {
   it("acceptance_criteria 与验收条目文字不同：卡保留原文，往返不丢", () => {
     const c = contract({ acceptanceCriteria: ["整体验收口径"] });
     const { card, runtime } = splitContract(c, note(c.contract_id));
-    expect(card.contract.intent.acceptance_criteria).toEqual(["整体验收口径"]);
+    expect(card.contract.intent["acceptance_criteria"]).toEqual([
+      "整体验收口径",
+    ]);
     expect(joinContract(card, runtime)).toEqual(c);
   });
 

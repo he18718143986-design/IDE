@@ -85,7 +85,7 @@ const CODE_REF = z
     message: "代码事实形如 path::symbol 或 path:10-20",
   });
 
-const intentShape = softwareContractSchema.innerType().shape.intent.shape;
+const intentShape = softwareContractSchema.shape.intent.shape;
 const noteShape = designNoteSchema.shape;
 
 const cardContractSchema = z
@@ -219,7 +219,16 @@ export const contractCardSchema = z
     status: z.enum(CARD_STATUSES),
     contract: cardContractSchema,
     design: cardDesignSchema,
-    governance: governanceSchema.default({}),
+    governance: governanceSchema.default(() => ({
+      spec_refs: [],
+      depends_on: [],
+      code_facts: [],
+      non_goals: [],
+      fail: [],
+      adr_revisions: [],
+      defaults: [],
+      open_questions: [],
+    })),
   })
   .strict()
   .superRefine((card, ctx) => {
@@ -476,9 +485,9 @@ export function joinContract(
       contract_type: runtime.contract_type,
       lifecycle_state: runtime.lifecycle_state,
       intent: {
-        title: c.intent.title,
-        description: c.intent.description,
-        acceptance_criteria: c.intent.acceptance_criteria ?? acceptanceTexts,
+        title: c.intent["title"],
+        description: c.intent["description"],
+        acceptance_criteria: c.intent["acceptance_criteria"] ?? acceptanceTexts,
         risk_level: c.intent.risk_level,
       },
       authorization: {

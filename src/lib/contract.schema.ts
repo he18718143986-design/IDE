@@ -554,9 +554,19 @@ export const softwareContractSchema = z
         readonly_paths: z.array(safePathString).default([]),
         strictly_forbidden_paths: z.array(z.string()).default([]),
       }),
-      budget_limits: budgetLimitsSchema.default({}),
+      budget_limits: budgetLimitsSchema.default(() => ({
+        max_file_modifications: 10,
+        max_total_diff_lines: 2000,
+        max_duration_seconds: 1800,
+        max_verification_retries: 3,
+      })),
       cost_limits: costLimitsSchema,
-      execution_permissions: executionPermissionsSchema.default({}),
+      execution_permissions: executionPermissionsSchema.default(() => ({
+        allowed_commands: [],
+        allowed_environment_variable_names: [],
+        network_policy: "DENY" as const,
+        dependency_changes_allowed: false,
+      })),
     }),
     verification_spec: z.object({
       commands: z.array(verificationCommandSchema),
