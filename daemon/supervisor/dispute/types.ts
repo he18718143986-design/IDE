@@ -1,4 +1,5 @@
 import type { SoftwareContract } from "../../../src/lib/contract.schema";
+import type { ReasonCode } from "../../../src/lib/evidence.schema";
 
 /**
  * 质疑自查领域类型（TASK-S.5 / 架构 §5.7、§6.5）。
@@ -29,6 +30,8 @@ export interface PromptFactMessage {
   role: "user" | "supervisor" | "system";
   text: string;
   created_at: string;
+  raw_start?: number | undefined;
+  raw_end?: number | undefined;
 }
 
 export interface PromptFact {
@@ -38,7 +41,11 @@ export interface PromptFact {
   original_request: string | null;
   /** 用户显式确认/批准过的意图记录 */
   confirmations: PromptFactMessage[];
-  /** 与本次质询关键词命中的会话消息 */
+  /**
+   * 左栏「你当时说的」：与本次质询相关的冻结方案条目所锚定的原话高亮
+   * （修 P-2：来自台账 evidence 的 anchor，不再是会话消息的关键词命中）。
+   * `text` 为锚定片段；`raw_start`/`raw_end` 指向原话中的高亮区间。
+   */
   matched_messages: PromptFactMessage[];
 }
 
@@ -58,6 +65,11 @@ export interface DiffFact {
   diff_stat: string;
   diff_excerpt: string;
   commit_sha: string | null;
+  /**
+   * 新增的非注释、非字符串代码行（修 P-4）。由 `git diff base..task` 全文计算，
+   * 不受 `diff_excerpt` 截断影响；缺省时由 `diff_excerpt` 现算。
+   */
+  added_code_lines?: string[] | undefined;
   /** 真实终端输出（来自 Evidence 的 stdout/stderr tail） */
   terminal_lines: string[];
   verification_results: Array<{
@@ -121,7 +133,10 @@ export interface DisputeReport {
   suggested_classification?: DisputeClassification | undefined;
   confidence: number;
   degraded: boolean;
-  reason_code?: string | undefined;
+  /** 对齐 `reasonCodeSchema` 枚举（修 P-5）；质疑自查本身不写入 */
+  reason_code?: ReasonCode | undefined;
+  /** 技术错误码独立字段（修 P-5）：超时降级时为 `E_DISPUTE_TIMEOUT` */
+  error_code?: typeof E_DISPUTE_TIMEOUT | undefined;
   rationale: string[];
   plain_summary: string;
   facts: TriadFacts;

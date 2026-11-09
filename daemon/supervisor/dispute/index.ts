@@ -73,32 +73,33 @@ function changeRequestId(now: Date): string {
   return `cr_${day}_${randomUUID().slice(0, 8)}`;
 }
 
+/**
+ * 用户可见文案（supervisor §16.7）：只用「这是 Bug，免费修」「我想要新功能，下一轮做」，
+ * 不出现技术分类词、置信度或错误码。
+ */
 function plainSummary(
   classification: DisputeReport["classification"],
-  confidence: number,
   next: DisputeNextAction,
 ): string {
   switch (classification) {
     case "IMPLEMENTATION_BUG":
       return (
-        `这次更像「实现偏差」：规范里写了相关要求，但代码或验证没有做到` +
-        `（置信度 ${confidence.toFixed(2)}）。已生成返工提案，` +
-        `只允许改动原合同授权范围内的文件` +
+        "这是 Bug，免费修：方案里写了这一条，这次施工没有做到。" +
+        "我安排返工，只改授权范围内的文件" +
         (next.rework && next.rework.target_files.length > 0
-          ? `：${next.rework.target_files.slice(0, 3).join("、")}`
+          ? `（${next.rework.target_files.slice(0, 3).join("、")}）`
           : "") +
-        "。"
+        "，不另算。"
       );
     case "REQUIREMENT_DRIFT":
       return (
-        `这次更像「需求遗漏或理解差异」：您最初提过该诉求，但已批准的需求规范` +
-        `没有覆盖（置信度 ${confidence.toFixed(2)}）。已生成新的合同草案，` +
-        "需要您重新审批后才会执行，不会直接改代码。"
+        "我想要新功能，下一轮做：这一条方案里没有提到。" +
+        "我整理成下一轮的需求草稿，需要你确认后才会动工，不会直接改代码。"
       );
     default:
       return (
-        `自动归因的可信度不足（置信度 ${confidence.toFixed(2)}，门槛 0.70）。` +
-        "三方事实已原样列出：请您选择「按 Bug 修复」或「按新需求演进」。"
+        "我还不能确定是哪一边的问题。你可以选：" +
+        "「这是 Bug，免费修」或「我想要新功能，下一轮做」。"
       );
   }
 }
@@ -177,7 +178,7 @@ export async function runDisputeSelfCheck(
     nextAction = {
       kind: "MANUAL_ARBITRATION",
       message:
-        "自动归因证据不足，请依据下方三方事实选择「按 Bug 修复」或「按新需求演进」。",
+        "我还不能确定是哪一边的问题，请在下面二选一：「这是 Bug，免费修」或「我想要新功能，下一轮做」。",
     };
   }
 
@@ -193,11 +194,7 @@ export async function runDisputeSelfCheck(
     confidence: outcome.confidence,
     degraded: outcome.classification === "UNATTRIBUTED",
     rationale: outcome.rationale,
-    plain_summary: plainSummary(
-      outcome.classification,
-      outcome.confidence,
-      nextAction,
-    ),
+    plain_summary: plainSummary(outcome.classification, nextAction),
     facts,
     next_action: nextAction,
     generated_at: at.toISOString(),
@@ -253,15 +250,15 @@ export function buildTimeoutFallbackReport(params: {
     classification: "UNATTRIBUTED",
     confidence: 0,
     degraded: true,
-    reason_code: E_DISPUTE_TIMEOUT,
+    error_code: E_DISPUTE_TIMEOUT,
     rationale: [`质疑自查在 ${timeoutMs}ms 内未完成，已按 D-3 降级为人工裁决`],
     plain_summary:
-      `自查超时（${timeoutMs}ms），系统没有足够时间完成三方比对。` +
-      "下方只展示已抓取的事实；请稍后重试，或直接依据现有事实选择处理方式。",
+      "这次比对花的时间比预期长，我先把已经找到的三方事实列给你看。" +
+      "你可以选：「这是 Bug，免费修」或「我想要新功能，下一轮做」。",
     facts,
     next_action: {
       kind: "MANUAL_ARBITRATION",
-      message: "自查超时，请人工裁决或稍后重试。",
+      message: "比对超时，请直接二选一，或稍后重试。",
     },
     generated_at: at.toISOString(),
   };

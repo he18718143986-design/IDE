@@ -867,7 +867,9 @@ function Console() {
       facts: {
         prompt: {
           original_request: report.facts.prompt.original_request,
-          matched_messages: report.facts.prompt.matched_messages.length,
+          matched_quotes: Array.isArray(report.facts.prompt.matched_messages)
+            ? report.facts.prompt.matched_messages.map((quote) => quote.text)
+            : [],
           confirmations: report.facts.prompt.confirmations.length,
         },
         spec: report.facts.spec
