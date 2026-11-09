@@ -1,6 +1,7 @@
 # 试玩自查引擎 · 确定性裁决规范（§16.7「这里不对」与验收清单点亮）
 
 > **状态**：**设计定稿 · 待施工**（归属第二批预告 `J.16`「试玩幕、对话式验收」；本文只覆盖其中的自查与点亮，建议实施时拆卡）
+> **J.16 实施状态（P-175 挂账，2026-11-09）**：P-1～P-6 已合（[#188](https://github.com/he18718143986-design/IDE/pull/188) / `859f762`）；文案修正 [#189](https://github.com/he18718143986-design/IDE/pull/189) 待合。**未做**：GAP-P8 `surface_log`、K-14 归因账本、K-16 `attributions.trigger` 闭集与 `linked_reason_code`；P-7 按 §3.3 本版不做。**J.16 不标 COMPLETED**。续作顺序：`surface_log` 采集（随 §15.4 投影写入）→ K-14 → K-16；验收须含真实会话 + 真实台账端到端链路（P-2 sha 口径至今仅单测验证），以及缺 `surface_log` 时 `resolution_note` 标「无呈现记录」的测试覆盖。
 > **建立日期**：2026-10-28（Asia/Hong_Kong）
 > **上位规格**：[`supervisor.md`](./supervisor.md) §14.11（台账、子账本四 `attributions`、K-14、K-15、K-16）、§16.5（B/C 分流与不变式 C-1）、§16.7（试玩幕与质询台）、§17 D10；[`runtime-contract-and-safety.md`](./runtime-contract-and-safety.md) §5.4；[`worker-graveyard-gate.md`](./worker-graveyard-gate.md)（返工派工同样过门禁）；架构 [`system-architecture.md`](./system-architecture.md) 步骤六（已被 §16.7 与 D10 修订的部分以 SSOT 为准）。
 > **与上位规格的关系**：本文是实施口径，不新增场景、不新增用户决定类型、不新增错误码与原因码。**K-14 / K-15 / K-16、G-MATCH、INV-LEDGER-03 以 [`supervisor.md`](./supervisor.md) §14.11 为准**；冲突时以 SSOT 为准。
