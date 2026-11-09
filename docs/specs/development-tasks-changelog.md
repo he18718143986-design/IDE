@@ -221,6 +221,7 @@
 - **P-173（结构债挂账，2026-11-08）**：登记大文件结构债（OP-39）：daemon/server.ts handleHttpRequest ~2128 行（24 个 handle* 方法手动分发）、src/routes/index.tsx Console() ~3447 行（105 useState / 19 useEffect）；更正外部评审误判（daemon→src/lib 为共享契约层设计，非违规）；清算前置（路由级/UI 测试兜底先行）与时机（v0.3 方向拍板后立项，分 3 阶段估算 6-10 周，**外部评审估算、未实测，推新 head 后复核**）；不新增施工 OP 号。同步：ledger/README.md 与 consistency-audit.md 追加 OP-39 条目。**本条仅文档挂账**；不改产品代码；不立拆分任务卡；清算时机待 v0.3 方向拍板。 
 
 - **P-174（验收线修订 · 路线 B 拍板，2026-11-08）**：Tina 拍板路线 B：Stagent 定位为「受控施工台」，不追求替代 Cursor（`STAGENT_EDITOR="cursor {path}"` 并用设计维持）；路线 A（双模式：Vibe 直改 + Spec 隔离）否决。`docs/scheme.md` §9 验收线修订：① 验收口径「给定 DoR 任务卡，无人工干预完成：派生合同 → agent 施工 → Evidence → 通过校验 → 交付可审查 PR」；② 通过判据「N=3（待 Tina 拍板）个真实任务卡全程无人工介入 + 越权/漂移被失败关闭拦下」；③ 明确排除「不替代 Cursor 编辑/补全/调试」「不要求北极星网址复刻（goal-2 仍做不到）」；④ agent 施工前置「依赖 P0b 拍板（写码档开不开/控制档/越权防线归谁），拍板前验收线不生效」；⑤ 缺口登记（agent 写码档未开启、端到端串联未验证）。同步：ledger 两处（consistency-audit / README）注记路线 B 拍板决策留痕；changelog 本条目；`scheme.md` §9 原单项验收移至 §9.2 小节（index 不动、历史保留）；附 grep 自证。**本条仅 docs 纯文档**；不新增 OP 号（OP 范围仍 OP-1～OP-39）；不改产品代码；不另立实施卡。
+- **P-175（J.16 续作挂账 · 2026-11-09）**：基于 `main`@`859f762`（[#188](https://github.com/he18718143986-design/IDE/pull/188) squash，P-1～P-6）。J.16 母项挂账：P-1～P-6 已合；#189 为左栏与 §16.7 文案修正（待合）。未做：GAP-P8 `surface_log`、K-14 归因账本、K-16 trigger 闭集；P-7 按 `playtest-self-check.md` §3.3 本版不做、不开卡、不动 `SchemeDraftV2`。**J.16 不标 COMPLETED**。续作范围与顺序：`surface_log` → K-14 → K-16；验收含真实会话 + 真实台账端到端（P-2 sha 口径）与无 `surface_log` 退化测试。同步：`playtest-self-check.md` 状态头注记。**本条仅 docs 挂账**；不新增 OP 号；不改产品代码；续作卡正式立号（矩阵 / index / yaml 卡）待另行授权后单开 PR。
 
 ## 枢纽迁入修订（P-43～P-66，按编号升序）
 

@@ -342,3 +342,9 @@
 - **诚实口径**：#178 合入时 `src/routes/index.tsx` 父级 `onReturnToPending` **未接线**（卡外；按卡停工）。Tina 已授权 follow-up code PR 补接线（**进行中**）——**非**永久挂账、**不**另立产品卡；**不**宣称端到端闭环 / e2e；不销 OP-34。
 - **Sprint**：首要 → **在队清零**（无 READY；父级接线 follow-up 进行中；下一张待 Tina 拍板）。不碰 D.1e/S.3；不做 DS-6 DoR；不新增 OP；不改产品代码（本条 docs）。
 - **物理 tip**：代码 tip `71684d4`（#178）；立卡 docs tip `7d9fc2b`（#177 P-170）；P-171 docs 本 PR。
+
+## J.16 续作与试玩自查挂账（2026-11-09 新增 · P-175）
+
+- **挂账①（J.16 续作，不新增 OP）**：GAP-P8 `surface_log`、K-14 归因账本、K-16 trigger 闭集未做；`TASK-J.16` 不标 COMPLETED。P-1～P-6 已合 #188；文案 #189 待合。续作须含真实链路端到端验收。
+- **挂账②（测试隔离，不新增 OP）**：`tests/ui/scheme-review-playtest.test.tsx` 的 `SystemMapPane` 异步更新在 jsdom 销毁后触发 `window is not defined` 未处理拒绝，偶发（Ubuntu 一次，重跑即过）；待隔离修复。
+- **挂账③（CI 性能门禁抖动，不新增 OP）**：#189 macOS unit 三次分别失败于 `pre-merge-fingerprint`（68ms/50ms）与 `RadarGraph.perf`（18.4ms/16ms）等不同性能断言；处理口径参照 TASK-CI.1：仅放宽测试断言并依据实测中位数，**不动产品阈值**，且不宣称永久全绿。
