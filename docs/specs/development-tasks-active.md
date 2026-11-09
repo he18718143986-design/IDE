@@ -970,9 +970,9 @@ governance:
 
 <a id="task-ci.2"></a>
 
-#### 【Task CI.2】性能门禁抗抖动（arch P100 与合并前指纹中位数的测试口径）`[NEW_TASK · 立卡 P-177 · 未开工]`
+#### 【Task CI.2】macOS 性能门禁抗抖动（arch P100 / 合并前指纹中位数 / RadarGraph 16ms 的测试口径）`[NEW_TASK · 立卡 P-177 · 未开工]`
 
-> **立卡说明（2026-11-09 · P-177）**：承接 #189 合入后暴露的 macOS 性能门禁抖动。两处测试阈值由 #189 内的提交放宽：`arch-graph-cache`（P100 50→80，`987e276d`；**#192 还原为 50ms**）与 `pre-merge-fingerprint-fallback`（门禁③中位数 50→80，`58cf6057`；**保留并挂账**）。按 TASK-CI.1 口径：**依据多次 macOS run 中位数，仅放宽测试断言；产品判据不动**。**立卡 ≠ 开工 ≠ 销项**；抗抖动 ≠ 永久全绿；本卡不标 COMPLETED。
+> **立卡说明（2026-11-09 · P-177）**：承接 #189 合入后暴露的 macOS 性能门禁抖动。本卡收「同一类问题」：macOS 性能断言贴着 runner 正常波动上限，范围含 `arch-graph-cache`、`pre-merge-fingerprint`、`RadarGraph.perf` 及后续同类断言，一张卡收一类，不按断言逐条开卡。两处测试阈值由 #189 内的提交放宽：`arch-graph-cache`（P100 50→80，`987e276d`；**#192 还原为 50ms**）与 `pre-merge-fingerprint-fallback`（门禁③中位数 50→80，`58cf6057`；**保留并挂账**）。按 TASK-CI.1 口径：**依据多次 macOS run 中位数，仅放宽测试断言；产品判据不动**。**立卡 ≠ 开工 ≠ 销项**；抗抖动 ≠ 永久全绿；本卡不标 COMPLETED。
 
 映射关系（施工前须更新「依据」列为已核实的 run id）：
 
@@ -980,14 +980,14 @@ governance:
 |---|---|---|---|
 | `arch-graph-cache` 缓存命中 P100 | `w3-known-gaps.md` §4.2：单次同步计算 ≤ 50ms，取 P100，不以平均值代替 | 现为 50ms（#192 还原）；放宽须先有 ≥3 次 macOS 样本 | `987e276d` 注释称 macOS 实测约 57ms，**run id 未核实** |
 | `pre-merge-fingerprint` 门禁③ | B.2 门禁③：合并前全量指纹复核耗时中位数 | 现为 80ms（`58cf6057`，随 #189 合入） | `58cf6057` 注释称 macOS 实测约 53ms，**run id 未核实** |
-| `RadarGraph.perf` | 另议 | 不在本卡范围 | #189 失败样本 18.4ms / 16ms，先取证再决定是否另立 |
+| `RadarGraph.perf` 门禁① | TASK-C.4 门禁①：1000 节点 / 2000 边局部更新 ≤ 16ms（60 FPS） | 现为 16ms，**不放宽**；放宽须先有 ≥3 次 macOS 样本 | #192 重跑前 run `42606981507` 实测 16.28ms（单次，非中位数）；#189 样本 18.4ms / 16ms |
 
 ```yaml task-card
 id: TASK-CI.2
 status: NEW_TASK
 contract:
   intent:
-    title: 性能门禁抗抖动（arch P100 与合并前指纹中位数的测试口径）
+    title: macOS 性能门禁抗抖动（arch P100 / 合并前指纹中位数 / RadarGraph 16ms 的测试口径）
     description: >-
       承接 #189 合入后 macOS 性能断言的反复抖动。依据 ≥3 次 macOS 必需检查 run 的中位数（或 P100）决定测试断言是否放宽，
       仅放宽测试断言并写明映射关系；产品判据（w3-known-gaps §4.2 P100 ≤50ms、B.2 门禁口径）与 daemon 阈值不改。
@@ -1015,13 +1015,14 @@ contract:
     writable_paths:
       - tests/unit/arch-graph-cache.test.ts
       - tests/unit/pre-merge-fingerprint-fallback.test.ts
+      - tests/components/RadarGraph.perf.test.tsx
     readonly_paths:
       - docs/ledger/w3-known-gaps.md
       - daemon/arch/graph.ts
       - daemon/guard/evidence-integrity.ts
   verification:
     commands:
-      - { alias: perf-unit, executable: npx, args: [vitest, run, tests/unit/arch-graph-cache.test.ts, tests/unit/pre-merge-fingerprint-fallback.test.ts] }
+      - { alias: perf-unit, executable: npx, args: [vitest, run, tests/unit/arch-graph-cache.test.ts, tests/unit/pre-merge-fingerprint-fallback.test.ts, tests/components/RadarGraph.perf.test.tsx] }
       - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
 design:
   approach: >-
@@ -1030,10 +1031,12 @@ design:
   touches:
     - { path: tests/unit/arch-graph-cache.test.ts, change: modify, why: 依据 run 中位数校准 P100 测试口径，或保持 50ms 并补证据, symbols: [] }
     - { path: tests/unit/pre-merge-fingerprint-fallback.test.ts, change: modify, why: 核实 80ms 依据并补 run id 注释, symbols: [] }
+    - { path: tests/components/RadarGraph.perf.test.tsx, change: modify, why: 依据 ≥3 次 macOS 样本决定是否放宽 16ms（默认不放宽）；补 run id 注释, symbols: [] }
   interfaces: []
   test_plan:
     - { acceptance_id: CI2-P1, test_path: tests/unit/arch-graph-cache.test.ts, level: unit, debt: "未施工；依据样本待采集" }
     - { acceptance_id: CI2-P2, test_path: tests/unit/pre-merge-fingerprint-fallback.test.ts, level: unit, debt: "未施工" }
+    - { acceptance_id: CI2-P1, test_path: tests/components/RadarGraph.perf.test.tsx, level: unit, debt: "未施工；RadarGraph 样本待采集，16ms 默认不放宽" }
     - { acceptance_id: CI2-P3, test_path: tests/unit/arch-graph-cache.test.ts, level: unit, debt: "未施工" }
     - { acceptance_id: CI2-P4, test_path: tests/unit/arch-graph-cache.test.ts, level: integration, debt: "CI 证据项：需真实 macOS CI 连续两次绿（非单测断言）；未取证" }
 governance:
@@ -1045,12 +1048,13 @@ governance:
   code_facts:
     - { ref: "tests/unit/arch-graph-cache.test.ts:82-89", note: "main 上为 80ms（987e276d，#189 合入）；#192 还原为 50ms 待合" }
     - { ref: "tests/unit/pre-merge-fingerprint-fallback.test.ts:82-86", note: "main 上为 80ms（58cf6057，#189 合入）；未单独立卡" }
+    - { ref: "tests/components/RadarGraph.perf.test.tsx:60-96", note: "main 上为 16ms（未放宽）；#192 重跑前 run 42606981507 实测 16.28ms（单次）" }
   non_goals:
     - 不改产品阈值（w3-known-gaps §4.2 50ms 判据；B.2 门禁口径）
     - 不宣称永久全绿；抗抖动 ≠ 永久全绿
     - 不以单次 run 作为放宽依据
-    - 不处理 RadarGraph.perf（先取证，另议）
-    - 不修改 ruleset 与分支保护
+    - 不以单次样本放宽 RadarGraph.perf 的 16ms（须 ≥3 次 macOS 中位数）
+    - 不修改 ruleset 与分支保护（review 与 CODEOWNERS 另由 CODEOWNERS PR 与网页设置处理）
   fail:
     - 修改 daemon 或 w3-known-gaps 的阈值以让 CI 变绿
     - 放宽无 run id 证据的阈值，或放宽正确性断言
