@@ -9,7 +9,7 @@ import {
   clearArchGraphCache,
 } from "../../daemon/arch/graph";
 
-/** 缺口 4.2 后端判据：G-16 扫描收敛 + mtime 增量缓存 + 单次 P100 ≤ 80ms（TASK-CI.1：macOS CI 实测 ~57ms，仅放宽测试门禁） */
+/** 缺口 4.2 后端判据：G-16 扫描收敛 + mtime 增量缓存 + 单次 P100 ≤ 50ms */
 
 describe("4.2 /api/arch/graph：src 收敛与 mtime 缓存", () => {
   let root: string;
@@ -79,13 +79,13 @@ describe("4.2 /api/arch/graph：src 收敛与 mtime 缓存", () => {
     expect(archGraphCacheSize()).toBe(2);
   });
 
-  it("缓存命中时单次构建 P100 ≤ 80ms", () => {
+  it("缓存命中时单次构建 P100 ≤ 50ms", () => {
     buildDependencyGraph({ root });
     const samples: number[] = [];
     for (let i = 0; i < 20; i += 1) {
       samples.push(buildDependencyGraph({ root }).durationMs);
     }
-    expect(Math.max(...samples)).toBeLessThanOrEqual(80);
+    expect(Math.max(...samples)).toBeLessThanOrEqual(50);
   });
 
   it("连续两次构建命中单例缓存，不重复执行全量重构且返回同一图实例", () => {
