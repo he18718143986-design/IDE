@@ -117,6 +117,30 @@ jobs:
       - name: Check knowledge base (docs/system)
         run: npm run check:knowledge
 
+  perf-gate:
+    # 性能阈值挂卡门禁（TASK-CI.2 配套）：确定性、零模型、不看人。
+    # PR 触及 perf 测试里的阈值断言行（.toBeLessThan / OrEqual，含改数字）时，
+    # PR 描述或 docs 新增行须引用真实存在的任务卡号，否则本 job 失败。
+    # 非 pull_request 事件由脚本直接放行。需在 ruleset 中设为 required 才会挡合并。
+    name: Perf threshold gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 脚本要对 base...head 做 diff，必须拿到完整历史
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies (locked)
+        run: npm ci
+
+      - name: Check perf threshold changes cite a task card
+        run: npx tsx scripts/perf-threshold-gate.ts
+
   lint:
     name: Lint (${{ matrix.os }})
     needs: changes
