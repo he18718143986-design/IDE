@@ -220,7 +220,7 @@ describe("三类归因分流", () => {
     expect(report.next_action.rework?.target_files).toEqual(["src/order.ts"]);
     expect(report.next_action.rework?.scope_subset_valid).toBe(true);
     expect(report.next_action.rework?.requires_scope_expansion).toBe(false);
-    expect(report.plain_summary).toContain("实现偏差");
+    expect(report.plain_summary).toContain("这是 Bug，免费修");
   });
 
   it("规范缺失 + 用户原始意图存在 → 需求遗漏，生成待审批的新合同草案", async () => {
@@ -250,7 +250,7 @@ describe("三类归因分流", () => {
     expect(report.next_action.change_request?.change_request_id).toBe(
       report.change_request_id,
     );
-    expect(report.plain_summary).toContain("需求遗漏");
+    expect(report.plain_summary).toContain("我想要新功能，下一轮做");
   });
 
   it("三方信号不足 → UNATTRIBUTED，降级人工裁决", async () => {
@@ -271,7 +271,7 @@ describe("三类归因分流", () => {
     expect(report.classification).toBe("UNATTRIBUTED");
     expect(report.degraded).toBe(true);
     expect(report.next_action.kind).toBe("MANUAL_ARBITRATION");
-    expect(report.plain_summary).toContain("门槛 0.70");
+    expect(report.plain_summary).toContain("我还不能确定是哪一边的问题");
     expect(report.next_action.rework).toBeUndefined();
   });
 
@@ -331,9 +331,10 @@ describe("超时降级报告", () => {
     });
     expect(report.classification).toBe("UNATTRIBUTED");
     expect(report.degraded).toBe(true);
-    expect(report.reason_code).toBe(E_DISPUTE_TIMEOUT);
+    expect(report.error_code).toBe(E_DISPUTE_TIMEOUT);
+    expect(report).not.toHaveProperty("reason_code");
     expect(report.next_action.kind).toBe("MANUAL_ARBITRATION");
-    expect(report.plain_summary).toContain("自查超时");
+    expect(report.plain_summary).toContain("花的时间比预期长");
   });
 });
 

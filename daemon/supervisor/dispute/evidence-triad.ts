@@ -1,35 +1,57 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type { SoftwareContract } from "../../../src/lib/contract.schema";
 import type { EvidenceBundle } from "../../../src/lib/evidence.schema";
+import {
+  lexemes,
+  matchNormalize,
+} from "../../../src/lib/journey/graveyard-match";
+import type {
+  SchemeDraftV2,
+  SchemeItemMeta,
+  TurnRef,
+} from "../../../src/lib/journey/scheme-patch-types";
 import { execGit } from "../../git/worktree-manager";
 import { loadLatestEvidenceSnapshot } from "../../pipeline/merger";
+import {
+  readSchemeSnapshot,
+  type SchemeSnapshot,
+} from "../../pipeline/scheme-snapshot-store";
 import { unquoteGitPath } from "../../pipeline/untracked-scope-guard";
+import { readSchemeLedger } from "../intent-compiler/scheme-ledger-store";
 import { SupervisorSessionManager } from "../session-manager";
 import type { SupervisorMessage, SupervisorSession } from "../types";
-import { RequirementsStore } from "../specs/requirements-store";
-import type { DiffFact, PromptFact, SpecFact, TriadFacts } from "./types";
+import { addedCodeLines } from "./added-code";
+import type {
+  DiffFact,
+  PromptFact,
+  PromptFactMessage,
+  SpecFact,
+  TriadFacts,
+} from "./types";
 
 /**
- * 三方事实抓取管道（TASK-S.5 / 架构 §5.7）。
+ * 三方事实抓取管道（TASK-S.5 / 架构 §5.7；口径见 playtest-self-check §2）。
  *
- * 三路证据全部来自真实物理载体，任何一路缺失都会被显式标注：
- * - Prompt：`SupervisorSessionManager` 的会话文件（`.stagent/sessions/`）；
- * - Spec：`RequirementsStore` 的冻结快照（`.stagent/specs/requirements.md`）；
- * - Diff：受控 Worktree 的 `git status/diff`、Evidence 里的验证退出码与终端尾巴。
+ * 三路事实全部来自已冻结或已提交的物理载体，任何一路缺失都显式标注：
+ * - 左栏「你当时说的」：冻结方案条目的 `evidence` 锚定原话（修 P-2）；
+ * - 中栏「确认的方案里记的」：确认快照 `.stagent/drafts/schemes/*.json`（修 P-1）；
+ * - 右栏「代码实际做的」：证据包 `git_info` 的 `base..task` 区间 diff（修 P-3）。
  *
  * 本模块只抓事实，不做归因判断；归因在 `classification.ts`。
- * 所有外部依赖均可注入，测试不需要真实 git / 真实会话目录。
+ * 所有外部依赖均可注入，测试不需要真实会话目录。
  */
 
 const MAX_DIFF_CHARS = 20_000;
 const MAX_TERMINAL_LINES = 200;
 const MAX_SPEC_ENTRIES = 20;
+const MAX_QUOTES = 20;
 
 /**
- * 中文质询没有分词器可用，这里用「停用词剥离 + 2-gram」近似：
- * "订单页面没有满减折扣功能" → 订单 / 满减折扣 / 满减 / 减折 / 折扣。
- * 2-gram 提高召回，停用词剥离避免"没有/功能"这类词把每行都命中。
+ * 中文质询没有分词器可用：先剥离停用短语，再用 G-MATCH 的 `lexemes`
+ * 取二元组（单一语义源，修 P-6）。
+ * "订单页面没有满减折扣功能" → 订单 / 满减 / 减折 / 折扣。
  */
 const STOP_PHRASES: readonly string[] = [
   "为什么",
@@ -64,46 +86,31 @@ const STOP_PHRASES: readonly string[] = [
   "明明",
 ];
 
-/** 从白话质询中提取用于三方比对的关键词（确定性、无模型） */
+/** 从白话质询中提取用于三方比对的关键词（确定性、无模型，复用 G-MATCH 词素） */
 export function extractKeywords(text: string): string[] {
-  const normalized = text.normalize("NFKC").toLowerCase();
-  const chunks = normalized
-    .split(/[^\p{Script=Han}a-z0-9]+/u)
-    .map((chunk) => chunk.trim())
-    .filter((chunk) => chunk.length > 0);
-
-  const tokens = new Set<string>();
-  for (const chunk of chunks) {
-    let cleaned = chunk;
-    for (const stop of STOP_PHRASES) {
-      cleaned = cleaned.split(stop).join(" ");
-    }
-    for (const part of cleaned.split(/\s+/)) {
-      if (!part) continue;
-      if (/^[a-z0-9]+$/.test(part)) {
-        if (part.length >= 3) tokens.add(part);
-        continue;
-      }
-      if (part.length >= 2) tokens.add(part);
-      for (let i = 0; i + 2 <= part.length; i += 1) {
-        tokens.add(part.slice(i, i + 2));
-      }
-    }
+  let cleaned = text.normalize("NFKC").toLowerCase();
+  for (const stop of STOP_PHRASES) {
+    cleaned = cleaned.split(stop).join(" ");
   }
-
-  return [...tokens]
+  return lexemes(cleaned)
     .filter((token) => token.length >= 2)
     .sort((a, b) => b.length - a.length || a.localeCompare(b))
     .slice(0, 40);
 }
 
-/** 关键词命中（大小写不敏感；任一命中即可） */
+/**
+ * 关键词命中：与 G-MATCH 同一规范化（NFKC、去空白与标点、ASCII 小写），
+ * 任一关键词命中即可。
+ */
 export function matchesKeywords(
   text: string,
   keywords: readonly string[],
 ): boolean {
-  const haystack = text.toLowerCase();
-  return keywords.some((keyword) => haystack.includes(keyword));
+  const haystack = matchNormalize(text);
+  return keywords.some((keyword) => {
+    const needle = matchNormalize(keyword);
+    return needle.length > 0 && haystack.includes(needle);
+  });
 }
 
 /** 解析 `git status --porcelain -uall` 的变更路径（含重命名与引号转义） */
@@ -124,17 +131,20 @@ export function parseChangedPaths(porcelain: string): string[] {
   return [...paths].sort();
 }
 
+type ContractBinding = SoftwareContract["scheme_binding"];
+
 export interface SessionFactInput {
   contractId: string;
   challenge?: string | undefined;
   sessionId?: string | undefined;
   keywords: readonly string[];
+  schemeBinding?: ContractBinding | undefined;
 }
 
 export interface SpecFactInput {
   contract: Pick<
     SoftwareContract,
-    "contract_id" | "contract_revision" | "intent"
+    "contract_id" | "contract_revision" | "intent" | "scheme_binding"
   >;
   keywords: readonly string[];
 }
@@ -166,24 +176,140 @@ export function worktreePathFor(repoRoot: string, contractId: string): string {
   );
 }
 
-function toPromptMessage(message: SupervisorMessage): {
-  message_id: string;
-  role: SupervisorMessage["role"];
-  text: string;
-  created_at: string;
-} {
+function sha256Hex(text: string): string {
+  return createHash("sha256").update(text, "utf8").digest("hex");
+}
+
+/**
+ * 读取与合同绑定一致的确认快照（修 P-1 的前提）。
+ * 快照缺失或 digest 与 `scheme_binding.snapshot_digest` 不符 → null（失败关闭）。
+ */
+export function loadBoundSnapshot(
+  repoRoot: string,
+  binding: ContractBinding,
+): SchemeSnapshot | null {
+  if (!binding) return null;
+  const snapshot = readSchemeSnapshot(repoRoot, binding.confirmation_id);
+  if (!snapshot || snapshot.digest !== binding.snapshot_digest) return null;
+  return snapshot;
+}
+
+/**
+ * 中栏事实：确认快照里的方案条目（模块与验收），不读 `requirements.md`（修 P-1）。
+ */
+export function specFactFromSnapshot(
+  snapshot: SchemeSnapshot,
+  keywords: readonly string[],
+): SpecFact {
+  const scheme = snapshot.scheme;
+  const lines: string[] = [];
+  for (const moduleName of scheme.modules) {
+    lines.push(`模块：${moduleName}`);
+  }
+  for (const item of scheme.acceptance ?? []) {
+    lines.push(`验收 ${item.id}：${item.text}`);
+  }
   return {
-    message_id: message.message_id,
-    role: message.role,
-    text: message.text,
-    created_at: message.created_at,
+    snapshot_id: snapshot.snapshot_id,
+    version: scheme.scheme_revision,
+    sha256: snapshot.digest,
+    content: lines.join("\n"),
+    matched_entries: lines
+      .filter((line) => matchesKeywords(line, keywords))
+      .slice(0, MAX_SPEC_ENTRIES),
   };
+}
+
+const ANCHORED_COLLECTIONS = [
+  "goals",
+  "out_of_scope",
+  "modules",
+  "flows",
+  "entities",
+  "decisions",
+  "conflicts",
+  "open_questions",
+  "acceptance",
+] as const;
+
+function itemLabel(item: Record<string, unknown>): string {
+  for (const key of ["text", "name", "question", "summary"]) {
+    const value = item[key];
+    if (typeof value === "string" && value !== "") return value;
+  }
+  return "";
+}
+
+/**
+ * 左栏事实：与质询相关的方案条目所锚定的原话（修 P-2）。
+ *
+ * - 只采信 `turn` 证据且带 `anchor`；
+ * - 锚点的 `turn_text_sha256` 必须与会话里该轮原文一致，否则丢弃（失败关闭）；
+ * - 高亮区间 `raw_start/raw_end` 直接切原文，不做模型改写。
+ */
+export function anchoredQuotesFromDraft(
+  draft: SchemeDraftV2,
+  messages: readonly SupervisorMessage[],
+  keywords: readonly string[],
+): PromptFactMessage[] {
+  const byId = new Map(
+    messages.map((message) => [message.message_id, message]),
+  );
+  const out: PromptFactMessage[] = [];
+  for (const collection of ANCHORED_COLLECTIONS) {
+    const items = (draft[collection] ?? []) as unknown as Array<
+      SchemeItemMeta & Record<string, unknown>
+    >;
+    for (const item of items) {
+      if (!matchesKeywords(itemLabel(item), keywords)) continue;
+      for (const evidence of item.evidence ?? []) {
+        if (evidence.kind !== "turn") continue;
+        const ref: TurnRef = evidence.ref;
+        const anchor = ref.anchor;
+        if (!anchor) continue;
+        const message = byId.get(ref.turn_id);
+        if (!message) continue;
+        if (sha256Hex(message.text) !== anchor.turn_text_sha256) continue;
+        const quote = message.text.slice(anchor.raw_start, anchor.raw_end);
+        if (quote === "") continue;
+        out.push({
+          message_id: message.message_id,
+          role: message.role,
+          text: quote,
+          created_at: message.created_at,
+          raw_start: anchor.raw_start,
+          raw_end: anchor.raw_end,
+        });
+      }
+    }
+  }
+  return out.slice(-MAX_QUOTES);
+}
+
+/** 台账中的方案草稿，且与确认快照同一 scheme_id / revision 才可用（失败关闭） */
+export function ledgerDraftForSnapshot(
+  repoRoot: string,
+  snapshot: SchemeSnapshot | null,
+): SchemeDraftV2 | null {
+  if (!snapshot) return null;
+  const record = readSchemeLedger(repoRoot);
+  if (!record) return null;
+  const draft = record.state.draft;
+  if (
+    draft.scheme_id !== snapshot.scheme.scheme_id ||
+    draft.scheme_revision !== snapshot.scheme.scheme_revision
+  ) {
+    return null;
+  }
+  return draft;
 }
 
 export class SessionFactSourceImpl implements SessionFactSource {
   private readonly manager: SupervisorSessionManager;
+  private readonly repoRoot: string;
 
   constructor(repoRoot: string) {
+    this.repoRoot = repoRoot;
     this.manager = new SupervisorSessionManager(repoRoot);
   }
 
@@ -215,48 +341,39 @@ export class SessionFactSourceImpl implements SessionFactSource {
     const confirmations = userMessages.filter((message) =>
       /确认|同意|批准|就按|按这个|没问题|可以，?就/.test(message.text),
     );
-    const matched = messages.filter((message) =>
-      matchesKeywords(message.text, input.keywords),
-    );
+
+    const snapshot = input.schemeBinding
+      ? loadBoundSnapshot(this.repoRoot, input.schemeBinding)
+      : null;
+    const draft = ledgerDraftForSnapshot(this.repoRoot, snapshot);
+    const matched = draft
+      ? anchoredQuotesFromDraft(draft, session.messages, input.keywords)
+      : [];
 
     return {
       session_id: session.session_id,
       source: "SESSION",
       original_request: original,
       confirmations,
-      matched_messages: matched.slice(-20),
+      matched_messages: matched,
     };
   }
 }
 
 export class SpecFactSourceImpl implements SpecFactSource {
-  private readonly store: RequirementsStore;
+  private readonly repoRoot: string;
 
   constructor(repoRoot: string) {
-    this.store = new RequirementsStore(repoRoot);
+    this.repoRoot = repoRoot;
   }
 
   collect(input: SpecFactInput): SpecFact | null {
-    const baseline = this.store.ensureBaseline(input.contract);
-    const entries = baseline.content
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(
-        (line) =>
-          line.length > 0 &&
-          !line.startsWith("#") &&
-          !line.startsWith("- 合同："),
-      );
-
-    return {
-      snapshot_id: baseline.snapshot.snapshot_id,
-      version: baseline.snapshot.version,
-      sha256: baseline.snapshot.sha256,
-      content: baseline.content,
-      matched_entries: entries
-        .filter((line) => matchesKeywords(line, input.keywords))
-        .slice(0, MAX_SPEC_ENTRIES),
-    };
+    const snapshot = loadBoundSnapshot(
+      this.repoRoot,
+      input.contract.scheme_binding,
+    );
+    if (!snapshot) return null;
+    return specFactFromSnapshot(snapshot, input.keywords);
   }
 }
 
@@ -272,6 +389,52 @@ function evidenceTerminalLines(evidence: EvidenceBundle | null): string[] {
     }
   }
   return lines.slice(-MAX_TERMINAL_LINES);
+}
+
+const SHA_PATTERN = /^[0-9a-f]{7,64}$/;
+
+export interface GitRangeFacts {
+  changed_files: string[];
+  diff_stat: string;
+  patch: string;
+}
+
+/**
+ * 施工提交区间的真实改动（修 P-3）。
+ *
+ * `commitWorktree` 已 `git commit`，worktree 的 status/diff 为空，
+ * 所以右栏必须看 `base..task` 区间。两端必须是十六进制 SHA，
+ * 防止被当作 git 选项注入。
+ */
+export async function collectGitRangeFacts(
+  repoRoot: string,
+  baseSha: string,
+  taskSha: string,
+): Promise<GitRangeFacts | null> {
+  if (!SHA_PATTERN.test(baseSha) || !SHA_PATTERN.test(taskSha)) return null;
+  const range = `${baseSha}..${taskSha}`;
+  const names = await execGit(["diff", "--name-only", "-z", range], repoRoot, {
+    raw: true,
+  }).catch(() => null);
+  const stat = await execGit(["diff", "--numstat", range], repoRoot).catch(
+    () => null,
+  );
+  const patch = await execGit(
+    ["diff", "--no-color", "--no-ext-diff", range],
+    repoRoot,
+    { raw: true },
+  ).catch(() => null);
+  if (!names || names.exitCode !== 0 || !patch || patch.exitCode !== 0) {
+    return null;
+  }
+  const changed = [
+    ...new Set(names.stdout.split("\0").filter((file) => file !== "")),
+  ].sort();
+  return {
+    changed_files: changed,
+    diff_stat: stat?.exitCode === 0 ? stat.stdout.trim() : "",
+    patch: patch.stdout,
+  };
 }
 
 export class CodeFactSourceImpl implements CodeFactSource {
@@ -296,56 +459,57 @@ export class CodeFactSourceImpl implements CodeFactSource {
         exit_code: result.exit_code,
         passed: result.passed,
       })) ?? [];
-
-    if (!fs.existsSync(worktreePath)) {
-      return {
-        worktree_path: worktreePath,
-        available: false,
-        changed_files: [],
-        diff_stat: "",
-        diff_excerpt: "",
-        commit_sha: null,
-        terminal_lines: evidenceTerminalLines(evidence),
-        verification_results: verification,
-        evidence_id: evidence?.evidence_id ?? null,
-        tests_modified: evidence?.tests_modified === true,
-      };
-    }
-
-    const status = await execGit(
-      ["status", "--porcelain", "-uall"],
-      worktreePath,
-    ).catch(() => null);
-    const changed =
-      status?.exitCode === 0 ? parseChangedPaths(status.stdout) : [];
-
-    const stat = await execGit(["diff", "--stat", "HEAD"], worktreePath).catch(
-      () => null,
-    );
-    const patch = await execGit(["diff", "HEAD"], worktreePath).catch(
-      () => null,
-    );
-    const head = await execGit(["rev-parse", "HEAD"], worktreePath).catch(
-      () => null,
-    );
-
-    return {
+    const base = {
       worktree_path: worktreePath,
-      available: true,
-      changed_files: changed,
-      diff_stat: stat?.exitCode === 0 ? stat.stdout.trim() : "",
-      diff_excerpt:
-        patch?.exitCode === 0 ? patch.stdout.slice(0, MAX_DIFF_CHARS) : "",
-      commit_sha:
-        head !== null && head.exitCode === 0 && head.stdout !== ""
-          ? head.stdout
-          : null,
       terminal_lines: evidenceTerminalLines(evidence),
       verification_results: verification,
       evidence_id: evidence?.evidence_id ?? null,
       tests_modified: evidence?.tests_modified === true,
     };
+
+    const git = evidence?.git_info;
+    const range = git
+      ? await collectGitRangeFacts(
+          this.repoRoot,
+          git.base_commit_sha,
+          git.task_commit_sha,
+        )
+      : null;
+    if (!git || !range) {
+      return {
+        ...base,
+        available: false,
+        changed_files: [],
+        diff_stat: "",
+        diff_excerpt: "",
+        commit_sha: null,
+      };
+    }
+
+    return {
+      ...base,
+      available: true,
+      changed_files: range.changed_files,
+      diff_stat: range.diff_stat,
+      diff_excerpt: range.patch.slice(0, MAX_DIFF_CHARS),
+      added_code_lines: addedCodeLines(range.patch),
+      commit_sha: git.task_commit_sha,
+    };
   }
+}
+
+function toPromptMessage(message: SupervisorMessage): {
+  message_id: string;
+  role: SupervisorMessage["role"];
+  text: string;
+  created_at: string;
+} {
+  return {
+    message_id: message.message_id,
+    role: message.role,
+    text: message.text,
+    created_at: message.created_at,
+  };
 }
 
 export interface CollectTriadInput {
@@ -374,6 +538,7 @@ export async function collectTriadFacts(
   const prompt = sessions.collect({
     contractId: input.contract.contract_id,
     keywords,
+    schemeBinding: input.contract.scheme_binding,
     ...(input.sessionId === undefined ? {} : { sessionId: input.sessionId }),
     challenge: input.challenge,
   });

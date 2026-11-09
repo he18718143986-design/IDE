@@ -4,6 +4,7 @@ import {
   type SoftwareContract,
 } from "../../../src/lib/contract.schema";
 import { checkWriteAccess } from "../../../src/lib/scope";
+import { addedCodeLines } from "./added-code";
 import { matchesKeywords } from "./evidence-triad";
 import {
   DISPUTE_CONFIDENCE_THRESHOLD,
@@ -57,11 +58,9 @@ export function computeSignals(
   contract: SoftwareContract,
 ): DisputeSignals {
   const specMatched = facts.spec?.matched_entries.length ?? 0;
-  const diffHaystack = [
-    facts.code.diff_excerpt,
-    facts.code.diff_stat,
-    facts.code.changed_files.join("\n"),
-  ].join("\n");
+  // 修 P-4：只看新增的非注释、非字符串代码行；文件名与 diff_stat 由 Worker 命名，不作正向证据
+  const addedCode =
+    facts.code.added_code_lines ?? addedCodeLines(facts.code.diff_excerpt);
   const testsTotal = facts.code.verification_results.length;
   const testsFailed = facts.code.verification_results.filter(
     (result) => result.exit_code !== 0 || !result.passed,
@@ -74,7 +73,7 @@ export function computeSignals(
 
   return {
     spec_matched_entries: specMatched,
-    diff_matched: matchesKeywords(diffHaystack, facts.keywords),
+    diff_matched: matchesKeywords(addedCode.join("\n"), facts.keywords),
     prompt_matched_messages: facts.prompt.matched_messages.length,
     changed_files: facts.code.changed_files.length,
     changed_files_in_scope: inScope,
