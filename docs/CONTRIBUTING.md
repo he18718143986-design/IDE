@@ -5,7 +5,14 @@
 ## 修改规则（像 Supervisor 一样改）
 
 | 你要做的事 | 改哪里 | 规则 |
-| :
+| :--- | :--- | :--- |
+| 用户说了新需求或新偏好 | `scheme.md` §0 追加原话，§1～§9 打补丁 | 只增不改原话；新条目标 `user_said` 并引 qid |
+| Agent 发现原话与规格打架 | `scheme.md` §7 加冲突卡 | `chosen_id` 留空，等用户选 |
+| 用户拍板了一个决定 | 新增 `adr/00NN-*.md`；`scheme.md` 把对应条目改为 `accepted` 并指向 ADR | 被取代的 ADR 标 `SUPERSEDED by`，不删 |
+| 用户否决了一个方案 | `scheme.md` §10 墓地加一行 | 写清谁否决、为什么 |
+| 规格条款要变 | 先立规格修订任务卡，再改 `specs/` | 实施口径不得反向改上位规格 |
+| 卡做完了 | 任务卡状态回写 + `reports/` 或 PR 附证据 | 按 supervisor §10 与 [`evidence-and-acceptance-criteria.md`](./specs/evidence-and-acceptance-criteria.md) 判定，不得假 COMPLETED |
+| 发现解决不了的问题 | `ledger/` 加一行 | 必须写清谁来定、判据是什么 |
 
 ## 命名与自动检查
 

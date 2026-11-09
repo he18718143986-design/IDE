@@ -5,9 +5,9 @@
 ## 2026-11-09 文档治理
 
 - `specs/constants-and-paths.md`、`specs/state-machine-contract.md`：两份 `[HISTORICAL]` 指针桩已删除；内容于 2026-11-01（DOC-7）并入 [`../specs/runtime-contract-and-safety.md`](../specs/runtime-contract-and-safety.md) §10 / §11。
-- `reports/full-diagnosis-revision-notes-2026-10-31.md` → `reports/full-diagnosis-revision-notes-2026-10-31.md`
-- `reports/j1-partner-cli-verification-2026-10-28.md` → `reports/j1-partner-cli-verification-2026-10-28.md`
-- `reports/w5c-iii-real-container-test-2026-11-02.md` → `reports/w5c-iii-real-container-test-2026-11-02.md`
+- `reports/完整诊断修订纪要-2026-10-31.md` → `reports/full-diagnosis-revision-notes-2026-10-31.md`
+- `reports/J1-partner-cli-verification-2026-10-28.md` → `reports/j1-partner-cli-verification-2026-10-28.md`
+- `reports/W5c-iii-真实容器实测-2026-11-02.md` → `reports/w5c-iii-real-container-test-2026-11-02.md`
 - `development-tasks.md` 文件头部内联的 P-43～P-66 修订流水：迁至 [`development-tasks-changelog.md`](../specs/development-tasks-changelog.md) 末节（P-45 与既有条目重复，只保留一份）。
 
 

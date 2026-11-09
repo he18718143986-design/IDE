@@ -712,7 +712,7 @@ export function checkFilenames(files: string[]): Finding[] {
   for (const file of files) {
     const base = path.posix.basename(file);
     if (CONVENTIONAL_NAMES.has(base)) continue;
-    let stem = base.slice(0, -".md".length);
+    let stem = path.posix.parse(base).name;
     if (file.startsWith("docs/reports/"))
       stem = stem.replace(REPORT_DATE_SUFFIX, "");
     if (!KEBAB_STEM.test(stem)) {
