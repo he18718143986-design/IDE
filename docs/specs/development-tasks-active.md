@@ -772,6 +772,111 @@ governance:
 
 <a id="task-j.18"></a>
 
+#### 【Task J.16】试玩幕 · 质疑自查续作（surface_log → K-14 归因账本 → K-16 trigger 闭集）`[NEW_TASK · 立卡 P-176 · 未开工]`
+
+> **立卡说明（2026-11-09 · P-176）**：S.5 注记（「已知 7 处局限由 TASK-J.16 实施时一并修复」）所指的卡。P-1～P-6 已合（[#188](https://github.com/he18718143986-design/IDE/pull/188) / `859f762`），左栏与 §16.7 文案已合（[#189](https://github.com/he18718143986-design/IDE/pull/189) / `f0ca93c`）。本卡只承接**未落地**部分。**立卡 ≠ 开工 ≠ 销项**：待 Tina 单卡授权后才可施工；不宣称端到端闭环；本卡不标 COMPLETED，直到验收条件全部通过。
+
+```yaml task-card
+id: TASK-J.16
+status: NEW_TASK
+contract:
+  intent:
+    title: 试玩幕 · 质疑自查续作（surface_log → K-14 归因账本 → K-16 trigger 闭集）
+    description: >-
+      补齐 playtest-self-check.md 中 P-1～P-6 之外仍未落地的部分：GAP-P8 surface_log（随 §15.4 投影写入）、
+      K-14 三分类归因账本（依赖 surface_log 的 (a)/(b) 区分）、K-16 attributions.trigger 闭集与 linked_reason_code。
+      缺 surface_log 时三分类必须退化并标「无呈现记录」，不得伪造分类。P-7 条目级自动点亮按 §3.3 本版不做，不在本卡范围。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J16-P1
+      check: auto
+      text: >-
+        surface_log 随 §15.4 投影写入：每条记录含 item_ref 与呈现时间；未呈现过的条目不产生记录。
+    - id: J16-P2
+      check: auto
+      text: >-
+        K-14 三分类账本依赖 surface_log 产出 (a)/(b) 归因，账本只追加；给定 item_ref 与同一 surface_log 时分类可复现。
+    - id: J16-P3
+      check: auto
+      text: >-
+        K-16 attributions.trigger 仅接受闭集三值，写入未知值被拒；旧值迁移为 "user_dispute" 并带 [legacy-trigger:<原值>] 前缀；
+        linked_reason_code 对齐 reasonCodeSchema。
+    - id: J16-P4
+      check: auto
+      text: >-
+        缺 surface_log 时三分类退化，resolution_note 标「无呈现记录」，不伪造 (a)/(b)；测试覆盖该退化路径。
+    - id: J16-P5
+      check: playtest
+      text: >-
+        真实会话 + 真实台账端到端：P-2 锚定原话的 turn_text_sha256（sha256(text, utf8)，与 intent-compiler/host.ts 口径一致）
+        在真实数据上校验通过，左栏显示锚定原话。单测不替代本条。
+    - id: J16-P6
+      check: playtest
+      text: >-
+        用户可见文案按 §16.7 在渲染层验收（真实打开质疑自查面板）：不出现「按缺陷修复」「按新需求演进」「实现缺陷」「confidence」
+        等技术术语；左栏为空时有白话说明。服务端字段不算验收。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/supervisor/dispute/**
+      - src/components/studio/DisputeConsolePane.tsx
+      - src/lib/daemon-api.ts
+      - tests/unit/dispute-*.test.ts
+      - tests/components/DisputeConsolePane.test.tsx
+    readonly_paths:
+      - docs/specs/playtest-self-check.md
+      - docs/specs/supervisor.md
+      - daemon/supervisor/intent-compiler/host.ts
+      - daemon/supervisor/dispute/evidence-triad.ts
+  verification:
+    commands:
+      - { alias: regression-dispute, executable: npx, args: [vitest, run, tests/unit/dispute-triad.test.ts, tests/unit/dispute-self-check-fixes.test.ts, tests/components/DisputeConsolePane.test.tsx] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) 先接 surface_log：随 §15.4 投影写入，只记录确已呈现的条目。2) K-14 账本只追加，三分类以 surface_log 为唯一呈现依据。
+    3) K-16 闭集与 linked_reason_code 在写入口校验，旧台账按 legacy 前缀迁移。4) 缺 surface_log 的退化路径单独测试。
+    5) 验收 P5/P6 须真实链路与渲染层，不以 jsdom 或服务端字段替代。施工前按当时代码重核 touches。
+  touches:
+    - { path: daemon/supervisor/dispute/evidence-triad.ts, change: modify, why: 左栏锚定原话与三方证据接入呈现记录, symbols: [] }
+    - { path: daemon/supervisor/dispute/types.ts, change: modify, why: surface_log / 归因账本类型与 K-16 闭集, symbols: [] }
+    - { path: daemon/supervisor/dispute/index.ts, change: modify, why: 三分类退化与 resolution_note 标注, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J16-P1, test_path: tests/unit/dispute-surface-log.test.ts, level: unit, debt: "J.16 未施工；待单卡授权后补测试" }
+    - { acceptance_id: J16-P2, test_path: tests/unit/dispute-attribution-ledger.test.ts, level: unit, debt: "J.16 未施工；待单卡授权后补测试" }
+    - { acceptance_id: J16-P3, test_path: tests/unit/dispute-trigger-closed-set.test.ts, level: unit, debt: "J.16 未施工；待单卡授权后补测试" }
+    - { acceptance_id: J16-P4, test_path: tests/unit/dispute-surface-log-degraded.test.ts, level: unit, debt: "J.16 未施工；待单卡授权后补测试" }
+    - { acceptance_id: J16-P5, test_path: tests/integration/dispute-anchor-real-session.test.ts, level: integration, debt: "真实会话与真实台账验证未做；需 Tina 提供或授权环境" }
+    - { acceptance_id: J16-P6, test_path: tests/components/DisputeConsolePane.test.tsx, level: integration, debt: "jsdom 不替代真实面板人工验收" }
+governance:
+  spec_refs:
+    - docs/specs/playtest-self-check.md
+    - docs/specs/supervisor.md
+    - docs/specs/development-tasks-completed.md#task-s.5
+  depends_on:
+    - { id: TASK-S.5, kind: hard }
+  code_facts:
+    - { ref: "daemon/supervisor/dispute/evidence-triad.ts::anchoredQuotesFromDraft", note: "P-1～P-6 已合（#188 `859f762`）；左栏锚定原话与 §16.7 文案已合（#189 `f0ca93c`）" }
+    - { ref: "daemon/supervisor/dispute/index.ts::outcomeFromUserChoice", note: "仓库未找到 surface_log 或 attributions 实现（#188 核对结论）；本卡新增" }
+  non_goals:
+    - 不做 P-7 条目级自动点亮（playtest-self-check.md §3.3，本版不做）
+    - 不改 SchemeDraftV2 的验收条目结构
+    - 不以 jsdom 或服务端字段替代 J16-P5 / J16-P6 的真实验收
+    - 不改 P-1～P-6 已定的判定逻辑、类型枚举与 0.7 阈值
+  fail:
+    - 缺 surface_log 时仍产出 (a)/(b) 分类，或不标「无呈现记录」
+    - K-16 trigger 接受闭集外的值，或旧值迁移不带 legacy 前缀
+    - 只以单测通过宣称 J.16 完成，或在 J16-P5 / J16-P6 未通过时标 COMPLETED
+    - 用户可见文案出现 §16.7 禁用的技术分类词
+  estimate: L
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
 #### 【Task J.18】Worker 派工墓地门禁（INV-LEDGER-03 工地侧）· **拆分母卡** `[SPLIT]`
 
 * **任务编号**：`TASK-J.18`
