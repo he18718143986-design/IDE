@@ -1001,7 +1001,7 @@ contract:
     - id: CI2-P2
       check: auto
       text: >-
-        产品判据零改动：daemon/** 与 docs/specs/w3-known-gaps.md 的阈值 diff 为空；测试与产品判据的映射保留在本卡表格中。
+        产品判据零改动：daemon/** 与 docs/ledger/w3-known-gaps.md 的阈值 diff 为空；测试与产品判据的映射保留在本卡表格中。
     - id: CI2-P3
       check: auto
       text: >-
@@ -1016,7 +1016,7 @@ contract:
       - tests/unit/arch-graph-cache.test.ts
       - tests/unit/pre-merge-fingerprint-fallback.test.ts
     readonly_paths:
-      - docs/specs/w3-known-gaps.md
+      - docs/ledger/w3-known-gaps.md
       - daemon/arch/graph.ts
       - daemon/guard/evidence-integrity.ts
   verification:
@@ -1035,16 +1035,16 @@ design:
     - { acceptance_id: CI2-P1, test_path: tests/unit/arch-graph-cache.test.ts, level: unit, debt: "未施工；依据样本待采集" }
     - { acceptance_id: CI2-P2, test_path: tests/unit/pre-merge-fingerprint-fallback.test.ts, level: unit, debt: "未施工" }
     - { acceptance_id: CI2-P3, test_path: tests/unit/arch-graph-cache.test.ts, level: unit, debt: "未施工" }
-    - { acceptance_id: CI2-P4, test_path: .github/workflows/ci.yml, level: integration, debt: "需真实 macOS CI 两次绿；未取证" }
+    - { acceptance_id: CI2-P4, test_path: tests/unit/arch-graph-cache.test.ts, level: integration, debt: "CI 证据项：需真实 macOS CI 连续两次绿（非单测断言）；未取证" }
 governance:
   spec_refs:
-    - docs/specs/w3-known-gaps.md
+    - docs/ledger/w3-known-gaps.md
     - docs/specs/development-tasks-completed.md#task-ci.1
   depends_on:
     - { id: TASK-CI.1, kind: soft }
   code_facts:
-    - { ref: "tests/unit/arch-graph-cache.test.ts::缓存命中时单次构建 P100", note: "main 上为 80ms（987e276d，#189 合入）；#192 还原为 50ms 待合" }
-    - { ref: "tests/unit/pre-merge-fingerprint-fallback.test.ts::性能门禁③", note: "main 上为 80ms（58cf6057，#189 合入）；未单独立卡" }
+    - { ref: "tests/unit/arch-graph-cache.test.ts:82-89", note: "main 上为 80ms（987e276d，#189 合入）；#192 还原为 50ms 待合" }
+    - { ref: "tests/unit/pre-merge-fingerprint-fallback.test.ts:82-86", note: "main 上为 80ms（58cf6057，#189 合入）；未单独立卡" }
   non_goals:
     - 不改产品阈值（w3-known-gaps §4.2 50ms 判据；B.2 门禁口径）
     - 不宣称永久全绿；抗抖动 ≠ 永久全绿
