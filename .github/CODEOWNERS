@@ -1,0 +1,6 @@
+# 性能门禁与 CI 工作流：阈值与门禁配置的改动须经负责人审阅（见 TASK-CI.2 / ledger 挂账④）。
+# 注意：CODEOWNERS 只有在 ruleset 开启「Require review from Code Owners」后才会强制执行。
+tests/**/*perf*                          @he18718143986-design
+tests/**/arch-graph-cache.test.ts        @he18718143986-design
+tests/**/pre-merge-fingerprint*.test.ts  @he18718143986-design
+.github/workflows/**                     @he18718143986-design
