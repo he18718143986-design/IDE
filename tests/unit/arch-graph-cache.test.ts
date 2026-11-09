@@ -98,4 +98,3 @@ describe("4.2 /api/arch/graph：src 收敛与 mtime 缓存", () => {
     expect(res2.graph.getStats().nodes).toBe(2);
   });
 });
-
