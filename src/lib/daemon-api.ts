@@ -1700,7 +1700,8 @@ export interface DisputeReportApiView {
       source: string;
       original_request: string | null;
       confirmations: unknown[];
-      matched_messages: unknown[];
+      /** 锚定原话（修 P-2）：每条含 `text`，供左栏「你当时说的」高亮 */
+      matched_messages: Array<{ text: string }>;
     };
     spec: {
       snapshot_id: string;

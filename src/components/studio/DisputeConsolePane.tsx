@@ -23,7 +23,7 @@ export interface DisputeReportView {
   facts: {
     prompt: {
       original_request: string | null;
-      matched_messages: number;
+      matched_quotes: string[];
       confirmations: number;
     };
     spec: {
@@ -156,12 +156,6 @@ export function DisputeConsolePane(props: DisputeConsolePaneProps) {
             >
               {CLASSIFICATION_LABEL[report.classification]}
             </span>
-            <span
-              data-testid="dispute-confidence"
-              className="text-[11px] text-muted-foreground"
-            >
-              把握 {Math.round(report.confidence * 100)}%
-            </span>
             {report.degraded && (
               <span
                 data-testid="dispute-degraded-badge"
@@ -187,7 +181,12 @@ export function DisputeConsolePane(props: DisputeConsolePaneProps) {
                 report.facts.prompt.original_request
                   ? `原始需求：${report.facts.prompt.original_request}`
                   : "没有找到会话里的原始需求",
-                `相关消息 ${report.facts.prompt.matched_messages} 条 · 确认 ${report.facts.prompt.confirmations} 次`,
+                ...(report.facts.prompt.matched_quotes.length > 0
+                  ? report.facts.prompt.matched_quotes.map(
+                      (quote) => `你当时说：「${quote}」`,
+                    )
+                  : ["没有找到与这次确认的方案对应的你的原话记录"]),
+                `确认 ${report.facts.prompt.confirmations} 次`,
               ]}
             />
             <FactBlock
@@ -240,7 +239,7 @@ export function DisputeConsolePane(props: DisputeConsolePaneProps) {
                 }}
                 className="rounded border border-border px-2 py-1 text-xs"
               >
-                按缺陷修复
+                这是 Bug，免费修
               </button>
               <button
                 type="button"
@@ -250,7 +249,7 @@ export function DisputeConsolePane(props: DisputeConsolePaneProps) {
                 }}
                 className="rounded border border-border px-2 py-1 text-xs"
               >
-                按新需求演进
+                我想要新功能，下一轮做
               </button>
             </div>
           )}
