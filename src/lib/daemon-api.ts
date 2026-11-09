@@ -1748,7 +1748,7 @@ export async function submitDisputeSelfCheck(
     contract_id: string;
     challenge: string;
     session_id?: string | undefined;
-    /** 降级后用户点选：按缺陷修复 / 按新需求演进 */
+    /** 降级后用户点选：这是 Bug，免费修 / 我想要新功能，下一轮做 */
     user_choice?: DisputeUserChoice | undefined;
   },
 ): Promise<DisputeSelfCheckResponse> {

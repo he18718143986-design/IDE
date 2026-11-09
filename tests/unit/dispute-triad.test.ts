@@ -358,7 +358,7 @@ describe("用户白话裁决 userChoice", () => {
     expect(report.classification).toBe("IMPLEMENTATION_BUG");
     expect(report.degraded).toBe(false);
     expect(report.next_action.kind).toBe("REWORK");
-    expect(report.rationale.join(" ")).toContain("按缺陷修复");
+    expect(report.rationale.join(" ")).toContain("这是 Bug，免费修");
   });
 
   it("REQUIREMENT_CHANGE 强制 REQUIREMENT_DRIFT + 新需求提案", async () => {
@@ -381,6 +381,6 @@ describe("用户白话裁决 userChoice", () => {
     expect(report.degraded).toBe(false);
     expect(report.next_action.kind).toBe("REQUIREMENT_CHANGE");
     expect(report.next_action.change_request).toBeDefined();
-    expect(report.rationale.join(" ")).toContain("按新需求演进");
+    expect(report.rationale.join(" ")).toContain("我想要新功能，下一轮做");
   });
 });

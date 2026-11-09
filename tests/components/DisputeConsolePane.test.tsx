@@ -48,6 +48,39 @@ describe("TASK-J.16 · 左栏「你当时说的」与 §16.7 文案", () => {
     expect(left).not.toHaveTextContent("相关消息");
   });
 
+  it("左栏不再放「原始需求」这一行（它不是锚定证据）", () => {
+    render(
+      <DisputeConsolePane
+        report={reportFixture({ matched_quotes: ["记住我要勾上"] })}
+      />,
+    );
+    expect(screen.getByTestId("dispute-fact-prompt")).not.toHaveTextContent(
+      "原始需求",
+    );
+    expect(screen.getByTestId("dispute-fact-prompt")).toHaveTextContent(
+      "你当时说的",
+    );
+  });
+
+  it("分类与建议用白话句式，不出现内部分类词", () => {
+    render(
+      <DisputeConsolePane
+        report={{
+          ...reportFixture(),
+          classification: "IMPLEMENTATION_BUG",
+          degraded: false,
+          next_action: { kind: "REWORK" },
+        }}
+      />,
+    );
+    expect(screen.getByTestId("dispute-classification")).toHaveTextContent(
+      "方案里写了这一条，是施工漏了",
+    );
+    expect(screen.getByTestId("dispute-next-action")).toHaveTextContent(
+      "我安排在原范围内返工，不另算。",
+    );
+  });
+
   it("没有对应原话时给一句白话说明，而不是空白", () => {
     render(<DisputeConsolePane report={reportFixture()} />);
     expect(screen.getByTestId("dispute-fact-prompt")).toHaveTextContent(
@@ -68,5 +101,9 @@ describe("TASK-J.16 · 左栏「你当时说的」与 §16.7 文案", () => {
     expect(container.textContent).not.toContain("按缺陷修复");
     expect(container.textContent).not.toContain("按新需求演进");
     expect(container.textContent).not.toContain("把握");
+    expect(container.textContent).not.toContain("实现缺陷");
+    expect(container.textContent).not.toContain("需求有偏差");
+    expect(container.textContent).not.toContain("建议开新需求");
+    expect(container.textContent).not.toContain("confidence");
   });
 });

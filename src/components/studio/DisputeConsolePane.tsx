@@ -50,22 +50,22 @@ export interface DisputeConsolePaneProps {
   busy?: boolean | undefined;
   error?: string | null | undefined;
   onSubmit?: ((challenge: string) => void | Promise<void>) | undefined;
-  /** 用户在降级场景下点选「按缺陷修复」 */
+  /** 用户在降级场景下点选「这是 Bug，免费修」 */
   onChooseBugFix?: (() => void) | undefined;
-  /** 用户在降级场景下点选「按新需求演进」 */
+  /** 用户在降级场景下点选「我想要新功能，下一轮做」 */
   onChooseRequirementChange?: (() => void) | undefined;
 }
 
 const CLASSIFICATION_LABEL: Record<DisputeClassificationView, string> = {
-  IMPLEMENTATION_BUG: "更像是实现缺陷",
-  REQUIREMENT_DRIFT: "更像是需求有偏差",
-  UNATTRIBUTED: "暂时分不清，需要你拍板",
+  IMPLEMENTATION_BUG: "方案里写了这一条，是施工漏了",
+  REQUIREMENT_DRIFT: "这一条方案里没提到",
+  UNATTRIBUTED: "我不确定是谁的问题",
 };
 
 const ACTION_LABEL = {
-  REWORK: "建议在原范围内返工修复",
-  REQUIREMENT_CHANGE: "建议开新需求演进",
-  MANUAL_ARBITRATION: "请你手动裁决",
+  REWORK: "我安排在原范围内返工，不另算。",
+  REQUIREMENT_CHANGE: "这一条可以放到下一轮做。",
+  MANUAL_ARBITRATION: "请你选一个，我照你的选择来。",
 } as const;
 
 export function DisputeConsolePane(props: DisputeConsolePaneProps) {
@@ -86,8 +86,8 @@ export function DisputeConsolePane(props: DisputeConsolePaneProps) {
       <div>
         <h3 className="text-xs font-semibold text-foreground">质疑自查</h3>
         <p className="mt-1 text-[11px] text-muted-foreground">
-          说出哪里不对劲。系统会对照「你怎么说的 / 需求怎么写的 /
-          代码实际改了什么」给出一份白话报告，不会擅自改代码。
+          说出哪里不对劲。系统会对照「你当时说的 / 方案里记的 /
+          代码实际做的」给出一份白话报告，不会擅自改代码。
         </p>
       </div>
 
@@ -176,11 +176,8 @@ export function DisputeConsolePane(props: DisputeConsolePaneProps) {
           <div className="grid gap-2 md:grid-cols-3">
             <FactBlock
               testId="dispute-fact-prompt"
-              title="你怎么说的"
+              title="你当时说的"
               lines={[
-                report.facts.prompt.original_request
-                  ? `原始需求：${report.facts.prompt.original_request}`
-                  : "没有找到会话里的原始需求",
                 ...(report.facts.prompt.matched_quotes.length > 0
                   ? report.facts.prompt.matched_quotes.map(
                       (quote) => `你当时说：「${quote}」`,
@@ -191,7 +188,7 @@ export function DisputeConsolePane(props: DisputeConsolePaneProps) {
             />
             <FactBlock
               testId="dispute-fact-spec"
-              title="需求怎么写的"
+              title="确认的方案里记的"
               lines={
                 report.facts.spec
                   ? report.facts.spec.matched_entries.length > 0
@@ -202,7 +199,7 @@ export function DisputeConsolePane(props: DisputeConsolePaneProps) {
             />
             <FactBlock
               testId="dispute-fact-code"
-              title="代码实际改了什么"
+              title="代码实际做的"
               lines={
                 report.facts.code.worktree_available
                   ? report.facts.code.changed_files.length > 0
