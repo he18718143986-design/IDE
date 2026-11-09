@@ -25,6 +25,7 @@ import {
 } from "../../src/lib/journey/scheme-draft";
 import type { DaemonConnection } from "../../src/lib/daemon-api";
 import * as playtestEvidence from "../../src/lib/journey/playtest-evidence";
+import * as daemonApi from "../../src/lib/daemon-api";
 
 function makeScheme() {
   let scheme = rebuildSchemeFromCorpus(
@@ -48,6 +49,26 @@ const CONN: DaemonConnection = {
 describe("TASK-L.17c 中栏试玩认可", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    // SchemeReviewPane 挂载时会一并渲染系统地图（SystemMapPane），后者在 effect 里发起
+    // 未桩的真实 daemon 请求 GET /api/knowledge/modules；试玩状态查询在部分用例中也未桩。
+    // 这些请求在用例结束后仍未决，会跨过 jsdom 环境销毁，是挂账②（window is not defined）的来源。
+    // 本文件只断言试玩认可，故在此统一桩掉两处挂载请求；个别用例仍可用 spyOn 覆盖。
+    vi.spyOn(daemonApi, "fetchKnowledgeModules").mockResolvedValue({
+      ok: false,
+      modules: [],
+      edges: [],
+      message: "测试桩：本文件不断言系统地图",
+    });
+    vi.spyOn(playtestEvidence, "fetchPlaytestStatus").mockResolvedValue({
+      ok: false,
+      status: "UNCONFIRMED",
+      code: "PLAYTEST_UNCONFIRMED",
+      message: "还没有试玩认可证据",
+      contract_id: "ctr-1",
+      evidence_release_id: null,
+      current_release_id: "rel-1",
+      reset_approval: false,
+    });
   });
   afterEach(() => {
     vi.restoreAllMocks();
