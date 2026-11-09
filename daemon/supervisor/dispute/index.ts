@@ -117,7 +117,7 @@ export function outcomeFromUserChoice(
       suggested: "IMPLEMENTATION_BUG",
       confidence: 1,
       signals,
-      rationale: ["您已选择：按缺陷修复（人工裁决）"],
+      rationale: ["您已选择：这是 Bug，免费修（人工裁决）"],
     };
   }
   return {
@@ -125,7 +125,7 @@ export function outcomeFromUserChoice(
     suggested: "REQUIREMENT_DRIFT",
     confidence: 1,
     signals,
-    rationale: ["您已选择：按新需求演进（人工裁决）"],
+    rationale: ["您已选择：我想要新功能，下一轮做（人工裁决）"],
   };
 }
 
