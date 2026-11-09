@@ -20,9 +20,9 @@
 | :--- | :--- | :--- |
 | [`dor-readiness-audit-2026-10-31.md`](./dor-readiness-audit-2026-10-31.md) | **DoR 全量审计** | 基线 `main` @ `a2fa7df`（2026-10-31）。**快照**：矩阵/卡状态此后已有多轮回写（含 L.8～L.10），不得当作今日开工清单。 |
 | [`delivery-path-audit.md`](./delivery-path-audit.md) | **交付全链路审计** | 2026-10-30 七环核查与补全清单；后续以任务卡与 tip 为准。 |
-| [`完整诊断修订纪要-2026-10-31.md`](./完整诊断修订纪要-2026-10-31.md) | **完整诊断十四定型** | 产品+交付诊断落盘（确认开工/D9/Canvas/JourneyStage/等待态等）；仅文档；多数结论已吸入 `supervisor` / ADR。 |
-| [`J1-partner-cli-verification-2026-10-28.md`](./J1-partner-cli-verification-2026-10-28.md) | **J.1 真实 CLI 验证** | 右栏只读搭档实测报告；会话附件目录 [`j1-cli-session-2026-10-28/`](./j1-cli-session-2026-10-28/)。 |
-| [`W5c-iii-真实容器实测-2026-11-02.md`](./W5c-iii-真实容器实测-2026-11-02.md) | **W.5c-iii 容器隔离实测** | Docker 29.6.1 + OpenHands 0.59.0（摘要固定）真实容器负例；**施工期证据**，仅声称「通过已知探测集」，不宣称端到端闭环、不宣称「绝对受控」。 |
+| [`full-diagnosis-revision-notes-2026-10-31.md`](./full-diagnosis-revision-notes-2026-10-31.md) | **完整诊断十四定型** | 产品+交付诊断落盘（确认开工/D9/Canvas/JourneyStage/等待态等）；仅文档；多数结论已吸入 `supervisor` / ADR。 |
+| [`j1-partner-cli-verification-2026-10-28.md`](./j1-partner-cli-verification-2026-10-28.md) | **J.1 真实 CLI 验证** | 右栏只读搭档实测报告；会话附件目录 [`j1-cli-session-2026-10-28/`](./j1-cli-session-2026-10-28/)。 |
+| [`w5c-iii-real-container-test-2026-11-02.md`](./w5c-iii-real-container-test-2026-11-02.md) | **W.5c-iii 容器隔离实测** | Docker 29.6.1 + OpenHands 0.59.0（摘要固定）真实容器负例；**施工期证据**，仅声称「通过已知探测集」，不宣称端到端闭环、不宣称「绝对受控」。 |
 
 ---
 
