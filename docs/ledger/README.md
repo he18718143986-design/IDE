@@ -12,6 +12,7 @@
 | :--- | :--- | :--- |
 | [`consistency-audit.md`](./consistency-audit.md) | 规格一致性审计台账：`C-` 待裁决矛盾、`M-` 机械修复、`OP-` 挂账项（OP-1～OP-39）、权威分层表 | 持续追加；**OP-1 / OP-13 / oq-2 / oq-3 已于 2026-11-01 销项**（见 consistency-audit「一之二」）；**2026-11-02 P-112 新增 OP-36～OP-38**（L.17b 三条边界，见 completed §3.4f）；**P-113 W.6 两条边界沿用 P-112 先例仅归拢至 completed §3.4g、不另立 OP 号**；**2026-11-02 P-121 W.5c-ii 挂账同理归拢至 completed §3.4j（含「派工未走 `runInSandbox`」这条 W.5c-iii 必收边界）**；**P-122 W.5c-iii 已 COMPLETED（#87/`2313597a`）——挂账 4 条归拢至 completed §3.4k、不另立 OP 号；`REJ-010` 已进 `scheme.md` §10 墓地**；**2026-11-03 P-138 OP-33～38 挂账清扫销项（#118/96225df）**：OP-33 部分销项/改定性平台侧不可修，OP-34 改定性平台侧持续观察不销项，OP-35①/35②/36/37/38 销项，新增两条边界挂账（归一化多对一碰撞未区分、.history.jsonl 无界增长）；**2026-11-03 P-140 v0.2 范围 RFC 起草**（[`../rfc/v0.2-scope.md`](../rfc/v0.2-scope.md)，讨论稿）：B.1 / B.2 / C.4 / S.3 / D.1e 状态维持 DEFERRED，不新增 OP 号、无新挂账；**2026-11-08 P-173 结构债挂账**（OP-39）：大文件结构债登记（server.ts handleHttpRequest ~2128 行 / index.tsx Console ~3447 行），外部评审误判更正（daemon→src/lib 为共享契约层非违规），清算前置条件与时机明确（v0.3 方向拍板后立项），不新增施工 OP 号 |
 | [`w3-known-gaps.md`](./w3-known-gaps.md) | W.3 环境 / 秘密 / 网络守卫的已知缺口 | 7 项中 2 项未修（`tmpRoot` GC、`splitShellSegments` 引号边界） |
+| [`removed-and-moved.md`](./removed-and-moved.md) | 已删除与已移动的文档索引（原 `docs/README.md` §9） | 2026-11-09 迁入；旧路径勿再引用 |
 
 ## 文档治理挂账（2026-10-29 新增）
 
@@ -19,10 +20,10 @@
 
 | 编号 | 问题 | 位置 | 建议 | 阻断级别 |
 | :--- | :--- | :--- | :--- | :--- |
-| DOC-1 | `development-tasks.md` 约 460KB：约 65% 是已完成卡历史，版本头 84 条状态回写与 §6 修订流水重复，卡内样板句重复上百次 | `specs/development-tasks.md` | 拆成卡号索引 + 活跃卡 + 已完成卡 + 修订流水，卡号不变（[`../scheme.md`](../scheme.md) dec-4） → **已做**：拆为枢纽 + index/active/completed/changelog；卡号不变 | **RESOLVED**（docs 冗余治理第 2 波 · #42） |
+| DOC-1 | `development-tasks.md` 约 460KB：约 65% 是已完成卡历史，版本头 84 条状态回写与 §6 修订流水重复，卡内样板句重复上百次 | `specs/development-tasks.md` | 拆成卡号索引 + 活跃卡 + 已完成卡 + 修订流水，卡号不变（[`../scheme.md`](../scheme.md) dec-4） → **已做**：拆为枢纽 + index/active/completed/changelog；卡号不变 | **RESOLVED**（docs 冗余治理第 2 波 · #42；2026-11-09 残留的内联修订流水已迁出 · [#187](https://github.com/he18718143986-design/IDE/pull/187)） |
 | DOC-2 | 任务卡状态矛盾：C.14f、C.15a、C.15c、C.15d 矩阵写 COMPLETED、卡内写 NEW_TASK；J.1 代码已合入（PR #29 / #30）但卡仍为 NEW_TASK | 同上 | 由卡 owner 按 supervisor §10 判定口径回写 → **已做**：四卡回写 COMPLETED（证据 `5f6ca93`）；J.1 此前已对齐；全库矩阵↔卡内抽查仅余该四处 | **RESOLVED**（docs 冗余治理第 1 波 · #41） |
 | DOC-3 | 任务卡文件内三处「当前基线」互相矛盾（`6415fbd` / `4280de6` / `f14c8cb`） | 同上 L28、L121、§4 | 只保留一处，其余改指针 → **已做**：权威 tip 见 Sprint「当前工程物理起点」/`e4351b0`，另两处改历史指针 | **RESOLVED**（docs 冗余治理第 0 波 · #40） |
-| DOC-4 | 约 24 处引用已删除的 `docs/archive/*`，约 98 处引用已删除的「走查报告 §6.x」 | 同上 | 统一改为「见 Git 历史」或删除 → **已做**（docs 内活引用改指针；历史叙述保留路径字面作溯源） | **RESOLVED**（docs 冗余治理第 0 波 · #40） |
+| DOC-4 | 约 24 处引用已删除的 `docs/archive/*`，约 98 处引用已删除的「走查报告 §6.x」 | 同上 | 统一改为「见 Git 历史」或删除 → **已做**（docs 内活引用改指针；历史叙述保留路径字面作溯源） | **RESOLVED**（docs 冗余治理第 0 波 · #40；2026-11-09 新增 `archive-ref` 守卫 · [#187](https://github.com/he18718143986-design/IDE/pull/187)） |
 | DOC-5 | 路径三方不一致：Worktree 目录（`task-{id}` vs `{id}`）、Demo 目录（`.stagent/demo/` vs `.stagent/prototypes/`）、Git Trailer 键名与长度上限 | `system-architecture.md` §5、`constants-and-paths.md` §2/§3、`runtime-contract-and-safety.md` §5.3、代码 | 以代码为准回写规格，或立卡改代码 → **已做**：constants §0 代码事实表 + runtime §2/§5.3 注记；**`worktree-seal` 无 `task-` 前缀**曾挂代码债 → **代码侧已收口** `TASK-A.7` COMPLETED（[#49](https://github.com/he18718143986-design/IDE/pull/49)/`4b7a709`） | **RESOLVED**（docs 第 1 波 · #41；**代码侧** · #49 / A.7） |
 | DOC-6 | `delivery-state.ts` 仍有 `DELIVERED`，与 ADR-0012、`state-machine-contract.md` 冲突；两套状态机（生命周期 9 态 / 交付轨 A）关系未交代 | `state-machine-contract.md`、runtime §7、§9 | 在 state-machine-contract 补一节两轨关系 → **已做**：§0 两轨关系 + ADR-0012/H.2 指针；`DELIVERED` 仅交付投影内部标记 | **RESOLVED**（docs 冗余治理第 1 波 · #41） |
 | DOC-7 | `state-machine-contract.md` 标「目标、待测试固化」，但 `src/lib/state-machine.ts` 已实现其迁移表；`constants-and-paths.md` 同为草案 | `specs/` 两份草案 | 核对后升格或合并入 runtime 契约 → 第 1 波仅加指针；**2026-11-01 用户拍板提前做**：内容并入 `runtime-contract-and-safety.md` §10 / §11（以代码为准回写）；原文件降为 `[HISTORICAL]` 指针 | **CLOSED**（升格完成 · 2026-11-01；遗留「另议」关闭） |

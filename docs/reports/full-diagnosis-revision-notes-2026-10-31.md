@@ -58,7 +58,7 @@
 | `docs/adr/0001-target-user-positioning.md` | （完整诊断首轮）降频/合并/延后 |
 | `docs/adr/0014-three-agent-topology-open-supervisor.md` | （完整诊断首轮）Canvas 定型 |
 | `docs/README.md` / `docs/reports/README.md` | 索引 |
-| `docs/reports/完整诊断修订纪要-2026-10-31.md` | 本文 |
+| `docs/reports/full-diagnosis-revision-notes-2026-10-31.md` | 本文 |
 
 ---
 

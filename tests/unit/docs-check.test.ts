@@ -449,3 +449,25 @@ describe("scheme.md 溯源", () => {
     ]);
   });
 });
+
+describe("命名与死引用（文档治理）", () => {
+  it("kebab-case 文件名通过；大写或中文文件名报 error；reports/ 日期后缀与约定大写名豁免", () => {
+    write("docs/rfc/v0.2-scope.md", "# ok\n");
+    write("docs/reports/full-audit-2026-10-31.md", "# ok\n");
+    write("docs/CONTRIBUTING.md", "# ok\n");
+    write("docs/Bad_Name.md", "# bad\n");
+    write("docs/reports/完整纪要-2026-10-31.md", "# bad\n");
+    const found = messages(run(), "filename-kebab");
+    expect(found).toHaveLength(2);
+    expect(found.some((m) => m.includes("Bad_Name.md"))).toBe(true);
+    expect(found.some((m) => m.includes("完整纪要-2026-10-31.md"))).toBe(true);
+  });
+
+  it("正文里的 docs/archive/ 溯源语境放行，活引用报 warn", () => {
+    write("docs/a.md", "旧稿见 Git 历史（原 `docs/archive/x.md`）\n");
+    write("docs/b.md", "参考 docs/archive/y.md 的设计\n");
+    const found = run().filter((f) => f.rule === "archive-ref");
+    expect(found.map((f) => f.file)).toEqual(["docs/b.md"]);
+    expect(found[0]!.severity).toBe("warn");
+  });
+});

@@ -95,7 +95,7 @@
 | OP-15 | 「21/47」按 51 码重算 | J.10 | J.10 实施前 | M-6 |
 | OP-16 | M-9 代码注释是否进文档 PR | Tina | 本 PR 审核时 | M-9 为可选项 |
 | OP-17 | PR #9 合入 | Tina | 审核后 | PR #9 open，clean |
-| OP-18 | 审计未覆盖范围：架构 §1–§4、§9；state-machine-contract 其余章节；constants-and-paths | 下一轮审计 | 下一轮 | 本轮只核 §0.2.3.1、§5.2.2、§6.4、§6.5、§7.1 与 state-machine §4 |
+| OP-18 | 审计未覆盖范围：架构 §1–§4、§9；state-machine-contract 其余章节；constants-and-paths（两文件已于 2026-11-09 删除，内容见 runtime §10 / §11） | 下一轮审计 | 下一轮 | 本轮只核 §0.2.3.1、§5.2.2、§6.4、§6.5、§7.1 与 state-machine §4 |
 | ~~OP-19~~ | ~~按钮文案统一~~ | — | **已销项**：以 supervisor §16.7 与 §18 行为规范层文案为准，架构 §6.4 D-3 已同步为「这是 Bug，免费修 / 我想要新功能，下一轮做」（Tina 裁决，2026-10-28） | C-4 裁决落笔时发现 |
 | ~~OP-20~~ | 上一轮审计漏网：架构「低置信度降级」条目仍写用户点选「按缺陷修复 / 按新需求演进」，未随 OP-19 同步 | — | **已销项**（本 PR）：该条改为系统向用户提业务澄清问题，口径指向 supervisor §16.7；架构底部改判说明与 supervisor §16.7 的取代说明、禁止项保留 | 逐处核对 OP-19 相关 grep 命中时发现 |
 | ~~OP-21~~ | supervisor §16.7 内部口径冲突：低置信度时既写「系统问一个业务问题、不把技术分类推给用户」，又写「底部仍显示两按钮，上方加一行『我不确定是谁的问题，你定』」 | — | **已销项**（本 PR）：裁决为「以 supervisor §16.7 澄清问题口径为准，质询台规格段已同步，按钮保留为用户主动裁决入口」；底部按钮段改为低置信度先问业务澄清问题、按钮标注「我不确定是谁的问题」 | 本 PR 修架构时发现；后续提交已同步 supervisor 质询台规格段 |
@@ -125,14 +125,14 @@
 | **规格 SSOT** | 产品与契约 | 架构 `system-architecture.md`（宪法；§0.2 与 §7.1 等已有改判横幅）；`supervisor.md` 第三部分（v2.1，现行生效）；`runtime-contract-and-safety.md`（硬契约）；`development-tasks.md`（任务卡与施工 DAG） | 上位规格优先；第三部分 §17 决策与第一部分 §7 同级 |
 | **实施口径（附属）** | 某条 SSOT 的实施细节 | `scheme-patch-engine.md`（§14.2/§14.3/§14.11）；`intent-compiler-prompt.md`（§14.4–§14.9，引擎码表以引擎为准）；`worker-graveyard-gate.md`（§14.11 INV-LEDGER-03）；`playtest-self-check.md`（§16.7） | 以所指上位规格为准 |
 | **代码即权威** | 运行时事实 | `src/lib/state/delivery-state.ts`；`src/lib/journey/confirm-scheme-atomic.ts`；`daemon/supervisor/demo/signing-gate.ts`；`daemon/guard/audit-manifest.ts`；`daemon/supervisor/rules-l0.ts`；`src/lib/error-codes.ts`（码表目录） | 代码现状不等于目标规格，差距登记在 supervisor §19 |
-| **历史指针（非依据）** | 已并入 runtime 的 HISTORICAL 指针 | `constants-and-paths.md`、`state-machine-contract.md`（DOC-7 升格后仅指针）；`rfc/`、`templates/` | 路径/状态机以 `runtime-contract-and-safety.md` §10 / §11 与代码为准 |
+| **历史指针（非依据）** | 已并入 runtime 的 HISTORICAL 指针 | `constants-and-paths.md`、`state-machine-contract.md`（DOC-7 升格后仅指针；2026-11-09 已删除）；`rfc/`、`templates/` | 路径/状态机以 `runtime-contract-and-safety.md` §10 / §11 与代码为准 |
 
 ## 五、已验证销项清单（本轮）
 
 | 项 | 结论 | 证据 |
 | :--- | :--- | :--- |
 | 1. 架构 §0.2.3.1、§5.2.2、§6.4、§6.5、§7.1 的外部引用逐条核对 | 编号与所指内容一致：§0.2.3.1 第 3 条（越界熔断）、§5.2.2（Checkpoint）、§6.5.2（0.7 门槛）、§6.5.3（子集检查）、§6.5.4、§7.1（被 D8 取代）。有三处语义问题，见 C-3、C-4、C-5 | supervisor 行 873、1457、1507、1518、1548、1559；架构行 141、703、807、813、815、822、855 |
-| 2. state-machine-contract §4 的 `ReasonCode` | 代表码引用，非全量枚举，**不触发 F-6**。未被引用的 4 码（`UNSAFE_EXECUTION`、`EVIDENCE_STALE`、`PREPARATION_INTERRUPTED`、`WORKSPACE_LOCKED`）不构成缺口 | state-machine 行 100–103 |
+| 2. state-machine-contract §4 的 `ReasonCode`（文件已于 2026-11-09 删除，见 runtime §11） | 代表码引用，非全量枚举，**不触发 F-6**。未被引用的 4 码（`UNSAFE_EXECUTION`、`EVIDENCE_STALE`、`PREPARATION_INTERRUPTED`、`WORKSPACE_LOCKED`）不构成缺口 | state-machine 行 100–103 |
 | 3. `ERROR_CODES` 孤儿码反向检查 | 17 码（头注释「14 个」为旧值，M-9）。除 `E_PREPARATION_FAILED`（OP-10）外，16 码在 `daemon/` 均有抛出或返回点。`E_COMMAND_TIMEOUT` 值分歧见 OP-11。检查范围为 `src/` 与 `daemon/`（抛出点在 `daemon/`，只查 `src/` 会误报） | 非注释、非测试命中计数，见 OP-10、OP-11 |
 | 4. 门禁码补登归属清点 | `E_GATE_SCAN_FAILED`（仅规格）、`E_TEST_FILE_WRITE_BLOCKED`（有代码、未登记）、`E_PROPOSAL_PREVIOUSLY_REJECTED`（仅规格）、`surface_log`（数据字段，代码 0 命中）。已归入 OP-3、OP-5 至 OP-7 | 见 OP-3 至 OP-9 |
 | 5. 「≥2 模块」残留 | 除 M-7、M-8 外，supervisor 行 1627（L-07 落差登记，记录当前代码事实）无需改；§7 D5 段（行 822）已指向 §14.10 | — |

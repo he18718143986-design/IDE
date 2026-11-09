@@ -698,6 +698,61 @@ export function checkScheme(repo: Repo): Finding[] {
   return findings;
 }
 
+// ── 命名与死引用（文档治理 2026-11-09）──────────────────────────────────
+
+/** 小写 ASCII、数字；允许 `.`（如 v0.2）与 `-` 分段。 */
+const KEBAB_STEM = /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
+/** 惯例大写文件名，不走 kebab-case。 */
+const CONVENTIONAL_NAMES = new Set(["README.md", "CONTRIBUTING.md"]);
+/** reports/ 时点快照允许的日期后缀。 */
+const REPORT_DATE_SUFFIX = /-\d{4}-\d{2}-\d{2}$/;
+
+export function checkFilenames(files: string[]): Finding[] {
+  const findings: Finding[] = [];
+  for (const file of files) {
+    const base = path.posix.basename(file);
+    if (CONVENTIONAL_NAMES.has(base)) continue;
+    let stem = path.posix.parse(base).name;
+    if (file.startsWith("docs/reports/"))
+      stem = stem.replace(REPORT_DATE_SUFFIX, "");
+    if (!KEBAB_STEM.test(stem)) {
+      findings.push({
+        severity: "error",
+        rule: "filename-kebab",
+        file,
+        message: `文件名不是 kebab-case（小写英文、数字与连字符；reports/ 可加 -YYYY-MM-DD）：${base}`,
+      });
+    }
+  }
+  return findings;
+}
+
+/** 已删除的 docs/archive/：正文里的路径只允许出现在溯源语境中。 */
+const ARCHIVE_PATH = /docs\/archive\//;
+const ARCHIVE_HISTORICAL =
+  /Git 历史|已移除|已随|原文查|git log|原 `docs\/archive\//;
+
+export function checkArchiveRefs(repo: Repo, files: string[]): Finding[] {
+  const findings: Finding[] = [];
+  for (const file of files) {
+    const content = repo.read(file);
+    if (content === null) continue;
+    content.split("\n").forEach((line, i) => {
+      if (ARCHIVE_PATH.test(line) && !ARCHIVE_HISTORICAL.test(line)) {
+        findings.push({
+          severity: "warn",
+          rule: "archive-ref",
+          file,
+          line: i + 1,
+          message:
+            "疑似引用已删除的 docs/archive/，请改为「见 Git 历史」或指向现行文件",
+        });
+      }
+    });
+  }
+  return findings;
+}
+
 // ── 汇总 ───────────────────────────────────────────────────────────────────
 
 export interface RunOptions {
@@ -729,6 +784,8 @@ export function runAllChecks(
     ...cards.flatMap((c) => checkCard(ctx, c, all)),
     ...checkDependencyCycles(cards),
     ...checkScheme(repo),
+    ...checkFilenames(docs),
+    ...checkArchiveRefs(repo, docs),
   ];
   return { findings, cards };
 }

@@ -221,7 +221,7 @@
 
 | id | text | check | 绑定 | 状态 |
 | :--- | :--- | :--- | :--- | :--- |
-| acc-1 | 右栏 Agent 无法写文件、跑 shell、联网。 | `auto` | `tests/integration/partner-readonly.test.ts`；[`reports/J1-partner-cli-verification-2026-10-28.md`](./reports/J1-partner-cli-verification-2026-10-28.md) | PASS（替身模型）；真 Key 补验挂账 OP-28 |
+| acc-1 | 右栏 Agent 无法写文件、跑 shell、联网。 | `auto` | `tests/integration/partner-readonly.test.ts`；[`reports/j1-partner-cli-verification-2026-10-28.md`](./reports/j1-partner-cli-verification-2026-10-28.md) | PASS（替身模型）；真 Key 补验挂账 OP-28 |
 | acc-2 | 右栏 Agent 启动参数中没有任何系统提示注入。 | `auto` | 待写：断言 `buildLaunch` 的 argv 不含 `--system-prompt` / `--append-system-prompt` | ⏳ |
 | acc-3 | Supervisor 的一切输出只出现在中栏画布。 | `playtest` | supervisor §18 J 系列 | ⏳ |
 | acc-4 | 方案里每条 `user_said` 条目都能在原话中找到逐字子串。 | `auto` | INV-LEDGER-01；本文 §0 可用同一规则自检 | 本文已人工核对 |

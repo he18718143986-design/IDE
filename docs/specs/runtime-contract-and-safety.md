@@ -290,13 +290,13 @@
 | 保护清单与审计（代码即权威） | `daemon/guard/audit-manifest.ts`、`daemon/supervisor/rules-l0.ts` |
 | 路径与常量（DOC-7 升格） | 本文 **§10**；代码：`daemon/git/worktree-manager.ts`、`daemon/guard/worktree-seal.ts`、`daemon/pipeline/merger.ts` |
 | 状态机合同（DOC-7 升格） | 本文 **§11**；代码：`src/lib/state-machine.ts`、`src/lib/state/delivery-state.ts` |
-| 历史指针 | [`constants-and-paths.md`](./constants-and-paths.md)、[`state-machine-contract.md`](./state-machine-contract.md)（仅指针，非权威） |
+| 历史指针 | 两份旧草案已于 2026-11-09 删除（内容见本文件 §10 / §11；溯源见 [`../ledger/removed-and-moved.md`](../ledger/removed-and-moved.md)） |
 
 ---
 
 ## 10. 路径与常量（DOC-7 升格 · 代码权威）
 
-> **升格（2026-11-01 · 用户拍板提前做 DOC-7）**：自 `constants-and-paths.md` 的「代码事实」并入。冲突时以代码为准。原文件降为 `[HISTORICAL]` 指针。
+> **升格（2026-11-01 · 用户拍板提前做 DOC-7）**：自 `constants-and-paths.md` 的「代码事实」并入。冲突时以代码为准。原文件曾降为 `[HISTORICAL]` 指针，2026-11-09 已删除。
 > **权威代码**：`daemon/git/worktree-manager.ts`、`daemon/guard/worktree-seal.ts`、`daemon/pipeline/merger.ts`、`daemon/supervisor/demo/demo-generator.ts`、`src/lib/journey/scheme-draft.ts`。
 
 ### 10.1 运行时路径（代码事实）
