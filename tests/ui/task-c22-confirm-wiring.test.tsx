@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { stubOfflineFetch } from "../../src/tests/setup";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { SchemeReviewPane } from "../../src/components/studio/SchemeReviewPane";
 import { AgentChatPane } from "../../src/components/AgentChatPane";
@@ -122,6 +123,11 @@ function renderPane(
     />,
   );
 }
+
+beforeEach(() => {
+  // TASK-CI.3：本文件发出的未桩接口，以离线失败应答（与哨兵行为一致）
+  stubOfflineFetch(["/api/knowledge/modules"]);
+});
 
 describe("T-UI-1 确认按钮由唯一谓词决定", () => {
   it("T-UI-001 未生成 Demo：确认按钮可用，且不显示阻断原因", () => {

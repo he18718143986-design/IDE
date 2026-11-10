@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { stubOfflineFetch } from "../../src/tests/setup";
 import {
   act,
   fireEvent,
@@ -104,6 +105,21 @@ async function openRequirement(title: string) {
   const item = await screen.findByRole("button", { name: new RegExp(title) });
   fireEvent.click(item);
 }
+
+beforeEach(() => {
+  // TASK-CI.3：本文件发出的未桩接口，以离线失败应答（与哨兵行为一致）
+  stubOfflineFetch([
+    "/api/supervisor/journey",
+    "/api/project/plan",
+    "/api/chat/adapters",
+    "/api/chat/sessions",
+    "/api/graph",
+    "/api/preview/real/status",
+    "/api/playtest/reference-snapshots",
+    "/api/baseline",
+    "/api/playtest/status",
+  ]);
+});
 
 describe("TASK-C.1 主页面接入三栏工作台", () => {
   it("首屏是空编辑区：不自动打开 Studio，顶栏只留状态胶囊", async () => {

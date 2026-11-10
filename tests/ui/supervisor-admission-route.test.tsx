@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { stubOfflineFetch } from "../../src/tests/setup";
 import {
   act,
   fireEvent,
@@ -135,6 +136,18 @@ async function createViaForm() {
     fireEvent.click(screen.getByRole("button", { name: /提交给 Daemon/ }));
   });
 }
+
+beforeEach(() => {
+  // TASK-CI.3：本文件发出的未桩接口，以离线失败应答（与哨兵行为一致）
+  stubOfflineFetch([
+    "/api/supervisor/journey",
+    "/api/project/plan",
+    "/api/chat/adapters",
+    "/api/chat/sessions",
+    "/api/graph",
+    "/api/baseline",
+  ]);
+});
 
 describe("TASK-C.2 路由接线：无交集静默流转", () => {
   it("AUTO_APPROVED 后页面没有任何确认弹窗，也不调用 admit", async () => {

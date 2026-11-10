@@ -1,5 +1,6 @@
 /** @vitest-environment jsdom */
-import { describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { stubOfflineFetch } from "../../src/tests/setup";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { WorkspaceLayout } from "../../src/components/WorkspaceLayout";
 import { SettingsTab } from "../../src/components/settings/SettingsTab";
@@ -12,6 +13,11 @@ const base = {
   runMode: "VIBE" as const,
   files: [] as { name: string; path: string }[],
 };
+
+beforeEach(() => {
+  // TASK-CI.3：本文件发出的未桩接口，以离线失败应答（与哨兵行为一致）
+  stubOfflineFetch(["/api/vault", "/api/workers"]);
+});
 
 describe("TASK-C.9d 中栏让路 / 设置回跳", () => {
   it("C.10a：纯 journey-active 无三步台时不渲染空让路壳（回欢迎/主路径）", () => {

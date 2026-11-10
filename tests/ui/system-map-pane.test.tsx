@@ -2,7 +2,8 @@
 /**
  * TASK-L.18：系统地图同页嵌 + 空态 / 有 modules 渲染 + impact 查询烟测。
  */
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { stubOfflineFetch } from "../../src/tests/setup";
 import {
   fireEvent,
   render,
@@ -61,6 +62,11 @@ const impactOk: KnowledgeImpactResult = {
   edges: [{ from: "auth", to: "db" }],
   empty_reason: "ok",
 };
+
+beforeEach(() => {
+  // TASK-CI.3：本文件发出的未桩接口，以离线失败应答（与哨兵行为一致）
+  stubOfflineFetch(["/api/knowledge/modules"]);
+});
 
 describe("TASK-L.18 SystemMapPane", () => {
   it("无 modules 时诚实空态", async () => {
