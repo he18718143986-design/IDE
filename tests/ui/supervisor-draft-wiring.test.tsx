@@ -51,6 +51,13 @@ const generateSupervisorDraft = vi.fn(
   ): Promise<SupervisorDraftResponse> => draftResponse,
 );
 
+/** 本测试未桩的 daemon 接口统一以「离线」失败，防止未决请求泄漏到 jsdom 销毁之后。 */
+function offlineDaemon(name: string) {
+  return vi.fn(async (): Promise<never> => {
+    throw new TypeError(`${name}：本测试未桩（daemon 离线）`);
+  });
+}
+
 vi.mock("@/lib/daemon-api", async (orig) => {
   const real = await orig<typeof import("@/lib/daemon-api")>();
   const draftBridge = (...args: unknown[]): unknown =>
@@ -104,6 +111,14 @@ vi.mock("@/lib/daemon-api", async (orig) => {
       model: "",
       source: "none",
     })),
+    // 挂账②：以下挂载时会发请求的接口，本测试不关心其结果。
+    // 与此前未桩时的行为保持一致（daemon 不可达 → 失败），但显式可见、不再泄漏真实请求。
+    getProjectPlan: offlineDaemon("getProjectPlan"),
+    fetchBaselineArchive: offlineDaemon("fetchBaselineArchive"),
+    listChatAdapters: offlineDaemon("listChatAdapters"),
+    listChatSessions: offlineDaemon("listChatSessions"),
+    fetchTaskGraph: offlineDaemon("fetchTaskGraph"),
+    fetchJourneyHistory: offlineDaemon("fetchJourneyHistory"),
   };
 });
 
