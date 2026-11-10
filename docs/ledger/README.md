@@ -347,4 +347,5 @@
 
 - **挂账①（J.16 续作，不新增 OP）**：GAP-P8 `surface_log`、K-14 归因账本、K-16 trigger 闭集未做；`TASK-J.16` 不标 COMPLETED。P-1～P-6 已合 #188；文案 #189 待合。续作须含真实链路端到端验收。
 - **挂账②（测试隔离，不新增 OP）**：`tests/ui/scheme-review-playtest.test.tsx` 的 `SystemMapPane` 异步更新在 jsdom 销毁后触发 `window is not defined` 未处理拒绝，偶发（Ubuntu 一次，重跑即过）；待隔离修复。
+- **挂账② 重开（2026-11-10，不新增 OP）**：main `6311c7b2a`（#194 合入后）的 Ubuntu `Unit tests` 再现 `ReferenceError: window is not defined`（Vitest「Unhandled Rejection」，来源 `tests/ui/supervisor-draft-wiring.test.tsx`，栈经 `src/routes/index.tsx` 的 `dispatchSetState`），run [`42725022760`](https://github.com/he18718143986-design/IDE/actions/runs/42725022760)：314 文件、2998 用例全部通过，但 Vitest 因未处理错误退出码 1，导致必需检查失败。该错误与 [#196](https://github.com/he18718143986-design/IDE/pull/196) 修复的 `scheme-review-playtest.test.tsx` 不是同一文件，故 #196 **不能**视为挂账②已销项。处理方向待单开修复 PR：定位 `supervisor-draft-wiring` 与 `src/routes/index.tsx` 中异步 setState 在 jsdom 销毁后的未收尾更新，测试侧收尾优先，产品代码改动需单独说明。
 - **挂账③（CI 性能门禁抖动，不新增 OP）**：#189 macOS unit 三次分别失败于 `pre-merge-fingerprint`（68ms/50ms）与 `RadarGraph.perf`（18.4ms/16ms）等不同性能断言；处理口径参照 TASK-CI.1：仅放宽测试断言并依据实测中位数，**不动产品阈值**，且不宣称永久全绿。
