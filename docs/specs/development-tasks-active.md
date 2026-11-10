@@ -1177,13 +1177,23 @@ governance:
 
 <a id="task-ci.3"></a>
 
-#### 【Task CI.3】测试 fetch 哨兵清零未桩请求并切判红 `[NEW_TASK · 立卡 P-178 · 未开工]`
+#### 【Task CI.3】测试 fetch 哨兵清零未桩请求并切判红 `[COMPLETED · 立卡 P-178 · 施工 P-179]`
 
 > **立卡说明（2026-11-10 · P-178）**：承接 #198（挂账②修复）。全局 fetch 哨兵当前为「拒绝 + 打印」**降级态，不判红**：未桩请求不再泄漏到 jsdom 销毁之后，但 10 个文件共 115 次未桩请求仍被静默吞掉，对 daemon-api 行为的回归保护是虚的。本卡逐文件补桩至零，再把哨兵切为判红模式。与 CI.2（性能门禁抗抖动）分卡。**立卡 ≠ 开工 ≠ 销项**；不标 COMPLETED；不新增 OP；不改产品代码。
 
+> **归档注记（2026-11-10 · P-179）**：本卡已 **COMPLETED**（[#201](https://github.com/he18718143986-design/IDE/pull/201) squash `bdde65c`；分支 `test/ci3-fetch-sentinel-strict`，分支 tip `0811fb8`，合入前 tree 与分支一致）。验收逐条：
+> - **CI3-P1**：10 文件 115 次未桩请求清零（逐文件单跑，`[unstubbed-fetch]` 计数为 0）。
+> - **CI3-P2**：`UNSTUBBED_FETCH_STRICT = true` 为显式常量；探针测试判红并列出 URL，探针已删除；未用 try/catch 或全局吞错。
+> - **CI3-P3**：`vitest run --project dom` 49 文件 / 301 用例全绿，未新增 skip。
+> - **CI3-P4**：`src/**`（除 setup 外）与 `daemon/**` 的 diff 为空。
+> - **CI3-P5**：**本地** DOM 全量连续 3 次全绿，未桩日志为 0。合入后 main 上的连续 CI 回看**另记，本注记不替代**。
+> - **CI 侧**：Ubuntu/macOS 的 lint、typecheck、unit 全绿（必需项）；Windows 单测失败的 16 个文件与 main 基线逐一相同（非必需，不作 macOS 证据）。
+> - **实现偏差**：补桩采用 fetch 层 `stubOfflineFetch`（定义于 `src/tests/setup.ts`），未用 `vi.mock` daemon-api；行为与哨兵 reject 一致，断言未改，未伪造成功数据。
+> - **不宣称**：不宣称 CI.3 修复了挂账② 的确切根因。
+
 ```yaml task-card
 id: TASK-CI.3
-status: NEW_TASK
+status: COMPLETED
 contract:
   intent:
     title: 测试 fetch 哨兵清零未桩请求并切判红
@@ -1233,6 +1243,8 @@ contract:
   verification:
     commands:
       - { alias: dom-project, executable: npx, args: [vitest, run, --project, dom] }
+      - { alias: dom-index-route, executable: npx, args: [vitest, run, --project, dom, tests/ui/index-route.test.tsx] }
+      - { alias: dom-settings-tab, executable: npx, args: [vitest, run, --project, dom, tests/ui/settings-tab.test.tsx] }
       - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
       - { alias: lint, executable: npm, args: [run, -s, lint] }
 design:
@@ -1254,11 +1266,11 @@ design:
     - { path: tests/ui/task-c18-scheme-single-pane.test.tsx, change: modify, why: 1 次未桩, symbols: [] }
   interfaces: []
   test_plan:
-    - { acceptance_id: CI3-P1, test_path: tests/ui/settings-tab.test.tsx, level: unit, debt: "未施工；逐文件单跑基线：settings-tab 36 / index-route 34 / supervisor-admission-route 24 / task-c22 11 / 其余 6 次" }
-    - { acceptance_id: CI3-P2, test_path: tests/ui/supervisor-draft-wiring.test.tsx, level: unit, debt: "未施工；判红模式下须能在该文件的未桩请求场景中判红" }
-    - { acceptance_id: CI3-P3, test_path: tests/ui/settings-tab.test.tsx, level: integration, debt: "未施工；基线 301 用例全绿" }
-    - { acceptance_id: CI3-P5, test_path: tests/ui/index-route.test.tsx, level: integration, debt: "未施工；需判红模式下 3 次连续全绿证据" }
-    - { acceptance_id: CI3-P4, test_path: tests/ui/settings-tab.test.tsx, level: unit, debt: "未施工；产品代码 diff 为空，由 git diff 核验" }
+    - { acceptance_id: CI3-P1, test_path: tests/ui/index-route.test.tsx, level: integration, case: "首屏是空编辑区" }
+    - { acceptance_id: CI3-P2, test_path: tests/ui/settings-tab.test.tsx, level: unit, debt: "判红开关（src/tests/setup.ts）默认开启且探针实测判红（探针已删，未入库）；持续的判红回归测试未入库，挂账⑦" }
+    - { acceptance_id: CI3-P3, test_path: tests/ui/settings-tab.test.tsx, level: integration, case: "GATEWAY_ENFORCED 显示受控且为绿色" }
+    - { acceptance_id: CI3-P5, test_path: tests/ui/index-route.test.tsx, level: integration, debt: "稳定性证据为本地连续 3 次全量 + CI 运行，非单一用例；合入后 main 连续回看另记，挂账⑦" }
+    - { acceptance_id: CI3-P4, test_path: tests/ui/settings-tab.test.tsx, level: unit, debt: "非测试项：产品代码零改动由 git diff 核验（#201 diff 仅含 setup.ts 与 10 个测试文件）" }
 governance:
   spec_refs:
     - docs/ledger/README.md
@@ -1281,6 +1293,7 @@ governance:
     demo_origin: unchanged
     illumination: unchanged
     gateway_write_scope: unchanged
+  delivered: { pr: 201, commit: bdde65cdc91e1efb842ad2b49adc93f5ce07ed23 }
 ```
 
 ---
