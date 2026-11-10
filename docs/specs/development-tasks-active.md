@@ -774,7 +774,7 @@ governance:
 
 #### 【Task J.16】试玩幕 · 质疑自查续作（surface_log → K-14 归因账本 → K-16 trigger 闭集）`[NEW_TASK · 立卡 P-176 · 未开工]`
 
-> **立卡说明（2026-11-09 · P-176）**：S.5 注记（「已知 7 处局限由 TASK-J.16 实施时一并修复」）所指的卡。P-1～P-6 已合（[#188](https://github.com/he18718143986-design/IDE/pull/188) / `859f762`），左栏与 §16.7 文案已合（[#189](https://github.com/he18718143986-design/IDE/pull/189) / `f0ca93c`）。本卡只承接**未落地**部分。**立卡 ≠ 开工 ≠ 销项**：待 Tina 单卡授权后才可施工；不宣称端到端闭环；本卡不标 COMPLETED，直到验收条件全部通过。
+> **立卡说明（2026-11-09 · P-176）**：S.5 注记（「已知 7 处局限由 TASK-J.16 实施时一并修复」）所指的卡。P-1～P-6 已合（[#188](https://github.com/he18718143986-design/IDE/pull/188) / `859f762`），左栏与 §16.7 文案已合（[#189](https://github.com/he18718143986-design/IDE/pull/189) / `f0ca93c`）。本卡只承接**未落地**部分。**立卡 ≠ 开工 ≠ 销项**：待 Tina 单卡授权后才可施工；不宣称端到端闭环；本卡不标 COMPLETED，直到验收条件全部通过。**施工顺序（依赖注记）**：先完成 TASK-CI.3（测试 fetch 哨兵判红、未桩请求清零），再做本卡的真实会话与真实台账端到端验收（J16-P5）；否则链路测试可能仍含未桩请求，验证可信度打折。
 
 ```yaml task-card
 id: TASK-J.16
@@ -856,6 +856,7 @@ governance:
     - docs/specs/development-tasks-completed.md#task-s.5
   depends_on:
     - { id: TASK-S.5, kind: hard }
+    - { id: TASK-CI.3, kind: soft }
   code_facts:
     - { ref: "daemon/supervisor/dispute/evidence-triad.ts::anchoredQuotesFromDraft", note: "P-1～P-6 已合（#188 `859f762`）；左栏锚定原话与 §16.7 文案已合（#189 `f0ca93c`）" }
     - { ref: "daemon/supervisor/dispute/index.ts::outcomeFromUserChoice", note: "仓库未找到 surface_log 或 attributions 实现（#188 核对结论）；本卡新增" }
