@@ -1174,6 +1174,117 @@ governance:
 
 ---
 
+<a id="task-ci.3"></a>
+
+#### 【Task CI.3】测试 fetch 哨兵清零未桩请求并切判红 `[NEW_TASK · 立卡 P-178 · 未开工]`
+
+> **立卡说明（2026-11-10 · P-178）**：承接 #198（挂账②修复）。全局 fetch 哨兵当前为「拒绝 + 打印」**降级态，不判红**：未桩请求不再泄漏到 jsdom 销毁之后，但 10 个文件共 115 次未桩请求仍被静默吞掉，对 daemon-api 行为的回归保护是虚的。本卡逐文件补桩至零，再把哨兵切为判红模式。与 CI.2（性能门禁抗抖动）分卡。**立卡 ≠ 开工 ≠ 销项**；不标 COMPLETED；不新增 OP；不改产品代码。
+
+```yaml task-card
+id: TASK-CI.3
+status: NEW_TASK
+contract:
+  intent:
+    title: 测试 fetch 哨兵清零未桩请求并切判红
+    description: >-
+      承接 #198。哨兵当前为「拒绝 + 打印」降级态：未桩请求立即 reject，不泄漏到 jsdom 销毁之后，但测试不会因此变红。
+      本卡逐文件补桩至零，再把哨兵切为判红模式，使未桩请求在所在测试内判红并指认 URL。
+      补桩只允许「离线失败」或与真实 schema 一致的最小夹具，不得为求绿伪造成功数据。
+    risk_level: LOW
+  acceptance:
+    - id: CI3-P1
+      check: auto
+      text: >-
+        未桩清零：逐文件单跑 DOM 测试，`[unstubbed-fetch]` 计数均为 0。范围 10 个文件：index-route、settings-tab、supervisor-admission-route、task-c22-confirm-wiring、journey-handoff、middle-yield、project-map-pane、scope-acceptance-block、system-map-pane、task-c18-scheme-single-pane。
+    - id: CI3-P2
+      check: auto
+      text: >-
+        判红模式：`src/tests/setup.ts` 中哨兵判红开关为显式常量且默认开启；未桩请求在所在测试的 afterEach 判红并列出 URL；不得用 try/catch 或全局吞错绕过。
+    - id: CI3-P3
+      check: auto
+      text: >-
+        DOM 全绿：`vitest run --project dom` 通过，用例数不少于 301，不新增 skip。
+    - id: CI3-P4
+      check: auto
+      text: >-
+        产品代码零改动：`src/**`（除 setup 外）与 `daemon/**` 的 diff 为空。
+    - id: CI3-P5
+      check: auto
+      text: >-
+        稳定性：判红模式下 DOM 全量连续 3 次全绿，且无 `window is not defined` 残留。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/tests/setup.ts
+      - tests/ui/index-route.test.tsx
+      - tests/ui/settings-tab.test.tsx
+      - tests/ui/supervisor-admission-route.test.tsx
+      - tests/ui/task-c22-confirm-wiring.test.tsx
+      - tests/ui/journey-handoff.test.tsx
+      - tests/ui/middle-yield.test.tsx
+      - tests/ui/project-map-pane.test.tsx
+      - tests/ui/scope-acceptance-block.test.tsx
+      - tests/ui/system-map-pane.test.tsx
+      - tests/ui/task-c18-scheme-single-pane.test.tsx
+    readonly_paths:
+      - src/lib/daemon-api.ts
+      - daemon/**
+  verification:
+    commands:
+      - { alias: dom-project, executable: npx, args: [vitest, run, --project, dom] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: lint, executable: npm, args: [run, -s, lint] }
+design:
+  approach: >-
+    1) 逐文件单跑，按 URL 归类未桩请求（workers、vault、knowledge/modules、supervisor/journey、project/plan、graph、chat/sessions、chat/adapters、baseline、preview/real/status、playtest/*）。
+    2) 每个 URL 以对应 daemon-api 函数的 vi.mock 补桩：默认「离线失败」，与此前未桩行为一致；仅当断言依赖返回值时给与 schema 一致的最小夹具并注明。
+    3) 全部清零后把哨兵切为判红模式。4) 连续 3 次全量验证。
+  touches:
+    - { path: src/tests/setup.ts, change: modify, why: 增加判红开关（默认开），降级态与判红态共用登记逻辑, symbols: [] }
+    - { path: tests/ui/settings-tab.test.tsx, change: modify, why: 36 次未桩，本卡最大头, symbols: [] }
+    - { path: tests/ui/index-route.test.tsx, change: modify, why: 34 次未桩, symbols: [] }
+    - { path: tests/ui/supervisor-admission-route.test.tsx, change: modify, why: 24 次未桩, symbols: [] }
+    - { path: tests/ui/task-c22-confirm-wiring.test.tsx, change: modify, why: 11 次未桩, symbols: [] }
+    - { path: tests/ui/journey-handoff.test.tsx, change: modify, why: 4 次未桩, symbols: [] }
+    - { path: tests/ui/middle-yield.test.tsx, change: modify, why: 2 次未桩, symbols: [] }
+    - { path: tests/ui/project-map-pane.test.tsx, change: modify, why: 1 次未桩, symbols: [] }
+    - { path: tests/ui/scope-acceptance-block.test.tsx, change: modify, why: 1 次未桩, symbols: [] }
+    - { path: tests/ui/system-map-pane.test.tsx, change: modify, why: 1 次未桩, symbols: [] }
+    - { path: tests/ui/task-c18-scheme-single-pane.test.tsx, change: modify, why: 1 次未桩, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: CI3-P1, test_path: tests/ui/settings-tab.test.tsx, level: unit, debt: "未施工；逐文件单跑基线：settings-tab 36 / index-route 34 / supervisor-admission-route 24 / task-c22 11 / 其余 6 次" }
+    - { acceptance_id: CI3-P2, test_path: tests/ui/supervisor-draft-wiring.test.tsx, level: unit, debt: "未施工；判红模式下须能在该文件的未桩请求场景中判红" }
+    - { acceptance_id: CI3-P3, test_path: tests/ui/settings-tab.test.tsx, level: integration, debt: "未施工；基线 301 用例全绿" }
+    - { acceptance_id: CI3-P5, test_path: tests/ui/index-route.test.tsx, level: integration, debt: "未施工；需判红模式下 3 次连续全绿证据" }
+    - { acceptance_id: CI3-P4, test_path: tests/ui/settings-tab.test.tsx, level: unit, debt: "未施工；产品代码 diff 为空，由 git diff 核验" }
+governance:
+  spec_refs:
+    - docs/ledger/README.md
+  depends_on: []
+  code_facts:
+    - { ref: "src/tests/setup.ts:24-33", note: "main 3c6dfeb（#198）：全局 fetch 哨兵为拒绝 + console.warn 降级态，不判红" }
+    - { ref: "tests/ui/supervisor-draft-wiring.test.tsx:55-59", note: "main 3c6dfeb（#198）：offlineDaemon 补桩 6 个接口，该文件已无未桩请求" }
+  non_goals:
+    - 不改产品代码与 daemon 行为
+    - 不新增 OP；不并入 CI.2（性能门禁）
+    - 不以 try/catch 或全局吞错绕过哨兵
+    - 不宣称 window is not defined 唯一根因；挂账② 销项待 main CI 观察期与本卡完成
+  fail:
+    - 为求绿给未桩接口返回伪造的成功数据
+    - 用 skip / it.skip 绕过未桩失败
+    - 判红开关在完成后仍保持关闭
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+---
+
+
 <a id="task-audited.1"></a>
 
 #### 【Task AUDITED.1】AUDITED 合同退回待批受控边 `[COMPLETED]`
