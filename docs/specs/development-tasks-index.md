@@ -52,6 +52,7 @@
 | `TASK-H.9` | `COMPLETED` | 废止 `.stagent/metadata/` 写入（DLV-4 · ADR-0011） | [打开](./development-tasks-completed.md#task-h.9) |
 | `TASK-B.1` | `COMPLETED` | 本地 AST 增量依赖图分析引擎（parser/graph 增强 + 性能基准 + 恶魔测试 + 契约兼容超集；#124/9c177e9） | [打开](./development-tasks-completed.md#task-b.1) |
 | `TASK-CI.1` | `COMPLETED` | B.1 Tarjan 门禁抗 macos CI 抖动（[#161](https://github.com/he18718143986-design/IDE/pull/161)/`bf971d5`；P-159 回写；门禁 4 ≤150ms；抗抖动≠永久全绿） | [打开](./development-tasks-completed.md#task-ci.1) |
+| `TASK-CI.2` | `NEW_TASK` | macOS 性能门禁抗抖动（含 RadarGraph 16ms；arch P100 还原见 [#192](https://github.com/he18718143986-design/IDE/pull/192)；pre-merge 80ms 挂账；立卡 P-177；未开工） | [正文](./development-tasks-active.md#task-ci.2) |
 | `TASK-AUDITED.1` | `COMPLETED` | AUDITED 合同退回待批受控边（[#165](https://github.com/he18718143986-design/IDE/pull/165)/`b390254`；P-162 回写；库层边+Guard；**（P-171）** 生产接线由 [`TASK-AUDITED.2`](./development-tasks-completed.md#task-audited.2) 承接；不宣称闭环） | [打开](./development-tasks-completed.md#task-audited.1) |
 | `TASK-AUDITED.2` | `COMPLETED` | AUDITED 退回待批生产接线（[#178](https://github.com/he18718143986-design/IDE/pull/178)/`71684d4`；P-171 回写；orchestrator/API/ContractCard；#178 合入时 index 父级未接 · follow-up 进行中；不宣称闭环） | [打开](./development-tasks-completed.md#task-audited.2) |
 | `TASK-B.2` | `COMPLETED` | 多活跃 Worktree 监听与 Evidence 状态联动（Map 监听、指纹单点、合并前兜底；门禁①中位 67.9ms，未达 50ms 体验目标；[#128](https://github.com/he18718143986-design/IDE/pull/128)/`b1aa44f`） | [打开](./development-tasks-completed.md#task-b.2) |
