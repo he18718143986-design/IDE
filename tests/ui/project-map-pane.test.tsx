@@ -2,7 +2,8 @@
 /**
  * TASK-L.10：项目地图同页嵌 + 补丁操作 + 禁止技术单位 / 禁止本地算下一份。
  */
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { stubOfflineFetch } from "../../src/tests/setup";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { ProjectMapPane } from "../../src/components/project/ProjectMapPane";
 import { SchemeReviewPane } from "../../src/components/studio/SchemeReviewPane";
@@ -94,6 +95,11 @@ function makeScheme() {
     { titleHint: "示例方案" },
   );
 }
+
+beforeEach(() => {
+  // TASK-CI.3：本文件发出的未桩接口，以离线失败应答（与哨兵行为一致）
+  stubOfflineFetch(["/api/knowledge/modules"]);
+});
 
 describe("TASK-L.10 ProjectMapPane", () => {
   it("renders two milestones and three stubs; next highlight is unique", () => {

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { stubOfflineFetch } from "../../src/tests/setup";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { SettingsTab } from "../../src/components/settings/SettingsTab";
 import type { DaemonConnection } from "../../src/lib/daemon-api";
@@ -37,6 +38,11 @@ function renderSettings(over: Partial<Parameters<typeof SettingsTab>[0]> = {}) {
   );
   return { onConnChange };
 }
+
+beforeEach(() => {
+  // TASK-CI.3：本文件发出的未桩接口，以离线失败应答（与哨兵行为一致）
+  stubOfflineFetch(["/api/vault", "/api/workers"]);
+});
 
 describe("设置页：受控状态搬运后语义不变", () => {
   it("GATEWAY_ENFORCED 显示受控且为绿色", () => {

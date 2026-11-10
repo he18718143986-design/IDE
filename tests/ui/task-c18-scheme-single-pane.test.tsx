@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { stubOfflineFetch } from "../../src/tests/setup";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { SchemeReviewPane } from "../../src/components/studio/SchemeReviewPane";
 import { StudioViewportShell } from "../../src/components/studio/StudioViewportShell";
@@ -60,6 +61,11 @@ function compliantScopePlan(revision: number): ScopePlan {
   withDigest.plan_digest = scopePlanDigest(withDigest);
   return withDigest;
 }
+
+beforeEach(() => {
+  // TASK-CI.3：本文件发出的未桩接口，以离线失败应答（与哨兵行为一致）
+  stubOfflineFetch(["/api/knowledge/modules"]);
+});
 
 describe("TASK-C.18 单页方案审阅", () => {
   it("Studio 外壳无五视口 Tab，只有方案审阅", () => {

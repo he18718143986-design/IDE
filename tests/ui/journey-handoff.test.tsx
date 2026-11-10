@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { stubOfflineFetch } from "../../src/tests/setup";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { SchemeReviewPane } from "../../src/components/studio/SchemeReviewPane";
@@ -159,6 +160,11 @@ function stubSession(
     ...overrides,
   } as UseAgentSession;
 }
+
+beforeEach(() => {
+  // TASK-CI.3：本文件发出的未桩接口，以离线失败应答（与哨兵行为一致）
+  stubOfflineFetch(["/api/knowledge/modules"]);
+});
 
 describe("J-02 handoff progress helpers", () => {
   it("五阶段映射到三步人话", () => {

@@ -3,7 +3,8 @@
  * TASK-J.6 / SSOT S2-08：中栏《改动范围与验收方式》区块。
  * ADR-0014：开工前仅三行白话 + 敏感「不碰这些」；无路径树/区域按钮/逐项授权。
  */
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { stubOfflineFetch } from "../../src/tests/setup";
 import { fireEvent, render, screen } from "@testing-library/react";
 import {
   authorizePendingSensitiveDecisions,
@@ -107,6 +108,11 @@ function assertNoTechJargon(root: HTMLElement): void {
   expect(text).not.toContain("**");
   expect(text.toLowerCase()).not.toMatch(/glob/);
 }
+
+beforeEach(() => {
+  // TASK-CI.3：本文件发出的未桩接口，以离线失败应答（与哨兵行为一致）
+  stubOfflineFetch(["/api/knowledge/modules"]);
+});
 
 describe("TASK-J.6 ScopeAcceptanceBlock（S2-08）", () => {
   it("开工前渲染三行白话概览；不含路径树与区域级按钮", () => {
