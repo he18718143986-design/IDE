@@ -172,3 +172,4 @@
 | `TASK-D.2b` | `COMPLETED` | 未跟踪文件合并门禁与 Contract v1.3 零静默迁移接入 | [打开](./development-tasks-completed.md#task-d.2b) |
 | `TASK-E.1` | `COMPLETED` | 双 Agent 协同与全流程 E2E 自动化测试 | [打开](./development-tasks-completed.md#task-e.1) |
 | `TASK-E.2` | `COMPLETED` | Stagent 仓库自举 (Dogfooding) 与发版交付 | [打开](./development-tasks-completed.md#task-e.2) |
+| `TASK-J.16` | `NEW_TASK` | 试玩幕 · 质疑自查续作：surface_log → K-14 归因账本 → K-16 trigger 闭集（立卡 P-176；未开工；P-1～P-6 已合 #188，文案 #189） | [正文](./development-tasks-active.md) |
