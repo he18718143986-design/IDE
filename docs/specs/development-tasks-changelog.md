@@ -227,6 +227,7 @@
 - **P-178（立卡 TASK-CI.3 · 测试 fetch 哨兵判红与未桩清零 · 2026-11-10）**：基于 `main`@`3c6dfeb`（#198 squash）。#198 将全局 fetch 哨兵定为「拒绝 + 打印」**降级态，不判红**；严格判红试验曾判红 11 文件 / 52 用例，故未切。本次逐文件单跑核实：DOM 全量 49 文件 / 301 用例全绿；**发出未桩请求的文件为 10 个**，合计 115 次（index-route 34、settings-tab 36、supervisor-admission-route 24、task-c22-confirm-wiring 11、journey-handoff 4、middle-yield 2、project-map-pane 1、scope-acceptance-block 1、system-map-pane 1、task-c18-scheme-single-pane 1）。**更正**：此前口径「14 个文件」系按 stderr 块数量误计（含应用层日志），以本条为准。新增 `[NEW_TASK]` 卡 **`TASK-CI.3`**（矩阵行、index 行、active yaml 卡；范围：10 个文件补桩清零 + 哨兵切判红）。不并入 CI.2。**立卡 ≠ 开工 ≠ 销项**；不标 COMPLETED；不新增 OP；不改产品代码；挂账② 仍重开未销。
 - **P-179（TASK-CI.3 完成回写 · 2026-11-10）**：#201 squash `bdde65c` 合入，卡标 COMPLETED（归档注记见 active）；#202 因 strict 规则 behind 被替换为 #203（squash `7c35428`，台账销项）；挂账②销项（终态注明）、挂账⑤ 销项；挂账⑥ 登记 Windows 样本。仅 docs，不新增 OP，不改产品代码。
 - **P-180（立卡 TASK-CI.4 · 判红开关与离线桩回归用例 · 2026-11-10）**：承接 TASK-CI.3 挂账⑦；新增 `[NEW_TASK]` 卡，单一新测试文件，不改哨兵行为，不并入 J.16 / CI.2；矩阵、索引同步。仅 docs，不新增 OP。
+- **P-181（TASK-CI.3 归档迁移 · 2026-11-10 · 不新增 OP）**：CI.3 卡由 `development-tasks-active.md` 迁入 `development-tasks-completed.md`（卡内容不变，状态 COMPLETED 已与归档位置一致）；索引与台账挂账⑤ 的链接同步改指 completed。P-179 中「归档注记见 active」随迁移失效，以本条为准。挂账⑧ 的一例已修正，校验器改造仍待。台账观察项补记 `ff611086` 的 macOS 性能断言失败与连续计数重置。仅 docs。
 
 ## 枢纽迁入修订（P-43～P-66，按编号升序）
 
