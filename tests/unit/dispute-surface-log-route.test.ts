@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { safeRmSync } from "../helpers/tmp";
 import { createDaemon, type StagentDaemon } from "../../daemon/server";
 import {
   parseSurfacePresentationRequest,
@@ -91,7 +92,8 @@ describe("POST /api/supervisor/surface-log", () => {
   afterEach(async () => {
     if (daemon?.isRunning) await daemon.stop();
     daemon = null;
-    fs.rmSync(repo, { recursive: true, force: true });
+    // Windows 上 daemon 刚停止时句柄可能未释放：走仓库统一的瞬时错误重试
+    safeRmSync(repo);
   });
 
   const post = (body: unknown, auth: string | null = `Bearer ${token}`) =>
