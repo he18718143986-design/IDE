@@ -114,7 +114,10 @@ describe("验收条目 ID 撞号复现", () => {
 
   it("模拟进程重启（回放 T1 后提交 T2）：新批次不得覆盖台账中已有的验收条目", async () => {
     const root = newRepo();
-    const first = makeHost(root, { nextText: "登录成功后要显示欢迎语", replay: false });
+    const first = makeHost(root, {
+      nextText: "登录成功后要显示欢迎语",
+      replay: false,
+    });
     first.commitUserTurn({ text: "登录成功后要显示欢迎语", turnId: "T1" });
     await first.flushForTest();
     first.dispose();
@@ -138,5 +141,7 @@ describe("验收条目 ID 撞号复现", () => {
 
   // 挂账⑫（未修，另卡）：重启后 transcript 不从磁盘恢复，台账证据指向的旧 turn 不存在，
   // 审计会以 E_STATE_CORRUPT 拒绝之后所有批次。本测试只覆盖撞号，不覆盖该问题。
-  it.todo("重启后 transcript 恢复（挂账⑫）：台账证据引用的旧 turn 必须可解析，否则不得 E_STATE_CORRUPT");
+  it.todo(
+    "重启后 transcript 恢复（挂账⑫）：台账证据引用的旧 turn 必须可解析，否则不得 E_STATE_CORRUPT",
+  );
 });

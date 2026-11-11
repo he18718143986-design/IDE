@@ -171,6 +171,34 @@ function defaultNonce(): string {
 }
 
 /**
+ * 台账中已占用的最大 ITEM 序号（扫描整份台账，含墓地、建议等处的引用）。
+ * 以台账为唯一事实来源：不依赖进程内计数器，因而重启后与同进程内的新批次都不会撞号。
+ */
+export function maxItemSeqInLedger(state: LedgerState): number {
+  let max = 0;
+  for (const m of JSON.stringify(state).matchAll(/\bITEM-(\d+)\b/g)) {
+    const n = Number(m[1]);
+    if (Number.isSafeInteger(n) && n > max) max = n;
+  }
+  return max;
+}
+
+/**
+ * 批次级 ITEM 分配器：起点 = 台账最大序号 + 1，批内单调递增。
+ * 注入的 newId（测试用）优先，保持原有覆盖能力。
+ */
+export function createItemIdAllocator(
+  state: LedgerState,
+  injected?: (prefix: "ITEM") => string,
+): (prefix: "ITEM") => string {
+  let next = maxItemSeqInLedger(state) + 1;
+  return (prefix) => {
+    if (injected) return injected(prefix);
+    return `${prefix}-${next++}`;
+  };
+}
+
+/**
  * 编译循环控制器。宿主在用户消息落盘后调用 {@link notifyUserTurnCommitted}。
  */
 export class IntentCompileLoop {
@@ -364,13 +392,14 @@ export class IntentCompileLoop {
       batchAliases: rendered.ub,
       batchTurnIds: batch,
     };
+    const allocItem = createItemIdAllocator(state, this.deps.newId);
     const assembled = assembleCompilerOutput(
       modelResult.raw,
       rendered.aliasMap,
       state.draft.scheme_revision,
       assembleBatch,
       enums,
-      this.deps.newId,
+      allocItem,
     );
     if (!assembled.ok) {
       this.noteFailure("assemble", assembled.subreason, elapsed, rendered, {
@@ -386,7 +415,7 @@ export class IntentCompileLoop {
       ctx: {
         attempt,
         newId: (p) => {
-          if (p === "ITEM" && this.deps.newId) return this.deps.newId(p);
+          if (p === "ITEM") return allocItem(p);
           this.seqCounter += 1;
           return `${p}-${this.seqCounter}`;
         },
