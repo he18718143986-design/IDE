@@ -775,6 +775,7 @@ governance:
 #### 【Task J.16】试玩幕 · 质疑自查续作（surface_log → K-14 归因账本 → K-16 trigger 闭集）`[NEW_TASK · 立卡 P-176 · 未开工]`
 
 > **立卡说明（2026-11-09 · P-176）**：S.5 注记（「已知 7 处局限由 TASK-J.16 实施时一并修复」）所指的卡。P-1～P-6 已合（[#188](https://github.com/he18718143986-design/IDE/pull/188) / `859f762`），左栏与 §16.7 文案已合（[#189](https://github.com/he18718143986-design/IDE/pull/189) / `f0ca93c`）。本卡只承接**未落地**部分。**立卡 ≠ 开工 ≠ 销项**：待 Tina 单卡授权后才可施工；不宣称端到端闭环；本卡不标 COMPLETED，直到验收条件全部通过。**施工顺序（依赖注记）**：先完成 TASK-CI.3（测试 fetch 哨兵判红、未桩请求清零），再做本卡的真实会话与真实台账端到端验收（J16-P5）；否则链路测试可能仍含未桩请求，验证可信度打折。
+> **卡修订与进度注记（P-186 · 2026-11-11）**：`writable_paths` 与 `touches` 追加 `compile-loop.ts` 与 ITEM 撞号复现测试（授权：Tina 拍板方案 A 与「ITEM 撞号先修后进 K-14」）。`surface_log` 采集与前端接线已合（#211 / `273e506`）。ITEM 撞号修复 [#214](https://github.com/he18718143986-design/IDE/pull/214) 须在本修订合入后再合（挂账⑪）。验收条目呈现数据通路未决（挂账⑬，待 Tina 决策）；K-14 未开工；J16-P5 待真实数据。**仍不标 COMPLETED**。
 
 ```yaml task-card
 id: TASK-J.16
@@ -828,6 +829,8 @@ contract:
       - src/routes/index.tsx
       - daemon/server.ts
       - tests/ui/scope-acceptance-surface-log.test.tsx
+      - daemon/supervisor/intent-compiler/compile-loop.ts
+      - tests/integration/intent-compiler-item-id-collision.test.ts
     readonly_paths:
       - docs/specs/playtest-self-check.md
       - docs/specs/supervisor.md
@@ -850,6 +853,8 @@ design:
     - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 把确认 ID 透传给范围区块, symbols: [] }
     - { path: src/routes/index.tsx, change: modify, why: 确认 ID 生成与 surface_log 上报对齐（键与 §5.3 confirmation_id 一致）, symbols: [] }
     - { path: daemon/server.ts, change: modify, why: 新增 surface_log 写入路由（沿既有 Bearer 鉴权，不新开写权限）, symbols: [] }
+    - { path: daemon/supervisor/intent-compiler/compile-loop.ts, change: modify, why: ITEM-n 由台账推导分配（挂账⑪，K-14 前置；P-186 授权）, symbols: [] }
+    - { path: tests/integration/intent-compiler-item-id-collision.test.ts, change: create, why: ITEM-n 撞号复现（同进程 + 模拟重启）与 todo 留痕（挂账⑪⑫）, symbols: [] }
   interfaces: []
   test_plan:
     - { acceptance_id: J16-P1, test_path: tests/unit/dispute-surface-log.test.ts, level: unit, debt: "J.16 未施工；待单卡授权后补测试" }
