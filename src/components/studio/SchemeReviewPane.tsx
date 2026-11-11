@@ -28,6 +28,7 @@ import type { ScopePlan } from "@/lib/journey/scope-plan";
 import {
   ScopeAcceptanceBlock,
   type ScopeAcceptanceMode,
+  type ScopeAcceptanceSurfaceProps,
 } from "@/components/studio/ScopeAcceptanceBlock";
 import { ProjectMapPane } from "@/components/project/ProjectMapPane";
 import { SystemMapPane } from "@/components/project/SystemMapPane";
@@ -51,6 +52,9 @@ export interface SchemeReviewPaneProps {
   scopeAcceptanceMode?: ScopeAcceptanceMode | undefined;
   forceExpandSensitive?: boolean | undefined;
   onDeclineSensitive?: (() => void) | undefined;
+  /** J.16：当前方案修订的确认 ID（与确认按钮使用同一键）；缺省则不上报呈现 */
+  surfaceConfirmationId?: string | null | undefined;
+  onSurfacePresented?: ScopeAcceptanceSurfaceProps["onReport"] | undefined;
   onConfirmDecision?: ((decisionId: string) => void) | undefined;
   onResolveConflict?:
     ((conflictId: string, optionId: string) => void) | undefined;
@@ -350,6 +354,14 @@ export function SchemeReviewPane(props: SchemeReviewPaneProps) {
         forceExpandSensitive={props.forceExpandSensitive}
         busy={props.confirmBusy}
         onDeclineSensitive={props.onDeclineSensitive}
+        surface={
+          props.surfaceConfirmationId && props.onSurfacePresented
+            ? {
+                confirmationId: props.surfaceConfirmationId,
+                onReport: props.onSurfacePresented,
+              }
+            : undefined
+        }
       />
 
       <section className="mb-3 rounded border border-border p-3">
