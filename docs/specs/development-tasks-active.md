@@ -823,6 +823,11 @@ contract:
       - src/lib/daemon-api.ts
       - tests/unit/dispute-*.test.ts
       - tests/components/DisputeConsolePane.test.tsx
+      - src/components/studio/ScopeAcceptanceBlock.tsx
+      - src/components/studio/SchemeReviewPane.tsx
+      - src/routes/index.tsx
+      - daemon/server.ts
+      - tests/ui/scope-acceptance-surface-log.test.tsx
     readonly_paths:
       - docs/specs/playtest-self-check.md
       - docs/specs/supervisor.md
@@ -841,6 +846,10 @@ design:
     - { path: daemon/supervisor/dispute/evidence-triad.ts, change: modify, why: 左栏锚定原话与三方证据接入呈现记录, symbols: [] }
     - { path: daemon/supervisor/dispute/types.ts, change: modify, why: surface_log / 归因账本类型与 K-16 闭集, symbols: [] }
     - { path: daemon/supervisor/dispute/index.ts, change: modify, why: 三分类退化与 resolution_note 标注, symbols: [] }
+    - { path: src/components/studio/ScopeAcceptanceBlock.tsx, change: modify, why: §15.4 白话投影渲染后上报实际呈现条目（不得渲染前预写）, symbols: [] }
+    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 把确认 ID 透传给范围区块, symbols: [] }
+    - { path: src/routes/index.tsx, change: modify, why: 确认 ID 生成与 surface_log 上报对齐（键与 §5.3 confirmation_id 一致）, symbols: [] }
+    - { path: daemon/server.ts, change: modify, why: 新增 surface_log 写入路由（沿既有 Bearer 鉴权，不新开写权限）, symbols: [] }
   interfaces: []
   test_plan:
     - { acceptance_id: J16-P1, test_path: tests/unit/dispute-surface-log.test.ts, level: unit, debt: "J.16 未施工；待单卡授权后补测试" }
