@@ -169,6 +169,11 @@ import {
   type DisputeReport,
 } from "./supervisor/dispute/types";
 import {
+  appendSurfaceLog,
+  buildSurfaceLogEntries,
+  parseSurfacePresentationRequest,
+} from "./supervisor/dispute/surface-log";
+import {
   extractKeywords,
   SpecFactSourceImpl,
 } from "./supervisor/dispute/evidence-triad";
@@ -4293,6 +4298,54 @@ export class StagentDaemon {
    * 只读合同与会话、只读 Worktree；产出返工提案或新合同草案（均为未落盘对象），
    * 不执行任何写操作。60s 看门狗超时时不挂死调用方，按 D-3 降级呈递事实。
    */
+  /**
+   * `POST /api/supervisor/surface-log` —— 记录 §15.4 白话区块的实际呈现（J.16 / GAP-P8）。
+   * 只追加到 `<repoRoot>/.stagent/records/surface-log/`，路径由 Daemon 固定，请求体不能指定路径；
+   * 鉴权沿用 `isAuthorized`（Bearer），不新开写权限。
+   */
+  private async handleSurfaceLog(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    method: string,
+  ): Promise<void> {
+    if (method !== "POST") {
+      this.sendJson(res, 405, { error: "Method not allowed" });
+      return;
+    }
+    let body: unknown;
+    try {
+      body = await this.readJsonBody(req);
+    } catch (err) {
+      this.sendJson(res, 400, {
+        error: "invalid_json",
+        message: (err as Error).message,
+      });
+      return;
+    }
+    const parsed = parseSurfacePresentationRequest(body);
+    if (!parsed.ok) {
+      this.sendJson(res, 400, {
+        error: "surface_log_invalid",
+        message: parsed.message,
+      });
+      return;
+    }
+    try {
+      const entries = buildSurfaceLogEntries(parsed.value);
+      appendSurfaceLog(this.repoRoot, entries);
+      this.sendJson(res, 200, {
+        written: entries.length,
+        confirmation_id: parsed.value.confirmation_id,
+      });
+    } catch (err) {
+      console.warn("[surface-log] 写入失败", (err as Error).message);
+      this.sendJson(res, 500, {
+        error: "surface_log_write_failed",
+        message: (err as Error).message,
+      });
+    }
+  }
+
   private async handleSupervisorDispute(
     req: http.IncomingMessage,
     res: http.ServerResponse,
@@ -5406,6 +5459,15 @@ export class StagentDaemon {
         return;
       }
       await this.handleSupervisorDispute(req, res, method);
+      return;
+    }
+
+    if (pathname === "/api/supervisor/surface-log") {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      await this.handleSurfaceLog(req, res, method);
       return;
     }
 

@@ -93,8 +93,10 @@ import {
   type ProtectionStateView,
   type SupervisorDraftResult,
   type SupervisorDraftResponse,
+  type SurfacePresentationReport,
   type WorkerRunResult,
   DaemonApiError,
+  reportSurfacePresentation,
 } from "@/lib/daemon-api";
 import { ContractCard } from "@/components/contract/ContractCard";
 import { ScopeList } from "@/components/contract/ScopeList";
@@ -576,6 +578,36 @@ function Console() {
     setActivePrototypeId(null);
     schemeConfirmIdRef.current = null;
   }, []);
+
+  /**
+   * TASK-J.16 / GAP-P8：呈现记录与确认共用 confirmation_id。
+   * 在方案修订出现时即铸造（与确认按钮同一键，修订变化才换新），
+   * 使区块渲染时就能把实际呈现的条目绑定到将来的确认上。
+   */
+  const [schemeSurfaceConfirmId, setSchemeSurfaceConfirmId] = useState<
+    string | null
+  >(null);
+  const schemeRevisionForSurface = schemeDraft?.scheme_revision;
+  useEffect(() => {
+    if (schemeRevisionForSurface === undefined) {
+      setSchemeSurfaceConfirmId(null);
+      return;
+    }
+    if (schemeConfirmIdRef.current?.revision !== schemeRevisionForSurface) {
+      schemeConfirmIdRef.current = {
+        revision: schemeRevisionForSurface,
+        id: newSchemeConfirmationId(),
+      };
+    }
+    setSchemeSurfaceConfirmId(schemeConfirmIdRef.current.id);
+  }, [schemeRevisionForSurface]);
+  const handleSchemeSurfacePresented = useCallback(
+    (report: SurfacePresentationReport) => {
+      if (!conn) return Promise.reject(new Error("daemon 未连接"));
+      return reportSurfacePresentation(conn, report);
+    },
+    [conn],
+  );
 
   const fileTree = useMemo(() => buildFileTree(repoPaths), [repoPaths]);
 
@@ -3628,6 +3660,8 @@ ${trimmed}`
                     onDeclineSensitive={() => {
                       void handleDeclineSensitive();
                     }}
+                    surfaceConfirmationId={schemeSurfaceConfirmId}
+                    onSurfacePresented={handleSchemeSurfacePresented}
                     onConfirmDecision={handleSchemeConfirmDecision}
                     onResolveConflict={handleSchemeResolveConflict}
                     onNotesChange={handleSchemeNotesChange}

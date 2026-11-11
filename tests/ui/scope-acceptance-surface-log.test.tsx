@@ -1,0 +1,197 @@
+// @vitest-environment jsdom
+/**
+ * TASK-J.16 / GAP-P8（J16-P1 接线部分）：§15.4 区块只上报「确已展示」的条目。
+ * - 渲染提交之后才上报（上报时 DOM 已含对应条目，不是渲染前预写）；
+ * - 上报失败不阻塞渲染，只留痕（console.warn + data-surface-log="failed"）；
+ * - 同一确认 ID 与同一展示集合不重复上报。
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { stubOfflineFetch } from "../../src/tests/setup";
+import { render, screen, waitFor, act } from "@testing-library/react";
+import {
+  ScopeAcceptanceBlock,
+  SCOPE_ACCEPTANCE_PLAIN_TEXT_VERSION,
+  scopeAcceptanceShownItems,
+} from "../../src/components/studio/ScopeAcceptanceBlock";
+import type { ScopePlan } from "../../src/lib/journey/scope-plan";
+import type { SurfacePresentationReport } from "../../src/lib/daemon-api";
+
+function makePlan(partial: Partial<ScopePlan> = {}): ScopePlan {
+  return {
+    scheme_revision: 1,
+    plan_digest: "digest-1",
+    areas: [
+      {
+        id: "area-0",
+        label: "首页看板",
+        why: "显示逾期数",
+        module_ids: [],
+        kind: "change_existing",
+        paths: ["src/home.tsx"],
+        excluded_by_user: false,
+      },
+      {
+        id: "area-1",
+        label: "报表页",
+        why: "新页面",
+        module_ids: [],
+        kind: "create_new",
+        paths: ["src/report.tsx"],
+        excluded_by_user: true,
+      },
+    ],
+    never_touch: [],
+    needs_approval: [
+      {
+        id: "prot-0",
+        label: "加一个图表依赖",
+        why: "报表要画图",
+        paths: ["package.json"],
+        approved: null,
+      },
+    ],
+    verification: {
+      commands: [],
+      plain: ["首页能看到数字"],
+      manual_only: false,
+    },
+    budget: {
+      limits: {} as ScopePlan["budget"]["limits"],
+      plain: "约 3 个文件",
+    },
+    grade: { ok: true, rejected: [] },
+    ...partial,
+  } as unknown as ScopePlan;
+}
+
+describe("TASK-J.16 · 区块呈现上报（surface_log 接线）", () => {
+  let warn: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    stubOfflineFetch();
+    warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warn.mockRestore();
+  });
+
+  it("只读态按展示的区域上报，排除掉的区域不计入", () => {
+    expect(scopeAcceptanceShownItems(makePlan(), "frozen")).toEqual([
+      { item_ref: "area-0", section: "area" },
+    ]);
+  });
+
+  it("开工前上报敏感项（标签在按钮中已可见），不上报区域（只展示计数）", () => {
+    expect(scopeAcceptanceShownItems(makePlan(), "pre_start")).toEqual([
+      { item_ref: "prot-0", section: "approval" },
+    ]);
+  });
+
+  it("没有 surface 参数时不上报，区块照常渲染", () => {
+    render(<ScopeAcceptanceBlock plan={makePlan()} mode="pre_start" />);
+    expect(screen.getByTestId("scope-acceptance-block")).toHaveAttribute(
+      "data-surface-log",
+      "idle",
+    );
+  });
+
+  it("展示后上报：调用时 DOM 已含该条目，且报文带确认 ID 与版本号", async () => {
+    const onReport = vi.fn((_r: SurfacePresentationReport) => {
+      // 上报发生时，敏感项按钮已经在 DOM 中
+      expect(
+        document.querySelector(
+          '[data-testid="scope-acceptance-sensitive-toggle"]',
+        ),
+      ).not.toBeNull();
+      return Promise.resolve({
+        written: 1,
+        confirmation_id: "scheme-confirm-abc",
+      });
+    });
+    render(
+      <ScopeAcceptanceBlock
+        plan={makePlan()}
+        mode="pre_start"
+        surface={{ confirmationId: "scheme-confirm-abc", onReport }}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("scope-acceptance-block")).toHaveAttribute(
+        "data-surface-log",
+        "reported",
+      ),
+    );
+    expect(onReport).toHaveBeenCalledTimes(1);
+    const payload = onReport.mock.calls[0]![0];
+    expect(payload.confirmation_id).toBe("scheme-confirm-abc");
+    expect(payload.plain_text_version).toBe(
+      SCOPE_ACCEPTANCE_PLAIN_TEXT_VERSION,
+    );
+    expect(payload.shown).toEqual([
+      { item_ref: "prot-0", section: "approval" },
+    ]);
+    expect(Number.isNaN(Date.parse(payload.presented_at))).toBe(false);
+  });
+
+  it("上报失败：页面照常显示，记 console.warn 并标记 failed", async () => {
+    const onReport = vi.fn(() => Promise.reject(new Error("daemon down")));
+    render(
+      <ScopeAcceptanceBlock
+        plan={makePlan({ needs_approval: [] })}
+        mode="frozen"
+        surface={{ confirmationId: "scheme-confirm-x", onReport }}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("scope-acceptance-block")).toHaveAttribute(
+        "data-surface-log",
+        "failed",
+      ),
+    );
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("[surface-log]"),
+      expect.any(Error),
+    );
+    expect(
+      screen.getByTestId("scope-acceptance-full-list"),
+    ).toBeInTheDocument();
+  });
+
+  it("没有可展示条目时不上报", () => {
+    const onReport = vi.fn(() => Promise.resolve({}));
+    render(
+      <ScopeAcceptanceBlock
+        plan={makePlan({ needs_approval: [] })}
+        mode="pre_start"
+        surface={{ confirmationId: "scheme-confirm-y", onReport }}
+      />,
+    );
+    expect(onReport).not.toHaveBeenCalled();
+  });
+
+  it("同一确认 ID 与同一展示集合重渲染时不重复上报", async () => {
+    const onReport = vi.fn(() => Promise.resolve({}));
+    const plan = makePlan();
+    const { rerender } = render(
+      <ScopeAcceptanceBlock
+        plan={plan}
+        mode="pre_start"
+        surface={{ confirmationId: "scheme-confirm-z", onReport }}
+      />,
+    );
+    await act(async () => {
+      rerender(
+        <ScopeAcceptanceBlock
+          plan={plan}
+          mode="pre_start"
+          surface={{
+            confirmationId: "scheme-confirm-z",
+            onReport: (r) => onReport(r),
+          }}
+        />,
+      );
+    });
+    expect(onReport).toHaveBeenCalledTimes(1);
+  });
+});

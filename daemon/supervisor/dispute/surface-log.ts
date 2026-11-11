@@ -178,3 +178,82 @@ export function surfaceLogResolutionNote(
   if (entries === null || entries.length === 0) return NO_SURFACE_RECORD_NOTE;
   return null;
 }
+
+/** 单次上报的条目上限：防止异常大的请求体拖慢追加写。 */
+export const SURFACE_PRESENTATION_MAX_ITEMS = 200 as const;
+
+/**
+ * 校验 `POST /api/supervisor/surface-log` 的请求体。只做结构校验，不做业务判定：
+ * 合法即返回可直接交给 `buildSurfaceLogEntries` 的输入；非法返回可读原因。
+ */
+export function parseSurfacePresentationRequest(
+  body: unknown,
+):
+  | { ok: true; value: SurfacePresentationInput }
+  | { ok: false; message: string } {
+  if (typeof body !== "object" || body === null) {
+    return { ok: false, message: "请求体必须是 JSON 对象" };
+  }
+  const v = body as {
+    confirmation_id?: unknown;
+    plain_text_version?: unknown;
+    presented_at?: unknown;
+    shown?: unknown;
+  };
+  if (
+    typeof v.confirmation_id !== "string" ||
+    v.confirmation_id.length > 96 ||
+    !SAFE_ID.test(v.confirmation_id)
+  ) {
+    return { ok: false, message: "confirmation_id 非法" };
+  }
+  if (
+    typeof v.plain_text_version !== "string" ||
+    v.plain_text_version.trim() === "" ||
+    v.plain_text_version.length > 64
+  ) {
+    return { ok: false, message: "plain_text_version 非法" };
+  }
+  if (
+    typeof v.presented_at !== "string" ||
+    Number.isNaN(Date.parse(v.presented_at))
+  ) {
+    return { ok: false, message: "presented_at 不是合法时间" };
+  }
+  if (
+    !Array.isArray(v.shown) ||
+    v.shown.length > SURFACE_PRESENTATION_MAX_ITEMS
+  ) {
+    return {
+      ok: false,
+      message: `shown 必须是数组且不超过 ${SURFACE_PRESENTATION_MAX_ITEMS} 条`,
+    };
+  }
+  const shown: SurfaceShownItem[] = [];
+  for (const item of v.shown) {
+    if (typeof item !== "object" || item === null) {
+      return { ok: false, message: "shown 条目必须是对象" };
+    }
+    const it = item as { item_ref?: unknown; section?: unknown };
+    if (
+      typeof it.item_ref !== "string" ||
+      it.item_ref.trim() === "" ||
+      it.item_ref.length > 200
+    ) {
+      return { ok: false, message: "shown.item_ref 非法" };
+    }
+    if (!isSection(it.section)) {
+      return { ok: false, message: "shown.section 不在闭集内" };
+    }
+    shown.push({ item_ref: it.item_ref, section: it.section });
+  }
+  return {
+    ok: true,
+    value: {
+      confirmation_id: v.confirmation_id,
+      plain_text_version: v.plain_text_version,
+      presented_at: v.presented_at,
+      shown,
+    },
+  };
+}

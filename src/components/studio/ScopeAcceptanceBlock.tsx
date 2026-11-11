@@ -5,10 +5,27 @@
  * 冻结后 / 验收幕：完整清单只读。
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ScopePlan } from "@/lib/journey/scope-plan";
+import type {
+  SurfacePresentationReport,
+  SurfacePresentationSection,
+} from "@/lib/daemon-api";
 
 export type ScopeAcceptanceMode = "pre_start" | "frozen" | "acceptance";
+
+/** §15.4 白话投影的版本号；文案措辞变化时递增，写入 surface_log 的 plain_text_version。 */
+export const SCOPE_ACCEPTANCE_PLAIN_TEXT_VERSION =
+  "scope-acceptance-v1" as const;
+
+/**
+ * 呈现上报（J.16 / GAP-P8）。`confirmationId` 由父级在方案修订期间铸造并保持稳定；
+ * `onReport` 失败不阻塞渲染，只留痕（console.warn + data-surface-log="failed"）。
+ */
+export interface ScopeAcceptanceSurfaceProps {
+  confirmationId: string;
+  onReport: (report: SurfacePresentationReport) => Promise<unknown>;
+}
 
 export interface ScopeAcceptanceBlockProps {
   plan: ScopePlan | null;
@@ -23,6 +40,29 @@ export interface ScopeAcceptanceBlockProps {
   forceExpandSensitive?: boolean | undefined;
   busy?: boolean | undefined;
   onDeclineSensitive?: (() => void) | undefined;
+  /** J.16：存在时，在区块真正展示之后上报实际呈现的条目 */
+  surface?: ScopeAcceptanceSurfaceProps | undefined;
+}
+
+/**
+ * 当前模式下**确已展示**的可引用条目（与下方渲染分支一一对应，不预写）：
+ * - 只读态：展示的会改动区域（FullReadonlyList 逐条列出）；
+ * - 开工前：敏感项的标签在「含 N 处敏感改动」按钮里可见，即展示过。
+ * 验收条目 `verification.plain` 没有稳定 id，本切片不上报（不伪造 item_ref）。
+ */
+export function scopeAcceptanceShownItems(
+  plan: ScopePlan | null,
+  mode: ScopeAcceptanceMode,
+): { item_ref: string; section: SurfacePresentationSection }[] {
+  if (!plan) return [];
+  if (mode === "frozen" || mode === "acceptance") {
+    return plan.areas
+      .filter((a) => !a.excluded_by_user)
+      .map((a) => ({ item_ref: a.id, section: "area" as const }));
+  }
+  return plan.needs_approval
+    .filter((item) => item.approved !== false)
+    .map((item) => ({ item_ref: item.id, section: "approval" as const }));
 }
 
 function activeAreaCount(plan: ScopePlan): number {
@@ -119,6 +159,45 @@ export function ScopeAcceptanceBlock(props: ScopeAcceptanceBlockProps) {
     Boolean(props.approvalRequired || props.forceExpandSensitive),
   );
 
+  const shown = scopeAcceptanceShownItems(plan, mode);
+  const shownKey = JSON.stringify(shown);
+  const surfaceConfirmationId = props.surface?.confirmationId ?? null;
+  const [surfaceStatus, setSurfaceStatus] = useState<
+    "idle" | "reported" | "failed"
+  >("idle");
+  const onReportRef = useRef(props.surface?.onReport ?? null);
+  useEffect(() => {
+    onReportRef.current = props.surface?.onReport ?? null;
+  });
+
+  // 渲染提交之后才上报：条目已在 DOM 中，不是渲染前预写。
+  useEffect(() => {
+    const report = onReportRef.current;
+    const items = JSON.parse(shownKey) as SurfacePresentationReport["shown"];
+    if (!surfaceConfirmationId || !report || items.length === 0) return;
+    let cancelled = false;
+    const payload: SurfacePresentationReport = {
+      confirmation_id: surfaceConfirmationId,
+      plain_text_version: SCOPE_ACCEPTANCE_PLAIN_TEXT_VERSION,
+      presented_at: new Date().toISOString(),
+      shown: items,
+    };
+    Promise.resolve()
+      .then(() => report(payload))
+      .then(
+        () => {
+          if (!cancelled) setSurfaceStatus("reported");
+        },
+        (err: unknown) => {
+          console.warn("[surface-log] 呈现记录上报失败，页面照常显示", err);
+          if (!cancelled) setSurfaceStatus("failed");
+        },
+      );
+    return () => {
+      cancelled = true;
+    };
+  }, [surfaceConfirmationId, shownKey]);
+
   useEffect(() => {
     if (props.approvalRequired || props.forceExpandSensitive) {
       setExpanded(true);
@@ -130,6 +209,7 @@ export function ScopeAcceptanceBlock(props: ScopeAcceptanceBlockProps) {
       data-testid="scope-acceptance-block"
       data-mode={mode}
       data-readonly={readOnly ? "true" : "false"}
+      data-surface-log={surfaceStatus}
       className="mb-3 rounded border border-border p-3"
     >
       <h3 className="mb-2 text-xs font-semibold text-foreground">

@@ -2363,3 +2363,34 @@ export async function fetchPlaytestReferenceSnapshots(
     { method: "GET" },
   );
 }
+
+// ---------------------------------------------------------------------------
+// TASK-J.16 / GAP-P8：§15.4 白话区块的实际呈现记录（surface_log）
+// ---------------------------------------------------------------------------
+
+export type SurfacePresentationSection =
+  | "decision"
+  | "acceptance"
+  | "approval"
+  | "high_risk"
+  | "area"
+  | "unmapped_files";
+
+export interface SurfacePresentationReport {
+  confirmation_id: string;
+  plain_text_version: string;
+  presented_at: string;
+  shown: { item_ref: string; section: SurfacePresentationSection }[];
+}
+
+/** 上报用户确认时实际呈现过的条目。调用方须在 DOM 已展示后再调用。 */
+export async function reportSurfacePresentation(
+  conn: DaemonConnection,
+  report: SurfacePresentationReport,
+): Promise<{ written: number; confirmation_id: string }> {
+  return request<{ written: number; confirmation_id: string }>(
+    conn,
+    "/api/supervisor/surface-log",
+    { method: "POST", body: JSON.stringify(report) },
+  );
+}
