@@ -11,6 +11,12 @@ import os from "node:os";
 import path from "node:path";
 import { safeRmSync } from "../helpers/tmp";
 import { createDaemon, type StagentDaemon } from "../../daemon/server";
+import type { SchemeDraftV2 } from "../../src/lib/journey/scheme-patch-types";
+import {
+  emptyLedgerState,
+  emptySchemeDraftV2,
+  schemeLedgerPath,
+} from "../../daemon/supervisor/intent-compiler/scheme-ledger-store";
 import {
   parseSurfacePresentationRequest,
   readSurfaceLog,
@@ -181,5 +187,59 @@ describe("POST /api/supervisor/surface-log", () => {
       headers: { authorization: `Bearer ${token}` },
     });
     expect(res.status).toBe(405);
+  });
+  it("GET /api/supervisor/scheme-acceptance：沿 Bearer 鉴权；无台账返回空投影；有台账只读投影且不写盘", async () => {
+    const url = `${base}/api/supervisor/scheme-acceptance`;
+    const auth = { authorization: `Bearer ${token}` };
+    const empty = await fetch(url, { headers: auth });
+    expect(empty.status).toBe(200);
+    expect(await empty.json()).toEqual({
+      scheme_id: null,
+      scheme_revision: null,
+      items: [],
+    });
+
+    const file = schemeLedgerPath(repo);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const acceptance: SchemeDraftV2["acceptance"] = [
+      {
+        id: "ITEM-1",
+        text: "首页显示逾期数",
+        source: "user_said",
+        evidence: [],
+        user_pinned: false,
+        updated_in_revision: 1,
+      },
+    ];
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        schema_version: "1.0",
+        updated_at: "2026-11-11T00:00:00.000Z",
+        state: emptyLedgerState({
+          draft: emptySchemeDraftV2({
+            scheme_id: "scheme-r",
+            scheme_revision: 2,
+            acceptance,
+          }),
+        }),
+        last_journal: null,
+        last_model_id: null,
+        last_prompt_version: null,
+        offline: true,
+      }),
+    );
+    const before = fs.readFileSync(file, "utf8");
+    const res = await fetch(url, { headers: auth });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      scheme_id: "scheme-r",
+      scheme_revision: 2,
+      items: [{ id: "ITEM-1", text: "首页显示逾期数" }],
+    });
+    expect(fs.readFileSync(file, "utf8")).toBe(before);
+
+    const unauth = await fetch(url);
+    expect(unauth.status).toBe(401);
   });
 });

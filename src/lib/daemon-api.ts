@@ -2383,6 +2383,29 @@ export interface SurfacePresentationReport {
   shown: { item_ref: string; section: SurfacePresentationSection }[];
 }
 
+/** 台账验收条目（只读投影，挂账⑬ 方案 A）。 */
+export interface SchemeAcceptanceItem {
+  id: string;
+  text: string;
+}
+
+export interface SchemeAcceptanceProjection {
+  scheme_id: string | null;
+  scheme_revision: number | null;
+  items: SchemeAcceptanceItem[];
+}
+
+/** 读取编译器台账的验收条目（只读，不写盘）。 */
+export async function fetchSchemeAcceptance(
+  conn: DaemonConnection,
+): Promise<SchemeAcceptanceProjection> {
+  return request<SchemeAcceptanceProjection>(
+    conn,
+    "/api/supervisor/scheme-acceptance",
+    { method: "GET" },
+  );
+}
+
 /** 上报用户确认时实际呈现过的条目。调用方须在 DOM 已展示后再调用。 */
 export async function reportSurfacePresentation(
   conn: DaemonConnection,
