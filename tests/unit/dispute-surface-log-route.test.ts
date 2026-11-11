@@ -6,6 +6,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { safeRmSync } from "../helpers/tmp";
@@ -26,6 +27,29 @@ const VALID = {
     { item_ref: "area-0", section: "area" },
   ],
 };
+
+/**
+ * 端口就绪等待：用原始 TCP 探测（不走 fetch，避免 undici 连接池复用上一个 daemon 的旧 socket）。
+ * 只在需要的用例里调用，不改其它用例的时序。
+ */
+function waitForPort(port: number, timeoutMs = 5000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  return new Promise((resolve, reject) => {
+    const attempt = () => {
+      const sock = net.connect({ host: "127.0.0.1", port });
+      sock.once("connect", () => {
+        sock.destroy();
+        resolve();
+      });
+      sock.once("error", () => {
+        sock.destroy();
+        if (Date.now() > deadline) reject(new Error(`port ${port} not ready`));
+        else setTimeout(attempt, 50);
+      });
+    };
+    attempt();
+  });
+}
 
 describe("parseSurfacePresentationRequest", () => {
   it("接受合法请求体", () => {
@@ -142,6 +166,7 @@ describe("POST /api/supervisor/surface-log", () => {
   });
 
   it("shown 为空时返回 0 条且不建日志文件", async () => {
+    await waitForPort(Number(new URL(base).port));
     const res = await post({ ...VALID, shown: [] });
     expect(res.status).toBe(200);
     expect((await res.json()).written).toBe(0);
