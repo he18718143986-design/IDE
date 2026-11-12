@@ -5,6 +5,7 @@
  * 本文件零 node:* 导入、零时钟、零随机数、零网络（同 scheme-patch-engine.ts 纪律）。
  */
 import { z } from "zod";
+import type { ReasonCode } from "../evidence.schema";
 
 // ───────────── 对话记录（只读视图，由调用方提供） ─────────────
 
@@ -182,10 +183,41 @@ export interface Suggestion {
 
 // ───────────── 引擎状态 ─────────────
 
+/** K-14 三分类（supervisor §14.11 子账本四）+ P-189 退化值 `no_surface_record` */
+export const ATTRIBUTION_CATEGORIES = [
+  "approved_on_list",
+  "diff_unsurfaced",
+  "absent_from_diff",
+  "no_surface_record",
+] as const;
+export type AttributionCategory = (typeof ATTRIBUTION_CATEGORIES)[number];
+
+/** K-16 闭集：trigger 仅接受这三值（删除 `| string` 兜底） */
+export const ATTRIBUTION_TRIGGERS = [
+  "first_impression",
+  "user_dispute",
+  "acceptance_fail",
+] as const;
+export type AttributionTrigger = (typeof ATTRIBUTION_TRIGGERS)[number];
+
+/** 质疑归因账本条目（只追加；不改写既有条目） */
+export interface AttributionEntry {
+  attribution_id: string;
+  trigger: AttributionTrigger;
+  /** K-16：只读引用，仅 trigger === "acceptance_fail" 时可带；类型即 reasonCodeSchema */
+  linked_reason_code?: ReasonCode;
+  item_ref?: { section: string; id: string };
+  category: AttributionCategory;
+  resolution_note: string;
+  created_in_revision: number;
+}
+
 export interface LedgerState {
   draft: SchemeDraftV2;
   graveyard: GraveyardEntry[];
   suggestions: Suggestion[];
+  /** K-14 子账本四；缺省为空数组（旧台账兼容），只追加 */
+  attributions: AttributionEntry[];
 }
 
 // ───────────── 补丁（§14.3 + 可选 revival） ─────────────
