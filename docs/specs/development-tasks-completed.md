@@ -5931,3 +5931,94 @@ governance:
 ```
 
 ---
+
+<a id="task-j21"></a>
+
+#### 【Task J.21】intent-compiler 重启后状态恢复（transcript 持久化与证据回放）`[COMPLETED · 立卡 P-187 · 施工 P-194]`
+
+> **立卡说明（2026-11-11 · P-187）**：挂账⑫。集成测试已观察：进程重启后 transcript 只在内存里，台账证据指向的旧 turn 解析不到，审计以 `E_STATE_CORRUPT` 拒绝之后的批次。**生产环境未验证**；影响面按测试观察为「重启后编译循环不可用」，而非仅审计报错。与 ITEM-n 撞号（#214 已合）是两个问题。**立卡 ≠ 开工**；优先级：**P1**（Tina 拍板，P-188）。
+
+> **归档注记（2026-11-12 · P-194）**：本卡已 **COMPLETED**（[#229](https://github.com/he18718143986-design/IDE/pull/229) squash `21b8b35`；分支 `feat/j21-transcript-store-recovery`，分支 tip `60e7a07`，合入前 tree 与分支一致）。验收逐条：
+> - **J21-P1**：端到端冷重启恢复：模拟进程重启（新 host 实例仅从磁盘加载），台账中已引用的证据 turn 均可从落盘 transcript 解析，审计通过并成功 CAS 提交新批次；新增集成测试 `tests/integration/intent-compiler-restart-recovery.test.ts`（+262/-0）全绿。
+> - **J21-P2**：碰撞测试用例转正与去除空补丁回放：`tests/integration/intent-compiler-item-id-collision.test.ts` 中删掉 `replay` 空补丁绕开手段，原 `it.todo("重启后 transcript 恢复（挂账⑫）...")` 转为正式断言用例且持续通过。
+> - **J21-P3**：版本校验与失败关闭：transcript 落盘于 `.stagent/drafts/scheme-ledger/transcript.json`，原子落盘；带 `schema_version: "1.0"`；版本缺失/不识别抛出 `E_TRANSCRIPT_SCHEMA_VERSION`，损坏/字段缺失抛出 `E_TRANSCRIPT_CORRUPT`，不静默忽略；新增单测 `tests/unit/transcript-store.test.ts`（+212/-0）全绿。
+> - **改动范围**：严格位于卡片 6 个 `writable_paths` 内（`host.ts`、`scheme-ledger-store.ts`、`transcript-store.ts`、`intent-compiler-restart-recovery.test.ts`、`intent-compiler-item-id-collision.test.ts`、`transcript-store.test.ts`），无任何超范围改动。
+> - **CI 侧**：Ubuntu/macOS/Windows 的 lint、typecheck、Ubuntu/macOS 单测、Docs check、Knowledge check、Perf threshold gate 12 项必需检查全绿；Windows 单测失败的 9 文件（非必需）均为既有环境/路径与挂账⑩/⑯ 项，本卡改动的 6 个文件在 Windows 0 失败，0 新增。
+> - **销项**：台账挂账⑫ 销项（重启后 transcript 持久化恢复已落地，`E_STATE_CORRUPT` 死锁消除）。
+> - **诚实口径**：集成测试已验证，生产环境真实重启场景未验证。
+
+```yaml task-card
+id: TASK-J.21
+status: COMPLETED
+contract:
+  intent:
+    title: intent-compiler 重启后状态恢复（transcript 持久化与证据回放）
+    description: >-
+      进程重启后，台账已引用的证据 turn 须可从磁盘解析，编译循环可继续提交新批次，不得以 E_STATE_CORRUPT 拒绝全部后续批次。
+      transcript 持久化须版本化：旧数据缺失或版本不识别时明确报错，不静默降级。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J21-P1
+      check: auto
+      text: >-
+        模拟进程重启（新 host 实例仅从磁盘加载）后，台账中已引用的证据 turn 均可解析，审计通过。
+    - id: J21-P2
+      check: auto
+      text: >-
+        重启后提交新批次（不以空补丁回放绕开）不被拒绝；tests/integration/intent-compiler-item-id-collision.test.ts 中以 it.todo 留痕的重启用例转为正式断言。
+    - id: J21-P3
+      check: auto
+      text: >-
+        transcript 持久化带版本号；版本缺失或不识别时返回明确错误码，不静默忽略。
+  scope:
+    writable_paths:
+      - daemon/supervisor/intent-compiler/host.ts
+      - daemon/supervisor/intent-compiler/scheme-ledger-store.ts
+      - daemon/supervisor/intent-compiler/transcript-store.ts
+      - tests/integration/intent-compiler-restart-recovery.test.ts
+      - tests/integration/intent-compiler-item-id-collision.test.ts
+      - tests/unit/transcript-store.test.ts
+    readonly_paths:
+      - docs/specs/intent-compiler-prompt.md
+      - docs/specs/supervisor.md
+  verification:
+    commands:
+      - { alias: regression-intent-compiler, executable: npx, args: [vitest, run, tests/integration/intent-compiler-restart-recovery.test.ts, tests/integration/intent-compiler-item-id-collision.test.ts, tests/unit/transcript-store.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) 先确认 transcript 的生命周期与持久化点（内存 → 磁盘）。2) 持久化带版本号，读取时校验。3) 重启用例以新实例仅从磁盘加载，不以空补丁回放绕开。施工前按当时代码重核 touches。
+  touches:
+    - { path: daemon/supervisor/intent-compiler/host.ts, change: modify, why: transcript 持久化点与重启加载, symbols: [] }
+    - { path: daemon/supervisor/intent-compiler/scheme-ledger-store.ts, change: modify, why: 台账读取与 transcript 版本校验配合, symbols: [] }
+    - { path: daemon/supervisor/intent-compiler/transcript-store.ts, change: create, why: transcript 持久化与版本化读取（新文件，施工前核对是否需要）, symbols: [] }
+    - { path: tests/integration/intent-compiler-restart-recovery.test.ts, change: create, why: 重启后证据回放与新批次提交（J21-P1、P2）, symbols: [] }
+    - { path: tests/integration/intent-compiler-item-id-collision.test.ts, change: modify, why: 将 it.todo 重启用例转正式断言（J21-P2）, symbols: [] }
+    - { path: tests/unit/transcript-store.test.ts, change: create, why: 版本校验与错误码（J21-P3）, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J21-P1, test_path: tests/integration/intent-compiler-restart-recovery.test.ts, level: integration, case: "模拟进程冷重启后，历史证据 turn 可解析" }
+    - { acceptance_id: J21-P2, test_path: tests/integration/intent-compiler-item-id-collision.test.ts, level: integration, case: "重启后 transcript 恢复（挂账⑫）" }
+    - { acceptance_id: J21-P3, test_path: tests/unit/transcript-store.test.ts, level: unit, case: "缺少 schema_version 字段时抛出 E_TRANSCRIPT_SCHEMA_VERSION" }
+governance:
+  spec_refs:
+    - docs/specs/intent-compiler-prompt.md
+    - docs/specs/supervisor.md
+  depends_on: []
+  code_facts:
+    - { ref: "daemon/supervisor/intent-compiler/host.ts::transcript", note: "transcript 仅存内存（挂账⑫，P-186 复现测试观察）" }
+  non_goals:
+    - 不改 E_STATE_CORRUPT 的审计规则本身（只保证合法状态可恢复）
+    - 不做中栏方案来源统一（另卡 TASK-J.22）
+  fail:
+    - 重启后仍以 E_STATE_CORRUPT 拒绝合法台账的新批次
+    - 用空补丁回放或跳过审计让重启用例变绿
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 229, commit: 21b8b3565ad0d293ac871ab657a96d7627b10c58 }
+```
+
