@@ -116,6 +116,67 @@ describe("K-16 接线：失败关闭", () => {
   });
 });
 
+describe("K-16 接线：退化写入（J16-P4）", () => {
+  it("surface_log 目录整体不存在：写 no_surface_record 与「无呈现记录」", () => {
+    const bare = fs.mkdtempSync(path.join(os.tmpdir(), "k16-bare-"));
+    try {
+      casWriteSchemeLedger(bare, {
+        expectedPrevRevision: 0,
+        next: emptyLedgerState({
+          draft: emptySchemeDraftV2({ scheme_revision: 1 }),
+        }),
+        journal: null,
+        modelId: null,
+        offline: true,
+      });
+      const r = recordUserDisputeAttribution({
+        repoRoot: bare,
+        report: report("dispute_bare"),
+        contract,
+        confirmationId: "conf_any1",
+      });
+      expect(r).toMatchObject({
+        status: "recorded",
+        category: "no_surface_record",
+      });
+      const saved = readSchemeLedger(bare)?.state.attributions[0];
+      expect(saved?.category).toBe("no_surface_record");
+      expect(saved?.resolution_note).toContain("无呈现记录");
+      expect(saved?.trigger).toBe("user_dispute");
+    } finally {
+      fs.rmSync(bare, { recursive: true, force: true });
+    }
+  });
+
+  it("有效 id 且该确认文件存在但无呈现条目：写 no_surface_record", () => {
+    fs.writeFileSync(surfaceLogPath(repo, "conf_empty1"), "");
+    const r = recordUserDisputeAttribution({
+      repoRoot: repo,
+      report: report("dispute_empty"),
+      contract,
+      confirmationId: "conf_empty1",
+    });
+    expect(r).toMatchObject({
+      status: "recorded",
+      category: "no_surface_record",
+    });
+    expect(
+      readSchemeLedger(repo)?.state.attributions[0]?.resolution_note,
+    ).toContain("无呈现记录");
+  });
+
+  it("目录存在但该 id 无文件：仍失败关闭（不退化）", () => {
+    const r = recordUserDisputeAttribution({
+      repoRoot: repo,
+      report: report("dispute_nofile"),
+      contract,
+      confirmationId: "conf_nofile",
+    });
+    expect(r).toEqual({ status: "rejected", reason: "confirmation_not_found" });
+    expect(readSchemeLedger(repo)?.state.attributions).toEqual([]);
+  });
+});
+
 describe("K-16 接线：正常写入", () => {
   it("已知 confirmation_id：写入 user_dispute 归因，键为报告 id", () => {
     const r = recordUserDisputeAttribution({

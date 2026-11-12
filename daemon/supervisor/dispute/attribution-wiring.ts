@@ -2,7 +2,10 @@
  * TASK-J.16 K-16 接线 · `user_dispute` 归因写入（playtest-self-check §5.1 / §5.3）。
  *
  * - `confirmation_id` 由前端透传（用户当时看的那份确认）；服务端只校验，不改用自己查到的值。
- * - 失败关闭：缺失、surface_log 中不存在、或日志损坏 → 不写归因，返回 rejected 原因（调用方留痕）。
+ * - 失败关闭（不写归因，返回 rejected，调用方留痕）：未提供 id、id 在已存在的 surface_log 目录中无对应文件、
+ *   或该日志损坏。
+ * - 退化写入（J16-P4）：surface_log 目录整体不存在（从未有呈现记录），或该确认文件存在但无任何呈现条目 →
+ *   写 `category = no_surface_record`，`resolution_note` 标「无呈现记录」。
  * - 2b 输入为近似（P-190）：`change_on_unmapped_file` = 改动超出合同授权范围；
  *   `change_in_unshown_area` = 有范围内改动且确认清单未展示任何 area。item_ref 暂为空。
  */
@@ -13,7 +16,13 @@ import {
 } from "./attribution-ledger";
 import { classifyAttribution, snapshotRefsFromDraft } from "./attribution";
 import { computeSignals } from "./classification";
-import { readSurfaceLog, type SurfaceLogEntry } from "./surface-log";
+import fs from "node:fs";
+import path from "node:path";
+import {
+  readSurfaceLog,
+  SURFACE_LOG_ROOT,
+  type SurfaceLogEntry,
+} from "./surface-log";
 import type { DisputeReport } from "./types";
 import { loadOrInitLedgerState } from "../intent-compiler/scheme-ledger-store";
 
@@ -43,13 +52,21 @@ export function recordUserDisputeAttribution(params: {
   if (params.confirmationId === null)
     return rejected("confirmation_id_missing");
 
-  let entries: SurfaceLogEntry[] | null;
-  try {
-    entries = readSurfaceLog(params.repoRoot, params.confirmationId);
-  } catch {
-    return rejected("surface_log_unreadable");
+  let entries: SurfaceLogEntry[];
+  if (!fs.existsSync(path.join(params.repoRoot, SURFACE_LOG_ROOT))) {
+    // 整体缺失：从未写过呈现记录 → 退化（J16-P4）
+    entries = [];
+  } else {
+    let read: SurfaceLogEntry[] | null;
+    try {
+      read = readSurfaceLog(params.repoRoot, params.confirmationId);
+    } catch {
+      return rejected("surface_log_unreadable");
+    }
+    if (read === null) return rejected("confirmation_not_found");
+    // 文件存在但无任何呈现条目 → 退化（J16-P4，由 classifyAttribution 处理）
+    entries = read;
   }
-  if (entries === null) return rejected("confirmation_not_found");
 
   const ledger = loadOrInitLedgerState(params.repoRoot);
   const signals = computeSignals(params.report.facts, params.contract);
