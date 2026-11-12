@@ -173,6 +173,7 @@ import {
   buildSurfaceLogEntries,
   parseSurfacePresentationRequest,
 } from "./supervisor/dispute/surface-log";
+import { recordUserDisputeAttribution } from "./supervisor/dispute/attribution-wiring";
 import {
   extractKeywords,
   SpecFactSourceImpl,
@@ -4363,6 +4364,7 @@ export class StagentDaemon {
         challenge?: unknown;
         session_id?: unknown;
         user_choice?: unknown;
+        confirmation_id?: unknown;
       };
       try {
         body = (await this.readJsonBody(req)) as typeof body;
@@ -4419,6 +4421,23 @@ export class StagentDaemon {
         return;
       }
 
+      // K-16 接线（P-190）：confirmation_id 由前端透传，服务端只校验格式，查证在 surface_log。
+      const rawConfirmation =
+        typeof body.confirmation_id === "string"
+          ? body.confirmation_id.trim()
+          : "";
+      if (
+        rawConfirmation !== "" &&
+        !/^[A-Za-z0-9_-]{1,96}$/.test(rawConfirmation)
+      ) {
+        this.sendJson(res, 400, {
+          error: "confirmation_id_invalid",
+          message: "confirmation_id 格式非法",
+        });
+        return;
+      }
+      const confirmationId = rawConfirmation === "" ? null : rawConfirmation;
+
       const loaded = this.orchestrator.getStore().getWithMigration(contractId);
       if (!loaded) {
         this.sendJson(res, 404, {
@@ -4441,7 +4460,20 @@ export class StagentDaemon {
           ...(userChoice === undefined ? {} : { userChoice }),
         });
         this.broadcastDisputeReport(report);
-        this.sendJson(res, 200, { report });
+        const attribution = recordUserDisputeAttribution({
+          repoRoot: this.repoRoot,
+          report,
+          contract,
+          confirmationId,
+        });
+        if (attribution.status === "rejected") {
+          console.warn(
+            "[dispute] 归因未写入（失败关闭）",
+            attribution.reason,
+            report.report_id,
+          );
+        }
+        this.sendJson(res, 200, { report, attribution });
       } catch (err) {
         if (err instanceof DisputeTimeoutError) {
           // D-3：超时不空转，降级呈递已抓到的规范事实

@@ -1750,6 +1750,8 @@ export async function submitDisputeSelfCheck(
     session_id?: string | undefined;
     /** 降级后用户点选：这是 Bug，免费修 / 我想要新功能，下一轮做 */
     user_choice?: DisputeUserChoice | undefined;
+    /** 用户当时看的那份确认（P-190）；服务端只校验，不改用其他值 */
+    confirmation_id?: string | undefined;
   },
 ): Promise<DisputeSelfCheckResponse> {
   return request<DisputeSelfCheckResponse>(conn, "/api/supervisor/dispute", {
@@ -1763,6 +1765,9 @@ export async function submitDisputeSelfCheck(
       ...(input.user_choice === undefined
         ? {}
         : { user_choice: input.user_choice }),
+      ...(input.confirmation_id === undefined
+        ? {}
+        : { confirmation_id: input.confirmation_id }),
     }),
   });
 }
