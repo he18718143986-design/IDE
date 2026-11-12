@@ -772,6 +772,8 @@ governance:
 
 <a id="task-j.18"></a>
 
+<a id="task-j.16"></a>
+
 #### 【Task J.16】试玩幕 · 质疑自查续作（surface_log → K-14 归因账本 → K-16 trigger 闭集）`[NEW_TASK · 立卡 P-176 · 未开工]`
 
 > **立卡说明（2026-11-09 · P-176）**：S.5 注记（「已知 7 处局限由 TASK-J.16 实施时一并修复」）所指的卡。P-1～P-6 已合（[#188](https://github.com/he18718143986-design/IDE/pull/188) / `859f762`），左栏与 §16.7 文案已合（[#189](https://github.com/he18718143986-design/IDE/pull/189) / `f0ca93c`）。本卡只承接**未落地**部分。**立卡 ≠ 开工 ≠ 销项**：待 Tina 单卡授权后才可施工；不宣称端到端闭环；本卡不标 COMPLETED，直到验收条件全部通过。**施工顺序（依赖注记）**：先完成 TASK-CI.3（测试 fetch 哨兵判红、未桩请求清零），再做本卡的真实会话与真实台账端到端验收（J16-P5）；否则链路测试可能仍含未桩请求，验证可信度打折。
@@ -781,6 +783,7 @@ governance:
 > **进度注记（P-190 · 2026-11-12）**：K-14 台账写入 [#221](https://github.com/he18718143986-design/IDE/pull/221) 已合（main `930d383`）。K-16 接线 `user_dispute` 见 [#222](https://github.com/he18718143986-design/IDE/pull/222)（head `65cfc9336a5fa674cdff316966826233be61f33f`，待合）。trigger 来源裁决：前端透传 `confirmation_id` + 服务端失败关闭。待确认：J16-P4 与失败关闭的张力（`no_surface_record` 服务端不可达），以及挂账⑮ 的 2b 近似输入。J16-P5 待 `.stagent/`，J16-P6 待渲染层核对。**仍不标 COMPLETED**。
 > **进度注记（P-191 · 2026-11-12）**：K-16 接线 [#222](https://github.com/he18718143986-design/IDE/pull/222) 已合（main `19c99ff`）；docs [#223](https://github.com/he18718143986-design/IDE/pull/223) 已合（main `60b4383`）。J16-P4 按场景拆分落地：退化写入与失败关闭见 [#224](https://github.com/he18718143986-design/IDE/pull/224)（head `ba5cda2`，待合）。挂账⑮ 的 2b 近似已接受，不另立卡。Windows watcher 抗抖动另立挂账⑯。J16-P5 待 `.stagent/`，J16-P6 待渲染层核对。**仍不标 COMPLETED**。
 > **进度注记（P-192 · 2026-11-12）**：J16-P4 降级路径 [#224](https://github.com/he18718143986-design/IDE/pull/224) 已合（main `a5919d9`）。登记挂账⑰（`first_impression`/`acceptance_fail` 暂无生产写入端、§5.1 互引去重未做，属规格预留非缺陷）。J16-P1～P4 代码与降级测试已全部合入。J16-P5 待真实 `.stagent/` 数据核对，J16-P6 待真实面板人工核对。两项通过前 J.16 **仍不标 COMPLETED**。
+> **进度注记（P-195 · 2026-11-12）**：Tina 授权本机真实试玩并登记结果。试玩项目 `/Users/tina/Downloads/aes-douyin`。运行副本为本机 `/Users/tina/IDE` 工作树 `a2363d1`（分支 `docs/ci1-windows-assessment`，2026-11-08），Daemon 于当日 17:01 启动；**不是**当时的 `origin/main`。**J16-P5 FAIL**：方案冻结后在右栏发出一次「这里不对」，质疑面板未出现，请求走了普通聊天（`POST /api/chat/sessions/.../messages`）；`.stagent` 会话记下了原话与「这里不对」，但无 `turn_text_sha256` / `text_sha256` 可与 `intent-compiler/host.ts` 的 sha256(utf8) 对照（目录含登录令牌，未拷出）。对照现行 main `a79bd93`：`handleJourneyBeforeSend` 在方案冻结后仍对所有右栏消息返回 `passthrough`（含「这里不对」）；`DisputeConsolePane` 仅 import、未 JSX 挂载；`viewport-routing.ts` 把视口收成单页 `scheme`。此链路缺口在现行 main 仍在，**转 `TASK-J.23` 处理**。**J16-P6 FAIL**：该次试玩生产界面打不开质疑面板。试玩修订 `a2363d1` 上面板源码仍为旧文案（「你怎么说的 / 需求怎么写的 / 代码实际改了什么」「按缺陷修复」「按新需求演进」「把握」）。现行 main `a79bd93` 面板源码文案已按 §16.7 更新（#189 / `f0ca93c`），但因未挂载，生产界面仍无法做渲染层验收。卡状态仍为 `NEW_TASK`，**仍不标 COMPLETED**。文档计划暂缓，不主动开工新方案。
 > **卡修订与进度注记（P-186 · 2026-11-11）**：`writable_paths` 与 `touches` 追加 `compile-loop.ts` 与 ITEM 撞号复现测试（授权：Tina 拍板方案 A 与「ITEM 撞号先修后进 K-14」）。`surface_log` 采集与前端接线已合（#211 / `273e506`）。ITEM 撞号修复 [#214](https://github.com/he18718143986-design/IDE/pull/214) 须在本修订合入后再合（挂账⑪）。验收条目呈现数据通路未决（挂账⑬，待 Tina 决策）；K-14 未开工；J16-P5 待真实数据。**仍不标 COMPLETED**。
 
 ```yaml task-card
@@ -979,6 +982,204 @@ governance:
     - 中栏与台账不一致仍出现而未标注
     - 以 jsdom 替代真实会话验收
   estimate: L
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+<a id="task-j.23"></a>
+
+#### 【Task J.23】质疑自查生产链路接线（面板挂载 · DISPUTE 路由 · turn_text_sha256 落盘）`[NEW_TASK · 立卡 P-195 · 未开工]`
+
+> **立卡说明（2026-11-12 · P-195）**：承接 `TASK-J.16` 真实试玩暴露的生产链路未接线（J16-P5 / J16-P6 FAIL）。范围只覆盖：质疑面板挂到日常工作台、冻结后「这里不对」走 DISPUTE 路由、`turn_text_sha256` 落盘并可对照。验收必须含真实界面走查。**立卡 ≠ 开工 ≠ 销项**；不标 `TASK-J.16` COMPLETED；不改已在 main 落地的 §16.7 面板源码文案（除非走查发现回归）；不开文档计划。`writable_paths` 为试玩对照后的预估，施工前按实际核对。
+
+```yaml task-card
+id: TASK-J.23
+status: NEW_TASK
+contract:
+  intent:
+    title: 质疑自查生产链路接线（面板挂载 · DISPUTE 路由 · turn_text_sha256 落盘）
+    description: >-
+      做完后，用户在日常工作台能打开质疑自查面板；方案确认之后在右栏发送「这里不对」进入 DISPUTE
+      流程而不是普通聊天；真实会话落盘含 turn_text_sha256（sha256(utf8) 口径与
+      intent-compiler/host.ts 一致），左栏显示锚定原话。真实界面走查通过前不宣称本卡完成。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J23-P1
+      check: auto
+      text: >-
+        质疑自查面板挂到生产日常壳（viewport-routing / StudioViewportShell 或经核对后的实际挂载点），
+        不再只 import 而不 JSX 挂载；用户在真实界面能打开该面板。
+    - id: J23-P2
+      check: auto
+      text: >-
+        方案冻结后，右栏发送「这里不对」（及同类质疑用语）走 DISPUTE 路由，不得因
+        partnerMessageMayRebuildScheme 为假而 passthrough 到普通聊天。
+    - id: J23-P3
+      check: auto
+      text: >-
+        真实会话落盘出现 turn_text_sha256 或同源的 text_sha256，且等于 sha256(utf8 原文)，
+        与 intent-compiler/host.ts 口径一致；左栏显示锚定原话。
+    - id: J23-P4
+      check: playtest
+      text: >-
+        真实界面走查覆盖 J23-P1～P3：能打开面板、冻结后「这里不对」进入质疑流程、哈希可对照且左栏有原话。
+        单测 / jsdom / 仅有源码目录不替代本条。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/components/studio/viewport-routing.ts
+      - src/components/studio/StudioViewportShell.tsx
+      - src/lib/journey/intent-router.ts
+      - daemon/supervisor/intent-compiler/transcript-store.ts
+      - src/routes/index.tsx
+      - src/lib/journey/handoff-progress.ts
+      - tests/ui/dispute-production-wiring.test.tsx
+    readonly_paths:
+      - docs/specs/supervisor.md
+      - docs/specs/playtest-self-check.md
+      - daemon/supervisor/intent-compiler/host.ts
+      - src/components/studio/DisputeConsolePane.tsx
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: unit-wiring, executable: npx, args: [vitest, run, tests/ui/dispute-production-wiring.test.tsx] }
+design:
+  approach: >-
+    预估接线：把 DisputeConsolePane 挂回日常壳（C.18 目前只渲染 scheme）；冻结后仍要把质疑语送入
+    DISPUTE 而不是一律 passthrough；在 Daemon 会话落盘处写出可对照的 turn_text_sha256。
+    上列 writable_paths 含试玩对照后的候选（index.tsx 的 handleJourneyBeforeSend、
+    handoff-progress.ts 的 partnerMessageMayRebuildScheme、transcript-store.ts），施工前按实际核对后可增删。
+  touches:
+    - { path: src/components/studio/viewport-routing.ts, change: modify, why: C.18 把视口收成单页 scheme，质疑视口无法出现, symbols: [] }
+    - { path: src/components/studio/StudioViewportShell.tsx, change: modify, why: 日常壳需能挂载或切入质疑面板, symbols: [] }
+    - { path: src/lib/journey/intent-router.ts, change: modify, why: DISPUTE 路由接线点（施工前核对是否确需改）, symbols: [] }
+    - { path: daemon/supervisor/intent-compiler/transcript-store.ts, change: modify, why: 预估的会话哈希落盘处（施工前核对）, symbols: [] }
+    - { path: src/routes/index.tsx, change: modify, why: 面板挂载与冻结后 handleJourneyBeforeSend 分流（预估，施工前核对）, symbols: ["handleJourneyBeforeSend"] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J23-P1, test_path: tests/ui/dispute-production-wiring.test.tsx, level: integration, debt: "未施工" }
+    - { acceptance_id: J23-P2, test_path: tests/ui/dispute-production-wiring.test.tsx, level: integration, debt: "未施工" }
+    - { acceptance_id: J23-P3, test_path: tests/unit/dispute-turn-hash.test.ts, level: unit, debt: "未施工；真实落盘仍须 J23-P4 走查" }
+    - { acceptance_id: J23-P4, test_path: tests/ui/dispute-production-wiring.test.tsx, level: integration, debt: "需 Tina 或授权本机真实界面走查；jsdom 不替代" }
+governance:
+  spec_refs:
+    - docs/specs/supervisor.md
+    - docs/specs/playtest-self-check.md
+  depends_on:
+    - { id: TASK-J.16, kind: soft }
+  code_facts:
+    - { ref: "src/routes/index.tsx::handleJourneyBeforeSend", note: "方案冻结后 partnerMessageMayRebuildScheme 为假则一律 passthrough，质疑语进普通聊天（现行 main a79bd93 仍在）" }
+    - { ref: "src/components/studio/viewport-routing.ts", note: "C.18 只导出 scheme 视口；DisputeConsolePane 在 index.tsx 仅 import 未挂载" }
+    - { ref: "daemon/supervisor/intent-compiler/host.ts", note: "哈希口径 sha256(utf8)；P-195 试玩的 .stagent 会话事件未写出该字段" }
+  non_goals:
+    - 不标 TASK-J.16 COMPLETED
+    - 不改已在 main 落地的 §16.7 面板源码文案（除非走查发现回归）
+    - 不开文档计划、不另立产品方向
+    - 不以单测或 jsdom 替代真实界面走查
+  fail:
+    - 生产界面仍打不开质疑面板
+    - 冻结后「这里不对」仍走普通聊天
+    - 真实落盘仍无对得上的 turn_text_sha256
+    - 以单测替代 J23-P4 走查
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+<a id="task-j.24"></a>
+
+#### 【Task J.24】开工路径三缺口（脏目录确认 · 空仓库无 main · Worker provider 默认值）`[NEW_TASK · 立卡 P-195 · 未开工]`
+
+> **立卡说明（2026-11-12 · P-195）**：同一轮真实试玩中，正式开工路径被三条缺口挡住，当时只做了试玩绕过、未改仓库。本卡逐项修复，使「确认方案 / 确认开工」在脏工作区、空仓库、以及设置页已配置非 OpenAI 钥匙时，都能走产品自己的路径。**立卡 ≠ 开工**。`writable_paths` 为预估，施工前按实际核对。文档计划暂缓。
+
+* **FAIL 现象与修复方向（P-195 试玩登记）**：
+  1. **脏目录确认**：主仓有未提交文件时，确认开工返回 `409 E_WORKTREE_DIRTY`。服务端已支持 `acknowledge_dirty`，界面也写了「点确认后会列入禁写名单」，但 `approveContract`（`src/lib/daemon-api.ts`）不发送该字段，用户无法走完正式确认。修复方向：确认开工的前端请求带上用户确认后的 `acknowledge_dirty`（或等价字段），与现有文案和 409 语义对齐；不得默默跳过确认。
+  2. **空仓库无 `main`**：`stagent open` 可对非仓库目录执行 `git init`，但不做初始提交、没有 `main` 引用，随后 `createTaskWorktree` 失败（`fatal: invalid reference: main`）。修复方向：在 open/init 路径为无提交仓库建立可用的 `main`（或经用户确认的初始提交），不把项目已有文件或密钥纳入提交。
+  3. **Worker provider 默认值的钥匙来源**：设置页可保存 DeepSeek 等钥匙与模型（runtime 内存，`source: runtime`），但 Worker 的 `openai-client` 使用 `process.env.OPENAI_BASE_URL`，未设时 SDK 默认打到 `api.openai.com`。L1 enrich 已默认 `https://api.deepseek.com/v1`，两边不一致。修复方向：Worker 实际请求的 base URL 跟设置页的钥匙来源走同一套默认，避免只配了钥匙却打到错误供应商。
+
+```yaml task-card
+id: TASK-J.24
+status: NEW_TASK
+contract:
+  intent:
+    title: 开工路径三缺口（脏目录确认 · 空仓库无 main · Worker provider 默认值）
+    description: >-
+      补上确认开工正式路径上的三条缺口：脏工作区确认须真正发给服务端；空仓库初始化后须有可用的 main
+      引用以便创建施工树；设置页配置的钥匙来源须决定 Worker 的默认 base URL，不得在仅有 runtime
+      钥匙时默认打到 api.openai.com。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J24-P1
+      check: auto
+      text: >-
+        主仓脏且用户已确认时，确认开工请求携带 acknowledge_dirty（或等价确认字段），不再因
+        E_WORKTREE_DIRTY 409 而无法走完正式路径；未确认不得悄悄带上该字段。
+    - id: J24-P2
+      check: auto
+      text: >-
+        对无提交的新仓库，open/init 之后存在可用的 main 引用，createTaskWorktree 不再因
+        fatal: invalid reference: main 失败；不得把已有项目文件或密钥纳入该初始提交。
+    - id: J24-P3
+      check: auto
+      text: >-
+        设置页已配置的钥匙来源（含 DeepSeek 等）与 Worker 实际请求的 base URL 一致；
+        仅有 runtime key、未设 OPENAI_BASE_URL 时，不得默认打到 api.openai.com。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/lib/daemon-api.ts
+      - daemon/git/ensure-git-repo.ts
+      - daemon/worker/openai-client.ts
+      - daemon/worker/key-store.ts
+      - tests/unit/approve-acknowledge-dirty.test.ts
+      - tests/unit/empty-repo-main-ref.test.ts
+      - tests/unit/worker-provider-base-url.test.ts
+    readonly_paths:
+      - daemon/server.ts
+      - daemon/pipeline/orchestrator.ts
+      - daemon/git/worktree-manager.ts
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: unit-j24, executable: npx, args: [vitest, run, tests/unit/approve-acknowledge-dirty.test.ts, tests/unit/empty-repo-main-ref.test.ts, tests/unit/worker-provider-base-url.test.ts] }
+design:
+  approach: >-
+    三条缺口分别修：前端确认开工补 acknowledge_dirty；open/init 给空仓库建立 main；Worker
+    默认 base URL 跟随设置页钥匙来源。writable_paths 为预估，施工前按实际核对后可增删。
+  touches:
+    - { path: src/lib/daemon-api.ts, change: modify, why: approveContract 目前不发送 acknowledge_dirty, symbols: ["approveContract"] }
+    - { path: daemon/git/ensure-git-repo.ts, change: modify, why: git init 后可能仍无 main 引用（施工前核对是否确在此文件）, symbols: [] }
+    - { path: daemon/worker/openai-client.ts, change: modify, why: baseURL 只读 process.env.OPENAI_BASE_URL，未跟随设置页钥匙来源, symbols: [] }
+    - { path: daemon/worker/key-store.ts, change: modify, why: runtime key / 模型已保存，需核对是否应在此给出 provider 默认 URL, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J24-P1, test_path: tests/unit/approve-acknowledge-dirty.test.ts, level: unit, debt: "未施工" }
+    - { acceptance_id: J24-P2, test_path: tests/unit/empty-repo-main-ref.test.ts, level: unit, debt: "未施工" }
+    - { acceptance_id: J24-P3, test_path: tests/unit/worker-provider-base-url.test.ts, level: unit, debt: "未施工" }
+governance:
+  spec_refs:
+    - docs/specs/supervisor.md
+  depends_on: []
+  code_facts:
+    - { ref: "src/lib/daemon-api.ts::approveContract", note: "现行 main a79bd93 仍不发送 acknowledge_dirty；服务端已支持该字段" }
+    - { ref: "daemon/git/ensure-git-repo.ts", note: "可 git init，P-195 试玩中无提交仓库随后 worktree add 因 invalid reference: main 失败" }
+    - { ref: "daemon/worker/openai-client.ts", note: "baseURL 默认 process.env.OPENAI_BASE_URL；未设时 SDK 打 api.openai.com。L1 enrich 已默认 api.deepseek.com/v1" }
+  non_goals:
+    - 不把项目已有文件或密钥纳入初始提交
+    - 不在未确认时自动 acknowledge_dirty
+    - 不开文档计划
+    - 不重启即丢失钥匙的存储策略不在本卡范围（设置页 runtime 钥匙仍可以是内存）
+  fail:
+    - 脏工作区确认开工仍 409 且没有正式确认字段
+    - 空仓库仍因缺少 main 引用无法建施工树
+    - 已配 DeepSeek 钥匙的 Worker 仍默认打到 api.openai.com
+  estimate: M
   invariants:
     auth: unchanged
     demo_origin: unchanged
