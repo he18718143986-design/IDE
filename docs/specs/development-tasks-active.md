@@ -1017,7 +1017,9 @@ contract:
       check: auto
       text: >-
         方案冻结后，右栏发送「这里不对」（及同类质疑用语）走 DISPUTE 路由，不得因
-        partnerMessageMayRebuildScheme 为假而 passthrough 到普通聊天。
+        partnerMessageMayRebuildScheme 为假而 passthrough 到普通聊天；旅程请求复用 #222
+        已有 confirmation_id 透传与服务端格式校验 / surface_log 查证归因链路，不另造机制，
+        缺失或查证失败时继续失败关闭、不写归因。
     - id: J23-P3
       check: auto
       text: >-
@@ -1037,7 +1039,12 @@ contract:
       - daemon/supervisor/intent-compiler/transcript-store.ts
       - src/routes/index.tsx
       - src/lib/journey/handoff-progress.ts
+      - src/lib/daemon-api.ts
+      - daemon/server.ts
+      - daemon/supervisor/journey/orchestrate.ts
       - tests/ui/dispute-production-wiring.test.tsx
+      - tests/integration/journey-dispute-routing.test.ts
+      - tests/unit/dispute-turn-hash.test.ts
     readonly_paths:
       - docs/specs/supervisor.md
       - docs/specs/playtest-self-check.md
@@ -1047,22 +1054,31 @@ contract:
     commands:
       - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
       - { alias: unit-wiring, executable: npx, args: [vitest, run, tests/ui/dispute-production-wiring.test.tsx] }
+      - { alias: integration-dispute-routing, executable: npx, args: [vitest, run, tests/integration/journey-dispute-routing.test.ts] }
 design:
   approach: >-
     预估接线：把 DisputeConsolePane 挂回日常壳（C.18 目前只渲染 scheme）；冻结后仍要把质疑语送入
     DISPUTE 而不是一律 passthrough；在 Daemon 会话落盘处写出可对照的 turn_text_sha256。
     上列 writable_paths 含试玩对照后的候选（index.tsx 的 handleJourneyBeforeSend、
-    handoff-progress.ts 的 partnerMessageMayRebuildScheme、transcript-store.ts），施工前按实际核对后可增删。
+    handoff-progress.ts 的 partnerMessageMayRebuildScheme、transcript-store.ts）。冻结后质疑需经
+    journey API 进入 DISPUTE，并复用 #222 的 confirmation_id 前端透传、服务端校验及 surface_log
+    查证归因机制；因此允许调整 daemon-api.ts、daemon/server.ts、journey/orchestrate.ts 并补生产集成测试，
+    不另造确认机制。施工前仍按实际核对。
   touches:
     - { path: src/components/studio/viewport-routing.ts, change: modify, why: C.18 把视口收成单页 scheme，质疑视口无法出现, symbols: [] }
     - { path: src/components/studio/StudioViewportShell.tsx, change: modify, why: 日常壳需能挂载或切入质疑面板, symbols: [] }
     - { path: src/lib/journey/intent-router.ts, change: modify, why: DISPUTE 路由接线点（施工前核对是否确需改）, symbols: [] }
     - { path: daemon/supervisor/intent-compiler/transcript-store.ts, change: modify, why: 预估的会话哈希落盘处（施工前核对）, symbols: [] }
     - { path: src/routes/index.tsx, change: modify, why: 面板挂载与冻结后 handleJourneyBeforeSend 分流（预估，施工前核对）, symbols: ["handleJourneyBeforeSend"] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: journey 请求透传既有 confirmation_id, symbols: ["submitJourneyMessage"] }
+    - { path: daemon/server.ts, change: modify, why: "journey 请求接收与复用 #222 格式校验及 surface_log 归因链路", symbols: ["handleSupervisorJourney"] }
+    - { path: daemon/supervisor/journey/orchestrate.ts, change: modify, why: "DISPUTE 编排透传确认上下文至既有自查归因机制", symbols: ["orchestrateJourney"] }
+    - { path: tests/integration/journey-dispute-routing.test.ts, change: create, why: "覆盖生产 journey DISPUTE 路由、confirmation_id 复用及失败关闭", symbols: [] }
+    - { path: tests/unit/dispute-turn-hash.test.ts, change: create, why: "覆盖 turn_text_sha256 与 sha256(utf8 原文) 一致", symbols: [] }
   interfaces: []
   test_plan:
     - { acceptance_id: J23-P1, test_path: tests/ui/dispute-production-wiring.test.tsx, level: integration, debt: "未施工" }
-    - { acceptance_id: J23-P2, test_path: tests/ui/dispute-production-wiring.test.tsx, level: integration, debt: "未施工" }
+    - { acceptance_id: J23-P2, test_path: tests/integration/journey-dispute-routing.test.ts, level: integration, debt: "未施工；覆盖冻结后 DISPUTE 路由、confirmation_id 透传/校验与缺失时失败关闭" }
     - { acceptance_id: J23-P3, test_path: tests/unit/dispute-turn-hash.test.ts, level: unit, debt: "未施工；真实落盘仍须 J23-P4 走查" }
     - { acceptance_id: J23-P4, test_path: tests/ui/dispute-production-wiring.test.tsx, level: integration, debt: "需 Tina 或授权本机真实界面走查；jsdom 不替代" }
 governance:
@@ -1072,8 +1088,9 @@ governance:
   depends_on:
     - { id: TASK-J.16, kind: soft }
   code_facts:
-    - { ref: "src/routes/index.tsx::handleJourneyBeforeSend", note: "方案冻结后 partnerMessageMayRebuildScheme 为假则一律 passthrough，质疑语进普通聊天（现行 main a79bd93 仍在）" }
+    - { ref: "src/routes/index.tsx::handleJourneyBeforeSend", note: "方案冻结后 partnerMessageMayRebuildScheme 为假则一律 passthrough，质疑语进普通聊天（现行 main b3d14d0 仍在）" }
     - { ref: "src/components/studio/viewport-routing.ts::STUDIO_VIEWPORT_IDS", note: "C.18 只导出 scheme 视口；DisputeConsolePane 在 index.tsx 仅 import 未挂载" }
+    - { ref: "src/lib/daemon-api.ts::submitJourneyMessage", note: "当前 journey 请求无 confirmation_id 字段；POST /api/supervisor/dispute 已有 confirmation_id 透传与服务端校验 / surface_log 查证机制（#222）" }
     - { ref: "daemon/supervisor/intent-compiler/host.ts::sha256", note: "哈希口径 sha256(utf8)；P-195 试玩的 .stagent 会话事件未写出该字段" }
   non_goals:
     - 不标 TASK-J.16 COMPLETED
