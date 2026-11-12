@@ -5847,3 +5847,87 @@ governance:
 ```
 
 ---
+
+<a id="task-ci.4"></a>
+
+#### 【Task CI.4】判红开关与离线桩的回归用例（挂账⑦）`[COMPLETED · 立卡 P-180 · 施工 P-193]`
+
+> **立卡说明（2026-11-10 · P-180）**：承接 TASK-CI.3 挂账⑦。CI.3 完成后，判红开关 `UNSTUBBED_FETCH_STRICT` 与离线桩 `stubOfflineFetch` 尚无持久回归用例：若有人把开关改为 false，仓库里没有任何测试会变红。本卡只补回归用例，不改哨兵行为。**立卡 ≠ 开工 ≠ 销项**；不新增 OP；不改产品代码；与 TASK-J.16 无依赖。
+
+> **归档注记（2026-11-12 · P-193）**：本卡已 **COMPLETED**（[#227](https://github.com/he18718143986-design/IDE/pull/227) squash `f8bfbad`；分支 `test/ci4-unstubbed-fetch-guard`，分支 tip `56d466c`，合入前 tree 与分支一致）。验收逐条：
+> - **CI4-P1**：回归用例「判红开关为显式常量且默认开启」落于 `src/tests/unstubbed-fetch-guard.test.tsx`，断言 `UNSTUBBED_FETCH_STRICT === true`；若开关被改为 `false`，该用例变红阻断合入。
+> - **CI4-P2**：回归用例「离线桩对声明路径以 reject 应答」落于 `src/tests/unstubbed-fetch-guard.test.tsx`，断言 `stubOfflineFetch` 声明的路径（相对路径与绝对 URL）fetch 被拒绝（错误含「离线桩」），且离线请求不进入未桩登记（`afterEach` 无抛错）。
+> - **CI4-P3**：产品代码零改动：diff 仅包含单一测试文件 `src/tests/unstubbed-fetch-guard.test.tsx`（+32/-0），`src/**`（除该文件外）与 `daemon/**` 的 diff 为空；`vitest run --project dom` 49 文件 / 303 用例全绿（基线 301 + 本卡 2），不新增 skip。
+> - **CI 侧**：Ubuntu/macOS 的 lint、typecheck、unit、Docs check、Knowledge check、Perf threshold gate 全绿（必需项）；Windows 单测失败的 17 个文件 / 30 用例与 main 基线逐一相同（非必需，挂账⑩/⑯，不新增失败）。
+> - **销项**：台账挂账⑦ 销项。
+
+```yaml task-card
+id: TASK-CI.4
+status: COMPLETED
+contract:
+  intent:
+    title: 判红开关与离线桩的回归用例
+    description: >-
+      为 src/tests/setup.ts 的判红开关（UNSTUBBED_FETCH_STRICT）与 stubOfflineFetch 离线桩补持久回归用例：开关被改为 false 时用例变红；离线桩对声明路径以 reject 应答且不计入未桩登记。不改哨兵行为。
+    risk_level: LOW
+  acceptance:
+    - id: CI4-P1
+      check: auto
+      text: >-
+        回归用例「判红开关为显式常量且默认开启」存在于 src/tests/unstubbed-fetch-guard.test.tsx，断言 UNSTUBBED_FETCH_STRICT 为 true；若开关被改为 false，该用例变红。
+    - id: CI4-P2
+      check: auto
+      text: >-
+        回归用例「离线桩对声明路径以 reject 应答」存在，断言 stubOfflineFetch 声明的路径 fetch 被拒绝（错误含「离线桩」），且该请求不进入未桩登记。
+    - id: CI4-P3
+      check: auto
+      text: >-
+        产品代码零改动：src/**（除 src/tests/ 外）与 daemon/** 的 diff 为空；vitest run --project dom 全绿，用例数多于 CI.3 基线（301），不新增 skip。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/tests/unstubbed-fetch-guard.test.tsx
+    readonly_paths:
+      - src/tests/setup.ts
+      - src/lib/daemon-api.ts
+      - daemon/**
+  verification:
+    commands:
+      - { alias: dom-guard, executable: npx, args: [vitest, run, --project, dom, src/tests/unstubbed-fetch-guard.test.tsx] }
+      - { alias: dom-project, executable: npx, args: [vitest, run, --project, dom] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: lint, executable: npm, args: [run, -s, lint] }
+design:
+  approach: >-
+    1) 新建单一测试文件，导入 setup 的导出常量与 stubOfflineFetch。 2) 用例只读判定开关值与离线桩行为，不修改 setup。 3) 验证：文件单跑、DOM 全量、tsc、lint。
+  touches:
+    - { path: src/tests/unstubbed-fetch-guard.test.tsx, change: create, why: 判红开关与离线桩的回归用例, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: CI4-P1, test_path: src/tests/unstubbed-fetch-guard.test.tsx, level: unit, case: "判红开关为显式常量且默认开启" }
+    - { acceptance_id: CI4-P2, test_path: src/tests/unstubbed-fetch-guard.test.tsx, level: unit, case: "离线桩对声明路径以 reject 应答" }
+    - { acceptance_id: CI4-P3, test_path: src/tests/unstubbed-fetch-guard.test.tsx, level: integration, debt: "非单一用例：产品零改动由 git diff 核验，DOM 全绿由 dom-project 验证命令承担" }
+governance:
+  spec_refs:
+    - docs/ledger/README.md
+  depends_on: []
+  code_facts:
+    - { ref: "src/tests/setup.ts:22", note: "UNSTUBBED_FETCH_STRICT = true（TASK-CI.3 #201 `bdde65c`）" }
+    - { ref: "src/tests/setup.ts:50", note: "stubOfflineFetch 离线桩（TASK-CI.3 #201 `bdde65c`）" }
+  non_goals:
+    - 不改哨兵行为与 setup 导出
+    - 不新增与判红开关无关的空用例凑数
+    - 不并入 TASK-J.16 或 TASK-CI.2
+  fail:
+    - 用例通过 try/catch、skip 或 todo 绕过
+    - 断言被放宽为只检查「存在」而不检查取值
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 227, commit: f8bfbadebf5980369bbdd3882851accda4e48a9e }
+```
+
+---
