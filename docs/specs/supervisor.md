@@ -1192,7 +1192,7 @@ export interface EvidenceLedger {
     trigger: "first_impression" | "user_dispute" | "acceptance_fail"; // 触发源（闭集，K-16：已删除 `| string` 兜底）
     linked_reason_code?: ReasonCode; // K-16：可选，类型为 ReasonCode（运行时由 reasonCodeSchema 校验；不新增码、不建映射）；仅 trigger === "acceptance_fail" 的条目可带
     item_ref?: { section: string; id: string };   // 归因指向的方案/台账条目（可空）
-    category: "approved_on_list" | "diff_unsurfaced" | "absent_from_diff"; // 三分类
+    category: "approved_on_list" | "diff_unsurfaced" | "absent_from_diff" | "no_surface_record"; // 三分类 + 退化值（P-189：缺呈现记录时 resolution_note 标「无呈现记录」）
     resolution_note: string;
     created_in_revision: number;
   }[];
