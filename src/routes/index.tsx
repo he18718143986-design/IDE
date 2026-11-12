@@ -964,6 +964,10 @@ function Console() {
           contract_id: selected.contract_id,
           challenge: textIn,
           ...(userChoice === undefined ? {} : { user_choice: userChoice }),
+          // P-190：透传用户当时看的确认 id；服务端查证，查不到则不写归因
+          ...(schemeSurfaceConfirmId === null
+            ? {}
+            : { confirmation_id: schemeSurfaceConfirmId }),
         });
         setDisputeReport(
           toDisputeView(result.report, result.degraded === true),
@@ -1024,7 +1028,7 @@ function Console() {
         setDisputeBusy(false);
       }
     },
-    [conn, selected, toDisputeView, taskGraph],
+    [conn, selected, toDisputeView, taskGraph, schemeSurfaceConfirmId],
   );
 
   /** TASK-C.18：右栏真正自由对话；去掉 ≤2 轮选择题门控。Supervisor 旁观更新中间方案。 */
