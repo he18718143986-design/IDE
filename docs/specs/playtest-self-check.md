@@ -332,6 +332,7 @@ interface SurfaceLog {
 ```
 
 - `item_ref` 为空时只可能走到 2b 或 3。`resolution_note` 必须写明「未能定位到方案条目」，以免把「定位失败」与「真的没有」混为一谈。
+- **退化（P-189）**：`surface_log` 缺失或为空时，`category` 为 `no_surface_record`，`resolution_note` 标「无呈现记录」，不做 (a)/(b) 判定（挂账⑭ 裁决：新增枚举值，不用 `null`）。
 - 算法只读确定性数据，同一输入恒得同一分类；模型不参与（与 `intent-compiler-prompt.md` §2.2「归因字段生成端不可写」一致）。
 
 ### 5.4 与 9 个 `reason_code` 的映射：不补码

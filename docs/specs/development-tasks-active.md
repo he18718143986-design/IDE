@@ -776,6 +776,7 @@ governance:
 
 > **立卡说明（2026-11-09 · P-176）**：S.5 注记（「已知 7 处局限由 TASK-J.16 实施时一并修复」）所指的卡。P-1～P-6 已合（[#188](https://github.com/he18718143986-design/IDE/pull/188) / `859f762`），左栏与 §16.7 文案已合（[#189](https://github.com/he18718143986-design/IDE/pull/189) / `f0ca93c`）。本卡只承接**未落地**部分。**立卡 ≠ 开工 ≠ 销项**：待 Tina 单卡授权后才可施工；不宣称端到端闭环；本卡不标 COMPLETED，直到验收条件全部通过。**施工顺序（依赖注记）**：先完成 TASK-CI.3（测试 fetch 哨兵判红、未桩请求清零），再做本卡的真实会话与真实台账端到端验收（J16-P5）；否则链路测试可能仍含未桩请求，验证可信度打折。
 > **卡修订与进度注记（P-187 · 2026-11-11）**：Tina 拍板挂账⑬ 走方案 A。新增 J16-P7（中栏上半部分渲染台账验收条目，只读投影）及对应 writable_paths / touches。方案 B 另立 `TASK-J.22`；挂账⑫ 另立 `TASK-J.21`。卡状态仍为 `NEW_TASK`，**仍不标 COMPLETED**。
+> **卡修订（P-189 · 2026-11-12）**：挂账⑭ 裁决为新增 `no_surface_record` 枚举值（Tina 拍板）。台账写入需改 `LedgerState` 与台账存储，故 `writable_paths` 追加 `src/lib/journey/scheme-patch-types.ts`、`src/lib/journey/scheme-patch-engine.ts`、`daemon/supervisor/intent-compiler/scheme-ledger-store.ts`；`touches` 同步登记。`attributions` 只追加，不覆盖既有记录；旧台账缺省为空数组，`schema_version` 不变。卡状态仍 `NEW_TASK`。
 > **进度注记（P-188 · 2026-11-12）**：K-14 第一刀（三分类纯算法 + 缺 surface_log 退化）见 [#218](https://github.com/he18718143986-design/IDE/pull/218)。台账 `attributions` 写入与 trigger 接线未做，待卡修订（`LedgerState` 与台账存储不在 writable_paths）；`category` 退化值待 Tina 拍板（挂账⑭）。§5.3 写入分工已在 P-186 落地，P-188 核对无需再改。J16-P5 仍待真实 `.stagent/` 数据。**仍不标 COMPLETED**。
 > **卡修订与进度注记（P-186 · 2026-11-11）**：`writable_paths` 与 `touches` 追加 `compile-loop.ts` 与 ITEM 撞号复现测试（授权：Tina 拍板方案 A 与「ITEM 撞号先修后进 K-14」）。`surface_log` 采集与前端接线已合（#211 / `273e506`）。ITEM 撞号修复 [#214](https://github.com/he18718143986-design/IDE/pull/214) 须在本修订合入后再合（挂账⑪）。验收条目呈现数据通路未决（挂账⑬，待 Tina 决策）；K-14 未开工；J16-P5 待真实数据。**仍不标 COMPLETED**。
 
@@ -839,6 +840,9 @@ contract:
       - tests/integration/intent-compiler-item-id-collision.test.ts
       - daemon/supervisor/intent-compiler/acceptance-projection.ts
       - tests/unit/scheme-acceptance-projection.test.ts
+      - src/lib/journey/scheme-patch-types.ts
+      - src/lib/journey/scheme-patch-engine.ts
+      - daemon/supervisor/intent-compiler/scheme-ledger-store.ts
     readonly_paths:
       - docs/specs/playtest-self-check.md
       - docs/specs/supervisor.md
@@ -866,6 +870,10 @@ design:
     - { path: daemon/supervisor/intent-compiler/acceptance-projection.ts, change: modify, why: 台账验收条目只读投影（纯函数，不写盘；挂账⑬ 方案 A，P-187）, symbols: [] }
     - { path: tests/unit/scheme-acceptance-projection.test.ts, change: modify, why: 投影纯函数与台账为空时的降级（J16-P7）, symbols: [] }
     - { path: src/lib/daemon-api.ts, change: modify, why: 新增只读获取台账验收条目的客户端函数（J16-P7）, symbols: [] }
+    - { path: daemon/supervisor/dispute/attribution.ts, change: modify, why: K-14 三分类；缺日志退化值改为 no_surface_record（P-189，挂账⑭ 裁决）, symbols: [] }
+    - { path: src/lib/journey/scheme-patch-types.ts, change: modify, why: LedgerState 增 attributions（K-14 子账本四，只追加）；category 枚举加 no_surface_record（P-189）, symbols: [] }
+    - { path: src/lib/journey/scheme-patch-engine.ts, change: modify, why: 重建 LedgerState 的各处须保留 attributions（否则补丁后丢失，见 ~L1655）, symbols: [] }
+    - { path: daemon/supervisor/intent-compiler/scheme-ledger-store.ts, change: modify, why: 读取旧台账时 attributions 缺省为空数组；CAS 写入保留 attributions；schema_version 维持 1.0（向后兼容）, symbols: [] }
   interfaces: []
   test_plan:
     - { acceptance_id: J16-P1, test_path: tests/unit/dispute-surface-log.test.ts, level: unit, debt: "J.16 未施工；待单卡授权后补测试" }
