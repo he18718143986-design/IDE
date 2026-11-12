@@ -783,7 +783,7 @@ governance:
 > **进度注记（P-190 · 2026-11-12）**：K-14 台账写入 [#221](https://github.com/he18718143986-design/IDE/pull/221) 已合（main `930d383`）。K-16 接线 `user_dispute` 见 [#222](https://github.com/he18718143986-design/IDE/pull/222)（head `65cfc9336a5fa674cdff316966826233be61f33f`，待合）。trigger 来源裁决：前端透传 `confirmation_id` + 服务端失败关闭。待确认：J16-P4 与失败关闭的张力（`no_surface_record` 服务端不可达），以及挂账⑮ 的 2b 近似输入。J16-P5 待 `.stagent/`，J16-P6 待渲染层核对。**仍不标 COMPLETED**。
 > **进度注记（P-191 · 2026-11-12）**：K-16 接线 [#222](https://github.com/he18718143986-design/IDE/pull/222) 已合（main `19c99ff`）；docs [#223](https://github.com/he18718143986-design/IDE/pull/223) 已合（main `60b4383`）。J16-P4 按场景拆分落地：退化写入与失败关闭见 [#224](https://github.com/he18718143986-design/IDE/pull/224)（head `ba5cda2`，待合）。挂账⑮ 的 2b 近似已接受，不另立卡。Windows watcher 抗抖动另立挂账⑯。J16-P5 待 `.stagent/`，J16-P6 待渲染层核对。**仍不标 COMPLETED**。
 > **进度注记（P-192 · 2026-11-12）**：J16-P4 降级路径 [#224](https://github.com/he18718143986-design/IDE/pull/224) 已合（main `a5919d9`）。登记挂账⑰（`first_impression`/`acceptance_fail` 暂无生产写入端、§5.1 互引去重未做，属规格预留非缺陷）。J16-P1～P4 代码与降级测试已全部合入。J16-P5 待真实 `.stagent/` 数据核对，J16-P6 待真实面板人工核对。两项通过前 J.16 **仍不标 COMPLETED**。
-> **进度注记（P-195 · 2026-11-12）**：Tina 授权本机真实试玩并登记结果。试玩项目 `/Users/tina/Downloads/aes-douyin`。运行副本为本机 `/Users/tina/IDE` 工作树 `a2363d1`（分支 `docs/ci1-windows-assessment`，2026-11-08），Daemon 于当日 17:01 启动；**不是**当时的 `origin/main`。**J16-P5 FAIL**：方案冻结后在右栏发出一次「这里不对」，质疑面板未出现，请求走了普通聊天（`POST /api/chat/sessions/.../messages`）；`.stagent` 会话记下了原话与「这里不对」，但无 `turn_text_sha256` / `text_sha256` 可与 `intent-compiler/host.ts` 的 sha256(utf8) 对照（目录含登录令牌，未拷出）。对照现行 main `a79bd93`：`handleJourneyBeforeSend` 在方案冻结后仍对所有右栏消息返回 `passthrough`（含「这里不对」）；`DisputeConsolePane` 仅 import、未 JSX 挂载；`viewport-routing.ts` 把视口收成单页 `scheme`。此链路缺口在现行 main 仍在，**转 `TASK-J.23` 处理**。**J16-P6 FAIL**：该次试玩生产界面打不开质疑面板。试玩修订 `a2363d1` 上面板源码仍为旧文案（「你怎么说的 / 需求怎么写的 / 代码实际改了什么」「按缺陷修复」「按新需求演进」「把握」）。现行 main `a79bd93` 面板源码文案已按 §16.7 更新（#189 / `f0ca93c`），但因未挂载，生产界面仍无法做渲染层验收。卡状态仍为 `NEW_TASK`，**仍不标 COMPLETED**。文档计划暂缓，不主动开工新方案。
+> **进度注记（P-195 · 2026-11-12）**：Tina 授权本机真实试玩并登记结果。试玩项目 `/Users/tina/Downloads/aes-douyin`。运行副本为本机 `/Users/tina/IDE` 工作树 `a2363d1`（分支 `docs/ci1-windows-assessment`，2026-11-08），Daemon 于当日 17:01 启动；**不是**当时的 `origin/main`。**J16-P5 FAIL**：方案冻结后在右栏发出一次「这里不对」，质疑面板未出现，请求走了普通聊天（`POST /api/chat/sessions/.../messages`）；`.stagent` 会话记下了原话与「这里不对」，但无 `turn_text_sha256` / `text_sha256` 可与 `intent-compiler/host.ts` 的 sha256(utf8) 对照（目录含登录令牌，未拷出）。对照现行 main `a79bd93`：`handleJourneyBeforeSend` 在方案冻结后仍对所有右栏消息返回 `passthrough`（含「这里不对」）；`DisputeConsolePane` 仅 import、未 JSX 挂载；`viewport-routing.ts` 把视口收成单页 `scheme`。此链路缺口在现行 main 仍在，**转 `TASK-J.23` 处理**。**J16-P6 FAIL**：该次试玩生产界面打不开质疑面板。文案在 `a2363d1` 上 FAIL，main 上已合规，待面板挂载后复核。经直读复核 main 上 `src/components/studio/DisputeConsolePane.tsx`：按钮为「这是 Bug，免费修」「我想要新功能，下一轮做」，`confidence` 仅是类型字段未渲染，分类标签为白话，源码文案已符合 §16.7；但「面板未挂载 + 冻结后『这里不对』走普通聊天」在 main 上仍成立，FAIL 维持。生产界面仍待面板挂载后做真实渲染层走查复核。卡状态仍为 `NEW_TASK`，**仍不标 COMPLETED**。文档计划暂缓，不主动开工新方案。
 > **卡修订与进度注记（P-186 · 2026-11-11）**：`writable_paths` 与 `touches` 追加 `compile-loop.ts` 与 ITEM 撞号复现测试（授权：Tina 拍板方案 A 与「ITEM 撞号先修后进 K-14」）。`surface_log` 采集与前端接线已合（#211 / `273e506`）。ITEM 撞号修复 [#214](https://github.com/he18718143986-design/IDE/pull/214) 须在本修订合入后再合（挂账⑪）。验收条目呈现数据通路未决（挂账⑬，待 Tina 决策）；K-14 未开工；J16-P5 待真实数据。**仍不标 COMPLETED**。
 
 ```yaml task-card
@@ -991,27 +991,28 @@ governance:
 
 <a id="task-j.23"></a>
 
-#### 【Task J.23】质疑自查生产链路接线（面板挂载 · DISPUTE 路由 · turn_text_sha256 落盘）`[NEW_TASK · 立卡 P-195 · 未开工]`
+#### 【Task J.23】质疑自查生产链路接线（面板挂载 · DISPUTE 路由 · turn_text_sha256 落盘 · 纯接线不含文案）`[NEW_TASK · 立卡 P-195 · 未开工]`
 
-> **立卡说明（2026-11-12 · P-195）**：承接 `TASK-J.16` 真实试玩暴露的生产链路未接线（J16-P5 / J16-P6 FAIL）。范围只覆盖：质疑面板挂到日常工作台、冻结后「这里不对」走 DISPUTE 路由、`turn_text_sha256` 落盘并可对照。验收必须含真实界面走查。**立卡 ≠ 开工 ≠ 销项**；不标 `TASK-J.16` COMPLETED；不改已在 main 落地的 §16.7 面板源码文案（除非走查发现回归）；不开文档计划。`writable_paths` 为试玩对照后的预估，施工前按实际核对。
+> **立卡说明（2026-11-12 · P-195）**：承接 `TASK-J.16` 真实试玩暴露的生产链路未接线（J16-P5 / J16-P6 FAIL）。**范围严格收窄为纯接线**：质疑面板挂到日常工作台、冻结后「这里不对」走 DISPUTE 路由、`turn_text_sha256` 落盘；**不含文案整改**（main 上 `DisputeConsolePane.tsx` 源码文案已按 §16.7 合规，待挂载后复核）。验收必须含真实界面走查。**立卡 ≠ 开工 ≠ 销项**；不标 `TASK-J.16` COMPLETED；不改已在 main 落地的面板文案；不开文档计划。`writable_paths` 为试玩对照后的预估，施工前按实际核对。
 
 ```yaml task-card
 id: TASK-J.23
 status: NEW_TASK
 contract:
   intent:
-    title: 质疑自查生产链路接线（面板挂载 · DISPUTE 路由 · turn_text_sha256 落盘）
+    title: 质疑自查生产链路接线（面板挂载 · DISPUTE 路由 · turn_text_sha256 落盘 · 纯接线不含文案）
     description: >-
       做完后，用户在日常工作台能打开质疑自查面板；方案确认之后在右栏发送「这里不对」进入 DISPUTE
       流程而不是普通聊天；真实会话落盘含 turn_text_sha256（sha256(utf8) 口径与
-      intent-compiler/host.ts 一致），左栏显示锚定原话。真实界面走查通过前不宣称本卡完成。
+      intent-compiler/host.ts 一致），左栏显示锚定原话。本卡范围严格限定为纯接线，不含文案整改
+      （main 上面板源码文案已符合 §16.7，待挂载后复核）。真实界面走查通过前不宣称本卡完成。
     risk_level: MEDIUM
   acceptance:
     - id: J23-P1
       check: auto
       text: >-
         质疑自查面板挂到生产日常壳（viewport-routing / StudioViewportShell 或经核对后的实际挂载点），
-        不再只 import 而不 JSX 挂载；用户在真实界面能打开该面板。
+        不再只 import 而不 JSX 挂载；用户在真实界面能打开该面板（纯接线挂载，不改动面板源码文案）。
     - id: J23-P2
       check: auto
       text: >-
@@ -1025,8 +1026,8 @@ contract:
     - id: J23-P4
       check: playtest
       text: >-
-        真实界面走查覆盖 J23-P1～P3：能打开面板、冻结后「这里不对」进入质疑流程、哈希可对照且左栏有原话。
-        单测 / jsdom / 仅有源码目录不替代本条。
+        真实界面走查覆盖 J23-P1～P3 纯接线：能打开面板、冻结后「这里不对」进入质疑流程、哈希可对照且左栏有原话；
+        复核确认 main 既有合规文案在挂载后正常呈现（不含文案整改）。单测 / jsdom / 仅有源码目录不替代本条。
   scheme_item_ids: []
   scope:
     writable_paths:
@@ -1072,11 +1073,11 @@ governance:
     - { id: TASK-J.16, kind: soft }
   code_facts:
     - { ref: "src/routes/index.tsx::handleJourneyBeforeSend", note: "方案冻结后 partnerMessageMayRebuildScheme 为假则一律 passthrough，质疑语进普通聊天（现行 main a79bd93 仍在）" }
-    - { ref: "src/components/studio/viewport-routing.ts", note: "C.18 只导出 scheme 视口；DisputeConsolePane 在 index.tsx 仅 import 未挂载" }
-    - { ref: "daemon/supervisor/intent-compiler/host.ts", note: "哈希口径 sha256(utf8)；P-195 试玩的 .stagent 会话事件未写出该字段" }
+    - { ref: "src/components/studio/viewport-routing.ts::STUDIO_VIEWPORT_IDS", note: "C.18 只导出 scheme 视口；DisputeConsolePane 在 index.tsx 仅 import 未挂载" }
+    - { ref: "daemon/supervisor/intent-compiler/host.ts::sha256", note: "哈希口径 sha256(utf8)；P-195 试玩的 .stagent 会话事件未写出该字段" }
   non_goals:
     - 不标 TASK-J.16 COMPLETED
-    - 不改已在 main 落地的 §16.7 面板源码文案（除非走查发现回归）
+    - 纯接线不含文案整改：main 上 DisputeConsolePane.tsx 源码文案已合规，严禁修改面板文案
     - 不开文档计划、不另立产品方向
     - 不以单测或 jsdom 替代真实界面走查
   fail:
@@ -1168,8 +1169,8 @@ governance:
   depends_on: []
   code_facts:
     - { ref: "src/lib/daemon-api.ts::approveContract", note: "现行 main a79bd93 仍不发送 acknowledge_dirty；服务端已支持该字段" }
-    - { ref: "daemon/git/ensure-git-repo.ts", note: "可 git init，P-195 试玩中无提交仓库随后 worktree add 因 invalid reference: main 失败" }
-    - { ref: "daemon/worker/openai-client.ts", note: "baseURL 默认 process.env.OPENAI_BASE_URL；未设时 SDK 打 api.openai.com。L1 enrich 已默认 api.deepseek.com/v1" }
+    - { ref: "daemon/git/ensure-git-repo.ts::inspectGitRepo", note: "可 git init，P-195 试玩中无提交仓库随后 worktree add 因 invalid reference: main 失败" }
+    - { ref: "daemon/worker/openai-client.ts::OpenAiWorkerClient", note: "baseURL 默认 process.env.OPENAI_BASE_URL；未设时 SDK 打 api.openai.com。L1 enrich 已默认 api.deepseek.com/v1" }
   non_goals:
     - 不把项目已有文件或密钥纳入初始提交
     - 不在未确认时自动 acknowledge_dirty
