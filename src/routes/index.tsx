@@ -97,6 +97,8 @@ import {
   type WorkerRunResult,
   DaemonApiError,
   reportSurfacePresentation,
+  fetchSchemeAcceptance,
+  type SchemeAcceptanceItem,
 } from "@/lib/daemon-api";
 import { ContractCard } from "@/components/contract/ContractCard";
 import { ScopeList } from "@/components/contract/ScopeList";
@@ -601,6 +603,27 @@ function Console() {
     }
     setSchemeSurfaceConfirmId(schemeConfirmIdRef.current.id);
   }, [schemeRevisionForSurface]);
+  // 挂账⑬ 方案 A：台账验收条目只读投影进中栏；修订变化或连接变化时重取，失败则为空（标无呈现记录）。
+  const [schemeAcceptanceItems, setSchemeAcceptanceItems] = useState<
+    SchemeAcceptanceItem[]
+  >([]);
+  useEffect(() => {
+    if (!conn || schemeRevisionForSurface === undefined) {
+      setSchemeAcceptanceItems([]);
+      return;
+    }
+    let cancelled = false;
+    fetchSchemeAcceptance(conn)
+      .then((projection) => {
+        if (!cancelled) setSchemeAcceptanceItems(projection.items);
+      })
+      .catch(() => {
+        if (!cancelled) setSchemeAcceptanceItems([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [conn, schemeRevisionForSurface]);
   const handleSchemeSurfacePresented = useCallback(
     (report: SurfacePresentationReport) => {
       if (!conn) return Promise.reject(new Error("daemon 未连接"));
@@ -3660,6 +3683,7 @@ ${trimmed}`
                     onDeclineSensitive={() => {
                       void handleDeclineSensitive();
                     }}
+                    acceptanceItems={schemeAcceptanceItems}
                     surfaceConfirmationId={schemeSurfaceConfirmId}
                     onSurfacePresented={handleSchemeSurfacePresented}
                     onConfirmDecision={handleSchemeConfirmDecision}

@@ -10,6 +10,7 @@ import type { ScopePlan } from "@/lib/journey/scope-plan";
 import type {
   SurfacePresentationReport,
   SurfacePresentationSection,
+  SchemeAcceptanceItem,
 } from "@/lib/daemon-api";
 
 export type ScopeAcceptanceMode = "pre_start" | "frozen" | "acceptance";
@@ -40,6 +41,8 @@ export interface ScopeAcceptanceBlockProps {
   forceExpandSensitive?: boolean | undefined;
   busy?: boolean | undefined;
   onDeclineSensitive?: (() => void) | undefined;
+  /** 挂账⑬ 方案 A：台账验收条目（只读投影）；渲染即展示，展示后按 acceptance 段上报 */
+  acceptanceItems?: readonly SchemeAcceptanceItem[] | undefined;
   /** J.16：存在时，在区块真正展示之后上报实际呈现的条目 */
   surface?: ScopeAcceptanceSurfaceProps | undefined;
 }
@@ -51,6 +54,18 @@ export interface ScopeAcceptanceBlockProps {
  * 验收条目 `verification.plain` 没有稳定 id，本切片不上报（不伪造 item_ref）。
  */
 export function scopeAcceptanceShownItems(
+  plan: ScopePlan | null,
+  mode: ScopeAcceptanceMode,
+  acceptanceItems: readonly SchemeAcceptanceItem[] = [],
+): { item_ref: string; section: SurfacePresentationSection }[] {
+  const acceptanceShown = acceptanceItems.map((item) => ({
+    item_ref: item.id,
+    section: "acceptance" as const,
+  }));
+  return [...acceptanceShown, ...planShownItems(plan, mode)];
+}
+
+function planShownItems(
   plan: ScopePlan | null,
   mode: ScopeAcceptanceMode,
 ): { item_ref: string; section: SurfacePresentationSection }[] {
@@ -159,7 +174,11 @@ export function ScopeAcceptanceBlock(props: ScopeAcceptanceBlockProps) {
     Boolean(props.approvalRequired || props.forceExpandSensitive),
   );
 
-  const shown = scopeAcceptanceShownItems(plan, mode);
+  const shown = scopeAcceptanceShownItems(
+    plan,
+    mode,
+    props.acceptanceItems ?? [],
+  );
   const shownKey = JSON.stringify(shown);
   const surfaceConfirmationId = props.surface?.confirmationId ?? null;
   const [surfaceStatus, setSurfaceStatus] = useState<
@@ -223,6 +242,26 @@ export function ScopeAcceptanceBlock(props: ScopeAcceptanceBlockProps) {
         >
           {props.policyMessage}
         </p>
+      ) : null}
+
+      {props.acceptanceItems && props.acceptanceItems.length > 0 ? (
+        <div
+          data-testid="scope-acceptance-criteria"
+          className="mb-2 space-y-1 text-xs"
+        >
+          <h4 className="font-medium text-foreground">验收条目</h4>
+          <ul className="list-inside list-disc space-y-0.5 text-muted-foreground">
+            {props.acceptanceItems.map((item) => (
+              <li
+                key={item.id}
+                data-testid="scope-acceptance-criterion-row"
+                data-item-ref={item.id}
+              >
+                {item.text}
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : null}
 
       {!plan ? (

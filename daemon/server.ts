@@ -260,6 +260,7 @@ import {
 } from "./supervisor/design/design-dependency-surprise";
 import { synthesizeSchemeFromPlan } from "./supervisor/design/scheme-from-plan";
 import { readSchemeLedger } from "./supervisor/intent-compiler/scheme-ledger-store";
+import { projectSchemeAcceptance } from "./supervisor/intent-compiler/acceptance-projection";
 import {
   applyContractStubTerminal,
   findInFlightContract,
@@ -5459,6 +5460,24 @@ export class StagentDaemon {
         return;
       }
       await this.handleSupervisorDispute(req, res, method);
+      return;
+    }
+
+    if (pathname === "/api/supervisor/scheme-acceptance") {
+      // 只读投影（挂账⑬ 方案 A）：不写盘，沿既有 Bearer 鉴权。
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      if (method !== "GET") {
+        this.sendJson(res, 405, { error: "Method not allowed" });
+        return;
+      }
+      this.sendJson(
+        res,
+        200,
+        projectSchemeAcceptance(readSchemeLedger(this.repoRoot)),
+      );
       return;
     }
 
