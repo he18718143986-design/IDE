@@ -776,6 +776,7 @@ governance:
 
 > **立卡说明（2026-11-09 · P-176）**：S.5 注记（「已知 7 处局限由 TASK-J.16 实施时一并修复」）所指的卡。P-1～P-6 已合（[#188](https://github.com/he18718143986-design/IDE/pull/188) / `859f762`），左栏与 §16.7 文案已合（[#189](https://github.com/he18718143986-design/IDE/pull/189) / `f0ca93c`）。本卡只承接**未落地**部分。**立卡 ≠ 开工 ≠ 销项**：待 Tina 单卡授权后才可施工；不宣称端到端闭环；本卡不标 COMPLETED，直到验收条件全部通过。**施工顺序（依赖注记）**：先完成 TASK-CI.3（测试 fetch 哨兵判红、未桩请求清零），再做本卡的真实会话与真实台账端到端验收（J16-P5）；否则链路测试可能仍含未桩请求，验证可信度打折。
 > **卡修订与进度注记（P-187 · 2026-11-11）**：Tina 拍板挂账⑬ 走方案 A。新增 J16-P7（中栏上半部分渲染台账验收条目，只读投影）及对应 writable_paths / touches。方案 B 另立 `TASK-J.22`；挂账⑫ 另立 `TASK-J.21`。卡状态仍为 `NEW_TASK`，**仍不标 COMPLETED**。
+> **进度注记（P-188 · 2026-11-12）**：K-14 第一刀（三分类纯算法 + 缺 surface_log 退化）见 [#218](https://github.com/he18718143986-design/IDE/pull/218)。台账 `attributions` 写入与 trigger 接线未做，待卡修订（`LedgerState` 与台账存储不在 writable_paths）；`category` 退化值待 Tina 拍板（挂账⑭）。§5.3 写入分工已在 P-186 落地，P-188 核对无需再改。J16-P5 仍待真实 `.stagent/` 数据。**仍不标 COMPLETED**。
 > **卡修订与进度注记（P-186 · 2026-11-11）**：`writable_paths` 与 `touches` 追加 `compile-loop.ts` 与 ITEM 撞号复现测试（授权：Tina 拍板方案 A 与「ITEM 撞号先修后进 K-14」）。`surface_log` 采集与前端接线已合（#211 / `273e506`）。ITEM 撞号修复 [#214](https://github.com/he18718143986-design/IDE/pull/214) 须在本修订合入后再合（挂账⑪）。验收条目呈现数据通路未决（挂账⑬，待 Tina 决策）；K-14 未开工；J16-P5 待真实数据。**仍不标 COMPLETED**。
 
 ```yaml task-card
@@ -862,8 +863,8 @@ design:
     - { path: daemon/server.ts, change: modify, why: 新增 surface_log 写入路由（沿既有 Bearer 鉴权，不新开写权限）, symbols: [] }
     - { path: daemon/supervisor/intent-compiler/compile-loop.ts, change: modify, why: ITEM-n 由台账推导分配（挂账⑪，K-14 前置；P-186 授权）, symbols: [] }
     - { path: tests/integration/intent-compiler-item-id-collision.test.ts, change: modify, why: ITEM-n 撞号复现（同进程 + 模拟重启）与 todo 留痕（挂账⑪⑫）, symbols: [] }
-    - { path: daemon/supervisor/intent-compiler/acceptance-projection.ts, change: create, why: 台账验收条目只读投影（纯函数，不写盘；挂账⑬ 方案 A，P-187）, symbols: [] }
-    - { path: tests/unit/scheme-acceptance-projection.test.ts, change: create, why: 投影纯函数与台账为空时的降级（J16-P7）, symbols: [] }
+    - { path: daemon/supervisor/intent-compiler/acceptance-projection.ts, change: modify, why: 台账验收条目只读投影（纯函数，不写盘；挂账⑬ 方案 A，P-187）, symbols: [] }
+    - { path: tests/unit/scheme-acceptance-projection.test.ts, change: modify, why: 投影纯函数与台账为空时的降级（J16-P7）, symbols: [] }
     - { path: src/lib/daemon-api.ts, change: modify, why: 新增只读获取台账验收条目的客户端函数（J16-P7）, symbols: [] }
   interfaces: []
   test_plan:
@@ -906,7 +907,7 @@ governance:
 
 #### 【Task J.21】intent-compiler 重启后状态恢复（transcript 持久化与证据回放）`[NEW_TASK · 立卡 P-187 · 未开工]`
 
-> **立卡说明（2026-11-11 · P-187）**：挂账⑫。集成测试已观察：进程重启后 transcript 只在内存里，台账证据指向的旧 turn 解析不到，审计以 `E_STATE_CORRUPT` 拒绝之后的批次。**生产环境未验证**；影响面按测试观察为「重启后编译循环不可用」，而非仅审计报错。与 ITEM-n 撞号（#214 已合）是两个问题。**立卡 ≠ 开工**；优先级：建议 P1，待 Tina 定。
+> **立卡说明（2026-11-11 · P-187）**：挂账⑫。集成测试已观察：进程重启后 transcript 只在内存里，台账证据指向的旧 turn 解析不到，审计以 `E_STATE_CORRUPT` 拒绝之后的批次。**生产环境未验证**；影响面按测试观察为「重启后编译循环不可用」，而非仅审计报错。与 ITEM-n 撞号（#214 已合）是两个问题。**立卡 ≠ 开工**；优先级：**P1**（Tina 拍板，P-188）。
 
 ```yaml task-card
 id: TASK-J.21
@@ -984,7 +985,7 @@ governance:
 
 #### 【Task J.22】中栏方案来源统一为编译器台账（挂账⑬ 方案 B · 根本解）`[NEW_TASK · 立卡 P-187 · 未开工 · 须先拆卡]`
 
-> **立卡说明（2026-11-11 · P-187）**：挂账⑬ 方案 B。当前中栏方案由前端 `rebuildSchemeFromCorpus` 从对话语料启发式拼出，编译器台账不进入中栏。TASK-J.16 J16-P7 以只读投影（方案 A）作过渡；本卡为根本解，范围远超 J.16，故另立。**估算 L：施工前须先拆卡**，拆卡前不得开工。依赖 TASK-J.21（重启后台账可用）与 TASK-J.16 J16-P7（过渡投影已合）。**立卡 ≠ 开工**。
+> **立卡说明（2026-11-11 · P-187）**：挂账⑬ 方案 B。当前中栏方案由前端 `rebuildSchemeFromCorpus` 从对话语料启发式拼出，编译器台账不进入中栏。TASK-J.16 J16-P7 以只读投影（方案 A）作过渡；本卡为根本解，范围远超 J.16，故另立。**估算 L：施工前须先拆卡**，拆卡前不得开工。依赖 TASK-J.21（重启后台账可用）与 TASK-J.16 J16-P7（过渡投影已合）。**立卡 ≠ 开工**。 **已知限制（K-14 第一刀 #217 记录）**：台账 `scheme_revision` 与中栏启发式方案修订号未对齐校验，二者可能不是同一份方案；J16-P5 真实数据验收须核对此点，根治依赖本卡。
 
 ```yaml task-card
 id: TASK-J.22
