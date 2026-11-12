@@ -306,6 +306,7 @@ interface SurfaceLog {
 1. **`confirmation_id` 铸造点**：在方案修订出现时由前端铸造并随方案透传，确认点击与呈现上报共用同一键；不是在确认点击时才生成。
 2. **呈现事实由前端判定**：§15.4 白话区块在 DOM 真正展示之后，前端按实际呈现的条目调用上报；未呈现过的条目不得预写。
 3. **持久化由 Daemon 完成**：`POST /api/supervisor/surface-log` 沿既有 Bearer 鉴权，只向固定路径 `.stagent/records/surface-log/<confirmation_id>.jsonl` 追加记录；不接受模型或 Worker 写入。前端上报失败只留痕，不阻塞渲染（呈现是主流程，日志是旁路）。
+4. **trigger 来源（P-190，Tina 裁决）**：`user_dispute` 的 `confirmation_id` 由前端透传（质疑请求体可选字段，取当前修订的呈现确认 id）；服务端只校验格式，并在 surface_log 中查证。缺失、不存在或损坏时**失败关闭**：不写归因，响应 `attribution.status = rejected` 并 `warn` 留痕，不改用服务端查到的其他值。2b 输入为近似，见挂账⑮。
 
 **验收条目 ID 结论（P-186）**：复用 `SchemeDraftV2.acceptance[].id`，不新增 schema 字段、不引入文本哈希。前提是 ID 跨重启唯一，`ITEM-n` 撞号由 #214 修复（挂账⑪）。`ScopePlan.verification.plain` 是引擎固定检查文案、不对应任何验收条目，不纳入归因。
 
