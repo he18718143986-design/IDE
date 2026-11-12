@@ -365,9 +365,13 @@
 ## J.16 验收线挂账（2026-11-11 新增 · P-186 · 不新增 OP）
 
 - **挂账⑪（ITEM-n 验收条目撞号 · 修复待合）**：根因（复现测试证实）：`assembleCompilerOutput` 的默认 `newId` 每批重置为 `ITEM-1`，同进程内即撞号，不只重启；`IntentCompileLoop.seqCounter` 不从台账恢复。`upsert_acceptance` 按 id 替换，新批次覆盖旧条目。修复：[#214](https://github.com/he18718143986-design/IDE/pull/214) 每批从台账扫描最大 ITEM 序号分配；复现测试提交 `559d421` 修复前两条均红，提交 `fdd135a` 修复后转绿。**处理**：卡修订（本 PR）合入后合并 #214，合入后销项。`SUG-` / `REJ-` 仍用 `seqCounter`，同类风险另记、本次未修。
-- **挂账⑫（重启后 transcript 不恢复 · 未修 · 另卡）**：host 的 transcript 只在内存。重启后台账证据引用的旧 turn 不可解析，审计以 `E_STATE_CORRUPT` 拒绝之后所有批次。复现测试中以空补丁回放绕开，并以 `it.todo` 留痕。不在 J.16 范围，需另立卡（intent-compiler 的 transcript 持久化与恢复）。
+- **挂账⑫（重启后 transcript 不恢复 · 已销项）**：host 的 transcript 只在内存。重启后台账证据引用的旧 turn 不可解析，审计以 `E_STATE_CORRUPT` 拒绝之后所有批次。复现测试中以空补丁回放绕开，并以 `it.todo` 留痕。由 [`TASK-J.21`](../specs/development-tasks-completed.md#task-j21)（[#229](https://github.com/he18718143986-design/IDE/pull/229) squash `21b8b35`）承接修复并销项。
 - **挂账⑬（验收条目呈现数据通路缺失 · 待 Tina 决策）**：§15.4 上半部分应渲染白话验收条目，当前未渲染。更根本的是中栏方案由 `rebuildSchemeFromCorpus` 从对话语料生成，编译器台账的 `acceptance` 未进入中栏，前端 `SchemeDraft.acceptance` 从未被填充。K-14 的 `acceptance_ids_shown` 无真实来源。可选方向：(A) 增加只读路由，把台账验收条目投影进中栏（需改 daemon 路由，J.16 `writable_paths` 再修订）；(B) 以台账替换中栏的启发式来源（范围大，属方案来源统一，需另立卡）。决策前不动代码。
 - **挂账⑭（K-14 验收条目 ID 方案 · 已拍板 · 方案 A）**：复用 `acceptance[].id`，不改 `SchemeDraftV2` schema，不做文本哈希或新字段。前提是 ⑪ 合入。`ScopePlan.verification.plain` 不纳入 K-14 归因。
+
+### 挂账状态更新（P-194 · 2026-11-12 · 不新增 OP）
+
+- **挂账⑫ 销项**：由 [`TASK-J.21`](../specs/development-tasks-completed.md#task-j21)（[#229](https://github.com/he18718143986-design/IDE/pull/229) squash `21b8b35`）销项：重启后 transcript 持久化恢复已落地（#229），`E_STATE_CORRUPT` 死锁消除，销项。注意：集成测试已验证，生产环境真实重启场景未验证。
 
 ### 挂账状态更新（P-187 · 2026-11-11 · 不新增 OP）
 
