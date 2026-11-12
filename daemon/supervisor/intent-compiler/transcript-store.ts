@@ -200,17 +200,23 @@ export function readTranscript(repoRoot: string): TranscriptRecord | null {
         ? item.turn_text_sha256
         : textSha;
 
-    turns.push({
+    const turnObj: PersistedTranscriptTurn = {
       turn_id: item.turn_id,
       role: item.role,
       seq: item.seq,
       text: item.text,
       text_sha256: textSha,
-      turn_text_sha256: turnTextSha,
       ...(item.user_alias_seq !== undefined
         ? { user_alias_seq: item.user_alias_seq }
         : {}),
+    };
+    Object.defineProperty(turnObj, "turn_text_sha256", {
+      value: turnTextSha,
+      enumerable: false,
+      configurable: true,
+      writable: true,
     });
+    turns.push(turnObj);
   }
 
   return {
