@@ -240,6 +240,8 @@
 - **P-193（TASK-CI.4 完成回写与归档迁档 · 挂账⑦ 销项 · 2026-11-12）**：#227 squash `f8bfbad` 合入，`TASK-CI.4` 标 COMPLETED，卡片正文由 `development-tasks-active.md` 迁入 `development-tasks-completed.md`；同步更新索引行状态（COMPLETED）与链接（指向 completed.md）；矩阵标 COMPLETED；台账挂账⑦ 销项（判红开关与离线桩已有持久回归用例）。仅 docs，不新增 OP，不改产品代码。
 - **P-188（TASK-J.21 优先级 · TASK-J.16 进度注记 · 2026-11-12）**：授权来源为 Tina 拍板：`TASK-J.21` 定为 P1（集成测试已观察 `E_STATE_CORRUPT`，生产未验证，口径保留）；J.22 卡补「中栏 `scheme_revision` 未对齐」已知限制；J.16 登记 K-14 第一刀 [#218](https://github.com/he18718143986-design/IDE/pull/218)（纯算法，台账写入与 trigger 未做）。§5.3 `surface_log` 写入分工已在 P-186 落地，本次核对无需改动。新增挂账⑭（K-14 退化 `category` 与台账 schema 冲突，待拍板）。仅 docs，不新增 OP，卡状态不变。
 
+- **P-196（修订 TASK-J.23 writable_paths · 2026-11-12）**：授权来源为 Tina 本轮 TASK-J.23 开工指令。施工前核对确认冻结后 DISPUTE 必须经过 journey API，才能复用 #222 已有 `confirmation_id` 透传、服务端格式校验及 `surface_log` 查证归因（缺失或查证失败仍失败关闭、不写归因）；原卡 writable_paths 未包含 `src/lib/daemon-api.ts`、`daemon/server.ts`、`daemon/supervisor/journey/orchestrate.ts` 与生产集成测试。补入路径、touches、验收与 `tests/integration/journey-dispute-routing.test.ts` 测试计划；卡仍 `NEW_TASK`、未开工。仅 docs，不新增 OP、不改产品代码。
+
 ## 枢纽迁入修订（P-43～P-66，按编号升序）
 
 > 2026-11-09 文档治理：自 `development-tasks.md` 文件头部之后内联迁出（原第 17–39 行）。P-45 与本文件既有条目完全重复，只保留一份。
