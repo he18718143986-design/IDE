@@ -26,6 +26,12 @@ import {
   readSchemeLedger,
   type SchemeLedgerRecord,
 } from "./scheme-ledger-store";
+import {
+  readTranscript,
+  writeTranscript,
+  type PersistedTranscriptTurn,
+  type TranscriptRecord,
+} from "./transcript-store";
 
 function sha256(text: string): string {
   return createHash("sha256").update(text, "utf8").digest("hex");
@@ -81,6 +87,36 @@ export class IntentCompilerHost {
     this.repoRoot = options.repoRoot;
     this.state = loadOrInitLedgerState(options.repoRoot);
     this.usingTestTimers = options.setTimeoutFn !== undefined;
+
+    // 从磁盘恢复 transcript（失败关闭：文件不存在视为空基线；损坏或版本不匹配抛出）
+    const transcriptRecord = readTranscript(options.repoRoot);
+    if (transcriptRecord) {
+      let maxSeq = transcriptRecord.seq;
+      let maxAliasSeq = transcriptRecord.user_alias_seq;
+      for (const t of transcriptRecord.turns) {
+        if (t.seq > maxSeq) maxSeq = t.seq;
+        if (t.user_alias_seq !== undefined && t.user_alias_seq > maxAliasSeq) {
+          maxAliasSeq = t.user_alias_seq;
+        }
+        this.turns.push({
+          turn_id: t.turn_id,
+          role: t.role,
+          text: t.text,
+          ...(t.user_alias_seq !== undefined
+            ? { user_alias_seq: t.user_alias_seq }
+            : {}),
+        });
+        this.turnIndex.set(t.turn_id, {
+          turn_id: t.turn_id,
+          role: t.role,
+          seq: t.seq,
+          text: t.text,
+          text_sha256: t.text_sha256,
+        });
+      }
+      this.seq = maxSeq;
+      this.userAliasSeq = maxAliasSeq;
+    }
 
     const setTimeoutFn =
       options.setTimeoutFn ??
@@ -150,13 +186,18 @@ export class IntentCompilerHost {
     return readSchemeLedger(this.repoRoot);
   }
 
+  /** 磁盘权威 transcript 记录 */
+  readPersistedTranscript(): TranscriptRecord | null {
+    return readTranscript(this.repoRoot);
+  }
+
   getStats(): CompilerLoopStats {
     return this.loop.getStats();
   }
 
   /**
    * 生产入口：用户消息已提交（USER_TURN_COMMITTED）。
-   * 追加 transcript 后通知编译循环（1.2s 防抖 → 组装/merge/CAS）。
+   * 追加 transcript 后立即原子落盘，并通知编译循环（1.2s 防抖 → 组装/merge/CAS）。
    */
   commitUserTurn(input: CommitUserTurnInput): CommitUserTurnResult {
     if (this.disposed) {
@@ -184,12 +225,14 @@ export class IntentCompilerHost {
       text,
       user_alias_seq: this.userAliasSeq,
     });
+    this.persistTranscript();
     this.loop.notifyUserTurnCommitted(turn_id);
     return { turn_id, seq };
   }
 
   /**
    * 记录 AI/Supervisor 回复到 transcript（不触发编译，V-05）。
+   * 追加内存后立即原子落盘。
    */
   recordAssistantTurn(text: string): void {
     if (this.disposed) return;
@@ -205,7 +248,29 @@ export class IntentCompilerHost {
       text_sha256: sha256(trimmed),
     });
     this.turns.push({ turn_id, role: "assistant", text: trimmed });
+    this.persistTranscript();
     this.loop.notifyNonTrigger("AI_REPLY_FINISHED");
+  }
+
+  private persistTranscript(): void {
+    const persistedTurns: PersistedTranscriptTurn[] = this.turns.map((msg) => {
+      const indexed = this.turnIndex.get(msg.turn_id);
+      return {
+        turn_id: msg.turn_id,
+        role: msg.role,
+        seq: indexed?.seq ?? 0,
+        text: msg.text,
+        text_sha256: indexed?.text_sha256 ?? sha256(msg.text),
+        ...(msg.user_alias_seq !== undefined
+          ? { user_alias_seq: msg.user_alias_seq }
+          : {}),
+      };
+    });
+    writeTranscript(this.repoRoot, {
+      seq: this.seq,
+      user_alias_seq: this.userAliasSeq,
+      turns: persistedTurns,
+    });
   }
 
   /**
