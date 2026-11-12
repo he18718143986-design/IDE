@@ -88,7 +88,13 @@ export function state(
   draft: Partial<SchemeDraftV2> = {},
   extra: Partial<LedgerState> = {},
 ): LedgerState {
-  return { draft: emptyDraft(draft), graveyard: [], suggestions: [], ...extra };
+  return {
+    draft: emptyDraft(draft),
+    graveyard: [],
+    suggestions: [],
+    attributions: [],
+    ...extra,
+  };
 }
 
 export function ctxCounter(attempt: 0 | 1 = 0): MergeContext {

@@ -125,7 +125,7 @@ describe("K-14 classifyAttribution", () => {
           change_in_unshown_area: true,
         }),
       );
-      expect(r.category).toBeNull();
+      expect(r.category).toBe("no_surface_record");
       expect(r.resolution_note).toBe(NO_SURFACE_RECORD_NOTE);
     }
   });

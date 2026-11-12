@@ -1652,7 +1652,12 @@ export function mergeSchemePatch(input: MergeInput): MergeResult {
   const rev = cur + 1;
   const { draft, graveyard } = applyAll(applied, state, rev, sv.watermark, ctx);
   const issues = auditLedgerState(
-    { draft, graveyard, suggestions: state.suggestions },
+    {
+      draft,
+      graveyard,
+      suggestions: state.suggestions,
+      attributions: state.attributions,
+    },
     transcript,
   );
   if (issues.length > 0)
@@ -1670,6 +1675,7 @@ export function mergeSchemePatch(input: MergeInput): MergeResult {
       draft,
       graveyard,
       suggestions: [...state.suggestions, ...suggestions],
+      attributions: state.attributions,
     },
     expected_prev_revision: cur,
     revision: rev,
@@ -1692,13 +1698,18 @@ function finish(
   transcript: TranscriptView,
 ): EditResult {
   const issues = auditLedgerState(
-    { draft, graveyard, suggestions },
+    { draft, graveyard, suggestions, attributions: state.attributions },
     transcript,
   );
   if (issues.length > 0) return { ok: false, code: "E_PATCH_POST_INVARIANT" };
   return {
     ok: true,
-    state: { draft, graveyard, suggestions },
+    state: {
+      draft,
+      graveyard,
+      suggestions,
+      attributions: state.attributions,
+    },
     expected_prev_revision: state.draft.scheme_revision,
     revision: draft.scheme_revision,
   };

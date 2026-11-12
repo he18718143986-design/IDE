@@ -2,33 +2,32 @@
  * TASK-J.16 K-14 · 三分类归因算法（playtest-self-check §5.3；supervisor §14.11 子账本四）。
  *
  * 纯确定性函数：同一输入恒得同一输出，不调用模型、不读写磁盘。
- * 台账写入（`attributions` 追加）不在本模块内，待卡修订后另行接线。
  *
  * 三分类：
  * - approved_on_list：条目在呈现清单上且已获批（审查通道问题）；
  * - diff_unsurfaced：差集里有，但没有分级上屏（分流规则问题）；
  * - absent_from_diff：差集里根本没有（规格残缺 / 回写断裂 / 意图未结晶）。
  *
- * J16-P4：呈现日志缺失或为空时不做 (a)/(b) 判定，category 为 null，resolution_note 标「无呈现记录」。
+ * J16-P4 / P-189：呈现日志缺失或为空时不做 (a)/(b) 判定，category 为 no_surface_record，
+ * resolution_note 标「无呈现记录」。
  */
-import type { SchemeDraftV2 } from "../../../src/lib/journey/scheme-patch-types";
+import {
+  ATTRIBUTION_CATEGORIES,
+  type AttributionCategory,
+  type SchemeDraftV2,
+} from "../../../src/lib/journey/scheme-patch-types";
 import {
   NO_SURFACE_RECORD_NOTE,
   type SurfaceLogEntry,
   type SurfaceSection,
 } from "./surface-log";
 
-export const ATTRIBUTION_CATEGORIES = [
-  "approved_on_list",
-  "diff_unsurfaced",
-  "absent_from_diff",
-] as const;
-export type AttributionCategory = (typeof ATTRIBUTION_CATEGORIES)[number];
+export { ATTRIBUTION_CATEGORIES, type AttributionCategory };
 
 /** 冻结快照中可被归因的条目（由 `snapshotRefsFromDraft` 从方案派生） */
 export interface SnapshotRef {
   item_ref: string;
-  /** 只取确认清单相关的 section（decision / acceptance / approval / high_risk） */
+  /** 只取确认清单相关的 section */
   section: Extract<
     SurfaceSection,
     "decision" | "acceptance" | "approval" | "high_risk"
@@ -50,7 +49,7 @@ export interface AttributionInput {
 }
 
 export interface AttributionResult {
-  category: AttributionCategory | null;
+  category: AttributionCategory;
   resolution_note: string;
 }
 
@@ -62,7 +61,7 @@ const FREEZE_SECTIONS: readonly SurfaceSection[] = [
   "high_risk",
 ];
 
-/** 从冻结方案派生可归因条目（仅 decision 与 acceptance；needs_approval 不在 SchemeDraftV2 内，暂不派生） */
+/** 从冻结方案派生可归因条目（decision 与 acceptance；needs_approval 不在 SchemeDraftV2 内，暂不派生） */
 export function snapshotRefsFromDraft(draft: SchemeDraftV2): SnapshotRef[] {
   const refs: SnapshotRef[] = [];
   for (const d of draft.decisions) {
@@ -84,7 +83,10 @@ export function classifyAttribution(
 ): AttributionResult {
   const entries = input.surface_entries;
   if (entries === null || entries.length === 0) {
-    return { category: null, resolution_note: NO_SURFACE_RECORD_NOTE };
+    return {
+      category: "no_surface_record",
+      resolution_note: NO_SURFACE_RECORD_NOTE,
+    };
   }
 
   const freezeShown = new Set(

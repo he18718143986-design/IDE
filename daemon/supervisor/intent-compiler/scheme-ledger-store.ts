@@ -9,6 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { writeJsonAtomic } from "../../../src/lib/state-machine";
 import type {
+  AttributionEntry,
   LedgerState,
   MergeJournal,
   SchemeDraftV2,
@@ -64,6 +65,7 @@ export function emptyLedgerState(over: Partial<LedgerState> = {}): LedgerState {
     draft: emptySchemeDraftV2(over.draft),
     graveyard: over.graveyard ?? [],
     suggestions: over.suggestions ?? [],
+    attributions: over.attributions ?? [],
   };
 }
 
@@ -79,6 +81,10 @@ export function readSchemeLedger(repoRoot: string): SchemeLedgerRecord | null {
       !raw.state.draft
     ) {
       return null;
+    }
+    // 旧台账没有 attributions 字段：缺省为空数组，schema_version 不变
+    if (!Array.isArray(raw.state.attributions)) {
+      raw.state = { ...raw.state, attributions: [] };
     }
     return raw;
   } catch {
@@ -114,10 +120,18 @@ export function casWriteSchemeLedger(
     return { ok: false, reason: "cas_mismatch" };
   }
 
+  // K-14 归因只增不减：以磁盘上的条目为底，并入 next 中新的条目（按 attribution_id 去重）。
+  // 防止编译回合用较旧快照写回时覆盖掉期间追加的归因。
+  const carried: AttributionEntry[] = current?.state.attributions ?? [];
+  const known = new Set(carried.map((a) => a.attribution_id));
+  const extra = (input.next.attributions ?? []).filter(
+    (a) => !known.has(a.attribution_id),
+  );
+
   const record: SchemeLedgerRecord = {
     schema_version: SCHEME_LEDGER_SCHEMA_VERSION,
     updated_at: new Date().toISOString(),
-    state: input.next,
+    state: { ...input.next, attributions: [...carried, ...extra] },
     last_journal: input.journal ?? null,
     last_model_id: input.modelId,
     last_prompt_version: input.promptVersion ?? null,
@@ -130,4 +144,61 @@ export function casWriteSchemeLedger(
     return { ok: false, reason: "io" };
   }
   return { ok: true, revision: nextRev };
+}
+
+export interface AppendAttributionsResult {
+  ok: true;
+  appended: number;
+  /** 因 attribution_id 已存在而跳过的条目数（只追加，不覆盖） */
+  skipped_duplicates: number;
+  revision: number;
+}
+
+/**
+ * K-14 写入：把归因条目追加到台账 `attributions`（只追加、不覆盖既有条目）。
+ *
+ * 只改子账本，不改方案 draft 与 scheme_revision：以当前 revision 做 CAS，
+ * 并原样保留 journal / modelId / promptVersion / offline。
+ */
+export function appendAttributionsCas(
+  repoRoot: string,
+  entries: readonly AttributionEntry[],
+): AppendAttributionsResult | { ok: false; reason: "cas_mismatch" | "io" } {
+  const current = readSchemeLedger(repoRoot);
+  const state: LedgerState = current?.state ?? emptyLedgerState();
+  const existing = new Set(state.attributions.map((a) => a.attribution_id));
+  const fresh: AttributionEntry[] = [];
+  let skipped = 0;
+  for (const e of entries) {
+    if (existing.has(e.attribution_id)) {
+      skipped += 1;
+      continue;
+    }
+    existing.add(e.attribution_id);
+    fresh.push(e);
+  }
+  const rev = state.draft.scheme_revision;
+  if (fresh.length === 0) {
+    return {
+      ok: true,
+      appended: 0,
+      skipped_duplicates: skipped,
+      revision: rev,
+    };
+  }
+  const result = casWriteSchemeLedger(repoRoot, {
+    expectedPrevRevision: rev,
+    next: { ...state, attributions: [...state.attributions, ...fresh] },
+    journal: current?.last_journal ?? null,
+    modelId: current?.last_model_id ?? null,
+    promptVersion: current?.last_prompt_version ?? null,
+    offline: current?.offline ?? false,
+  });
+  if (!result.ok) return result;
+  return {
+    ok: true,
+    appended: fresh.length,
+    skipped_duplicates: skipped,
+    revision: result.revision,
+  };
 }
