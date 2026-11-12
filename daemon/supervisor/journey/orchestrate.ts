@@ -22,6 +22,10 @@ import {
 } from "../draft-generator";
 import { runDisputeSelfCheck } from "../dispute/index";
 import type { DisputeReport } from "../dispute/types";
+import {
+  recordUserDisputeAttribution,
+  type UserDisputeAttributionOutcome,
+} from "../dispute/attribution-wiring";
 import type { RequirementsStore } from "../specs/requirements-store";
 import type { SupervisorBudgetLedger } from "../budget";
 import type { SupervisorMessage } from "../types";
@@ -47,6 +51,8 @@ export interface JourneyOrchestrateInput {
   hasInProgressContract?: boolean | undefined;
   /** 当前选中合同；质疑路径必需 */
   contract?: SoftwareContract | undefined;
+  /** J.23 / 复用 #222：前端透传的确认 ID（用于 DISPUTE 归因查证与失败关闭） */
+  confirmationId?: string | null | undefined;
   sessionId?: string | undefined;
   requirementsStore?: RequirementsStore | undefined;
   budgetLedger?: SupervisorBudgetLedger | undefined;
@@ -73,6 +79,7 @@ export interface JourneyOrchestrateResult {
   route: JourneyIntentKind;
   plain_summary: string;
   dispute_report?: DisputeReport | undefined;
+  attribution?: UserDisputeAttributionOutcome | undefined;
   draft?: ContractDraftGenerated | undefined;
   /** TASK-H.5：顶层必带，与落盘合同一致 */
   contract_id?: string | undefined;
@@ -157,11 +164,26 @@ export async function orchestrateJourney(
       ...(input.sessionId === undefined ? {} : { sessionId: input.sessionId }),
     });
 
+    // J.23 / 复用 #222：在 DISPUTE 路由下，透传 confirmation_id 走 recordUserDisputeAttribution
+    // 缺失、查不到或格式异常时失败关闭，不写归因（不另造机制，不静默改用服务端反查值）
+    const attribution = recordUserDisputeAttribution({
+      repoRoot: input.repoRoot,
+      report,
+      contract: input.contract,
+      confirmationId: input.confirmationId ?? null,
+    });
+    if (attribution.status === "rejected") {
+      console.warn(
+        `[dispute-attribution] 旅程 DISPUTE 归因被拒 (${attribution.reason})，失败关闭不写入`,
+      );
+    }
+
     return {
       intent,
       route: "DISPUTE",
       plain_summary: withGuard(report.plain_summary),
       dispute_report: report,
+      attribution,
       suggest_viewport: "dispute",
       requirements_updated: true,
       requirements_hint: `需求基准已对齐 · ${formatLocalTime(now)}`,

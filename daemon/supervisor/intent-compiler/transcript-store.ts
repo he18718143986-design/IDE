@@ -9,8 +9,16 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { writeJsonAtomic } from "../../../src/lib/state-machine";
 import { SCHEME_LEDGER_DIR } from "./scheme-ledger-store";
+
+/**
+ * TASK-J.23 / J23-P3：会话原话哈希口径，与 intent-compiler/host.ts::sha256 一致（sha256(utf8)）。
+ */
+export function computeTurnTextSha256(text: string): string {
+  return createHash("sha256").update(text, "utf8").digest("hex");
+}
 
 export const TRANSCRIPT_FILE = "transcript.json" as const;
 export const TRANSCRIPT_SCHEMA_VERSION = "1.0" as const;
@@ -34,6 +42,7 @@ export interface PersistedTranscriptTurn {
   seq: number;
   text: string;
   text_sha256: string;
+  turn_text_sha256?: string;
   user_alias_seq?: number;
 }
 
@@ -59,6 +68,7 @@ interface RawTurnItem {
   seq?: unknown;
   text?: unknown;
   text_sha256?: unknown;
+  turn_text_sha256?: unknown;
   user_alias_seq?: unknown;
 }
 
@@ -149,6 +159,14 @@ export function readTranscript(repoRoot: string): TranscriptRecord | null {
       );
     }
     const item = t as RawTurnItem;
+    const textSha =
+      typeof item.text_sha256 === "string" && item.text_sha256.trim()
+        ? item.text_sha256
+        : typeof item.turn_text_sha256 === "string" &&
+            item.turn_text_sha256.trim()
+          ? item.turn_text_sha256
+          : "";
+
     if (
       typeof item.turn_id !== "string" ||
       !item.turn_id.trim() ||
@@ -158,8 +176,7 @@ export function readTranscript(repoRoot: string): TranscriptRecord | null {
       typeof item.seq !== "number" ||
       !Number.isFinite(item.seq) ||
       typeof item.text !== "string" ||
-      typeof item.text_sha256 !== "string" ||
-      !item.text_sha256.trim()
+      !textSha
     ) {
       throw new TranscriptStoreError(
         "E_TRANSCRIPT_CORRUPT",
@@ -178,12 +195,18 @@ export function readTranscript(repoRoot: string): TranscriptRecord | null {
       );
     }
 
+    const turnTextSha =
+      typeof item.turn_text_sha256 === "string" && item.turn_text_sha256.trim()
+        ? item.turn_text_sha256
+        : textSha;
+
     turns.push({
       turn_id: item.turn_id,
       role: item.role,
       seq: item.seq,
       text: item.text,
-      text_sha256: item.text_sha256,
+      text_sha256: textSha,
+      turn_text_sha256: turnTextSha,
       ...(item.user_alias_seq !== undefined
         ? { user_alias_seq: item.user_alias_seq }
         : {}),
@@ -212,12 +235,27 @@ export function writeTranscript(
   },
 ): void {
   const file = transcriptPath(repoRoot);
+  const turns: PersistedTranscriptTurn[] = record.turns.map((t) => {
+    const hash =
+      t.text_sha256 || t.turn_text_sha256 || computeTurnTextSha256(t.text);
+    return {
+      turn_id: t.turn_id,
+      role: t.role,
+      seq: t.seq,
+      text: t.text,
+      text_sha256: hash,
+      turn_text_sha256: t.turn_text_sha256 ?? hash,
+      ...(t.user_alias_seq !== undefined
+        ? { user_alias_seq: t.user_alias_seq }
+        : {}),
+    };
+  });
   const data: TranscriptRecord = {
     schema_version: TRANSCRIPT_SCHEMA_VERSION,
     updated_at: record.updated_at ?? new Date().toISOString(),
     seq: record.seq,
     user_alias_seq: record.user_alias_seq,
-    turns: record.turns.slice(),
+    turns,
   };
   writeJsonAtomic(file, data);
 }

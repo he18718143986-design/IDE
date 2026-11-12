@@ -173,6 +173,7 @@ import {
   type HandoffUiStepId,
 } from "@/lib/journey/handoff-progress";
 import { selectSessionVerbatimCandidates } from "@/lib/journey/session-verbatim-candidates";
+import { classifyJourneyIntent } from "@/lib/journey/intent-router";
 import {
   grayOutTaskGraphNodes,
   shouldGrayAfterDispute,
@@ -1042,38 +1043,40 @@ function Console() {
       const trimmed = text.trim();
       if (!trimmed) return "passthrough";
 
-      // J.7 / D9：方案已冻结后，右栏消息只作施工对话，绝不回写方案。
-      if (!partnerMessageMayRebuildScheme(schemeDraft)) {
-        return "passthrough";
-      }
+      const looksDispute =
+        classifyJourneyIntent(trimmed).kind === "DISPUTE" ||
+        /不对|质疑|有问题|bug|缺陷|验收失败/.test(trimmed.toLowerCase());
 
-      // 随对话刷新方案（不锁用户进选择题）
-      const nextCorpus = schemeCorpus
-        ? `${schemeCorpus}
+      // J.7 / D9：方案未冻结时，随对话更新方案草案；方案已冻结后，绝不回写方案。
+      if (partnerMessageMayRebuildScheme(schemeDraft)) {
+        const nextCorpus = schemeCorpus
+          ? `${schemeCorpus}
 ${trimmed}`
-        : trimmed;
-      setSchemeCorpus(nextCorpus);
-      setSchemeDraft((cur) =>
-        rebuildSchemeFromCorpus(cur, nextCorpus, {
-          titleHint: trimmed.length > 48 ? `${trimmed.slice(0, 48)}…` : trimmed,
-        }),
-      );
-      setStudioNonce((n) => n + 1);
+          : trimmed;
+        setSchemeCorpus(nextCorpus);
+        setSchemeDraft((cur) =>
+          rebuildSchemeFromCorpus(cur, nextCorpus, {
+            titleHint:
+              trimmed.length > 48 ? `${trimmed.slice(0, 48)}…` : trimmed,
+          }),
+        );
+        setStudioNonce((n) => n + 1);
+      }
 
-      const looksDispute = /不对|质疑|有问题|bug|缺陷|验收失败/.test(
-        trimmed.toLowerCase(),
-      );
       if (!looksDispute) {
-        // 自由聊：交给右侧 Agent；中间方案已更新
+        // 自由聊：交给右侧 Agent；未冻结时中间方案已更新，冻结后作施工对话
         return "passthrough";
       }
 
-      // 质疑仍走旅程分流（不阻断后续自由聊）
+      // 质疑走旅程 DISPUTE 分流（J.23：方案冻结后「这里不对」仍走 DISPUTE，不一律 passthrough）
       setJourneyBusy(true);
       try {
         const result = await submitJourneyMessage(conn, {
           message: trimmed,
           ...(selectedId ? { contract_id: selectedId } : {}),
+          ...(schemeSurfaceConfirmId
+            ? { confirmation_id: schemeSurfaceConfirmId }
+            : {}),
         });
         const kind = result.route;
         if (kind === "CHAT") return "passthrough";
@@ -1086,6 +1089,7 @@ ${trimmed}`
         if (kind === "DISPUTE" && result.dispute_report) {
           setDisputeReport(toDisputeView(result.dispute_report));
           setDisputeError(null);
+          setStudioViewportOverride("dispute");
           setStudioNonce((n) => n + 1);
         }
         if (result.draft) {
@@ -1108,7 +1112,15 @@ ${trimmed}`
         setJourneyBusy(false);
       }
     },
-    [conn, connected, selectedId, toDisputeView, schemeCorpus, schemeDraft],
+    [
+      conn,
+      connected,
+      selectedId,
+      toDisputeView,
+      schemeCorpus,
+      schemeDraft,
+      schemeSurfaceConfirmId,
+    ],
   );
 
   const handleSchemeConfirmDecision = useCallback((decisionId: string) => {
@@ -3573,6 +3585,10 @@ ${trimmed}`
                   ? presentationByContract[selectedId]?.message || null
                   : null
               }
+              activeViewport={studioViewportOverride ?? "scheme"}
+              onViewportChange={(vp) =>
+                setStudioViewportOverride(vp as StudioViewportId)
+              }
               contractRail={
                 // C.16：需求列表 + 规范与资产在合同操作台左侧栏（单门）
                 <div className="flex min-h-0 flex-1 flex-col gap-2 p-2 text-xs">
@@ -3645,6 +3661,14 @@ ${trimmed}`
                     className="mt-auto rounded border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
                   >
                     项目全景与准入
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="studio-open-dispute"
+                    onClick={() => setStudioViewportOverride("dispute")}
+                    className="rounded border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
+                  >
+                    质疑自查
                   </button>
                 </div>
               }
@@ -3740,6 +3764,27 @@ ${trimmed}`
                     }}
                   />
                 </div>
+              }
+              dispute={
+                <DisputeConsolePane
+                  contractId={selected?.contract_id ?? null}
+                  report={disputeReport}
+                  busy={disputeBusy}
+                  error={disputeError}
+                  onSubmit={async (challenge) => {
+                    await runDisputeSelfCheckUi(challenge);
+                  }}
+                  onChooseBugFix={() => {
+                    const challenge = disputeReport?.challenge?.trim();
+                    if (!challenge) return;
+                    void runDisputeSelfCheckUi(challenge, "BUG_FIX");
+                  }}
+                  onChooseRequirementChange={() => {
+                    const challenge = disputeReport?.challenge?.trim();
+                    if (!challenge) return;
+                    void runDisputeSelfCheckUi(challenge, "REQUIREMENT_CHANGE");
+                  }}
+                />
               }
             />
           }
