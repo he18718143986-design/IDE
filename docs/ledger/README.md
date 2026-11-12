@@ -366,3 +366,9 @@
 - **挂账⑫（重启后 transcript 不恢复 · 未修 · 另卡）**：host 的 transcript 只在内存。重启后台账证据引用的旧 turn 不可解析，审计以 `E_STATE_CORRUPT` 拒绝之后所有批次。复现测试中以空补丁回放绕开，并以 `it.todo` 留痕。不在 J.16 范围，需另立卡（intent-compiler 的 transcript 持久化与恢复）。
 - **挂账⑬（验收条目呈现数据通路缺失 · 待 Tina 决策）**：§15.4 上半部分应渲染白话验收条目，当前未渲染。更根本的是中栏方案由 `rebuildSchemeFromCorpus` 从对话语料生成，编译器台账的 `acceptance` 未进入中栏，前端 `SchemeDraft.acceptance` 从未被填充。K-14 的 `acceptance_ids_shown` 无真实来源。可选方向：(A) 增加只读路由，把台账验收条目投影进中栏（需改 daemon 路由，J.16 `writable_paths` 再修订）；(B) 以台账替换中栏的启发式来源（范围大，属方案来源统一，需另立卡）。决策前不动代码。
 - **挂账⑭（K-14 验收条目 ID 方案 · 已拍板 · 方案 A）**：复用 `acceptance[].id`，不改 `SchemeDraftV2` schema，不做文本哈希或新字段。前提是 ⑪ 合入。`ScopePlan.verification.plain` 不纳入 K-14 归因。
+
+### 挂账状态更新（P-187 · 2026-11-11 · 不新增 OP）
+
+- **挂账⑪ 销项**：[#214](https://github.com/he18718143986-design/IDE/pull/214) squash `70ae19c` 合入 main；ITEM-n 由台账推导分配，复现测试转为回归用例。销项口径：修复已合，未宣称覆盖所有 `SUG-` / `REJ-` 序号分配。
+- **挂账⑫ 立卡**：`TASK-J.21`（NEW_TASK，立卡 P-187，未开工）。优先级建议 P1，待 Tina 定。注意：集成测试已观察，生产环境未验证。
+- **挂账⑬ 决策与立卡**：Tina 拍板方案 A；过渡实现登记为 `TASK-J.16` J16-P7（只读投影，卡修订 P-187，实施待单卡授权）；根本解方案 B 立卡 `TASK-J.22`（估算 L，须先拆卡）。K-14 的验收条目组在 J16-P7 合入并渲染前不得宣称可用。

@@ -1,7 +1,7 @@
 # 试玩自查引擎 · 确定性裁决规范（§16.7「这里不对」与验收清单点亮）
 
 > **状态**：**设计定稿 · 待施工**（归属第二批预告 `J.16`「试玩幕、对话式验收」；本文只覆盖其中的自查与点亮，建议实施时拆卡）
-> **J.16 实施状态（P-186 更新，2026-11-11）**：P-1～P-6 已合（[#188](https://github.com/he18718143986-design/IDE/pull/188) / `859f762`）；文案修正已合（[#189](https://github.com/he18718143986-design/IDE/pull/189) / `f0ca93c`）；`surface_log` 采集与前端接线已合（[#211](https://github.com/he18718143986-design/IDE/pull/211) / `273e506`）。**待合**：`ITEM-n` 撞号修复 [#214](https://github.com/he18718143986-design/IDE/pull/214)（卡修订合入后再合）。**未做**：验收条目呈现数据通路（挂账⑬）、K-14 归因账本、K-16 `attributions.trigger` 闭集与 `linked_reason_code`；P-7 按 §3.3 本版不做。**J.16 不标 COMPLETED**。续作顺序：ITEM 修复 → 验收条目呈现通路（待决策）→ K-14 → K-16；J16-P5 须真实会话 + 真实台账，由 Tina 本机试玩提供 `.stagent/`。
+> **J.16 实施状态（P-186 更新，2026-11-11）**：P-1～P-6 已合（[#188](https://github.com/he18718143986-design/IDE/pull/188) / `859f762`）；文案修正已合（[#189](https://github.com/he18718143986-design/IDE/pull/189) / `f0ca93c`）；`surface_log` 采集与前端接线已合（[#211](https://github.com/he18718143986-design/IDE/pull/211) / `273e506`）。**待合**：`ITEM-n` 撞号修复 [#214](https://github.com/he18718143986-design/IDE/pull/214)（卡修订合入后再合）。**未做**：验收条目呈现数据通路（挂账⑬）、K-14 归因账本、K-16 `attributions.trigger` 闭集与 `linked_reason_code`；P-7 按 §3.3 本版不做。**J.16 不标 COMPLETED**。**P-187**：挂账⑬ 走方案 A，中栏验收条目只读投影登记为 J16-P7；方案 B 另立 `TASK-J.22`，挂账⑫ 另立 `TASK-J.21`。续作顺序：ITEM 修复 → 验收条目呈现通路（待决策）→ K-14 → K-16；J16-P5 须真实会话 + 真实台账，由 Tina 本机试玩提供 `.stagent/`。
 > **建立日期**：2026-10-28（Asia/Hong_Kong）
 > **上位规格**：[`supervisor.md`](./supervisor.md) §14.11（台账、子账本四 `attributions`、K-14、K-15、K-16）、§16.5（B/C 分流与不变式 C-1）、§16.7（试玩幕与质询台）、§17 D10；[`runtime-contract-and-safety.md`](./runtime-contract-and-safety.md) §5.4；[`worker-graveyard-gate.md`](./worker-graveyard-gate.md)（返工派工同样过门禁）；架构 [`system-architecture.md`](./system-architecture.md) 步骤六（已被 §16.7 与 D10 修订的部分以 SSOT 为准）。
 > **与上位规格的关系**：本文是实施口径，不新增场景、不新增用户决定类型、不新增错误码与原因码。**K-14 / K-15 / K-16、G-MATCH、INV-LEDGER-03 以 [`supervisor.md`](./supervisor.md) §14.11 为准**；冲突时以 SSOT 为准。
@@ -309,7 +309,7 @@ interface SurfaceLog {
 
 **验收条目 ID 结论（P-186）**：复用 `SchemeDraftV2.acceptance[].id`，不新增 schema 字段、不引入文本哈希。前提是 ID 跨重启唯一，`ITEM-n` 撞号由 #214 修复（挂账⑪）。`ScopePlan.verification.plain` 是引擎固定检查文案、不对应任何验收条目，不纳入归因。
 
-**实施偏差（P-186 记录，挂账⑬）**：§15.4 要求中栏上半部分展示白话验收条目。当前 `ScopeAcceptanceBlock` 只渲染 areas 与引擎生成的 `verification.plain`，未渲染方案验收条目。中栏方案还由前端 `rebuildSchemeFromCorpus` 从对话语料启发式生成，编译器台账的 `acceptance` 未经任何路由进入中栏，前端 `SchemeDraft.acceptance` 当前从未被填充。因此 `acceptance_ids_shown` 暂无真实来源；该通路待决策，在此之前 K-14 的「验收条目组」不得宣称可用。
+**实施偏差（P-186 记录，挂账⑬）**：§15.4 要求中栏上半部分展示白话验收条目。当前 `ScopeAcceptanceBlock` 只渲染 areas 与引擎生成的 `verification.plain`，未渲染方案验收条目。中栏方案还由前端 `rebuildSchemeFromCorpus` 从对话语料启发式生成，编译器台账的 `acceptance` 未经任何路由进入中栏，前端 `SchemeDraft.acceptance` 当前从未被填充。因此 `acceptance_ids_shown` 暂无真实来源；该通路已拍板采用方案 A（P-187，只读投影，见 J16-P7）；在其合入并渲染前，K-14 的「验收条目组」不得宣称可用。
 
 **算法**（按顺序，先命中先用）：
 

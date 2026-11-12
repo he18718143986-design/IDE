@@ -775,6 +775,7 @@ governance:
 #### 【Task J.16】试玩幕 · 质疑自查续作（surface_log → K-14 归因账本 → K-16 trigger 闭集）`[NEW_TASK · 立卡 P-176 · 未开工]`
 
 > **立卡说明（2026-11-09 · P-176）**：S.5 注记（「已知 7 处局限由 TASK-J.16 实施时一并修复」）所指的卡。P-1～P-6 已合（[#188](https://github.com/he18718143986-design/IDE/pull/188) / `859f762`），左栏与 §16.7 文案已合（[#189](https://github.com/he18718143986-design/IDE/pull/189) / `f0ca93c`）。本卡只承接**未落地**部分。**立卡 ≠ 开工 ≠ 销项**：待 Tina 单卡授权后才可施工；不宣称端到端闭环；本卡不标 COMPLETED，直到验收条件全部通过。**施工顺序（依赖注记）**：先完成 TASK-CI.3（测试 fetch 哨兵判红、未桩请求清零），再做本卡的真实会话与真实台账端到端验收（J16-P5）；否则链路测试可能仍含未桩请求，验证可信度打折。
+> **卡修订与进度注记（P-187 · 2026-11-11）**：Tina 拍板挂账⑬ 走方案 A。新增 J16-P7（中栏上半部分渲染台账验收条目，只读投影）及对应 writable_paths / touches。方案 B 另立 `TASK-J.22`；挂账⑫ 另立 `TASK-J.21`。卡状态仍为 `NEW_TASK`，**仍不标 COMPLETED**。
 > **卡修订与进度注记（P-186 · 2026-11-11）**：`writable_paths` 与 `touches` 追加 `compile-loop.ts` 与 ITEM 撞号复现测试（授权：Tina 拍板方案 A 与「ITEM 撞号先修后进 K-14」）。`surface_log` 采集与前端接线已合（#211 / `273e506`）。ITEM 撞号修复 [#214](https://github.com/he18718143986-design/IDE/pull/214) 须在本修订合入后再合（挂账⑪）。验收条目呈现数据通路未决（挂账⑬，待 Tina 决策）；K-14 未开工；J16-P5 待真实数据。**仍不标 COMPLETED**。
 
 ```yaml task-card
@@ -816,6 +817,10 @@ contract:
       text: >-
         用户可见文案按 §16.7 在渲染层验收（真实打开质疑自查面板）：不出现「按缺陷修复」「按新需求演进」「实现缺陷」「confidence」
         等技术术语；左栏为空时有白话说明。服务端字段不算验收。
+    - id: J16-P7
+      check: auto
+      text: >-
+        中栏上半部分（§15.4）渲染台账验收条目：Daemon 以只读路由投影 `SchemeDraftV2.acceptance`（不写盘）；区块只展示确已渲染的条目，`surface_log` 的 `acceptance` 段 `item_ref` 与台账 `id` 一致；台账为空或读取失败时不渲染条目、不伪造，标「无呈现记录」。
   scheme_item_ids: []
   scope:
     writable_paths:
@@ -831,6 +836,8 @@ contract:
       - tests/ui/scope-acceptance-surface-log.test.tsx
       - daemon/supervisor/intent-compiler/compile-loop.ts
       - tests/integration/intent-compiler-item-id-collision.test.ts
+      - daemon/supervisor/intent-compiler/acceptance-projection.ts
+      - tests/unit/scheme-acceptance-projection.test.ts
     readonly_paths:
       - docs/specs/playtest-self-check.md
       - docs/specs/supervisor.md
@@ -844,7 +851,7 @@ design:
   approach: >-
     1) 先接 surface_log：随 §15.4 投影写入，只记录确已呈现的条目。2) K-14 账本只追加，三分类以 surface_log 为唯一呈现依据。
     3) K-16 闭集与 linked_reason_code 在写入口校验，旧台账按 legacy 前缀迁移。4) 缺 surface_log 的退化路径单独测试。
-    5) 验收 P5/P6 须真实链路与渲染层，不以 jsdom 或服务端字段替代。施工前按当时代码重核 touches。
+    5) 验收 P5/P6 须真实链路与渲染层，不以 jsdom 或服务端字段替代。6) 验收条目呈现（P-187 · 挂账⑬ 方案 A）：Daemon 新增只读路由投影台账 acceptance，中栏上半部分渲染，上报 `section=acceptance` 的 `item_ref` 为台账 id。施工前按当时代码重核 touches。
   touches:
     - { path: daemon/supervisor/dispute/evidence-triad.ts, change: modify, why: 左栏锚定原话与三方证据接入呈现记录, symbols: [] }
     - { path: daemon/supervisor/dispute/types.ts, change: modify, why: surface_log / 归因账本类型与 K-16 闭集, symbols: [] }
@@ -854,7 +861,10 @@ design:
     - { path: src/routes/index.tsx, change: modify, why: 确认 ID 生成与 surface_log 上报对齐（键与 §5.3 confirmation_id 一致）, symbols: [] }
     - { path: daemon/server.ts, change: modify, why: 新增 surface_log 写入路由（沿既有 Bearer 鉴权，不新开写权限）, symbols: [] }
     - { path: daemon/supervisor/intent-compiler/compile-loop.ts, change: modify, why: ITEM-n 由台账推导分配（挂账⑪，K-14 前置；P-186 授权）, symbols: [] }
-    - { path: tests/integration/intent-compiler-item-id-collision.test.ts, change: create, why: ITEM-n 撞号复现（同进程 + 模拟重启）与 todo 留痕（挂账⑪⑫）, symbols: [] }
+    - { path: tests/integration/intent-compiler-item-id-collision.test.ts, change: modify, why: ITEM-n 撞号复现（同进程 + 模拟重启）与 todo 留痕（挂账⑪⑫）, symbols: [] }
+    - { path: daemon/supervisor/intent-compiler/acceptance-projection.ts, change: create, why: 台账验收条目只读投影（纯函数，不写盘；挂账⑬ 方案 A，P-187）, symbols: [] }
+    - { path: tests/unit/scheme-acceptance-projection.test.ts, change: create, why: 投影纯函数与台账为空时的降级（J16-P7）, symbols: [] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: 新增只读获取台账验收条目的客户端函数（J16-P7）, symbols: [] }
   interfaces: []
   test_plan:
     - { acceptance_id: J16-P1, test_path: tests/unit/dispute-surface-log.test.ts, level: unit, debt: "J.16 未施工；待单卡授权后补测试" }
@@ -863,6 +873,8 @@ design:
     - { acceptance_id: J16-P4, test_path: tests/unit/dispute-surface-log-degraded.test.ts, level: unit, debt: "J.16 未施工；待单卡授权后补测试" }
     - { acceptance_id: J16-P5, test_path: tests/integration/dispute-anchor-real-session.test.ts, level: integration, debt: "真实会话与真实台账验证未做；需 Tina 提供或授权环境" }
     - { acceptance_id: J16-P6, test_path: tests/components/DisputeConsolePane.test.tsx, level: integration, debt: "jsdom 不替代真实面板人工验收" }
+    - { acceptance_id: J16-P7, test_path: tests/unit/scheme-acceptance-projection.test.ts, level: unit, debt: "J.16 未施工；待单卡授权后补测试" }
+    - { acceptance_id: J16-P7, test_path: tests/ui/scope-acceptance-surface-log.test.tsx, level: integration, debt: "jsdom 不替代真实面板人工验收" }
 governance:
   spec_refs:
     - docs/specs/playtest-self-check.md
@@ -884,6 +896,154 @@ governance:
     - K-16 trigger 接受闭集外的值，或旧值迁移不带 legacy 前缀
     - 只以单测通过宣称 J.16 完成，或在 J16-P5 / J16-P6 未通过时标 COMPLETED
     - 用户可见文案出现 §16.7 禁用的技术分类词
+  estimate: L
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+#### 【Task J.21】intent-compiler 重启后状态恢复（transcript 持久化与证据回放）`[NEW_TASK · 立卡 P-187 · 未开工]`
+
+> **立卡说明（2026-11-11 · P-187）**：挂账⑫。集成测试已观察：进程重启后 transcript 只在内存里，台账证据指向的旧 turn 解析不到，审计以 `E_STATE_CORRUPT` 拒绝之后的批次。**生产环境未验证**；影响面按测试观察为「重启后编译循环不可用」，而非仅审计报错。与 ITEM-n 撞号（#214 已合）是两个问题。**立卡 ≠ 开工**；优先级：建议 P1，待 Tina 定。
+
+```yaml task-card
+id: TASK-J.21
+status: NEW_TASK
+contract:
+  intent:
+    title: intent-compiler 重启后状态恢复（transcript 持久化与证据回放）
+    description: >-
+      进程重启后，台账已引用的证据 turn 须可从磁盘解析，编译循环可继续提交新批次，不得以 E_STATE_CORRUPT 拒绝全部后续批次。
+      transcript 持久化须版本化：旧数据缺失或版本不识别时明确报错，不静默降级。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J21-P1
+      check: auto
+      text: >-
+        模拟进程重启（新 host 实例仅从磁盘加载）后，台账中已引用的证据 turn 均可解析，审计通过。
+    - id: J21-P2
+      check: auto
+      text: >-
+        重启后提交新批次（不以空补丁回放绕开）不被拒绝；tests/integration/intent-compiler-item-id-collision.test.ts 中以 it.todo 留痕的重启用例转为正式断言。
+    - id: J21-P3
+      check: auto
+      text: >-
+        transcript 持久化带版本号；版本缺失或不识别时返回明确错误码，不静默忽略。
+  scope:
+    writable_paths:
+      - daemon/supervisor/intent-compiler/host.ts
+      - daemon/supervisor/intent-compiler/scheme-ledger-store.ts
+      - daemon/supervisor/intent-compiler/transcript-store.ts
+      - tests/integration/intent-compiler-restart-recovery.test.ts
+      - tests/integration/intent-compiler-item-id-collision.test.ts
+      - tests/unit/transcript-store.test.ts
+    readonly_paths:
+      - docs/specs/intent-compiler-prompt.md
+      - docs/specs/supervisor.md
+  verification:
+    commands:
+      - { alias: regression-intent-compiler, executable: npx, args: [vitest, run, tests/integration/intent-compiler-restart-recovery.test.ts, tests/integration/intent-compiler-item-id-collision.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) 先确认 transcript 的生命周期与持久化点（内存 → 磁盘）。2) 持久化带版本号，读取时校验。3) 重启用例以新实例仅从磁盘加载，不以空补丁回放绕开。施工前按当时代码重核 touches。
+  touches:
+    - { path: daemon/supervisor/intent-compiler/host.ts, change: modify, why: transcript 持久化点与重启加载, symbols: [] }
+    - { path: daemon/supervisor/intent-compiler/scheme-ledger-store.ts, change: modify, why: 台账读取与 transcript 版本校验配合, symbols: [] }
+    - { path: daemon/supervisor/intent-compiler/transcript-store.ts, change: create, why: transcript 持久化与版本化读取（新文件，施工前核对是否需要）, symbols: [] }
+    - { path: tests/integration/intent-compiler-restart-recovery.test.ts, change: create, why: 重启后证据回放与新批次提交（J21-P1、P2）, symbols: [] }
+    - { path: tests/integration/intent-compiler-item-id-collision.test.ts, change: modify, why: 将 it.todo 重启用例转正式断言（J21-P2）, symbols: [] }
+    - { path: tests/unit/transcript-store.test.ts, change: create, why: 版本校验与错误码（J21-P3）, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J21-P1, test_path: tests/integration/intent-compiler-restart-recovery.test.ts, level: integration, debt: "未施工" }
+    - { acceptance_id: J21-P2, test_path: tests/integration/intent-compiler-item-id-collision.test.ts, level: integration, debt: "未施工" }
+    - { acceptance_id: J21-P3, test_path: tests/unit/transcript-store.test.ts, level: unit, debt: "未施工" }
+governance:
+  spec_refs:
+    - docs/specs/intent-compiler-prompt.md
+    - docs/specs/supervisor.md
+  depends_on: []
+  code_facts:
+    - { ref: "daemon/supervisor/intent-compiler/host.ts::transcript", note: "transcript 仅存内存（挂账⑫，P-186 复现测试观察）" }
+  non_goals:
+    - 不改 E_STATE_CORRUPT 的审计规则本身（只保证合法状态可恢复）
+    - 不做中栏方案来源统一（另卡 TASK-J.22）
+  fail:
+    - 重启后仍以 E_STATE_CORRUPT 拒绝合法台账的新批次
+    - 用空补丁回放或跳过审计让重启用例变绿
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+#### 【Task J.22】中栏方案来源统一为编译器台账（挂账⑬ 方案 B · 根本解）`[NEW_TASK · 立卡 P-187 · 未开工 · 须先拆卡]`
+
+> **立卡说明（2026-11-11 · P-187）**：挂账⑬ 方案 B。当前中栏方案由前端 `rebuildSchemeFromCorpus` 从对话语料启发式拼出，编译器台账不进入中栏。TASK-J.16 J16-P7 以只读投影（方案 A）作过渡；本卡为根本解，范围远超 J.16，故另立。**估算 L：施工前须先拆卡**，拆卡前不得开工。依赖 TASK-J.21（重启后台账可用）与 TASK-J.16 J16-P7（过渡投影已合）。**立卡 ≠ 开工**。
+
+```yaml task-card
+id: TASK-J.22
+status: NEW_TASK
+contract:
+  intent:
+    title: 中栏方案来源统一为编译器台账（替换启发式 rebuildSchemeFromCorpus）
+    description: >-
+      中栏方案（目标、模块、验收条目等）的来源改为编译器台账 SchemeDraftV2；启发式拼接仅保留为无台账时的明确降级态并标注。
+    risk_level: HIGH
+  acceptance:
+    - id: J22-P1
+      check: auto
+      text: >-
+        中栏渲染的方案内容与台账 SchemeDraftV2 逐项一致（标题、目标、验收条目）；不再由对话语料拼接。
+    - id: J22-P2
+      check: playtest
+      text: >-
+        真实会话中，编译器台账与中栏方案在确认前后保持一致；真实打开方案面板人工核对（jsdom 不替代）。
+    - id: J22-P3
+      check: auto
+      text: >-
+        无台账时降级态明确标注「方案尚未生成」，不以启发式拼接内容冒充台账方案。
+  scope:
+    writable_paths:
+      - src/routes/index.tsx
+      - src/lib/journey/scheme-draft.ts
+      - src/components/studio/SchemeReviewPane.tsx
+      - tests/ui/scheme-source-unification.test.tsx
+    readonly_paths:
+      - daemon/supervisor/intent-compiler/scheme-ledger-store.ts
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    待拆卡后确定。拆分建议：A) 台账到中栏的映射层（纯函数 + 单测）；B) 路由切换数据源与降级态；C) 真实会话人工验收。
+  touches:
+    - { path: src/routes/index.tsx, change: modify, why: 中栏数据源切换为台账（待拆卡核对具体改动范围）, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J22-P1, test_path: tests/ui/scheme-source-unification.test.tsx, level: integration, debt: "未施工" }
+    - { acceptance_id: J22-P2, test_path: tests/ui/scheme-source-unification.test.tsx, level: integration, debt: "需 Tina 真实试玩；jsdom 不替代" }
+    - { acceptance_id: J22-P3, test_path: tests/ui/scheme-source-unification.test.tsx, level: integration, debt: "未施工" }
+governance:
+  spec_refs:
+    - docs/specs/playtest-self-check.md
+    - docs/specs/supervisor.md
+  depends_on:
+    - { id: TASK-J.21, kind: hard }
+    - { id: TASK-J.16, kind: hard }
+  code_facts:
+    - { ref: "src/routes/index.tsx::rebuildSchemeFromCorpus", note: "中栏方案由 rebuildSchemeFromCorpus 启发式拼接（挂账⑬ 核实）" }
+  non_goals:
+    - 不改台账 schema 与编译器提示词
+    - 不在拆卡前开工
+  fail:
+    - 中栏与台账不一致仍出现而未标注
+    - 以 jsdom 替代真实会话验收
   estimate: L
   invariants:
     auth: unchanged
