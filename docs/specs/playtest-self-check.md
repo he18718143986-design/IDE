@@ -274,6 +274,8 @@ stateDiagram-v2
 
 **去重**：同一次用户操作同时满足 `user_dispute` 与 `acceptance_fail`（用户质疑引发返工，返工复检失败）→ 两条都记，`resolution_note` 互相引用对方的 `attribution_id`。它们回答不同的问题：一个是「用户为什么觉得不对」，一个是「系统为什么没做到」。
 
+> **实施状态（P-192 挂账⑰，2026-11-12）**：`user_dispute` 生产写入端已在 [#221](https://github.com/he18718143986-design/IDE/pull/221)/[#222](https://github.com/he18718143986-design/IDE/pull/222)/[#224](https://github.com/he18718143986-design/IDE/pull/224) 接线落地；`first_impression` 与 `acceptance_fail` 两个 trigger 暂无生产写入端，本节定义的互引去重逻辑暂未实现。定性明确属规格预留（SPEC_RESERVED）而非实现缺陷，待对应生产场景（第一印象速记、验收失败触发）落地时接入。
+
 ### 5.2 trigger 收紧为闭集（K-16）
 
 > **SSOT**：闭集定义与字段语义见 [`supervisor.md`](./supervisor.md) §14.11 **K-16**（及 K-14 归因账本）。本文不复述。
