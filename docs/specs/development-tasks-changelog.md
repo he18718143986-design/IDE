@@ -242,6 +242,9 @@
 
 - **P-196（修订 TASK-J.23 writable_paths · 2026-11-12）**：授权来源为 Tina 本轮 TASK-J.23 开工指令。施工前核对确认冻结后 DISPUTE 必须经过 journey API，才能复用 #222 已有 `confirmation_id` 透传、服务端格式校验及 `surface_log` 查证归因（缺失或查证失败仍失败关闭、不写归因）；原卡 writable_paths 未包含 `src/lib/daemon-api.ts`、`daemon/server.ts`、`daemon/supervisor/journey/orchestrate.ts` 与生产集成测试。补入路径、touches、验收与 `tests/integration/journey-dispute-routing.test.ts` 测试计划；卡仍 `NEW_TASK`、未开工。仅 docs，不新增 OP、不改产品代码。
 
+- **P-197（修订 TASK-J.24 writable_paths 与方案裁决 · 2026-11-13）**：授权来源为 Tina 授权 TASK-J.24 开工。施工前核对确认开工路径三缺口实际需触及 `src/routes/index.tsx`（确认弹窗/重试交互）、`src/lib/journey/confirm-scheme-atomic.ts`（原子确认流程）、设置页模型钥匙组件与对应 API 参数扩展（`src/components/settings/SettingsTab.tsx`、`daemon/server.ts`，后者约束仅限 settings 接口参数接线）；缺口 3 明确选定「供应商选择器」方案，严禁靠猜模型名推断供应商；缺口 1 验收条款与既有「点确认后会列入禁写名单」语义对齐，未显式确认不得带 `acknowledge_dirty`。扩充 `writable_paths`、touches 与测试计划；卡状态仍为 `NEW_TASK`、未开工。仅 docs，不新增 OP，不改产品代码。
+
+
 ## 枢纽迁入修订（P-43～P-66，按编号升序）
 
 > 2026-11-09 文档治理：自 `development-tasks.md` 文件头部之后内联迁出（原第 17–39 行）。P-45 与本文件既有条目完全重复，只保留一份。
