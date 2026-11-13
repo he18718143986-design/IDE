@@ -4,6 +4,7 @@ import { stubOfflineFetch } from "../../src/tests/setup";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { SettingsTab } from "../../src/components/settings/SettingsTab";
 import type { DaemonConnection } from "../../src/lib/daemon-api";
+import { ModelKeyPanel } from "../../src/routes/index";
 
 /**
  * 设置页验收。
@@ -342,5 +343,68 @@ describe("设置页 C.10l：高级里可选会话/适配器", () => {
     renderSettings();
     fireEvent.click(screen.getByTestId("settings-advanced-summary"));
     expect(screen.queryByTestId("settings-chat-session")).toBeNull();
+  });
+});
+
+describe("TASK-J.24 缺口 3：供应商选择器与模型钥匙保存", () => {
+  it("T-J24-UI-001 生产模型钥匙面板允许选择供应商并透传 Base URL", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (_url, init) => {
+        const body = JSON.parse(init?.body as string);
+        expect(body).toEqual({
+          api_key: "sk-custom-key-123456",
+          model: "local-model",
+          provider: "custom",
+          base_url: "http://127.0.0.1:11434/v1",
+        });
+        return new Response(
+          JSON.stringify({
+            settings: {
+              configured: true,
+              model: "local-model",
+              source: "runtime",
+              provider: "custom",
+              baseURL: "http://127.0.0.1:11434/v1",
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      });
+    const onSaved = vi.fn();
+    render(<ModelKeyPanel conn={conn} settings={null} onSaved={onSaved} />);
+    fireEvent.change(screen.getByLabelText("供应商"), {
+      target: { value: "custom" },
+    });
+    fireEvent.change(screen.getByLabelText("Base URL"), {
+      target: { value: "http://127.0.0.1:11434/v1" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("粘贴你的钥匙…"), {
+      target: { value: "sk-custom-key-123456" },
+    });
+    fireEvent.change(screen.getByTestId("model-name"), {
+      target: { value: "local-model" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await screen.findByText(/已就绪/);
+    expect(onSaved).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: "custom",
+        baseURL: "http://127.0.0.1:11434/v1",
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    fetchMock.mockRestore();
+  });
+
+  it("T-J24-UI-002 自定义供应商未填写 Base URL 时不能保存", () => {
+    render(<ModelKeyPanel conn={conn} settings={null} onSaved={() => {}} />);
+    fireEvent.change(screen.getByLabelText("供应商"), {
+      target: { value: "custom" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("粘贴你的钥匙…"), {
+      target: { value: "sk-custom-key-123456" },
+    });
+    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
   });
 });

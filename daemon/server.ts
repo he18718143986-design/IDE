@@ -4976,12 +4976,20 @@ export class StagentDaemon {
         const body = (await this.readJsonBody(req)) as {
           api_key?: string;
           model?: string;
+          provider?: string;
+          base_url?: string;
+          baseURL?: string;
         };
         if (!body.api_key || body.api_key.trim().length < 8) {
           this.sendJson(res, 400, { error: "api_key is required" });
           return;
         }
-        setRuntimeKey(body.api_key, body.model);
+        setRuntimeKey(body.api_key, body.model, {
+          ...(body.provider ? { provider: body.provider } : {}),
+          ...((body.base_url ?? body.baseURL)
+            ? { baseURL: body.base_url ?? body.baseURL }
+            : {}),
+        });
         // 绝不回显 Key
         this.sendJson(res, 200, { settings: getModelSettings() });
       } catch (err) {

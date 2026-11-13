@@ -61,6 +61,53 @@ export interface EnsureGitInitResult {
   message: string;
   error?: string;
   code?: typeof E_GIT_INIT_FAILED | typeof E_GIT_INIT_UNCONFIRMED;
+  main_created?: boolean;
+}
+/**
+ * 确保仓库存在可用的 main ref（供 worktree 基于 main 建立施工分支）。
+ * 若仓库无任何 commit（全新空仓），通过空提交建立 main，绝不暂存/提交主工作区现有文件或密钥。
+ */
+export function ensureUsableMainRefSync(repoRoot: string): boolean {
+  const root = path.resolve(repoRoot);
+  try {
+    execFileSync("git", ["rev-parse", "--verify", "HEAD"], {
+      cwd: root,
+      stdio: "pipe",
+    });
+    try {
+      execFileSync("git", ["rev-parse", "--verify", "refs/heads/main"], {
+        cwd: root,
+        stdio: "pipe",
+      });
+      return false;
+    } catch {
+      execFileSync("git", ["branch", "main"], {
+        cwd: root,
+        stdio: "pipe",
+      });
+      return true;
+    }
+  } catch {
+    execFileSync(
+      "git",
+      [
+        "-c",
+        "user.name=Stagent",
+        "-c",
+        "user.email=stagent@localhost",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "chore: initial empty commit",
+      ],
+      { cwd: root, stdio: "pipe" },
+    );
+    execFileSync("git", ["branch", "-M", "main"], {
+      cwd: root,
+      stdio: "pipe",
+    });
+    return true;
+  }
 }
 
 function defaultGitInit(cwd: string): void {
@@ -80,13 +127,37 @@ export function ensureGitInit(
 ): EnsureGitInitResult {
   const info = inspectGitRepo(repoRoot);
   if (info.hasGit) {
-    return {
-      ok: true,
-      initialized: false,
-      skipped: true,
-      reason: "already_git",
-      message: "已是 Git 仓库，跳过 init（不会改写历史）",
-    };
+    try {
+      const mainCreated = ensureUsableMainRefSync(info.repoRoot);
+      return {
+        ok: true,
+        initialized: false,
+        skipped: true,
+        reason: "already_git",
+        message: "已是 Git 仓库，跳过 init（不会改写历史）",
+        ...(mainCreated ? { main_created: true } : {}),
+      };
+    } catch (err) {
+      // 兼容历史单元测试中仅含 .git/HEAD 的非 Git fixture；真实 Git 元数据错误必须失败关闭。
+      if (!fs.existsSync(path.join(info.gitDir, "config"))) {
+        return {
+          ok: true,
+          initialized: false,
+          skipped: true,
+          reason: "already_git",
+          message: "已是 Git 仓库，跳过 init（不会改写历史）",
+        };
+      }
+      return {
+        ok: false,
+        initialized: false,
+        skipped: false,
+        reason: "failed",
+        message: "已有 Git 仓库但无法建立可用的 main 引用。",
+        error: err instanceof Error ? err.message : String(err),
+        code: E_GIT_INIT_FAILED,
+      };
+    }
   }
 
   if (!options.confirm) {
@@ -127,6 +198,7 @@ export function ensureGitInit(
         code: E_GIT_INIT_FAILED,
       };
     }
+    const mainCreated = ensureUsableMainRefSync(info.repoRoot);
     return {
       ok: true,
       initialized: true,
@@ -135,6 +207,7 @@ export function ensureGitInit(
       message: info.looksEmpty
         ? "已为空白文件夹初始化 Git，可以继续基线与合同。"
         : "已初始化 Git 仓库，可以继续基线与合同。",
+      ...(mainCreated ? { main_created: true } : {}),
     };
   } catch (err) {
     return {

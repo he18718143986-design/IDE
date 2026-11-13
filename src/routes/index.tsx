@@ -388,6 +388,10 @@ function Console() {
     useState<DemoGate>(EMPTY_DEMO_GATE);
   const [schemeConfirmBusy, setSchemeConfirmBusy] = useState(false);
   const [schemeChatLocked, setSchemeChatLocked] = useState(false);
+  const [dirtyWorktreeConfirmation, setDirtyWorktreeConfirmation] = useState<{
+    files: string[];
+    plainMessage: string;
+  } | null>(null);
   /** J.7：交接三步人话进度；null = 未在交接 */
   const [handoffStep, setHandoffStep] = useState<HandoffUiStepId | null>(null);
   /** J.7：中栏交接成功卡（DEC-005，不进右栏） */
@@ -1286,7 +1290,7 @@ ${trimmed}`
   }, [conn, schemeDraft, scopePlan, scopeDecisionBusy]);
 
   const handleConfirmScheme = useCallback(
-    async (overridePlan?: ScopePlan) => {
+    async (overridePlan?: ScopePlan, acknowledgeDirty = false) => {
       if (!conn || !schemeDraft || schemeDraft.frozen || schemeConfirmBusy)
         return;
       setSchemeConfirmBusy(true);
@@ -1347,6 +1351,7 @@ ${trimmed}`
         demo: schemeDemoGate,
         expectedRevision,
         scopePlan: planForConfirm,
+        acknowledgeDirty,
 
         // 1. 先停流式，再禁右栏；交接瞬态锁定（J.7 / D9）。
         quiesceRightChat: async () => {
@@ -1400,7 +1405,11 @@ ${trimmed}`
         },
 
         // 3. 签署 + 施工准备：按 ScopePlan 投影建合同 → 批准 → 建任务图。
-        signAndPrepare: async ({ confirmation_id, onContractCreated }) => {
+        signAndPrepare: async ({
+          confirmation_id,
+          acknowledgeDirty: confirmedDirty,
+          onContractCreated,
+        }) => {
           const fromPlan = buildConfirmContractFromScopePlan(
             schemeDraft,
             planForConfirm,
@@ -1426,6 +1435,7 @@ ${trimmed}`
 
           await approveContract(conn, saved.contract_id, "local-user", {
             confirmationId: confirmation_id,
+            ...(confirmedDirty ? { acknowledgeDirty: true } : {}),
           });
           const list = await listContracts(conn);
           setContracts(list);
@@ -1466,6 +1476,18 @@ ${trimmed}`
       if (!result.ok) {
         const compensationFailed = result.code === "E_COMPENSATION_FAILED";
         const drifted = result.code === "E_SCOPE_PLAN_DRIFT";
+        if (result.code === "E_WORKTREE_DIRTY") {
+          const original = result.reason ?? "主工作区有未提交改动。";
+          setDirtyWorktreeConfirmation({
+            files: result.dirty_files ?? [],
+            plainMessage: original,
+          });
+          setHandoffStep(null);
+          setHandoffCompensationFailed(false);
+          setConfirmPrototypeError(null);
+          setSchemeConfirmBusy(false);
+          return;
+        }
         if (drifted && result.scope_plan) {
           setScopePlan(result.scope_plan);
         }
@@ -3060,6 +3082,19 @@ ${trimmed}`
   return (
     <div className="flex h-screen flex-col bg-background text-sm text-foreground">
       <>
+        {dirtyWorktreeConfirmation ? (
+          <DirtyWorktreeConfirmDialog
+            files={dirtyWorktreeConfirmation.files}
+            plainMessage={dirtyWorktreeConfirmation.plainMessage}
+            busy={schemeConfirmBusy}
+            onCancel={() => setDirtyWorktreeConfirmation(null)}
+            onConfirm={() => {
+              setDirtyWorktreeConfirmation(null);
+              void handleConfirmScheme(undefined, true);
+            }}
+          />
+        ) : null}
+
         <ScopePausedDialog
           view={scopePaused}
           busy={scopePausedBusy}
@@ -3800,7 +3835,67 @@ ${trimmed}`
   );
 }
 
-function ModelKeyPanel({
+export function DirtyWorktreeConfirmDialog({
+  files,
+  plainMessage,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  files: string[];
+  plainMessage: string;
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      data-testid="dirty-worktree-confirm-dialog"
+      role="alertdialog"
+      aria-label="确认处理本地未提交改动"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    >
+      <section className="w-full max-w-lg rounded-lg border border-amber-600/60 bg-background p-4 shadow-lg">
+        <h2 className="text-sm font-semibold text-foreground">
+          主工作区有未提交改动
+        </h2>
+        <p className="mt-2 text-xs text-muted-foreground">{plainMessage}</p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          这些文件不会进入施工树；点确认后会列入「绝不触碰」禁写名单。
+          未确认前不会发送 acknowledge_dirty。
+        </p>
+        {files.length > 0 ? (
+          <ul className="mt-2 max-h-40 space-y-1 overflow-auto rounded border border-border p-2 font-mono text-[11px]">
+            {files.map((file) => (
+              <li key={file}>{file}</li>
+            ))}
+          </ul>
+        ) : null}
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            data-testid="dirty-dialog-cancel"
+            onClick={onCancel}
+            className="rounded border border-border px-3 py-1.5 text-xs"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            data-testid="dirty-dialog-confirm"
+            disabled={busy}
+            onClick={onConfirm}
+            className="rounded border border-amber-700 bg-amber-500/20 px-3 py-1.5 text-xs text-amber-950 disabled:opacity-40"
+          >
+            确认并继续
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+export function ModelKeyPanel({
   conn,
   settings,
   onSaved,
@@ -3810,7 +3905,9 @@ function ModelKeyPanel({
   onSaved: (next: ModelSettings) => void;
 }) {
   const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState(settings?.model ?? "gpt-4o-mini");
+  const [model, setModel] = useState(settings?.model ?? "deepseek-chat");
+  const [provider, setProvider] = useState(settings?.provider ?? "deepseek");
+  const [baseURL, setBaseURL] = useState(settings?.baseURL ?? "");
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">(
     "idle",
   );
@@ -3820,7 +3917,10 @@ function ModelKeyPanel({
     setState("saving");
     setMessage(null);
     try {
-      const next = await saveOpenAiKey(conn, apiKey.trim(), model.trim());
+      const next = await saveOpenAiKey(conn, apiKey.trim(), model.trim(), {
+        provider,
+        ...(baseURL.trim() ? { baseURL: baseURL.trim() } : {}),
+      });
       onSaved(next);
       setApiKey("");
       setState("saved");
@@ -3841,11 +3941,11 @@ function ModelKeyPanel({
       className="space-y-2 text-[11px] leading-relaxed"
     >
       <p className="text-muted-foreground">
-        三步配好模型钥匙（OpenAI 兼容接口均可）：
+        三步配好模型钥匙（支持 OpenAI 兼容接口）：
       </p>
       <ol className="list-decimal space-y-0.5 pl-4 text-muted-foreground">
         <li>在下方粘贴钥匙（密码框，页面不会明文回显）</li>
-        <li>确认模型名（可按服务商说明改）</li>
+        <li>选择供应商并确认模型名；自定义供应商需填写 Base URL</li>
         <li>点「保存」→ 状态变成「已就绪」，再回右侧开新会话</li>
       </ol>
       <div className="flex flex-wrap items-center gap-2">
@@ -3858,8 +3958,51 @@ function ModelKeyPanel({
           placeholder={ready ? "已就绪（重新输入可覆盖）" : "粘贴你的钥匙…"}
           className="w-64 rounded border border-border bg-background px-2 py-1 outline-none"
         />
+        <label className="text-muted-foreground" htmlFor="model-provider">
+          供应商
+        </label>
+        <select
+          id="model-provider"
+          data-testid="model-provider"
+          value={provider}
+          onChange={(e) => {
+            const nextProvider = e.target.value;
+            setProvider(nextProvider);
+            if (nextProvider === "deepseek") {
+              setBaseURL("https://api.deepseek.com/v1");
+              setModel((current) => current || "deepseek-chat");
+            } else if (nextProvider === "openai") {
+              setBaseURL("https://api.openai.com/v1");
+              setModel((current) => current || "gpt-4o-mini");
+            } else {
+              setBaseURL("");
+            }
+          }}
+          className="rounded border border-border bg-background px-2 py-1 outline-none"
+        >
+          <option value="deepseek">DeepSeek</option>
+          <option value="openai">OpenAI</option>
+          <option value="custom">自定义 OpenAI 兼容接口</option>
+        </select>
+        {provider === "custom" ? (
+          <>
+            <label className="text-muted-foreground" htmlFor="model-base-url">
+              Base URL
+            </label>
+            <input
+              id="model-base-url"
+              data-testid="model-base-url"
+              type="url"
+              value={baseURL}
+              onChange={(e) => setBaseURL(e.target.value)}
+              placeholder="https://example.com/v1"
+              className="w-56 rounded border border-border bg-background px-2 py-1 outline-none"
+            />
+          </>
+        ) : null}
         <span className="text-muted-foreground">模型</span>
         <input
+          data-testid="model-name"
           value={model}
           onChange={(e) => setModel(e.target.value)}
           className="w-40 rounded border border-border bg-background px-2 py-1 outline-none"
@@ -3867,7 +4010,11 @@ function ModelKeyPanel({
         <button
           type="button"
           onClick={() => void save()}
-          disabled={state === "saving" || apiKey.trim().length < 8}
+          disabled={
+            state === "saving" ||
+            apiKey.trim().length < 8 ||
+            (provider === "custom" && !/^https?:\/\//i.test(baseURL.trim()))
+          }
           className="rounded bg-primary px-2 py-1 text-primary-foreground disabled:opacity-40"
         >
           {state === "saving" ? "保存中…" : "保存"}
