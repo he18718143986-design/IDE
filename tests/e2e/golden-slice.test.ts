@@ -346,11 +346,22 @@ describe("TASK-L.6 黄金切片 E2E（一句需求 → 合入）", () => {
   }
 
   it("一句需求 → 方案 → 确认开工 → 红绿施工 → 真预览 → 合入", async () => {
-    // ---------- 1. 右栏发一句 ----------
+    // ---------- 1. 右栏发一句（P-201：先登记原话，再带着已登记的 turn 进旅程）----------
+    const registered = await call<{
+      turn_id: string;
+      turn_text_sha256: string;
+    }>("POST", "/api/supervisor/turns", { text: USER_TEXT });
+    expect(registered.status).toBe(201);
+    const sourceTurns = [
+      {
+        turn_id: registered.body.turn_id,
+        turn_text_sha256: registered.body.turn_text_sha256,
+      },
+    ];
     const journey = await call<{ plain_summary?: string }>(
       "POST",
       "/api/supervisor/journey",
-      { message: USER_TEXT },
+      { message: USER_TEXT, ...sourceTurns[0] },
     );
     expect(journey.status).toBe(200);
     expect(typeof journey.body.plain_summary).toBe("string");
@@ -392,6 +403,7 @@ describe("TASK-L.6 黄金切片 E2E（一句需求 → 合入）", () => {
           demo_mode: "none",
         },
         scope_plan: plan,
+        source_turns: sourceTurns,
       },
     );
     expect(frozen.status).toBe(201);

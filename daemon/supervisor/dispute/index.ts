@@ -14,6 +14,7 @@ import {
   type DisputeNextAction,
   type DisputeReport,
   type DisputeUserChoice,
+  type SealFact,
   type SpecFact,
   type TriadFacts,
 } from "./types";
@@ -210,6 +211,8 @@ export function buildTimeoutFallbackReport(params: {
   challenge: string;
   timeoutMs?: number | undefined;
   spec?: SpecFact | null | undefined;
+  /** 超时也要呈递封存原话：它只读快照，不受看门狗中止的抓取影响 */
+  seal: SealFact;
   now?: (() => Date) | undefined;
 }): DisputeReport {
   const now = params.now ?? (() => new Date());
@@ -226,6 +229,7 @@ export function buildTimeoutFallbackReport(params: {
       original_request: null,
       confirmations: [],
       matched_messages: [],
+      seal: params.seal,
     },
     spec: params.spec ?? null,
     code: {

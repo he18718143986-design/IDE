@@ -33,6 +33,7 @@ import {
   E_DISPUTE_TIMEOUT,
   type DiffFact,
   type PromptFact as PromptFactType,
+  type SealFact,
   type TriadFacts,
 } from "../../daemon/supervisor/dispute/types";
 
@@ -60,6 +61,15 @@ const CONTRACT = createContractDraft({
   ],
 });
 
+const NO_SEAL: SealFact = {
+  status: "NO_BINDING",
+  confirmation_id: null,
+  bound_snapshot: false,
+  confirmed_at: null,
+  frozen_quotes_count: null,
+  quotes: [],
+};
+
 function promptFact(matched: number): PromptFactType {
   const messages = Array.from({ length: matched }, (_, index) => ({
     message_id: `msg_${index}`,
@@ -73,6 +83,7 @@ function promptFact(matched: number): PromptFactType {
     original_request: matched > 0 ? "订单页面要支持满减折扣" : null,
     confirmations: [],
     matched_messages: messages,
+    seal: NO_SEAL,
   };
 }
 
@@ -339,6 +350,7 @@ describe("超时降级报告", () => {
       contract: CONTRACT,
       challenge: "订单页面没有满减折扣功能",
       timeoutMs: 60_000,
+      seal: NO_SEAL,
     });
     expect(report.classification).toBe("UNATTRIBUTED");
     expect(report.degraded).toBe(true);

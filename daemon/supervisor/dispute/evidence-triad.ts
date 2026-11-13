@@ -16,6 +16,8 @@ import { execGit } from "../../git/worktree-manager";
 import { loadLatestEvidenceSnapshot } from "../../pipeline/merger";
 import {
   readSchemeSnapshot,
+  verifyFrozenQuotes,
+  type FrozenQuote,
   type SchemeSnapshot,
 } from "../../pipeline/scheme-snapshot-store";
 import { unquoteGitPath } from "../../pipeline/untracked-scope-guard";
@@ -32,6 +34,8 @@ import type {
   DiffFact,
   PromptFact,
   PromptFactMessage,
+  SealFact,
+  SealedQuoteFact,
   SpecFact,
   TriadFacts,
 } from "./types";
@@ -40,7 +44,7 @@ import type {
  * 三方事实抓取管道（TASK-S.5 / 架构 §5.7；口径见 playtest-self-check §2）。
  *
  * 三路事实全部来自已冻结或已提交的物理载体，任何一路缺失都显式标注：
- * - 左栏「你当时说的」：冻结方案条目的 `evidence` 锚定原话（修 P-2）；
+ * - 左栏「你当时说的」：确认快照里封存的原话（P-201）；条目 `evidence` 锚定原话只作归因信号（修 P-2）；
  * - 中栏「确认的方案里记的」：确认快照 `.stagent/drafts/schemes/*.json`（修 P-1）；
  * - 右栏「代码实际做的」：证据包 `git_info` 的 `base..task` 区间 diff（修 P-3）。
  *
@@ -246,7 +250,7 @@ function itemLabel(item: Record<string, unknown>): string {
 }
 
 /**
- * 左栏事实：与质询相关的方案条目所锚定的原话（修 P-2）。
+ * 归因信号：与质询相关的方案条目所锚定的原话（修 P-2；左栏展示见 `collectSealFact`）。
  *
  * - 只采信 `turn` 证据且带 `anchor`；
  * - 锚点的 `turn_text_sha256` 必须与会话里该轮原文一致，否则丢弃（失败关闭）；
@@ -409,6 +413,80 @@ export function anchoredQuotesFromDraft(
   return out.slice(-MAX_QUOTES);
 }
 
+function keywordHits(text: string, keywords: readonly string[]): number {
+  const haystack = matchNormalize(text);
+  let hits = 0;
+  for (const keyword of keywords) {
+    const needle = matchNormalize(keyword);
+    if (needle.length > 0 && haystack.includes(needle)) hits += 1;
+  }
+  return hits;
+}
+
+/** 关键词只决定先后：命中多的在前，同分按说话先后；不因零命中丢弃任何一句。 */
+function rankSealedQuotes(
+  quotes: readonly FrozenQuote[],
+  keywords: readonly string[],
+): SealedQuoteFact[] {
+  return quotes
+    .map((quote) => ({
+      turn_id: quote.turn_id,
+      seq: quote.seq,
+      text: quote.text,
+      turn_text_sha256: quote.turn_text_sha256,
+      keyword_hits: keywordHits(quote.text, keywords),
+    }))
+    .sort((a, b) => b.keyword_hits - a.keyword_hits || a.seq - b.seq)
+    .slice(0, MAX_QUOTES);
+}
+
+/**
+ * 左栏事实（P-201）：合同 scheme_binding 指向的确认快照里封存的原话。
+ * 不读会话、不读台账、不拼凑；快照与合同不符或封存段校验不通过时整段作废。
+ */
+export function collectSealFact(
+  repoRoot: string,
+  binding: ContractBinding,
+  keywords: readonly string[],
+): SealFact {
+  const unavailable = (status: SealFact["status"]): SealFact => ({
+    status,
+    confirmation_id: binding?.confirmation_id ?? null,
+    bound_snapshot: false,
+    confirmed_at: null,
+    frozen_quotes_count: null,
+    quotes: [],
+  });
+  if (!binding) return unavailable("NO_BINDING");
+  const snapshot = readSchemeSnapshot(repoRoot, binding.confirmation_id);
+  if (!snapshot) return unavailable("SNAPSHOT_MISSING");
+  if (snapshot.digest !== binding.snapshot_digest) {
+    return unavailable("TAMPERED");
+  }
+  const integrity = verifyFrozenQuotes(snapshot);
+  if (!integrity.ok) return unavailable("TAMPERED");
+  const bound = {
+    confirmation_id: binding.confirmation_id,
+    bound_snapshot: true,
+    confirmed_at: snapshot.created_at,
+  };
+  if (!integrity.sealed) {
+    return {
+      status: "NOT_SEALED",
+      ...bound,
+      frozen_quotes_count: null,
+      quotes: [],
+    };
+  }
+  const quotes = integrity.frozen_quotes.quotes;
+  return {
+    status: "SEALED",
+    ...bound,
+    frozen_quotes_count: quotes.length,
+    quotes: rankSealedQuotes(quotes, keywords),
+  };
+}
+
 export function ledgerDraftForSnapshot(
   repoRoot: string,
   snapshot: SchemeSnapshot | null,
@@ -446,6 +524,11 @@ export class SessionFactSourceImpl implements SessionFactSource {
   }
 
   collect(input: SessionFactInput): PromptFact {
+    const seal = collectSealFact(
+      this.repoRoot,
+      input.schemeBinding,
+      input.keywords,
+    );
     const session = this.pickSession(input);
     if (!session) {
       return {
@@ -454,6 +537,7 @@ export class SessionFactSourceImpl implements SessionFactSource {
         original_request: null,
         confirmations: [],
         matched_messages: [],
+        seal,
       };
     }
 
@@ -483,6 +567,7 @@ export class SessionFactSourceImpl implements SessionFactSource {
       original_request: original,
       confirmations,
       matched_messages: matched,
+      seal,
     };
   }
 }

@@ -68,6 +68,7 @@ beforeEach(() => {
       confirmation_id: "conf_known1",
       plain_text_version: "v1",
       presented_at: "2026-11-12T00:00:00.000Z",
+      phase: "pre_confirm",
       shown: [{ item_ref: "D-1", section: "decision" }],
     }),
   );

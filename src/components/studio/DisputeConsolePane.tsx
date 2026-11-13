@@ -10,6 +10,58 @@ import { useState } from "react";
 export type DisputeClassificationView =
   "IMPLEMENTATION_BUG" | "REQUIREMENT_DRIFT" | "UNATTRIBUTED";
 
+export type DisputeSealStatusView =
+  "SEALED" | "NOT_SEALED" | "NO_BINDING" | "SNAPSHOT_MISSING" | "TAMPERED";
+
+/** 左栏原话的封存事实（P-201），取自合同绑定的确认快照 */
+export interface DisputeSealView {
+  status: DisputeSealStatusView;
+  bound_snapshot: boolean;
+  confirmed_at: string | null;
+  frozen_quotes_count: number | null;
+  quotes: Array<{ turn_id: string; text: string; turn_text_sha256: string }>;
+}
+
+const SEAL_MISSING_VIEW: DisputeSealView = {
+  status: "NOT_SEALED",
+  bound_snapshot: false,
+  confirmed_at: null,
+  frozen_quotes_count: null,
+  quotes: [],
+};
+
+function formatConfirmedAt(iso: string | null): string | null {
+  if (!iso) return null;
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return null;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${at.getMonth() + 1}月${at.getDate()}日 ${pad(at.getHours())}:${pad(at.getMinutes())}`;
+}
+
+/** 左栏状态行：只陈述快照事实（是否找到确认记录、封存了几句），不做聊天计数 */
+function confirmationFactLine(seal: DisputeSealView): string {
+  const at = formatConfirmedAt(seal.confirmed_at);
+  const when = at ? `你在 ${at} 确认了这份方案` : "你确认了这份方案";
+  switch (seal.status) {
+    case "SEALED": {
+      const total = seal.frozen_quotes_count ?? seal.quotes.length;
+      const listed =
+        total > seal.quotes.length
+          ? `（下面列出最相关的 ${seal.quotes.length} 句）`
+          : "";
+      return `${when}，系统封存了你当时说的 ${total} 句话${listed}`;
+    }
+    case "NOT_SEALED":
+      return seal.bound_snapshot
+        ? `${when}，但系统没有封存你当时说的话`
+        : "没有找到这份合同绑定的确认记录，系统没有封存你当时说的话";
+    case "TAMPERED":
+      return "这份合同的确认记录校验没有通过，原话不予展示";
+    default:
+      return "没有找到这份合同绑定的确认记录，系统没有封存你当时说的话";
+  }
+}
+
 export interface DisputeReportView {
   report_id: string;
   contract_id: string;
@@ -23,8 +75,12 @@ export interface DisputeReportView {
   facts: {
     prompt: {
       original_request: string | null;
-      matched_quotes: string[];
-      confirmations: number;
+      /** P-201 起左栏不再渲染（只作归因信号） */
+      matched_quotes?: string[] | undefined;
+      /** P-201 起「确认 N 次」改取快照事实，不再渲染 */
+      confirmations?: number | undefined;
+      /** 缺省按未封存渲染 */
+      seal?: DisputeSealView | undefined;
     };
     spec: {
       matched_entries: string[];
@@ -77,6 +133,8 @@ export function DisputeConsolePane(props: DisputeConsolePaneProps) {
     props.busy !== true;
 
   const report = props.report ?? null;
+  const seal = report?.facts.prompt.seal ?? SEAL_MISSING_VIEW;
+  const sealed = seal.status === "SEALED";
 
   return (
     <div
@@ -146,6 +204,7 @@ export function DisputeConsolePane(props: DisputeConsolePaneProps) {
           data-testid="dispute-report-card"
           data-classification={report.classification}
           data-degraded={report.degraded ? "true" : "false"}
+          data-seal-status={seal.status}
           className="space-y-2 rounded border border-border p-3"
         >
           <div className="flex flex-wrap items-center gap-2">
@@ -156,12 +215,22 @@ export function DisputeConsolePane(props: DisputeConsolePaneProps) {
             >
               {CLASSIFICATION_LABEL[report.classification]}
             </span>
-            {report.degraded && (
+            {report.degraded && sealed && (
               <span
                 data-testid="dispute-degraded-badge"
                 className="rounded border border-amber-500/50 px-2 py-0.5 text-[11px] text-amber-800"
               >
                 已降级呈递事实
+              </span>
+            )}
+            {!sealed && (
+              <span
+                data-testid="dispute-seal-badge"
+                className="rounded border border-destructive/40 px-2 py-0.5 text-[11px] text-destructive"
+              >
+                {seal.status === "TAMPERED"
+                  ? "确认记录校验没有通过"
+                  : "系统没有封存原话"}
               </span>
             )}
           </div>
@@ -174,18 +243,7 @@ export function DisputeConsolePane(props: DisputeConsolePaneProps) {
           </p>
 
           <div className="grid gap-2 md:grid-cols-3">
-            <FactBlock
-              testId="dispute-fact-prompt"
-              title="你当时说的"
-              lines={[
-                ...(report.facts.prompt.matched_quotes.length > 0
-                  ? report.facts.prompt.matched_quotes.map(
-                      (quote) => `你当时说：「${quote}」`,
-                    )
-                  : ["没有找到与这次确认的方案对应的你的原话记录"]),
-                `确认 ${report.facts.prompt.confirmations} 次`,
-              ]}
-            />
+            <SealedQuotesBlock seal={seal} />
             <FactBlock
               testId="dispute-fact-spec"
               title="确认的方案里记的"
@@ -260,6 +318,56 @@ export function DisputeConsolePane(props: DisputeConsolePaneProps) {
         >
           还没有自查报告。写完质疑后点「开始自查」。
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * 左栏「你当时说的」：逐字展示确认时封存的原话，每行带封存哈希供逐句核对；
+ * 没有封存段时明说是系统记录缺失，不拿聊天记录或方案正文顶替。
+ */
+function SealedQuotesBlock(props: { seal: DisputeSealView }) {
+  const { seal } = props;
+  return (
+    <div
+      data-testid="dispute-fact-prompt"
+      className="rounded border border-border/70 p-2"
+    >
+      <div className="mb-1 text-[11px] font-semibold text-foreground">
+        你当时说的
+      </div>
+      <p
+        data-testid="dispute-confirmation-fact"
+        className="mb-1 text-[11px] text-muted-foreground"
+      >
+        {confirmationFactLine(seal)}
+      </p>
+      {seal.status === "SEALED" ? (
+        <ul className="space-y-0.5 text-[11px] text-muted-foreground">
+          {seal.quotes.map((quote) => (
+            <li
+              key={quote.turn_id}
+              data-testid="dispute-sealed-quote"
+              data-turn-id={quote.turn_id}
+              data-turn-text-sha256={quote.turn_text_sha256}
+              className="break-words"
+            >
+              · 你当时说：「
+              <span data-testid="dispute-sealed-quote-text">{quote.text}</span>
+              」
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p
+          data-testid="dispute-seal-missing"
+          className="text-[11px] text-muted-foreground"
+        >
+          {seal.status === "TAMPERED"
+            ? "确认记录校验没有通过，系统不展示原话"
+            : "系统没有封存你确认方案时的原话（这是系统记录缺失，不代表你没说过）"}
+        </p>
       )}
     </div>
   );
