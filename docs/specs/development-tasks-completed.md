@@ -6105,12 +6105,12 @@ design:
     - { path: daemon/git/ensure-git-repo.ts, change: modify, why: git init 后为无提交空仓库建立可用的 main 引用（不将已有文件纳入提交）, symbols: ["ensureGitInit"] }
   interfaces: []
   test_plan:
-    - { acceptance_id: J24-P1, test_path: tests/unit/approve-acknowledge-dirty.test.ts, level: unit, case: "主仓脏且确认重试携带 acknowledge_dirty" }
-    - { acceptance_id: J24-P1, test_path: tests/unit/confirm-scheme-atomic.test.ts, level: unit, case: "原子确认流程脏仓确认交互" }
-    - { acceptance_id: J24-P1, test_path: tests/ui/scheme-confirm-dirty-dialog.test.tsx, level: unit, case: "脏工作区确认弹窗文案与交互" }
-    - { acceptance_id: J24-P2, test_path: tests/unit/empty-repo-main-ref.test.ts, level: unit, case: "无提交空仓库自动建立可用 main 引用" }
-    - { acceptance_id: J24-P3, test_path: tests/unit/worker-provider-base-url.test.ts, level: unit, case: "Worker 严格跟随供应商选择器解析 baseURL" }
-    - { acceptance_id: J24-P3, test_path: tests/ui/settings-tab.test.tsx, level: unit, case: "设置页供应商选择器 UI" }
+    - { acceptance_id: J24-P1, test_path: tests/unit/approve-acknowledge-dirty.test.ts, level: unit, case: "T-J24-ACK-003 用户显式确认后，传递 acknowledgeDirty: true，请求体携带 acknowledge_dirty: true" }
+    - { acceptance_id: J24-P1, test_path: tests/unit/confirm-scheme-atomic.test.ts, level: unit, case: "T-ATOM-J24-001 acknowledgeDirty 从 input 准确透传至 signAndPrepare" }
+    - { acceptance_id: J24-P1, test_path: tests/ui/scheme-confirm-dirty-dialog.test.tsx, level: unit, case: "T-J24-UI-DIRTY-001 文案对齐禁写名单语义并展示脏文件" }
+    - { acceptance_id: J24-P2, test_path: tests/unit/empty-repo-main-ref.test.ts, level: unit, case: "T-J24-EMPTY-001 确认初始化后自动建立 main ref 并支持创建 worktree" }
+    - { acceptance_id: J24-P3, test_path: tests/unit/worker-provider-base-url.test.ts, level: unit, case: "T-J24-WORKER-001 显式选择 DeepSeek 供应商时，base URL 严格为 deepseek 端点" }
+    - { acceptance_id: J24-P3, test_path: tests/ui/settings-tab.test.tsx, level: unit, case: "T-J24-UI-001 生产模型钥匙面板允许选择供应商并透传 Base URL" }
 governance:
   spec_refs:
     - docs/specs/supervisor.md
