@@ -4067,6 +4067,7 @@ export class StagentDaemon {
         message?: unknown;
         contract_id?: unknown;
         session_id?: unknown;
+        confirmation_id?: unknown;
       };
       try {
         body = (await this.readJsonBody(req)) as typeof body;
@@ -4099,6 +4100,23 @@ export class StagentDaemon {
         typeof body.contract_id === "string" ? body.contract_id.trim() : "";
       const sessionId =
         typeof body.session_id === "string" ? body.session_id : undefined;
+
+      // J.23 / 复用 #222：confirmation_id 由前端透传，服务端只校验格式，查证在 surface_log
+      const rawConfirmation =
+        typeof body.confirmation_id === "string"
+          ? body.confirmation_id.trim()
+          : "";
+      if (
+        rawConfirmation !== "" &&
+        !/^[A-Za-z0-9_-]{1,96}$/.test(rawConfirmation)
+      ) {
+        this.sendJson(res, 400, {
+          error: "confirmation_id_invalid",
+          message: "confirmation_id 格式非法",
+        });
+        return;
+      }
+      const confirmationId = rawConfirmation === "" ? null : rawConfirmation;
 
       let contract = undefined as
         import("../src/lib/contract.schema").SoftwareContract | undefined;
@@ -4164,6 +4182,7 @@ export class StagentDaemon {
         hasInProgressContract: liveCtx.hasInProgressContract,
         ...(contract === undefined ? {} : { contract }),
         ...(sessionId === undefined ? {} : { sessionId }),
+        ...(confirmationId === undefined ? {} : { confirmationId }),
         requirementsStore: this.requirementsStore,
         budgetLedger: ledger,
         contractStore,
@@ -4287,6 +4306,7 @@ export class StagentDaemon {
         contract_id: result.contract_id ?? null,
         draft: draftPayload,
         dispute_report: result.dispute_report ?? null,
+        attribution: result.attribution ?? null,
         budget: ledger.snapshot(),
       });
     } catch (err) {

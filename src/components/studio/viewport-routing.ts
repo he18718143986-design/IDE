@@ -1,17 +1,17 @@
 import type { PresentationState } from "@/lib/state/presentation-state";
 
 /**
- * Studio 视口（TASK-C.18：收敛为单页「方案审阅」）。
+ * Studio 视口（TASK-C.18：收敛为单页「方案审阅」；TASK-J.23：支持切入「质疑自查」）。
  *
- * 旧五 id 仍导出，供历史测试/旅程 suggest_viewport 映射到 scheme；
- * UI 外壳不再渲染多 Tab。
+ * 旧五 id 仍导出，供历史测试/旅程 suggest_viewport 映射；
+ * 日常工作台主页为 scheme，质疑自查触发或切换时切入 dispute。
  */
 export const STUDIO_VIEWPORT_IDS = ["scheme"] as const;
 
 export type StudioViewportId =
   (typeof STUDIO_VIEWPORT_IDS)[number] | LegacyStudioViewportId;
 
-/** @deprecated C.18 起 UI 不再切换；仅兼容旧调用 */
+/** @deprecated C.18 起 UI 不再渲染多 Tab；仅兼容旧调用与 J.23 质疑面板切入 */
 export type LegacyStudioViewportId =
   "demo" | "graph" | "dispute" | "contract" | "playtest";
 
@@ -35,12 +35,23 @@ export function resolveActiveViewport(input: {
   presentationState: PresentationState | null | undefined;
   previousPresentationState: PresentationState | null | undefined;
   manualViewport: StudioViewportId | null;
-}): { viewport: "scheme"; clearManual: boolean } {
-  void input;
-  return { viewport: "scheme", clearManual: true };
+}): { viewport: "scheme" | "dispute"; clearManual: boolean } {
+  if (input.manualViewport === "dispute") {
+    return { viewport: "dispute", clearManual: false };
+  }
+  if (input.presentationState === "DISPUTED_INSPECTING") {
+    return { viewport: "dispute", clearManual: true };
+  }
+  return {
+    viewport: "scheme",
+    clearManual: input.manualViewport !== null,
+  };
 }
 
-/** 旧 suggest_viewport → 一律 scheme（单页） */
-export function mapLegacyViewportToScheme(_legacy?: string | null): "scheme" {
+/** 旧 suggest_viewport → 映射：dispute 保留，其余一律 scheme */
+export function mapLegacyViewportToScheme(
+  legacy?: string | null,
+): "scheme" | "dispute" {
+  if (legacy === "dispute") return "dispute";
   return "scheme";
 }

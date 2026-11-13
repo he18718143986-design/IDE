@@ -2,45 +2,50 @@ import type { ReactNode } from "react";
 import type { PresentationState } from "@/lib/state/presentation-state";
 
 /**
- * Studio 工作台外壳（TASK-C.18：单页方案审阅）。
+ * Studio 工作台外壳（TASK-C.18：单页方案审阅；TASK-J.23：支持挂载与切入质疑自查）。
  *
- * - 去掉五视口 Tab（原型试玩 / 任务图谱 / 质疑自查 / 合同审阅 / 真机试玩）
- * - 中间只挂一个主工作页（方案审阅）
- * - 可选左侧「选合同 / 规范与资产」栏（C.16 保留）
- *
- * 旧五视口组件文件仍留在仓库（兼容单测/回溯），日常入口不再挂载。
+ * - 中间主工作页默认挂「方案审阅」
+ * - 支持在质疑触发或用户切换时切入「质疑自查」面板（J.23 纯接线挂载）
+ * - 左侧「选合同 / 规范与资产」栏（C.16 保留）
  */
 export interface StudioViewportShellProps {
   presentationState?: PresentationState | null | undefined;
   presentationMessage?: string | null | undefined;
-  /** @deprecated C.18 单页后忽略；保留 prop 避免旧调用方崩 */
+  /** 活动视口标识（"scheme" | "dispute" 等） */
   activeViewport?: string | undefined;
-  /** @deprecated C.18 */
   onViewportChange?: ((viewport: string) => void) | undefined;
   contractRail?: ReactNode | undefined;
   /**
-   * C.18：唯一主内容。优先使用；未传时回退拼旧五插槽（兼容过渡测试）。
+   * C.18：主方案内容。优先使用；未传时回退拼旧插槽（兼容过渡测试）。
    */
   scheme?: ReactNode | undefined;
+  /** TASK-J.23：质疑自查面板 */
+  dispute?: ReactNode | undefined;
   /** @deprecated C.18 日常不再展示；仅 fallback */
   demo?: ReactNode | undefined;
   graph?: ReactNode | undefined;
-  dispute?: ReactNode | undefined;
   contract?: ReactNode | undefined;
   playtest?: ReactNode | undefined;
 }
 
 export function StudioViewportShell(props: StudioViewportShellProps) {
   const presentationState = props.presentationState ?? null;
-  const mainContent = props.scheme ?? props.contract ?? props.demo ?? (
-    <div className="p-4 text-xs text-muted-foreground">暂无方案内容</div>
-  );
+  const activeViewport = props.activeViewport ?? "scheme";
+  const isDispute = activeViewport === "dispute" && Boolean(props.dispute);
+
+  const mainContent = isDispute
+    ? props.dispute
+    : (props.scheme ??
+      props.contract ??
+      props.demo ?? (
+        <div className="p-4 text-xs text-muted-foreground">暂无方案内容</div>
+      ));
 
   const main = (
     <div
       data-testid="studio-viewport-shell"
       data-single-pane="true"
-      data-active-viewport="scheme"
+      data-active-viewport={isDispute ? "dispute" : "scheme"}
       data-presentation-state={presentationState ?? ""}
       className="flex h-full min-h-0 flex-1 flex-col"
     >
@@ -48,7 +53,19 @@ export function StudioViewportShell(props: StudioViewportShellProps) {
         data-testid="studio-viewport-header"
         className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-1.5"
       >
-        <span className="text-xs font-medium text-foreground">方案审阅</span>
+        <span className="text-xs font-medium text-foreground">
+          {isDispute ? "质疑自查" : "方案审阅"}
+        </span>
+        {isDispute && props.onViewportChange ? (
+          <button
+            type="button"
+            data-testid="studio-back-to-scheme"
+            onClick={() => props.onViewportChange?.("scheme")}
+            className="rounded border border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            返回方案审阅
+          </button>
+        ) : null}
         {props.presentationMessage ? (
           <span
             data-testid="studio-presentation-message"
@@ -66,8 +83,12 @@ export function StudioViewportShell(props: StudioViewportShellProps) {
       >
         <div
           role="region"
-          aria-label="方案审阅"
-          data-testid="studio-viewport-panel-scheme"
+          aria-label={isDispute ? "质疑自查" : "方案审阅"}
+          data-testid={
+            isDispute
+              ? "studio-viewport-panel-dispute"
+              : "studio-viewport-panel-scheme"
+          }
           data-active="true"
           className="absolute inset-0 flex min-h-0 flex-col overflow-auto"
         >

@@ -1955,6 +1955,7 @@ export interface JourneyResponse {
   code: string | null;
   draft: SupervisorDraftResult | null;
   dispute_report: DisputeReportApiView | null;
+  attribution?: unknown | null | undefined;
   budget: SupervisorBudgetSnapshotView;
 }
 
@@ -2012,6 +2013,7 @@ export async function submitJourneyMessage(
     message: string;
     contract_id?: string | undefined;
     session_id?: string | undefined;
+    confirmation_id?: string | undefined;
   },
 ): Promise<JourneyResponse> {
   return request<JourneyResponse>(conn, "/api/supervisor/journey", {
@@ -2024,6 +2026,9 @@ export async function submitJourneyMessage(
       ...(input.session_id === undefined
         ? {}
         : { session_id: input.session_id }),
+      ...(input.confirmation_id === undefined
+        ? {}
+        : { confirmation_id: input.confirmation_id }),
     }),
   });
 }
