@@ -788,6 +788,7 @@ governance:
 
 > **卡修订（P-200 · 2026-11-13）**：卡片内部 writable/readonly 冲突核对修复（施工前核对发现，先修卡）。从 `readonly_paths` 移除 `daemon/supervisor/dispute/evidence-triad.ts`（既有 `dispute/**` 通配符已覆盖可写）；`touches` 中该文件的 `why` 更新为本次修复的实际语义（按 `turn_id` 反查 transcript 原话 + 哈希校验）；`test_plan` 补充 `T1/T2` 原生键反查、哈希不匹配失败关闭、transcript 缺失时退化 `session.messages` 三类用例。卡状态仍为 `NEW_TASK`，未开工，**仍不标 COMPLETED**。
 
+> **卡修订核对（P-201 · #240 审核跟进）**：`non_goals` 文件禁动仅保留已列入 `readonly_paths` 的路径；`compile-loop.ts` 与 `dispute/attribution*.ts` 改为「本修订（P-201）不碰」（不作全卡禁动）；`fail`「修改禁动文件」对齐为 `readonly_paths`；`touches` 补 `tests/unit/dispute-surface-log-route.test.ts`（change: modify）。不重写施工口径。
 > **卡修订（P-201 · 2026-11-13）**：J16-P5 根因核定与施工口径（Tina 拍板「按稿施工」）。本机真实试玩（`b4ad38b`，试玩目录 `stagent-j16p5-b4ad38b-playtest`）左栏为空，根因在写侧，不是左栏组件：① 右栏普通消息从未登记为带 `turn_id` 的原话（C.18 `909198a` 起非质疑消息在前端直接走普通聊天，J.10 `97bb0db` 只在 journey 路由调用 `commitUserTurn`）；② 确认冻结不封存原话，快照无原话段；③ 读侧无 Supervisor 会话即提前返回，#239 的反查走不到；④ 确认当时 surface_log 无任何记录（现有 16 条 `area` 写于确认完成之后）。施工口径：说话时 Daemon 登记 `turn_id` + sha256(utf8)，登记失败的消息照常发右栏聊天但不折进方案、提示「没记进方案」，`schemeSourceTurns` 与方案语料同批更新、新建需求时一起清空；冻结请求只带已登记的 `{turn_id, turn_text_sha256}`，Daemon 从 transcript 取原文封入快照 `frozen_quotes` 并计入 digest，校验失败 409（复用 `E_SCHEME_SNAPSHOT_MISMATCH`，ADR-0018 §3.2），不写快照、不签合同；快照不升 `schema_version`（`dispatch-binding.ts` 以版本相等判定墓地权威），以 1.2 追加可选段落地；左栏只读合同绑定快照的封存段，逐条重算哈希，只排序不滤空，无封存段写明「系统没有封存」、不挂「已降级呈递事实」；「确认 N 次」改为快照确认事实；surface_log 记录加阶段字段 `phase`，确认前上报实际展示过的决议区条目（AI 推荐决策与冲突抉择）。`writable_paths` 追加快照存储、快照相关测试、`dispute-anchor-real-session.test.ts` 与前端接线测试 `scheme-turn-seal-wiring.test.tsx`；J16-P1 / P5 / P6 验收文字修订（P5 改为可机核条款，条目级高亮另记）；`touches` / `test_plan` / `verification` / `code_facts` / `non_goals` / `fail` 同步。**文档债务（完工回写时还）**：`runtime-contract-and-safety.md` §2.3「Daemon 专属码」表中 `E_SCHEME_SNAPSHOT_MISMATCH` 的触发说明尚未覆盖「冻结时原话清单校验失败」，已登记为 `fail` 条目。卡状态仍为 `NEW_TASK`，**仍不标 COMPLETED**。
 
 ```yaml task-card
@@ -895,6 +896,7 @@ design:
     - { path: daemon/supervisor/dispute/types.ts, change: modify, why: "surface_log / 归因账本类型与 K-16 闭集；P-201：PromptFact 增封存事实 seal", symbols: [] }
     - { path: daemon/supervisor/dispute/index.ts, change: modify, why: "三分类退化与 resolution_note 标注；P-201：超时降级报告携带封存事实", symbols: [] }
     - { path: daemon/supervisor/dispute/surface-log.ts, change: modify, why: "P-201：记录与上报请求增 phase（pre_confirm / post_confirm）；缺 phase 的旧记录照常读取", symbols: [] }
+    - { path: tests/unit/dispute-surface-log-route.test.ts, change: modify, why: "P-201：surface_log 路由校验 phase（确认后冒充 pre_confirm 被拒）", symbols: [] }
     - { path: daemon/pipeline/scheme-snapshot-store.ts, change: modify, why: "P-201：快照追加 frozen_quotes 与 quotes_digest 并计入 digest（不升 schema_version）；带封存段快照的完整性校验", symbols: [] }
     - { path: src/components/studio/DisputeConsolePane.tsx, change: modify, why: "P-201：左栏封存原话行（带 data-turn-text-sha256）、快照确认事实行；无封存段写明「系统没有封存」且不挂「已降级呈递事实」", symbols: [] }
     - { path: src/components/studio/ScopeAcceptanceBlock.tsx, change: modify, why: "§15.4 白话投影渲染后上报实际呈现条目（不得渲染前预写）；P-201：上报带 phase（开工前 pre_confirm，冻结与验收 post_confirm）", symbols: [] }
@@ -968,9 +970,10 @@ governance:
     - 不改 P-1～P-6 已定的判定逻辑、类型枚举与 0.7 阈值
     - 不做条目级高亮（frozen_quotes 不含条目关联，J.22 之后另记）
     - 不改编译器离线（bin/stagent.ts 不接模型）与台账 scheme_id=scheme-active（留给 J.10 / J.22）
-    - 不改 K-14 归因算法与 dispute/attribution*.ts；surface_log 的 phase 本卡只写入，不改 K-14 取数
-    - 不升快照 schema_version，不改 dispatch-binding.ts
-    - 不改 confirm-scheme-atomic.ts、host.ts、transcript-store.ts、compile-loop.ts、scheme-draft.ts、contract.schema.ts、bin/stagent.ts
+    - 本修订（P-201）不碰 K-14 归因算法与 dispute/attribution*.ts；surface_log 的 phase 本卡只写入，不改 K-14 取数
+    - 不升快照 schema_version
+    - 不改 readonly_paths 所列文件（playtest-self-check.md、supervisor.md、host.ts、transcript-store.ts、confirm-scheme-atomic.ts、scheme-draft.ts、contract.schema.ts、dispatch-binding.ts、bin/stagent.ts）
+    - 本修订（P-201）不碰 compile-loop.ts
     - 封存原话不接入归因信号（prompt_matched_messages），中栏关键词匹配不改
   fail:
     - 缺 surface_log 时仍产出 (a)/(b) 分类，或不标「无呈现记录」
@@ -983,7 +986,7 @@ governance:
     - 无封存段时左栏未写明「系统没有封存」，或仍显示「已降级呈递事实」
     - 「这里不对」使左栏因关键词过滤为空
     - 确认后的 surface_log 记录缺 phase 或记为 pre_confirm；确认前未上报实际展示过的决议区条目
-    - 修改 non_goals 所列禁动文件
+    - 修改 readonly_paths 所列禁动文件
     - 完工回写未同步 runtime-contract-and-safety.md §2.3 中 E_SCHEME_SNAPSHOT_MISMATCH 的触发说明（冻结时原话清单校验失败；P-201 文档债务）
   estimate: L
   invariants:
