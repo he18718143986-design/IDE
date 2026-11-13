@@ -329,6 +329,54 @@ describe("快照封存段", () => {
     ).toThrow(/拒绝覆盖/);
   });
 
+  it("sealed_through_seq 只由原话清单决定：两次冻结之间 transcript 多出轮次，同一确认仍幂等", () => {
+    const refs = [
+      { turn_id: "T1", turn_text_sha256: sha256Utf8(REQUIREMENT) },
+      { turn_id: "T3", turn_text_sha256: sha256Utf8(FOLLOW_UP) },
+    ];
+    const grown = transcript();
+    grown.turns.push(
+      {
+        turn_id: "T4",
+        role: "user",
+        seq: 4,
+        text: "这里不对",
+        text_sha256: sha256Utf8("这里不对"),
+        user_alias_seq: 3,
+      },
+      {
+        turn_id: "T5",
+        role: "assistant",
+        seq: 5,
+        text: "收到",
+        text_sha256: sha256Utf8("收到"),
+      },
+    );
+    grown.seq = 5;
+    grown.user_alias_seq = 3;
+    const first = sealFrozenQuotes(transcript(), refs);
+    const retry = sealFrozenQuotes(grown, refs);
+    if (!first.ok || !retry.ok) throw new Error("seal failed");
+    expect(retry.value.sealed_through_seq).toBe(3);
+    expect(retry.value).toEqual(first.value);
+
+    const input = {
+      confirmation_id: "scheme-confirm-retry-1",
+      scheme,
+      demo,
+      decision,
+      scope_plan: plan,
+    };
+    expect(
+      writeSchemeSnapshot(repo, { ...input, frozen_quotes: first.value })
+        .idempotent,
+    ).toBe(false);
+    expect(
+      writeSchemeSnapshot(repo, { ...input, frozen_quotes: retry.value })
+        .idempotent,
+    ).toBe(true);
+  });
+
   it("1.1 旧快照里的封存段不采信", () => {
     const file = schemeSnapshotPath(repo, "scheme-confirm-old-11");
     fs.mkdirSync(path.dirname(file), { recursive: true });
