@@ -533,7 +533,7 @@ export async function approveContract(
   conn: DaemonConnection,
   contractId: string,
   reviewer: string,
-  options?: { confirmationId?: string },
+  options?: { confirmationId?: string; acknowledgeDirty?: boolean },
 ): Promise<SoftwareContract> {
   const body = await request<{ contract: SoftwareContract }>(
     conn,
@@ -545,6 +545,7 @@ export async function approveContract(
         ...(options?.confirmationId
           ? { confirmation_id: options.confirmationId }
           : {}),
+        ...(options?.acknowledgeDirty ? { acknowledge_dirty: true } : {}),
       }),
     },
   );
@@ -1052,6 +1053,8 @@ export interface ModelSettings {
   configured: boolean;
   model: string;
   source: "runtime" | "environment" | "none";
+  provider?: string;
+  baseURL?: string;
 }
 
 export async function fetchSettings(
@@ -1068,6 +1071,7 @@ export async function saveOpenAiKey(
   conn: DaemonConnection,
   apiKey: string,
   model?: string,
+  options?: { provider?: string; baseURL?: string },
 ): Promise<ModelSettings> {
   const body = await request<{ settings: ModelSettings }>(
     conn,
@@ -1077,6 +1081,8 @@ export async function saveOpenAiKey(
       body: JSON.stringify({
         api_key: apiKey,
         ...(model ? { model } : {}),
+        ...(options?.provider ? { provider: options.provider } : {}),
+        ...(options?.baseURL ? { base_url: options.baseURL } : {}),
       }),
     },
   );

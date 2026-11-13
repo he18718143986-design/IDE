@@ -385,3 +385,38 @@ describe("T-ATOM confirmation_id 生成", () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("T-ATOM J.24 脏工作区确认与透传", () => {
+  it("T-ATOM-J24-001 acknowledgeDirty 从 input 准确透传至 signAndPrepare", async () => {
+    let capturedAck: boolean | undefined;
+    const h = makeHarness();
+    h.input.acknowledgeDirty = true;
+    h.input.signAndPrepare = async (arg) => {
+      capturedAck = arg.acknowledgeDirty;
+      return { contract_id: "c-ack" };
+    };
+
+    const result = await runConfirmSchemeAtomic(h.input);
+    expect(result.ok).toBe(true);
+    expect(capturedAck).toBe(true);
+  });
+
+  it("T-ATOM-J24-002 signAndPrepare 抛 E_WORKTREE_DIRTY 时，走补偿并回传 dirty_files 与错误码", async () => {
+    const h = makeHarness();
+    h.input.signAndPrepare = async () => {
+      const err = Object.assign(new Error("主工作区存在未提交变更"), {
+        code: "E_WORKTREE_DIRTY",
+        body: { files: ["src/app.ts", "package.json"] },
+      });
+      throw err;
+    };
+
+    const result = await runConfirmSchemeAtomic(h.input);
+    expect(result.ok).toBe(false);
+    expect(result.failedAt).toBe("SIGN_AND_PREPARE");
+    expect(result.code).toBe("E_WORKTREE_DIRTY");
+    expect(result.dirty_files).toEqual(["src/app.ts", "package.json"]);
+    expect(h.compensations).toHaveLength(1);
+    expect(h.restores).toBe(1);
+  });
+});

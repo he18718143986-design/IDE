@@ -51,6 +51,8 @@ export interface ConfirmSchemeAtomicInput {
   expectedRevision: number;
   /** J.5：与当前修订绑定的 ScopePlan；VALIDATE 与 Daemon 共用。 */
   scopePlan: ScopePlan | null;
+  /** TASK-J.24：用户已显式确认主工作区未提交变更不纳入任务，允许在脏工作区上继续 */
+  acknowledgeDirty?: boolean;
   /** 先停流式，再禁用右栏输入；两者都完成才允许继续。 */
   quiesceRightChat: () => void | Promise<void>;
   /** 写入不可变快照；同 id + 同内容必须幂等返回原快照。 */
@@ -66,6 +68,7 @@ export interface ConfirmSchemeAtomicInput {
     frozen: SchemeDraft;
     demo: DemoGate;
     snapshot: PersistedSchemeSnapshot;
+    acknowledgeDirty?: boolean;
     /**
      * 合同一旦落库就立即回报。
      *
@@ -105,6 +108,8 @@ export interface ConfirmSchemeAtomicResult {
   reason?: string;
   /** FREEZE 漂移时附带 Daemon 重算的新 plan，供调用方刷新。 */
   scope_plan?: ScopePlan;
+  /** TASK-J.24：主工作区脏导致 409 时附带未提交文件清单 */
+  dirty_files?: string[];
 }
 
 interface CompletedConfirmation {
@@ -169,6 +174,24 @@ function readDriftScopePlan(err: unknown): ScopePlan | undefined {
   const plan = (err as { scope_plan?: unknown }).scope_plan;
   if (plan && typeof plan === "object" && "plan_digest" in (plan as object)) {
     return plan as ScopePlan;
+  }
+  return undefined;
+}
+
+function readDirtyFiles(err: unknown): string[] | undefined {
+  if (typeof err !== "object" || err === null) return undefined;
+  const body = (err as { body?: unknown }).body;
+  if (body && typeof body === "object" && "files" in body) {
+    const files =
+      (body as { dirty_files?: unknown; files?: unknown }).dirty_files ??
+      (body as { files?: unknown }).files;
+    if (Array.isArray(files) && files.every((f) => typeof f === "string")) {
+      return files;
+    }
+  }
+  const files = (err as { files?: unknown }).files;
+  if (Array.isArray(files) && files.every((f) => typeof f === "string")) {
+    return files;
   }
   return undefined;
 }
@@ -310,6 +333,9 @@ export async function runConfirmSchemeAtomic(
       frozen,
       demo: input.demo,
       snapshot,
+      ...(input.acknowledgeDirty === undefined
+        ? {}
+        : { acknowledgeDirty: input.acknowledgeDirty }),
       onContractCreated: (id) => {
         staging.contractId = id;
       },
@@ -318,6 +344,8 @@ export async function runConfirmSchemeAtomic(
     steps.push({ step: "SIGN_AND_PREPARE", ok: true });
   } catch (err) {
     const reason = err instanceof Error ? err.message : "签署或施工准备失败";
+    const dirty = readErrorCode(err) === "E_WORKTREE_DIRTY";
+    const dirtyFiles = dirty ? readDirtyFiles(err) : undefined;
     const staged = staging.contractId;
     let compensated = false;
     try {
@@ -337,13 +365,18 @@ export async function runConfirmSchemeAtomic(
     return failed(
       input.confirmationId,
       "SIGN_AND_PREPARE",
-      compensated ? "E_SIGN_AND_PREPARE_FAILED" : "E_COMPENSATION_FAILED",
+      dirty
+        ? "E_WORKTREE_DIRTY"
+        : compensated
+          ? "E_SIGN_AND_PREPARE_FAILED"
+          : "E_COMPENSATION_FAILED",
       compensated ? reason : `${reason}；补偿未完成，已保持锁定并需人工处理`,
       steps,
       frozen,
       {
         snapshot,
         ...(staged === undefined ? {} : { contract_id: staged }),
+        ...(dirtyFiles ? { dirty_files: dirtyFiles } : {}),
       },
     );
   }

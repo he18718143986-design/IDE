@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getRuntimeKey, getRuntimeModel } from "./key-store";
+import { getRuntimeBaseUrl, getRuntimeKey, getRuntimeModel } from "./key-store";
 import { appendLlmMeta } from "../core/debug-log";
 import type {
   WorkerGenerationInput,
@@ -56,7 +56,12 @@ export class OpenAiWorkerClient implements WorkerModelClient {
     }
     this.apiKey = key;
     this.modelId = options.modelId ?? getRuntimeModel();
-    this.baseURL = options.baseURL ?? process.env["OPENAI_BASE_URL"];
+    this.baseURL = options.baseURL ?? getRuntimeBaseUrl();
+    if (!this.baseURL) {
+      throw new Error(
+        "Worker provider is not configured; choose a provider in Settings or set OPENAI_BASE_URL.",
+      );
+    }
     this.parseHooks = options.parseHooks ?? {};
     this.repoRoot = options.repoRoot;
   }
