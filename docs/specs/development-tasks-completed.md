@@ -6022,6 +6022,138 @@ governance:
   delivered: { pr: 229, commit: 21b8b3565ad0d293ac871ab657a96d7627b10c58 }
 ```
 
+<a id="task-j23"></a>
+<a id="task-j.23"></a>
+
+### 【Task J.23】质疑自查生产链路接线（面板挂载 · DISPUTE 路由 · turn_text_sha256 落盘 · 纯接线不含文案）`[COMPLETED · 立卡 P-195 · 修订 P-196 · 施工 P-198 · 走查通过 P-199]`
+
+> **立卡与修订说明（2026-11-12 · P-195 立卡；2026-11-12 · P-196 路径修订）**：承接 `TASK-J.16` 真实试玩暴露的生产链路未接线（J16-P5 / J16-P6 FAIL）。范围严格收窄为纯接线：质疑面板挂到日常工作台、冻结后「这里不对」走 DISPUTE 路由、`turn_text_sha256` 落盘；不含文案整改（main 上 `DisputeConsolePane.tsx` 源码文案已按 §16.7 合规，挂载后复核）。施工前核对确认冻结后 DISPUTE 需经过 journey API 复用 #222 已有 confirmation_id 透传、服务端格式校验及 surface_log 查证归因，经 P-196 扩充 writable_paths 与集成测试用例。立卡 ≠ 开工。文档计划暂缓。
+
+> **归档注记（2026-11-13 · P-198 施工；2026-11-13 · P-199 走查通过）**：本卡已 **COMPLETED**（[#233](https://github.com/he18718143986-design/IDE/pull/233) squash `ab40f3aaf115a37f6bc9bc75c637d41a2c5bf1e7`；分支 `feat/j23-dispute-wiring`，head `a200e00`；走查通过见 P-199）。验收逐条证据如下：
+> - **J23-P1（面板挂载）**：质疑自查面板（`DisputeConsolePane`）已成功接入日常壳（`StudioViewportShell.tsx` 与 `src/routes/index.tsx`），视口路由扩展支持 `dispute` 视口；用户在真实界面能打开该面板，源码文案符合 §16.7 白话要求（按钮为「这是 Bug，免费修」「我想要新功能，下一轮做」）。新增测试 `tests/ui/dispute-production-wiring.test.tsx` 全部通过。
+> - **J23-P2（冻结后 DISPUTE 路由与 confirmation_id 复用）**：方案冻结后，右栏发送「这里不对」（及同类质疑用语）经 `handleJourneyBeforeSend` 与 `intent-router.ts` 分流进入 DISPUTE 流程，不再因 `partnerMessageMayRebuildScheme` 为假而 passthrough 到普通聊天；透传 `confirmation_id` 并由服务端查证 surface_log，查不到则失败关闭、不写归因。新增集成测试 `tests/integration/journey-dispute-routing.test.ts` 全部通过。
+> - **J23-P3（会话哈希落盘）**：在 `daemon/supervisor/intent-compiler/transcript-store.ts` 与 `daemon/supervisor/journey/orchestrate.ts` 中写出 `turn_text_sha256`（口径为 UTF-8 原文 SHA-256），与 `host.ts` 保持一致。新增单测 `tests/unit/dispute-turn-hash.test.ts` 全部通过。
+> - **J23-P4（真实界面走查）**：Tina 本机真实试玩走查确认：用户在日常工作台能正常打开质疑自查面板，方案冻结后在右栏发送「这里不对」成功进入 DISPUTE 流程并切至质疑自查视口，不再走普通聊天；面板白话文案合规通过；**J23-P4 走查通过**。
+> - **遗留缺口注记**：左栏未展示确认时原话（J16-P5 最后一项失败），经代码排查为反查键未对齐等原因，不推翻 J.23 纯接线与 J23-P4 走查成果，转由 `TASK-J.16`（`NEW_TASK`）继续排查与根因修复。
+> - **改动范围**：严格位于卡片 12 个 `writable_paths` 内（实际修改 10 个，无超范围修改）。
+
+```yaml task-card
+id: TASK-J.23
+status: COMPLETED
+contract:
+  intent:
+    title: 质疑自查生产链路接线（面板挂载 · DISPUTE 路由 · turn_text_sha256 落盘 · 纯接线不含文案）
+    description: >-
+      做完后，用户在日常工作台能打开质疑自查面板；方案确认之后在右栏发送「这里不对」进入 DISPUTE
+      流程而不是普通聊天；真实会话落盘含 turn_text_sha256（sha256(utf8) 口径与
+      intent-compiler/host.ts 一致），左栏显示锚定原话。本卡范围严格限定为纯接线，不含文案整改
+      （main 上面板源码文案已符合 §16.7，待挂载后复核）。真实界面走查通过前不宣称本卡完成。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J23-P1
+      check: auto
+      text: >-
+        质疑自查面板挂到生产日常壳（viewport-routing / StudioViewportShell 或经核对后的实际挂载点），
+        不再只 import 而不 JSX 挂载；用户在真实界面能打开该面板（纯接线挂载，不改动面板源码文案）。
+    - id: J23-P2
+      check: auto
+      text: >-
+        方案冻结后，右栏发送「这里不对」（及同类质疑用语）走 DISPUTE 路由，不得因
+        partnerMessageMayRebuildScheme 为假而 passthrough 到普通聊天；旅程请求复用 #222
+        已有 confirmation_id 透传与服务端格式校验 / surface_log 查证归因链路，不另造机制，
+        缺失或查证失败时继续失败关闭、不写归因。
+    - id: J23-P3
+      check: auto
+      text: >-
+        真实会话落盘出现 turn_text_sha256 或同源的 text_sha256，且等于 sha256(utf8 原文)，
+        与 intent-compiler/host.ts 口径一致；左栏显示锚定原话。
+    - id: J23-P4
+      check: playtest
+      text: >-
+        真实界面走查覆盖 J23-P1～P3 纯接线：能打开面板、冻结后「这里不对」进入质疑流程、哈希可对照且左栏有原话；
+        复核确认 main 既有合规文案在挂载后正常呈现（不含文案整改）。单测 / jsdom / 仅有源码目录不替代本条。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/components/studio/viewport-routing.ts
+      - src/components/studio/StudioViewportShell.tsx
+      - src/lib/journey/intent-router.ts
+      - daemon/supervisor/intent-compiler/transcript-store.ts
+      - src/routes/index.tsx
+      - src/lib/journey/handoff-progress.ts
+      - src/lib/daemon-api.ts
+      - daemon/server.ts
+      - daemon/supervisor/journey/orchestrate.ts
+      - tests/ui/dispute-production-wiring.test.tsx
+      - tests/integration/journey-dispute-routing.test.ts
+      - tests/unit/dispute-turn-hash.test.ts
+    readonly_paths:
+      - docs/specs/supervisor.md
+      - docs/specs/playtest-self-check.md
+      - daemon/supervisor/intent-compiler/host.ts
+      - src/components/studio/DisputeConsolePane.tsx
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: unit-wiring, executable: npx, args: [vitest, run, tests/ui/dispute-production-wiring.test.tsx] }
+      - { alias: integration-dispute-routing, executable: npx, args: [vitest, run, tests/integration/journey-dispute-routing.test.ts] }
+      - { alias: unit-dispute-hash, executable: npx, args: [vitest, run, tests/unit/dispute-turn-hash.test.ts] }
+design:
+  approach: >-
+    预估接线：把 DisputeConsolePane 挂回日常壳（C.18 目前只渲染 scheme）；冻结后仍要把质疑语送入
+    DISPUTE 而不是一律 passthrough；在 Daemon 会话落盘处写出可对照的 turn_text_sha256。
+    上列 writable_paths 含试玩对照后的候选（index.tsx 的 handleJourneyBeforeSend、
+    handoff-progress.ts 的 partnerMessageMayRebuildScheme、transcript-store.ts）。冻结后质疑需经
+    journey API 进入 DISPUTE，并复用 #222 的 confirmation_id 前端透传、服务端校验及 surface_log
+    查证归因机制；因此允许调整 daemon-api.ts、daemon/server.ts、journey/orchestrate.ts 并补生产集成测试，
+    不另造确认机制。施工前仍按实际核对。
+  touches:
+    - { path: src/components/studio/viewport-routing.ts, change: modify, why: C.18 把视口收成单页 scheme，质疑视口无法出现, symbols: [] }
+    - { path: src/components/studio/StudioViewportShell.tsx, change: modify, why: 日常壳需能挂载或切入质疑面板, symbols: [] }
+    - { path: src/lib/journey/intent-router.ts, change: modify, why: DISPUTE 路由接线点（施工前核对是否确需改）, symbols: [] }
+    - { path: daemon/supervisor/intent-compiler/transcript-store.ts, change: modify, why: 预估的会话哈希落盘处（施工前核对）, symbols: [] }
+    - { path: src/routes/index.tsx, change: modify, why: 面板挂载与冻结后 handleJourneyBeforeSend 分流（预估，施工前核对）, symbols: ["handleJourneyBeforeSend"] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: journey 请求透传既有 confirmation_id, symbols: ["submitJourneyMessage"] }
+    - { path: daemon/server.ts, change: modify, why: "journey 请求接收与复用 #222 格式校验及 surface_log 归因链路", symbols: ["handleSupervisorJourney"] }
+    - { path: daemon/supervisor/journey/orchestrate.ts, change: modify, why: "DISPUTE 编排透传确认上下文至既有自查归因机制", symbols: ["orchestrateJourney"] }
+    - { path: tests/integration/journey-dispute-routing.test.ts, change: create, why: "覆盖生产 journey DISPUTE 路由、confirmation_id 复用及失败关闭", symbols: [] }
+    - { path: tests/unit/dispute-turn-hash.test.ts, change: create, why: "覆盖 turn_text_sha256 与 sha256(utf8 原文) 一致", symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J23-P1, test_path: tests/ui/dispute-production-wiring.test.tsx, level: integration, case: "StudioViewportShell 在 activeViewport 为 dispute 时正确渲染挂载的 DisputeConsolePane" }
+    - { acceptance_id: J23-P2, test_path: tests/integration/journey-dispute-routing.test.ts, level: integration, case: "方案冻结判定与意图分类：冻结后「这里不对」属于 DISPUTE，不应盲目 passthrough" }
+    - { acceptance_id: J23-P3, test_path: tests/unit/dispute-turn-hash.test.ts, level: unit, case: "writeTranscript 与 readTranscript 保证 turn_text_sha256 与 text_sha256 正确落盘与读回" }
+    - { acceptance_id: J23-P4, test_path: tests/ui/dispute-production-wiring.test.tsx, level: integration, debt: "Tina 本机真实试玩走查通过（J23-P4 走查完成）" }
+governance:
+  spec_refs:
+    - docs/specs/supervisor.md
+    - docs/specs/playtest-self-check.md
+  depends_on:
+    - { id: TASK-J.16, kind: soft }
+  code_facts:
+    - { ref: "src/routes/index.tsx::handleJourneyBeforeSend", note: "方案冻结后 partnerMessageMayRebuildScheme 为假则一律 passthrough，质疑语进普通聊天（现行 main b3d14d0 仍在）" }
+    - { ref: "src/components/studio/viewport-routing.ts::STUDIO_VIEWPORT_IDS", note: "C.18 只导出 scheme 视口；DisputeConsolePane 在 index.tsx 仅 import 未挂载" }
+    - { ref: "src/lib/daemon-api.ts::submitJourneyMessage", note: "当前 journey 请求无 confirmation_id 字段；POST /api/supervisor/dispute 已有 confirmation_id 透传与服务端校验 / surface_log 查证机制（#222）" }
+    - { ref: "daemon/supervisor/intent-compiler/host.ts::sha256", note: "哈希口径 sha256(utf8)；P-195 试玩的 .stagent 会话事件未写出该字段" }
+  non_goals:
+    - 不标 TASK-J.16 COMPLETED
+    - 纯接线不含文案整改：main 上 DisputeConsolePane.tsx 源码文案已合规，严禁修改面板文案
+    - 不开文档计划、不另立产品方向
+    - 不以单测或 jsdom 替代真实界面走查
+  fail:
+    - 生产界面仍打不开质疑面板
+    - 冻结后「这里不对」仍走普通聊天
+    - 真实落盘仍无对得上的 turn_text_sha256
+    - 以单测替代 J23-P4 走查
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 233, commit: ab40f3aaf115a37f6bc9bc75c637d41a2c5bf1e7 }
+```
+
 <a id="task-j24"></a>
 <a id="task-j.24"></a>
 
@@ -6036,7 +6168,7 @@ governance:
 > - **改动范围**：严格位于卡片 14 个 `writable_paths` 内（实际修改 13 个，无超范围修改）。
 > - **CI 侧**：Ubuntu/macOS 的 lint、typecheck、单测、Docs check、Knowledge check、Perf threshold gate 等 9 项物理门禁必需检查全绿；Windows 单测（非必需项）失败为存量已知挂账类环境问题，J.24 的 6 个测试文件在 Windows 上 100% 通过（55/55 passed），0 新增失败。
 > - **销项**：台账挂账⑲ 销项（开工路径三缺口修复已落地，见台账挂账⑲ 销项注记）。
-> - **诚实口径**：集成/单测已验证，真实开工路径未验证——三条缺口的真实验收待 Tina 下次走正式开工路径真实试玩验证。
+> - **真实验收通过（P-199 · 2026-11-13）**：开工路径三缺口（J24-P1 脏工作区确认带 acknowledge_dirty、J24-P2 空仓库无提交建 main 引用、J24-P3 Worker 供应商选择器与 base URL）经 Tina 本机正式开工路径真实试玩验证全部通过，原「真实开工路径未验证」诚实口径正式销项闭环。
 
 ```yaml task-card
 id: TASK-J.24

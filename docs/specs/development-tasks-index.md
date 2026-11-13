@@ -177,5 +177,5 @@
 | `TASK-J.16` | `NEW_TASK` | 试玩幕 · 质疑自查续作：surface_log → K-14 归因账本 → K-16 trigger 闭集（立卡 P-176；P-195 真实试玩 J16-P5/P6 FAIL，转 J.23；不标 COMPLETED） | [正文](./development-tasks-active.md#task-j.16) |
 | `TASK-J.21` | `COMPLETED` | intent-compiler 重启后状态恢复（挂账⑫；立卡 P-187；施工 P-194 · #229 `21b8b35`） | [正文](./development-tasks-completed.md#task-j21) |
 | `TASK-J.22` | `NEW_TASK` | 中栏方案来源统一为编译器台账（挂账⑬ 方案 B；立卡 P-187；估算 L，施工前须拆卡） | [正文](./development-tasks-active.md) |
-| `TASK-J.23` | `NEW_TASK` | 质疑自查生产链路接线（面板挂载 · DISPUTE 路由 + confirmation_id 复用 #222 · turn_text_sha256 落盘；立卡 P-195 / writable_paths 修订 P-196；未开工） | [正文](./development-tasks-active.md#task-j.23) |
-| `TASK-J.24` | `COMPLETED` | 开工路径三缺口：脏目录确认 + 空仓库 main 引用 + Worker provider 选择器（立卡 P-195；修订 P-197；施工 P-198 · #235 `72b52ab`；真实开工路径待试玩验证） | [正文](./development-tasks-completed.md#task-j24) |
+| `TASK-J.23` | `COMPLETED` | 质疑自查生产链路接线：面板挂载 + DISPUTE 路由 + turn_text_sha256 落盘（立卡 P-195；修订 P-196；施工 P-198 · #233 `ab40f3a`；J23-P4 真实界面走查通过 · P-199） | [正文](./development-tasks-completed.md#task-j23) |
+| `TASK-J.24` | `COMPLETED` | 开工路径三缺口：脏目录确认 + 空仓库 main 引用 + Worker provider 选择器（立卡 P-195；修订 P-197；施工 P-198 · #235 `72b52ab`；真实开工路径试玩验证通过 · P-199） | [正文](./development-tasks-completed.md#task-j24) |
