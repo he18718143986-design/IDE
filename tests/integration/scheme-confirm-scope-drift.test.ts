@@ -42,6 +42,7 @@ describe("T-HTTP S205–S207 范围预检与快照漂移（真 Daemon）", () =>
   let daemon: StagentDaemon | null = null;
   let base: string;
   let token: string;
+  let sourceTurns: Array<{ turn_id: string; turn_text_sha256: string }> = [];
 
   beforeEach(async () => {
     repo = fs.mkdtempSync(path.join(os.tmpdir(), "stagent-scope-drift-"));
@@ -62,6 +63,18 @@ describe("T-HTTP S205–S207 范围预检与快照漂移（真 Daemon）", () =>
     const info = await daemon.start();
     base = `http://127.0.0.1:${info.port}`;
     token = daemon.getSessionToken() ?? "";
+    // P-201：冻结必须带已登记的原话；先在右栏登记一句需求
+    const registered = await call<{
+      turn_id: string;
+      turn_text_sha256: string;
+    }>("POST", "/api/supervisor/turns", { text: "按项目维度汇总进度与预算" });
+    expect(registered.status).toBe(201);
+    sourceTurns = [
+      {
+        turn_id: registered.body.turn_id,
+        turn_text_sha256: registered.body.turn_text_sha256,
+      },
+    ];
   });
 
   afterEach(async () => {
@@ -140,6 +153,7 @@ describe("T-HTTP S205–S207 范围预检与快照漂移（真 Daemon）", () =>
         demo_mode: "none" as const,
       },
       scope_plan,
+      source_turns: sourceTurns,
     };
   }
 

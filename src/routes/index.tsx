@@ -99,6 +99,9 @@ import {
   reportSurfacePresentation,
   fetchSchemeAcceptance,
   type SchemeAcceptanceItem,
+  registerSchemeTurn,
+  type SchemeSourceTurn,
+  type DisputeSealApiView,
 } from "@/lib/daemon-api";
 import { ContractCard } from "@/components/contract/ContractCard";
 import { ScopeList } from "@/components/contract/ScopeList";
@@ -188,6 +191,7 @@ import { TaskGraphPane } from "@/components/studio/TaskGraphPane";
 import {
   DisputeConsolePane,
   type DisputeReportView,
+  type DisputeSealView,
 } from "@/components/studio/DisputeConsolePane";
 import { SupervisorTab } from "@/components/supervisor/SupervisorTab";
 import { SettingsTab } from "@/components/settings/SettingsTab";
@@ -248,6 +252,75 @@ export const Route = createFileRoute("/")({
   }),
   component: Console,
 });
+
+/**
+ * 方案语料与它所依据的已登记原话（P-201）。两者放在同一个状态对象里一起换、一起清，
+ * 不存在「语料已换而原话清单还在」的中间态；冻结时据 `turns` 封存原话。
+ */
+export interface SchemeSources {
+  corpus: string;
+  turns: SchemeSourceTurn[];
+}
+
+export const EMPTY_SCHEME_SOURCES: SchemeSources = { corpus: "", turns: [] };
+
+export type SchemeTurnRegistration =
+  { ok: true; turn: SchemeSourceTurn } | { ok: false; reason: string };
+
+/** 登记失败时的右栏提示：这句照常进聊天，但没有折进方案。 */
+export function schemeTurnNotFoldedNotice(reason: string): string {
+  return `这句没记进方案：${reason}。右栏照常聊天；需要进方案请重发这句。`;
+}
+
+/**
+ * 一句右栏消息能否折进方案：登记成功才把原文接进语料、把 id 与哈希记进清单（同一个新对象）；
+ * 登记失败原样返回旧对象，并给出「没记进方案」提示。
+ */
+export function applySchemeTurnRegistration(
+  prev: SchemeSources,
+  text: string,
+  registration: SchemeTurnRegistration,
+): { sources: SchemeSources; notice: string | null } {
+  if (!registration.ok) {
+    return {
+      sources: prev,
+      notice: schemeTurnNotFoldedNotice(registration.reason),
+    };
+  }
+  return {
+    sources: {
+      corpus: prev.corpus ? `${prev.corpus}\n${text}` : text,
+      turns: [
+        ...prev.turns,
+        {
+          turn_id: registration.turn.turn_id,
+          turn_text_sha256: registration.turn.turn_text_sha256,
+        },
+      ],
+    },
+    notice: null,
+  };
+}
+
+/** 旧 Daemon 不带封存事实时不填，面板按未封存渲染 */
+function sealViewFromApi(seal: DisputeSealApiView | undefined): {
+  seal?: DisputeSealView;
+} {
+  if (!seal) return {};
+  return {
+    seal: {
+      status: seal.status,
+      bound_snapshot: seal.bound_snapshot,
+      confirmed_at: seal.confirmed_at,
+      frozen_quotes_count: seal.frozen_quotes_count,
+      quotes: seal.quotes.map((quote) => ({
+        turn_id: quote.turn_id,
+        text: quote.text,
+        turn_text_sha256: quote.turn_text_sha256,
+      })),
+    },
+  };
+}
 
 function Console() {
   const [conn, setConn] = useState<DaemonConnection>(() => loadConnection());
@@ -382,7 +455,8 @@ function Console() {
   >(null);
   /** TASK-C.18：中间方案审阅（随右栏自由对话更新） */
   const [schemeDraft, setSchemeDraft] = useState<SchemeDraft | null>(null);
-  const [schemeCorpus, setSchemeCorpus] = useState("");
+  const [schemeSources, setSchemeSources] =
+    useState<SchemeSources>(EMPTY_SCHEME_SOURCES);
   const [schemeDemoBusy, setSchemeDemoBusy] = useState(false);
   const [schemeDemoGate, setSchemeDemoGate] =
     useState<DemoGate>(EMPTY_DEMO_GATE);
@@ -575,7 +649,7 @@ function Console() {
      * 与确认幂等键，让右栏回到可写态。
      */
     setSchemeDraft(null);
-    setSchemeCorpus("");
+    setSchemeSources(EMPTY_SCHEME_SOURCES);
     setSchemeDemoGate(EMPTY_DEMO_GATE);
     setSchemeChatLocked(false);
     setHandoffStep(null);
@@ -930,7 +1004,7 @@ function Console() {
           matched_quotes: Array.isArray(report.facts.prompt.matched_messages)
             ? report.facts.prompt.matched_messages.map((quote) => quote.text)
             : [],
-          confirmations: report.facts.prompt.confirmations.length,
+          ...sealViewFromApi(report.facts.prompt.seal),
         },
         spec: report.facts.spec
           ? {
@@ -1051,20 +1125,51 @@ function Console() {
         classifyJourneyIntent(trimmed).kind === "DISPUTE" ||
         /不对|质疑|有问题|bug|缺陷|验收失败/.test(trimmed.toLowerCase());
 
+      // P-201：说话时先由 Daemon 登记原话（turn_id + sha256(utf8)），登记成功才折进方案。
+      let registration: SchemeTurnRegistration;
+      try {
+        const turn = await registerSchemeTurn(conn, { text: trimmed });
+        registration = {
+          ok: true,
+          turn: {
+            turn_id: turn.turn_id,
+            turn_text_sha256: turn.turn_text_sha256,
+          },
+        };
+      } catch (error) {
+        registration = {
+          ok: false,
+          reason: error instanceof Error ? error.message : "登记失败",
+        };
+      }
+
       // J.7 / D9：方案未冻结时，随对话更新方案草案；方案已冻结后，绝不回写方案。
       if (partnerMessageMayRebuildScheme(schemeDraft)) {
-        const nextCorpus = schemeCorpus
-          ? `${schemeCorpus}
-${trimmed}`
-          : trimmed;
-        setSchemeCorpus(nextCorpus);
-        setSchemeDraft((cur) =>
-          rebuildSchemeFromCorpus(cur, nextCorpus, {
-            titleHint:
-              trimmed.length > 48 ? `${trimmed.slice(0, 48)}…` : trimmed,
-          }),
+        const { sources, notice } = applySchemeTurnRegistration(
+          schemeSources,
+          trimmed,
+          registration,
         );
-        setStudioNonce((n) => n + 1);
+        if (notice === null) {
+          // 语料、原话清单与方案草案同一批更新，不出现语料已换而清单未换的中间态
+          setSchemeSources(sources);
+          setSchemeDraft((cur) =>
+            rebuildSchemeFromCorpus(cur, sources.corpus, {
+              titleHint:
+                trimmed.length > 48 ? `${trimmed.slice(0, 48)}…` : trimmed,
+            }),
+          );
+          setStudioNonce((n) => n + 1);
+        } else {
+          setJourneyCards((prev) => [
+            ...prev.slice(-19),
+            {
+              id: `journey-unfolded-${Date.now()}`,
+              kind: "SYSTEM",
+              text: notice,
+            },
+          ]);
+        }
       }
 
       if (!looksDispute) {
@@ -1081,6 +1186,7 @@ ${trimmed}`
           ...(schemeSurfaceConfirmId
             ? { confirmation_id: schemeSurfaceConfirmId }
             : {}),
+          ...(registration.ok ? { turn: registration.turn } : {}),
         });
         const kind = result.route;
         if (kind === "CHAT") return "passthrough";
@@ -1121,7 +1227,7 @@ ${trimmed}`
       connected,
       selectedId,
       toDisputeView,
-      schemeCorpus,
+      schemeSources,
       schemeDraft,
       schemeSurfaceConfirmId,
     ],
@@ -1300,6 +1406,8 @@ ${trimmed}`
       setHandoffStep("save_scheme");
 
       const expectedRevision = schemeDraft.scheme_revision;
+      // P-201：与本修订同一批渲染的已登记原话，冻结时据此封存
+      const sourceTurnsForConfirm = schemeSources.turns;
       if (schemeConfirmIdRef.current?.revision !== expectedRevision) {
         schemeConfirmIdRef.current = {
           revision: expectedRevision,
@@ -1382,6 +1490,7 @@ ${trimmed}`
                 demo_mode: decision.demo_mode,
               },
               scope_plan: planForConfirm,
+              source_turns: sourceTurnsForConfirm,
             });
             return {
               snapshot_id: view.snapshot_id,
@@ -1560,6 +1669,7 @@ ${trimmed}`
     [
       conn,
       schemeDraft,
+      schemeSources,
       scopePlan,
       schemeDemoGate,
       schemeConfirmBusy,

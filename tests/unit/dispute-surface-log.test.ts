@@ -11,6 +11,7 @@ import {
   appendSurfaceLog,
   buildSurfaceLogEntries,
   readSurfaceLog,
+  surfacePhaseConflict,
 } from "../../daemon/supervisor/dispute/surface-log";
 
 const AT = "2026-11-11T10:00:00.000Z";
@@ -28,6 +29,7 @@ describe("J16-P1 · buildSurfaceLogEntries 只收确已呈现的条目", () => {
     const entries = buildSurfaceLogEntries({
       confirmation_id: "conf_01",
       plain_text_version: "v1",
+      phase: "pre_confirm",
       presented_at: AT,
       shown: [
         { item_ref: "dec_1", section: "decision" },
@@ -43,6 +45,7 @@ describe("J16-P1 · buildSurfaceLogEntries 只收确已呈现的条目", () => {
         section: "decision",
         presented_at: AT,
         plain_text_version: "v1",
+        phase: "pre_confirm",
       },
       {
         confirmation_id: "conf_01",
@@ -50,6 +53,7 @@ describe("J16-P1 · buildSurfaceLogEntries 只收确已呈现的条目", () => {
         section: "acceptance",
         presented_at: AT,
         plain_text_version: "v1",
+        phase: "pre_confirm",
       },
     ]);
   });
@@ -58,6 +62,7 @@ describe("J16-P1 · buildSurfaceLogEntries 只收确已呈现的条目", () => {
     const entries = buildSurfaceLogEntries({
       confirmation_id: "conf_empty",
       plain_text_version: "v1",
+      phase: "pre_confirm",
       presented_at: AT,
       shown: [],
     });
@@ -72,6 +77,7 @@ describe("J16-P1 · buildSurfaceLogEntries 只收确已呈现的条目", () => {
       buildSurfaceLogEntries({
         confirmation_id: "../escape",
         plain_text_version: "v1",
+        phase: "pre_confirm",
         presented_at: AT,
         shown: [{ item_ref: "x", section: "area" }],
       }),
@@ -80,6 +86,7 @@ describe("J16-P1 · buildSurfaceLogEntries 只收确已呈现的条目", () => {
       buildSurfaceLogEntries({
         confirmation_id: "conf_ok",
         plain_text_version: "v1",
+        phase: "pre_confirm",
         presented_at: "not-a-date",
         shown: [{ item_ref: "x", section: "area" }],
       }),
@@ -92,12 +99,14 @@ describe("J16-P1 · 追加写入与读回", () => {
     const first = buildSurfaceLogEntries({
       confirmation_id: "conf_02",
       plain_text_version: "v1",
+      phase: "pre_confirm",
       presented_at: AT,
       shown: [{ item_ref: "dec_1", section: "decision" }],
     });
     const second = buildSurfaceLogEntries({
       confirmation_id: "conf_02",
       plain_text_version: "v1",
+      phase: "pre_confirm",
       presented_at: "2026-11-11T10:05:00.000Z",
       shown: [{ item_ref: "area_9", section: "area" }],
     });
@@ -122,12 +131,14 @@ describe("J16-P1 · 追加写入与读回", () => {
       ...buildSurfaceLogEntries({
         confirmation_id: "conf_a",
         plain_text_version: "v1",
+        phase: "pre_confirm",
         presented_at: AT,
         shown: [{ item_ref: "a1", section: "approval" }],
       }),
       ...buildSurfaceLogEntries({
         confirmation_id: "conf_b",
         plain_text_version: "v1",
+        phase: "pre_confirm",
         presented_at: AT,
         shown: [{ item_ref: "b1", section: "high_risk" }],
       }),
@@ -158,5 +169,73 @@ describe("J16-P1 · 追加写入与读回", () => {
       "utf-8",
     );
     expect(() => readSurfaceLog(repo, "conf_mix")).toThrow(/归属不符/);
+  });
+});
+
+describe("P-201 · 呈现阶段 phase", () => {
+  it("新记录写入 phase；缺 phase 的旧记录照常读取，非法 phase 视为损坏", () => {
+    appendSurfaceLog(
+      repo,
+      buildSurfaceLogEntries({
+        confirmation_id: "conf_phase",
+        plain_text_version: "v1",
+        presented_at: AT,
+        phase: "post_confirm",
+        shown: [{ item_ref: "area-0", section: "area" }],
+      }),
+    );
+    expect(readSurfaceLog(repo, "conf_phase")?.[0]?.phase).toBe("post_confirm");
+
+    const dir = path.join(repo, SURFACE_LOG_ROOT);
+    const legacy = {
+      confirmation_id: "conf_legacy",
+      item_ref: "dec_1",
+      section: "decision",
+      presented_at: AT,
+      plain_text_version: "v1",
+    };
+    fs.writeFileSync(
+      path.join(dir, "conf_legacy.jsonl"),
+      `${JSON.stringify(legacy)}\n`,
+      "utf-8",
+    );
+    const read = readSurfaceLog(repo, "conf_legacy");
+    expect(read).toHaveLength(1);
+    expect(read?.[0]?.phase).toBeUndefined();
+
+    fs.writeFileSync(
+      path.join(dir, "conf_badphase.jsonl"),
+      `${JSON.stringify({ ...legacy, confirmation_id: "conf_badphase", phase: "at_freeze" })}\n`,
+      "utf-8",
+    );
+    expect(() => readSurfaceLog(repo, "conf_badphase")).toThrow(/字段不完整/);
+  });
+
+  it("确认后的呈现不能记为确认前，未确认不能记为确认后", () => {
+    const confirmedAt = "2026-11-11T10:00:00.000Z";
+    expect(
+      surfacePhaseConflict(
+        { phase: "pre_confirm", presented_at: "2026-11-11T09:59:59.000Z" },
+        confirmedAt,
+      ),
+    ).toBeNull();
+    expect(
+      surfacePhaseConflict(
+        { phase: "pre_confirm", presented_at: "2026-11-11T10:00:00.096Z" },
+        confirmedAt,
+      ),
+    ).toMatch(/不能记为确认前/);
+    expect(
+      surfacePhaseConflict(
+        { phase: "post_confirm", presented_at: "2026-11-11T10:00:01.000Z" },
+        confirmedAt,
+      ),
+    ).toBeNull();
+    expect(
+      surfacePhaseConflict({ phase: "post_confirm", presented_at: AT }, null),
+    ).toMatch(/还没有确认/);
+    expect(
+      surfacePhaseConflict({ phase: "pre_confirm", presented_at: AT }, null),
+    ).toBeNull();
   });
 });

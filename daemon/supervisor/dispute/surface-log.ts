@@ -28,12 +28,18 @@ export const SURFACE_SECTIONS = [
 ] as const;
 export type SurfaceSection = (typeof SURFACE_SECTIONS)[number];
 
+/** 呈现发生在确认之前还是之后（P-201）；确认后的呈现不得记为确认当时。 */
+export const SURFACE_PHASES = ["pre_confirm", "post_confirm"] as const;
+export type SurfacePhase = (typeof SURFACE_PHASES)[number];
+
 export interface SurfaceLogEntry {
   confirmation_id: string;
   item_ref: string;
   section: SurfaceSection;
   presented_at: string;
   plain_text_version: string;
+  /** P-201 起必写；更早的记录没有此字段，按原样读取，不补写 */
+  phase?: SurfacePhase;
 }
 
 export interface SurfaceShownItem {
@@ -45,6 +51,7 @@ export interface SurfacePresentationInput {
   confirmation_id: string;
   plain_text_version: string;
   presented_at: string;
+  phase: SurfacePhase;
   shown: readonly SurfaceShownItem[];
 }
 
@@ -60,6 +67,13 @@ function isSection(value: unknown): value is SurfaceSection {
   return (
     typeof value === "string" &&
     (SURFACE_SECTIONS as readonly string[]).includes(value)
+  );
+}
+
+function isPhase(value: unknown): value is SurfacePhase {
+  return (
+    typeof value === "string" &&
+    (SURFACE_PHASES as readonly string[]).includes(value)
   );
 }
 
@@ -87,9 +101,33 @@ export function buildSurfaceLogEntries(
       section: item.section,
       presented_at: input.presented_at,
       plain_text_version: input.plain_text_version,
+      phase: input.phase,
     });
   }
   return out;
+}
+
+/**
+ * 阶段校验（P-201）：`confirmedAt` 为该确认快照的创建时间（未确认为 null）。
+ * 确认之后才发生的呈现不得记为 pre_confirm；尚未确认时不得记为 post_confirm。
+ * 冲突返回白话原因，调用方拒收；无冲突返回 null。
+ */
+export function surfacePhaseConflict(
+  input: Pick<SurfacePresentationInput, "phase" | "presented_at">,
+  confirmedAt: string | null,
+): string | null {
+  if (input.phase === "post_confirm") {
+    return confirmedAt === null
+      ? "这份方案还没有确认，不能记为确认后的呈现"
+      : null;
+  }
+  if (confirmedAt === null) return null;
+  const presented = Date.parse(input.presented_at);
+  const confirmed = Date.parse(confirmedAt);
+  if (Number.isNaN(confirmed) || presented > confirmed) {
+    return "确认之后才发生的呈现，不能记为确认前";
+  }
+  return null;
 }
 
 export function surfaceLogPath(
@@ -132,7 +170,8 @@ function isEntry(
     v.item_ref.length > 0 &&
     isSection(v.section) &&
     typeof v.presented_at === "string" &&
-    typeof v.plain_text_version === "string"
+    typeof v.plain_text_version === "string" &&
+    (v.phase === undefined || isPhase(v.phase))
   );
 }
 
@@ -198,6 +237,7 @@ export function parseSurfacePresentationRequest(
     confirmation_id?: unknown;
     plain_text_version?: unknown;
     presented_at?: unknown;
+    phase?: unknown;
     shown?: unknown;
   };
   if (
@@ -220,6 +260,10 @@ export function parseSurfacePresentationRequest(
   ) {
     return { ok: false, message: "presented_at 不是合法时间" };
   }
+  if (!isPhase(v.phase)) {
+    return { ok: false, message: "phase 必须是 pre_confirm 或 post_confirm" };
+  }
+  const phase = v.phase;
   if (
     !Array.isArray(v.shown) ||
     v.shown.length > SURFACE_PRESENTATION_MAX_ITEMS
@@ -253,6 +297,7 @@ export function parseSurfacePresentationRequest(
       confirmation_id: v.confirmation_id,
       plain_text_version: v.plain_text_version,
       presented_at: v.presented_at,
+      phase,
       shown,
     },
   };

@@ -1685,6 +1685,25 @@ export async function fetchPresentationSnapshot(
 export type DisputeClassificationView =
   "IMPLEMENTATION_BUG" | "REQUIREMENT_DRIFT" | "UNATTRIBUTED";
 
+export type DisputeSealStatus =
+  "SEALED" | "NOT_SEALED" | "NO_BINDING" | "SNAPSHOT_MISSING" | "TAMPERED";
+
+/** P-201：与 daemon `SealFact` 对齐 */
+export interface DisputeSealApiView {
+  status: DisputeSealStatus;
+  confirmation_id: string | null;
+  bound_snapshot: boolean;
+  confirmed_at: string | null;
+  frozen_quotes_count: number | null;
+  quotes: Array<{
+    turn_id: string;
+    seq: number;
+    text: string;
+    turn_text_sha256: string;
+    keyword_hits: number;
+  }>;
+}
+
 /** POST /api/supervisor/dispute 响应里的报告（字段与 daemon 对齐，前端只读展示） */
 export interface DisputeReportApiView {
   report_id: string;
@@ -1706,8 +1725,10 @@ export interface DisputeReportApiView {
       source: string;
       original_request: string | null;
       confirmations: unknown[];
-      /** 锚定原话（修 P-2）：每条含 `text`，供左栏「你当时说的」高亮 */
+      /** 锚定原话（修 P-2）：只作归因信号，左栏不再据此展示 */
       matched_messages: Array<{ text: string }>;
+      /** P-201：左栏「你当时说的」——确认快照里封存的原话；旧 Daemon 缺省按未封存处理 */
+      seal?: DisputeSealApiView | undefined;
     };
     spec: {
       snapshot_id: string;
@@ -2020,6 +2041,8 @@ export async function submitJourneyMessage(
     contract_id?: string | undefined;
     session_id?: string | undefined;
     confirmation_id?: string | undefined;
+    /** P-201：这句已由 registerSchemeTurn 登记时带上，Daemon 不再重复登记 */
+    turn?: SchemeSourceTurn | undefined;
   },
 ): Promise<JourneyResponse> {
   return request<JourneyResponse>(conn, "/api/supervisor/journey", {
@@ -2035,6 +2058,12 @@ export async function submitJourneyMessage(
       ...(input.confirmation_id === undefined
         ? {}
         : { confirmation_id: input.confirmation_id }),
+      ...(input.turn === undefined
+        ? {}
+        : {
+            turn_id: input.turn.turn_id,
+            turn_text_sha256: input.turn.turn_text_sha256,
+          }),
     }),
   });
 }
@@ -2148,6 +2177,26 @@ export interface SchemeSnapshotView {
   snapshot_id: string;
   digest: string;
   idempotent: boolean;
+  /** P-201：快照里封存的原话条数 */
+  frozen_quotes_count?: number;
+}
+
+/** P-201：Daemon 登记过的一句右栏原话；前端只持有 id 与哈希，不持有可冒充原文的副本。 */
+export interface SchemeSourceTurn {
+  turn_id: string;
+  turn_text_sha256: string;
+}
+
+/** P-201：把右栏一句用户消息登记为原话（Daemon 生成 turn_id 并按 sha256(utf8) 落盘）。 */
+export async function registerSchemeTurn(
+  conn: DaemonConnection,
+  input: { text: string },
+): Promise<SchemeSourceTurn & { seq: number }> {
+  return request<SchemeSourceTurn & { seq: number }>(
+    conn,
+    "/api/supervisor/turns",
+    { method: "POST", body: JSON.stringify({ text: input.text }) },
+  );
 }
 
 /** TASK-C.22 / J.4：确认方案不可变快照（幂等；须带 scope_plan）。 */
@@ -2163,6 +2212,8 @@ export async function freezeSchemeSnapshot(
       demo_mode: "none" | "interactive" | "degraded";
     };
     scope_plan: ScopePlan;
+    /** P-201：本修订折进方案的已登记原话；Daemon 据此从 transcript 逐字封存 */
+    source_turns: readonly SchemeSourceTurn[];
   },
 ): Promise<SchemeSnapshotView> {
   return request<SchemeSnapshotView>(conn, "/api/supervisor/scheme/freeze", {
@@ -2392,10 +2443,14 @@ export type SurfacePresentationSection =
   | "area"
   | "unmapped_files";
 
+/** P-201：呈现发生在确认前还是确认后；确认后的呈现不得记为确认前 */
+export type SurfacePresentationPhase = "pre_confirm" | "post_confirm";
+
 export interface SurfacePresentationReport {
   confirmation_id: string;
   plain_text_version: string;
   presented_at: string;
+  phase: SurfacePresentationPhase;
   shown: { item_ref: string; section: SurfacePresentationSection }[];
 }
 

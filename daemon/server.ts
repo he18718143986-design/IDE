@@ -60,7 +60,15 @@ import {
   writeSchemeSnapshot,
   schemeBindingFromSnapshot,
   SchemeSnapshotConflictError,
+  parseSourceTurnRefs,
+  sealFrozenQuotes,
+  FROZEN_QUOTE_MAX_CHARS,
+  type FrozenQuotesFailureReason,
 } from "./pipeline/scheme-snapshot-store";
+import {
+  computeTurnTextSha256,
+  readTranscript,
+} from "./supervisor/intent-compiler/transcript-store";
 import { explainLine, TraceBrokenError, E_TRACE_BROKEN } from "./trace/why";
 import { loadModulesForRepo } from "./knowledge/modules-store";
 import { impactClosure } from "../src/lib/knowledge/impact-closure";
@@ -172,9 +180,11 @@ import {
   appendSurfaceLog,
   buildSurfaceLogEntries,
   parseSurfacePresentationRequest,
+  surfacePhaseConflict,
 } from "./supervisor/dispute/surface-log";
 import { recordUserDisputeAttribution } from "./supervisor/dispute/attribution-wiring";
 import {
+  collectSealFact,
   extractKeywords,
   SpecFactSourceImpl,
 } from "./supervisor/dispute/evidence-triad";
@@ -2283,6 +2293,7 @@ export class StagentDaemon {
       demo?: unknown;
       decision?: unknown;
       scope_plan?: unknown;
+      source_turns?: unknown;
     };
     try {
       body = (await this.readJsonBody(req)) as typeof body;
@@ -2347,6 +2358,12 @@ export class StagentDaemon {
     }
     const submittedPlan = scopePlanRaw as ScopePlan;
 
+    const sourceTurns = parseSourceTurnRefs(body.source_turns);
+    if (!sourceTurns.ok) {
+      this.sendQuotesUnverified(res, sourceTurns.reason);
+      return;
+    }
+
     try {
       // 与预检同口径：先等基线扫落定，再用同一份脏区排除重算 digest，
       // 避免「扫描恰好插在预检与冻结之间」造成的假漂移（见 handleScopePreflight）。
@@ -2358,6 +2375,19 @@ export class StagentDaemon {
         scheme: schemeDraft,
         submitted: submittedPlan,
       });
+      // P-201：按前端回传的已登记 id 与哈希，从 transcript 逐字封存原话；对不上即不冻结
+      let transcript: ReturnType<typeof readTranscript>;
+      try {
+        transcript = readTranscript(this.repoRoot);
+      } catch {
+        this.sendQuotesUnverified(res, "transcript_unreadable");
+        return;
+      }
+      const sealed = sealFrozenQuotes(transcript, sourceTurns.value);
+      if (!sealed.ok) {
+        this.sendQuotesUnverified(res, sealed.reason, sealed.turn_id);
+        return;
+      }
       // TASK-J.18b / GAP-W2：冻结时从账本拷贝完整墓地（含 revived）进快照 1.2
       const ledgerGraveyard = loadOrInitLedgerState(this.repoRoot).graveyard;
       const written = writeSchemeSnapshot(this.repoRoot, {
@@ -2372,11 +2402,13 @@ export class StagentDaemon {
         },
         scope_plan: freshPlan,
         graveyard: ledgerGraveyard,
+        frozen_quotes: sealed.value,
       });
       this.sendJson(res, written.idempotent ? 200 : 201, {
         snapshot_id: written.snapshot.snapshot_id,
         digest: written.snapshot.digest,
         idempotent: written.idempotent,
+        frozen_quotes_count: written.snapshot.frozen_quotes?.quotes.length ?? 0,
       });
     } catch (err) {
       if (err instanceof ScopePlanDriftError) {
@@ -2398,6 +2430,35 @@ export class StagentDaemon {
       }
       this.sendActionError(res, err);
     }
+  }
+
+  /**
+   * P-201：冻结时原话清单校验失败。按 ADR-0018 §3.2 复用 `E_SCHEME_SNAPSHOT_MISMATCH`，
+   * `reason` 区分具体原因；不写快照，确认事务据此不签合同。
+   */
+  private sendQuotesUnverified(
+    res: http.ServerResponse,
+    reason: FrozenQuotesFailureReason,
+    turnId?: string,
+  ): void {
+    const listBroken =
+      reason === "quotes_missing" ||
+      reason === "quotes_malformed" ||
+      reason === "quotes_duplicate" ||
+      reason === "quotes_too_many";
+    const message =
+      reason === "quotes_empty"
+        ? "这份方案还没有登记到你在右栏说的原话，暂时不能冻结。请先在右栏把需求说一遍。"
+        : listBroken
+          ? "确认请求里的原话清单不完整，方案没有冻结。请刷新页面后重新确认。"
+          : "有一句你说过的话和登记记录对不上，方案没有冻结。请再确认一次；仍不行就把那句话重发后再确认。";
+    this.sendJson(res, 409, {
+      error: "scheme_quotes_unverified",
+      code: "E_SCHEME_SNAPSHOT_MISMATCH",
+      reason,
+      ...(turnId === undefined ? {} : { turn_id: turnId }),
+      message,
+    });
   }
 
   /**
@@ -4041,6 +4102,93 @@ export class StagentDaemon {
     this.sendJson(res, 200, { accepted });
   }
 
+  /**
+   * `POST /api/supervisor/turns` —— 右栏用户消息登记为原话（J16-P5 / P-201）。
+   *
+   * Daemon 生成 turn_id 并按 sha256(utf8) 写入编译器 transcript，前端只拿回 id 与哈希；
+   * 冻结时凭它们从 transcript 逐字封存，不得事后从聊天记录或方案正文拼凑。
+   */
+  private async handleSchemeTurnRegister(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    method: string,
+  ): Promise<void> {
+    if (method !== "POST") {
+      this.sendJson(res, 405, { error: "Method not allowed" });
+      return;
+    }
+    let body: { text?: unknown };
+    try {
+      body = (await this.readJsonBody(req)) as typeof body;
+    } catch (err) {
+      this.sendJson(res, 400, {
+        error: "invalid_json",
+        message: (err as Error).message,
+      });
+      return;
+    }
+    const text = typeof body.text === "string" ? body.text.trim() : "";
+    if (text.length === 0) {
+      this.sendJson(res, 400, {
+        error: "turn_text_required",
+        message: "要登记的这句话是空的",
+      });
+      return;
+    }
+    if (text.length > FROZEN_QUOTE_MAX_CHARS) {
+      this.sendJson(res, 400, {
+        error: "turn_text_too_long",
+        message: `这句超过 ${FROZEN_QUOTE_MAX_CHARS} 字`,
+      });
+      return;
+    }
+    try {
+      const { turn_id, seq } = this.ensureIntentCompilerHost().commitUserTurn({
+        text,
+      });
+      const expected = computeTurnTextSha256(text);
+      const persisted = readTranscript(this.repoRoot)?.turns.find(
+        (t) => t.turn_id === turn_id,
+      );
+      if (
+        !persisted ||
+        persisted.role !== "user" ||
+        persisted.text_sha256 !== expected
+      ) {
+        throw new Error(`登记后回读不一致（${turn_id}）`);
+      }
+      this.sendJson(res, 201, { turn_id, seq, turn_text_sha256: expected });
+    } catch (err) {
+      console.warn("[scheme-turn] 原话登记失败", (err as Error).message);
+      this.sendJson(res, 500, {
+        error: "turn_register_failed",
+        message: "这句话没能登记下来",
+      });
+    }
+  }
+
+  /** journey 复用已登记原话：id 存在、是用户发言、哈希与本句和登记记录都一致。 */
+  private registeredTurnMatches(
+    turnId: string,
+    turnSha: string,
+    message: string,
+  ): boolean {
+    let turn;
+    try {
+      turn = readTranscript(this.repoRoot)?.turns.find(
+        (t) => t.turn_id === turnId,
+      );
+    } catch {
+      return false;
+    }
+    return (
+      turn !== undefined &&
+      turn.role === "user" &&
+      turn.text_sha256 === turnSha &&
+      computeTurnTextSha256(message) === turnSha
+    );
+  }
+
   private async handleSupervisorJourney(
     req: http.IncomingMessage,
     res: http.ServerResponse,
@@ -4068,6 +4216,8 @@ export class StagentDaemon {
         contract_id?: unknown;
         session_id?: unknown;
         confirmation_id?: unknown;
+        turn_id?: unknown;
+        turn_text_sha256?: unknown;
       };
       try {
         body = (await this.readJsonBody(req)) as typeof body;
@@ -4117,6 +4267,32 @@ export class StagentDaemon {
         return;
       }
       const confirmationId = rawConfirmation === "" ? null : rawConfirmation;
+
+      // P-201：前端已登记过这句时带上 id 与哈希，对上才复用，对不上不进入编排
+      const rawTurnId =
+        typeof body.turn_id === "string" ? body.turn_id.trim() : "";
+      const rawTurnSha =
+        typeof body.turn_text_sha256 === "string"
+          ? body.turn_text_sha256.trim()
+          : "";
+      if ((rawTurnId === "") !== (rawTurnSha === "")) {
+        this.sendJson(res, 400, {
+          error: "turn_ref_incomplete",
+          message: "turn_id 与 turn_text_sha256 必须成对出现",
+        });
+        return;
+      }
+      const registeredTurn = rawTurnId !== "";
+      if (
+        registeredTurn &&
+        !this.registeredTurnMatches(rawTurnId, rawTurnSha, message)
+      ) {
+        this.sendJson(res, 409, {
+          error: "turn_mismatch",
+          message: "这句话和登记记录对不上，请重发",
+        });
+        return;
+      }
 
       let contract = undefined as
         import("../src/lib/contract.schema").SoftwareContract | undefined;
@@ -4209,11 +4385,14 @@ export class StagentDaemon {
         });
         // TASK-J.10：USER_TURN_COMMITTED → 意图编译循环（防抖后组装/merge/CAS）
         // 失败不挡旅程主路径；编译器输出严禁回流右栏（ADR-0014）。
-        try {
-          const host = this.ensureIntentCompilerHost();
-          host.commitUserTurn({ text: message });
-        } catch {
-          /* 编译宿主异常不挡主路径 */
+        // P-201：已经由 /api/supervisor/turns 登记过的这句不再重复登记。
+        if (!registeredTurn) {
+          try {
+            const host = this.ensureIntentCompilerHost();
+            host.commitUserTurn({ text: message });
+          } catch {
+            /* 编译宿主异常不挡主路径 */
+          }
         }
         appendJourneyTurn(this.repoRoot, {
           role: "assistant",
@@ -4349,6 +4528,18 @@ export class StagentDaemon {
       this.sendJson(res, 400, {
         error: "surface_log_invalid",
         message: parsed.message,
+      });
+      return;
+    }
+    // P-201：以确认快照的创建时间校验阶段，确认后的呈现不得记为确认前
+    const confirmedAt =
+      readSchemeSnapshot(this.repoRoot, parsed.value.confirmation_id)
+        ?.created_at ?? null;
+    const phaseConflict = surfacePhaseConflict(parsed.value, confirmedAt);
+    if (phaseConflict !== null) {
+      this.sendJson(res, 409, {
+        error: "surface_log_phase_mismatch",
+        message: phaseConflict,
       });
       return;
     }
@@ -4506,6 +4697,11 @@ export class StagentDaemon {
             challenge,
             timeoutMs: DISPUTE_TIMEOUT_MS,
             spec,
+            seal: collectSealFact(
+              this.repoRoot,
+              contract.scheme_binding,
+              extractKeywords(challenge),
+            ),
           });
           this.broadcastDisputeReport(report);
           this.sendJson(res, 200, {
@@ -5605,6 +5801,15 @@ export class StagentDaemon {
         return;
       }
       await this.handleSupervisorJourney(req, res, method, parsedUrl);
+      return;
+    }
+
+    if (pathname === "/api/supervisor/turns") {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      await this.handleSchemeTurnRegister(req, res, method);
       return;
     }
 

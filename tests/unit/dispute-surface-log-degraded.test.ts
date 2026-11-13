@@ -43,6 +43,7 @@ describe("J16-P4 · 缺 surface_log 的退化", () => {
         confirmation_id: "conf_full",
         plain_text_version: "v1",
         presented_at: AT,
+        phase: "pre_confirm",
         shown: [{ item_ref: "dec_1", section: "decision" }],
       }),
     );

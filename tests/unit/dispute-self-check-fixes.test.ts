@@ -20,7 +20,10 @@ import {
   matchesKeywords,
   specFactFromSnapshot,
 } from "../../daemon/supervisor/dispute/evidence-triad";
-import { E_DISPUTE_TIMEOUT } from "../../daemon/supervisor/dispute/types";
+import {
+  E_DISPUTE_TIMEOUT,
+  type SealFact,
+} from "../../daemon/supervisor/dispute/types";
 import type { SchemeSnapshot } from "../../daemon/pipeline/scheme-snapshot-store";
 import type { SupervisorMessage } from "../../daemon/supervisor/types";
 
@@ -77,10 +80,20 @@ describe("P-6 · 词法实现复用 G-MATCH", () => {
 
 describe("P-5 · 错误码不写进 reason_code", () => {
   it("超时报告的 E_DISPUTE_TIMEOUT 只出现在 error_code", () => {
+    const noSeal: SealFact = {
+      status: "NO_BINDING",
+      confirmation_id: null,
+      bound_snapshot: false,
+      confirmed_at: null,
+      frozen_quotes_count: null,
+      quotes: [],
+    };
     const report = buildTimeoutFallbackReport({
       contract: CONTRACT,
       challenge: "报表页没有按月份切换",
+      seal: noSeal,
     });
+    expect(report.facts.prompt.seal).toEqual(noSeal);
     expect(report.error_code).toBe(E_DISPUTE_TIMEOUT);
     expect(report).not.toHaveProperty("reason_code");
     expect(report.plain_summary).not.toMatch(/E_DISPUTE|ms|置信度/);

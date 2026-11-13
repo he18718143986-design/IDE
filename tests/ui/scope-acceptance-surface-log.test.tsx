@@ -15,6 +15,15 @@ import {
 } from "../../src/components/studio/ScopeAcceptanceBlock";
 import type { ScopePlan } from "../../src/lib/journey/scope-plan";
 import type { SurfacePresentationReport } from "../../src/lib/daemon-api";
+import {
+  SCHEME_DECISIONS_PLAIN_TEXT_VERSION,
+  SchemeReviewPane,
+  schemeDecisionShownItems,
+} from "../../src/components/studio/SchemeReviewPane";
+import {
+  freezeScheme,
+  rebuildSchemeFromCorpus,
+} from "../../src/lib/journey/scheme-draft";
 
 function makePlan(partial: Partial<ScopePlan> = {}): ScopePlan {
   return {
@@ -132,6 +141,8 @@ describe("TASK-J.16 · 区块呈现上报（surface_log 接线）", () => {
       { item_ref: "prot-0", section: "approval" },
     ]);
     expect(Number.isNaN(Date.parse(payload.presented_at))).toBe(false);
+    // P-201：开工前的展示记为确认前
+    expect(payload.phase).toBe("pre_confirm");
   });
 
   it("上报失败：页面照常显示，记 console.warn 并标记 failed", async () => {
@@ -225,6 +236,8 @@ describe("TASK-J.16 J16-P7 · 台账验收条目渲染与 acceptance 段上报",
       { item_ref: "ITEM-1", section: "acceptance" },
       { item_ref: "ITEM-2", section: "acceptance" },
     ]);
+    // P-201：冻结后的只读展示记为确认后，不冒充确认当时
+    expect(payload.phase).toBe("post_confirm");
   });
 
   it("没有台账条目时不渲染验收条目区块，也不上报 acceptance 段", () => {
@@ -241,5 +254,66 @@ describe("TASK-J.16 J16-P7 · 台账验收条目渲染与 acceptance 段上报",
         (s) => s.section === "acceptance",
       ),
     ).toBe(false);
+  });
+});
+
+describe("P-201 · 方案审阅：确认前上报实际展示的决议区条目", () => {
+  const scheme = rebuildSchemeFromCorpus(
+    null,
+    "做一个工程进度管控台，按项目汇总进度与预算，超期要预警。只做进度，财务下一期",
+  );
+
+  beforeEach(() => {
+    stubOfflineFetch(["/api/knowledge/modules"]);
+  });
+
+  it("确认前上报实际展示的决议区条目：section=decision，phase=pre_confirm", async () => {
+    const expected = [
+      ...scheme.conflicts.map((c) => ({ item_ref: c.id, section: "decision" })),
+      ...scheme.decisions.map((d) => ({ item_ref: d.id, section: "decision" })),
+    ];
+    expect(expected.length).toBeGreaterThan(0);
+    expect(schemeDecisionShownItems(scheme)).toEqual(expected);
+
+    const onReport = vi.fn((_r: SurfacePresentationReport) => {
+      // 上报发生时，决议区条目已经在 DOM 中
+      expect(
+        document.querySelectorAll('[data-testid="scheme-decision-item"]')
+          .length,
+      ).toBe(scheme.decisions.length);
+      return Promise.resolve({
+        written: expected.length,
+        confirmation_id: "c-dec",
+      });
+    });
+    render(
+      <SchemeReviewPane
+        scheme={scheme}
+        surfaceConfirmationId="c-dec"
+        onSurfacePresented={onReport}
+      />,
+    );
+    await waitFor(() => expect(onReport).toHaveBeenCalledTimes(1));
+    const payload = onReport.mock.calls[0]![0];
+    expect(payload.confirmation_id).toBe("c-dec");
+    expect(payload.phase).toBe("pre_confirm");
+    expect(payload.plain_text_version).toBe(
+      SCHEME_DECISIONS_PLAIN_TEXT_VERSION,
+    );
+    expect(payload.shown).toEqual(expected);
+  });
+
+  it("冻结后的方案不再按确认前上报决议区", () => {
+    const onReport = vi.fn(() => Promise.resolve({}));
+    const frozen = freezeScheme(scheme);
+    expect(schemeDecisionShownItems(frozen)).toEqual([]);
+    render(
+      <SchemeReviewPane
+        scheme={frozen}
+        surfaceConfirmationId="c-dec-frozen"
+        onSurfacePresented={onReport}
+      />,
+    );
+    expect(onReport).not.toHaveBeenCalled();
   });
 });

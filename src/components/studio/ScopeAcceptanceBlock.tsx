@@ -180,6 +180,7 @@ export function ScopeAcceptanceBlock(props: ScopeAcceptanceBlockProps) {
     props.acceptanceItems ?? [],
   );
   const shownKey = JSON.stringify(shown);
+  const surfacePhase = mode === "pre_start" ? "pre_confirm" : "post_confirm";
   const surfaceConfirmationId = props.surface?.confirmationId ?? null;
   const [surfaceStatus, setSurfaceStatus] = useState<
     "idle" | "reported" | "failed"
@@ -199,6 +200,7 @@ export function ScopeAcceptanceBlock(props: ScopeAcceptanceBlockProps) {
       confirmation_id: surfaceConfirmationId,
       plain_text_version: SCOPE_ACCEPTANCE_PLAIN_TEXT_VERSION,
       presented_at: new Date().toISOString(),
+      phase: surfacePhase,
       shown: items,
     };
     Promise.resolve()
@@ -215,7 +217,7 @@ export function ScopeAcceptanceBlock(props: ScopeAcceptanceBlockProps) {
     return () => {
       cancelled = true;
     };
-  }, [surfaceConfirmationId, shownKey]);
+  }, [surfaceConfirmationId, shownKey, surfacePhase]);
 
   useEffect(() => {
     if (props.approvalRequired || props.forceExpandSensitive) {

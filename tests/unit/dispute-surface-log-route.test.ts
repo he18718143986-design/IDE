@@ -23,11 +23,15 @@ import {
   surfaceLogPath,
   SURFACE_PRESENTATION_MAX_ITEMS,
 } from "../../daemon/supervisor/dispute/surface-log";
+import { writeSchemeSnapshot } from "../../daemon/pipeline/scheme-snapshot-store";
+import type { DemoGate, SchemeDraft } from "../../src/lib/journey/scheme-draft";
+import type { ScopePlan } from "../../src/lib/journey/scope-plan";
 
 const VALID = {
   confirmation_id: "scheme-confirm-route1",
   plain_text_version: "scope-acceptance-v1",
   presented_at: "2026-11-11T04:00:00.000Z",
+  phase: "pre_confirm",
   shown: [
     { item_ref: "prot-0", section: "approval" },
     { item_ref: "area-0", section: "area" },
@@ -97,6 +101,19 @@ describe("parseSurfacePresentationRequest", () => {
     );
     expect(parseSurfacePresentationRequest("text").ok).toBe(false);
   });
+
+  it("P-201：phase 必填且只接受 pre_confirm / post_confirm", () => {
+    const { phase: _omit, ...withoutPhase } = VALID;
+    expect(parseSurfacePresentationRequest(withoutPhase).ok).toBe(false);
+    expect(
+      parseSurfacePresentationRequest({ ...VALID, phase: "at_freeze" }).ok,
+    ).toBe(false);
+    const post = parseSurfacePresentationRequest({
+      ...VALID,
+      phase: "post_confirm",
+    });
+    expect(post.ok && post.value.phase).toBe("post_confirm");
+  });
 });
 
 describe("POST /api/supervisor/surface-log", () => {
@@ -117,6 +134,8 @@ describe("POST /api/supervisor/surface-log", () => {
     const info = await daemon.start();
     base = `http://127.0.0.1:${info.port}`;
     token = daemon.getSessionToken() ?? "";
+    // 上一用例 stop 后 undici 可能仍握着同端口的 keep-alive；先用 TCP 确认新进程已听
+    await waitForPort(info.port);
   });
 
   afterEach(async () => {
@@ -126,13 +145,17 @@ describe("POST /api/supervisor/surface-log", () => {
     safeRmSync(repo);
   });
 
+  /** 关闭 keep-alive，避免 Windows 上复用已 stop 的 daemon 的旧 socket（ECONNRESET）。 */
+  const headers = (auth: string | null = `Bearer ${token}`) => ({
+    "content-type": "application/json",
+    connection: "close",
+    ...(auth ? { authorization: auth } : {}),
+  });
+
   const post = (body: unknown, auth: string | null = `Bearer ${token}`) =>
     fetch(`${base}/api/supervisor/surface-log`, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        ...(auth ? { authorization: auth } : {}),
-      },
+      headers: headers(auth),
       body: JSON.stringify(body),
     });
 
@@ -184,14 +207,76 @@ describe("POST /api/supervisor/surface-log", () => {
   it("GET 返回 405", async () => {
     const res = await fetch(`${base}/api/supervisor/surface-log`, {
       method: "GET",
-      headers: { authorization: `Bearer ${token}` },
+      headers: headers(),
     });
     expect(res.status).toBe(405);
   });
+
+  it("phase：确认后上报带 post_confirm，冒充 pre_confirm 被拒", async () => {
+    const confirmedAt = "2026-11-11T05:00:00.000Z";
+    writeSchemeSnapshot(repo, {
+      confirmation_id: VALID.confirmation_id,
+      scheme: {
+        scheme_id: "scheme-route",
+        scheme_revision: 1,
+        frozen: true,
+      } as unknown as SchemeDraft,
+      demo: {
+        status: "none",
+        scheme_revision: null,
+        decision_revision: null,
+      } as DemoGate,
+      decision: { code: "OK", message: "ok", demo_mode: "none" },
+      scope_plan: { plan_digest: "p".repeat(64) } as unknown as ScopePlan,
+      now: () => new Date(confirmedAt),
+    });
+    const after = "2026-11-11T05:00:00.096Z";
+
+    const fake = await post({
+      ...VALID,
+      presented_at: after,
+      phase: "pre_confirm",
+    });
+    expect(fake.status).toBe(409);
+    expect((await fake.json()).error).toBe("surface_log_phase_mismatch");
+    expect(fs.existsSync(surfaceLogPath(repo, VALID.confirmation_id))).toBe(
+      false,
+    );
+
+    const before = await post({
+      ...VALID,
+      presented_at: "2026-11-11T04:59:59.000Z",
+      phase: "pre_confirm",
+    });
+    expect(before.status).toBe(200);
+
+    const real = await post({
+      ...VALID,
+      presented_at: after,
+      phase: "post_confirm",
+      shown: [{ item_ref: "area-0", section: "area" }],
+    });
+    expect(real.status).toBe(200);
+    const entries = readSurfaceLog(repo, VALID.confirmation_id) ?? [];
+    expect(entries.map((e) => e.phase)).toEqual([
+      "pre_confirm",
+      "pre_confirm",
+      "post_confirm",
+    ]);
+
+    const unconfirmed = await post({
+      ...VALID,
+      confirmation_id: "scheme-confirm-route2",
+      phase: "post_confirm",
+    });
+    expect(unconfirmed.status).toBe(409);
+  });
   it("GET /api/supervisor/scheme-acceptance：沿 Bearer 鉴权；无台账返回空投影；有台账只读投影且不写盘", async () => {
     const url = `${base}/api/supervisor/scheme-acceptance`;
-    const auth = { authorization: `Bearer ${token}` };
-    const empty = await fetch(url, { headers: auth });
+    // 紧接在多次 POST 的 phase 用例之后：再等端口，且用 connection:close，
+    // 否则 Windows 上 undici 会复用上一 daemon 的 socket → read ECONNRESET（#241）。
+    await waitForPort(Number(new URL(base).port));
+    const empty = await fetch(url, { headers: headers() });
     expect(empty.status).toBe(200);
     expect(await empty.json()).toEqual({
       scheme_id: null,
@@ -230,7 +315,7 @@ describe("POST /api/supervisor/surface-log", () => {
       }),
     );
     const before = fs.readFileSync(file, "utf8");
-    const res = await fetch(url, { headers: auth });
+    const res = await fetch(url, { headers: headers() });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       scheme_id: "scheme-r",
@@ -239,7 +324,7 @@ describe("POST /api/supervisor/surface-log", () => {
     });
     expect(fs.readFileSync(file, "utf8")).toBe(before);
 
-    const unauth = await fetch(url);
+    const unauth = await fetch(url, { headers: { connection: "close" } });
     expect(unauth.status).toBe(401);
   });
 });

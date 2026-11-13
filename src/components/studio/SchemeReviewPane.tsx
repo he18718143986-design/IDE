@@ -8,6 +8,7 @@
  * - J.7：确认中三步人话进度；COMMIT 后中栏交接卡（不进右栏）
  */
 
+import { useEffect, useRef } from "react";
 import {
   HANDOFF_COMPENSATION_FAILED_MESSAGE,
   HANDOFF_LOCK_HINT,
@@ -30,7 +31,10 @@ import {
   type ScopeAcceptanceMode,
   type ScopeAcceptanceSurfaceProps,
 } from "@/components/studio/ScopeAcceptanceBlock";
-import type { SchemeAcceptanceItem } from "@/lib/daemon-api";
+import type {
+  SchemeAcceptanceItem,
+  SurfacePresentationReport,
+} from "@/lib/daemon-api";
 import { ProjectMapPane } from "@/components/project/ProjectMapPane";
 import { SystemMapPane } from "@/components/project/SystemMapPane";
 import {
@@ -93,6 +97,31 @@ export interface SchemeReviewPaneProps {
   playtest?: PlaytestAcceptBlockProps | null | undefined;
 }
 
+/** 决议区白话投影的版本号；措辞变化时递增，写入 surface_log 的 plain_text_version。 */
+export const SCHEME_DECISIONS_PLAIN_TEXT_VERSION =
+  "scheme-decisions-v1" as const;
+
+/**
+ * 确认前决议区确已展示的条目（§5.3 decision 段：冲突抉择与 AI 推荐决策），
+ * 与下方渲染分支一一对应：空态不渲染决议区，冻结后的展示不算确认前的呈现。
+ */
+export function schemeDecisionShownItems(
+  scheme: SchemeDraft | null,
+): SurfacePresentationReport["shown"] {
+  if (!scheme || scheme.frozen) return [];
+  if (!scheme.title && scheme.modules.length === 0) return [];
+  return [
+    ...scheme.conflicts.map((c) => ({
+      item_ref: c.id,
+      section: "decision" as const,
+    })),
+    ...scheme.decisions.map((d) => ({
+      item_ref: d.id,
+      section: "decision" as const,
+    })),
+  ];
+}
+
 function MermaidCard(props: { title: string; source: string; testId: string }) {
   if (!props.source.trim()) return null;
   return (
@@ -116,6 +145,35 @@ function MermaidCard(props: { title: string; source: string; testId: string }) {
 export function SchemeReviewPane(props: SchemeReviewPaneProps) {
   const scheme = props.scheme;
   const frozen = scheme?.frozen === true;
+
+  const decisionShownKey = JSON.stringify(schemeDecisionShownItems(scheme));
+  const surfaceConfirmationId = props.surfaceConfirmationId ?? null;
+  const onSurfacePresentedRef = useRef(props.onSurfacePresented ?? null);
+  useEffect(() => {
+    onSurfacePresentedRef.current = props.onSurfacePresented ?? null;
+  });
+  // 渲染提交之后才上报：决议区条目已在 DOM 中，不是渲染前预写；失败只留痕，不挡渲染。
+  useEffect(() => {
+    const report = onSurfacePresentedRef.current;
+    const shown = JSON.parse(
+      decisionShownKey,
+    ) as SurfacePresentationReport["shown"];
+    if (!surfaceConfirmationId || !report || shown.length === 0) return;
+    void Promise.resolve()
+      .then(() =>
+        report({
+          confirmation_id: surfaceConfirmationId,
+          plain_text_version: SCHEME_DECISIONS_PLAIN_TEXT_VERSION,
+          presented_at: new Date().toISOString(),
+          phase: "pre_confirm",
+          shown,
+        }),
+      )
+      .catch((err: unknown) => {
+        console.warn("[surface-log] 决议区呈现记录上报失败，页面照常显示", err);
+      });
+  }, [surfaceConfirmationId, decisionShownKey]);
+
   const openConflicts =
     scheme?.conflicts.filter((c) => c.chosenId === null).length ?? 0;
   const demoGate = props.demoGate ?? EMPTY_DEMO_GATE;
