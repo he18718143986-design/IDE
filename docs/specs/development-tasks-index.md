@@ -178,4 +178,4 @@
 | `TASK-J.21` | `COMPLETED` | intent-compiler 重启后状态恢复（挂账⑫；立卡 P-187；施工 P-194 · #229 `21b8b35`） | [正文](./development-tasks-completed.md#task-j21) |
 | `TASK-J.22` | `NEW_TASK` | 中栏方案来源统一为编译器台账（挂账⑬ 方案 B；立卡 P-187；估算 L，施工前须拆卡） | [正文](./development-tasks-active.md) |
 | `TASK-J.23` | `NEW_TASK` | 质疑自查生产链路接线（面板挂载 · DISPUTE 路由 + confirmation_id 复用 #222 · turn_text_sha256 落盘；立卡 P-195 / writable_paths 修订 P-196；未开工） | [正文](./development-tasks-active.md#task-j.23) |
-| `TASK-J.24` | `NEW_TASK` | 开工路径三缺口（脏目录确认 · 空仓库无 main · Worker provider 默认值；立卡 P-195 / writable_paths 修订 P-197；未开工） | [正文](./development-tasks-active.md#task-j.24) |
+| `TASK-J.24` | `COMPLETED` | 开工路径三缺口：脏目录确认 + 空仓库 main 引用 + Worker provider 选择器（立卡 P-195；修订 P-197；施工 P-198 · #235 `72b52ab`；真实开工路径待试玩验证） | [正文](./development-tasks-completed.md#task-j24) |
