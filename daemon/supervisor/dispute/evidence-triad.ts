@@ -20,6 +20,11 @@ import {
 } from "../../pipeline/scheme-snapshot-store";
 import { unquoteGitPath } from "../../pipeline/untracked-scope-guard";
 import { readSchemeLedger } from "../intent-compiler/scheme-ledger-store";
+import {
+  readTranscript,
+  type PersistedTranscriptTurn,
+  type TranscriptRecord,
+} from "../intent-compiler/transcript-store";
 import { SupervisorSessionManager } from "../session-manager";
 import type { SupervisorMessage, SupervisorSession } from "../types";
 import { addedCodeLines } from "./added-code";
@@ -247,11 +252,78 @@ function itemLabel(item: Record<string, unknown>): string {
  * - 锚点的 `turn_text_sha256` 必须与会话里该轮原文一致，否则丢弃（失败关闭）；
  * - 高亮区间 `raw_start/raw_end` 直接切原文，不做模型改写。
  */
+export interface AnchoredQuotesOptions {
+  repoRoot?: string | null | undefined;
+  transcript?:
+    TranscriptRecord | readonly PersistedTranscriptTurn[] | null | undefined;
+}
+
 export function anchoredQuotesFromDraft(
   draft: SchemeDraftV2,
   messages: readonly SupervisorMessage[],
   keywords: readonly string[],
+  transcriptOrRepoRoot?:
+    | string
+    | TranscriptRecord
+    | readonly PersistedTranscriptTurn[]
+    | AnchoredQuotesOptions
+    | null,
 ): PromptFactMessage[] {
+  let transcriptTurns: Map<string, PersistedTranscriptTurn> | null = null;
+  let transcriptUpdatedAt = "";
+
+  if (typeof transcriptOrRepoRoot === "string") {
+    try {
+      const record = readTranscript(transcriptOrRepoRoot);
+      if (record?.turns) {
+        transcriptTurns = new Map(record.turns.map((t) => [t.turn_id, t]));
+        transcriptUpdatedAt = record.updated_at ?? "";
+      }
+    } catch {
+      transcriptTurns = null;
+    }
+  } else if (Array.isArray(transcriptOrRepoRoot)) {
+    transcriptTurns = new Map(transcriptOrRepoRoot.map((t) => [t.turn_id, t]));
+  } else if (transcriptOrRepoRoot && typeof transcriptOrRepoRoot === "object") {
+    if (
+      "turns" in transcriptOrRepoRoot &&
+      Array.isArray(transcriptOrRepoRoot.turns)
+    ) {
+      transcriptTurns = new Map(
+        transcriptOrRepoRoot.turns.map((t) => [t.turn_id, t]),
+      );
+      transcriptUpdatedAt = transcriptOrRepoRoot.updated_at ?? "";
+    } else if (
+      "transcript" in transcriptOrRepoRoot ||
+      "repoRoot" in transcriptOrRepoRoot
+    ) {
+      const opts = transcriptOrRepoRoot as AnchoredQuotesOptions;
+      if (opts.transcript) {
+        const transcriptVal = opts.transcript;
+        if ("turns" in transcriptVal) {
+          transcriptTurns = new Map(
+            transcriptVal.turns.map((t) => [t.turn_id, t]),
+          );
+          if (transcriptVal.updated_at) {
+            transcriptUpdatedAt = transcriptVal.updated_at;
+          }
+        } else {
+          transcriptTurns = new Map(transcriptVal.map((t) => [t.turn_id, t]));
+        }
+      } else if (opts.repoRoot) {
+        try {
+          const record = readTranscript(opts.repoRoot);
+          if (record?.turns) {
+            transcriptTurns = new Map(record.turns.map((t) => [t.turn_id, t]));
+            transcriptUpdatedAt = record.updated_at ?? "";
+          }
+        } catch {
+          transcriptTurns = null;
+        }
+      }
+    }
+  }
+
   const byId = new Map(
     messages.map((message) => [message.message_id, message]),
   );
@@ -267,9 +339,60 @@ export function anchoredQuotesFromDraft(
         const ref: TurnRef = evidence.ref;
         const anchor = ref.anchor;
         if (!anchor) continue;
+
+        // 1. 优先按 ref.turn_id 反查 readTranscript(repoRoot)
+        if (transcriptTurns) {
+          const turn = transcriptTurns.get(ref.turn_id);
+          if (turn) {
+            const computedSha = sha256Hex(turn.text);
+            const recordedSha = turn.turn_text_sha256 ?? turn.text_sha256;
+            const hashMatches =
+              computedSha === anchor.turn_text_sha256 ||
+              recordedSha === anchor.turn_text_sha256;
+            if (!hashMatches) {
+              // 哈希不一致 → 失败关闭，不兜底、不伪造
+              continue;
+            }
+            if (
+              anchor.raw_start < 0 ||
+              anchor.raw_end <= anchor.raw_start ||
+              anchor.raw_end > turn.text.length
+            ) {
+              // 越界 → 失败关闭
+              continue;
+            }
+            const quote = turn.text.slice(anchor.raw_start, anchor.raw_end);
+            if (quote === "") continue;
+
+            const role =
+              turn.role === "assistant"
+                ? "supervisor"
+                : turn.role === "system"
+                  ? "system"
+                  : "user";
+            out.push({
+              message_id: turn.turn_id,
+              role,
+              text: quote,
+              created_at: transcriptUpdatedAt,
+              raw_start: anchor.raw_start,
+              raw_end: anchor.raw_end,
+            });
+            continue;
+          }
+        }
+
+        // 2. transcript 缺失或 turn_id 未命中时，严格按 message_id/turn_id 兜底 session.messages
         const message = byId.get(ref.turn_id);
         if (!message) continue;
         if (sha256Hex(message.text) !== anchor.turn_text_sha256) continue;
+        if (
+          anchor.raw_start < 0 ||
+          anchor.raw_end <= anchor.raw_start ||
+          anchor.raw_end > message.text.length
+        ) {
+          continue;
+        }
         const quote = message.text.slice(anchor.raw_start, anchor.raw_end);
         if (quote === "") continue;
         out.push({
@@ -286,7 +409,6 @@ export function anchoredQuotesFromDraft(
   return out.slice(-MAX_QUOTES);
 }
 
-/** 台账中的方案草稿，且与确认快照同一 scheme_id / revision 才可用（失败关闭） */
 export function ledgerDraftForSnapshot(
   repoRoot: string,
   snapshot: SchemeSnapshot | null,
@@ -347,7 +469,12 @@ export class SessionFactSourceImpl implements SessionFactSource {
       : null;
     const draft = ledgerDraftForSnapshot(this.repoRoot, snapshot);
     const matched = draft
-      ? anchoredQuotesFromDraft(draft, session.messages, input.keywords)
+      ? anchoredQuotesFromDraft(
+          draft,
+          session.messages,
+          input.keywords,
+          this.repoRoot,
+        )
       : [];
 
     return {

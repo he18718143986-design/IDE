@@ -6,7 +6,18 @@ import {
   classifyDispute,
   finalizeClassification,
 } from "../../daemon/supervisor/dispute/classification";
+import { createHash } from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import type { SchemeDraftV2 } from "../../src/lib/journey/scheme-patch-types";
+import type { SupervisorMessage } from "../../daemon/supervisor/types";
+import type {
+  PersistedTranscriptTurn,
+  TranscriptRecord,
+} from "../../daemon/supervisor/intent-compiler/transcript-store";
 import {
+  anchoredQuotesFromDraft,
   extractKeywords,
   type CodeFactSource,
   type SessionFactSource,
@@ -382,5 +393,255 @@ describe("用户白话裁决 userChoice", () => {
     expect(report.next_action.kind).toBe("REQUIREMENT_CHANGE");
     expect(report.next_action.change_request).toBeDefined();
     expect(report.rationale.join(" ")).toContain("我想要新功能，下一轮做");
+  });
+});
+
+describe("J16-P5 · 左栏原话反查与哈希校验（路线 2）", () => {
+  function sha256(text: string): string {
+    return createHash("sha256").update(text, "utf8").digest("hex");
+  }
+
+  const sampleText = "我需要一个订单满减折扣功能支持满100减20";
+  const sampleSha = sha256(sampleText);
+  // "订单满减折扣" 为 sampleText.slice(5, 11)
+  const quoteStart = 5;
+  const quoteEnd = 11;
+
+  function draftWithEvidence(
+    turnId: string,
+    turnSha: string,
+    rawStart: number,
+    rawEnd: number,
+  ): SchemeDraftV2 {
+    return {
+      scheme_id: "sch_1",
+      scheme_revision: 1,
+      goals: [],
+      out_of_scope: [],
+      modules: [],
+      flows: [],
+      entities: [],
+      decisions: [],
+      conflicts: [],
+      open_questions: [],
+      acceptance: [
+        {
+          id: "AC-1",
+          text: "订单满减折扣",
+          source: "user_said",
+          user_pinned: false,
+          updated_in_revision: 1,
+          evidence: [
+            {
+              kind: "turn",
+              ref: {
+                turn_id: turnId,
+                anchor: {
+                  kind: "span",
+                  norm_start: 0,
+                  norm_end: 0,
+                  raw_start: rawStart,
+                  raw_end: rawEnd,
+                  occurrence_index: 0,
+                  occurrence_count: 1,
+                  turn_text_sha256: turnSha,
+                },
+              },
+            },
+          ],
+        },
+      ],
+    } as unknown as SchemeDraftV2;
+  }
+
+  it("T1/T2 原生键反查：按 ref.turn_id 从 transcript 成功反查原话切片并校验哈希", () => {
+    const draft = draftWithEvidence("T1", sampleSha, quoteStart, quoteEnd);
+    const messages: SupervisorMessage[] = [
+      {
+        message_id: "msg_c3b5d2e1-4f8a-4932-b7e1-8f2a3c4d5e6f",
+        role: "user",
+        text: "普通会话消息",
+        created_at: "2026-11-13T04:00:00.000Z",
+        source: "ui",
+      },
+    ];
+    const transcriptTurns: PersistedTranscriptTurn[] = [
+      {
+        turn_id: "T1",
+        role: "user",
+        seq: 1,
+        text: sampleText,
+        text_sha256: sampleSha,
+        turn_text_sha256: sampleSha,
+      },
+    ];
+
+    const quotes = anchoredQuotesFromDraft(
+      draft,
+      messages,
+      extractKeywords("订单满减折扣"),
+      transcriptTurns,
+    );
+
+    expect(quotes).toHaveLength(1);
+    expect(quotes[0]).toMatchObject({
+      message_id: "T1",
+      role: "user",
+      text: "订单满减折扣",
+      raw_start: quoteStart,
+      raw_end: quoteEnd,
+    });
+  });
+
+  it("失败关闭：turn_text_sha256 不匹配或切片越界时拒绝伪造，返回空原话", () => {
+    const transcriptTurns: PersistedTranscriptTurn[] = [
+      {
+        turn_id: "T1",
+        role: "user",
+        seq: 1,
+        text: sampleText,
+        text_sha256: sampleSha,
+        turn_text_sha256: sampleSha,
+      },
+    ];
+
+    // 1. 哈希不匹配
+    const forgedShaDraft = draftWithEvidence(
+      "T1",
+      "0".repeat(64),
+      quoteStart,
+      quoteEnd,
+    );
+    expect(
+      anchoredQuotesFromDraft(
+        forgedShaDraft,
+        [],
+        extractKeywords("订单满减折扣"),
+        transcriptTurns,
+      ),
+    ).toEqual([]);
+
+    // 2. 切片越界 (raw_end 超过文本长度)
+    const outOfBoundsDraft = draftWithEvidence("T1", sampleSha, 0, 9999);
+    expect(
+      anchoredQuotesFromDraft(
+        outOfBoundsDraft,
+        [],
+        extractKeywords("订单满减折扣"),
+        transcriptTurns,
+      ),
+    ).toEqual([]);
+
+    // 3. 切片无效区间 (raw_start < 0 或 raw_start >= raw_end)
+    const invalidRangeDraft = draftWithEvidence("T1", sampleSha, -1, 5);
+    expect(
+      anchoredQuotesFromDraft(
+        invalidRangeDraft,
+        [],
+        extractKeywords("订单满减折扣"),
+        transcriptTurns,
+      ),
+    ).toEqual([]);
+  });
+
+  it("降级兼容：transcript 缺失时按 message_id/turn_id 退化 session.messages（不宽松匹配）", () => {
+    // 1. transcript 缺失且 message_id 严格等于 ref.turn_id -> 成功退化
+    const matchedDraft = draftWithEvidence(
+      "msg_legacy_100",
+      sampleSha,
+      quoteStart,
+      quoteEnd,
+    );
+    const messages: SupervisorMessage[] = [
+      {
+        message_id: "msg_legacy_100",
+        role: "user",
+        text: sampleText,
+        created_at: "2026-11-13T04:00:00.000Z",
+        source: "ui",
+      },
+    ];
+
+    const quotes = anchoredQuotesFromDraft(
+      matchedDraft,
+      messages,
+      extractKeywords("订单满减折扣"),
+      null,
+    );
+    expect(quotes).toHaveLength(1);
+    expect(quotes[0]).toMatchObject({
+      message_id: "msg_legacy_100",
+      role: "user",
+      text: "订单满减折扣",
+      raw_start: quoteStart,
+      raw_end: quoteEnd,
+    });
+
+    // 2. transcript 缺失但 ref.turn_id 与 session.messages 的 message_id 不匹配 -> 严格拒绝，不宽松匹配
+    const unmatchedDraft = draftWithEvidence(
+      "T1",
+      sampleSha,
+      quoteStart,
+      quoteEnd,
+    );
+    const unmatchedQuotes = anchoredQuotesFromDraft(
+      unmatchedDraft,
+      messages,
+      extractKeywords("订单满减折扣"),
+      null,
+    );
+    expect(unmatchedQuotes).toEqual([]);
+  });
+
+  it("通过 repoRoot 从物理磁盘 transcript.json 读取并反查", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "j16-transcript-"));
+    try {
+      const ledgerDir = path.join(
+        tmpDir,
+        ".stagent",
+        "drafts",
+        "scheme-ledger",
+      );
+      fs.mkdirSync(ledgerDir, { recursive: true });
+      const record: TranscriptRecord = {
+        schema_version: "1.0",
+        updated_at: "2026-11-13T04:15:00.000Z",
+        seq: 1,
+        user_alias_seq: 1,
+        turns: [
+          {
+            turn_id: "T2",
+            role: "user",
+            seq: 1,
+            text: sampleText,
+            text_sha256: sampleSha,
+            turn_text_sha256: sampleSha,
+          },
+        ],
+      };
+      fs.writeFileSync(
+        path.join(ledgerDir, "transcript.json"),
+        JSON.stringify(record),
+      );
+
+      const draft = draftWithEvidence("T2", sampleSha, quoteStart, quoteEnd);
+      const quotes = anchoredQuotesFromDraft(
+        draft,
+        [],
+        extractKeywords("订单满减折扣"),
+        tmpDir,
+      );
+      expect(quotes).toHaveLength(1);
+      expect(quotes[0]).toMatchObject({
+        message_id: "T2",
+        role: "user",
+        text: "订单满减折扣",
+        created_at: "2026-11-13T04:15:00.000Z",
+        raw_start: quoteStart,
+        raw_end: quoteEnd,
+      });
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });
