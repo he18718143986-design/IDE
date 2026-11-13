@@ -788,6 +788,8 @@ governance:
 
 > **卡修订（P-200 · 2026-11-13）**：卡片内部 writable/readonly 冲突核对修复（施工前核对发现，先修卡）。从 `readonly_paths` 移除 `daemon/supervisor/dispute/evidence-triad.ts`（既有 `dispute/**` 通配符已覆盖可写）；`touches` 中该文件的 `why` 更新为本次修复的实际语义（按 `turn_id` 反查 transcript 原话 + 哈希校验）；`test_plan` 补充 `T1/T2` 原生键反查、哈希不匹配失败关闭、transcript 缺失时退化 `session.messages` 三类用例。卡状态仍为 `NEW_TASK`，未开工，**仍不标 COMPLETED**。
 
+> **卡修订（P-201 · 2026-11-13）**：J16-P5 根因核定与施工口径（Tina 拍板「按稿施工」）。本机真实试玩（`b4ad38b`，试玩目录 `stagent-j16p5-b4ad38b-playtest`）左栏为空，根因在写侧，不是左栏组件：① 右栏普通消息从未登记为带 `turn_id` 的原话（C.18 `909198a` 起非质疑消息在前端直接走普通聊天，J.10 `97bb0db` 只在 journey 路由调用 `commitUserTurn`）；② 确认冻结不封存原话，快照无原话段；③ 读侧无 Supervisor 会话即提前返回，#239 的反查走不到；④ 确认当时 surface_log 无任何记录（现有 16 条 `area` 写于确认完成之后）。施工口径：说话时 Daemon 登记 `turn_id` + sha256(utf8)，登记失败的消息照常发右栏聊天但不折进方案、提示「没记进方案」，`schemeSourceTurns` 与方案语料同批更新、新建需求时一起清空；冻结请求只带已登记的 `{turn_id, turn_text_sha256}`，Daemon 从 transcript 取原文封入快照 `frozen_quotes` 并计入 digest，校验失败 409（复用 `E_SCHEME_SNAPSHOT_MISMATCH`，ADR-0018 §3.2），不写快照、不签合同；快照不升 `schema_version`（`dispatch-binding.ts` 以版本相等判定墓地权威），以 1.2 追加可选段落地；左栏只读合同绑定快照的封存段，逐条重算哈希，只排序不滤空，无封存段写明「系统没有封存」、不挂「已降级呈递事实」；「确认 N 次」改为快照确认事实；surface_log 记录加阶段字段 `phase`，确认前上报实际展示过的决议区条目（AI 推荐决策与冲突抉择）。`writable_paths` 追加快照存储、快照相关测试、`dispute-anchor-real-session.test.ts` 与前端接线测试 `scheme-turn-seal-wiring.test.tsx`；J16-P1 / P5 / P6 验收文字修订（P5 改为可机核条款，条目级高亮另记）；`touches` / `test_plan` / `verification` / `code_facts` / `non_goals` / `fail` 同步。**文档债务（完工回写时还）**：`runtime-contract-and-safety.md` §2.3「Daemon 专属码」表中 `E_SCHEME_SNAPSHOT_MISMATCH` 的触发说明尚未覆盖「冻结时原话清单校验失败」，已登记为 `fail` 条目。卡状态仍为 `NEW_TASK`，**仍不标 COMPLETED**。
+
 ```yaml task-card
 id: TASK-J.16
 status: NEW_TASK
@@ -803,7 +805,9 @@ contract:
     - id: J16-P1
       check: auto
       text: >-
-        surface_log 随 §15.4 投影写入：每条记录含 item_ref 与呈现时间；未呈现过的条目不产生记录。
+        surface_log 随 §15.4 投影写入：每条记录含 item_ref、呈现时间与阶段 phase（pre_confirm 确认前 / post_confirm 确认后）；
+        未呈现过的条目不产生记录；确认前须上报实际展示过的决议区条目（AI 推荐决策与冲突抉择，section=decision，phase=pre_confirm）；
+        确认后的呈现不得记为确认前（Daemon 以确认快照 created_at 校验，冲突 409 不写入）；缺 phase 的旧记录按旧格式读取，不补写。
     - id: J16-P2
       check: auto
       text: >-
@@ -820,13 +824,18 @@ contract:
     - id: J16-P5
       check: playtest
       text: >-
-        真实会话 + 真实台账端到端：P-2 锚定原话的 turn_text_sha256（sha256(text, utf8)，与 intent-compiler/host.ts 口径一致）
-        在真实数据上校验通过，左栏显示锚定原话。单测不替代本条。
+        真实会话 + 真实快照端到端（Tina 本机、官方 Daemon；单测与集成测试不替代本条）：右栏发出需求原话 U，确认方案后发送「这里不对」，须同时满足：
+        ① 合同 scheme_binding 指向的 .stagent/drafts/schemes/<confirmation_id>.json 含 frozen_quotes，其中某条 text 等于 U 且
+        turn_text_sha256 = sha256(utf8(U))（与 intent-compiler/host.ts 口径一致）；② 快照 digest 等于合同 scheme_binding.snapshot_digest；
+        ③ 质疑面板报告卡 data-seal-status=SEALED；④ 左栏每条原话展示文本 t 满足 sha256(utf8(t)) 等于该行 data-turn-text-sha256，
+        且该值属于 frozen_quotes 的 turn_text_sha256 集合；⑤ 至少一行 t 整句等于 U。快照无封存段时本条判失败。
+        条目级高亮不在本条（J.22 之后另记）。
     - id: J16-P6
       check: playtest
       text: >-
         用户可见文案按 §16.7 在渲染层验收（真实打开质疑自查面板）：不出现「按缺陷修复」「按新需求演进」「实现缺陷」「confidence」
-        等技术术语；左栏为空时有白话说明。服务端字段不算验收。
+        等技术术语；左栏为空时有白话说明；无封存段时写明「系统没有封存」且不显示「已降级呈递事实」；左栏状态行取自合同绑定快照
+        （是否找到确认记录、封存原话条数），不再以聊天正则计数「确认 N 次」。服务端字段不算验收。
     - id: J16-P7
       check: auto
       text: >-
@@ -851,32 +860,60 @@ contract:
       - src/lib/journey/scheme-patch-types.ts
       - src/lib/journey/scheme-patch-engine.ts
       - daemon/supervisor/intent-compiler/scheme-ledger-store.ts
+      - daemon/pipeline/scheme-snapshot-store.ts
+      - tests/unit/scheme-snapshot-frozen-quotes.test.ts
+      - tests/integration/scheme-confirm-http-injection.test.ts
+      - tests/integration/scheme-confirm-scope-drift.test.ts
+      - tests/e2e/golden-slice.test.ts
+      - tests/integration/dispute-anchor-real-session.test.ts
+      - tests/ui/scheme-turn-seal-wiring.test.tsx
     readonly_paths:
       - docs/specs/playtest-self-check.md
       - docs/specs/supervisor.md
       - daemon/supervisor/intent-compiler/host.ts
+      - daemon/supervisor/intent-compiler/transcript-store.ts
+      - src/lib/journey/confirm-scheme-atomic.ts
+      - src/lib/journey/scheme-draft.ts
+      - src/lib/contract.schema.ts
+      - daemon/guard/dispatch-binding.ts
+      - bin/stagent.ts
   verification:
     commands:
       - { alias: regression-dispute, executable: npx, args: [vitest, run, tests/unit/dispute-triad.test.ts, tests/unit/dispute-self-check-fixes.test.ts, tests/components/DisputeConsolePane.test.tsx] }
+      - { alias: regression-seal, executable: npx, args: [vitest, run, tests/unit/scheme-snapshot-frozen-quotes.test.ts, tests/unit/dispute-seal-quotes.test.ts, tests/unit/dispute-seal-turn-register.test.ts, tests/unit/dispute-surface-log-route.test.ts, tests/integration/dispute-anchor-real-session.test.ts, tests/integration/scheme-confirm-http-injection.test.ts, tests/integration/scheme-confirm-scope-drift.test.ts, tests/e2e/golden-slice.test.ts, tests/ui/scope-acceptance-surface-log.test.tsx, tests/ui/scheme-turn-seal-wiring.test.tsx] }
       - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
 design:
   approach: >-
     1) 先接 surface_log：随 §15.4 投影写入，只记录确已呈现的条目。2) K-14 账本只追加，三分类以 surface_log 为唯一呈现依据。
     3) K-16 闭集与 linked_reason_code 在写入口校验，旧台账按 legacy 前缀迁移。4) 缺 surface_log 的退化路径单独测试。
     5) 验收 P5/P6 须真实链路与渲染层，不以 jsdom 或服务端字段替代。6) 验收条目呈现（P-187 · 挂账⑬ 方案 A）：Daemon 新增只读路由投影台账 acceptance，中栏上半部分渲染，上报 `section=acceptance` 的 `item_ref` 为台账 id。施工前按当时代码重核 touches。
+    7) 原话登记与冻结封存（P-201）：右栏消息先经 Daemon 登记 turn_id + sha256(utf8) 再折进方案（登记失败不折进、提示「没记进方案」；schemeSourceTurns 与语料同批更新、新建需求一起清空）；
+    冻结请求只带已登记的 turn_id 与哈希，Daemon 从 transcript 取原文封入快照 frozen_quotes 并计入 digest（不升 schema_version），校验失败 409 不签合同；
+    左栏只读合同绑定快照的封存段，逐条重算哈希，只排序不滤空；surface_log 记录加 phase，确认前上报决议区条目；「确认 N 次」改为快照确认事实。
   touches:
-    - { path: daemon/supervisor/dispute/evidence-triad.ts, change: modify, why: 按 turn_id 反查 transcript 原话 + 哈希校验, symbols: [] }
-    - { path: daemon/supervisor/dispute/types.ts, change: modify, why: surface_log / 归因账本类型与 K-16 闭集, symbols: [] }
-    - { path: daemon/supervisor/dispute/index.ts, change: modify, why: 三分类退化与 resolution_note 标注, symbols: [] }
-    - { path: src/components/studio/ScopeAcceptanceBlock.tsx, change: modify, why: §15.4 白话投影渲染后上报实际呈现条目（不得渲染前预写）, symbols: [] }
-    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 把确认 ID 透传给范围区块, symbols: [] }
-    - { path: src/routes/index.tsx, change: modify, why: 确认 ID 生成与 surface_log 上报对齐（键与 §5.3 confirmation_id 一致）, symbols: [] }
-    - { path: daemon/server.ts, change: modify, why: 新增 surface_log 写入路由（沿既有 Bearer 鉴权，不新开写权限）, symbols: [] }
+    - { path: daemon/supervisor/dispute/evidence-triad.ts, change: modify, why: "按 turn_id 反查 transcript 原话 + 哈希校验；P-201：左栏改读合同绑定快照的 frozen_quotes（逐条重算哈希，只排序不滤空，不依赖 Supervisor 会话）", symbols: [] }
+    - { path: daemon/supervisor/dispute/types.ts, change: modify, why: "surface_log / 归因账本类型与 K-16 闭集；P-201：PromptFact 增封存事实 seal", symbols: [] }
+    - { path: daemon/supervisor/dispute/index.ts, change: modify, why: "三分类退化与 resolution_note 标注；P-201：超时降级报告携带封存事实", symbols: [] }
+    - { path: daemon/supervisor/dispute/surface-log.ts, change: modify, why: "P-201：记录与上报请求增 phase（pre_confirm / post_confirm）；缺 phase 的旧记录照常读取", symbols: [] }
+    - { path: daemon/pipeline/scheme-snapshot-store.ts, change: modify, why: "P-201：快照追加 frozen_quotes 与 quotes_digest 并计入 digest（不升 schema_version）；带封存段快照的完整性校验", symbols: [] }
+    - { path: src/components/studio/DisputeConsolePane.tsx, change: modify, why: "P-201：左栏封存原话行（带 data-turn-text-sha256）、快照确认事实行；无封存段写明「系统没有封存」且不挂「已降级呈递事实」", symbols: [] }
+    - { path: src/components/studio/ScopeAcceptanceBlock.tsx, change: modify, why: "§15.4 白话投影渲染后上报实际呈现条目（不得渲染前预写）；P-201：上报带 phase（开工前 pre_confirm，冻结与验收 post_confirm）", symbols: [] }
+    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: "把确认 ID 透传给范围区块；P-201：确认前上报实际展示过的决议区条目（AI 推荐决策与冲突抉择，section=decision，phase=pre_confirm）", symbols: [] }
+    - { path: src/routes/index.tsx, change: modify, why: "确认 ID 生成与 surface_log 上报对齐（键与 §5.3 confirmation_id 一致）；P-201：右栏消息先登记再折进方案（schemeSourceTurns 与语料同批更新、新建需求一起清空），冻结带已登记原话清单，质疑视图映射封存事实", symbols: [] }
+    - { path: daemon/server.ts, change: modify, why: "新增 surface_log 写入路由（沿既有 Bearer 鉴权，不新开写权限）；P-201：新增 POST /api/supervisor/turns 登记原话；journey 复用已登记 turn；冻结校验原话清单并封存 frozen_quotes（失败 409）；surface_log 校验 phase；超时降级报告带封存事实", symbols: [] }
     - { path: daemon/supervisor/intent-compiler/compile-loop.ts, change: modify, why: ITEM-n 由台账推导分配（挂账⑪，K-14 前置；P-186 授权）, symbols: [] }
     - { path: tests/integration/intent-compiler-item-id-collision.test.ts, change: modify, why: ITEM-n 撞号复现（同进程 + 模拟重启）与 todo 留痕（挂账⑪⑫）, symbols: [] }
     - { path: daemon/supervisor/intent-compiler/acceptance-projection.ts, change: modify, why: 台账验收条目只读投影（纯函数，不写盘；挂账⑬ 方案 A，P-187）, symbols: [] }
     - { path: tests/unit/scheme-acceptance-projection.test.ts, change: modify, why: 投影纯函数与台账为空时的降级（J16-P7）, symbols: [] }
-    - { path: src/lib/daemon-api.ts, change: modify, why: 新增只读获取台账验收条目的客户端函数（J16-P7）, symbols: [] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: "新增只读获取台账验收条目的客户端函数（J16-P7）；P-201：registerSchemeTurn、冻结 source_turns、journey 已登记 turn 字段、报告封存事实、呈现上报 phase", symbols: [] }
+    - { path: tests/unit/scheme-snapshot-frozen-quotes.test.ts, change: create, why: "P-201：frozen_quotes 计入 digest、完整性校验、旧快照不受影响", symbols: [] }
+    - { path: tests/unit/dispute-seal-quotes.test.ts, change: create, why: "P-201：左栏封存事实（未封存 / 篡改 / 只排序不滤空 / 无会话可读）", symbols: [] }
+    - { path: tests/unit/dispute-seal-turn-register.test.ts, change: create, why: "P-201：登记路由、冻结原话清单校验 409、journey 复用已登记 turn", symbols: [] }
+    - { path: tests/integration/dispute-anchor-real-session.test.ts, change: create, why: "P-201：进程内全链路（登记→冻结封存→签合同→「这里不对」）与反例", symbols: [] }
+    - { path: tests/ui/scheme-turn-seal-wiring.test.tsx, change: create, why: "P-201：登记失败不折进方案并提示；语料与原话清单同批更新、同批清空", symbols: [] }
+    - { path: tests/integration/scheme-confirm-http-injection.test.ts, change: modify, why: "P-201：冻结请求先登记原话并带 source_turns", symbols: [] }
+    - { path: tests/integration/scheme-confirm-scope-drift.test.ts, change: modify, why: "P-201：冻结请求先登记原话并带 source_turns", symbols: [] }
+    - { path: tests/e2e/golden-slice.test.ts, change: modify, why: "P-201：冻结请求先登记原话并带 source_turns", symbols: [] }
     - { path: daemon/supervisor/dispute/attribution.ts, change: modify, why: K-14 三分类；缺日志退化值改为 no_surface_record（P-189，挂账⑭ 裁决）, symbols: [] }
     - { path: src/lib/journey/scheme-patch-types.ts, change: modify, why: LedgerState 增 attributions（K-14 子账本四，只追加）；category 枚举加 no_surface_record（P-189）, symbols: [] }
     - { path: src/lib/journey/scheme-patch-engine.ts, change: modify, why: 重建 LedgerState 的各处须保留 attributions（否则补丁后丢失，见 ~L1655）, symbols: [] }
@@ -890,8 +927,21 @@ design:
     - { acceptance_id: J16-P5, test_path: tests/unit/dispute-triad.test.ts, level: unit, case: "T1/T2 原生键反查：按 ref.turn_id 从 transcript 成功反查原话切片并校验哈希" }
     - { acceptance_id: J16-P5, test_path: tests/unit/dispute-triad.test.ts, level: unit, case: "失败关闭：turn_text_sha256 不匹配或切片越界时拒绝伪造，返回空原话" }
     - { acceptance_id: J16-P5, test_path: tests/unit/dispute-triad.test.ts, level: unit, case: "降级兼容：transcript 缺失时按 message_id/turn_id 退化 session.messages（不宽松匹配）" }
-    - { acceptance_id: J16-P5, test_path: tests/integration/dispute-anchor-real-session.test.ts, level: integration, debt: "真实会话与真实台账验证待 Tina 本机再次试玩；单测不替代本条" }
+    - { acceptance_id: J16-P5, test_path: tests/integration/dispute-anchor-real-session.test.ts, level: integration, case: "登记原话→冻结封存→「这里不对」：左栏整句与 frozen_quotes 哈希一致" }
+    - { acceptance_id: J16-P5, test_path: tests/unit/dispute-seal-quotes.test.ts, level: unit, case: "未封存快照：左栏为空且状态为未封存" }
+    - { acceptance_id: J16-P5, test_path: tests/unit/dispute-seal-quotes.test.ts, level: unit, case: "「这里不对」不滤空：封存原话全部按相关度排序" }
+    - { acceptance_id: J16-P5, test_path: tests/unit/dispute-seal-quotes.test.ts, level: unit, case: "封存段被改：整段作废" }
+    - { acceptance_id: J16-P5, test_path: tests/unit/dispute-seal-quotes.test.ts, level: unit, case: "无 Supervisor 会话仍能读出封存原话" }
+    - { acceptance_id: J16-P5, test_path: tests/unit/scheme-snapshot-frozen-quotes.test.ts, level: unit, case: "frozen_quotes 计入 digest：删段或改字后重算不一致" }
+    - { acceptance_id: J16-P5, test_path: tests/unit/dispute-seal-turn-register.test.ts, level: unit, case: "登记返回 turn_id 与 sha256(utf8)" }
+    - { acceptance_id: J16-P5, test_path: tests/unit/dispute-seal-turn-register.test.ts, level: unit, case: "冻结原话清单校验失败 409 且不写快照" }
+    - { acceptance_id: J16-P5, test_path: tests/unit/dispute-seal-turn-register.test.ts, level: unit, case: "journey 带已登记 turn 不重复登记" }
+    - { acceptance_id: J16-P5, test_path: tests/ui/scheme-turn-seal-wiring.test.tsx, level: integration, case: "登记失败不折进方案并提示没记进方案" }
+    - { acceptance_id: J16-P5, test_path: tests/ui/scheme-turn-seal-wiring.test.tsx, level: integration, case: "语料与原话清单同批更新：折进同增、新建需求同清" }
+    - { acceptance_id: J16-P1, test_path: tests/unit/dispute-surface-log-route.test.ts, level: unit, case: "phase：确认后上报带 post_confirm，冒充 pre_confirm 被拒" }
+    - { acceptance_id: J16-P1, test_path: tests/ui/scope-acceptance-surface-log.test.tsx, level: integration, case: "确认前上报实际展示的决议区条目：section=decision，phase=pre_confirm" }
     - { acceptance_id: J16-P6, test_path: tests/components/DisputeConsolePane.test.tsx, level: integration, debt: "jsdom 不替代真实面板人工验收" }
+    - { acceptance_id: J16-P6, test_path: tests/components/DisputeConsolePane.test.tsx, level: integration, case: "无封存段：写明系统没有封存且不显示已降级" }
     - { acceptance_id: J16-P7, test_path: tests/unit/scheme-acceptance-projection.test.ts, level: unit, debt: "J.16 未施工；待单卡授权后补测试" }
     - { acceptance_id: J16-P7, test_path: tests/ui/scope-acceptance-surface-log.test.tsx, level: integration, debt: "jsdom 不替代真实面板人工验收" }
 governance:
@@ -905,16 +955,36 @@ governance:
   code_facts:
     - { ref: "daemon/supervisor/dispute/evidence-triad.ts::anchoredQuotesFromDraft", note: "P-1～P-6 已合（#188 `859f762`）；左栏锚定原话与 §16.7 文案已合（#189 `f0ca93c`）" }
     - { ref: "daemon/supervisor/dispute/index.ts::outcomeFromUserChoice", note: "仓库未找到 surface_log 或 attributions 实现（#188 核对结论）；本卡新增" }
+    - { ref: "src/routes/index.tsx::handleJourneyBeforeSend", note: "P-201：非质疑消息在调用 journey 前直接 passthrough（C.18 909198a），需求句从未登记为带 turn_id 的原话" }
+    - { ref: "daemon/server.ts::handleSupervisorJourney", note: "P-201：生产上唯一调用 commitUserTurn 的位置（J.10 97bb0db）" }
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts::writeSchemeSnapshot", note: "P-201：快照无原话段，digest 不含原话" }
+    - { ref: "daemon/supervisor/dispute/evidence-triad.ts::SessionFactSourceImpl", note: "P-201：无 Supervisor 会话即提前返回 CHALLENGE_ONLY，#239 的 turn_id 反查走不到" }
+    - { ref: "daemon/guard/dispatch-binding.ts::snapshotHasGraveyardAuthority", note: "P-201：以 schema_version 等于现行常量判定墓地权威，故 frozen_quotes 以 1.2 追加段落地、不升版本" }
+    - { ref: "src/components/studio/ScopeAcceptanceBlock.tsx::scopeAcceptanceShownItems", note: "P-201：全仓唯一的呈现上报方，只报 acceptance / approval / area，不报决议区" }
   non_goals:
     - 不做 P-7 条目级自动点亮（playtest-self-check.md §3.3，本版不做）
     - 不改 SchemeDraftV2 的验收条目结构
     - 不以 jsdom 或服务端字段替代 J16-P5 / J16-P6 的真实验收
     - 不改 P-1～P-6 已定的判定逻辑、类型枚举与 0.7 阈值
+    - 不做条目级高亮（frozen_quotes 不含条目关联，J.22 之后另记）
+    - 不改编译器离线（bin/stagent.ts 不接模型）与台账 scheme_id=scheme-active（留给 J.10 / J.22）
+    - 不改 K-14 归因算法与 dispute/attribution*.ts；surface_log 的 phase 本卡只写入，不改 K-14 取数
+    - 不升快照 schema_version，不改 dispatch-binding.ts
+    - 不改 confirm-scheme-atomic.ts、host.ts、transcript-store.ts、compile-loop.ts、scheme-draft.ts、contract.schema.ts、bin/stagent.ts
+    - 封存原话不接入归因信号（prompt_matched_messages），中栏关键词匹配不改
   fail:
     - 缺 surface_log 时仍产出 (a)/(b) 分类，或不标「无呈现记录」
     - K-16 trigger 接受闭集外的值，或旧值迁移不带 legacy 前缀
     - 只以单测通过宣称 J.16 完成，或在 J16-P5 / J16-P6 未通过时标 COMPLETED
     - 用户可见文案出现 §16.7 禁用的技术分类词
+    - 左栏原话来自聊天记录或方案正文的事后拼凑，或未经 sha256(utf8) 重算校验即展示
+    - 冻结时原话清单校验失败仍写快照或签合同
+    - 登记失败的消息被折进方案，或 schemeSourceTurns 与方案语料不同批更新（出现语料已换而清单仍在的中间态）
+    - 无封存段时左栏未写明「系统没有封存」，或仍显示「已降级呈递事实」
+    - 「这里不对」使左栏因关键词过滤为空
+    - 确认后的 surface_log 记录缺 phase 或记为 pre_confirm；确认前未上报实际展示过的决议区条目
+    - 修改 non_goals 所列禁动文件
+    - 完工回写未同步 runtime-contract-and-safety.md §2.3 中 E_SCHEME_SNAPSHOT_MISMATCH 的触发说明（冻结时原话清单校验失败；P-201 文档债务）
   estimate: L
   invariants:
     auth: unchanged
