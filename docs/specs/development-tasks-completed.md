@@ -6022,3 +6022,120 @@ governance:
   delivered: { pr: 229, commit: 21b8b3565ad0d293ac871ab657a96d7627b10c58 }
 ```
 
+<a id="task-j24"></a>
+<a id="task-j.24"></a>
+
+### 【Task J.24】开工路径三缺口（脏目录确认 · 空仓库无 main · Worker provider 默认值）`[COMPLETED · 立卡 P-195 · 修订 P-197 · 施工 P-198]`
+
+> **立卡与修订说明（2026-11-12 · P-195 立卡；2026-11-13 · P-197 路径与方案修订）**：同一轮真实试玩中，正式开工路径被三条缺口挡住，当时只做了试玩绕过、未改仓库。本卡逐项修复，使「确认方案 / 确认开工」在脏工作区、空仓库、以及设置页已配置非 OpenAI 钥匙时，都能走产品自己的路径。施工前核对发现原预估路径缺少前端交互、原子流程与设置页相关文件，经 P-197 扩充 writable_paths，并明确缺口 3 采用「供应商选择器」方案、缺口 1 确认弹窗文案与既有「点确认后会列入禁写名单」语义对齐。立卡/修订 ≠ 开工。文档计划暂缓。
+
+> **归档注记（2026-11-13 · P-198）**：本卡已 **COMPLETED**（[#235](https://github.com/he18718143986-design/IDE/pull/235) squash `72b52abbdb007bb8bf02fb0b7e0a4e6427979fae`；分支 `feat/j24-starter-gaps`，head `5170c0b`）。验收逐条证据如下：
+> - **J24-P1（脏目录确认）**：在 `src/routes/index.tsx` 和 `confirm-scheme-atomic.ts` 中接入确认弹窗与重试逻辑，文案与既有「点确认后会列入禁写名单」语义对齐；未显式确认不得悄悄携带确认标记；显式确认重试后请求携带 `acknowledge_dirty: true`（经 `src/lib/daemon-api.ts::approveContract`），服务端 409 `E_WORKTREE_DIRTY` 正式消除。新增单测 `tests/unit/approve-acknowledge-dirty.test.ts`、`tests/unit/confirm-scheme-atomic.test.ts` 与 UI 测试 `tests/ui/scheme-confirm-dirty-dialog.test.tsx` 全部通过。
+> - **J24-P2（空仓库无 main 引用）**：在 `daemon/git/ensure-git-repo.ts` 的 `ensureGitInit` 与新增 `ensureUsableMainRefSync` 中，对全新无提交空仓库通过 `git commit --allow-empty -m "chore: initial empty commit"` 与 `git branch -M main` 建立初始空提交与可用 `main` 引用；完全不调用 `git add`，严格确保绝不把项目已有文件或密钥纳入初始提交；`createTaskWorktree` 不再因 `fatal: invalid reference: main` 失败。新增单测 `tests/unit/empty-repo-main-ref.test.ts` 全部通过。
+> - **J24-P3（Worker provider 选择器与默认值）**：设置页提供显式「供应商选择器」（支持 DeepSeek、OpenAI、自定义等），经设置接口 `/api/settings/openai-key` 保存 `provider` 与 `baseURL` 至 `daemon/worker/key-store.ts`；Worker 端 `OpenAiWorkerClient` 严格按「设置页显式选择 > runtime 钥匙来源 > `OPENAI_BASE_URL` 环境变量」解析，未配置时构造期直接失败关闭并抛错，严禁靠猜模型名推断；仅有 runtime key、未设 `OPENAI_BASE_URL` 时不再默认打到 `api.openai.com`。新增单测 `tests/unit/worker-provider-base-url.test.ts` 与 UI 测试 `tests/ui/settings-tab.test.tsx` 全部通过。
+> - **改动范围**：严格位于卡片 14 个 `writable_paths` 内（实际修改 13 个，无超范围修改）。
+> - **CI 侧**：Ubuntu/macOS 的 lint、typecheck、单测、Docs check、Knowledge check、Perf threshold gate 等 9 项物理门禁必需检查全绿；Windows 单测（非必需项）失败为存量已知挂账类环境问题，J.24 的 6 个测试文件在 Windows 上 100% 通过（55/55 passed），0 新增失败。
+> - **销项**：台账挂账⑲ 销项（开工路径三缺口修复已落地，见台账挂账⑲ 销项注记）。
+> - **诚实口径**：集成/单测已验证，真实开工路径未验证——三条缺口的真实验收待 Tina 下次走正式开工路径真实试玩验证。
+
+```yaml task-card
+id: TASK-J.24
+status: COMPLETED
+contract:
+  intent:
+    title: 开工路径三缺口（脏目录确认 · 空仓库无 main · Worker provider 默认值）
+    description: >-
+      补上确认开工正式路径上的三条缺口：脏工作区确认须真正发给服务端；空仓库初始化后须有可用的 main
+      引用以便创建施工树；设置页配置的钥匙来源须决定 Worker 的默认 base URL，不得在仅有 runtime
+      钥匙时默认打到 api.openai.com。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J24-P1
+      check: auto
+      text: >-
+        主仓脏且用户已确认时，确认弹窗文案与既有「点确认后会列入禁写名单」语义对齐，确认开工请求携带
+        acknowledge_dirty（或等价确认字段），不再因 E_WORKTREE_DIRTY 409 而无法走完正式路径；未显式确认不得悄悄带上该字段。
+    - id: J24-P2
+      check: auto
+      text: >-
+        对无提交的新仓库，open/init 之后存在可用的 main 引用，createTaskWorktree 不再因
+        fatal: invalid reference: main 失败；不得把已有项目文件或密钥纳入该初始提交。
+    - id: J24-P3
+      check: auto
+      text: >-
+        设置页提供「供应商选择器」（支持 DeepSeek、OpenAI、自定义等），选定或透传的 provider
+        / base URL 经设置接口保存；Worker 实际请求的 base URL 严格跟随该选择；仅有 runtime
+        key、未设 OPENAI_BASE_URL 时，不得默认打到 api.openai.com，严禁靠猜模型名推断。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/routes/index.tsx
+      - src/components/settings/SettingsTab.tsx
+      - src/lib/journey/confirm-scheme-atomic.ts
+      - src/lib/daemon-api.ts
+      - daemon/server.ts
+      - daemon/worker/key-store.ts
+      - daemon/worker/openai-client.ts
+      - daemon/git/ensure-git-repo.ts
+      - tests/unit/approve-acknowledge-dirty.test.ts
+      - tests/unit/confirm-scheme-atomic.test.ts
+      - tests/unit/empty-repo-main-ref.test.ts
+      - tests/unit/worker-provider-base-url.test.ts
+      - tests/ui/settings-tab.test.tsx
+      - tests/ui/scheme-confirm-dirty-dialog.test.tsx
+    readonly_paths:
+      - daemon/pipeline/orchestrator.ts
+      - daemon/git/worktree-manager.ts
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: unit-j24, executable: npx, args: [vitest, run, tests/unit/approve-acknowledge-dirty.test.ts, tests/unit/confirm-scheme-atomic.test.ts, tests/unit/empty-repo-main-ref.test.ts, tests/unit/worker-provider-base-url.test.ts, tests/ui/settings-tab.test.tsx, tests/ui/scheme-confirm-dirty-dialog.test.tsx] }
+design:
+  approach: >-
+    三条缺口分别修：前端确认开工接入弹窗并在显式确认后补 acknowledge_dirty；open/init
+    给空仓库建立可用 main 引用；设置页接入供应商选择器，Worker base URL 严格跟随该选择。
+  touches:
+    - { path: src/routes/index.tsx, change: modify, why: 接入脏工作区确认弹窗交互与设置页模型钥匙供应商选择器, symbols: ["ModelKeyPanel", "Console"] }
+    - { path: src/components/settings/SettingsTab.tsx, change: modify, why: 设置页 Tab 容器适配供应商配置插槽, symbols: ["SettingsTab"] }
+    - { path: src/lib/journey/confirm-scheme-atomic.ts, change: modify, why: 原子确认流程支持脏主仓确认后携带 acknowledge_dirty 重试, symbols: ["runConfirmSchemeAtomic"] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: approveContract 支持透传 acknowledgeDirty，saveOpenAiKey 与 ModelSettings 支持 provider / baseURL, symbols: ["approveContract", "saveOpenAiKey", "ModelSettings"] }
+    - { path: daemon/server.ts, change: modify, why: 仅限 /api/settings/openai-key 与 /api/settings 中 provider / base URL 参数接线与只读透传，不碰其他无关路由, symbols: ["handleHttpRequest"] }
+    - { path: daemon/worker/key-store.ts, change: modify, why: 保存并导出 runtime provider 与 baseURL 默认解析, symbols: ["setRuntimeKey", "getModelSettings", "getRuntimeBaseUrl"] }
+    - { path: daemon/worker/openai-client.ts, change: modify, why: baseURL 跟随设置页供应商选择器，不靠猜模型名、不默认打到 api.openai.com, symbols: ["OpenAiWorkerClient"] }
+    - { path: daemon/git/ensure-git-repo.ts, change: modify, why: git init 后为无提交空仓库建立可用的 main 引用（不将已有文件纳入提交）, symbols: ["ensureGitInit"] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J24-P1, test_path: tests/unit/approve-acknowledge-dirty.test.ts, level: unit, case: "主仓脏且确认重试携带 acknowledge_dirty" }
+    - { acceptance_id: J24-P1, test_path: tests/unit/confirm-scheme-atomic.test.ts, level: unit, case: "原子确认流程脏仓确认交互" }
+    - { acceptance_id: J24-P1, test_path: tests/ui/scheme-confirm-dirty-dialog.test.tsx, level: unit, case: "脏工作区确认弹窗文案与交互" }
+    - { acceptance_id: J24-P2, test_path: tests/unit/empty-repo-main-ref.test.ts, level: unit, case: "无提交空仓库自动建立可用 main 引用" }
+    - { acceptance_id: J24-P3, test_path: tests/unit/worker-provider-base-url.test.ts, level: unit, case: "Worker 严格跟随供应商选择器解析 baseURL" }
+    - { acceptance_id: J24-P3, test_path: tests/ui/settings-tab.test.tsx, level: unit, case: "设置页供应商选择器 UI" }
+governance:
+  spec_refs:
+    - docs/specs/supervisor.md
+  depends_on: []
+  code_facts:
+    - { ref: "src/lib/daemon-api.ts::approveContract", note: "approveContract 目前未透传 acknowledge_dirty；服务端已支持该字段" }
+    - { ref: "src/routes/index.tsx::signAndPrepare", note: "当前确认方案直接签署，遇到 E_WORKTREE_DIRTY 阻断，缺少弹窗确认与重试" }
+    - { ref: "daemon/git/ensure-git-repo.ts::inspectGitRepo", note: "可 git init，P-195 试玩中无提交仓库随后 worktree add 因 invalid reference: main 失败" }
+    - { ref: "daemon/worker/openai-client.ts::OpenAiWorkerClient", note: "baseURL 默认 process.env.OPENAI_BASE_URL；未设时 SDK 打 api.openai.com。L1 enrich 已默认 api.deepseek.com/v1" }
+    - { ref: "src/routes/index.tsx::ModelKeyPanel", note: "设置页目前仅输入 key 与 model，需补供应商选择器透传 provider/baseURL" }
+  non_goals:
+    - 不把项目已有文件或密钥纳入初始提交
+    - 不在未确认时自动 acknowledge_dirty
+    - 不靠猜模型名推断供应商
+    - 不开文档计划
+    - 不重启即丢失钥匙的存储策略不在本卡范围（设置页 runtime 钥匙仍可以是内存）
+  fail:
+    - 脏工作区确认开工仍 409 且没有正式确认字段
+    - 空仓库仍因缺少 main 引用无法建施工树
+    - 已配 DeepSeek 钥匙的 Worker 仍默认打到 api.openai.com
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 235, commit: 72b52abbdb007bb8bf02fb0b7e0a4e6427979fae }
+```
