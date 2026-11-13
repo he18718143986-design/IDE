@@ -134,6 +134,8 @@ describe("POST /api/supervisor/surface-log", () => {
     const info = await daemon.start();
     base = `http://127.0.0.1:${info.port}`;
     token = daemon.getSessionToken() ?? "";
+    // 上一用例 stop 后 undici 可能仍握着同端口的 keep-alive；先用 TCP 确认新进程已听
+    await waitForPort(info.port);
   });
 
   afterEach(async () => {
@@ -143,13 +145,17 @@ describe("POST /api/supervisor/surface-log", () => {
     safeRmSync(repo);
   });
 
+  /** 关闭 keep-alive，避免 Windows 上复用已 stop 的 daemon 的旧 socket（ECONNRESET）。 */
+  const headers = (auth: string | null = `Bearer ${token}`) => ({
+    "content-type": "application/json",
+    connection: "close",
+    ...(auth ? { authorization: auth } : {}),
+  });
+
   const post = (body: unknown, auth: string | null = `Bearer ${token}`) =>
     fetch(`${base}/api/supervisor/surface-log`, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        ...(auth ? { authorization: auth } : {}),
-      },
+      headers: headers(auth),
       body: JSON.stringify(body),
     });
 
@@ -201,7 +207,7 @@ describe("POST /api/supervisor/surface-log", () => {
   it("GET 返回 405", async () => {
     const res = await fetch(`${base}/api/supervisor/surface-log`, {
       method: "GET",
-      headers: { authorization: `Bearer ${token}` },
+      headers: headers(),
     });
     expect(res.status).toBe(405);
   });
@@ -267,8 +273,10 @@ describe("POST /api/supervisor/surface-log", () => {
   });
   it("GET /api/supervisor/scheme-acceptance：沿 Bearer 鉴权；无台账返回空投影；有台账只读投影且不写盘", async () => {
     const url = `${base}/api/supervisor/scheme-acceptance`;
-    const auth = { authorization: `Bearer ${token}` };
-    const empty = await fetch(url, { headers: auth });
+    // 紧接在多次 POST 的 phase 用例之后：再等端口，且用 connection:close，
+    // 否则 Windows 上 undici 会复用上一 daemon 的 socket → read ECONNRESET（#241）。
+    await waitForPort(Number(new URL(base).port));
+    const empty = await fetch(url, { headers: headers() });
     expect(empty.status).toBe(200);
     expect(await empty.json()).toEqual({
       scheme_id: null,
@@ -307,7 +315,7 @@ describe("POST /api/supervisor/surface-log", () => {
       }),
     );
     const before = fs.readFileSync(file, "utf8");
-    const res = await fetch(url, { headers: auth });
+    const res = await fetch(url, { headers: headers() });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       scheme_id: "scheme-r",
@@ -316,7 +324,7 @@ describe("POST /api/supervisor/surface-log", () => {
     });
     expect(fs.readFileSync(file, "utf8")).toBe(before);
 
-    const unauth = await fetch(url);
+    const unauth = await fetch(url, { headers: { connection: "close" } });
     expect(unauth.status).toBe(401);
   });
 });
