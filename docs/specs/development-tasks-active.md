@@ -786,6 +786,8 @@ governance:
 > **进度注记（P-195 · 2026-11-12）**：Tina 授权本机真实试玩并登记结果。试玩项目 `/Users/tina/Downloads/aes-douyin`。运行副本为本机 `/Users/tina/IDE` 工作树 `a2363d1`（分支 `docs/ci1-windows-assessment`，2026-11-08），Daemon 于当日 17:01 启动；**不是**当时的 `origin/main`。**J16-P5 FAIL**：方案冻结后在右栏发出一次「这里不对」，质疑面板未出现，请求走了普通聊天（`POST /api/chat/sessions/.../messages`）；`.stagent` 会话记下了原话与「这里不对」，但无 `turn_text_sha256` / `text_sha256` 可与 `intent-compiler/host.ts` 的 sha256(utf8) 对照（目录含登录令牌，未拷出）。对照现行 main `a79bd93`：`handleJourneyBeforeSend` 在方案冻结后仍对所有右栏消息返回 `passthrough`（含「这里不对」）；`DisputeConsolePane` 仅 import、未 JSX 挂载；`viewport-routing.ts` 把视口收成单页 `scheme`。此链路缺口在现行 main 仍在，**转 `TASK-J.23` 处理**。**J16-P6 FAIL**：该次试玩生产界面打不开质疑面板。文案在 `a2363d1` 上 FAIL，main 上已合规，待面板挂载后复核。经直读复核 main 上 `src/components/studio/DisputeConsolePane.tsx`：按钮为「这是 Bug，免费修」「我想要新功能，下一轮做」，`confidence` 仅是类型字段未渲染，分类标签为白话，源码文案已符合 §16.7；但「面板未挂载 + 冻结后『这里不对』走普通聊天」在 main 上仍成立，FAIL 维持。生产界面仍待面板挂载后做真实渲染层走查复核。卡状态仍为 `NEW_TASK`，**仍不标 COMPLETED**。文档计划暂缓，不主动开工新方案。
 > **卡修订与进度注记（P-186 · 2026-11-11）**：`writable_paths` 与 `touches` 追加 `compile-loop.ts` 与 ITEM 撞号复现测试（授权：Tina 拍板方案 A 与「ITEM 撞号先修后进 K-14」）。`surface_log` 采集与前端接线已合（#211 / `273e506`）。ITEM 撞号修复 [#214](https://github.com/he18718143986-design/IDE/pull/214) 须在本修订合入后再合（挂账⑪）。验收条目呈现数据通路未决（挂账⑬，待 Tina 决策）；K-14 未开工；J16-P5 待真实数据。**仍不标 COMPLETED**。
 
+> **卡修订（P-200 · 2026-11-13）**：卡片内部 writable/readonly 冲突核对修复（施工前核对发现，先修卡）。从 `readonly_paths` 移除 `daemon/supervisor/dispute/evidence-triad.ts`（既有 `dispute/**` 通配符已覆盖可写）；`touches` 中该文件的 `why` 更新为本次修复的实际语义（按 `turn_id` 反查 transcript 原话 + 哈希校验）；`test_plan` 补充 `T1/T2` 原生键反查、哈希不匹配失败关闭、transcript 缺失时退化 `session.messages` 三类用例。卡状态仍为 `NEW_TASK`，未开工，**仍不标 COMPLETED**。
+
 ```yaml task-card
 id: TASK-J.16
 status: NEW_TASK
@@ -853,7 +855,6 @@ contract:
       - docs/specs/playtest-self-check.md
       - docs/specs/supervisor.md
       - daemon/supervisor/intent-compiler/host.ts
-      - daemon/supervisor/dispute/evidence-triad.ts
   verification:
     commands:
       - { alias: regression-dispute, executable: npx, args: [vitest, run, tests/unit/dispute-triad.test.ts, tests/unit/dispute-self-check-fixes.test.ts, tests/components/DisputeConsolePane.test.tsx] }
@@ -864,7 +865,7 @@ design:
     3) K-16 闭集与 linked_reason_code 在写入口校验，旧台账按 legacy 前缀迁移。4) 缺 surface_log 的退化路径单独测试。
     5) 验收 P5/P6 须真实链路与渲染层，不以 jsdom 或服务端字段替代。6) 验收条目呈现（P-187 · 挂账⑬ 方案 A）：Daemon 新增只读路由投影台账 acceptance，中栏上半部分渲染，上报 `section=acceptance` 的 `item_ref` 为台账 id。施工前按当时代码重核 touches。
   touches:
-    - { path: daemon/supervisor/dispute/evidence-triad.ts, change: modify, why: 左栏锚定原话与三方证据接入呈现记录, symbols: [] }
+    - { path: daemon/supervisor/dispute/evidence-triad.ts, change: modify, why: 按 turn_id 反查 transcript 原话 + 哈希校验, symbols: [] }
     - { path: daemon/supervisor/dispute/types.ts, change: modify, why: surface_log / 归因账本类型与 K-16 闭集, symbols: [] }
     - { path: daemon/supervisor/dispute/index.ts, change: modify, why: 三分类退化与 resolution_note 标注, symbols: [] }
     - { path: src/components/studio/ScopeAcceptanceBlock.tsx, change: modify, why: §15.4 白话投影渲染后上报实际呈现条目（不得渲染前预写）, symbols: [] }
@@ -886,7 +887,10 @@ design:
     - { acceptance_id: J16-P2, test_path: tests/unit/dispute-attribution-ledger.test.ts, level: unit, debt: "J.16 未施工；待单卡授权后补测试" }
     - { acceptance_id: J16-P3, test_path: tests/unit/dispute-trigger-closed-set.test.ts, level: unit, debt: "J.16 未施工；待单卡授权后补测试" }
     - { acceptance_id: J16-P4, test_path: tests/unit/dispute-surface-log-degraded.test.ts, level: unit, debt: "J.16 未施工；待单卡授权后补测试" }
-    - { acceptance_id: J16-P5, test_path: tests/integration/dispute-anchor-real-session.test.ts, level: integration, debt: "真实会话与真实台账验证未做；需 Tina 提供或授权环境" }
+    - { acceptance_id: J16-P5, test_path: tests/unit/dispute-triad.test.ts, level: unit, case: "T1/T2 原生键反查：按 ref.turn_id 从 transcript 成功反查原话切片并校验哈希" }
+    - { acceptance_id: J16-P5, test_path: tests/unit/dispute-triad.test.ts, level: unit, case: "失败关闭：turn_text_sha256 不匹配或切片越界时拒绝伪造，返回空原话" }
+    - { acceptance_id: J16-P5, test_path: tests/unit/dispute-triad.test.ts, level: unit, case: "降级兼容：transcript 缺失时按 message_id/turn_id 退化 session.messages（不宽松匹配）" }
+    - { acceptance_id: J16-P5, test_path: tests/integration/dispute-anchor-real-session.test.ts, level: integration, debt: "真实会话与真实台账验证待 Tina 本机再次试玩；单测不替代本条" }
     - { acceptance_id: J16-P6, test_path: tests/components/DisputeConsolePane.test.tsx, level: integration, debt: "jsdom 不替代真实面板人工验收" }
     - { acceptance_id: J16-P7, test_path: tests/unit/scheme-acceptance-projection.test.ts, level: unit, debt: "J.16 未施工；待单卡授权后补测试" }
     - { acceptance_id: J16-P7, test_path: tests/ui/scope-acceptance-surface-log.test.tsx, level: integration, debt: "jsdom 不替代真实面板人工验收" }
