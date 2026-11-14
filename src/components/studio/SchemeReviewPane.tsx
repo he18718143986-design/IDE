@@ -60,6 +60,8 @@ export interface SchemeReviewPaneProps {
   /** J.16：当前方案修订的确认 ID（与确认按钮使用同一键）；缺省则不上报呈现 */
   /** 挂账⑬ 方案 A：台账验收条目（只读投影），缺省不渲染条目 */
   acceptanceItems?: readonly SchemeAcceptanceItem[] | undefined;
+  /** J16-P7：取数完成或失败后为 true，空条目时标「无呈现记录」 */
+  acceptanceSettled?: boolean | undefined;
   surfaceConfirmationId?: string | null | undefined;
   onSurfacePresented?: ScopeAcceptanceSurfaceProps["onReport"] | undefined;
   onConfirmDecision?: ((decisionId: string) => void) | undefined;
@@ -416,6 +418,7 @@ export function SchemeReviewPane(props: SchemeReviewPaneProps) {
         busy={props.confirmBusy}
         onDeclineSensitive={props.onDeclineSensitive}
         acceptanceItems={props.acceptanceItems}
+        acceptanceSettled={props.acceptanceSettled}
         surface={
           props.surfaceConfirmationId && props.onSurfacePresented
             ? {
