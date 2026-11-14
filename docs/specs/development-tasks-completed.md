@@ -6531,3 +6531,221 @@ governance:
     gateway_write_scope: unchanged
   delivered: { pr: 244, commit: 8e985381d76e32184435a6161b85d9f382bb33a6 }
 ```
+
+### 3.4ag 用户旅程、术语表与固定底线清单规格（J.25 / J.27 · 完工回写 P-207）
+
+<a id="task-j.25"></a>
+
+### 【Task J.25】新增用户旅程与术语表（`user-journey.md` + `glossary.md`）`[COMPLETED · 立卡 P-206 · 施工 #248 · 完工回写 P-207]`
+
+> **立卡说明（2026-11-14 · P-206）**：第一块纯 docs 的薄切片。本卡只新增面向非技术用户的旅程说明与术语表，并在既定入口文件做术语首次出现处的链接；不搬 `scheme.md` / 七环进度列（见 `TASK-J.26`）。**立卡 ≠ 开工**。
+
+> **归档注记（2026-11-14 · P-207）**：本卡已 **COMPLETED**。Tina t1252u 授权施工、t1253u 授权合入。[#248](https://github.com/he18718143986-design/IDE/pull/248) squash `f90c881196f2ab8f8f1e02f7911415f5919e03de` 于 2026-11-14 21:40 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `00b7379a8a9fbd66c255ecca979843888b5b933a`）。交付：`docs/user-journey.md`（七环白话旅程，入口含产品定位、只负责聊天和拍板、质量由 Daemon 门禁与试玩把关、北极星场景当前做不到）与 `docs/glossary.md`（必收术语加 Daemon / 试玩 / 北极星场景，各有一句话定义和出处链接）；`docs/README.md` 分层表第 25–26 行已登记且未新增 L7；`delivery-lifecycle.md` 只在首次出现处加链接，未删「现状 → 卡」列，未改 `scheme.md`。本条将 `touches` 中两份新文件的 `change: create` 改为 `modify`，消除「卡头写新建但文件已存在」的 warn。J.26 仍 `[NEW_TASK]`，待另行授权；不开工 J.22；CI.2 攒样本。
+
+```yaml task-card
+id: TASK-J.25
+status: COMPLETED
+contract:
+  intent:
+    title: 新增用户旅程与术语表，让非技术用户读懂「会看到什么 / 要做什么 / 不必做什么」
+    description: >-
+      非技术用户打开 docs/user-journey.md，能按 delivery-lifecycle.md 七环看到每一环
+      「你会看到什么 / 你需要做什么 / 你不需要做什么」；入口几句话说明产品、用户只负责聊天和拍板、
+      质量由 Daemon 门禁与试玩共同把关，并写明北极星场景（scheme.md goal-2）当前做不到。
+      docs/glossary.md 为密封、合同、卡片流、墓地、挂账、PAB、DesignNote、EvidenceBundle、任务卡
+      各提供一句话白话定义与权威出处链接；本卡 writable_paths 内各文件首次出现这些术语处改为链向术语表。
+      两份新文件在 docs/README.md 分层表登记落点与「谁能改」。
+    risk_level: LOW
+  acceptance:
+    - id: J25-P1
+      check: auto
+      text: >-
+        docs/user-journey.md 已落盘：入口含产品说明、用户只负责聊天和拍板、质量由 Daemon 门禁与试玩共同把关、
+        北极星场景（scheme.md goal-2）当前做不到；并以 delivery-lifecycle.md §2 七环为骨架（S2→Seal 与 S3 子步骤按总表分行，不另开文档层），
+        逐环写「你会看到什么 / 你需要做什么 / 你不需要做什么」。
+    - id: J25-P2
+      check: auto
+      text: >-
+        docs/glossary.md 已落盘：密封、合同、卡片流、墓地、挂账、PAB、DesignNote、EvidenceBundle、任务卡
+        各有一句话白话定义，并链到现行权威出处（规格或 ADR），不另造定义层。
+    - id: J25-P3
+      check: auto
+      text: >-
+        docs/README.md 分层表已登记 user-journey.md 与 glossary.md 的落点与「谁能改」；不新增 L7 或其它文档层。
+    - id: J25-P4
+      check: auto
+      text: >-
+        本卡 writable_paths 内既有文件（docs/README.md、docs/specs/delivery-lifecycle.md）以及两份新文件中，
+        上述术语的首次出现处已改为链向 docs/glossary.md 对应条目；不改七环「现状 → 卡」列，不改 scheme.md 结构。
+  scheme_item_ids: [goal-1, goal-2, goal-5, goal-7]
+  scope:
+    writable_paths:
+      - docs/user-journey.md
+      - docs/glossary.md
+      - docs/README.md
+      - docs/specs/delivery-lifecycle.md
+    readonly_paths:
+      - docs/scheme.md
+      - docs/specs/task-card-standard.md
+      - docs/adr/README.md
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    按 delivery-lifecycle.md §2 七环与 §4 用户触点总表写白话旅程，不重写规格条款。
+    术语表只做一句话定义 + 出处链接。术语链接范围（ai_inferred，为把本卡保持为 S）：
+    仅限本卡新建的两份文件，以及 docs/README.md 与 docs/specs/delivery-lifecycle.md 的首次出现处；
+    不扫 docs/ 全文，不改 scheme.md（结构分家见 TASK-J.26）。新文件在 README 分层表登记。
+    三条铁律、q* 原话溯源、user_said/ai_inferred 标注不动；ADR 只 SUPERSEDE 不删改。
+  touches:
+    - { path: docs/user-journey.md, change: modify, why: "已新增非技术用户旅程说明（施工 #248 落盘后改记为 modify，消除 create-vs-exists warn）", symbols: [] }
+    - { path: docs/glossary.md, change: modify, why: "已新增术语白话定义与权威出处链接（施工 #248 落盘后改记为 modify，消除 create-vs-exists warn）", symbols: [] }
+    - { path: docs/README.md, change: modify, why: 分层表登记新文件落点与谁能改，并做本文件术语首次链接, symbols: [] }
+    - { path: docs/specs/delivery-lifecycle.md, change: modify, why: 仅在首次出现术语处加链接，不删现状→卡列、不改条款, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J25-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #248 交付；门禁仍为 npm run check:docs，本卡未新增 vitest 文件" }
+    - { acceptance_id: J25-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #248 交付；门禁仍为 npm run check:docs" }
+    - { acceptance_id: J25-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #248 交付；门禁仍为 npm run check:docs" }
+    - { acceptance_id: J25-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #248 交付；术语链接的机器核对若需新规则，另修卡后再做，本卡未扩展检查器" }
+governance:
+  spec_refs:
+    - docs/specs/delivery-lifecycle.md
+    - docs/scheme.md
+    - docs/README.md
+    - docs/specs/task-card-standard.md
+  depends_on: []
+  code_facts:
+    - { ref: "docs/specs/delivery-lifecycle.md:36-49", note: "七环总表已存在，含「现状 → 卡」列，但没有面向非技术用户的「会看到什么 / 要做什么 / 不必做什么」旅程文" }
+    - { ref: "docs/README.md:21-39", note: "分层表没有 user-journey.md / glossary.md 登记" }
+    - { ref: "docs/scheme.md:79", note: "goal-2 北极星场景已标明「当前做不到」，旅程入口必须复述，不得改成已交付" }
+  non_goals:
+    - 不删除或改写 delivery-lifecycle.md 的「现状 → 卡」列，不搬 scheme.md 结构（TASK-J.26）
+    - 不扫 docs/ 全文做术语链接（范围仅限本卡 writable_paths）
+    - 不动三条铁律、q* 原话溯源、user_said/ai_inferred 标注；ADR 只 SUPERSEDE 不删改
+    - 不宣称北极星场景（goal-2）或「无人值守连续三张真实任务卡」已交付；不加新文档层
+    - 不暗示条目级高亮已交付（J.22 范围）；不开工 J.22 / CI.2；不改 D.1e / S.3 / 已完工的 TASK-J.16
+    - 不写第二块验收约定，不做密封前意图完整性核对
+  fail:
+    - 旅程入口未写明 goal-2 当前做不到，或把北极星 / 无人值守三连卡写成已交付
+    - 术语定义没有权威出处链接，或另造与规格冲突的定义
+    - 改了「现状 → 卡」列或 scheme.md 结构
+    - 新文件未在 docs/README.md 分层表登记落点与「谁能改」
+  defaults:
+    - 术语链接范围限于本卡 writable_paths（ai_inferred，为保持估算 S；「各文件」不解释为 docs/ 全文）
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 248, commit: f90c881196f2ab8f8f1e02f7911415f5919e03de }
+```
+
+* **背景**：已解锁方案的第一块薄切片；用户入口目前是规格总装图，缺少白话旅程与术语表。
+* **取舍**：不把术语链接做成全库扫荡，避免本卡升为 L / 与 J.26 抢改 scheme.md。
+
+<a id="task-j.27"></a>
+
+### 【Task J.27】固定底线清单写入验证与验收规格（含 LLM 审核软层局限）`[COMPLETED · 立卡 P-206 · 施工 #249 · 完工回写 P-207]`
+
+> **立卡说明（2026-11-14 · P-206）**：第三块可先行的纯 docs 卡，不依赖第一块文档重组。只把固定底线清单与 LLM 软层局限写进规格；Daemon 接线见 `TASK-J.28`，三类检查适配见 `TASK-J.29`。**立卡 ≠ 开工**。
+
+> **归档注记（2026-11-14 · P-207）**：本卡已 **COMPLETED**。Tina t1252u 授权施工、t1253u 授权合入。因 #248 先合入，本卡分支曾变 BEHIND，已 rebase 到当时 main `f90c881196f2ab8f8f1e02f7911415f5919e03de` 后重跑检查再合。[#249](https://github.com/he18718143986-design/IDE/pull/249) squash `a96623c39a71c5d69bde7dfc08ccd16554d60387` 于 2026-11-14 21:42 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `118cee4ccee21a043e0ed01736436ac091e04f87`）。交付：`verification-strategy.md` §2.1（第 43 行起）与 `evidence-and-acceptance-criteria.md` §6（第 83 行起）写入安全 / 回滚 / 关键路径硬门禁；结论只由退出码进入 `can_merge`；类名标 `user_said`、细项标 `ai_inferred`；写明 LLM 审核只是补充软层，不能把 `can_merge` 置 true，人工三态也不替代 Daemon 判卷；北极星场景与「无人值守连续三张真实任务卡」仍标明未交付。未改产品代码。J.28 / J.29 仍 `[NEW_TASK]`，待另行授权；不开工 J.22；CI.2 攒样本。
+
+```yaml task-card
+id: TASK-J.27
+status: COMPLETED
+contract:
+  intent:
+    title: 把固定底线清单与 LLM 审核的非独立性写进验证策略和验收规格
+    description: >-
+      在 verification-strategy.md 与 evidence-and-acceptance-criteria.md 写入「固定底线清单」：
+      安全、回滚、关键路径三类检查必须是 Daemon 可执行的硬门禁，结论只由真实子进程退出码进入现有 can_merge 派生路径；
+      并显式声明 LLM 独立审核 / 测试义务审阅只是补充软层，写清其非独立性局限（不能单独把 can_merge 置真，也不能代替退出码）。
+      北极星场景与「无人值守连续三张真实任务卡」继续标明未交付。
+    risk_level: LOW
+  acceptance:
+    - id: J27-P1
+      check: auto
+      text: >-
+        docs/specs/verification-strategy.md 已增加固定底线清单正文：列出安全、回滚、关键路径三类硬门禁的覆盖范围与不覆盖范围，
+        并写明须参照现有 can_merge 只由退出码派生的机制（ADR-0005 / deriveCanMerge）实现；清单细项须标注 user_said 或 ai_inferred。
+    - id: J27-P2
+      check: auto
+      text: >-
+        docs/specs/evidence-and-acceptance-criteria.md 已同步该清单，并写明人工验收三态不替代 Daemon 判卷。
+    - id: J27-P3
+      check: auto
+      text: >-
+        两份规格都明确：LLM 独立审核测试义务只是补充软层，不具独立性，不能单独放行合入，也不能改写或绕过退出码派生的 can_merge。
+    - id: J27-P4
+      check: auto
+      text: >-
+        两份规格都继续标明北极星场景（goal-2）与「无人值守连续三张真实任务卡」未交付；不加新文档层。本卡不改产品代码。
+  scheme_item_ids: [goal-7, acc-7, acc-9]
+  scope:
+    writable_paths:
+      - docs/specs/verification-strategy.md
+      - docs/specs/evidence-and-acceptance-criteria.md
+    readonly_paths:
+      - docs/specs/delivery-lifecycle.md
+      - docs/specs/release-and-operations.md
+      - docs/scheme.md
+      - src/lib/evidence.schema.ts
+      - daemon/pipeline/orchestrator.ts
+      - docs/adr/0005-deterministic-verification-gate.md
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    先盘点已有退出码门禁（verification_spec 命令、stagent check obligations / test-integrity / knowledge、
+    deriveCanMerge、发布失败回滚）与仍只存在于文档或 LLM 审阅的项，再写成固定底线清单。
+    安全 / 回滚 / 关键路径的细项若超出用户原话「安全、回滚、关键路径检查」，一律标 ai_inferred，
+    供 J.28 / J.29 实施，但不在本卡发明新子系统。LLM 审核局限写进同一节，避免被读成硬门禁。
+  touches:
+    - { path: docs/specs/verification-strategy.md, change: modify, why: 写入固定底线清单与 LLM 软层局限, symbols: [] }
+    - { path: docs/specs/evidence-and-acceptance-criteria.md, change: modify, why: 同步清单，并重申人工三态不替代退出码判卷, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J27-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #249 交付；门禁仍为 npm run check:docs" }
+    - { acceptance_id: J27-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #249 交付；门禁仍为 npm run check:docs" }
+    - { acceptance_id: J27-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #249 交付；门禁仍为 npm run check:docs" }
+    - { acceptance_id: J27-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #249 交付；门禁仍为 npm run check:docs" }
+governance:
+  spec_refs:
+    - docs/specs/verification-strategy.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+    - docs/specs/delivery-lifecycle.md
+    - docs/adr/0005-deterministic-verification-gate.md
+    - docs/scheme.md
+  depends_on: []
+  code_facts:
+    - { ref: "docs/specs/verification-strategy.md:38-46", note: "已规定 can_merge 只由 V0～V3 退出码与 V4 确认派生，但没有名为「固定底线清单」的安全/回滚/关键路径硬门禁专节" }
+    - { ref: "docs/specs/evidence-and-acceptance-criteria.md:1-12", note: "现行规格讲人工三态与必填证据，未声明 LLM 审核的非独立性，也未列出固定底线清单" }
+    - { ref: "src/lib/evidence.schema.ts::deriveCanMerge", note: "can_merge 唯一派生函数已存在；本卡只引用，不改代码" }
+  non_goals:
+    - 不改 src/、daemon/、tests/ 或 bin/stagent.ts（接线是 TASK-J.28，三类检查是 TASK-J.29）
+    - 不把可维护性、架构品味、安全细节包装成已有硬门禁（那是第二块「质量边界」的范围，本批不立）
+    - 不做密封前意图完整性核对（U<seq> 回链）
+    - 不动三条铁律、q* 溯源、user_said/ai_inferred 标注；ADR 只 SUPERSEDE 不删改
+    - 不宣称北极星场景或「无人值守连续三张真实任务卡」已交付；不加新文档层
+    - 不暗示条目级高亮已交付；不开工 J.22 / CI.2
+  fail:
+    - 把 LLM 审核写成可以独立放行合入或改写 can_merge
+    - 清单细项不标 ai_inferred / user_said，或超出「安全、回滚、关键路径」另开产品方向
+    - 本卡直接改产品代码
+    - 把 goal-2 或无人值守三连卡写成已交付
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 249, commit: a96623c39a71c5d69bde7dfc08ccd16554d60387 }
+```
+
+* **背景**：质量安全网要求「固定底线」先有规格口径，再接线。现有 ADR-0005 / deriveCanMerge 已是机制样板，但规格没有把安全 / 回滚 / 关键路径写成固定清单，也未写清 LLM 审核局限。
+* **取舍**：本卡只写规格；不在立卡时发明新的扫描器或回滚子系统。
