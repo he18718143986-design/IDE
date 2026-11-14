@@ -793,6 +793,8 @@ governance:
 
 > **落地回写（P-202 · 2026-11-13）**：[#241](https://github.com/he18718143986-design/IDE/pull/241) squash `707028b15fe5b9072f52e20d88ded3c707286e5c` 合入后，Tina 本机官方 Daemon 对新建业务项目正式试玩 J16-P5，五条可机核项全部 PASS（2026-11-13 22:21 香港时间；`confirmation_id` `scheme-confirm-mwf2ep22-o4u1x2h6`；快照 digest `93c8683cab0235878e880aeb99c1aeabe884b0079c8a88b1522db7f342f6a2d7`）。本次登记口径为确认级整句原话；条目级高亮按拍板另记，不得视为本次已覆盖。同一次面板观察到 J16-P6 未出现禁词，确认事实行取自快照；「已降级呈递事实」因分类为 UNATTRIBUTED，且封存存在，不是缺封存的顶替。J16-P6「无封存段」分支本轮未再走；J16-P7 不声称完成。文档债务已还：§2.3 `E_SCHEME_SNAPSHOT_MISMATCH` 触发说明已覆盖冻结时原话清单校验失败。卡状态仍为 `NEW_TASK`，**仍不标 COMPLETED**。
 
+> **落地回写（P-203 · 2026-11-14）**：在 `main`@`c22ef7fd00a52f091f1c8bd759ba6c476ea9fb3b` 上，用旧合同项目 `/Users/tina/aes-douyin` 单独打开质疑面板走查 J16-P6「无封存段」分支（2026-11-14 12:21 香港时间；未重走确认冻结）。合同 `contract_1794481121624_0ymfe`，快照 `scheme-confirm-mwdfm0qn-5mug2rb1`。左栏 `data-seal-status=NOT_SEALED`，徽章「系统没有封存原话」，说明「系统没有封存你确认方案时的原话（这是系统记录缺失，不代表你没说过）」，确认事实行取自快照「你在 11月12日 18:55 确认了这份方案，但系统没有封存你当时说的话」；未出现「已降级呈递事实」「按缺陷修复」「按新需求演进」「实现缺陷」「confidence」「确认 N 次」。J16-P6 无封存段分支 PASS。J16-P7 仍未开工、未授权，不声称完成。卡状态仍为 `NEW_TASK`，**仍不标 COMPLETED**。
+
 ```yaml task-card
 id: TASK-J.16
 status: NEW_TASK
