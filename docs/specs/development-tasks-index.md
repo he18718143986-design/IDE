@@ -179,3 +179,8 @@
 | `TASK-J.22` | `NEW_TASK` | 中栏方案来源统一为编译器台账（挂账⑬ 方案 B；立卡 P-187；估算 L，施工前须拆卡） | [正文](./development-tasks-active.md) |
 | `TASK-J.23` | `COMPLETED` | 质疑自查生产链路接线：面板挂载 + DISPUTE 路由 + turn_text_sha256 落盘（立卡 P-195；修订 P-196；施工 P-198 · #233 `ab40f3a`；J23-P4 真实界面走查通过 · P-199） | [正文](./development-tasks-completed.md#task-j23) |
 | `TASK-J.24` | `COMPLETED` | 开工路径三缺口：脏目录确认 + 空仓库 main 引用 + Worker provider 选择器（立卡 P-195；修订 P-197；施工 P-198 · #235 `72b52ab`；真实开工路径试玩验证通过 · P-199） | [正文](./development-tasks-completed.md#task-j24) |
+| `TASK-J.25` | `NEW_TASK` | 新增用户旅程与术语表（user-journey.md + glossary.md；立卡 P-206；估算 S；未开工） | [正文](./development-tasks-active.md#task-j.25) |
+| `TASK-J.26` | `NEW_TASK` | 文档结构分家：生命周期进度迁索引、scheme 只留 L0、去掉 README 空壳与硬编码计数（立卡 P-206；估算 M；未开工） | [正文](./development-tasks-active.md#task-j.26) |
+| `TASK-J.27` | `NEW_TASK` | 固定底线清单写入验证与验收规格，并写明 LLM 审核软层局限（立卡 P-206；估算 S；未开工） | [正文](./development-tasks-active.md#task-j.27) |
+| `TASK-J.28` | `NEW_TASK` | 固定底线硬门禁接线：清单检查以子进程退出码进入 can_merge（立卡 P-206；估算 M；未开工；硬依赖 J.27） | [正文](./development-tasks-active.md#task-j.28) |
+| `TASK-J.29` | `NEW_TASK` | 把安全、回滚、关键路径检查接到固定底线硬门禁（立卡 P-206；估算 M；未开工；硬依赖 J.27 / J.28） | [正文](./development-tasks-active.md#task-j.29) |

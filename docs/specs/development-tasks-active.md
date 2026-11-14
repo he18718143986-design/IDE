@@ -1184,3 +1184,573 @@ governance:
 > **归档注记（2026-11-08 · P-169）**：本卡已 COMPLETED（[#174](https://github.com/he18718143986-design/IDE/pull/174)/`eacd101`，squash；立卡基线 #173/`2a7c404` P-168）。完整卡正文（yaml + 交付清单、默认/未做边界）迁入 [`development-tasks-completed.md` §3.4ae](./development-tasks-completed.md#task-ds.2)。**交付**：`daemon/desktop/create-empty-project.ts` + `POST /api/desktop/create-empty-project`（AUTH+loopback，同 pick-folder 门禁）+ `daemon-api` + OpenProjectEntry/Welcome darwin「新建空项目」；流程 名→pick-folder 选父目录→mkdir（E_EXISTS/非法名失败、非 recursive）→reopen/openWorkspaceByPath；取消选夹不 create；200 仅 `{ path }`；无 token/launchUrl。三套单测 16 passed（6+5+5）；tsc 0；回归 port-map+DS.1 UI 8 passed；端口 3700–3719。**诚实口径**：**完成 ≠ D.1e 完成**；`TASK-D.1e` 仍 DEFERRED；不做 Electron/Tauri/Win/Linux/单窗 IDE；不宣称端到端闭环；未碰 orchestrator/supervisor/Seal；不销 OP-34；不激活 S.3。
 
 ---
+
+### 3.4f 文档可读性与固定底线清单（2026-11-14 · 立卡 P-206 · 未开工）
+
+> **立卡说明（2026-11-14 · P-206）**：授权来源为 Tina t1250u「按这个立卡」。目标是让非软件专业用户能走完「表达偏好 → 签字开工 → 试玩验收」并稳定得到高质量结果。本批只立第一块（文档可读性与结构分家）与第三块「固定底线清单硬门禁」。**不立**第二块（质量边界 / 判分表 / `card-copy-standard` / 校验器），**不立**「密封前意图完整性核对（`U<seq>` 回链）」卡——这两块留给 Opus 5.5。五张卡均为 `[NEW_TASK]`，估算均为 S 或 M（R-11；不立 L，不重演 J.16）。**立卡 ≠ 授权 ≠ 开工**；待 Tina 逐张授权。J.22 不开工；CI.2 攒样本。不改已完工的 `TASK-J.16`，不碰 `TASK-D.1e` / `TASK-S.3`，不改 runtime/contract ScopePlan sandbox。北极星场景（`scheme.md` goal-2）与「无人值守连续三张真实任务卡」继续标明未交付，不加新文档层。不暗示条目级高亮已交付（J.22 范围）。
+
+<a id="task-j.25"></a>
+
+#### 【Task J.25】新增用户旅程与术语表（`user-journey.md` + `glossary.md`）`[NEW_TASK · 立卡 P-206 · 未开工]`
+
+> **立卡说明（2026-11-14 · P-206）**：第一块纯 docs 的薄切片。本卡只新增面向非技术用户的旅程说明与术语表，并在既定入口文件做术语首次出现处的链接；不搬 `scheme.md` / 七环进度列（见 `TASK-J.26`）。**立卡 ≠ 开工**。
+
+```yaml task-card
+id: TASK-J.25
+status: NEW_TASK
+contract:
+  intent:
+    title: 新增用户旅程与术语表，让非技术用户读懂「会看到什么 / 要做什么 / 不必做什么」
+    description: >-
+      非技术用户打开 docs/user-journey.md，能按 delivery-lifecycle.md 七环看到每一环
+      「你会看到什么 / 你需要做什么 / 你不需要做什么」；入口几句话说明产品、用户只负责聊天和拍板、
+      质量由 Daemon 门禁与试玩共同把关，并写明北极星场景（scheme.md goal-2）当前做不到。
+      docs/glossary.md 为密封、合同、卡片流、墓地、挂账、PAB、DesignNote、EvidenceBundle、任务卡
+      各提供一句话白话定义与权威出处链接；本卡 writable_paths 内各文件首次出现这些术语处改为链向术语表。
+      两份新文件在 docs/README.md 分层表登记落点与「谁能改」。
+    risk_level: LOW
+  acceptance:
+    - id: J25-P1
+      check: auto
+      text: >-
+        docs/user-journey.md 已落盘：入口含产品说明、用户只负责聊天和拍板、质量由 Daemon 门禁与试玩共同把关、
+        北极星场景（scheme.md goal-2）当前做不到；并以 delivery-lifecycle.md §2 七环为骨架（S2→Seal 与 S3 子步骤按总表分行，不另开文档层），
+        逐环写「你会看到什么 / 你需要做什么 / 你不需要做什么」。
+    - id: J25-P2
+      check: auto
+      text: >-
+        docs/glossary.md 已落盘：密封、合同、卡片流、墓地、挂账、PAB、DesignNote、EvidenceBundle、任务卡
+        各有一句话白话定义，并链到现行权威出处（规格或 ADR），不另造定义层。
+    - id: J25-P3
+      check: auto
+      text: >-
+        docs/README.md 分层表已登记 user-journey.md 与 glossary.md 的落点与「谁能改」；不新增 L7 或其它文档层。
+    - id: J25-P4
+      check: auto
+      text: >-
+        本卡 writable_paths 内既有文件（docs/README.md、docs/specs/delivery-lifecycle.md）以及两份新文件中，
+        上述术语的首次出现处已改为链向 docs/glossary.md 对应条目；不改七环「现状 → 卡」列，不改 scheme.md 结构。
+  scheme_item_ids: [goal-1, goal-2, goal-5, goal-7]
+  scope:
+    writable_paths:
+      - docs/user-journey.md
+      - docs/glossary.md
+      - docs/README.md
+      - docs/specs/delivery-lifecycle.md
+    readonly_paths:
+      - docs/scheme.md
+      - docs/specs/task-card-standard.md
+      - docs/adr/README.md
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    按 delivery-lifecycle.md §2 七环与 §4 用户触点总表写白话旅程，不重写规格条款。
+    术语表只做一句话定义 + 出处链接。术语链接范围（ai_inferred，为把本卡保持为 S）：
+    仅限本卡新建的两份文件，以及 docs/README.md 与 docs/specs/delivery-lifecycle.md 的首次出现处；
+    不扫 docs/ 全文，不改 scheme.md（结构分家见 TASK-J.26）。新文件在 README 分层表登记。
+    三条铁律、q* 原话溯源、user_said/ai_inferred 标注不动；ADR 只 SUPERSEDE 不删改。
+  touches:
+    - { path: docs/user-journey.md, change: create, why: 新增非技术用户旅程说明, symbols: [] }
+    - { path: docs/glossary.md, change: create, why: 新增术语白话定义与权威出处链接, symbols: [] }
+    - { path: docs/README.md, change: modify, why: 分层表登记新文件落点与谁能改，并做本文件术语首次链接, symbols: [] }
+    - { path: docs/specs/delivery-lifecycle.md, change: modify, why: 仅在首次出现术语处加链接，不删现状→卡列、不改条款, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J25-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "未施工；本卡以 npm run check:docs 为门禁，不在本卡新增 vitest 文件" }
+    - { acceptance_id: J25-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "未施工；本卡以 npm run check:docs 为门禁" }
+    - { acceptance_id: J25-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "未施工；本卡以 npm run check:docs 为门禁" }
+    - { acceptance_id: J25-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "未施工；术语链接的机器核对若需新规则，另修卡后再做，不在本卡扩展检查器" }
+governance:
+  spec_refs:
+    - docs/specs/delivery-lifecycle.md
+    - docs/scheme.md
+    - docs/README.md
+    - docs/specs/task-card-standard.md
+  depends_on: []
+  code_facts:
+    - { ref: "docs/specs/delivery-lifecycle.md:36-49", note: "七环总表已存在，含「现状 → 卡」列，但没有面向非技术用户的「会看到什么 / 要做什么 / 不必做什么」旅程文" }
+    - { ref: "docs/README.md:21-39", note: "分层表没有 user-journey.md / glossary.md 登记" }
+    - { ref: "docs/scheme.md:79", note: "goal-2 北极星场景已标明「当前做不到」，旅程入口必须复述，不得改成已交付" }
+  non_goals:
+    - 不删除或改写 delivery-lifecycle.md 的「现状 → 卡」列，不搬 scheme.md 结构（TASK-J.26）
+    - 不扫 docs/ 全文做术语链接（范围仅限本卡 writable_paths）
+    - 不动三条铁律、q* 原话溯源、user_said/ai_inferred 标注；ADR 只 SUPERSEDE 不删改
+    - 不宣称北极星场景（goal-2）或「无人值守连续三张真实任务卡」已交付；不加新文档层
+    - 不暗示条目级高亮已交付（J.22 范围）；不开工 J.22 / CI.2；不改 D.1e / S.3 / 已完工的 TASK-J.16
+    - 不写第二块验收约定，不做密封前意图完整性核对
+  fail:
+    - 旅程入口未写明 goal-2 当前做不到，或把北极星 / 无人值守三连卡写成已交付
+    - 术语定义没有权威出处链接，或另造与规格冲突的定义
+    - 改了「现状 → 卡」列或 scheme.md 结构
+    - 新文件未在 docs/README.md 分层表登记落点与「谁能改」
+  defaults:
+    - 术语链接范围限于本卡 writable_paths（ai_inferred，为保持估算 S；「各文件」不解释为 docs/ 全文）
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：已解锁方案的第一块薄切片；用户入口目前是规格总装图，缺少白话旅程与术语表。
+* **取舍**：不把术语链接做成全库扫荡，避免本卡升为 L / 与 J.26 抢改 scheme.md。
+
+<a id="task-j.26"></a>
+
+#### 【Task J.26】文档结构分家（生命周期进度、scheme L0、README 空壳与硬编码计数）`[NEW_TASK · 立卡 P-206 · 未开工]`
+
+> **立卡说明（2026-11-14 · P-206）**：第一块的结构迁移切片，风险略高于 J.25，估算 M，不是 L。建议在 J.25 之后施工，以免术语链接与搬迁互相覆盖；无硬依赖。**立卡 ≠ 开工**。
+
+```yaml task-card
+id: TASK-J.26
+status: NEW_TASK
+contract:
+  intent:
+    title: 文档结构分家：进度进索引、scheme 只留 L0、去掉 README 空壳与硬编码计数
+    description: >-
+      delivery-lifecycle.md 删除「现状 → 卡」列，该列进度迁入 development-tasks-index.md；
+      scheme.md 只留 L0 意图（原话、目标、模块），物理指针快照迁 docs/reports/，已落盘裁决迁 docs/ledger/，
+      作废正文迁出只留指针；docs/README.md 删除「已迁走」空壳节（现 §3 / §8 / §9），顶部加 3～5 句项目简介；
+      索引与卡片状态一致性继续由 check:docs 校验，并消除 docs/ 内除 docs/adr/README.md 以外的硬编码计数。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J26-P1
+      check: auto
+      text: >-
+        docs/specs/delivery-lifecycle.md 七环表已删除「现状 → 卡」列；该列原先记录的进度已迁入 docs/specs/development-tasks-index.md，
+        且迁后索引状态与卡头 / §1.1 矩阵仍被 check:docs 校验为一致。
+    - id: J26-P2
+      check: auto
+      text: >-
+        docs/scheme.md 正文只保留 L0 意图（§0 原话、§1 目标、§3 模块及溯源所需的 source/evidence 列）；
+        物理指针快照已迁至 docs/reports/scheme-physical-pointers.md，已落盘裁决已迁至 docs/ledger/scheme-settled-decisions.md，
+        作废正文迁出后在原位只留指针；user_said 仍能追到 §0 原话（check:docs / acc-4），q* 溯源与 user_said/ai_inferred 标注不丢。
+    - id: J26-P3
+      check: auto
+      text: >-
+        docs/README.md 已删除「已迁走」空壳节（现 §3 / §8 / §9 仅剩「已迁至 …」的空壳），顶部有 3～5 句项目简介；
+        三条铁律仍在；分层表如因 J.25 已登记新文件则保持登记。
+    - id: J26-P4
+      check: auto
+      text: >-
+        docs/ 内除 docs/adr/README.md 以外，不再出现以正文硬编码维护的 ADR / 篇数计数；
+        check:docs 新增规则在此类硬编码出现时判红；历史 changelog 中的过时计数不在本卡清扫范围。
+  scheme_item_ids: [goal-5, goal-6]
+  scope:
+    writable_paths:
+      - docs/specs/delivery-lifecycle.md
+      - docs/specs/development-tasks-index.md
+      - docs/scheme.md
+      - docs/README.md
+      - docs/reports/README.md
+      - docs/reports/scheme-physical-pointers.md
+      - docs/ledger/README.md
+      - docs/ledger/scheme-settled-decisions.md
+      - scripts/docs-check/checks.ts
+      - tests/unit/docs-check.test.ts
+    readonly_paths:
+      - docs/adr/README.md
+      - docs/specs/task-card-standard.md
+      - docs/specs/development-tasks-active.md
+      - docs/specs/development-tasks-completed.md
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/docs-check.test.ts] }
+design:
+  approach: >-
+    先列出 scheme.md 各节迁出清单再搬迁，避免一次改丢溯源。L0 只留原话、目标、模块；
+    物理指针进 reports，已落盘裁决进 ledger（只迁 scheme 正文中的裁决叙述并加指针，不改 ADR 原文）。
+    生命周期进度列整列删除，文字迁入索引（可增注或附列，但不得与卡头/矩阵状态打架）。
+    README 去空壳、补项目简介。硬编码计数清除后，在 scripts/docs-check/checks.ts 加看守规则，
+    并在 tests/unit/docs-check.test.ts 补用例。三条铁律、q* 溯源、标注与 ADR SUPERSEDE 纪律不动。
+  touches:
+    - { path: docs/specs/delivery-lifecycle.md, change: modify, why: 删除「现状 → 卡」列, symbols: [] }
+    - { path: docs/specs/development-tasks-index.md, change: modify, why: 承接七环进度文字，保持与矩阵/卡头状态一致, symbols: [] }
+    - { path: docs/scheme.md, change: modify, why: 只留 L0，其余迁出只留指针, symbols: [] }
+    - { path: docs/reports/scheme-physical-pointers.md, change: create, why: 承接 scheme.md 物理指针快照（文件名为 ai_inferred）, symbols: [] }
+    - { path: docs/ledger/scheme-settled-decisions.md, change: create, why: 承接 scheme.md 已落盘裁决叙述并指向 ADR/ledger（文件名为 ai_inferred）, symbols: [] }
+    - { path: docs/reports/README.md, change: modify, why: 登记迁入的指针快照, symbols: [] }
+    - { path: docs/ledger/README.md, change: modify, why: 登记迁入的裁决叙述, symbols: [] }
+    - { path: docs/README.md, change: modify, why: 删空壳节、顶部加项目简介、去掉硬编码计数, symbols: [] }
+    - { path: scripts/docs-check/checks.ts, change: modify, why: 新增硬编码计数看守，计数只允许出现在 docs/adr/README.md, symbols: [] }
+    - { path: tests/unit/docs-check.test.ts, change: modify, why: 为硬编码计数规则补用例, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J26-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "未施工" }
+    - { acceptance_id: J26-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "未施工；迁后须仍通过既有 scheme user_said 溯源检查" }
+    - { acceptance_id: J26-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "未施工" }
+    - { acceptance_id: J26-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "未施工；须补硬编码计数看守用例" }
+governance:
+  spec_refs:
+    - docs/specs/delivery-lifecycle.md
+    - docs/scheme.md
+    - docs/README.md
+    - docs/adr/README.md
+    - docs/specs/task-card-standard.md
+  depends_on:
+    - { id: TASK-J.25, kind: soft }
+  code_facts:
+    - { ref: "docs/specs/delivery-lifecycle.md:36-49", note: "七环表含「现状 → 卡」列，进度与任务卡/索引重复且易过期" }
+    - { ref: "docs/scheme.md:141-172", note: "§6 决定 / 已落盘裁决仍写在意图层，应按方案迁 docs/ledger/ 并留指针" }
+    - { ref: "docs/scheme.md:304-364", note: "文末大量「现行物理指针」快照，应按方案迁 docs/reports/ 并留指针" }
+    - { ref: "docs/README.md:47", note: "阅读顺序写「17 条已拍板决策」，与 §4「19 篇」及 adr 索引不一致，属硬编码计数" }
+    - { ref: "docs/README.md:62-89", note: "§3 / §8 / §9 已是「已迁走」空壳；§4 标题硬编码「19 篇」" }
+  non_goals:
+    - 不改 ADR 原文（只可在迁出叙述中加指针；ADR 只 SUPERSEDE 不删改）
+    - 不改写三条铁律、q* 原话、user_said/ai_inferred 标注；迁出后 acc-4 溯源不得破
+    - 不清扫历史 changelog 里的过时计数；不重写已完成任务卡正文
+    - 不宣称北极星场景或「无人值守连续三张真实任务卡」已交付；不加新文档层
+    - 不暗示条目级高亮已交付；不开工 J.22 / CI.2；不改 D.1e / S.3 / 已完工的 TASK-J.16
+    - 不写第二块验收约定，不做密封前意图完整性核对
+  fail:
+    - scheme.md 迁出后 user_said 无法追到 §0 原话，或丢掉 ai_inferred 标注
+    - 删除「现状 → 卡」列后进度丢失，未迁入索引
+    - 改了 ADR 原文，或在 adr/README.md 以外继续用正文维护篇数计数且门禁不报
+    - 把本卡做成产品代码改动，或改 runtime sandbox
+  defaults:
+    - 迁出文件名采用 docs/reports/scheme-physical-pointers.md 与 docs/ledger/scheme-settled-decisions.md（ai_inferred；若需更名须先修卡）
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：scheme.md 与七环表同时承担意图、进度和指针，非技术用户与施工者都难读；README 仍留空壳节与互相矛盾的计数。
+* **取舍**：硬编码计数看守放进既有 `check:docs`，不另做文档层。建议 J.25 先做，以免两边同时改 README / lifecycle。
+
+<a id="task-j.27"></a>
+
+#### 【Task J.27】固定底线清单写入验证与验收规格（含 LLM 审核软层局限）`[NEW_TASK · 立卡 P-206 · 未开工]`
+
+> **立卡说明（2026-11-14 · P-206）**：第三块可先行的纯 docs 卡，不依赖第一块文档重组。只把固定底线清单与 LLM 软层局限写进规格；Daemon 接线见 `TASK-J.28`，三类检查适配见 `TASK-J.29`。**立卡 ≠ 开工**。
+
+```yaml task-card
+id: TASK-J.27
+status: NEW_TASK
+contract:
+  intent:
+    title: 把固定底线清单与 LLM 审核的非独立性写进验证策略和验收规格
+    description: >-
+      在 verification-strategy.md 与 evidence-and-acceptance-criteria.md 写入「固定底线清单」：
+      安全、回滚、关键路径三类检查必须是 Daemon 可执行的硬门禁，结论只由真实子进程退出码进入现有 can_merge 派生路径；
+      并显式声明 LLM 独立审核 / 测试义务审阅只是补充软层，写清其非独立性局限（不能单独把 can_merge 置真，也不能代替退出码）。
+      北极星场景与「无人值守连续三张真实任务卡」继续标明未交付。
+    risk_level: LOW
+  acceptance:
+    - id: J27-P1
+      check: auto
+      text: >-
+        docs/specs/verification-strategy.md 已增加固定底线清单正文：列出安全、回滚、关键路径三类硬门禁的覆盖范围与不覆盖范围，
+        并写明须参照现有 can_merge 只由退出码派生的机制（ADR-0005 / deriveCanMerge）实现；清单细项须标注 user_said 或 ai_inferred。
+    - id: J27-P2
+      check: auto
+      text: >-
+        docs/specs/evidence-and-acceptance-criteria.md 已同步该清单，并写明人工验收三态不替代 Daemon 判卷。
+    - id: J27-P3
+      check: auto
+      text: >-
+        两份规格都明确：LLM 独立审核测试义务只是补充软层，不具独立性，不能单独放行合入，也不能改写或绕过退出码派生的 can_merge。
+    - id: J27-P4
+      check: auto
+      text: >-
+        两份规格都继续标明北极星场景（goal-2）与「无人值守连续三张真实任务卡」未交付；不加新文档层。本卡不改产品代码。
+  scheme_item_ids: [goal-7, acc-7, acc-9]
+  scope:
+    writable_paths:
+      - docs/specs/verification-strategy.md
+      - docs/specs/evidence-and-acceptance-criteria.md
+    readonly_paths:
+      - docs/specs/delivery-lifecycle.md
+      - docs/specs/release-and-operations.md
+      - docs/scheme.md
+      - src/lib/evidence.schema.ts
+      - daemon/pipeline/orchestrator.ts
+      - docs/adr/0005-deterministic-verification-gate.md
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    先盘点已有退出码门禁（verification_spec 命令、stagent check obligations / test-integrity / knowledge、
+    deriveCanMerge、发布失败回滚）与仍只存在于文档或 LLM 审阅的项，再写成固定底线清单。
+    安全 / 回滚 / 关键路径的细项若超出用户原话「安全、回滚、关键路径检查」，一律标 ai_inferred，
+    供 J.28 / J.29 实施，但不在本卡发明新子系统。LLM 审核局限写进同一节，避免被读成硬门禁。
+  touches:
+    - { path: docs/specs/verification-strategy.md, change: modify, why: 写入固定底线清单与 LLM 软层局限, symbols: [] }
+    - { path: docs/specs/evidence-and-acceptance-criteria.md, change: modify, why: 同步清单，并重申人工三态不替代退出码判卷, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J27-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "未施工；本卡以 npm run check:docs 为门禁" }
+    - { acceptance_id: J27-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "未施工；本卡以 npm run check:docs 为门禁" }
+    - { acceptance_id: J27-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "未施工；本卡以 npm run check:docs 为门禁" }
+    - { acceptance_id: J27-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "未施工；本卡以 npm run check:docs 为门禁" }
+governance:
+  spec_refs:
+    - docs/specs/verification-strategy.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+    - docs/specs/delivery-lifecycle.md
+    - docs/adr/0005-deterministic-verification-gate.md
+    - docs/scheme.md
+  depends_on: []
+  code_facts:
+    - { ref: "docs/specs/verification-strategy.md:38-46", note: "已规定 can_merge 只由 V0～V3 退出码与 V4 确认派生，但没有名为「固定底线清单」的安全/回滚/关键路径硬门禁专节" }
+    - { ref: "docs/specs/evidence-and-acceptance-criteria.md:1-12", note: "现行规格讲人工三态与必填证据，未声明 LLM 审核的非独立性，也未列出固定底线清单" }
+    - { ref: "src/lib/evidence.schema.ts::deriveCanMerge", note: "can_merge 唯一派生函数已存在；本卡只引用，不改代码" }
+  non_goals:
+    - 不改 src/、daemon/、tests/ 或 bin/stagent.ts（接线是 TASK-J.28，三类检查是 TASK-J.29）
+    - 不把可维护性、架构品味、安全细节包装成已有硬门禁（那是第二块「质量边界」的范围，本批不立）
+    - 不做密封前意图完整性核对（U<seq> 回链）
+    - 不动三条铁律、q* 溯源、user_said/ai_inferred 标注；ADR 只 SUPERSEDE 不删改
+    - 不宣称北极星场景或「无人值守连续三张真实任务卡」已交付；不加新文档层
+    - 不暗示条目级高亮已交付；不开工 J.22 / CI.2
+  fail:
+    - 把 LLM 审核写成可以独立放行合入或改写 can_merge
+    - 清单细项不标 ai_inferred / user_said，或超出「安全、回滚、关键路径」另开产品方向
+    - 本卡直接改产品代码
+    - 把 goal-2 或无人值守三连卡写成已交付
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：质量安全网要求「固定底线」先有规格口径，再接线。现有 ADR-0005 / deriveCanMerge 已是机制样板，但规格没有把安全 / 回滚 / 关键路径写成固定清单，也未写清 LLM 审核局限。
+* **取舍**：本卡只写规格；不在立卡时发明新的扫描器或回滚子系统。
+
+<a id="task-j.28"></a>
+
+#### 【Task J.28】固定底线硬门禁接线：清单检查以子进程退出码进入 can_merge`[NEW_TASK · 立卡 P-206 · 未开工]`
+
+> **立卡说明（2026-11-14 · P-206）**：第三块施工的机制卡。把 J.27 清单中的检查登记为必须跑到的真实子进程，沿用现有 `verification_spec` → `executeWithSignal` → `deriveCanMerge` 路径；不手写 `can_merge`。三类检查的具体适配见 `TASK-J.29`。硬依赖 J.27（清单未落盘前不得开工）。**立卡 ≠ 开工**。
+
+```yaml task-card
+id: TASK-J.28
+status: NEW_TASK
+contract:
+  intent:
+    title: 固定底线检查必须作为真实子进程跑完，can_merge 仍只由退出码派生
+    description: >-
+      Daemon 在验证阶段始终注入并执行 J.27 固定底线清单登记的检查命令（真实子进程，退出码 0/1）；
+      任一项缺失、未跑或退出码非 0 时，verdict.status 不得为 PASSED，deriveCanMerge 结果必须为 false。
+      禁止手写 can_merge，禁止用 LLM 审核结果把 can_merge 置真。本卡只做登记表与接线，不实现安全/回滚/关键路径的具体检查体。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J28-P1
+      check: auto
+      text: >-
+        ScopePlan / 合同 verification_spec 会注入 J.27 清单登记的底线检查命令（建议沿用 stagent check <subcommand> 形态，具体子命令名以施工为准并在卡回写中写清）。
+    - id: J28-P2
+      check: auto
+      text: >-
+        这些命令由现有验证循环以真实子进程执行，结果写入 evidence.verification_results（含 exit_code）；passed 只由退出码派生。
+    - id: J28-P3
+      check: auto
+      text: >-
+        清单中任一项缺失、被跳过或退出码非 0 时，writeEvidence 不得得到 can_merge=true；can_merge 仍只经 deriveCanMerge 计算，测试中不存在手写 true 的旁路。
+    - id: J28-P4
+      check: auto
+      text: >-
+        单测或集成测试用桩命令证明：全部退出码 0 时才可能 can_merge=true（其它门禁也通过的前提下）；任一非 0 或缺项则 can_merge=false；LLM / 人工评语不能单独置真。
+  scheme_item_ids: [goal-7, acc-7]
+  scope:
+    writable_paths:
+      - daemon/supervisor/scope-plan-builder.ts
+      - daemon/pipeline/orchestrator.ts
+      - bin/stagent.ts
+      - daemon/guard/baseline-gates.ts
+      - tests/unit/baseline-gates.test.ts
+      - docs/specs/verification-strategy.md
+      - docs/specs/evidence-and-acceptance-criteria.md
+    readonly_paths:
+      - src/lib/evidence.schema.ts
+      - daemon/pipeline/two-phase-runner.ts
+      - daemon/pipeline/merger.ts
+      - docs/specs/task-card-standard.md
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/baseline-gates.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    参照 withSystemScope 注入 stagent check obligations / test-integrity / knowledge 的既有模式：
+    在 buildScopePlan / withSystemScope 注入底线命令，runCheckCommand 增加对应子命令分发，
+    executeWithSignal 验证循环跑子进程。缺项 fail-closed：在写证据前核对清单别名是否都出现在 verification_results。
+    deriveCanMerge 保持唯一布尔派生器，本卡默认不改其签名（若必须扩展输入，须在 PR 说明且仍禁止手写 can_merge）。
+    具体安全/回滚/关键路径检查体留给 TASK-J.29；本卡可用桩命令把机制测绿。
+    新文件 daemon/guard/baseline-gates.ts 为 ai_inferred 落点，施工前若更名须先修卡。
+  touches:
+    - { path: daemon/supervisor/scope-plan-builder.ts, change: modify, why: 向 verification_spec 注入固定底线检查命令, symbols: [withSystemScope, buildScopePlan] }
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: 验证循环对清单做缺项 fail-closed，仍经 deriveCanMerge 写 can_merge, symbols: [executeWithSignal] }
+    - { path: bin/stagent.ts, change: modify, why: 为底线检查增加 stagent check 子命令分发, symbols: [runCheckCommand] }
+    - { path: daemon/guard/baseline-gates.ts, change: create, why: 清单登记与缺项判定（ai_inferred 路径）, symbols: [] }
+    - { path: tests/unit/baseline-gates.test.ts, change: create, why: 用桩命令锁定退出码派生与缺项 fail-closed, symbols: [] }
+    - { path: docs/specs/verification-strategy.md, change: modify, why: 回写接线后的命令别名与 fail-closed 行为, symbols: [] }
+    - { path: docs/specs/evidence-and-acceptance-criteria.md, change: modify, why: 回写证据字段与人工三态仍不替代退出码, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J28-P1, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "未施工" }
+    - { acceptance_id: J28-P2, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "未施工" }
+    - { acceptance_id: J28-P3, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "未施工" }
+    - { acceptance_id: J28-P4, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "未施工" }
+governance:
+  spec_refs:
+    - docs/specs/verification-strategy.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+    - docs/adr/0005-deterministic-verification-gate.md
+    - docs/specs/delivery-lifecycle.md
+  depends_on:
+    - { id: TASK-J.27, kind: hard }
+  code_facts:
+    - { ref: "src/lib/evidence.schema.ts::deriveCanMerge", note: "can_merge 唯一派生函数；本卡只调用，默认不改签名" }
+    - { ref: "daemon/pipeline/orchestrator.ts::executeWithSignal", note: "验证循环已按 verification_spec.commands 起真实子进程，并用 deriveCanMerge 写 can_merge；尚未对固定底线清单做缺项 fail-closed" }
+    - { ref: "daemon/supervisor/scope-plan-builder.ts::withSystemScope", note: "已注入 obligations / test-integrity / knowledge 命令，尚未注入固定底线清单" }
+    - { ref: "bin/stagent.ts::runCheckCommand", note: "check 子命令目前只分发 obligations / test-integrity / knowledge / playtest" }
+  non_goals:
+    - 不实现安全 / 回滚 / 关键路径的具体检查体（TASK-J.29）
+    - 不改 deriveCanMerge 的「禁止手写」纪律，不让 LLM 审核置真 can_merge
+    - 不改 runtime/contract ScopePlan sandbox 语义，不扩网关写范围
+    - 不动三条铁律、q* 溯源、标注；ADR 只 SUPERSEDE 不删改
+    - 不宣称北极星或无人值守三连卡已交付；不加新文档层
+    - 不暗示条目级高亮已交付；不开工 J.22 / CI.2；不改 D.1e / S.3 / 已完工的 TASK-J.16
+  fail:
+    - 手写 can_merge=true，或用 LLM / 人工评语绕过退出码
+    - 清单项缺失或未跑时仍出现 can_merge=true
+    - 在本卡实现三类检查的产品行为（越界到 J.29）
+    - 把本卡估成 L 后直接开工而不拆
+  defaults:
+    - 新模块路径采用 daemon/guard/baseline-gates.ts，测试采用 tests/unit/baseline-gates.test.ts（ai_inferred）
+    - 默认不修改 deriveCanMerge 签名
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：现有 can_merge 已只由退出码与门禁派生，但没有「固定底线清单必须全部跑到，缺项即失败」的接线。
+* **取舍**：先接线与桩测，再让 J.29 把三类真实检查接进同一登记表，避免一张卡跨机制与三个领域而变成 L。
+
+<a id="task-j.29"></a>
+
+#### 【Task J.29】把安全、回滚、关键路径检查接到固定底线硬门禁`[NEW_TASK · 立卡 P-206 · 未开工]`
+
+> **立卡说明（2026-11-14 · P-206）**：第三块施工的检查适配卡。只把 J.27 清单里的安全 / 回滚 / 关键路径项接到 J.28 登记表，复用已有代码事实，不新造扫描器、回滚子系统或新的主路径测试框架。若 J.27 落盘后的清单要求新子系统，必须先拆卡再授权（R-11）。硬依赖 J.27 与 J.28。**立卡 ≠ 开工**。
+
+```yaml task-card
+id: TASK-J.29
+status: NEW_TASK
+contract:
+  intent:
+    title: 将安全、回滚、关键路径三类底线检查接到退出码硬门禁
+    description: >-
+      J.27 清单中的安全、回滚、关键路径检查均以真实子进程形式出现在 J.28 登记表中：
+      退出码 0 表示该条通过，非 0 或未跑则 can_merge 为 false。
+      实现以现有门禁为适配对象（如范围/鉴权相关守卫、发布失败回滚、主路径/回归检查），
+      不新造独立扫描器或第二套 can_merge。LLM 审核仍不得置真 can_merge。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J29-P1
+      check: auto
+      text: >-
+        「安全」类底线检查已作为真实子进程接入 J.28 登记表；非 0 或缺失时 can_merge 为 false。检查覆盖范围以 J.27 正文为准，测试锁定退出码行为。
+    - id: J29-P2
+      check: auto
+      text: >-
+        「回滚」类底线检查同样接入；须能体现发布失败回到上一个 LIVE 这一既有口径（acc-9 / release-and-operations.md）的可执行判定，而不是只写文档。
+    - id: J29-P3
+      check: auto
+      text: >-
+        「关键路径」类底线检查同样接入；以 J.27 清单为准，复用既有主路径/回归检查，不新开测试框架。
+    - id: J29-P4
+      check: auto
+      text: >-
+        三类检查全部 0 且其它既有门禁通过时，才可能 can_merge=true；任一失败则 false。LLM 审核输出不能单独置真。
+    - id: J29-P5
+      check: auto
+      text: >-
+        本卡没有新增与现有网关/发布/回归子系统并行的第二套实现；规格回写与 J.27 清单一致，并继续标明北极星与无人值守三连卡未交付。
+  scheme_item_ids: [goal-7, acc-5, acc-7, acc-9]
+  scope:
+    writable_paths:
+      - daemon/guard/baseline-gates.ts
+      - bin/stagent.ts
+      - tests/unit/baseline-gates.test.ts
+      - docs/specs/verification-strategy.md
+      - docs/specs/evidence-and-acceptance-criteria.md
+    readonly_paths:
+      - src/lib/evidence.schema.ts
+      - daemon/pipeline/orchestrator.ts
+      - daemon/supervisor/scope-plan-builder.ts
+      - daemon/pipeline/merger.ts
+      - docs/specs/release-and-operations.md
+      - daemon/pipeline/mainline-regression.ts
+      - docs/adr/0005-deterministic-verification-gate.md
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/baseline-gates.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    施工以 J.27 已落盘清单为唯一产品口径。每类检查优先适配已有命令或模块：
+    安全对既有范围/鉴权/测试完整性等退出码门禁；回滚对发布失败自动回到上一个 LIVE 的既有路径；
+    关键路径对既有主路径/回归检查（如 mainline-regression）。
+    只做薄适配接到 J.28 登记表。若清单要求新子系统，停止并拆卡，不得在本卡膨胀为 L。
+  touches:
+    - { path: daemon/guard/baseline-gates.ts, change: create, why: 把三类真实检查接到登记表；文件由 J.28 创建，J.28 合入后开工前须改 touch 为 modify, symbols: [] }
+    - { path: bin/stagent.ts, change: modify, why: 为三类检查补齐 check 子命令分发（若 J.28 已留扩展点则只接实现）, symbols: [runCheckCommand] }
+    - { path: tests/unit/baseline-gates.test.ts, change: create, why: 为三类检查的退出码与 can_merge 派生补用例；J.28 合入后开工前须改 touch 为 modify, symbols: [] }
+    - { path: docs/specs/verification-strategy.md, change: modify, why: 回写三类检查的命令与覆盖范围, symbols: [] }
+    - { path: docs/specs/evidence-and-acceptance-criteria.md, change: modify, why: 回写证据与软层界限, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J29-P1, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "未施工" }
+    - { acceptance_id: J29-P2, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "未施工" }
+    - { acceptance_id: J29-P3, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "未施工" }
+    - { acceptance_id: J29-P4, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "未施工" }
+    - { acceptance_id: J29-P5, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "未施工" }
+governance:
+  spec_refs:
+    - docs/specs/verification-strategy.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+    - docs/specs/release-and-operations.md
+    - docs/adr/0005-deterministic-verification-gate.md
+    - docs/scheme.md
+  depends_on:
+    - { id: TASK-J.27, kind: hard }
+    - { id: TASK-J.28, kind: hard }
+  code_facts:
+    - { ref: "src/lib/evidence.schema.ts::deriveCanMerge", note: "合入门禁仍须经此函数派生" }
+    - { ref: "daemon/pipeline/mainline-regression.ts:1-20", note: "已有主路径/回归机制，关键路径检查应优先适配而非另起框架（具体导出符号施工时以文件为准）" }
+    - { ref: "docs/specs/release-and-operations.md:112-114", note: "发布失败自动回滚到上一个 LIVE 已有规格与 L.15 机制；本卡要把它变成可进入 can_merge 的退出码检查，而不是重写发布子系统" }
+    - { ref: "bin/stagent.ts::runCheckCommand", note: "现有 check 分发尚无安全/回滚/关键路径底线子命令（J.28 会先留扩展点）" }
+  non_goals:
+    - 不新造安全扫描器、第二套回滚子系统或新的主路径测试框架
+    - 不重做 J.28 的注入与 deriveCanMerge 接线，不改 sandbox / 网关写范围
+    - 不做第二块质量边界、判分表、card-copy-standard，不做密封前意图核对
+    - 不动三条铁律、q* 溯源、标注；ADR 只 SUPERSEDE 不删改
+    - 不宣称北极星或无人值守三连卡已交付；不加新文档层
+    - 不暗示条目级高亮已交付；不开工 J.22 / CI.2；不改 D.1e / S.3 / 已完工的 TASK-J.16
+  fail:
+    - 某类清单检查只写文档、没有真实子进程退出码
+    - LLM 审核或手写布尔把 can_merge 置真
+    - 本卡膨胀为新子系统却不拆卡（R-11）
+    - 在 J.27 / J.28 未完成时开工
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：三类检查是原方案点名的硬门禁内容；与接线拆开是为了避免单卡 L。
+* **取舍**：只做薄适配。清单若要求全新能力，先拆卡，不在本卡发明产品方向。

@@ -199,6 +199,8 @@
 > 175. **TASK-CI.3 完成回写（2026-11-10 · P-179）**：#201 squash `bdde65c` 合入；卡片验收 CI3-P1～P5 逐条见 active 归档注记；矩阵标 COMPLETED。挂账⑤ 销项、挂账② 终态见台账。**不新增 OP；不改产品代码；不宣称根因修复。**
 > 176. **立卡 TASK-CI.4 · 判红开关与离线桩回归用例（挂账⑦ · 2026-11-10 · P-180）**：CI.3 完成后判红开关与离线桩无持久回归用例；新增 `[NEW_TASK]` 卡 **`TASK-CI.4`**，单一新测试文件，不改哨兵行为。与 J.16 无依赖。**立卡 ≠ 开工 ≠ 销项**；不新增 OP；不改产品代码。
 > 177. **修订 TASK-J.16 + 立卡 TASK-J.21 / TASK-J.22（2026-11-11 · P-187）**：Tina 拍板挂账⑬ 走方案 A（J16-P7 只读投影）；挂账⑫ 立卡 `TASK-J.21`；方案 B 立卡 `TASK-J.22`（估算 L，须先拆卡）。卡状态均为 `NEW_TASK`；未新增 OP。
+> 191. **立卡 TASK-J.25～TASK-J.29（2026-11-14 · P-206）**：Tina t1250u「按这个立卡」。新增 `[NEW_TASK]` 卡 **`TASK-J.25`**（旅程+术语表，S）、**`TASK-J.26`**（结构分家，M）、**`TASK-J.27`**（底线清单纯 docs，S）、**`TASK-J.28`**（退出码接线，M）、**`TASK-J.29`**（三类检查适配，M）。不立第二块与密封前意图核对卡。不立 L 卡。**立卡 ≠ 授权 ≠ 开工**。J.22 不开工；CI.2 攒样本。仅文档立卡；不改产品代码。
+>
 > 190. **TASK-J.16 完工回写与归档（2026-11-14 · P-205）**：Tina t1243u 拍板就事论事收口。`TASK-J.16` 标 `[COMPLETED]`，卡片迁入 completed，挂账⑱ 追加销项。`estimate` 仍为 L，不事后改估算、不追溯拆卡；记一次性例外，R-11 对未开工卡继续有效。本条取代 P-204「因 estimate 为 L 仍不标完成」的暂扣。`delivered` 锚定 #244 squash `8e98538`。条目级高亮不在本卡（J.22 范畴）。J.22 不开工；CI.2 攒样本；文档计划暂缓。为让文档门禁在「L + COMPLETED + delivered」下通过，校验器按 R-11「L 卡不得开工」收窄：L 仍不得进入 READY / IN_PROGRESS，已写 delivered 的 COMPLETED 放行。仅 docs + 该最小校验器修正，不新增 OP，不改产品代码。
 >
 > 189. **TASK-J.16 J16-P7 官方中栏验收通过回写（2026-11-14 · P-204）**：[#244](https://github.com/he18718143986-design/IDE/pull/244) squash `8e98538` 合入后，Grok Bot 在 Tina 本机对 `main`@`8e985381d76e32184435a6161b85d9f382bb33a6` 做官方中栏走查 PASS（15:12 香港时间）。空台账中栏标「无呈现记录」、无假条目；有台账列出「首页显示逾期数」「报表可导出 CSV」。J16-P1～P7 验收已齐，但卡内 `estimate: L`，按 R-11 不得进入 COMPLETED，**仍不标完成、不迁档**。不销挂账⑱。不开工 J.22 / CI.2，文档计划暂缓。仅 docs，不新增 OP，不改产品代码。
@@ -252,6 +254,11 @@
 | **TASK-J.22** | 中栏方案来源统一为编译器台账 | 建议中枢 | **[NEW_TASK]**（立卡 P-187；未开工；估算 L，施工前拆卡） | 挂账⑬（方案 B） | • 替换启发式 rebuildSchemeFromCorpus<br>• 依赖 J.21 与 J.16 J16-P7 |
 | **TASK-J.23** | 质疑自查生产链路接线 | 建议中枢 | **[COMPLETED]**（#233 `ab40f3a` 接线合入；J23-P4 真实界面走查通过 · P-199） | 挂账⑱（J16-P5/P6 FAIL） | • 面板挂载 + DISPUTE 路由 + `turn_text_sha256` 落盘已落地<br>• Tina 真实界面走查覆盖 J23-P1～P4，白话文案合规通过<br>• 左栏原话缺口转由 TASK-J.16 根因修复跟进 |
 | **TASK-J.24** | 开工路径三缺口 | 建议中枢 | **[COMPLETED]**（立卡 P-195；修订 P-197；施工 P-198 · #235 `72b52ab`；真实开工路径待试玩验证） | 挂账⑲ | • 脏目录确认发送 `acknowledge_dirty`<br>• 空仓库可用 `main` 引用<br>• Worker base URL 跟随设置页供应商选择器 |
+| **TASK-J.25** | 新增用户旅程与术语表 | 文档 | **[NEW_TASK]**（立卡 P-206；未开工；估算 S） | 文档可读性（第一块） | • 新增 `docs/user-journey.md` / `docs/glossary.md`<br>• README 分层表登记<br>• 术语链接范围限于本卡 writable_paths |
+| **TASK-J.26** | 文档结构分家 | 文档 | **[NEW_TASK]**（立卡 P-206；未开工；估算 M） | 文档可读性（第一块） | • 七环进度迁索引<br>• scheme 只留 L0<br>• README 去空壳并消除硬编码计数 |
+| **TASK-J.27** | 固定底线清单写入规格 | 文档 / 门禁 | **[NEW_TASK]**（立卡 P-206；未开工；估算 S） | 质量安全网（第三块） | • 写入 verification-strategy 与验收规格<br>• 写明 LLM 审核软层局限 |
+| **TASK-J.28** | 底线硬门禁退出码接线 | 门禁 / 接线 | **[NEW_TASK]**（立卡 P-206；未开工；估算 M；硬依赖 J.27） | 质量安全网（第三块） | • 清单检查以子进程进入 can_merge<br>• 缺项 fail-closed<br>• 不实现三类检查体 |
+| **TASK-J.29** | 安全 / 回滚 / 关键路径检查接入 | 门禁 | **[NEW_TASK]**（立卡 P-206；未开工；估算 M；硬依赖 J.27 / J.28） | 质量安全网（第三块） | • 薄适配既有机制<br>• 要求新子系统则先拆卡 |
 | **TASK-S.6** | 非技术旅程串联（右侧分流 + 确认原型开工） | 建议中枢 / 编排粘合 | **[COMPLETED]**（2026-10-24 合入 main，merge `6415fbd`；功能 `bbab79e`；合后四件套 1155 passed / 6 skipped；**S.6b 已收口** merge `024d2b8` / `613ff51`，1165 passed / 6 skipped） | P4.5 / P5.7 串联（八步旅程最后一公里） | • 右侧唯一入口白话分流：质疑 → `POST /api/supervisor/dispute` + 白话卡；大事 → 草案；小事 → Fast Path（免强制 Demo）<br>• 吸收 C.2 残余：【确认原型并实施真实工程】真建全灰 TaskGraph 并进入审批/开工链（禁止只改 nonce）<br>• 聊完一段落后左侧需求说明可感知刷新；审批/开工后中栏图随真实 Evidence 点亮（复用既有 verify）<br>• **S.6b COMPLETED**：`REAL_PLAYTEST` 真预览 URL 挂中栏 iframe +「在浏览器打开」外链（4200–4210 stub/attach）<br>• 底座复用 S.4/C.7/S.5/C.2/S.2/W.5a，不重砌；对照 见 Git 历史（原 `docs/archive/non-technical-journey-acceptance.md`） |
 | **TASK-S.6b** | 真机试玩收口（S.6 降级项） | 建议中枢 / 编排粘合 | **[COMPLETED]**（merge `024d2b8`；功能 `613ff51`） | P4.5 / P5.7 串联 | 无独立详细卡；交付与验收见上方 S.6 行与修订流水 P-22 |
 | **TASK-W.1** | Coding Worker 适配器抽象与任务指令装配 | 编码内核 | **[COMPLETED]**（已合入 main，worker-adapter.interface / adapter-registry 在位） | P2 Worker 适配 | • 统一 `CodingWorkerAdapter` 接口，支持 Managed AI / CLI<br>• 补齐第 9 项 `known_limitations`<br>• 区分 `GATEWAY_ENFORCED` 与 `UNCONTROLLED_EXTERNAL`<br>• 合同上下文装配 + Worktree 隔离校验，专用用例 34 个 |
@@ -757,7 +764,7 @@ TASK-0.1 ──► TASK-0.2b ──► TASK-0.2c (Schema v1.3.0 & 自愈边) ─
 
 > **Sprint 0 / 2 / 3 / 4 实施基线核验**：
 > - **当前工程物理起点（权威 · 唯一）**：本地代码仓库 `main`@`442e5836fa9c48b8dd997c087bc28747b4f4fbbf`（[#245](https://github.com/he18718143986-design/IDE/pull/245) P-204 squash；其下 [#244](https://github.com/he18718143986-design/IDE/pull/244) 为 J16-P7 施工）。
-> - **当前首要任务（P-205）**：`TASK-J.16` 已 `[COMPLETED]`（P-205 就事论事收口；`estimate` 仍为 L，记一次性例外，不追溯拆卡）。J.22 不开工；CI.2 攒样本；文档计划暂缓。**`TASK-D.1e` 仍 `[DEFERRED → v0.2+]`**。不宣称端到端闭环；不销 OP-34；不激活 S.3。不新立产品首要任务。
+> - **当前首要任务（P-206）**：P-206 已立 `TASK-J.25`～`TASK-J.29`（文档可读性与固定底线清单硬门禁），均为 `[NEW_TASK]`，待 Tina 逐张授权，**不开工**。`TASK-J.16` 已 `[COMPLETED]`（P-205 就事论事收口；`estimate` 仍为 L，记一次性例外）。J.22 不开工；CI.2 攒样本。**不立**第二块（质量边界 / 判分表 / card-copy-standard）与密封前意图完整性核对卡。**`TASK-D.1e` 仍 `[DEFERRED → v0.2+]`**。不宣称端到端闭环；不销 OP-34；不激活 S.3。不把本批立卡当作已授权的产品首要施工任务。
 > - **前序（历史）**：`TASK-C.21` → **`[COMPLETED]`**（Tina t910u Supervisor SSOT v2.0.1 审查补丁）。C.20/C.19/C.18/C.17/C.16/H.1–H.8 均 COMPLETED。**不**改产品代码；不抢 D.1e；不扩 v0.2。
 > - **Sprint 2 已达成**：`TASK-P.1`、`TASK-C.5`、`TASK-W.3`、`TASK-W.4` 四张卡均已落地并通过各自专用用例；保护路径在任意模式被门卫拦截、撤销一键恢复、4 类绕过负例失败关闭均已成立。
 > - **Sprint 3 已达成**：`TASK-D.2` 主体已落地，无交集合同自动批准，交互收敛为 1 次合并按钮。
