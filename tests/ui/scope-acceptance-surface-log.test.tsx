@@ -225,7 +225,9 @@ describe("TASK-J.16 J16-P7 · 台账验收条目渲染与 acceptance 段上报",
       />,
     );
     expect(screen.getByTestId("scope-acceptance-criteria")).toBeTruthy();
-    expect(screen.queryByTestId("scope-acceptance-no-surface-record")).toBeNull();
+    expect(
+      screen.queryByTestId("scope-acceptance-no-surface-record"),
+    ).toBeNull();
     const rows = screen.getAllByTestId("scope-acceptance-criterion-row");
     expect(rows.map((r) => r.getAttribute("data-item-ref"))).toEqual([
       "ITEM-1",
@@ -266,7 +268,9 @@ describe("TASK-J.16 J16-P7 · 台账验收条目渲染与 acceptance 段上报",
         acceptanceItems={[]}
       />,
     );
-    expect(screen.queryByTestId("scope-acceptance-no-surface-record")).toBeNull();
+    expect(
+      screen.queryByTestId("scope-acceptance-no-surface-record"),
+    ).toBeNull();
     rerender(
       <ScopeAcceptanceBlock
         plan={makePlan()}
@@ -275,7 +279,9 @@ describe("TASK-J.16 J16-P7 · 台账验收条目渲染与 acceptance 段上报",
         acceptanceSettled={false}
       />,
     );
-    expect(screen.queryByTestId("scope-acceptance-no-surface-record")).toBeNull();
+    expect(
+      screen.queryByTestId("scope-acceptance-no-surface-record"),
+    ).toBeNull();
     expect(screen.queryByTestId("scope-acceptance-criteria")).toBeNull();
   });
 
@@ -290,9 +296,9 @@ describe("TASK-J.16 J16-P7 · 台账验收条目渲染与 acceptance 段上报",
         surface={{ confirmationId: "c-empty", onReport }}
       />,
     );
-    expect(screen.getByTestId("scope-acceptance-no-surface-record").textContent).toBe(
-      NO_ACCEPTANCE_SURFACE_RECORD_LABEL,
-    );
+    expect(
+      screen.getByTestId("scope-acceptance-no-surface-record").textContent,
+    ).toBe(NO_ACCEPTANCE_SURFACE_RECORD_LABEL);
     expect(NO_ACCEPTANCE_SURFACE_RECORD_LABEL).toBe("无呈现记录");
     expect(screen.queryByTestId("scope-acceptance-criteria")).toBeNull();
     expect(screen.queryByTestId("scope-acceptance-criterion-row")).toBeNull();
@@ -315,10 +321,14 @@ describe("TASK-J.16 J16-P7 · 台账验收条目渲染与 acceptance 段上报",
         acceptanceSettled
       />,
     );
-    expect(screen.getByTestId("scope-acceptance-criterion-row").getAttribute("data-item-ref")).toBe(
-      "ITEM-1",
-    );
-    expect(screen.queryByTestId("scope-acceptance-no-surface-record")).toBeNull();
+    expect(
+      screen
+        .getByTestId("scope-acceptance-criterion-row")
+        .getAttribute("data-item-ref"),
+    ).toBe("ITEM-1");
+    expect(
+      screen.queryByTestId("scope-acceptance-no-surface-record"),
+    ).toBeNull();
   });
 
   it("SchemeReviewPane 把 acceptanceSettled 传给中栏区块：空条目仅在取数完成后标「无呈现记录」", () => {
@@ -328,15 +338,25 @@ describe("TASK-J.16 J16-P7 · 台账验收条目渲染与 acceptance 段上报",
       "做一个工程进度管控台，按项目汇总进度与预算，超期要预警。只做进度，财务下一期",
     );
     const { rerender } = render(
-      <SchemeReviewPane scheme={scheme} acceptanceItems={[]} acceptanceSettled={false} />,
+      <SchemeReviewPane
+        scheme={scheme}
+        acceptanceItems={[]}
+        acceptanceSettled={false}
+      />,
     );
-    expect(screen.queryByTestId("scope-acceptance-no-surface-record")).toBeNull();
+    expect(
+      screen.queryByTestId("scope-acceptance-no-surface-record"),
+    ).toBeNull();
     rerender(
-      <SchemeReviewPane scheme={scheme} acceptanceItems={[]} acceptanceSettled />,
+      <SchemeReviewPane
+        scheme={scheme}
+        acceptanceItems={[]}
+        acceptanceSettled
+      />,
     );
-    expect(screen.getByTestId("scope-acceptance-no-surface-record").textContent).toBe(
-      "无呈现记录",
-    );
+    expect(
+      screen.getByTestId("scope-acceptance-no-surface-record").textContent,
+    ).toBe("无呈现记录");
     expect(screen.queryByTestId("scope-acceptance-criteria")).toBeNull();
   });
 });
