@@ -174,7 +174,7 @@
 | `TASK-D.2b` | `COMPLETED` | 未跟踪文件合并门禁与 Contract v1.3 零静默迁移接入 | [打开](./development-tasks-completed.md#task-d.2b) |
 | `TASK-E.1` | `COMPLETED` | 双 Agent 协同与全流程 E2E 自动化测试 | [打开](./development-tasks-completed.md#task-e.1) |
 | `TASK-E.2` | `COMPLETED` | Stagent 仓库自举 (Dogfooding) 与发版交付 | [打开](./development-tasks-completed.md#task-e.2) |
-| `TASK-J.16` | `NEW_TASK` | 试玩幕 · 质疑自查续作：surface_log → K-14 归因账本 → K-16 trigger 闭集（立卡 P-176；P-202 J16-P5 五条 PASS；P-203 J16-P6 无封存段分支 PASS；P-204 #244 `8e98538` 官方中栏走查 J16-P7 PASS；因 estimate 为 L，按 R-11 仍不标 COMPLETED） | [正文](./development-tasks-active.md#task-j.16) |
+| `TASK-J.16` | `COMPLETED` | 试玩幕 · 质疑自查续作：surface_log → K-14 归因账本 → K-16 trigger 闭集（立卡 P-176；P-202 J16-P5 五条 PASS；P-203 J16-P6 无封存段分支 PASS；P-204 #244 `8e98538` 官方中栏走查 J16-P7 PASS；P-205 就事论事收口标完成，estimate 仍为 L） | [正文](./development-tasks-completed.md#task-j.16) |
 | `TASK-J.21` | `COMPLETED` | intent-compiler 重启后状态恢复（挂账⑫；立卡 P-187；施工 P-194 · #229 `21b8b35`） | [正文](./development-tasks-completed.md#task-j21) |
 | `TASK-J.22` | `NEW_TASK` | 中栏方案来源统一为编译器台账（挂账⑬ 方案 B；立卡 P-187；估算 L，施工前须拆卡） | [正文](./development-tasks-active.md) |
 | `TASK-J.23` | `COMPLETED` | 质疑自查生产链路接线：面板挂载 + DISPUTE 路由 + turn_text_sha256 落盘（立卡 P-195；修订 P-196；施工 P-198 · #233 `ab40f3a`；J23-P4 真实界面走查通过 · P-199） | [正文](./development-tasks-completed.md#task-j23) |

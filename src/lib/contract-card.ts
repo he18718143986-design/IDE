@@ -41,7 +41,7 @@ export const CARD_STATUSES = [
 ] as const;
 export type CardStatus = (typeof CARD_STATUSES)[number];
 
-/** 进入这些状态后，DoR 必须成立（依赖已完成、无未决问题、不是 L）。 */
+/** 进入这些状态后，DoR 必须成立（依赖已完成、无未决问题）。估算 L 不得进入 READY / IN_PROGRESS（R-11：L 卡不得开工）；已写 delivered 的 COMPLETED 允许收口。 */
 export const COMMITTED_STATUSES: readonly CardStatus[] = [
   "READY",
   "IN_PROGRESS",
@@ -262,11 +262,15 @@ export const contractCardSchema = z
       });
     }
     if (COMMITTED_STATUSES.includes(card.status)) {
-      if (card.governance.estimate === "L") {
+      if (
+        card.governance.estimate === "L" &&
+        (card.status === "READY" || card.status === "IN_PROGRESS")
+      ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["governance", "estimate"],
-          message: "估算 L 的卡不得进入 READY 及之后的状态，必须拆分（R-11）",
+          message:
+            "估算 L 的卡不得进入 READY 或 IN_PROGRESS，必须拆分后再开工（R-11）",
         });
       }
       if (card.governance.open_questions.length > 0) {

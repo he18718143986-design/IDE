@@ -213,6 +213,44 @@ describe("卡的就绪字段与 Schema", () => {
       expect.stringContaining("估算 L"),
     ]);
   });
+
+  it("IN_PROGRESS 估算为 L 被 Schema 拒绝", () => {
+    statusTables([["TASK-X.1", "IN_PROGRESS"]]);
+    write(
+      "docs/specs/cards.md",
+      cardDoc(
+        baseCard({ status: "IN_PROGRESS", governance: { estimate: "L" } }),
+      ),
+    );
+    expect(messages(run(), "card-schema")).toEqual([
+      expect.stringContaining("估算 L"),
+    ]);
+  });
+
+  it("COMPLETED 估算为 L 且已写 delivered 被 Schema 接受", () => {
+    write(
+      "docs/specs/cards.md",
+      cardDoc(baseCard({ status: "COMPLETED", governance: { estimate: "L" } })),
+    );
+    expect(messages(run(), "card-schema")).toEqual([]);
+  });
+
+  it("COMPLETED 估算为 L 但缺少 delivered 仍被拒绝", () => {
+    write(
+      "docs/specs/cards.md",
+      cardDoc(
+        baseCard({
+          status: "COMPLETED",
+          governance: { estimate: "L", delivered: undefined },
+        }),
+      ),
+    );
+    expect(messages(run(), "card-dor")).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("COMPLETED 必须写 governance.delivered"),
+      ]),
+    );
+  });
 });
 
 describe("卡对照代码", () => {
