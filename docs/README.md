@@ -1,6 +1,10 @@
 # Stagent 文档地图
 
-> **更新**：2026-11-09 文档治理：§3 迁至 [`specs/README.md`](./specs/README.md)，§8 迁至 [`CONTRIBUTING.md`](./CONTRIBUTING.md)，§9 迁至 [`ledger/removed-and-moved.md`](./ledger/removed-and-moved.md)；命名与死引用由 `check:docs` 校验。
+Stagent 是一个本地优先的软件开发工作台：用户用日常语言提出需求，系统把需求整理成方案、拆成可执行的任务卡，再由 Agent 在隔离环境里施工，并用可检查的证据判断能不能合入。文档按这条链分层，从用户原话一直追到规格、任务卡和证据。
+
+本仓库的文档既是 Stagent 自己的施工依据，也是「Supervisor 读完模糊意图后应当交出什么」的样板。下面的地图说明先读哪一份、哪一层说了算。
+
+> **更新**：2026-11-14（TASK-J.26）：删去原 §3 / §8 / §9「已迁走」空壳，文首补项目简介，阅读顺序与决策节去掉硬编码篇数；§3 此前已迁至 [`specs/README.md`](./specs/README.md)，怎么改文档见 [`CONTRIBUTING.md`](./CONTRIBUTING.md)，已删除或已移动的路径见 [`ledger/removed-and-moved.md`](./ledger/removed-and-moved.md)。命名、死引用与硬编码计数由 `check:docs` 校验。
 > **上次内容更新**：2026-10-30（Asia/Hong_Kong）· 第三轮：补全交付全链路（项目分解、技术方案、测试义务、发布运维、卡就绪标准）。第二轮（2026-10-29）按 Supervisor 产物的形态重排。
 > **一句话**：这套文档就是 Stagent 的 Supervisor 读完用户模糊意图后**应该交出的东西**。从用户原话出发，逐层推到决策、规格、给 Worker 的[任务卡](./glossary.md#任务卡)、证据和台账。每层都能往上追到原话，往下追到代码。
 > **命名约定**：文件名英文 kebab-case（小写 ASCII、数字与连字符；`v0.2` 这类版本号可用 `.`）；`reports/` 下的时点快照允许 `-YYYY-MM-DD` 日期后缀；`README.md`、`CONTRIBUTING.md` 为惯例大写名；版本流转交给 Git Tag 与 commit 历史；规格文件头标注定稿基线。
@@ -30,11 +34,11 @@
 | **L4 证据** | 做到了没有，凭什么说做到了 | [`EvidenceBundle`](./glossary.md#evidencebundle) | [`reports/`](./reports/README.md)、[`specs/evidence-and-acceptance-criteria.md`](./specs/evidence-and-acceptance-criteria.md)（现行规格） | 只追加；证据绑定 head SHA |
 | **L5 台账** | 还欠什么、谁来定 | `conflicts` / `open_questions` / [挂账](./glossary.md#挂账) | [`ledger/`](./ledger/README.md) | 只追加；销项要注明 PR |
 | **L6 系统知识** | 系统由哪些模块组成、每次改动动了谁 | `KnowledgeDelta` | [`system/`](./system/overview.md)（ADR-0016） | 随合同同步；`changelog.md` 由本次合同追加 |
-| 旁支 | 未批准的远期提案 | — | `rfc/`（见 §6） | 立项后才进 L1 / L2 |
-| 旁支 | 空白格式 | — | `templates/`（见 §7） | — |
+| 旁支 | 未批准的远期提案 | — | `rfc/`（见 §5） | 立项后才进 L1 / L2 |
+| 旁支 | 空白格式 | — | `templates/`（见 §6） | — |
 
 **往上追**：任何规格条款或任务卡，都应能回答「对应 `scheme.md` 哪一条目标或模块」。答不出来的，要么补依据，要么是范围蔓延。
-**往下追**：`scheme.md` §11 落差登记把每条目标映射到任务卡；任务卡再绑定测试与证据。
+**往下追**：原 `scheme.md` §11 落差登记（已迁至 [`ledger/scheme-settled-decisions.md`](./ledger/scheme-settled-decisions.md)）把每条目标映射到任务卡；任务卡再绑定测试与证据。
 
 ---
 
@@ -48,29 +52,23 @@
 4. [`specs/delivery-lifecycle.md`](./specs/delivery-lifecycle.md) — **总装图**：从一句话到上线的七环、用户触点、追踪链、里程碑 M1～M5
 5. [`specs/supervisor.md`](./specs/supervisor.md) 第三部分 §13 — 一个页面、一条旅程、五个决定
 6. [`specs/runtime-contract-and-safety.md`](./specs/runtime-contract-and-safety.md) — **写代码前必读**的运行时硬契约
-7. [`adr/README.md`](./adr/README.md) — 17 条已拍板决策的索引
+7. [`adr/README.md`](./adr/README.md) — 已拍板决策的索引（篇数以该索引为准，此处不维护数字）
 8. [`specs/development-tasks.md`](./specs/development-tasks.md) §3.4c（J 系列，含 ADR-0014 修订块）与 §3.4d（L 系列）— 当前要做的卡
 
 **要施工的 Worker**：只读第 4、6、8 项加卡内引用的规格节；开工前用 [`specs/task-card-standard.md`](./specs/task-card-standard.md) 核对卡是否就绪，未就绪不开工；有疑问先查 [`ledger/`](./ledger/README.md) 是否已挂账，不要自行补全。
 
-**要审阅的用户**：先看 [`user-journey.md`](./user-journey.md) 和 [`glossary.md`](./glossary.md)，再看 [`scheme.md`](./scheme.md) §6～§8（决定、分歧、待澄清）。其余是 Agent 的活。
+**要审阅的用户**：先看 [`user-journey.md`](./user-journey.md) 和 [`glossary.md`](./glossary.md)，再看 [`ledger/scheme-settled-decisions.md`](./ledger/scheme-settled-decisions.md)（原 `scheme.md` §6～§8：决定、分歧、待澄清）。其余是 Agent 的活。
 
 ---
 
-## 3. L2 规格（`specs/`）· 施工权威
-
-> 权威分层表与三个 Agent 在规格里的位置已迁至 [`specs/README.md`](./specs/README.md)。`specs/` 仍是施工权威。
-
----
-
-## 4. L1 决策（`adr/`）· 19 篇
+## 3. L1 决策（`adr/`）
 
 索引见 [`adr/README.md`](./adr/README.md)。0001～0009 抽自架构规范 §8；0010～0013 为 2026-10-27 补录；0014 为三 Agent 拓扑（用户裁决）；0015～0019 **均已 ACCEPTED**（0015～0017：用户原话 q22；0018：合入 `main` @ `931b188` 并经完整诊断加固；0019：随 PR #1 合入并经完整诊断增等待态 UX）。状态以各 ADR 文件头 `> **状态**:` 为准，本段与 [`adr/README.md`](./adr/README.md) 须同步。
-方案里 `status: pending` 的决定（[`scheme.md`](./scheme.md) §6）经用户拍板后，在此新增 ADR（下一个未使用编号）。
+方案里 `status: pending` 的决定（见 [`ledger/scheme-settled-decisions.md`](./ledger/scheme-settled-decisions.md)，原 `scheme.md` §6）经用户拍板后，在此新增 ADR（下一个未使用编号，以 [`adr/README.md`](./adr/README.md) 为准）。
 
 ---
 
-## 5. L4 证据与历史签收（`reports/`）
+## 4. L4 证据与历史签收（`reports/`）
 
 > **`reports/` 不作现行施工依据**——只保留签收凭据与时点审计快照；施工认 `specs/` + `adr/`。完整分组索引见 [`reports/README.md`](./reports/README.md)。
 
@@ -85,7 +83,7 @@
 
 ---
 
-## 6. 提案（`rfc/`）· 未批准
+## 5. 提案（`rfc/`）· 未批准
 
 | 文件 | 主题 | 状态 |
 | :--- | :--- | :--- |
@@ -94,20 +92,10 @@
 
 ---
 
-## 7. 模板（`templates/`）
+## 6. 模板（`templates/`）
 
 空白的传统五件套（填写说明、PRD、系统设计、验收矩阵、追溯矩阵），加 [`05-task-card.md`](./templates/05-task-card.md)（任务卡模板，**施工时要用**）。它们与 Supervisor 产物的字段对应关系见 supervisor §14.11 小节 3；**本仓自己的「填好的样板」是 [`scheme.md`](./scheme.md)**，不是这里的空表。写代码、写卡、写验收都不要引用本目录。
 
 ---
-
-## 8. 怎么改文档
-
-> 已迁至 [`CONTRIBUTING.md`](./CONTRIBUTING.md)，修改规则不变。
-
----
-
-## 9. 已删除或已移动（勿再引用旧路径）
-
-> 已迁至 [`ledger/removed-and-moved.md`](./ledger/removed-and-moved.md)。查历史用 `git log --diff-filter=D -- docs/`。
 
 **反虚构提醒**：仓库中不存在《产品体验与技术底座设计规范 v1.1》，任何文档或代码注释都不得引用它。

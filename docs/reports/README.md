@@ -18,6 +18,7 @@
 
 | 文件 | 定位 | 说明 |
 | :--- | :--- | :--- |
+| [`scheme-physical-pointers.md`](./scheme-physical-pointers.md) | **scheme.md 物理指针快照** | 2026-11-14 自 [`../scheme.md`](../scheme.md) 迁入的原 §12 / §13 与历次「现行物理指针」；时点快照，不代表今日 tip，不作施工依据。 |
 | [`dor-readiness-audit-2026-10-31.md`](./dor-readiness-audit-2026-10-31.md) | **DoR 全量审计** | 基线 `main` @ `a2fa7df`（2026-10-31）。**快照**：矩阵/卡状态此后已有多轮回写（含 L.8～L.10），不得当作今日开工清单。 |
 | [`delivery-path-audit.md`](./delivery-path-audit.md) | **交付全链路审计** | 2026-10-30 七环核查与补全清单；后续以任务卡与 tip 为准。 |
 | [`full-diagnosis-revision-notes-2026-10-31.md`](./full-diagnosis-revision-notes-2026-10-31.md) | **完整诊断十四定型** | 产品+交付诊断落盘（确认开工/D9/Canvas/JourneyStage/等待态等）；仅文档；多数结论已吸入 `supervisor` / ADR。 |

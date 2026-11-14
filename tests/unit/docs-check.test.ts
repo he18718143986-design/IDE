@@ -11,6 +11,7 @@ import {
   SCHEME_FILE,
   checkLinks,
   checkScheme,
+  checkHardcodedCounts,
   declaresSymbol,
   findTestCase,
   runAllChecks,
@@ -507,5 +508,43 @@ describe("命名与死引用（文档治理）", () => {
     const found = run().filter((f) => f.rule === "archive-ref");
     expect(found.map((f) => f.file)).toEqual(["docs/b.md"]);
     expect(found[0]!.severity).toBe("warn");
+  });
+});
+
+describe("硬编码计数（TASK-J.26）", () => {
+  it("README 硬编码篇数或已拍板条数报 error；adr 索引与 changelog 豁免", () => {
+    write(
+      "docs/README.md",
+      [
+        "## 3. L1 决策（`adr/`）· 19 篇",
+        "7. [adr](./adr/README.md) — 17 条已拍板决策的索引",
+      ].join("\n"),
+    );
+    write("docs/adr/README.md", "# ADR 索引 · 19 篇\n");
+    write(
+      "docs/specs/development-tasks-changelog.md",
+      "- 历史上写过 17 条已拍板决策\n",
+    );
+    const hits = checkHardcodedCounts(new Repo(root), [
+      "docs/README.md",
+      "docs/adr/README.md",
+      "docs/specs/development-tasks-changelog.md",
+    ]);
+    expect(
+      hits.map((f) => `${f.severity}:${f.file}:${f.line}`),
+    ).toEqual([
+      "error:docs/README.md:1",
+      "error:docs/README.md:2",
+    ]);
+  });
+
+  it("去掉硬编码计数后零发现", () => {
+    write(
+      "docs/README.md",
+      "7. [adr](./adr/README.md) — 已拍板决策的索引\n",
+    );
+    expect(
+      checkHardcodedCounts(new Repo(root), ["docs/README.md"]),
+    ).toEqual([]);
   });
 });

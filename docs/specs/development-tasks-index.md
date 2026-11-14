@@ -184,3 +184,24 @@
 | `TASK-J.27` | `COMPLETED` | 固定底线清单写入验证与验收规格，并写明 LLM 审核软层局限（立卡 P-206；施工 #249 `a96623c`；完工回写 P-207；估算 S） | [正文](./development-tasks-completed.md#task-j.27) |
 | `TASK-J.28` | `NEW_TASK` | 固定底线硬门禁接线：清单检查以子进程退出码进入 can_merge（立卡 P-206；估算 M；未开工；硬依赖 J.27） | [正文](./development-tasks-active.md#task-j.28) |
 | `TASK-J.29` | `NEW_TASK` | 把安全、回滚、关键路径检查接到固定底线硬门禁（立卡 P-206；估算 M；未开工；硬依赖 J.27 / J.28） | [正文](./development-tasks-active.md#task-j.29) |
+
+---
+
+## 七环进度（自 `delivery-lifecycle.md` 迁入）
+
+> **迁入**：2026-11-14（TASK-J.26）。下文是原七环表「现状 → 卡」列与文后「横切」进度的迁入稿。权威状态仍以卡头 / 本索引状态列 / §1.1 矩阵为准；本表只保留进度叙述，不另写一套状态。
+
+| 环 | 进度（迁自七环表「现状 → 卡」列） |
+| :--- | :--- |
+| **S1 需求摄取** | 只读已实现；纯净化 → **L.1** |
+| **S2 方案编译** | **J.9 COMPLETED**（#12）；**J.10 COMPLETED**（#17）；**L.6 COMPLETED**（#21 / `93589bf`）；**L.8 COMPLETED**（#33 / `fb27504`）；**L.9 COMPLETED**（#35 / `e1cf1bb`）；**L.10 COMPLETED**（#38 / `e4351b0`）；**L.11 COMPLETED**（#43 / `78ec236`）；**L.12 COMPLETED**（#47 / `39f426a`）；**L.13 COMPLETED**（#51 / `51ea872`）；L 系下一张 → **L.15** |
+| **S2→Seal 意图[密封](../glossary.md#密封)** | **J.2～J.5 COMPLETED**（#4～#7）；编译生成端 **J.10 COMPLETED**（#17）；Seal 消费链齐 |
+| **S3 项目架构基线** | 待施工；先于 L.7/L.8 |
+| **S3 项目分解** | **L.7 COMPLETED**（#23 / `607d742`：类型/校验/落盘）；**L.8 COMPLETED**（#33 / `fb27504`：PlanPatch/分解器/API）；**L.9 COMPLETED**（#35 / `e1cf1bb`：nextStub/桩视图/互斥/回填）；**L.10 COMPLETED**（#38 / `e4351b0`：同页嵌地图 + GET plan 权威下一份） |
+| **S3→合同** | **J.2～J.6 COMPLETED**（#4～#7、#11）；**J.10 COMPLETED**（#17）；**L.7 COMPLETED**（#23）；**L.8 COMPLETED**（#33 / `fb27504`）；**L.9 COMPLETED**（#35 / `e1cf1bb`：合同序列/下一份交接）；**L.10 COMPLETED**（#38 / `e4351b0`：画布同页嵌入口）；**L.11 COMPLETED**（#43 / `78ec236`）；**L.12 COMPLETED**（#47 / `39f426a`：知识库门禁）；**L.13 COMPLETED**（#51 / `51ea872`：Trailer/反查）；发布 **L.15 COMPLETED**（#52/`9829385`）；回流 **L.16 COMPLETED**（#62/`e4dfe1c`） |
+| **S4 技术方案** | **L.11 COMPLETED**（#43 / `78ec236`）；**L.12 COMPLETED**（#47 / `39f426a`）；**J.19 COMPLETED**（#55 / `4bae423`：DN-2 HTTP/画布入口；DLV-6 RESOLVED）；**L.18 COMPLETED**（#54 / `c8e6a81`：系统地图 + impactClosure；DLV-5 RESOLVED） |
+| **S5 施工** | 单合同已实现；验证命令进指令 → **L.2**；墓地：**J.18a～J.18d COMPLETED**（#24/#22/#26/#27 / tip `a2fa7df`；母卡 J.18 仍 `[SPLIT]`） |
+| **S6 验证与验收** | 测试义务 **L.3 COMPLETED**（#15）；两段式 **L.4 COMPLETED**（#18）；真实预览 **L.5 COMPLETED**（#14）；M2 黄金切片 **L.6 COMPLETED**（#21 / `93589bf`）；知识库检查 **L.12 COMPLETED**（#47 / `39f426a`）；Trailer/反查 **L.13 COMPLETED**（#51 / `51ea872`）；发布 **L.15 COMPLETED**（#52/`9829385`）；回流 **L.16 COMPLETED**（#62/`e4dfe1c`） |
+| **S7 发布与运维** | 保险库 **L.14 COMPLETED**（#31 / `ae57543`）；**发布生命周期 L.15 COMPLETED**（#52 / `9829385`）；**线上回流 L.16 COMPLETED**（#62 / `e4dfe1c`；挂账见 completed） |
+
+**横切**（同日迁入）：追踪链 **L.13 COMPLETED**（#51 / `51ea872`）；发布 **L.15 COMPLETED**（#52 / `9829385`）；回流 **L.16 COMPLETED**（#62 / `e4dfe1c`）；北极星外网摄取与试玩 **L.17a COMPLETED**（#70/`8516c3d`）、**L.17b COMPLETED**（#72/`d26def6`）——**M5 北极星主序全部落完**（oq-2 dec-12、oq-3 dec-13 均已裁决；L.17b 未宣称端到端 UI 闭环，[挂账](../glossary.md#挂账)见 completed §3.4f；**历史 P-132** 曾立 `TASK-L.17c` `[NEW_TASK]` 未开工；**P-133** `TASK-L.17c` → `[COMPLETED]`（#104/`06661be`；UI 已挂）；**P-150** `TASK-L.17d` → `[COMPLETED]`（#145/`e2b8dd3`；挂账①销项）；**P-151** `TASK-L.17e` → `[COMPLETED]`（#147/`aeedecd`；挂账②销项）；**P-152** `TASK-L.17f` → `[COMPLETED]`（#149/`86da495`；挂账③销项；L.17c 三项挂账均已销，见 completed §3.4p / §3.4u / §3.4v / §3.4w；**仍不宣称闭环**））；**编码内核台账债受控派工 W.6 COMPLETED**（#74/`b5d8c53`，`AdapterRegistry` 挂派工工厂、缺注册/非受控显式失败，见 completed §3.4g）——主序收官后首张债卡销项，不改鉴权 / Demo Origin / Gateway 写范围。
