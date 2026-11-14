@@ -2,7 +2,7 @@
 
 > **更新**：2026-11-09 文档治理：§3 迁至 [`specs/README.md`](./specs/README.md)，§8 迁至 [`CONTRIBUTING.md`](./CONTRIBUTING.md)，§9 迁至 [`ledger/removed-and-moved.md`](./ledger/removed-and-moved.md)；命名与死引用由 `check:docs` 校验。
 > **上次内容更新**：2026-10-30（Asia/Hong_Kong）· 第三轮：补全交付全链路（项目分解、技术方案、测试义务、发布运维、卡就绪标准）。第二轮（2026-10-29）按 Supervisor 产物的形态重排。
-> **一句话**：这套文档就是 Stagent 的 Supervisor 读完用户模糊意图后**应该交出的东西**。从用户原话出发，逐层推到决策、规格、给 Worker 的任务卡、证据和台账。每层都能往上追到原话，往下追到代码。
+> **一句话**：这套文档就是 Stagent 的 Supervisor 读完用户模糊意图后**应该交出的东西**。从用户原话出发，逐层推到决策、规格、给 Worker 的[任务卡](./glossary.md#任务卡)、证据和台账。每层都能往上追到原话，往下追到代码。
 > **命名约定**：文件名英文 kebab-case（小写 ASCII、数字与连字符；`v0.2` 这类版本号可用 `.`）；`reports/` 下的时点快照允许 `-YYYY-MM-DD` 日期后缀；`README.md`、`CONTRIBUTING.md` 为惯例大写名；版本流转交给 Git Tag 与 commit 历史；规格文件头标注定稿基线。
 
 ---
@@ -10,7 +10,7 @@
 ## 0. 三条铁律
 
 1. **意图看 [`scheme.md`](./scheme.md)，施工看 `specs/` + 任务卡。** 方案说「要什么」；只有 `specs/` 四份现行规范与任务卡能当写代码的依据。
-2. **用户说过的才算数。** 任何文档里，Agent 的推断都要标成推断；分歧摆出选项，不替用户选；被否决的方案进墓地，不得悄悄复活。
+2. **用户说过的才算数。** 任何文档里，Agent 的推断都要标成推断；分歧摆出选项，不替用户选；被否决的方案进[墓地](./glossary.md#墓地)，不得悄悄复活。
 3. **台账、提案、模板都不是权威。** `ledger/` 是欠账，`rfc/` 是未批准提案，`templates/` 是空白格式。三者与 `specs/`、`adr/` 冲突时，一律以后者为准。
 
 ---
@@ -22,11 +22,13 @@
 | 层 | 回答什么 | Supervisor 产物 | 本仓落点 | 谁能改 |
 | :--- | :--- | :--- | :--- | :--- |
 | **L0 意图** | 用户要什么、为什么；哪些还没定 | 原话摘录 + `SchemeDraftV2` | [`scheme.md`](./scheme.md) | 原话只能追加；`ai_inferred` 条目经用户确认才升格 |
+| 用户旅程 | 非技术用户会看到什么、要做什么、不必做什么 | — | [`user-journey.md`](./user-journey.md) | 走任务卡修订；不改三条铁律；不宣称未交付能力已交付 |
+| 术语表 | 一句话白话定义，并链到现行规格或 ADR | — | [`glossary.md`](./glossary.md) | 定义必须带权威出处链接，不另造定义层 |
 | **L1 决策** | 已拍板、难逆转的技术选择 | `decisions[]`（已确认） | [`adr/`](./adr/README.md) | 只能 SUPERSEDE，不能删改原文 |
 | **L2 规格** | 系统必须怎样表现（契约） | 冻结快照 + `ScopePlan` | `specs/`（见 [`specs/README.md`](./specs/README.md)） | 走规格修订任务卡 |
-| **L3 任务卡** | 交给 Worker 的机器指令 | 合同 + 任务图节点 | [`specs/development-tasks.md`](./specs/development-tasks.md)（就绪标准 [`specs/task-card-standard.md`](./specs/task-card-standard.md)） | 按卡施工；开工前过就绪标准；按 supervisor §10 判定口径回写状态 |
-| **L4 证据** | 做到了没有，凭什么说做到了 | `EvidenceBundle` | [`reports/`](./reports/README.md)、[`specs/evidence-and-acceptance-criteria.md`](./specs/evidence-and-acceptance-criteria.md)（现行规格） | 只追加；证据绑定 head SHA |
-| **L5 台账** | 还欠什么、谁来定 | `conflicts` / `open_questions` / 挂账 | [`ledger/`](./ledger/README.md) | 只追加；销项要注明 PR |
+| **L3 任务卡** | 交给 Worker 的机器指令 | [合同](./glossary.md#合同) + 任务图节点 | [`specs/development-tasks.md`](./specs/development-tasks.md)（就绪标准 [`specs/task-card-standard.md`](./specs/task-card-standard.md)） | 按卡施工；开工前过就绪标准；按 supervisor §10 判定口径回写状态 |
+| **L4 证据** | 做到了没有，凭什么说做到了 | [`EvidenceBundle`](./glossary.md#evidencebundle) | [`reports/`](./reports/README.md)、[`specs/evidence-and-acceptance-criteria.md`](./specs/evidence-and-acceptance-criteria.md)（现行规格） | 只追加；证据绑定 head SHA |
+| **L5 台账** | 还欠什么、谁来定 | `conflicts` / `open_questions` / [挂账](./glossary.md#挂账) | [`ledger/`](./ledger/README.md) | 只追加；销项要注明 PR |
 | **L6 系统知识** | 系统由哪些模块组成、每次改动动了谁 | `KnowledgeDelta` | [`system/`](./system/overview.md)（ADR-0016） | 随合同同步；`changelog.md` 由本次合同追加 |
 | 旁支 | 未批准的远期提案 | — | `rfc/`（见 §6） | 立项后才进 L1 / L2 |
 | 旁支 | 空白格式 | — | `templates/`（见 §7） | — |
@@ -40,16 +42,18 @@
 
 **第一次来（人或新会话）**：
 
-1. [`scheme.md`](./scheme.md) — 用户原话、三 Agent 设想、目标能力、待你拍板的分歧（约 15 分钟）
-2. [`specs/delivery-lifecycle.md`](./specs/delivery-lifecycle.md) — **总装图**：从一句话到上线的七环、用户触点、追踪链、里程碑 M1～M5
-3. [`specs/supervisor.md`](./specs/supervisor.md) 第三部分 §13 — 一个页面、一条旅程、五个决定
-4. [`specs/runtime-contract-and-safety.md`](./specs/runtime-contract-and-safety.md) — **写代码前必读**的运行时硬契约
-5. [`adr/README.md`](./adr/README.md) — 17 条已拍板决策的索引
-6. [`specs/development-tasks.md`](./specs/development-tasks.md) §3.4c（J 系列，含 ADR-0014 修订块）与 §3.4d（L 系列）— 当前要做的卡
+1. [`user-journey.md`](./user-journey.md) — 非技术用户会看到什么、要做什么、不必做什么（按七环）
+2. [`glossary.md`](./glossary.md) — 术语一句话白话定义与权威出处
+3. [`scheme.md`](./scheme.md) — 用户原话、三 Agent 设想、目标能力、待你拍板的分歧（约 15 分钟）
+4. [`specs/delivery-lifecycle.md`](./specs/delivery-lifecycle.md) — **总装图**：从一句话到上线的七环、用户触点、追踪链、里程碑 M1～M5
+5. [`specs/supervisor.md`](./specs/supervisor.md) 第三部分 §13 — 一个页面、一条旅程、五个决定
+6. [`specs/runtime-contract-and-safety.md`](./specs/runtime-contract-and-safety.md) — **写代码前必读**的运行时硬契约
+7. [`adr/README.md`](./adr/README.md) — 17 条已拍板决策的索引
+8. [`specs/development-tasks.md`](./specs/development-tasks.md) §3.4c（J 系列，含 ADR-0014 修订块）与 §3.4d（L 系列）— 当前要做的卡
 
-**要施工的 Worker**：只读第 2、4、6 项加卡内引用的规格节；开工前用 [`specs/task-card-standard.md`](./specs/task-card-standard.md) 核对卡是否就绪，未就绪不开工；有疑问先查 [`ledger/`](./ledger/README.md) 是否已挂账，不要自行补全。
+**要施工的 Worker**：只读第 4、6、8 项加卡内引用的规格节；开工前用 [`specs/task-card-standard.md`](./specs/task-card-standard.md) 核对卡是否就绪，未就绪不开工；有疑问先查 [`ledger/`](./ledger/README.md) 是否已挂账，不要自行补全。
 
-**要审阅的用户**：只看 [`scheme.md`](./scheme.md) §6～§8（决定、分歧、待澄清）。其余是 Agent 的活。
+**要审阅的用户**：先看 [`user-journey.md`](./user-journey.md) 和 [`glossary.md`](./glossary.md)，再看 [`scheme.md`](./scheme.md) §6～§8（决定、分歧、待澄清）。其余是 Agent 的活。
 
 ---
 
