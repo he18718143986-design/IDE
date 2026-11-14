@@ -686,18 +686,28 @@ function Console() {
   const [schemeAcceptanceItems, setSchemeAcceptanceItems] = useState<
     SchemeAcceptanceItem[]
   >([]);
+  const [schemeAcceptanceSettled, setSchemeAcceptanceSettled] = useState(false);
   useEffect(() => {
     if (!conn || schemeRevisionForSurface === undefined) {
       setSchemeAcceptanceItems([]);
+      setSchemeAcceptanceSettled(false);
       return;
     }
     let cancelled = false;
+    setSchemeAcceptanceItems([]);
+    setSchemeAcceptanceSettled(false);
     fetchSchemeAcceptance(conn)
       .then((projection) => {
-        if (!cancelled) setSchemeAcceptanceItems(projection.items);
+        if (!cancelled) {
+          setSchemeAcceptanceItems(projection.items);
+          setSchemeAcceptanceSettled(true);
+        }
       })
       .catch(() => {
-        if (!cancelled) setSchemeAcceptanceItems([]);
+        if (!cancelled) {
+          setSchemeAcceptanceItems([]);
+          setSchemeAcceptanceSettled(true);
+        }
       });
     return () => {
       cancelled = true;
@@ -3857,6 +3867,7 @@ function Console() {
                       void handleDeclineSensitive();
                     }}
                     acceptanceItems={schemeAcceptanceItems}
+                    acceptanceSettled={schemeAcceptanceSettled}
                     surfaceConfirmationId={schemeSurfaceConfirmId}
                     onSurfacePresented={handleSchemeSurfacePresented}
                     onConfirmDecision={handleSchemeConfirmDecision}

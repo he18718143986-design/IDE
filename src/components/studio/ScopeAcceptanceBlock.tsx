@@ -19,6 +19,9 @@ export type ScopeAcceptanceMode = "pre_start" | "frozen" | "acceptance";
 export const SCOPE_ACCEPTANCE_PLAIN_TEXT_VERSION =
   "scope-acceptance-v1" as const;
 
+/** J16-P7：台账为空或读取失败、且取数已完成后的中栏标记。 */
+export const NO_ACCEPTANCE_SURFACE_RECORD_LABEL = "无呈现记录" as const;
+
 /**
  * 呈现上报（J.16 / GAP-P8）。`confirmationId` 由父级在方案修订期间铸造并保持稳定；
  * `onReport` 失败不阻塞渲染，只留痕（console.warn + data-surface-log="failed"）。
@@ -43,6 +46,11 @@ export interface ScopeAcceptanceBlockProps {
   onDeclineSensitive?: (() => void) | undefined;
   /** 挂账⑬ 方案 A：台账验收条目（只读投影）；渲染即展示，展示后按 acceptance 段上报 */
   acceptanceItems?: readonly SchemeAcceptanceItem[] | undefined;
+  /**
+   * J16-P7：取数完成或失败后为 true。仅在此时且条目为空时标「无呈现记录」；
+   * 取数完成前或尚无方案时不得提前标，避免加载中闪现该文案。
+   */
+  acceptanceSettled?: boolean | undefined;
   /** J.16：存在时，在区块真正展示之后上报实际呈现的条目 */
   surface?: ScopeAcceptanceSurfaceProps | undefined;
 }
@@ -264,6 +272,13 @@ export function ScopeAcceptanceBlock(props: ScopeAcceptanceBlockProps) {
             ))}
           </ul>
         </div>
+      ) : props.acceptanceSettled === true ? (
+        <p
+          data-testid="scope-acceptance-no-surface-record"
+          className="mb-2 text-xs text-muted-foreground"
+        >
+          {NO_ACCEPTANCE_SURFACE_RECORD_LABEL}
+        </p>
       ) : null}
 
       {!plan ? (

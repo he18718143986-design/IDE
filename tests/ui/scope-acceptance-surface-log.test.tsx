@@ -11,6 +11,7 @@ import { render, screen, waitFor, act } from "@testing-library/react";
 import {
   ScopeAcceptanceBlock,
   SCOPE_ACCEPTANCE_PLAIN_TEXT_VERSION,
+  NO_ACCEPTANCE_SURFACE_RECORD_LABEL,
   scopeAcceptanceShownItems,
 } from "../../src/components/studio/ScopeAcceptanceBlock";
 import type { ScopePlan } from "../../src/lib/journey/scope-plan";
@@ -224,6 +225,9 @@ describe("TASK-J.16 J16-P7 · 台账验收条目渲染与 acceptance 段上报",
       />,
     );
     expect(screen.getByTestId("scope-acceptance-criteria")).toBeTruthy();
+    expect(
+      screen.queryByTestId("scope-acceptance-no-surface-record"),
+    ).toBeNull();
     const rows = screen.getAllByTestId("scope-acceptance-criterion-row");
     expect(rows.map((r) => r.getAttribute("data-item-ref"))).toEqual([
       "ITEM-1",
@@ -254,6 +258,106 @@ describe("TASK-J.16 J16-P7 · 台账验收条目渲染与 acceptance 段上报",
         (s) => s.section === "acceptance",
       ),
     ).toBe(false);
+  });
+
+  it("取数完成前或尚无方案时，即使条目为空也不提前标「无呈现记录」", () => {
+    const { rerender } = render(
+      <ScopeAcceptanceBlock
+        plan={makePlan()}
+        mode="frozen"
+        acceptanceItems={[]}
+      />,
+    );
+    expect(
+      screen.queryByTestId("scope-acceptance-no-surface-record"),
+    ).toBeNull();
+    rerender(
+      <ScopeAcceptanceBlock
+        plan={makePlan()}
+        mode="frozen"
+        acceptanceItems={[]}
+        acceptanceSettled={false}
+      />,
+    );
+    expect(
+      screen.queryByTestId("scope-acceptance-no-surface-record"),
+    ).toBeNull();
+    expect(screen.queryByTestId("scope-acceptance-criteria")).toBeNull();
+  });
+
+  it("取数完成或失败且条目为空时标「无呈现记录」，不渲染假条目，也不上报 acceptance 段", async () => {
+    const onReport = vi.fn(() => Promise.resolve({}));
+    render(
+      <ScopeAcceptanceBlock
+        plan={makePlan()}
+        mode="frozen"
+        acceptanceItems={[]}
+        acceptanceSettled
+        surface={{ confirmationId: "c-empty", onReport }}
+      />,
+    );
+    expect(
+      screen.getByTestId("scope-acceptance-no-surface-record").textContent,
+    ).toBe(NO_ACCEPTANCE_SURFACE_RECORD_LABEL);
+    expect(NO_ACCEPTANCE_SURFACE_RECORD_LABEL).toBe("无呈现记录");
+    expect(screen.queryByTestId("scope-acceptance-criteria")).toBeNull();
+    expect(screen.queryByTestId("scope-acceptance-criterion-row")).toBeNull();
+    expect(
+      scopeAcceptanceShownItems(makePlan(), "frozen", []).some(
+        (s) => s.section === "acceptance",
+      ),
+    ).toBe(false);
+    await waitFor(() => expect(onReport).toHaveBeenCalledTimes(1));
+    const payload = onReport.mock.calls[0]?.[0] as SurfacePresentationReport;
+    expect(payload.shown.filter((s) => s.section === "acceptance")).toEqual([]);
+  });
+
+  it("取数已完成且有条目时不标「无呈现记录」", () => {
+    render(
+      <ScopeAcceptanceBlock
+        plan={makePlan()}
+        mode="frozen"
+        acceptanceItems={[{ id: "ITEM-1", text: "首页显示逾期数" }]}
+        acceptanceSettled
+      />,
+    );
+    expect(
+      screen
+        .getByTestId("scope-acceptance-criterion-row")
+        .getAttribute("data-item-ref"),
+    ).toBe("ITEM-1");
+    expect(
+      screen.queryByTestId("scope-acceptance-no-surface-record"),
+    ).toBeNull();
+  });
+
+  it("SchemeReviewPane 把 acceptanceSettled 传给中栏区块：空条目仅在取数完成后标「无呈现记录」", () => {
+    stubOfflineFetch(["/api/knowledge/modules"]);
+    const scheme = rebuildSchemeFromCorpus(
+      null,
+      "做一个工程进度管控台，按项目汇总进度与预算，超期要预警。只做进度，财务下一期",
+    );
+    const { rerender } = render(
+      <SchemeReviewPane
+        scheme={scheme}
+        acceptanceItems={[]}
+        acceptanceSettled={false}
+      />,
+    );
+    expect(
+      screen.queryByTestId("scope-acceptance-no-surface-record"),
+    ).toBeNull();
+    rerender(
+      <SchemeReviewPane
+        scheme={scheme}
+        acceptanceItems={[]}
+        acceptanceSettled
+      />,
+    );
+    expect(
+      screen.getByTestId("scope-acceptance-no-surface-record").textContent,
+    ).toBe("无呈现记录");
+    expect(screen.queryByTestId("scope-acceptance-criteria")).toBeNull();
   });
 });
 
