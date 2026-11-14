@@ -230,9 +230,7 @@ describe("卡的就绪字段与 Schema", () => {
   it("COMPLETED 估算为 L 且已写 delivered 被 Schema 接受", () => {
     write(
       "docs/specs/cards.md",
-      cardDoc(
-        baseCard({ status: "COMPLETED", governance: { estimate: "L" } }),
-      ),
+      cardDoc(baseCard({ status: "COMPLETED", governance: { estimate: "L" } })),
     );
     expect(messages(run(), "card-schema")).toEqual([]);
   });

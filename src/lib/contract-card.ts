@@ -269,7 +269,8 @@ export const contractCardSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["governance", "estimate"],
-          message: "估算 L 的卡不得进入 READY 或 IN_PROGRESS，必须拆分后再开工（R-11）",
+          message:
+            "估算 L 的卡不得进入 READY 或 IN_PROGRESS，必须拆分后再开工（R-11）",
         });
       }
       if (card.governance.open_questions.length > 0) {
