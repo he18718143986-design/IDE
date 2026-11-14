@@ -530,21 +530,16 @@ describe("硬编码计数（TASK-J.26）", () => {
       "docs/adr/README.md",
       "docs/specs/development-tasks-changelog.md",
     ]);
-    expect(
-      hits.map((f) => `${f.severity}:${f.file}:${f.line}`),
-    ).toEqual([
+    expect(hits.map((f) => `${f.severity}:${f.file}:${f.line}`)).toEqual([
       "error:docs/README.md:1",
       "error:docs/README.md:2",
     ]);
   });
 
   it("去掉硬编码计数后零发现", () => {
-    write(
-      "docs/README.md",
-      "7. [adr](./adr/README.md) — 已拍板决策的索引\n",
+    write("docs/README.md", "7. [adr](./adr/README.md) — 已拍板决策的索引\n");
+    expect(checkHardcodedCounts(new Repo(root), ["docs/README.md"])).toEqual(
+      [],
     );
-    expect(
-      checkHardcodedCounts(new Repo(root), ["docs/README.md"]),
-    ).toEqual([]);
   });
 });
