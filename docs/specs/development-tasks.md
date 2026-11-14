@@ -763,8 +763,8 @@ TASK-0.1 ──► TASK-0.2b ──► TASK-0.2c (Schema v1.3.0 & 自愈边) ─
 | **v0.2（架构感知层 · P-141 已拍板）** | `TASK-B.1` 与 `TASK-B.2` 可并行（无依赖）→ `TASK-C.4`（B.1 硬依赖、B.2 软依赖）；`TASK-S.3` 维持 DEFERRED（D-5）；`TASK-D.1e` 维持 DEFERRED（P-172：DoR 重写已落，仍未激活）；**TASK-DS.1 → COMPLETED（P-167）**；**TASK-DS.2 → COMPLETED（P-169）**（D-6 · 选夹+新建切片已落地 · D.1e 仍 DEFERRED） | 架构雷达与多 Worktree 新鲜度主链 | **B.1 / B.2 / C.4 已 COMPLETED**（P-143 / P-145 / P-148）；S.3 / D.1e 维持 DEFERRED；AUDITED.1 → COMPLETED（P-162）；**桌面形态 RFC** [`../rfc/desktop-shell-form.md`](../rfc/desktop-shell-form.md)（P-165 DoR · P-166/P-167 选夹 · P-168/P-169 新建 · 仍 ≠ 激活 D.1e） |
 
 > **Sprint 0 / 2 / 3 / 4 实施基线核验**：
-> - **当前工程物理起点（权威 · 唯一）**：本地代码仓库 `main`@`442e5836fa9c48b8dd997c087bc28747b4f4fbbf`（[#245](https://github.com/he18718143986-design/IDE/pull/245) P-204 squash；其下 [#244](https://github.com/he18718143986-design/IDE/pull/244) 为 J16-P7 施工）。
-> - **当前首要任务（P-206）**：P-206 已立 `TASK-J.25`～`TASK-J.29`（文档可读性与固定底线清单硬门禁），均为 `[NEW_TASK]`，待 Tina 逐张授权，**不开工**。`TASK-J.16` 已 `[COMPLETED]`（P-205 就事论事收口；`estimate` 仍为 L，记一次性例外）。J.22 不开工；CI.2 攒样本。**不立**第二块（质量边界 / 判分表 / card-copy-standard）与密封前意图完整性核对卡。**`TASK-D.1e` 仍 `[DEFERRED → v0.2+]`**。不宣称端到端闭环；不销 OP-34；不激活 S.3。不把本批立卡当作已授权的产品首要施工任务。
+> - **当前工程物理起点（权威 · 唯一）**：本地代码仓库 `main`@`8b580334b0252d88efe958778b7a8fdadebf994e`（[#246](https://github.com/he18718143986-design/IDE/pull/246) P-205 squash）。
+> - **当前首要任务（P-206）**：`TASK-J.16` 已 `[COMPLETED]`（P-205 就事论事收口；`estimate` 仍为 L，记一次性例外），`TASK-J.25`～`TASK-J.29` 已立卡待授权，均为 `[NEW_TASK]`，待 Tina 逐张授权，**不开工**。J.22 不开工；CI.2 攒样本。**不立**第二块（质量边界 / 判分表 / card-copy-standard）与密封前意图完整性核对卡。**`TASK-D.1e` 仍 `[DEFERRED → v0.2+]`**。不宣称端到端闭环；不销 OP-34；不激活 S.3。不把本批立卡当作已授权的产品首要施工任务。
 > - **前序（历史）**：`TASK-C.21` → **`[COMPLETED]`**（Tina t910u Supervisor SSOT v2.0.1 审查补丁）。C.20/C.19/C.18/C.17/C.16/H.1–H.8 均 COMPLETED。**不**改产品代码；不抢 D.1e；不扩 v0.2。
 > - **Sprint 2 已达成**：`TASK-P.1`、`TASK-C.5`、`TASK-W.3`、`TASK-W.4` 四张卡均已落地并通过各自专用用例；保护路径在任意模式被门卫拦截、撤销一键恢复、4 类绕过负例失败关闭均已成立。
 > - **Sprint 3 已达成**：`TASK-D.2` 主体已落地，无交集合同自动批准，交互收敛为 1 次合并按钮。
