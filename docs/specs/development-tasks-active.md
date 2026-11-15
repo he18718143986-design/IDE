@@ -777,13 +777,18 @@ governance:
 
 > **归档注记（2026-11-14 · P-205）**：本卡已 **COMPLETED**，正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.16)。
 
-#### 【Task J.22】中栏方案来源统一为编译器台账（挂账⑬ 方案 B · 根本解）`[NEW_TASK · 立卡 P-187 · 未开工 · 须先拆卡]`
+<a id="task-j.22"></a>
 
-> **立卡说明（2026-11-11 · P-187）**：挂账⑬ 方案 B。当前中栏方案由前端 `rebuildSchemeFromCorpus` 从对话语料启发式拼出，编译器台账不进入中栏。TASK-J.16 J16-P7 以只读投影（方案 A）作过渡；本卡为根本解，范围远超 J.16，故另立。**估算 L：施工前须先拆卡**，拆卡前不得开工。依赖 TASK-J.21（重启后台账可用）与 TASK-J.16 J16-P7（过渡投影已合）。**立卡 ≠ 开工**。 **已知限制（K-14 第一刀 #217 记录）**：台账 `scheme_revision` 与中栏启发式方案修订号未对齐校验，二者可能不是同一份方案；J16-P5 真实数据验收须核对此点，根治依赖本卡。
+#### 【Task J.22】中栏方案来源统一为编译器台账（挂账⑬ 方案 B · 根本解）`[SPLIT · 立卡 P-187 · 拆卡 P-215]`
+
+> **立卡说明（2026-11-11 · P-187）**：挂账⑬ 方案 B。当前中栏方案由前端 `rebuildSchemeFromCorpus` 从对话语料启发式拼出，编译器台账不进入中栏。TASK-J.16 J16-P7 以只读投影（方案 A）作过渡；本卡为根本解，范围远超 J.16，故另立。**估算 L：施工前须先拆卡**，拆卡前不得开工。依赖 TASK-J.21（重启后台账可用）与 TASK-J.16 J16-P7（过渡投影已合）。**立卡 ≠ 开工**。
+>
+> **拆卡说明（2026-11-15 · P-215）**：按 R-11，估算 L 的母卡不得开工，必须先拆。Tina t1286u 授权拆为三张子卡，本卡改标 **`[SPLIT]`**，保留追溯，**不再作为施工依据**，施工以子卡正文为准：[`TASK-J.22a`](#task-j.22a)（来源统一 + 无台账降级，承接 J22-P1 / J22-P3，估算 M）、[`TASK-J.22b`](#task-j.22b)（条目级呈现，J.16 延期项，估算 M）、[`TASK-J.22c`](#task-j.22c)（真实试玩，承接 J22-P2，估算 S）。硬依赖 `TASK-J.21` 与 `TASK-J.16` 均已 `[COMPLETED]`。**拆卡 ≠ 开工**；子卡施工须逐张授权。不暗示条目级高亮已交付。
+> **已知限制（K-14 第一刀 #217 记录）**：台账 `scheme_revision` 与中栏启发式方案修订号未对齐校验，二者可能不是同一份方案；J16-P5 真实数据验收须核对此点，根治依赖本卡。
 
 ```yaml task-card
 id: TASK-J.22
-status: NEW_TASK
+status: SPLIT
 contract:
   intent:
     title: 中栏方案来源统一为编译器台账（替换启发式 rebuildSchemeFromCorpus）
@@ -835,10 +840,12 @@ governance:
     - { ref: "src/routes/index.tsx::rebuildSchemeFromCorpus", note: "中栏方案由 rebuildSchemeFromCorpus 启发式拼接（挂账⑬ 核实）" }
   non_goals:
     - 不改台账 schema 与编译器提示词
-    - 不在拆卡前开工
+    - 本卡已拆分，不再作为施工依据；不得按本卡开工
+    - 不暗示条目级高亮已交付（见 TASK-J.22b）
   fail:
     - 中栏与台账不一致仍出现而未标注
     - 以 jsdom 替代真实会话验收
+    - 在子卡未授权时按本卡开工，或把已拆的 L 母卡重新标为可开工
   estimate: L
   invariants:
     auth: unchanged
@@ -846,6 +853,247 @@ governance:
     illumination: unchanged
     gateway_write_scope: unchanged
 ```
+
+<a id="task-j.22a"></a>
+
+#### 【Task J.22a】中栏方案来源改为编译器台账（含无台账降级标注）`[NEW_TASK · 立卡 P-215 · 未开工]`
+
+> **立卡说明（2026-11-15 · P-215）**：由 `TASK-J.22` 按 R-11 拆出。承接原验收 J22-P1（来源统一）并合理归并 J22-P3（无台账时明确标注「方案尚未生成」，不以启发式拼接冒充台账方案），因为二者是同一数据源切换。估算 M。硬依赖 `TASK-J.21` 与 `TASK-J.16` 均已 `[COMPLETED]`，依赖已满足。条目级高亮见 `TASK-J.22b`，真实试玩见 `TASK-J.22c`。**立卡 ≠ 开工**。施工须另授权。
+
+```yaml task-card
+id: TASK-J.22a
+status: NEW_TASK
+contract:
+  intent:
+    title: 中栏方案来源改为编译器台账，无台账时明确降级
+    description: >-
+      中栏方案（标题、目标、验收条目等）改为来自编译器台账 SchemeDraftV2，
+      不再由 rebuildSchemeFromCorpus 从对话语料启发式拼接。
+      无台账时降级态必须明确标注「方案尚未生成」，不得用启发式内容冒充台账方案。
+    risk_level: HIGH
+  acceptance:
+    - id: J22A-P1
+      check: auto
+      text: >-
+        中栏渲染的方案内容与台账 SchemeDraftV2 逐项一致（标题、目标、验收条目）；不再由对话语料拼接（承接 J22-P1）。
+    - id: J22A-P2
+      check: auto
+      text: >-
+        无台账时降级态明确标注「方案尚未生成」，不以启发式拼接内容冒充台账方案（承接 J22-P3）。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/routes/index.tsx
+      - src/lib/journey/scheme-draft.ts
+      - src/components/studio/SchemeReviewPane.tsx
+      - tests/ui/scheme-source-unification.test.tsx
+    readonly_paths:
+      - daemon/supervisor/intent-compiler/scheme-ledger-store.ts
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    把中栏数据源切换到编译器台账；启发式拼接仅保留为无台账时的明确降级态并标注。施工前核对改动范围，多出的只读文件须先修卡。
+  touches:
+    - { path: src/routes/index.tsx, change: modify, why: 中栏数据源改为台账，去掉对启发式拼接的默认依赖, symbols: [rebuildSchemeFromCorpus] }
+    - { path: src/lib/journey/scheme-draft.ts, change: modify, why: 台账到中栏的映射与无台账降级态, symbols: [rebuildSchemeFromCorpus] }
+    - { path: tests/ui/scheme-source-unification.test.tsx, change: create, why: 锁定来源一致与无台账降级标注, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J22A-P1, test_path: tests/ui/scheme-source-unification.test.tsx, level: integration, debt: "立卡阶段；测试体待授权施工后再写" }
+    - { acceptance_id: J22A-P2, test_path: tests/ui/scheme-source-unification.test.tsx, level: integration, debt: "立卡阶段；测试体待授权施工后再写" }
+governance:
+  spec_refs:
+    - docs/specs/playtest-self-check.md
+    - docs/specs/supervisor.md
+  depends_on:
+    - { id: TASK-J.21, kind: hard }
+    - { id: TASK-J.16, kind: hard }
+  code_facts:
+    - { ref: "src/lib/journey/scheme-draft.ts:578", note: "rebuildSchemeFromCorpus 定义处；中栏启发式来源的根函数" }
+    - { ref: "src/routes/index.tsx:1167", note: "中栏调用 rebuildSchemeFromCorpus 的现网接缝" }
+    - { ref: "src/lib/journey/scheme-draft.ts:46-74", note: "SchemeDraft 及可选 acceptance 字段；来源切换后应由台账填充" }
+    - { ref: "src/components/studio/SchemeReviewPane.tsx:62-64", note: "中栏已能接收验收条目投影；本卡负责数据源，不在此做条目级高亮" }
+  non_goals:
+    - 本条立卡 ≠ 开工；施工须另授权
+    - 不改台账 schema 与编译器提示词
+    - 不做条目级高亮（见 TASK-J.22b），不以 jsdom 替代真实试玩（见 TASK-J.22c）
+    - 不暗示条目级高亮已交付；不开工 CI.2；不改 D.1e / S.3
+  fail:
+    - 中栏与台账不一致仍出现而未标注，或无台账时仍用启发式内容冒充台账方案
+    - 改只读的 scheme-ledger-store.ts 却不先修卡
+    - 本条合入前开工，或本卡膨胀为 L 却不拆（R-11）
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：挂账⑬ 方案 B。J16-P7 只做了只读投影过渡；本卡是把中栏默认来源换成台账。
+* **取舍**：把来源统一与无台账降级放在同一张卡，因为是同一条数据通路；高亮与真实试玩另卡。
+
+<a id="task-j.22b"></a>
+
+#### 【Task J.22b】中栏验收条目的条目级呈现（J.16 延期项）`[NEW_TASK · 立卡 P-215 · 未开工]`
+
+> **立卡说明（2026-11-15 · P-215）**：由 `TASK-J.22` 按 R-11 拆出。J.16 已明确「条目级高亮不在本条（J.22 之后另记）」「`frozen_quotes` 不含条目关联」。本卡承接该项呈现，估算 M；若施工前发现必须改冻结快照结构才能做条目关联，先报修卡或再拆，不得带病扩大。硬依赖 `TASK-J.22a`（先有台账来源，再谈条目呈现）。**不实现** [`playtest-self-check.md`](./playtest-self-check.md) §3.3 的条目级自动点亮（该口子仍为「本版不实现」）。不暗示该项已交付。硬依赖 `TASK-J.21` 与 `TASK-J.16` 均已 `[COMPLETED]`。**立卡 ≠ 开工**。施工须另授权。
+
+```yaml task-card
+id: TASK-J.22b
+status: NEW_TASK
+contract:
+  intent:
+    title: 中栏按台账条目呈现验收项，并把关联建立在已登记原话上
+    description: >-
+      在中栏按编译器台账逐条呈现验收条目（条目级呈现）。
+      若需要把条目与用户原话关联，必须复用已登记 turn_id + sha256(utf8) / frozen_quotes，
+      不得事后拼凑。不实现 playtest-self-check.md §3.3 的条目级自动点亮。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J22B-P1
+      check: auto
+      text: >-
+        中栏按台账逐条呈现验收条目；空台账时沿用已有「无呈现记录」或本卡规定的等价标注，不伪造条目。
+    - id: J22B-P2
+      check: auto
+      text: >-
+        如本卡实现条目与原话的关联，关联只指向已登记并封存的原话；未登记文本不得被当成条目依据。
+    - id: J22B-P3
+      check: auto
+      text: >-
+        不实现 §3.3 条目级自动点亮；文档与界面均不得把它写成已交付。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/components/studio/SchemeReviewPane.tsx
+      - src/lib/journey/scheme-draft.ts
+      - tests/ui/scope-acceptance-surface-log.test.tsx
+      - tests/unit/scheme-acceptance-projection.test.ts
+    readonly_paths:
+      - daemon/pipeline/scheme-snapshot-store.ts
+      - docs/specs/playtest-self-check.md
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    在 J.22a 把数据源换成台账之后，补中栏的条目级呈现。
+    frozen_quotes 目前不含条目关联：若必须改冻结结构，停工报修卡，不把 scheme-snapshot-store.ts 偷偷写入本卡范围。
+  touches:
+    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 按台账逐条呈现验收条目, symbols: [] }
+    - { path: tests/unit/scheme-acceptance-projection.test.ts, change: modify, why: 锁定条目呈现与空台账不伪造, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J22B-P1, test_path: tests/unit/scheme-acceptance-projection.test.ts, level: unit, debt: "立卡阶段；测试体待授权施工后再写" }
+    - { acceptance_id: J22B-P2, test_path: tests/ui/scope-acceptance-surface-log.test.tsx, level: integration, debt: "立卡阶段；若本卡不含条目-原话关联，施工时把本项标为不适用并写进 PR" }
+    - { acceptance_id: J22B-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "立卡阶段；须能核对未把 §3.3 自动点亮写成已交付" }
+governance:
+  spec_refs:
+    - docs/specs/playtest-self-check.md
+    - docs/specs/supervisor.md
+  depends_on:
+    - { id: TASK-J.22a, kind: hard }
+    - { id: TASK-J.21, kind: hard }
+    - { id: TASK-J.16, kind: hard }
+  code_facts:
+    - { ref: "src/components/studio/SchemeReviewPane.tsx:62-64", note: "中栏已能接收 acceptanceItems / acceptanceSettled；条目级呈现在此扩展" }
+    - { ref: "docs/specs/playtest-self-check.md:132-141", note: "§3.3 条目级自动点亮仍为「本版不实现」；本卡不得实施或宣称已交付" }
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:36-50", note: "frozen_quotes 现结构只有 turn_id 与 turn_text_sha256，不含条目关联；改结构须先修卡" }
+  non_goals:
+    - 本条立卡 ≠ 开工；施工须另授权
+    - 不实现 §3.3 条目级自动点亮，不暗示该项已交付
+    - 不重做 J.22a 的数据源切换，不以 jsdom 替代 TASK-J.22c 的真实试玩
+    - 不改冻结快照结构除非先修卡；不开工 CI.2；不改 D.1e / S.3
+  fail:
+    - 伪造验收条目，或把未登记文本当成条目依据
+    - 把 §3.3 自动点亮做成功能或写成已交付
+    - 发现必须改 frozen_quotes 结构却不报修卡、带病施工
+    - 本条合入前开工，或在 J.22a 未完成时开工，或本卡膨胀为 L 却不拆（R-11）
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：J.16 把条目级高亮明确推迟到 J.22 之后；本卡把它从母卡拆出，避免与来源切换混成一张 L。
+* **取舍**：先呈现台账条目；条目与原话的关联若触及冻结结构，先修卡再做。自动点亮仍不做。
+
+<a id="task-j.22c"></a>
+
+#### 【Task J.22c】中栏方案来源统一的真实试玩验收`[NEW_TASK · 立卡 P-215 · 未开工]`
+
+> **立卡说明（2026-11-15 · P-215）**：由 `TASK-J.22` 按 R-11 拆出，承接原验收 J22-P2。估算 S。硬依赖 `TASK-J.22a`（须先有来源切换）。`TASK-J.22b` 为软依赖：本卡原文验收是「台账与中栏方案在确认前后保持一致」；条目级呈现的试玩可在 J.22b 合入后一并做，但不把 J.22b 当成硬门槛，以免拖延来源一致性验收。jsdom 不替代真实打开方案面板。硬依赖 `TASK-J.21` 与 `TASK-J.16` 均已 `[COMPLETED]`。**立卡 ≠ 开工**。施工须另授权。
+
+```yaml task-card
+id: TASK-J.22c
+status: NEW_TASK
+contract:
+  intent:
+    title: 用真实会话验收中栏方案与台账一致
+    description: >-
+      在真实会话中打开方案面板，人工核对编译器台账与中栏方案在确认前后保持一致。
+      jsdom 或集成测试不得替代这次真实试玩。
+    risk_level: LOW
+  acceptance:
+    - id: J22C-P1
+      check: playtest
+      text: >-
+        真实会话中，编译器台账与中栏方案在确认前后保持一致；真实打开方案面板人工核对（承接 J22-P2；jsdom 不替代）。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - tests/ui/scheme-source-unification.test.tsx
+      - docs/specs/evidence-and-acceptance-criteria.md
+    readonly_paths:
+      - src/components/studio/SchemeReviewPane.tsx
+      - src/routes/index.tsx
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    本卡几乎不改产品代码，只做真实会话试玩并留下证据；集成测试只能作辅助，不能代替人工核对。
+  touches:
+    - { path: docs/specs/evidence-and-acceptance-criteria.md, change: modify, why: 回写真实试玩证据与结论, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J22C-P1, test_path: tests/ui/scheme-source-unification.test.tsx, level: integration, debt: "立卡阶段；须 Tina 真实试玩，jsdom 不替代；证据回写待授权施工后补" }
+governance:
+  spec_refs:
+    - docs/specs/playtest-self-check.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+  depends_on:
+    - { id: TASK-J.22a, kind: hard }
+    - { id: TASK-J.22b, kind: soft }
+    - { id: TASK-J.21, kind: hard }
+    - { id: TASK-J.16, kind: hard }
+  code_facts:
+    - { ref: "src/routes/index.tsx:1167", note: "中栏现网仍调用 rebuildSchemeFromCorpus；本卡在 J.22a 切换后再做真实核对" }
+    - { ref: "src/components/studio/SchemeReviewPane.tsx:62-64", note: "真实打开的方案面板组件；jsdom 不替代本次验收" }
+  non_goals:
+    - 本条立卡 ≠ 开工；施工须另授权
+    - 不以 jsdom 或单测替代真实会话验收
+    - 不重做 J.22a / J.22b 的产品改动；不暗示条目级高亮已交付
+    - 不开工 CI.2；不改 D.1e / S.3
+  fail:
+    - 只用 jsdom 或书面说明就宣称 J22-P2 通过
+    - 在 J.22a 未完成时开工
+    - 本条合入前开工
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：原 J.22 把真实试玩写成 J22-P2，且明确 jsdom 不能替代；拆出后才不会和代码改造混在一张 L 卡里。
+* **取舍**：硬依赖来源切换，条目呈现只作软依赖，避免试玩卡被高亮方案卡住。
 
 <a id="task-j.23"></a>
 
@@ -1187,3 +1435,287 @@ governance:
 
 > **立卡说明（2026-11-14 · P-206）**：授权来源为 Tina t1250u「按这个立卡」。目标是让非软件专业用户能走完「表达偏好 → 签字开工 → 试玩验收」并稳定得到高质量结果。本批只立第一块（文档可读性与结构分家）与第三块「固定底线清单硬门禁」。**不立**第二块（质量边界 / 判分表 / `card-copy-standard` / 校验器），**不立**「密封前意图完整性核对（`U<seq>` 回链）」卡——这两块留给 Opus 5.5。五张卡均为 `[NEW_TASK]`，估算均为 S 或 M（R-11；不立 L，不重演 J.16）。**立卡 ≠ 授权 ≠ 开工**；待 Tina 逐张授权。J.22 不开工；CI.2 攒样本。不改已完工的 `TASK-J.16`，不碰 `TASK-D.1e` / `TASK-S.3`，不改 runtime/contract ScopePlan sandbox。北极星场景（`scheme.md` goal-2）与「无人值守连续三张真实任务卡」继续标明未交付，不加新文档层。不暗示条目级高亮已交付（J.22 范围）。
 
+
+### 3.4g 第二块判分表与卡文案、密封前意图完整性核对（2026-11-15 · 立卡 P-215）
+
+> **立卡说明（2026-11-15 · P-215）**：授权来源为 Tina t1286u。本条只立卡 / 拆卡，不写产品代码，不开工。第二块按 R-11 拆为 [`TASK-J.31`](#task-j.31)（判分表升级，纯文档，估算 S）与 [`TASK-J.33`](#task-j.33)（`card-copy-standard.md` + 校验器，估算 M）。「密封前意图完整性核对」立 [`TASK-J.32`](#task-j.32)（估算 M，须复用 J.16 `frozen_quotes` 登记与封存链路）。`TASK-J.22` 的拆卡正文在既有卡位，不迁入本节。所有新卡均为 `[NEW_TASK]`。**立卡 ≠ 开工**。J.31 合入后可先行报施工方案；J.33 / J.32 / J.22 子卡待逐张授权。`prompt-builder.ts` 对齐可并入 J.32 或后续卡，报方案时说明。CI.2 攒样本；文档计划暂缓；不暗示条目级高亮已交付。
+
+<a id="task-j.31"></a>
+
+#### 【Task J.31】把试玩自查升级为非技术用户可执行的判分表`[NEW_TASK · 立卡 P-215 · 未开工]`
+
+> **立卡说明（2026-11-15 · P-215）**：第二块的纯文档切片（估算 S）。把 [`playtest-self-check.md`](./playtest-self-check.md) 升级为非技术用户可执行的判分表：每一步写成「看到 X 即通过 / 看到 Y 即失败」，试玩认可须留证据。不改产品代码，不接线校验器（校验器见 `TASK-J.33`），不实现 [`playtest-self-check.md`](./playtest-self-check.md) §3.3「条目级自动点亮」（该口子仍为「本版不实现」）。**立卡 ≠ 开工**。合入后可先行报本卡施工方案；施工须另授权。
+
+```yaml task-card
+id: TASK-J.31
+status: NEW_TASK
+contract:
+  intent:
+    title: 把试玩自查升级为非技术用户可执行的判分表
+    description: >-
+      将 playtest-self-check.md 改写成非技术用户可按步执行的判分表：
+      每一步写明「看到 X 即通过 / 看到 Y 即失败」，试玩认可必须留下可核对的证据。
+    risk_level: LOW
+  acceptance:
+    - id: J31-P1
+      check: auto
+      text: >-
+        判分表每一步都写成「看到 X 即通过 / 看到 Y 即失败」，读者不必懂工程术语也能执行。
+    - id: J31-P2
+      check: auto
+      text: >-
+        文中规定试玩认可必须留证据，并写明证据留在何处、至少包含哪些可核对字段。
+    - id: J31-P3
+      check: auto
+      text: >-
+        不把 §3.3 条目级自动点亮写成已交付或本卡范围；该口子仍标明「本版不实现」。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - docs/specs/playtest-self-check.md
+    readonly_paths:
+      - docs/specs/evidence-and-acceptance-criteria.md
+      - docs/glossary.md
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    只改 playtest-self-check.md 的判分表述与证据要求，不新增文档层，不改 Daemon / UI。
+  touches:
+    - { path: docs/specs/playtest-self-check.md, change: modify, why: 升级为非技术用户可执行的逐步判分表并写明证据要求, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J31-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "立卡阶段；测试体待授权施工后再写；门禁仍为 npm run check:docs" }
+    - { acceptance_id: J31-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "立卡阶段；测试体待授权施工后再写" }
+    - { acceptance_id: J31-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "立卡阶段；测试体待授权施工后再写" }
+governance:
+  spec_refs:
+    - docs/specs/playtest-self-check.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+  depends_on: []
+  code_facts:
+    - { ref: "docs/specs/playtest-self-check.md:1-16", note: "现行试玩自查规格正文；本卡只升级判分表表述，不改其上位口径" }
+    - { ref: "docs/specs/playtest-self-check.md:132-141", note: "§3.3 条目级自动点亮仍为「本版不实现」；本卡不得改写成已交付" }
+  non_goals:
+    - 本条立卡 ≠ 开工；施工须另授权
+    - 不改产品代码，不接线校验器（见 TASK-J.33）
+    - 不实现 §3.3 条目级自动点亮，不暗示条目级高亮已交付
+    - 不开工 J.22 子卡 / J.32 / J.33 / CI.2；不改 D.1e / S.3
+    - 不宣称北极星或无人值守三连卡已交付；不加新文档层
+  fail:
+    - 判分表仍依赖工程术语，或某步没有「看到 X 即通过 / 看到 Y 即失败」
+    - 试玩认可不要求留证据
+    - 把 §3.3 自动点亮或条目级高亮写成已交付
+    - 本条合入前开工，或把本卡做成 L 却不拆（R-11）
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：第二块要让非技术用户自己能做试玩判定；现规格对实施者友好，对业主逐步判分与证据留存不够直白。
+* **取舍**：只改一份已有规格，不做校验器、不做自动点亮；施工方案等本条合入后再报。
+
+<a id="task-j.33"></a>
+
+#### 【Task J.33】新增卡文案规范并做成机器可校验项`[NEW_TASK · 立卡 P-215 · 未开工]`
+
+> **立卡说明（2026-11-15 · P-215）**：第二块的文档 + 校验器切片（估算 M）。新增 `docs/specs/card-copy-standard.md`（冲突卡 / 意外卡 / 线上卡文案规范）：术语黑名单以 [`glossary.md`](../glossary.md) 已收录词为限；每选项必须含「推荐项 + 后果一句话」结构化字段。这两项做成 `scripts/docs-check/checks.ts` 或 `src/lib/contract-card.ts` 的机器可校验规则，并补测试。文档必须写明：「用户是否真懂」只能靠非技术用户试用验证，不是门禁，不得做成 `can_merge` 派生输入。本条立卡时该新文件尚不存在，不得在 code_facts 里引用尚未落地的行号。**立卡 ≠ 开工**。施工须另授权，不与 `TASK-J.31` 捆绑开工。
+
+```yaml task-card
+id: TASK-J.33
+status: NEW_TASK
+contract:
+  intent:
+    title: 新增卡文案规范并做成机器可校验项
+    description: >-
+      新增 docs/specs/card-copy-standard.md，规定冲突卡、意外卡、线上卡的文案：
+      术语黑名单只使用 glossary.md 已收录词；每个选项含「推荐项」和「后果一句话」两个结构化字段。
+      把这两项接到现有文档门禁（checks.ts 或 contract-card.ts）做成机器可校验规则。
+      「是否真懂」只在文档中声明须经非技术用户试用验证，不得做成门禁。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J33-P1
+      check: auto
+      text: >-
+        docs/specs/card-copy-standard.md 已落地，覆盖冲突卡、意外卡、线上卡，并写明「是否真懂」只能靠非技术用户试用验证、不是门禁。
+    - id: J33-P2
+      check: auto
+      text: >-
+        术语黑名单以 glossary.md 已收录词为限，且由文档门禁机器校验；未收录词不得静默进入黑名单。
+    - id: J33-P3
+      check: auto
+      text: >-
+        每个选项的「推荐项」与「后果一句话」为结构化字段，并由文档门禁机器校验缺失或空字段。
+    - id: J33-P4
+      check: auto
+      text: >-
+        校验器接线不改 deriveCanMerge，不把「是否真懂」做成 can_merge 输入或退出码门禁。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - docs/specs/card-copy-standard.md
+      - scripts/docs-check/checks.ts
+      - src/lib/contract-card.ts
+      - tests/unit/docs-check.test.ts
+      - docs/glossary.md
+    readonly_paths:
+      - src/lib/evidence.schema.ts
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    先落规范文档，再把术语黑名单与选项结构化字段接到现有 docs-check（优先 checks.ts；若必须改 contract-card.ts 只加校验、不改 deriveCanMerge）。
+    glossary.md 仅在规范需要引用或增补已授权术语时改动，不借机扩写术语表。
+  touches:
+    - { path: docs/specs/card-copy-standard.md, change: create, why: 新增冲突卡/意外卡/线上卡文案规范, symbols: [] }
+    - { path: scripts/docs-check/checks.ts, change: modify, why: 把黑名单与选项结构化字段做成机器可校验项, symbols: [] }
+    - { path: tests/unit/docs-check.test.ts, change: modify, why: 锁定新规则的通过/失败样本, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J33-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "立卡阶段；测试体待授权施工后再写" }
+    - { acceptance_id: J33-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "立卡阶段；测试体待授权施工后再写" }
+    - { acceptance_id: J33-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "立卡阶段；测试体待授权施工后再写" }
+    - { acceptance_id: J33-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "立卡阶段；测试体待授权施工后再写；不得把本项接入 deriveCanMerge" }
+governance:
+  spec_refs:
+    - docs/glossary.md
+    - docs/specs/playtest-self-check.md
+  depends_on: []
+  code_facts:
+    - { ref: "docs/glossary.md:1-16", note: "术语表已收录词是术语黑名单的唯一来源；本卡立卡时 card-copy-standard.md 尚不存在，不得引用其行号" }
+    - { ref: "scripts/docs-check/checks.ts:385", note: "现有 checkCard 入口；新规则优先接到此文件" }
+    - { ref: "scripts/docs-check/checks.ts:806", note: "runAllChecks 汇总入口；接线不得绕开此跑法另起门禁" }
+    - { ref: "src/lib/contract-card.ts:32-42", note: "合同卡状态与 Schema；若在此接线只加文案校验，不改 deriveCanMerge" }
+    - { ref: "tests/unit/docs-check.test.ts:179", note: "现有卡就绪字段与 Schema 用例组，新规则测试补在本文件" }
+  non_goals:
+    - 本条立卡 ≠ 开工；施工须另授权
+    - 不把「是否真懂」做成门禁或 can_merge 输入，不改 deriveCanMerge
+    - 不实现条目级自动点亮，不暗示条目级高亮已交付
+    - 不开工 J.31 / J.32 / J.22 子卡 / CI.2；不改 D.1e / S.3
+    - 不宣称北极星或无人值守三连卡已交付
+  fail:
+    - 只写规范、没有机器可校验规则就把本卡标完成
+    - 黑名单使用 glossary 未收录词，或选项缺少「推荐项 / 后果一句话」仍能通过门禁
+    - 把「是否真懂」做成退出码或 can_merge 条件
+    - 本条合入前开工，或本卡膨胀为 L 却不拆（R-11）
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：冲突卡 / 意外卡 / 线上卡如果术语不受控、选项不写后果，非技术用户难以选择；机器只能校验格式与用词来源，不能替用户判断「是否真懂」。
+* **取舍**：规范 + 门禁接线放在同一张 M 卡；「是否真懂」明确排除在门禁之外。
+
+<a id="task-j.32"></a>
+
+#### 【Task J.32】密封前意图完整性核对（方案卡回链用户原话）`[NEW_TASK · 立卡 P-215 · 未开工]`
+
+> **立卡说明（2026-11-15 · P-215）**：把「密封前意图完整性核对」立为独立卡（估算 M；若施工前方案超出 M，必须再拆，不得在未拆时扩成 L）。业主签字前，方案卡须逐项回链到用户消息 `U<seq>` 原话，对照「说过的每件事都有着落」。**与 J.16 `frozen_quotes` 封存机制的复用关系**：说话时已登记 `turn_id` + `sha256(utf8)`，冻结时封入快照的既有链路必须复用；回链应建立在已登记原话上，禁止事后拼凑一段未登记文本冒充原话。登记点须写入 [`supervisor.md`](./supervisor.md) 密封判定与 [`delivery-lifecycle.md`](./delivery-lifecycle.md) S2→Seal 环。`prompt-builder.ts` 第 248 行「对话上下文」拼装不是活发送点，其对齐可并入本卡施工或留待后续另卡，本条立卡不把它列入必须可写；归并方式在本卡合入后的施工方案里说明。**立卡 ≠ 开工**。施工须另授权。
+
+```yaml task-card
+id: TASK-J.32
+status: NEW_TASK
+contract:
+  intent:
+    title: 密封前让业主能对照方案卡是否覆盖说过的每句原话
+    description: >-
+      在业主签字（密封）前，方案卡的每一项都回链到用户消息 U<seq> 原话，
+      使业主可以对照「说过的每件事都有着落」。
+      回链必须复用 J.16 已有的 frozen_quotes 链路：说话时登记 turn_id 与 sha256(utf8)，
+      冻结时封入快照；不得在签字前事后拼凑未登记文本。
+      该登记与核对点写入 supervisor.md 密封判定和 delivery-lifecycle.md 的 S2→Seal 环。
+    risk_level: HIGH
+  acceptance:
+    - id: J32-P1
+      check: auto
+      text: >-
+        方案卡逐项回链到已登记的用户消息 U<seq> 原话（turn_id + sha256(utf8)），缺登记或哈希不一致则不得当作已覆盖。
+    - id: J32-P2
+      check: playtest
+      text: >-
+        业主在签字前可以看到「说过的每件事都有着落」的对照面；未覆盖项被明确标出，不得静默跳过。
+    - id: J32-P3
+      check: auto
+      text: >-
+        回链只使用说话时已登记、冻结时已封入 frozen_quotes 的原话；用事后拼凑文本冒充原话必须失败。
+    - id: J32-P4
+      check: auto
+      text: >-
+        supervisor.md 密封判定与 delivery-lifecycle.md S2→Seal 环已写明该登记点与核对要求。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - docs/specs/supervisor.md
+      - docs/specs/delivery-lifecycle.md
+      - daemon/pipeline/scheme-snapshot-store.ts
+      - daemon/server.ts
+      - src/lib/daemon-api.ts
+      - tests/unit/scheme-snapshot-frozen-quotes.test.ts
+      - tests/unit/dispute-seal-turn-register.test.ts
+    readonly_paths:
+      - daemon/supervisor/intent-compiler/host.ts
+      - daemon/supervisor/prompt-builder.ts
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    复用已有 turn 登记与 frozen_quotes 封存，在密封判定增加「方案项 → 已登记原话」回链与缺口标出；
+    不另造一套原话存储。prompt-builder.ts 不对齐进必须可写，归并方式留待施工方案。
+  touches:
+    - { path: docs/specs/supervisor.md, change: modify, why: 在密封判定写入登记点与完整性核对要求, symbols: [] }
+    - { path: docs/specs/delivery-lifecycle.md, change: modify, why: 在 S2→Seal 环写入同一登记点, symbols: [] }
+    - { path: daemon/pipeline/scheme-snapshot-store.ts, change: modify, why: 回链复用 frozen_quotes，禁止事后拼凑, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J32-P1, test_path: tests/unit/scheme-snapshot-frozen-quotes.test.ts, level: unit, debt: "立卡阶段；测试体待授权施工后再写" }
+    - { acceptance_id: J32-P2, test_path: tests/unit/dispute-seal-turn-register.test.ts, level: unit, debt: "立卡阶段；真实对照面须 Tina 试玩，jsdom 不替代" }
+    - { acceptance_id: J32-P3, test_path: tests/unit/scheme-snapshot-frozen-quotes.test.ts, level: unit, debt: "立卡阶段；测试体待授权施工后再写" }
+    - { acceptance_id: J32-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "立卡阶段；规格落点待授权施工后再写" }
+governance:
+  spec_refs:
+    - docs/specs/supervisor.md
+    - docs/specs/delivery-lifecycle.md
+    - docs/specs/playtest-self-check.md
+  depends_on:
+    - { id: TASK-J.16, kind: hard }
+  code_facts:
+    - { ref: "docs/specs/delivery-lifecycle.md:42", note: "S2→Seal 环现行定义；本卡要把原话登记与完整性核对写进这一环" }
+    - { ref: "docs/specs/supervisor.md:485-497", note: "D3 主按钮密封/开工事务与规划密封子集；登记点写在密封判定，不另起一套按钮" }
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:36-50", note: "冻结引用已含 turn_id 与 turn_text_sha256；回链应建立在此结构上" }
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:315-362", note: "密封成功返回 frozen_quotes；不得另造一套原话封存" }
+    - { ref: "daemon/supervisor/intent-compiler/host.ts:202", note: "commitUserTurn 是说话时登记的既有入口（只读，复用）" }
+    - { ref: "daemon/server.ts:4160", note: "登记成功返回 turn_id 与 turn_text_sha256 的既有接口" }
+    - { ref: "daemon/supervisor/prompt-builder.ts:248", note: "「对话上下文」拼装不是活发送点；本卡不列入必须可写，归并方式待施工方案" }
+  non_goals:
+    - 本条立卡 ≠ 开工；施工须另授权；方案超出 M 必须再拆（R-11）
+    - 不事后拼凑未登记文本冒充用户原话，不另造一套原话存储
+    - 不把 prompt-builder.ts 列为必须可写；对齐可并入本卡或后续卡，报方案时说明
+    - 不实现 §3.3 条目级自动点亮，不暗示条目级高亮已交付（条目级高亮见 TASK-J.22b）
+    - 不开工 J.31 / J.33 / J.22 子卡 / CI.2；不改 D.1e / S.3
+    - 不宣称北极星或无人值守三连卡已交付
+  fail:
+    - 回链使用事后拼凑、未登记或哈希不一致的文本仍能通过密封
+    - 业主签字前没有「说过的每件事都有着落」的对照，或缺口被静默跳过
+    - 规格未写入 supervisor.md 密封判定或 delivery-lifecycle.md S2→Seal 环
+    - 方案超出 M 却不拆卡，或本条合入前开工（R-11）
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：密封是业主对方案的签字点；没有回链到已登记原话，就无法核对应办事项是否都有着落。J.16 已经把说话登记和冻结封存做完，本卡复用这条链路，不另起炉灶。
+* **取舍**：估算先标 M；施工前若发现必须改只读适配器或另造存储，先拆卡 / 修卡。prompt-builder 对齐不在本条预先绑死。
