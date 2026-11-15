@@ -753,6 +753,48 @@ export function checkArchiveRefs(repo: Repo, files: string[]): Finding[] {
   return findings;
 }
 
+// ── 硬编码计数（TASK-J.26）──────────────────────────────────────────────
+
+/** 以正文维护的 ADR / 篇数计数。历史 changelog 与任务卡正文、adr 索引本身除外。 */
+export const HARD_CODED_COUNT =
+  /\d+\s*条已拍板|(?:\bADR\b|L1 决策|决策（`adr\/`）)[^。\n]{0,40}\d+\s*篇/;
+
+function isHardCountExempt(file: string): boolean {
+  if (file === "docs/adr/README.md") return true;
+  const base = path.posix.basename(file);
+  if (/changelog/i.test(base)) return true;
+  if (
+    file === "docs/specs/development-tasks.md" ||
+    file === "docs/specs/development-tasks-active.md" ||
+    file === "docs/specs/development-tasks-completed.md"
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function checkHardcodedCounts(repo: Repo, files: string[]): Finding[] {
+  const findings: Finding[] = [];
+  for (const file of files) {
+    if (isHardCountExempt(file)) continue;
+    const content = repo.read(file);
+    if (content === null) continue;
+    content.split("\n").forEach((line, i) => {
+      if (HARD_CODED_COUNT.test(line)) {
+        findings.push({
+          severity: "error",
+          rule: "hardcoded-count",
+          file,
+          line: i + 1,
+          message:
+            "正文不得硬编码维护 ADR / 篇数计数；请改为指向 docs/adr/README.md，由索引自行反映篇数",
+        });
+      }
+    });
+  }
+  return findings;
+}
+
 // ── 汇总 ───────────────────────────────────────────────────────────────────
 
 export interface RunOptions {
@@ -786,6 +828,7 @@ export function runAllChecks(
     ...checkScheme(repo),
     ...checkFilenames(docs),
     ...checkArchiveRefs(repo, docs),
+    ...checkHardcodedCounts(repo, docs),
   ];
   return { findings, cards };
 }

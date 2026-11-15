@@ -1284,8 +1284,8 @@ governance:
     - { id: TASK-J.25, kind: soft }
   code_facts:
     - { ref: "docs/specs/delivery-lifecycle.md:36-49", note: "七环表含「现状 → 卡」列，进度与任务卡/索引重复且易过期" }
-    - { ref: "docs/scheme.md:141-172", note: "§6 决定 / 已落盘裁决仍写在意图层，应按方案迁 docs/ledger/ 并留指针" }
-    - { ref: "docs/scheme.md:304-364", note: "文末大量「现行物理指针」快照，应按方案迁 docs/reports/ 并留指针" }
+    - { ref: "docs/ledger/scheme-settled-decisions.md:9-28", note: "原 scheme.md §6 已落盘裁决已迁至此；scheme.md 对应节只留指针（施工中为通过行号核验而改指，状态仍 NEW_TASK）" }
+    - { ref: "docs/reports/scheme-physical-pointers.md:29-90", note: "原 scheme.md 文末物理指针已迁至此；scheme.md 对应节只留指针（施工中为通过行号核验而改指，状态仍 NEW_TASK）" }
     - { ref: "docs/README.md:47", note: "阅读顺序写「17 条已拍板决策」，与 §4「19 篇」及 adr 索引不一致，属硬编码计数" }
     - { ref: "docs/README.md:62-89", note: "§3 / §8 / §9 已是「已迁走」空壳；§4 标题硬编码「19 篇」" }
   non_goals:
