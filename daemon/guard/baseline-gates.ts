@@ -329,8 +329,14 @@ function stagentPackageRoot(): string {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 }
 
-function evaluateMainlineRegression(root: string): { ok: boolean; reason?: string } {
-  if (!MAINLINE_NODES.includes("merged") || !MAINLINE_NODES.includes("verify")) {
+function evaluateMainlineRegression(root: string): {
+  ok: boolean;
+  reason?: string;
+} {
+  if (
+    !MAINLINE_NODES.includes("merged") ||
+    !MAINLINE_NODES.includes("verify")
+  ) {
     return { ok: false, reason: "missing_MAINLINE_NODES" };
   }
   for (const rel of REGRESSION_FINGERPRINT) {
@@ -429,7 +435,8 @@ export function runBaselineGateBody(
           ? { ok: true }
           : {
               ok: false,
-              reason: denied.reason ?? "pretended_success_without_previous_live",
+              reason:
+                denied.reason ?? "pretended_success_without_previous_live",
             };
       return pickSample(alias, mode, clean, denied);
     }
