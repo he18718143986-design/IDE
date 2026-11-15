@@ -23,8 +23,14 @@ import { MemoryVaultBackend } from "./memory-backend";
 
 /** 接口本体在 `./types`（零依赖叶子）；此处转出以保持既有导入面。 */
 export type { Vault } from "./types";
-/** 活跃实例注册表在 `./active`（叶子）；此处转出，调用方仍可从门面取。 */
-export { getActiveVault, setActiveVault } from "./active";
+/** 活跃实例注册表与共享断言在 `./active`（叶子）；此处转出，调用方仍可从门面取。 */
+export {
+  getActiveVault,
+  setActiveVault,
+  assertContextHasNoVaultSecrets,
+  VaultSecretInContextError,
+  E_VAULT_SECRET_IN_CONTEXT,
+} from "./active";
 
 export interface CreateVaultOptions {
   repoRoot: string;

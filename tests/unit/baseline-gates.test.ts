@@ -1,5 +1,6 @@
 /**
- * TASK-J.28 / TASK-J.29：固定底线硬门禁接线，以及八项既有检查体的退出码。
+ * TASK-J.28 / TASK-J.29 / TASK-J.30：固定底线硬门禁接线，八项既有检查体，
+ * 以及 baseline-safety-secrets 去桩后的固定样本退出码。
  */
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
@@ -129,7 +130,7 @@ describe("TASK-J.28 命令注入", () => {
 });
 
 describe("TASK-J.28 stagent check baseline-gate 命令", () => {
-  it("baseline-safety-secrets 仍为桩，检查体留给 TASK-J.30", () => {
+  it("baseline-safety-secrets 已去桩：默认自检 0，干净样本 0，夹带固定样本非 0", () => {
     const result = runCheckCommand([
       "baseline-gate",
       "--id",
@@ -143,9 +144,38 @@ describe("TASK-J.28 stagent check baseline-gate 命令", () => {
       id: string;
     };
     expect(body.ok).toBe(true);
-    expect(body.stub).toBe(true);
+    expect(body.stub).toBe(false);
     expect(body.body).toBe("TASK-J.30");
     expect(body.id).toBe(BASELINE_SECRETS_ALIAS);
+
+    const clean = runCheckCommand([
+      "baseline-gate",
+      "--id",
+      BASELINE_SECRETS_ALIAS,
+      "--sample",
+      "clean",
+    ]);
+    expect(clean.exitCode).toBe(0);
+    expect(JSON.parse(clean.stdout).stub).toBe(false);
+
+    const violating = runCheckCommand([
+      "baseline-gate",
+      "--id",
+      BASELINE_SECRETS_ALIAS,
+      "--sample",
+      "violating",
+    ]);
+    expect(violating.exitCode).not.toBe(0);
+    const violatingBody = JSON.parse(violating.stdout) as {
+      ok: boolean;
+      stub: boolean;
+      body: string;
+      reason?: string;
+    };
+    expect(violatingBody.ok).toBe(false);
+    expect(violatingBody.stub).toBe(false);
+    expect(violatingBody.body).toBe("TASK-J.30");
+    expect(violatingBody.reason).toBe("E_VAULT_SECRET_IN_CONTEXT");
   });
 
   it("可用 --exit 强制非 0，用于测 fail-closed；未知 id 或缺 id 也非 0", () => {
@@ -339,8 +369,8 @@ describe("TASK-J.29 八项检查体", () => {
     }
   });
 
-  it("J29-P4：八项全 0 且其它门禁通过时才可能 can_merge=true；secrets 仍为桩；LLM 不能单独置真", () => {
-    expect(DESTUBBED_BASELINE_GATE_ALIASES).toHaveLength(8);
+  it("J29-P4：九项全 0 且其它门禁通过时才可能 can_merge=true；secrets 已去桩；LLM 不能单独置真", () => {
+    expect(DESTUBBED_BASELINE_GATE_ALIASES).toHaveLength(9);
     for (const id of DESTUBBED_BASELINE_GATE_ALIASES) {
       expect(runCheckCommand(["baseline-gate", "--id", id]).exitCode, id).toBe(
         0,
@@ -352,7 +382,8 @@ describe("TASK-J.29 八项检查体", () => {
       BASELINE_SECRETS_ALIAS,
     ]);
     expect(secrets.exitCode).toBe(0);
-    expect(JSON.parse(secrets.stdout).stub).toBe(true);
+    expect(JSON.parse(secrets.stdout).stub).toBe(false);
+    expect(JSON.parse(secrets.stdout).body).toBe("TASK-J.30");
 
     const allPassing = evaluateBaselineGateResults(
       REQUIRED_BASELINE_GATES.map((gate) => ({
@@ -389,10 +420,11 @@ describe("TASK-J.29 八项检查体", () => {
     expect(deriveCanMerge.length).toBe(1);
   });
 
-  it("J29-P5：没有第二套 deriveCanMerge，八项均非新子系统桩", () => {
+  it("J29-P5：没有第二套 deriveCanMerge，九项均非新子系统桩", () => {
     expect(DESTUBBED_BASELINE_GATE_ALIASES).toEqual([
       "baseline-safety-writable-scope",
       "baseline-safety-test-integrity",
+      "baseline-safety-secrets",
       "baseline-rollback-auto",
       "baseline-rollback-manual",
       "baseline-rollback-no-live",
@@ -403,7 +435,9 @@ describe("TASK-J.29 八项检查体", () => {
     for (const id of DESTUBBED_BASELINE_GATE_ALIASES) {
       const body = runBaselineGateBody(id);
       expect(body.stub, id).toBe(false);
-      expect(body.body, id).toBe("TASK-J.29");
+      expect(body.body, id).toBe(
+        id === BASELINE_SECRETS_ALIAS ? "TASK-J.30" : "TASK-J.29",
+      );
       expect(body.ok, id).toBe(true);
     }
     expect(deriveCanMerge.length).toBe(1);

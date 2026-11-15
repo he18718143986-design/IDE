@@ -6,6 +6,7 @@ import type { GraveyardEntry } from "../../src/lib/journey/scheme-patch-types";
 import { renderRejectedProposalsSection } from "../guard/graveyard-wiring";
 import type { AdapterCapabilityDeclaration } from "./worker-adapter.interface";
 import { KNOWLEDGE_CHECK_RULE_SUMMARIES } from "../knowledge/check-knowledge";
+import { assertContextHasNoVaultSecrets } from "../vault/active";
 
 /**
  * Worker 任务指令装配器（TASK-W.1 目标 2 / 规范 A §2.3、§4.1）。
@@ -526,6 +527,10 @@ export function buildWorkerTaskInstruction(
     "# Stagent Coding Worker 任务指令",
     ...sections.map((section) => `## ${section.title}\n${section.body}`),
   ].join("\n\n");
+
+  assertContextHasNoVaultSecrets(systemPrompt);
+  assertContextHasNoVaultSecrets(objective.title);
+  assertContextHasNoVaultSecrets(objective.description);
 
   return {
     contract_id: contract.contract_id,

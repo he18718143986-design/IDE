@@ -7,6 +7,7 @@ import type {
 } from "../../src/lib/chat-events";
 import type { AdapterEvent, ChatAdapter, HistoryTurn } from "./types";
 import { ChatSessionStore, type StoredSession } from "./session-store";
+import { assertContextHasNoVaultSecrets } from "../vault/active";
 import { pickPreferredAdapterId } from "../../src/lib/pick-chat-adapter";
 
 /**
@@ -176,6 +177,8 @@ export class ChatSessionManager {
     if (!session) throw new Error(`session not found: ${sessionId}`);
     const trimmed = text.trim();
     if (!trimmed) throw new Error("empty message");
+    // 发出或入队前断言，避免密钥被写入会话事件
+    assertContextHasNoVaultSecrets(trimmed);
     const st = this.state(sessionId);
     if (st.controller) {
       st.queue.push(trimmed);
@@ -224,6 +227,10 @@ export class ChatSessionManager {
     st.turnId = turnId;
     st.gateOpen = true;
     const history = this.historyOf(session);
+    assertContextHasNoVaultSecrets(text);
+    for (const turn of history) {
+      assertContextHasNoVaultSecrets(turn.text);
+    }
     if (session.title === "新会话") session.title = text.slice(0, 40);
     this.emit(session, turnId, { kind: "user", text });
     try {
