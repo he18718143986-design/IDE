@@ -76,16 +76,16 @@ Daemon 在签署前（`withSystemScope` / `buildScopePlan`）向 `verification` 
 
 **fail-closed 触发路径**：写证据前，若合同已登记底线命令，则 `evaluateBaselineGateResults` 核对清单每个别名都出现在 `verification_results`，且退出码为 0（`passed === false` 也视为失败）。缺项、未跑（结果中无该别名）或退出码非 0 → `verdict.status` 不得为 `PASSED`，`reason_code` 为既有 `UNSAFE_EXECUTION`。`can_merge` 仍只经 `deriveCanMerge` 计算（本卡不改其签名），结果为 false。LLM / 人工评语不进入该函数。未登记底线命令的空命令合同仍走既有零命令兜底（G1 / N-⑩），不在本路径把 `can_merge` 置真。
 
-#### TASK-J.30 已拍板方案（P-211）
+#### TASK-J.30 已拍板方案（P-211 / P-213）
 
-Tina t1271u / t1273u 拍板：`TASK-J.30` 采用 Vault 口径运行时断言，不采用落盘文本静态扫描。断言函数加在现有 `daemon/vault/vault.ts` 门面，复用 `currentValues()`（第 98 行；只覆盖已加载进缓存且长度 ≥6 的密钥，未 `get()` 过的密钥不在断言范围），不新建 `assert-context.ts`。四处生产发送接缝在发出前调用同一函数：
+Tina t1271u / t1273u 拍板、t1281u 修订：`TASK-J.30` 采用 Vault 口径运行时断言，不采用落盘文本静态扫描。共享断言函数放在现有叶子 `daemon/vault/active.ts`（Supervisor 与 debug-log 可安全引用），`daemon/vault/vault.ts` 门面转出该函数；复用 `currentValues()`（`vault.ts` 第 98 行；只覆盖已加载进缓存且长度 ≥6 的密钥，未 `get()` 过的密钥不在断言范围），不新建 `assert-context.ts`。四处生产发送接缝在发出前从 `active.ts` 引用同一函数，不直接引用 `vault.ts`：
 
 - 右栏：`daemon/chat/session-manager.ts`（`send` 第 174 行 → `runOne` 第 219 行；断言失败则不调用第 232 行 `adapter.run`）；
 - L1 补全：`daemon/supervisor/draft-generator.ts` 的 `buildEnrichmentPrompt`（第 136 行）之后、调用 `enrich` 之前；
 - 方案编译器：`daemon/supervisor/intent-compiler/compile-loop.ts` 的 `callModel`（第 435 行）在第 451 行 `client.generate` 之前；
 - 工人：`daemon/worker/session-task-injector.ts` 的 `buildWorkerTaskInstruction`（第 382 行），以及 `daemon/worker/ai-worker.ts` 的 `collectContext`（第 345 行）之后、发起模型调用前（指令 + 已收集文件双重断言）。
 
-断言失败必须非 0 且上下文不发出，不得降级为「脱敏后继续」。`stagent check baseline-gate --id baseline-safety-secrets` 去桩后用同一断言函数跑固定样本，不做全仓库落盘文本扫描。`daemon/supervisor/prompt-builder.ts` 第 248 行「对话上下文」拼装不是活的发送点，不列入必须可写。本条只修卡；代码施工必须等 `TASK-J.29` 合入后基于新 main 变基。
+断言失败必须非 0 且上下文不发出，不得降级为「脱敏后继续」。`stagent check baseline-gate --id baseline-safety-secrets` 去桩后用同一断言函数跑固定样本，不做全仓库落盘文本扫描。`daemon/supervisor/prompt-builder.ts` 第 248 行「对话上下文」拼装不是活的发送点，不列入必须可写。P-213 只修卡；代码施工必须等 P-213 合入后基于新 main 变基。不改 `deriveCanMerge`。
 
 北极星场景（[`../scheme.md`](../scheme.md) goal-2）与「无人值守连续三张真实任务卡」在本节落地后仍为**未交付**；本节不加新的文档层。
 
