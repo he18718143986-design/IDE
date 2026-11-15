@@ -1183,7 +1183,7 @@ governance:
 
 ---
 
-### 3.4f 文档可读性与固定底线清单（2026-11-14 · 立卡 P-206；J.25 / J.26 / J.27 / J.28 已完工迁出，J.29 经 P-210 缩为八项薄适配，J.30 已立卡待方案）
+### 3.4f 文档可读性与固定底线清单（2026-11-14 · 立卡 P-206；J.25 / J.26 / J.27 / J.28 已完工迁出，J.29 经 P-210 缩为八项薄适配，J.30 经 P-211 拍板 Vault 运行时断言并补代码路径，代码施工等 J.29 合入）
 
 > **立卡说明（2026-11-14 · P-206）**：授权来源为 Tina t1250u「按这个立卡」。目标是让非软件专业用户能走完「表达偏好 → 签字开工 → 试玩验收」并稳定得到高质量结果。本批只立第一块（文档可读性与结构分家）与第三块「固定底线清单硬门禁」。**不立**第二块（质量边界 / 判分表 / `card-copy-standard` / 校验器），**不立**「密封前意图完整性核对（`U<seq>` 回链）」卡——这两块留给 Opus 5.5。五张卡均为 `[NEW_TASK]`，估算均为 S 或 M（R-11；不立 L，不重演 J.16）。**立卡 ≠ 授权 ≠ 开工**；待 Tina 逐张授权。J.22 不开工；CI.2 攒样本。不改已完工的 `TASK-J.16`，不碰 `TASK-D.1e` / `TASK-S.3`，不改 runtime/contract ScopePlan sandbox。北极星场景（`scheme.md` goal-2）与「无人值守连续三张真实任务卡」继续标明未交付，不加新文档层。不暗示条目级高亮已交付（J.22 范围）。
 
@@ -1308,13 +1308,15 @@ governance:
 ```
 
 * **背景**：三类检查是原方案点名的硬门禁内容；与接线拆开是为了避免单卡 L。施工前发现凭据项没有可调用退出码检查，故从本卡拆出。
-* **取舍**：只做八项薄适配。凭据项见 `TASK-J.30`，由 Opus 5.5 先出方案再定实现，不在本卡发明产品方向。
+* **取舍**：只做八项薄适配。凭据项见 `TASK-J.30`（P-211 已拍板 Vault 口径运行时断言并补代码路径；代码施工等本卡合入后再动），不在本卡发明产品方向。
 
 <a id="task-j.30"></a>
 
-#### 【Task J.30】凭据与秘密不得进入对话的退出码检查`[NEW_TASK · 立卡 P-210 · 未开工]`
+#### 【Task J.30】凭据与秘密不得进入对话的退出码检查`[NEW_TASK · 立卡 P-210 · 修订 P-211 · 未开工]`
 
-> **立卡说明（2026-11-15 · P-210）**：从 `TASK-J.29` 拆出的安全类第③项。J.27 清单要求「凭据与秘密不得进入对话」以真实子进程退出码进入 J.28 登记表（别名 `baseline-safety-secrets`），但施工前核对确认：`stagent check` 现有子命令只有 `obligations` / `test-integrity` / `knowledge` / `playtest` 与 J.28 的 `baseline-gate` 桩，没有凭据检查项；`redactSecrets` / `redactText` 是运行时遮蔽，`daemon/vault/` 是存取能力，都不是 0 / 1 门禁。出处应写 [`../ledger/scheme-settled-decisions.md`](../ledger/scheme-settled-decisions.md) 第 79 行 `conf-6`（q14 拍板，受控+Vault，账密严禁进入对话上下文），不是 settled 第 138 行 `acc-9`（发布失败回到上一个 LIVE）。设计方向为「复用既有 `redactSecrets` 模式表做静态扫描器」还是「Vault 口径的运行时断言」，先由 Opus 5.5 出方案再定代码 `writable_paths`，本卡不预设实现。硬依赖 J.27 清单口径，与 J.29 无代码依赖，可并行立卡。估算 M（R-11：若方案需要新子系统再拆，不得在未拆时把本卡扩成 L）。**立卡 ≠ 开工**。
+> **立卡说明（2026-11-15 · P-210）**：从 `TASK-J.29` 拆出的安全类第③项。J.27 清单要求「凭据与秘密不得进入对话」以真实子进程退出码进入 J.28 登记表（别名 `baseline-safety-secrets`），但施工前核对确认：`stagent check` 现有子命令只有 `obligations` / `test-integrity` / `knowledge` / `playtest` 与 J.28 的 `baseline-gate` 桩，没有凭据检查项；`redactSecrets` / `redactText` 是运行时遮蔽，`daemon/vault/` 是存取能力，都不是 0 / 1 门禁。出处应写 [`../ledger/scheme-settled-decisions.md`](../ledger/scheme-settled-decisions.md) 第 79 行 `conf-6`（q14 拍板，受控+Vault，账密严禁进入对话上下文），不是 settled 第 138 行 `acc-9`（发布失败回到上一个 LIVE）。立卡时两种设计方向待定，不预设实现。硬依赖 J.27 清单口径。估算 M（R-11：若方案需要新子系统再拆，不得在未拆时把本卡扩成 L）。**立卡 ≠ 开工**。
+>
+> **修订说明（2026-11-15 · P-211）**：Tina t1271u 拍板采用第二种（Vault 口径运行时断言），t1273u 核实并批准接缝清单。断言函数加在现有 `daemon/vault/vault.ts` 门面，复用 `currentValues()`（第 98 行；只覆盖已加载进缓存且长度 ≥6 的密钥，未 `get()` 过的密钥不在断言范围），不新建 `assert-context.ts`。四处生产发送接缝在发出前调用同一函数：右栏 `daemon/chat/session-manager.ts`（`send` 第 174 行 → `runOne` 第 219 行，失败则不调用第 232 行 `adapter.run`）；L1 补全 `daemon/supervisor/draft-generator.ts` 的 `buildEnrichmentPrompt`（第 136 行）之后、调用 `enrich` 之前；方案编译器 `daemon/supervisor/intent-compiler/compile-loop.ts` 的 `callModel`（第 435 行）在第 451 行 `client.generate` 之前；工人指令 `daemon/worker/session-task-injector.ts` 的 `buildWorkerTaskInstruction`（第 382 行），以及 `daemon/worker/ai-worker.ts` 的 `collectContext`（第 345 行）之后、发起模型调用前（指令 + 已收集文件双重断言）。失败必须非 0 且上下文不发出，不得降级为「脱敏后继续」。`stagent check baseline-gate --id baseline-safety-secrets` 去桩后用同一断言函数跑固定样本（干净上下文退出 0，夹带保险库值非 0），不做全仓库落盘文本扫描。`daemon/supervisor/prompt-builder.ts` 第 248 行「对话上下文」拼装不是活的发送点，不列入必须可写（可选对齐）。本卡仍 `[NEW_TASK]`、估算仍为 M；本条只修卡补 `writable_paths`，代码施工必须等 `TASK-J.29` 合入后基于新 main 变基，避免抢 `baseline-gates.ts` / `bin/stagent.ts` / `tests/unit/baseline-gates.test.ts`。**修订 ≠ 开工**。
 
 ```yaml task-card
 id: TASK-J.30
@@ -1326,22 +1328,30 @@ contract:
       将 J.27 清单安全类第③项「凭据与秘密不得进入对话」做成真实子进程，接入 J.28 登记表别名 baseline-safety-secrets：
       退出码 0 表示该条通过，非 0 或未跑则 can_merge 为 false。
       口径对齐 conf-6 / q14（账密严禁进入对话上下文），不得把 acc-9（发布回滚）当作本项出处。
-      实现方案（复用既有 redactSecrets 模式表做静态扫描器，或做 Vault 口径的运行时断言）待 Opus 5.5 写出后再定，本卡不预设实现。
-      LLM 审核仍不得置真 can_merge。
+      已拍板采用 Vault 口径运行时断言：在现有 vault.ts 增加断言函数，于四处生产发送接缝发出前调用；
+      失败必须非 0 且上下文不发出，不得降级为「脱敏后继续」。
+      断言范围以 currentValues() 已缓存且长度 ≥6 的密钥为限；baseline-safety-secrets 去桩后跑固定样本，不做全仓库扫描。
+      LLM 审核仍不得置真 can_merge。代码施工等 TASK-J.29 合入后再动。
     risk_level: MEDIUM
   acceptance:
     - id: J30-P1
       check: auto
       text: >-
-        「凭据与秘密不得进入对话」已作为真实子进程接入 J.28 登记表别名 baseline-safety-secrets；退出码 0 为通过，非 0 或缺失时 can_merge 为 false。测试锁定退出码行为。
+        「凭据与秘密不得进入对话」已作为真实子进程接入 J.28 登记表别名 baseline-safety-secrets；
+        stagent check baseline-gate --id baseline-safety-secrets 已去桩，用同一断言函数跑固定样本
+        （干净上下文退出 0，夹带保险库值非 0）；退出码 0 为通过，非 0 或缺失时 can_merge 为 false。测试锁定退出码行为。
+        不做全仓库落盘文本扫描。
     - id: J30-P2
       check: auto
       text: >-
-        检查口径对齐 conf-6 / q14（账密严禁进入对话上下文），并在规格中明确此项出处不是 acc-9。
+        检查口径对齐 conf-6 / q14（账密严禁进入对话上下文），并在规格中明确此项出处不是 acc-9；
+        同时写明 currentValues() 只覆盖已缓存且长度 ≥6 的密钥、未 get() 过的密钥不在断言范围。
     - id: J30-P3
       check: auto
       text: >-
-        实现采用经授权的方案（复用既有 redactSecrets 模式表做静态扫描器，或 Vault 口径的运行时断言），不另造与这两条既有模式无关的并行扫描子系统；can_merge 仍只经 deriveCanMerge 派生。
+        实现采用已授权的 Vault 口径运行时断言（断言函数在 daemon/vault/vault.ts，不新建 assert-context.ts），
+        于四处生产发送接缝发出前调用同一函数；失败必须非 0 且上下文不发出，不得降级为「脱敏后继续」；
+        不另造扫描子系统；can_merge 仍只经 deriveCanMerge 派生。
     - id: J30-P4
       check: auto
       text: >-
@@ -1349,6 +1359,16 @@ contract:
   scheme_item_ids: [conf-6]
   scope:
     writable_paths:
+      - daemon/vault/vault.ts
+      - daemon/chat/session-manager.ts
+      - daemon/supervisor/draft-generator.ts
+      - daemon/supervisor/intent-compiler/compile-loop.ts
+      - daemon/worker/session-task-injector.ts
+      - daemon/worker/ai-worker.ts
+      - daemon/guard/baseline-gates.ts
+      - bin/stagent.ts
+      - tests/unit/baseline-gates.test.ts
+      - tests/daemon/vault.test.ts
       - docs/specs/verification-strategy.md
       - docs/specs/evidence-and-acceptance-criteria.md
     readonly_paths:
@@ -1357,28 +1377,52 @@ contract:
       - daemon/runner/command-runner.ts
       - daemon/core/debug-log.ts
       - src/lib/ipc/redaction.ts
-      - daemon/vault/vault.ts
       - src/lib/evidence.schema.ts
       - daemon/pipeline/orchestrator.ts
-      - daemon/guard/baseline-gates.ts
-      - bin/stagent.ts
+      - daemon/chat/baseline-adapter.ts
+      - daemon/chat/demo-adapter.ts
+      - daemon/worker/cli-host/claude-code-adapter.ts
+      - daemon/supervisor/enrich-openai.ts
+      - daemon/supervisor/intent-compiler/render-input.ts
+      - daemon/supervisor/intent-compiler/system-prompt.ts
+      - daemon/worker/openai-client.ts
+      - daemon/worker/default-worker-registry.ts
+      - daemon/worker/policy-guard.ts
+      - daemon/supervisor/prompt-builder.ts
   verification:
     commands:
       - { alias: docs, executable: npm, args: [run, check:docs] }
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/baseline-gates.test.ts, tests/daemon/vault.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
 design:
   approach: >-
-    先由 Opus 5.5 比较两种方向并写出方案：「复用既有 redactSecrets 模式表做静态扫描器」，或「Vault 口径的运行时断言」。
-    方案经授权后，再修卡补入代码 writable_paths 与测试路径，然后施工。立卡阶段不预设实现、不写产品代码。
-    硬依赖仅为 J.27 清单口径；不重做 J.28 注入，不改 deriveCanMerge。
+    已拍板采用 Vault 口径运行时断言。在 daemon/vault/vault.ts 增加断言函数（复用 currentValues()，不新建 assert-context.ts），
+    于四处生产发送接缝发出前调用：session-manager.ts、draft-generator.ts、compile-loop.ts、
+    session-task-injector.ts 与 ai-worker.ts（指令 + 已收集文件）。
+    失败必须非 0 且上下文不发出，不得降级为「脱敏后继续」。
+    baseline-safety-secrets 去桩后用同一函数跑固定样本，不做全仓库落盘文本扫描。
+    prompt-builder.ts 第 248 行不是活发送点，不列入必须可写。
+    本条只修卡；代码施工必须等 TASK-J.29 合入后基于新 main 变基。
+    不重做 J.28 注入，不改 deriveCanMerge。估算维持 M；若施工中发现接缝比定位多或必须改只读适配器，停下来拆卡或再修卡。
   touches:
-    - { path: docs/specs/verification-strategy.md, change: modify, why: 方案与命令落盘后回写本项覆盖与出处（立卡阶段已先修正 acc-9 误引）, symbols: [] }
-    - { path: docs/specs/evidence-and-acceptance-criteria.md, change: modify, why: 回写本项证据与软层界限, symbols: [] }
+    - { path: daemon/vault/vault.ts, change: modify, why: 在现有门面增加断言函数，复用 currentValues()，不新建 assert-context.ts, symbols: [currentValues] }
+    - { path: daemon/chat/session-manager.ts, change: modify, why: 右栏统一拦截点：断言失败则不调用 adapter.run, symbols: [send, runOne] }
+    - { path: daemon/supervisor/draft-generator.ts, change: modify, why: L1 补全提示拼装后、调用 enrich 前断言, symbols: [buildEnrichmentPrompt, generateContractDraft] }
+    - { path: daemon/supervisor/intent-compiler/compile-loop.ts, change: modify, why: callModel 在 client.generate 发出前断言, symbols: [callModel] }
+    - { path: daemon/worker/session-task-injector.ts, change: modify, why: 拼工人 system_prompt 时断言，失败不返回指令, symbols: [buildWorkerTaskInstruction] }
+    - { path: daemon/worker/ai-worker.ts, change: modify, why: collectContext 之后、发起模型调用前对指令和已收集文件再断言, symbols: [collectContext] }
+    - { path: daemon/guard/baseline-gates.ts, change: modify, why: 去桩接线所需的登记/求值配合；与 J.29 共享，施工须等 J.29 合入后变基, symbols: [REQUIRED_BASELINE_GATES] }
+    - { path: bin/stagent.ts, change: modify, why: baseline-safety-secrets 去桩，改为用同一断言函数跑固定样本；与 J.29 共享，施工须等 J.29 合入后变基, symbols: [] }
+    - { path: tests/unit/baseline-gates.test.ts, change: modify, why: 锁定 baseline-safety-secrets 固定样本退出码；与 J.29 共享，施工须等 J.29 合入后变基, symbols: [] }
+    - { path: tests/daemon/vault.test.ts, change: modify, why: 扩展 RO-08：夹带保险库值时必须 fail-closed，不得脱敏后继续, symbols: [] }
+    - { path: docs/specs/verification-strategy.md, change: modify, why: 回写已拍板方案、currentValues 局限、去桩样本与非活发送点, symbols: [] }
+    - { path: docs/specs/evidence-and-acceptance-criteria.md, change: modify, why: 回写本项证据、软层界限与断言局限, symbols: [] }
   interfaces: []
   test_plan:
-    - { acceptance_id: J30-P1, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "未施工；测试路径待方案授权后修卡补入" }
-    - { acceptance_id: J30-P2, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "未施工；测试路径待方案授权后修卡补入" }
-    - { acceptance_id: J30-P3, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "未施工；测试路径待方案授权后修卡补入" }
-    - { acceptance_id: J30-P4, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "未施工；测试路径待方案授权后修卡补入" }
+    - { acceptance_id: J30-P1, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "修卡已补路径；测试体待 J.29 合入后施工再写" }
+    - { acceptance_id: J30-P2, test_path: tests/daemon/vault.test.ts, level: unit, debt: "修卡已补路径；测试体待 J.29 合入后施工再写" }
+    - { acceptance_id: J30-P3, test_path: tests/daemon/vault.test.ts, level: unit, debt: "修卡已补路径；测试体待 J.29 合入后施工再写" }
+    - { acceptance_id: J30-P4, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "修卡已补路径；测试体待 J.29 合入后施工再写" }
 governance:
   spec_refs:
     - docs/specs/verification-strategy.md
@@ -1390,21 +1434,35 @@ governance:
   code_facts:
     - { ref: "docs/ledger/scheme-settled-decisions.md:79", note: "conf-6 / q14：账密严禁进入对话上下文，是本项口径出处" }
     - { ref: "docs/ledger/scheme-settled-decisions.md:138", note: "settled acc-9 是发布失败回到上一个 LIVE，不是本项出处" }
-    - { ref: "bin/stagent.ts:707", note: "stagent check 可识别子命令目前为 obligations、test-integrity、knowledge、playtest、baseline-gate，无凭据检查项" }
-    - { ref: "daemon/runner/command-runner.ts:100", note: "既有 redactSecrets 为运行时遮蔽，不是 0/1 门禁" }
+    - { ref: "daemon/vault/vault.ts:98", note: "currentValues() 返回缓存中长度 ≥6 的值；未 get() 过的密钥不在断言范围" }
+    - { ref: "daemon/chat/session-manager.ts:174", note: "右栏 send 入口" }
+    - { ref: "daemon/chat/session-manager.ts:219", note: "runOne 汇合历史与本条原文" }
+    - { ref: "daemon/chat/session-manager.ts:232", note: "adapter.run；断言失败不得调用" }
+    - { ref: "daemon/supervisor/draft-generator.ts:136", note: "buildEnrichmentPrompt 把用户原话写入 L1 提示" }
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:435", note: "callModel 是编译器发送接缝" }
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:451", note: "client.generate 发出 system + rendered.prompt 之前必须断言" }
+    - { ref: "daemon/worker/session-task-injector.ts:382", note: "buildWorkerTaskInstruction 拼工人 system_prompt" }
+    - { ref: "daemon/worker/ai-worker.ts:345", note: "collectContext 读取可写路径已有文件，是第二道工人泄漏面" }
+    - { ref: "daemon/supervisor/prompt-builder.ts:248", note: "「对话上下文」拼装不是活的发送点，不列入必须可写" }
+    - { ref: "bin/stagent.ts:673", note: "baseline-gate 子命令目前仍为桩（stub: true，可被 --exit 置 0）；去桩留给本卡施工" }
+    - { ref: "daemon/runner/command-runner.ts:100", note: "既有 redactSecrets 为运行时遮蔽，不是 0/1 门禁，不得用来脱敏后继续" }
     - { ref: "daemon/core/debug-log.ts:156", note: "另一份 redactSecrets，同样是运行时遮蔽" }
     - { ref: "src/lib/ipc/redaction.ts:105", note: "既有 redactText 为运行时遮蔽，不是 0/1 门禁" }
-    - { ref: "daemon/vault/vault.ts:1-8", note: "Vault 是凭据存取门面，不是检查器" }
     - { ref: "daemon/guard/baseline-gates.ts::REQUIRED_BASELINE_GATES", note: "J.28 已登记 baseline-safety-secrets 别名，当前仍为桩命令" }
   non_goals:
-    - 不在方案授权前写产品代码，不预设实现，不提前填代码 writable_paths
-    - 不新造与「redactSecrets 模式表静态扫描」和「Vault 口径运行时断言」无关的并行扫描子系统
-    - 不重做 J.28 的注入与 deriveCanMerge 接线，不改 sandbox / 网关写范围
+    - 本条修卡合入 ≠ 开工；代码施工必须等 TASK-J.29 合入后基于新 main 变基
+    - 不新建 daemon/vault/assert-context.ts，不新造扫描子系统，不做全仓库落盘文本扫描
+    - 不得把断言失败降级为「脱敏后继续」
+    - 不把 prompt-builder.ts 列为必须可写（非活发送点，可选对齐）
+    - 不改只读适配器与 deriveCanMerge；不重做 J.28 注入；不改 sandbox / 网关写范围
     - 不做 J.29 的八项薄适配，不开工 J.22 / CI.2
     - 不宣称北极星或无人值守三连卡已交付；不加新文档层
     - 不改 D.1e / S.3 / 已完工的 TASK-J.16
   fail:
-    - 未出方案、未经授权就写产品代码或新造扫描器
+    - 未等 TASK-J.29 合入就抢共享文件施工，或修卡未合入就写产品代码
+    - 把断言失败做成「脱敏后继续」，或做全仓库落盘文本扫描，或新建 assert-context.ts / 扫描器
+    - 把未加载进缓存的密钥假装已在断言范围内
+    - 施工中发现接缝比定位多或必须改只读适配器却不报拆卡 / 再修卡、带病施工
     - 把 acc-9（发布回滚）当作本项出处
     - 只写文档、没有真实子进程退出码就把本项标完成
     - LLM 审核或手写布尔把 can_merge 置真
@@ -1417,5 +1475,5 @@ governance:
     gateway_write_scope: unchanged
 ```
 
-* **背景**：该项是 J.27 清单已点名的硬门禁，但没有可调用的退出码检查，不能塞进 J.29 的薄适配。
-* **取舍**：先立卡、先把引用改对，方案与代码路径留给 Opus 5.5；不在立卡时发明实现。
+* **背景**：该项是 J.27 清单已点名的硬门禁，但没有可调用的退出码检查，不能塞进 J.29 的薄适配。P-211 已拍板实现方向并补齐代码路径。
+* **取舍**：采用 Vault 口径运行时断言，不做落盘扫描、不新建断言文件；代码施工等 J.29 合入后再动，避免两卡抢同一批门禁文件。

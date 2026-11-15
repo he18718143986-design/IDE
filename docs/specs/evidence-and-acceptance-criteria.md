@@ -85,7 +85,7 @@
 机制定位（`user_said`）：安全、回滚、关键路径三类检查必须是 Daemon 可执行的硬门禁；结论只由真实子进程退出码进入现有 `can_merge` 派生路径（[ADR-0005](../adr/0005-deterministic-verification-gate.md) / `deriveCanMerge`）。接线见 `TASK-J.28`，三类检查接入见 `TASK-J.29`。
 人工验收三态不替代 Daemon 判卷：卡回写 / PR 审阅仍按本文 §1 的 PASS / FAIL / INCONCLUSIVE 与 §2～§5 必填字段判据进行；机器侧 `can_merge` 仍只由退出码派生，本文三态不能把 `can_merge` 置真，也不能改写或绕过退出码。
 覆盖范围（细项均为 `ai_inferred`）
-- 安全：写范围只允许改已被授权的路径（现有 `ScopePlan` / `writable_paths` / 网关拦截）；未经授权不得改测试来制造假绿（现有 `stagent check test-integrity`）；凭据与秘密不得进入对话（现有 Vault 口径，出处为 [`../ledger/scheme-settled-decisions.md`](../ledger/scheme-settled-decisions.md) 第 79 行 `conf-6` / q14，不是 `acc-9`；该项退出码检查见 `TASK-J.30`，不在 `TASK-J.29`）。不覆盖可维护性、架构品味或安全细节的包装式审查（第二块「质量边界」，本批不立卡），也不新增漏洞扫描子系统。
+- 安全：写范围只允许改已被授权的路径（现有 `ScopePlan` / `writable_paths` / 网关拦截）；未经授权不得改测试来制造假绿（现有 `stagent check test-integrity`）；凭据与秘密不得进入对话（现有 Vault 口径，出处为 [`../ledger/scheme-settled-decisions.md`](../ledger/scheme-settled-decisions.md) 第 79 行 `conf-6` / q14，不是 `acc-9`；该项退出码检查见 `TASK-J.30`，不在 `TASK-J.29`。P-211 已拍板采用 Vault 口径运行时断言：失败必须非 0 且上下文不发出，不得脱敏后继续；`currentValues()` 只覆盖已缓存且长度 ≥6 的密钥，未 `get()` 过的密钥不在断言范围；去桩后跑固定样本，不做全仓库落盘扫描）。不覆盖可维护性、架构品味或安全细节的包装式审查（第二块「质量边界」，本批不立卡），也不新增漏洞扫描子系统。
 - 回滚：发布探活失败且存在上一个 LIVE 时，自动回滚到上一个 LIVE（[`release-and-operations.md`](./release-and-operations.md) §3.3）；手动回滚 = 以上一个 LIVE 的 `commit_sha` 新建一次发布（R-INV-4）；没有上一个 LIVE 时必须失败并告知，不得假装回滚成功。不覆盖合入前工作区里的随手撤销 / 保护清单恢复。
 - 关键路径：现有 V0～V3 验证命令必须以真实子进程退出码进入 `deriveCanMerge`；主线回归（现有 `mainline-regression`）；知识库漂移检查（现有 `stagent check knowledge`）。不覆盖北极星场景（[`../scheme.md`](../scheme.md) goal-2）端到端交付，也不覆盖「无人值守连续三张真实任务卡」；二者继续标明未交付。条目级高亮属 `TASK-J.22`，不在本清单。
 LLM 独立审核测试义务只是补充软层，不具独立性：不能单独放行合入，不能单独把 `can_merge` 置为 true，也不能改写或绕过退出码派生的 `can_merge`。软层意见可写入证据或审阅记录供人参考，机器判卷仍只认真实子进程退出码。
