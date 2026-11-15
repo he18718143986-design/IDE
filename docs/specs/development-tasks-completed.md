@@ -7410,3 +7410,108 @@ governance:
 
 * **背景**：第二块要让非技术用户自己能做试玩判定；现规格对实施者友好，对业主逐步判分与证据留存不够直白。#264 已把判分表与「试玩证据」表写入 `playtest-self-check.md`。
 * **取舍**：只改一份已有规格，不做校验器、不做自动点亮；§1–§8 未改写，§3.3 仍为「本版不实现」。诚实口径：判分表为文档层交付，非技术用户实际试用验证属后续真实试玩范畴。
+
+### 3.4am 卡文案规范与文档门禁校验（J.33 · 完工回写 P-217）
+
+<a id="task-j.33"></a>
+
+### 【Task J.33】新增卡文案规范并做成机器可校验项`[COMPLETED · 立卡 P-215 · 施工 #266 · 完工回写 P-217]`
+
+> **立卡说明（2026-11-15 · P-215）**：第二块的文档 + 校验器切片（估算 M）。新增 `docs/specs/card-copy-standard.md`（冲突卡 / 意外卡 / 线上卡文案规范）：术语黑名单以 [`glossary.md`](../glossary.md) 已收录词为限；每选项必须含「推荐项 + 后果一句话」结构化字段。这两项做成 `scripts/docs-check/checks.ts` 或 `src/lib/contract-card.ts` 的机器可校验规则，并补测试。文档必须写明：「用户是否真懂」只能靠非技术用户试用验证，不是门禁，不得做成 `can_merge` 派生输入。本条立卡时该新文件尚不存在，不得在 code_facts 里引用尚未落地的行号。**立卡 ≠ 开工**。施工须另授权，不与 `TASK-J.31` 捆绑开工。
+>
+> **归档注记（2026-11-15 · P-217）**：本卡已 **COMPLETED**。Tina t1292u 授权施工、t1295u 授权合入施工 PR。[#266](https://github.com/he18718143986-design/IDE/pull/266) squash `838d1f44a81a1882fb7dc58ac9d93136efb6d828` 于 2026-11-15 17:15:48 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `450d528777a976a259857d52f45c682d214df0e6`；父提交 `0176c61e2a071bd993d80458483963f88d998c2e`）。合入前必需检查全绿，`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows 非必需单测失败）。CI run [`43695882208`](https://github.com/he18718143986-design/IDE/actions/runs/43695882208)：第一次 macOS 必需单测 job [`132756206555`](https://github.com/he18718143986-design/IDE/actions/runs/43695882208/job/132756206555) 于 16:46:54 香港时间失败（`app-preview-runner.test.ts:163`，`EADDRINUSE:4200`）；第一次重跑 job [`132759408423`](https://github.com/he18718143986-design/IDE/actions/runs/43695882208/job/132759408423) 于 17:00:38 仍失败（`:163` 已过，同文件 `:199` 中 `ready` 应为 `false` 得 `true`）；第二次重跑 job [`132761165913`](https://github.com/he18718143986-design/IDE/actions/runs/43695882208/job/132761165913) 于 17:05:00–17:08:28 转绿。施工只改 3 个 `writable_paths` 内文件：新建 `docs/specs/card-copy-standard.md`，以及 `scripts/docs-check/checks.ts` 与 `tests/unit/docs-check.test.ts`。未改 `contract-card.ts`、`glossary.md`、`deriveCanMerge` 或产品 UI。交付：规范覆盖冲突卡 / 意外卡 / 线上卡；术语黑名单只收 glossary 已有词；每个选项含非空「推荐项」和「后果一句话」；「是否真懂不是门禁」声明已写入并由 `checkCardCopyStandard` 接入 `runAllChecks`；测试含正负两向用例。本条把 `card-copy-standard.md` 的 `touches.change` 由 `create` 改为 `modify`（文件已存在，口径同 J.25 先例）。挂账⑨样本已正式追加（见 ledger）。**诚实口径：规范为文案结构层交付，不表示界面已按两列展示。条目级高亮未交付（J.22b 范畴）。** 不把「是否真懂」做成门禁。J.32 与 J.22 子卡待逐张授权；CI.2 攒样本；文档计划暂缓。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.33
+status: COMPLETED
+contract:
+  intent:
+    title: 新增卡文案规范并做成机器可校验项
+    description: >-
+      新增 docs/specs/card-copy-standard.md，规定冲突卡、意外卡、线上卡的文案：
+      术语黑名单只使用 glossary.md 已收录词；每个选项含「推荐项」和「后果一句话」两个结构化字段。
+      把这两项接到现有文档门禁（checks.ts 或 contract-card.ts）做成机器可校验规则。
+      「是否真懂」只在文档中声明须经非技术用户试用验证，不得做成门禁。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J33-P1
+      check: auto
+      text: >-
+        docs/specs/card-copy-standard.md 已落地，覆盖冲突卡、意外卡、线上卡，并写明「是否真懂」只能靠非技术用户试用验证、不是门禁。
+    - id: J33-P2
+      check: auto
+      text: >-
+        术语黑名单以 glossary.md 已收录词为限，且由文档门禁机器校验；未收录词不得静默进入黑名单。
+    - id: J33-P3
+      check: auto
+      text: >-
+        每个选项的「推荐项」与「后果一句话」为结构化字段，并由文档门禁机器校验缺失或空字段。
+    - id: J33-P4
+      check: auto
+      text: >-
+        校验器接线不改 deriveCanMerge，不把「是否真懂」做成 can_merge 输入或退出码门禁。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - docs/specs/card-copy-standard.md
+      - scripts/docs-check/checks.ts
+      - src/lib/contract-card.ts
+      - tests/unit/docs-check.test.ts
+      - docs/glossary.md
+    readonly_paths:
+      - src/lib/evidence.schema.ts
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    先落规范文档，再把术语黑名单与选项结构化字段接到现有 docs-check（优先 checks.ts；若必须改 contract-card.ts 只加校验、不改 deriveCanMerge）。
+    glossary.md 仅在规范需要引用或增补已授权术语时改动，不借机扩写术语表。
+  touches:
+    - { path: docs/specs/card-copy-standard.md, change: modify, why: "新增冲突卡/意外卡/线上卡文案规范（施工 #266 已创建，完工回写改记 modify）", symbols: [] }
+    - { path: scripts/docs-check/checks.ts, change: modify, why: 把黑名单与选项结构化字段做成机器可校验项, symbols: [] }
+    - { path: tests/unit/docs-check.test.ts, change: modify, why: 锁定新规则的通过/失败样本, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J33-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #266 交付；正负向用例见本文件「卡文案规范（TASK-J.33）」" }
+    - { acceptance_id: J33-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #266 交付；黑名单未收录词报 error、锚点别名可通过" }
+    - { acceptance_id: J33-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #266 交付；缺推荐项或后果一句话报 error" }
+    - { acceptance_id: J33-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #266 交付；runAllChecks 已接入 checkCardCopyStandard；不得把本项接入 deriveCanMerge" }
+governance:
+  spec_refs:
+    - docs/glossary.md
+    - docs/specs/playtest-self-check.md
+  depends_on: []
+  code_facts:
+    - { ref: "docs/specs/card-copy-standard.md:7-13", note: "「是否真懂不是门禁」声明与稳定标记；门禁只查格式与用词来源" }
+    - { ref: "docs/specs/card-copy-standard.md:15-35", note: "术语黑名单只收 glossary 已有词，YAML 块为机器校验唯一名单来源" }
+    - { ref: "docs/specs/card-copy-standard.md:38-91", note: "冲突卡 / 意外卡 / 线上卡选项均含非空「推荐项」和「后果一句话」" }
+    - { ref: "scripts/docs-check/checks.ts:861", note: "checkCardCopyStandard 入口" }
+    - { ref: "scripts/docs-check/checks.ts:1098", note: "runAllChecks 汇总入口；第 1124 行接入 checkCardCopyStandard" }
+    - { ref: "tests/unit/docs-check.test.ts:637", note: "J.33 正负向用例组（黑名单、选项字段、声明、runAllChecks 接线）" }
+    - { ref: "src/lib/contract-card.ts:32-42", note: "本卡未改此文件；不改 deriveCanMerge" }
+    - { ref: "docs/glossary.md:10-16", note: "术语表已收录词是术语黑名单的唯一来源（## 标题起始行）" }
+  non_goals:
+    - 本条立卡 ≠ 开工；施工须另授权
+    - 不把「是否真懂」做成门禁或 can_merge 输入，不改 deriveCanMerge
+    - 不实现条目级自动点亮，不暗示条目级高亮已交付
+    - 不开工 J.31 / J.32 / J.22 子卡 / CI.2；不改 D.1e / S.3
+    - 不宣称北极星或无人值守三连卡已交付
+  fail:
+    - 只写规范、没有机器可校验规则就把本卡标完成
+    - 黑名单使用 glossary 未收录词，或选项缺少「推荐项 / 后果一句话」仍能通过门禁
+    - 把「是否真懂」做成退出码或 can_merge 条件
+    - 本条合入前开工，或本卡膨胀为 L 却不拆（R-11）
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 266, commit: 838d1f44a81a1882fb7dc58ac9d93136efb6d828 }
+```
+
+* **背景**：冲突卡 / 意外卡 / 线上卡如果术语不受控、选项不写后果，非技术用户难以选择；机器只能校验格式与用词来源，不能替用户判断「是否真懂」。
+* **取舍**：规范 + 门禁接线放在同一张 M 卡；「是否真懂」明确排除在门禁之外。诚实口径：规范为文案结构层交付，不表示界面已按两列展示；条目级高亮未交付（J.22b 范畴）。
+
