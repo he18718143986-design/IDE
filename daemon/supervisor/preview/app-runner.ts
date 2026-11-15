@@ -66,6 +66,14 @@ export interface WaitReadyOptions {
   readonly host?: string | undefined;
   /** 失败时附带 stderr 尾部（测试与失败卡） */
   readonly getStderr?: (() => string) | undefined;
+  /**
+   * 若提供，只有响应带有该头且值完全一致才算就绪。
+   * 缺省保持原口径：任意 HTTP 响应（含 3xx / 4xx）即就绪。
+   * 供测试把本夹具与同一端口上的外来 / 残留监听区分开。
+   */
+  readonly expectedHeader?:
+    | { readonly name: string; readonly value: string }
+    | undefined;
 }
 
 export type WaitReadyResult =
@@ -219,12 +227,29 @@ export async function startAppPreview(
   };
 }
 
-function probeOnce(port: number, host: string): Promise<boolean> {
+function headerValueEquals(
+  res: http.IncomingMessage,
+  expected?: { readonly name: string; readonly value: string },
+): boolean {
+  if (!expected) return true;
+  const raw = res.headers[expected.name.toLowerCase()];
+  if (raw === undefined) return false;
+  const values = Array.isArray(raw) ? raw : [raw];
+  return values.includes(expected.value);
+}
+
+function probeOnce(
+  port: number,
+  host: string,
+  expectedHeader?: { readonly name: string; readonly value: string },
+): Promise<boolean> {
   return new Promise((resolve) => {
     const req = http.get({ host, port, path: "/", timeout: 1_500 }, (res) => {
-      // 任意 HTTP 响应（含 3xx / 4xx）即就绪
+      // 缺省：任意 HTTP 响应（含 3xx / 4xx）即就绪。
+      // 若调用方给了 expectedHeader，则必须头值一致。
+      const matched = headerValueEquals(res, expectedHeader);
       res.resume();
-      resolve(true);
+      resolve(matched);
     });
     req.on("error", () => resolve(false));
     req.on("timeout", () => {
@@ -235,8 +260,9 @@ function probeOnce(port: number, host: string): Promise<boolean> {
 }
 
 /**
- * 每 `intervalMs` 对 `http://127.0.0.1:<port>/` 发 GET；
- * 任意 HTTP 响应即就绪。超时返回失败，可附 stderr 尾部。
+ * 每 `intervalMs` 对 `http://127.0.0.1:<port>/` 发 GET。
+ * 缺省任意 HTTP 响应即就绪；若 `expectedHeader` 有值，则只有头匹配才就绪。
+ * 超时返回失败，可附 stderr 尾部。
  */
 export async function waitReady(
   port: number,
@@ -248,7 +274,7 @@ export async function waitReady(
   const deadline = Date.now() + Math.max(0, timeoutMs);
 
   for (;;) {
-    const ok = await probeOnce(port, host);
+    const ok = await probeOnce(port, host, options.expectedHeader);
     if (ok) return { ready: true };
     if (Date.now() >= deadline) {
       return {
