@@ -3,17 +3,24 @@ import os from "node:os";
 import path from "node:path";
 import yaml from "js-yaml";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { fileURLToPath } from "node:url";
 import {
+  CARD_COPY_STANDARD_FILE,
   CARD_FENCE_INFO,
+  GLOSSARY_FILE,
   INDEX_FILE,
   MATRIX_FILE,
   Repo,
   SCHEME_FILE,
+  UNDERSTANDING_NOT_A_GATE_MARKER,
+  UNDERSTANDING_NOT_A_GATE_SENTENCE,
+  checkCardCopyStandard,
   checkLinks,
   checkScheme,
   checkHardcodedCounts,
   declaresSymbol,
   findTestCase,
+  parseGlossaryTerms,
   runAllChecks,
   type Finding,
 } from "../../scripts/docs-check/checks";
@@ -29,6 +36,87 @@ function write(rel: string, content: string) {
   const p = path.join(root, rel);
   fs.mkdirSync(path.dirname(p), { recursive: true });
   fs.writeFileSync(p, content);
+}
+
+const REPO_ROOT = path.resolve(
+  fileURLToPath(new URL("../..", import.meta.url)),
+);
+
+const MINIMAL_GLOSSARY = `# 术语表
+
+<a id="pab"></a>
+<a id="PAB"></a>
+
+## PAB
+
+<a id="designnote"></a>
+<a id="DesignNote"></a>
+
+## DesignNote
+`;
+
+function optionBlock(
+  cardType: string,
+  recommended: string,
+  consequence: string,
+) {
+  return [
+    "```yaml card-copy-options",
+    `card_type: ${cardType}`,
+    "options:",
+    `  - 推荐项: ${recommended}`,
+    `    后果一句话: ${consequence}`,
+    "```",
+  ].join("\n");
+}
+
+function minimalCardCopyStandard(
+  overrides: {
+    marker?: string;
+    sentence?: string;
+    blacklistBody?: string;
+    optionBlocks?: string;
+  } = {},
+): string {
+  const marker =
+    overrides.marker ?? `<!-- ${UNDERSTANDING_NOT_A_GATE_MARKER} -->`;
+  const sentence = overrides.sentence ?? UNDERSTANDING_NOT_A_GATE_SENTENCE;
+  const blacklist =
+    overrides.blacklistBody ??
+    [
+      "```yaml card-copy-blacklist",
+      "terms:",
+      "  - PAB",
+      "  - DesignNote",
+      "```",
+    ].join("\n");
+  const options =
+    overrides.optionBlocks ??
+    [
+      optionBlock(
+        "冲突卡",
+        "先跑通主流程，界面以后再说",
+        "这一版先把主流程做出来。",
+      ),
+      optionBlock("意外卡", "可以（加依赖）", "会等你重新确认后再装库。"),
+      optionBlock(
+        "线上卡",
+        "让 AI 看看",
+        "会生成一份修复合同，不改已经合入的内容。",
+      ),
+    ].join("\n\n");
+  return [
+    "# 卡文案规范",
+    "",
+    marker,
+    "",
+    sentence,
+    "",
+    blacklist,
+    "",
+    options,
+    "",
+  ].join("\n");
 }
 
 interface CardOverrides {
@@ -139,6 +227,8 @@ beforeEach(() => {
   write("docs/specs/spec.md", "# 目标\n");
   write("src/a.ts", "export function foo() {\n  return 1;\n}\n");
   write("tests/unit/a.test.ts", 'it("foo 返回 1", () => {});\n');
+  write(GLOSSARY_FILE, MINIMAL_GLOSSARY);
+  write(CARD_COPY_STANDARD_FILE, minimalCardCopyStandard());
   statusTables([["TASK-X.1", "COMPLETED"]]);
 });
 
@@ -541,5 +631,144 @@ describe("硬编码计数（TASK-J.26）", () => {
     expect(checkHardcodedCounts(new Repo(root), ["docs/README.md"])).toEqual(
       [],
     );
+  });
+});
+
+describe("卡文案规范（TASK-J.33）", () => {
+  it("parseGlossaryTerms 收录 ## 标题与锚点别名", () => {
+    const terms = parseGlossaryTerms(MINIMAL_GLOSSARY);
+    expect(terms.has("PAB")).toBe(true);
+    expect(terms.has("pab")).toBe(true);
+    expect(terms.has("DesignNote")).toBe(true);
+    expect(terms.has("designnote")).toBe(true);
+  });
+
+  it("黑名单含术语表未收录词报 error", () => {
+    write(
+      CARD_COPY_STANDARD_FILE,
+      minimalCardCopyStandard({
+        blacklistBody: [
+          "```yaml card-copy-blacklist",
+          "terms:",
+          "  - PAB",
+          "  - can_merge",
+          "```",
+        ].join("\n"),
+      }),
+    );
+    const hits = checkCardCopyStandard(new Repo(root));
+    expect(messages(hits, "card-copy-blacklist")).toEqual([
+      expect.stringContaining("术语表未收录词「can_merge」"),
+    ]);
+    for (const f of hits) {
+      expect(["error", "warn"]).toContain(f.severity);
+      expect(f).not.toHaveProperty("can_merge");
+      expect(f).not.toHaveProperty("verdict");
+    }
+  });
+
+  it("黑名单写术语表锚点别名可通过", () => {
+    write(
+      CARD_COPY_STANDARD_FILE,
+      minimalCardCopyStandard({
+        blacklistBody: [
+          "```yaml card-copy-blacklist",
+          "terms:",
+          "  - pab",
+          "  - designnote",
+          "```",
+        ].join("\n"),
+      }),
+    );
+    expect(checkCardCopyStandard(new Repo(root))).toEqual([]);
+  });
+
+  it("选项缺推荐项或后果一句话、或字段为空报 error", () => {
+    write(
+      CARD_COPY_STANDARD_FILE,
+      minimalCardCopyStandard({
+        optionBlocks: [
+          [
+            "```yaml card-copy-options",
+            "card_type: 冲突卡",
+            "options:",
+            "  - 后果一句话: 只写了后果",
+            "```",
+          ].join("\n"),
+          [
+            "```yaml card-copy-options",
+            "card_type: 意外卡",
+            "options:",
+            "  - 推荐项: 可以（加依赖）",
+            '    后果一句话: ""',
+            "```",
+          ].join("\n"),
+          optionBlock(
+            "线上卡",
+            "让 AI 看看",
+            "会生成一份修复合同，不改已经合入的内容。",
+          ),
+        ].join("\n\n"),
+      }),
+    );
+    const msgs = messages(
+      checkCardCopyStandard(new Repo(root)),
+      "card-copy-option-fields",
+    );
+    expect(msgs).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("冲突卡 第 1 个选项缺少非空「推荐项」"),
+        expect.stringContaining("意外卡 第 1 个选项缺少非空「后果一句话」"),
+      ]),
+    );
+  });
+
+  it("缺少「是否真懂不是门禁」声明报 error", () => {
+    write(
+      CARD_COPY_STANDARD_FILE,
+      minimalCardCopyStandard({
+        marker: "",
+        sentence: "这里改写成别的话。",
+      }),
+    );
+    const msgs = messages(
+      checkCardCopyStandard(new Repo(root)),
+      "card-copy-understanding-gate",
+    );
+    expect(msgs).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining(UNDERSTANDING_NOT_A_GATE_MARKER),
+        expect.stringContaining("缺少声明句"),
+      ]),
+    );
+  });
+
+  it("最小合法规范对本规则零发现", () => {
+    expect(checkCardCopyStandard(new Repo(root))).toEqual([]);
+  });
+
+  it("仓库现行 card-copy-standard.md 对本规则零 error", () => {
+    const hits = checkCardCopyStandard(new Repo(REPO_ROOT)).filter(
+      (f) => f.severity === "error",
+    );
+    expect(hits).toEqual([]);
+  });
+
+  it("runAllChecks 会调用卡文案规范校验", () => {
+    write(
+      CARD_COPY_STANDARD_FILE,
+      minimalCardCopyStandard({
+        blacklistBody: [
+          "```yaml card-copy-blacklist",
+          "terms:",
+          "  - worktree",
+          "```",
+        ].join("\n"),
+      }),
+    );
+    const msgs = messages(run(), "card-copy-blacklist");
+    expect(msgs).toEqual([
+      expect.stringContaining("术语表未收录词「worktree」"),
+    ]);
   });
 });
