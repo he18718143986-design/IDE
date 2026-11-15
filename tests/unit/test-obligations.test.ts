@@ -27,6 +27,7 @@ import {
   withSystemScope,
   type ScopePlanSchemeInput,
 } from "../../daemon/supervisor/scope-plan-builder";
+import { REQUIRED_BASELINE_GATES } from "../../daemon/guard/baseline-gates";
 import { detectTestWeakening } from "../../daemon/guard/test-integrity";
 import { runCheckCommand } from "../../bin/stagent";
 import { emptySchemeDraft } from "../../src/lib/journey/scheme-draft";
@@ -268,7 +269,7 @@ describe("TASK-L.3 withSystemScope", () => {
     expect(aliases).toContain("check-test-integrity");
   });
 
-  it("无 auto 条目且无知识库时不变", () => {
+  it("无 auto 条目且无知识库时仍注入固定底线命令（不再是 identity）", () => {
     const base = minimalPlan();
     const before = base.plan_digest;
     // 隔离到没有 docs/system/modules.yaml 的空目录：本仓自举知识库后，
@@ -282,8 +283,20 @@ describe("TASK-L.3 withSystemScope", () => {
         ]),
         runner: { kind: "vitest", reportArgs: ["--reporter=json"] },
       });
-      expect(next).toBe(base);
-      expect(next.plan_digest).toBe(before);
+      // TASK-J.28：底线命令始终注入，引用与 digest 必然变化；不得再当 identity。
+      expect(next).not.toBe(base);
+      expect(next.plan_digest).not.toBe(before);
+      const aliases = next.verification.commands.map(
+        (command) => command.alias,
+      );
+      expect(aliases).toEqual(
+        expect.arrayContaining(
+          REQUIRED_BASELINE_GATES.map((gate) => gate.alias),
+        ),
+      );
+      expect(aliases).not.toContain("obligation-tests");
+      expect(aliases).not.toContain("check-obligations");
+      expect(next.verification.manual_only).toBe(false);
       expect(scopePlanToContractScope(next).writable_paths).not.toContain(
         "tests/stagent/**",
       );

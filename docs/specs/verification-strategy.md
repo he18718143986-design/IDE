@@ -64,6 +64,18 @@ LLM 对测试义务或其它材料做的「独立审核 / 审阅」只是补充�
 
 人工验收三态（PASS / FAIL / INCONCLUSIVE）的规则见 [`evidence-and-acceptance-criteria.md`](./evidence-and-acceptance-criteria.md)，同样不替代 Daemon 判卷。
 
+#### 接线后的命令与 fail-closed（TASK-J.28）
+
+Daemon 在签署前（`withSystemScope` / `buildScopePlan`）向 `verification` 命令清单注入下列桩命令；若合同已登记任一条底线命令，验证循环在构建网关前补齐缺项。检查体留给 TASK-J.29；本卡用桩把机制测绿。形态为 `stagent check baseline-gate --id <alias>`，默认退出码 0；`--exit <n>` 仅供测试强制非 0。
+
+| 类 | 别名 |
+|:--|:--|
+| 安全 | `baseline-safety-writable-scope`、`baseline-safety-test-integrity`、`baseline-safety-secrets` |
+| 回滚 | `baseline-rollback-auto`、`baseline-rollback-manual`、`baseline-rollback-no-live` |
+| 关键路径 | `baseline-path-exit-codes`、`baseline-path-mainline-regression`、`baseline-path-knowledge` |
+
+**fail-closed 触发路径**：写证据前，若合同已登记底线命令，则 `evaluateBaselineGateResults` 核对清单每个别名都出现在 `verification_results`，且退出码为 0（`passed === false` 也视为失败）。缺项、未跑（结果中无该别名）或退出码非 0 → `verdict.status` 不得为 `PASSED`，`reason_code` 为既有 `UNSAFE_EXECUTION`。`can_merge` 仍只经 `deriveCanMerge` 计算（本卡不改其签名），结果为 false。LLM / 人工评语不进入该函数。未登记底线命令的空命令合同仍走既有零命令兜底（G1 / N-⑩），不在本路径把 `can_merge` 置真。
+
 北极星场景（[`../scheme.md`](../scheme.md) goal-2）与「无人值守连续三张真实任务卡」在本节落地后仍为**未交付**；本节不加新的文档层。
 
 ---

@@ -46,6 +46,10 @@ import {
 
 import { applyRepoAllowlistToScopePlan } from "./authorization-allowlist-store";
 import type { SupervisorMessage } from "./types";
+import {
+  BASELINE_GATE_PLAIN,
+  injectBaselineGateCommands,
+} from "../guard/baseline-gates";
 
 /** 构建器接受的方案输入：兼容现行 SchemeDraft 与未来 SchemeDraftV2 子集 */
 export type SchemeAcceptanceItem = {
@@ -677,7 +681,7 @@ function hasAutoAcceptance(scheme: ScopePlanSchemeInput): boolean {
  *   并追加义务命令 + `stagent check obligations` + `stagent check test-integrity`
  * - 目标仓已有 `docs/system/modules.yaml`，或本桩为 `knowledge_bootstrap`
  *   → 写范围 `docs/system/**` + `stagent check knowledge`（排在既有命令之后）
- * - 两者皆不触发时原样返回（digest / 引用不变，便于 L.3 回归）
+ * - TASK-J.28：无论是否触发上述两项，都注入固定底线清单命令（缺项不得假绿）
  */
 export function withSystemScope(
   plan: ScopePlan,
@@ -700,10 +704,6 @@ export function withSystemScope(
     ? (ctx.runner ?? detectRunner(facts))
     : (ctx.runner ?? { kind: null, reportArgs: [] });
   const canTests = wantsTests && runner.kind !== null;
-
-  if (!canTests && !knowledgeNeeded) {
-    return plan;
-  }
 
   const next: ScopePlan = {
     ...plan,
@@ -880,6 +880,15 @@ export function withSystemScope(
     if (!next.verification.plain.includes("系统知识库检查全部通过")) {
       next.verification.plain.push("系统知识库检查全部通过");
     }
+  }
+
+  // TASK-J.28：固定底线清单始终注入；有自动命令则不得再标 manual_only。
+  next.verification.commands = injectBaselineGateCommands(
+    next.verification.commands,
+  );
+  next.verification.manual_only = false;
+  if (!next.verification.plain.includes(BASELINE_GATE_PLAIN)) {
+    next.verification.plain.push(BASELINE_GATE_PLAIN);
   }
 
   next.plan_digest = scopePlanDigest(next);

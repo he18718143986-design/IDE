@@ -21,6 +21,7 @@ import {
   verificationFromPackageJson,
   type ScopePlanSchemeInput,
 } from "../../daemon/supervisor/scope-plan-builder";
+import { REQUIRED_BASELINE_GATES } from "../../daemon/guard/baseline-gates";
 import { isGreenfieldRepo } from "../../daemon/supervisor/rules-l0";
 
 const tmpDirs: string[] = [];
@@ -273,7 +274,12 @@ describe("TASK-J.2 buildScopePlan 构建器", () => {
     expect(isGreenfieldRepo(root)).toBe(true);
     expect(plan.grade.ok).toBe(true);
     expect(plan.areas.some((a) => a.paths.includes("src/**"))).toBe(true);
-    expect(plan.verification.manual_only).toBe(true);
+    // TASK-J.28：buildScopePlan 经 withSystemScope 始终注入底线命令，
+    // 这些是自动检查（expected_exit_code 0），故 manual_only 为 false。
+    expect(plan.verification.manual_only).toBe(false);
+    expect(plan.verification.commands.map((c) => c.alias)).toEqual(
+      expect.arrayContaining(REQUIRED_BASELINE_GATES.map((g) => g.alias)),
+    );
   });
 
   it("老项目 + 命中真实子目录 src/pages → 收敛为 src/pages/** 且 grade.ok", () => {
@@ -400,13 +406,14 @@ describe("TASK-J.2 buildScopePlan 构建器", () => {
     );
   });
 
-  it("无 typecheck/test 脚本 → manual_only===true", () => {
+  it("无 typecheck/test 脚本 → package.json 派生仍 manual_only；buildScopePlan 因底线命令而为 false", () => {
     const root = emptyRepo();
     fs.writeFileSync(
       path.join(root, "package.json"),
       JSON.stringify({ name: "noscripts", scripts: { lint: "eslint ." } }),
     );
     const v = verificationFromPackageJson(root);
+    // 断言口径不放宽：V0/V2 从 package.json 仍视为没有自动检查脚本。
     expect(v.manual_only).toBe(true);
     expect(v.commands).toEqual([]);
 
@@ -415,8 +422,13 @@ describe("TASK-J.2 buildScopePlan 构建器", () => {
       repoRoot: root,
       scheme: baseScheme({ notes: "pages", modules: ["pages"] }),
     });
-    expect(plan.verification.manual_only).toBe(true);
+    // TASK-J.28：底线桩命令是签署前注入的自动检查，故 plan.manual_only 为 false。
+    // plain 里仍保留「没有自动检查」，指 package.json 没有 typecheck/test 脚本。
+    expect(plan.verification.manual_only).toBe(false);
     expect(plan.verification.plain.join("")).toMatch(/没有自动检查/);
+    expect(plan.verification.commands.map((c) => c.alias)).toEqual(
+      expect.arrayContaining(REQUIRED_BASELINE_GATES.map((g) => g.alias)),
+    );
   });
 
   it("budget.plain 与 areas[].label 不含 token/tool/glob/**", () => {

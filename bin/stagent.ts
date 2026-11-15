@@ -9,6 +9,7 @@
  *   stagent check obligations --report <path> [--phase t|i]
  *   stagent check test-integrity --base <path> --candidate <path> [--lang <lang>]
  *   stagent check knowledge --base <sha> --candidate <sha> --contract-id <id> [--all]
+ *   stagent check baseline-gate --id <alias> [--exit <code>]
  *
  * 安全约定（A §6.1 / B TASK-D.1 / D.1b）：
  * - Daemon 仅绑定 127.0.0.1，动态端口 3001~3010；
@@ -56,6 +57,7 @@ import {
 } from "../daemon/core/open-workspace";
 import { ensureGitInit, inspectGitRepo } from "../daemon/git/ensure-git-repo";
 import { evaluatePlaytestGuard } from "../daemon/supervisor/preview/playtest-guard";
+import { isBaselineGateAlias } from "../daemon/guard/baseline-gates";
 
 // 兼容 D.1b 单测：仍从本模块 re-export
 export {
@@ -201,6 +203,9 @@ function printHelp(): void {
   stagent check playtest --contract-id <id> [--repo <path>]
                                    试玩认可门禁：证据完整性 + release_id 与当前 LIVE 匹配
                                    （不匹配 STALE_VERSION 重置认可；退出码 0=认可有效）
+  stagent check baseline-gate --id <alias> [--exit <code>]
+                                   固定底线清单桩命令（TASK-J.28）；检查体留给 TASK-J.29
+                                   默认退出码 0；--exit 仅供测试强制非 0
   stagent export-card --contract-id <id> [--repo <path>]
                                    把合同 + DesignNote 导出为可入库的任务卡（yaml task-card 代码块）
   stagent version                  显示版本号
@@ -665,10 +670,41 @@ export function runCheckCommand(checkArgv: readonly string[]): {
     }
   }
 
+  if (sub === "baseline-gate") {
+    const id = parseCheckFlag(checkArgv, "--id");
+    if (!id || !isBaselineGateAlias(id)) {
+      const stdout = JSON.stringify({
+        ok: false,
+        error: "missing or unknown --id for baseline-gate",
+      });
+      return { exitCode: 1, stdout };
+    }
+    const exitRaw = parseCheckFlag(checkArgv, "--exit");
+    let exitCode = 0;
+    if (exitRaw !== undefined) {
+      const parsed = Number(exitRaw);
+      if (!Number.isInteger(parsed) || parsed < 0) {
+        const stdout = JSON.stringify({
+          ok: false,
+          error: "invalid --exit; use a non-negative integer",
+        });
+        return { exitCode: 1, stdout };
+      }
+      exitCode = parsed;
+    }
+    const stdout = JSON.stringify({
+      ok: exitCode === 0,
+      stub: true,
+      body: "TASK-J.29",
+      id,
+    });
+    return { exitCode, stdout };
+  }
+
   const stdout = JSON.stringify({
     ok: false,
     error:
-      'unknown check subcommand; use "obligations", "test-integrity", "knowledge", or "playtest"',
+      'unknown check subcommand; use "obligations", "test-integrity", "knowledge", "playtest", or "baseline-gate"',
   });
   return { exitCode: 1, stdout };
 }

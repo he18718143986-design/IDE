@@ -52,6 +52,11 @@ import {
 import { CostMonitor } from "../guard/cost-monitor";
 import { LoopGuard } from "../guard/loop-guard";
 import { isTestPath } from "../guard/test-integrity";
+import {
+  evaluateBaselineGateResults,
+  injectBaselineGateCommands,
+  isBaselineGateAlias,
+} from "../guard/baseline-gates";
 import { computeWorktreeFingerprint } from "../guard/evidence-integrity";
 import {
   contractLockPath,
@@ -1040,6 +1045,21 @@ export class ContractOrchestrator {
       );
     }
 
+    // TASK-J.28：合同已登记任一条底线命令时，在构建网关前补齐缺项，
+    // 使白名单与执行清单一致。空命令合同保持零命令兜底语义（G1 / N-⑩）。
+    if (
+      current.verification_spec.commands.some((command) =>
+        isBaselineGateAlias(command.alias),
+      )
+    ) {
+      current.verification_spec = {
+        ...current.verification_spec,
+        commands: injectBaselineGateCommands(
+          current.verification_spec.commands,
+        ),
+      };
+    }
+
     const { gateway, costMonitor, loopGuard, worktreePath, interceptor } =
       this.buildRuntime(current, signal);
 
@@ -1207,9 +1227,23 @@ export class ContractOrchestrator {
     const testsModified =
       gateway.wasTestsModified() || worktreeChanged.some(isTestPath);
     const zeroCommands = verificationResults.length === 0;
+    const baselineRequired = current.verification_spec.commands.some(
+      (command) => isBaselineGateAlias(command.alias),
+    );
+    const baselineGate = evaluateBaselineGateResults(
+      verificationResults.map((result) => ({
+        alias: result.alias,
+        exitCode: result.exitCode,
+        passed: result.passed,
+      })),
+    );
+    // 未登记底线命令的合同不走本卡 fail-closed，以免改变零命令 / 既有手写合同语义。
+    const baselineBlocked = baselineRequired && !baselineGate.ok;
     // G1 守卫条款：verificationResults 为空时不能取 every 的空真值 true（防假绿）
     const allPassed =
-      !zeroCommands && verificationResults.every((r) => r.passed);
+      !zeroCommands &&
+      verificationResults.every((r) => r.passed) &&
+      !baselineBlocked;
     const tripped = loopGuard.isTripped() || costMonitor.isTripped();
     // 只有「除端口冲突外没有别的失败」时，才把整轮归因为端口冲突；
     // 若同时存在断言失败，仍按 FAILED/UNSAFE_EXECUTION 处理。
@@ -1241,11 +1275,13 @@ export class ContractOrchestrator {
           ? "BLOCKED"
           : zeroCommandsBlocked
             ? "BLOCKED"
-            : allPassed
-              ? "PASSED"
-              : tripped
-                ? "BLOCKED"
-                : "FAILED";
+            : baselineBlocked
+              ? "FAILED"
+              : allPassed
+                ? "PASSED"
+                : tripped
+                  ? "BLOCKED"
+                  : "FAILED";
     const knowledgeFailed = verificationResults.some(
       (r) => !r.passed && r.alias === "check-knowledge",
     );
@@ -1257,15 +1293,17 @@ export class ContractOrchestrator {
           ? ("UNSAFE_EXECUTION" as const)
           : zeroCommandsBlocked
             ? undefined
-            : allPassed
-              ? undefined
-              : costMonitor.isTripped()
-                ? ("BUDGET_EXHAUSTED" as const)
-                : loopGuard.isTripped()
-                  ? ("VERIFICATION_RETRY_LIMIT" as const)
-                  : knowledgeFailed
-                    ? ("KNOWLEDGE_DRIFT" as const)
-                    : ("UNSAFE_EXECUTION" as const);
+            : baselineBlocked
+              ? ("UNSAFE_EXECUTION" as const)
+              : allPassed
+                ? undefined
+                : costMonitor.isTripped()
+                  ? ("BUDGET_EXHAUSTED" as const)
+                  : loopGuard.isTripped()
+                    ? ("VERIFICATION_RETRY_LIMIT" as const)
+                    : knowledgeFailed
+                      ? ("KNOWLEDGE_DRIFT" as const)
+                      : ("UNSAFE_EXECUTION" as const);
 
     const evidence = await this.writeEvidence(
       current,
@@ -1287,9 +1325,11 @@ export class ContractOrchestrator {
               ? `验证被端口占用阻断（${portConflictAliases.join(", ")}）：这是环境冲突，不是断言失败。请停止占用端口的进程后重试`
               : zeroCommandsBlocked
                 ? "零命令合同处于兜底等待人工确认状态，未执行自动化验证"
-                : allPassed
-                  ? `All ${verificationResults.length} verification command(s) passed`
-                  : `Verification failed (${verificationResults.filter((r) => !r.passed).length} command(s))`,
+                : baselineBlocked
+                  ? `固定底线清单 fail-closed（${!baselineGate.ok ? baselineGate.reason : "unknown"}: ${!baselineGate.ok ? baselineGate.alias : "n/a"}）：缺项、未跑或退出码非 0，verdict 不得为 PASSED`
+                  : allPassed
+                    ? `All ${verificationResults.length} verification command(s) passed`
+                    : `Verification failed (${verificationResults.filter((r) => !r.passed).length} command(s))`,
         verificationResults,
         // 由 TASK-W.2b 的未跟踪文件审计派生，不再写死 true
         scopePassed: postVerifyScope.passed,
