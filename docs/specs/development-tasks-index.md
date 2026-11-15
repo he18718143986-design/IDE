@@ -184,7 +184,7 @@
 | `TASK-J.27` | `COMPLETED` | 固定底线清单写入验证与验收规格，并写明 LLM 审核软层局限（立卡 P-206；施工 #249 `a96623c`；完工回写 P-207；估算 S） | [正文](./development-tasks-completed.md#task-j.27) |
 | `TASK-J.28` | `COMPLETED` | 固定底线硬门禁接线：清单检查以子进程退出码进入 can_merge（立卡 P-206；施工 #254 `31c69ec`；完工回写 P-209；估算 M） | [正文](./development-tasks-completed.md#task-j.28) |
 | `TASK-J.29` | `NEW_TASK` | 把八项既有检查接到固定底线硬门禁（立卡 P-206；修订 P-210 缩范围，凭据项拆至 J.30；估算 M；未开工；硬依赖 J.27 / J.28） | [正文](./development-tasks-active.md#task-j.29) |
-| `TASK-J.30` | `NEW_TASK` | 凭据与秘密不得进入对话的退出码检查（立卡 P-210；估算 M；未开工；方案待 Opus 5.5，不预设实现；硬依赖 J.27 清单口径） | [正文](./development-tasks-active.md#task-j.30) |
+| `TASK-J.30` | `NEW_TASK` | 凭据与秘密不得进入对话的退出码检查（立卡 P-210；修订 P-211：拍板 Vault 运行时断言并补代码路径；估算 M；未开工；代码施工等 J.29 合入后变基；硬依赖 J.27 清单口径） | [正文](./development-tasks-active.md#task-j.30) |
 
 ---
 

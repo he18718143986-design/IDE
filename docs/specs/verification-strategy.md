@@ -50,7 +50,7 @@
 
 | 类 | 来源 | 覆盖（细项） | 不覆盖 |
 | :--- | :--- | :--- | :--- |
-| **安全** | `user_said`（类名） | `ai_inferred`：① 写范围——只允许改已被授权的路径（现有 `ScopePlan` / `writable_paths` / 网关拦截）；② 测试完整性——未经授权不得改测试来制造假绿（现有 `stagent check test-integrity`）；③ 凭据与秘密不得进入对话（现有 Vault 口径，出处为 [`../ledger/scheme-settled-decisions.md`](../ledger/scheme-settled-decisions.md) 第 79 行 `conf-6` / q14，不是 `acc-9`；`acc-9` 是发布失败回到上一个 LIVE。退出码检查见 `TASK-J.30`，不在 `TASK-J.29`）。 | 可维护性、架构品味、安全细节的包装式审查（属第二块「质量边界」，本批不立卡）；本清单不新增漏洞扫描子系统。 |
+| **安全** | `user_said`（类名） | `ai_inferred`：① 写范围——只允许改已被授权的路径（现有 `ScopePlan` / `writable_paths` / 网关拦截）；② 测试完整性——未经授权不得改测试来制造假绿（现有 `stagent check test-integrity`）；③ 凭据与秘密不得进入对话（现有 Vault 口径，出处为 [`../ledger/scheme-settled-decisions.md`](../ledger/scheme-settled-decisions.md) 第 79 行 `conf-6` / q14，不是 `acc-9`；`acc-9` 是发布失败回到上一个 LIVE。退出码检查见 `TASK-J.30`，不在 `TASK-J.29`。P-211 已拍板采用 Vault 口径运行时断言：失败必须非 0 且上下文不发出，不得脱敏后继续；`currentValues()` 只覆盖已缓存且长度 ≥6 的密钥；去桩后跑固定样本，不做全仓库落盘扫描）。 | 可维护性、架构品味、安全细节的包装式审查（属第二块「质量边界」，本批不立卡）；本清单不新增漏洞扫描子系统。 |
 | **回滚** | `user_said`（类名） | `ai_inferred`：① 发布探活失败且存在上一个 LIVE 时，自动回滚到上一个 LIVE（[`release-and-operations.md`](./release-and-operations.md) §3.3）；② 手动回滚 = 以上一个 LIVE 的 `commit_sha` 新建一次发布（R-INV-4）；③ 没有上一个 LIVE 时必须失败并告知，不得假装回滚成功。 | 合入前工作区里的随手撤销 / 保护清单恢复（不是本清单所说的发布回滚）。 |
 | **关键路径** | `user_said`（类名） | `ai_inferred`：① 现有 V0～V3 验证命令必须以真实子进程退出码进入 `deriveCanMerge`（本节上文与 ADR-0005）；② 主线回归（现有 `mainline-regression`）；③ 知识库漂移检查（现有 `stagent check knowledge`）。 | 北极星场景（[`../scheme.md`](../scheme.md) goal-2）端到端交付、以及「无人值守连续三张真实任务卡」——二者继续标明**未交付**；条目级高亮属 `TASK-J.22`，不在本清单。 |
 
@@ -66,7 +66,7 @@ LLM 对测试义务或其它材料做的「独立审核 / 审阅」只是补充�
 
 #### 接线后的命令与 fail-closed（TASK-J.28）
 
-Daemon 在签署前（`withSystemScope` / `buildScopePlan`）向 `verification` 命令清单注入下列桩命令；若合同已登记任一条底线命令，验证循环在构建网关前补齐缺项。除 `baseline-safety-secrets` 外的八项检查体留给 `TASK-J.29`；`baseline-safety-secrets` 的检查体留给 `TASK-J.30`。在对应卡合入前，本处仍用桩把机制测绿。形态为 `stagent check baseline-gate --id <alias>`，默认退出码 0；`--exit <n>` 仅供测试强制非 0。
+Daemon 在签署前（`withSystemScope` / `buildScopePlan`）向 `verification` 命令清单注入下列桩命令；若合同已登记任一条底线命令，验证循环在构建网关前补齐缺项。除 `baseline-safety-secrets` 外的八项检查体留给 `TASK-J.29`；`baseline-safety-secrets` 的检查体留给 `TASK-J.30`。在对应施工卡合入前，本处仍用桩把机制测绿。形态为 `stagent check baseline-gate --id <alias>`，默认退出码 0；`--exit <n>` 仅供测试强制非 0。`TASK-J.30` 施工去桩后，`--id baseline-safety-secrets` 改为用同一断言函数跑固定样本（干净上下文退出 0，夹带保险库值非 0），不做全仓库落盘文本扫描；该施工必须等 `TASK-J.29` 合入后变基。
 
 | 类 | 别名 |
 |:--|:--|
@@ -75,6 +75,17 @@ Daemon 在签署前（`withSystemScope` / `buildScopePlan`）向 `verification` 
 | 关键路径 | `baseline-path-exit-codes`、`baseline-path-mainline-regression`、`baseline-path-knowledge` |
 
 **fail-closed 触发路径**：写证据前，若合同已登记底线命令，则 `evaluateBaselineGateResults` 核对清单每个别名都出现在 `verification_results`，且退出码为 0（`passed === false` 也视为失败）。缺项、未跑（结果中无该别名）或退出码非 0 → `verdict.status` 不得为 `PASSED`，`reason_code` 为既有 `UNSAFE_EXECUTION`。`can_merge` 仍只经 `deriveCanMerge` 计算（本卡不改其签名），结果为 false。LLM / 人工评语不进入该函数。未登记底线命令的空命令合同仍走既有零命令兜底（G1 / N-⑩），不在本路径把 `can_merge` 置真。
+
+#### TASK-J.30 已拍板方案（P-211）
+
+Tina t1271u / t1273u 拍板：`TASK-J.30` 采用 Vault 口径运行时断言，不采用落盘文本静态扫描。断言函数加在现有 `daemon/vault/vault.ts` 门面，复用 `currentValues()`（第 98 行；只覆盖已加载进缓存且长度 ≥6 的密钥，未 `get()` 过的密钥不在断言范围），不新建 `assert-context.ts`。四处生产发送接缝在发出前调用同一函数：
+
+- 右栏：`daemon/chat/session-manager.ts`（`send` 第 174 行 → `runOne` 第 219 行；断言失败则不调用第 232 行 `adapter.run`）；
+- L1 补全：`daemon/supervisor/draft-generator.ts` 的 `buildEnrichmentPrompt`（第 136 行）之后、调用 `enrich` 之前；
+- 方案编译器：`daemon/supervisor/intent-compiler/compile-loop.ts` 的 `callModel`（第 435 行）在第 451 行 `client.generate` 之前；
+- 工人：`daemon/worker/session-task-injector.ts` 的 `buildWorkerTaskInstruction`（第 382 行），以及 `daemon/worker/ai-worker.ts` 的 `collectContext`（第 345 行）之后、发起模型调用前（指令 + 已收集文件双重断言）。
+
+断言失败必须非 0 且上下文不发出，不得降级为「脱敏后继续」。`stagent check baseline-gate --id baseline-safety-secrets` 去桩后用同一断言函数跑固定样本，不做全仓库落盘文本扫描。`daemon/supervisor/prompt-builder.ts` 第 248 行「对话上下文」拼装不是活的发送点，不列入必须可写。本条只修卡；代码施工必须等 `TASK-J.29` 合入后基于新 main 变基。
 
 北极星场景（[`../scheme.md`](../scheme.md) goal-2）与「无人值守连续三张真实任务卡」在本节落地后仍为**未交付**；本节不加新的文档层。
 
