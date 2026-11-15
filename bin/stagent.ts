@@ -9,7 +9,7 @@
  *   stagent check obligations --report <path> [--phase t|i]
  *   stagent check test-integrity --base <path> --candidate <path> [--lang <lang>]
  *   stagent check knowledge --base <sha> --candidate <sha> --contract-id <id> [--all]
- *   stagent check baseline-gate --id <alias> [--exit <code>]
+ *   stagent check baseline-gate --id <alias> [--sample clean|violating] [--exit <code>]
  *
  * 安全约定（A §6.1 / B TASK-D.1 / D.1b）：
  * - Daemon 仅绑定 127.0.0.1，动态端口 3001~3010；
@@ -57,7 +57,11 @@ import {
 } from "../daemon/core/open-workspace";
 import { ensureGitInit, inspectGitRepo } from "../daemon/git/ensure-git-repo";
 import { evaluatePlaytestGuard } from "../daemon/supervisor/preview/playtest-guard";
-import { isBaselineGateAlias } from "../daemon/guard/baseline-gates";
+import {
+  isBaselineGateAlias,
+  runBaselineGateBody,
+  type BaselineGateSample,
+} from "../daemon/guard/baseline-gates";
 
 // 兼容 D.1b 单测：仍从本模块 re-export
 export {
@@ -203,7 +207,7 @@ function printHelp(): void {
   stagent check playtest --contract-id <id> [--repo <path>]
                                    试玩认可门禁：证据完整性 + release_id 与当前 LIVE 匹配
                                    （不匹配 STALE_VERSION 重置认可；退出码 0=认可有效）
-  stagent check baseline-gate --id <alias> [--exit <code>]
+  stagent check baseline-gate --id <alias> [--sample clean|violating] [--exit <code>]
                                    固定底线清单桩命令（TASK-J.28）；检查体留给 TASK-J.29
                                    默认退出码 0；--exit 仅供测试强制非 0
   stagent export-card --contract-id <id> [--repo <path>]
@@ -679,26 +683,55 @@ export function runCheckCommand(checkArgv: readonly string[]): {
       });
       return { exitCode: 1, stdout };
     }
+    const sampleRaw = parseCheckFlag(checkArgv, "--sample");
+    if (
+      sampleRaw !== undefined &&
+      sampleRaw !== "clean" &&
+      sampleRaw !== "violating" &&
+      sampleRaw !== "self-check"
+    ) {
+      const stdout = JSON.stringify({
+        ok: false,
+        error: 'invalid --sample; use "clean", "violating", or "self-check"',
+        id,
+      });
+      return { exitCode: 1, stdout };
+    }
     const exitRaw = parseCheckFlag(checkArgv, "--exit");
-    let exitCode = 0;
     if (exitRaw !== undefined) {
       const parsed = Number(exitRaw);
       if (!Number.isInteger(parsed) || parsed < 0) {
         const stdout = JSON.stringify({
           ok: false,
           error: "invalid --exit; use a non-negative integer",
+          id,
         });
         return { exitCode: 1, stdout };
       }
-      exitCode = parsed;
+      const stdout = JSON.stringify({
+        ok: parsed === 0,
+        stub: false,
+        body: "forced",
+        id,
+        mode: "forced",
+      });
+      return { exitCode: parsed, stdout };
     }
-    const stdout = JSON.stringify({
-      ok: exitCode === 0,
-      stub: true,
-      body: "TASK-J.29",
+    const body = runBaselineGateBody(
       id,
+      sampleRaw === undefined
+        ? undefined
+        : { sample: sampleRaw as BaselineGateSample },
+    );
+    const stdout = JSON.stringify({
+      ok: body.ok,
+      stub: body.stub,
+      body: body.body,
+      id: body.id,
+      mode: body.mode,
+      ...(body.reason === undefined ? {} : { reason: body.reason }),
     });
-    return { exitCode, stdout };
+    return { exitCode: body.exitCode, stdout };
   }
 
   const stdout = JSON.stringify({

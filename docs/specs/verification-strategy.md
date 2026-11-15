@@ -66,7 +66,7 @@ LLM 对测试义务或其它材料做的「独立审核 / 审阅」只是补充�
 
 #### 接线后的命令与 fail-closed（TASK-J.28）
 
-Daemon 在签署前（`withSystemScope` / `buildScopePlan`）向 `verification` 命令清单注入下列桩命令；若合同已登记任一条底线命令，验证循环在构建网关前补齐缺项。除 `baseline-safety-secrets` 外的八项检查体留给 `TASK-J.29`；`baseline-safety-secrets` 的检查体留给 `TASK-J.30`。在对应施工卡合入前，本处仍用桩把机制测绿。形态为 `stagent check baseline-gate --id <alias>`，默认退出码 0；`--exit <n>` 仅供测试强制非 0。`TASK-J.30` 施工去桩后，`--id baseline-safety-secrets` 改为用同一断言函数跑固定样本（干净上下文退出 0，夹带保险库值非 0），不做全仓库落盘文本扫描；该施工必须等 `TASK-J.29` 合入后变基。
+Daemon 在签署前（`withSystemScope` / `buildScopePlan`）向 `verification` 命令清单注入下列命令；若合同已登记任一条底线命令，验证循环在构建网关前补齐缺项。形态为 `stagent check baseline-gate --id <alias>`。`TASK-J.29` 已把除 `baseline-safety-secrets` 外的八项从桩换成对既有函数的薄适配：写范围调用 `checkWriteAccess`，测试完整性调用 `detectTestWeakening`，三类回滚调用 `canTransition` 与「上一个 LIVE / `E_RELEASE_NO_PREVIOUS`」口径，退出码路径调用 `evaluateBaselineGateResults` + `deriveCanMerge`，主线回归核对 `MAINLINE_NODES` / `REGRESSION_FINGERPRINT`，知识库漂移调用 `coversPath` / `hasDependsOnCycle`。各检查用固定样本做机制自检（干净样本须退出 0，违规样本须非 0；默认同时跑双向，全部成立才退出 0）。`--sample clean|violating` 供单测分别取值；`--exit <n>` 仅供测试强制退出码。不做全仓库落盘扫描，不新造扫描器或第二套 `can_merge`。`baseline-safety-secrets` 仍为桩，检查体留给 `TASK-J.30`；施工去桩后，`--id baseline-safety-secrets` 改为用同一断言函数跑固定样本（干净上下文退出 0，夹带保险库值非 0），不做全仓库落盘文本扫描，并须基于已合入的 `TASK-J.29` 变基。北极星场景与「无人值守连续三张真实任务卡」仍为未交付。
 
 | 类 | 别名 |
 |:--|:--|

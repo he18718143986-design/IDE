@@ -1,5 +1,5 @@
 /**
- * TASK-J.28：固定底线硬门禁接线——登记表、注入、桩命令与 fail-closed。
+ * TASK-J.28 / TASK-J.29：固定底线硬门禁接线，以及八项既有检查体的退出码。
  */
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
@@ -8,10 +8,13 @@ import path from "node:path";
 import { runCheckCommand } from "../../bin/stagent";
 import {
   BASELINE_GATE_PLAIN,
+  BASELINE_SECRETS_ALIAS,
+  DESTUBBED_BASELINE_GATE_ALIASES,
   REQUIRED_BASELINE_GATES,
   evaluateBaselineGateResults,
   injectBaselineGateCommands,
   isBaselineGateAlias,
+  runBaselineGateBody,
 } from "../../daemon/guard/baseline-gates";
 import { withSystemScope } from "../../daemon/supervisor/scope-plan-builder";
 import { deriveCanMerge } from "../../src/lib/evidence.schema";
@@ -125,10 +128,13 @@ describe("TASK-J.28 命令注入", () => {
   });
 });
 
-describe("TASK-J.28 stagent check baseline-gate 桩命令", () => {
-  it("已知 id 默认退出码 0，stdout 标明桩且检查体留给 J.29", () => {
-    const alias = REQUIRED_BASELINE_GATES[0]!.alias;
-    const result = runCheckCommand(["baseline-gate", "--id", alias]);
+describe("TASK-J.28 stagent check baseline-gate 命令", () => {
+  it("baseline-safety-secrets 仍为桩，检查体留给 TASK-J.30", () => {
+    const result = runCheckCommand([
+      "baseline-gate",
+      "--id",
+      BASELINE_SECRETS_ALIAS,
+    ]);
     expect(result.exitCode).toBe(0);
     const body = JSON.parse(result.stdout) as {
       ok: boolean;
@@ -138,8 +144,8 @@ describe("TASK-J.28 stagent check baseline-gate 桩命令", () => {
     };
     expect(body.ok).toBe(true);
     expect(body.stub).toBe(true);
-    expect(body.body).toBe("TASK-J.29");
-    expect(body.id).toBe(alias);
+    expect(body.body).toBe("TASK-J.30");
+    expect(body.id).toBe(BASELINE_SECRETS_ALIAS);
   });
 
   it("可用 --exit 强制非 0，用于测 fail-closed；未知 id 或缺 id 也非 0", () => {
@@ -232,5 +238,174 @@ describe("TASK-J.28 withSystemScope 始终注入底线命令", () => {
     } finally {
       fs.rmSync(emptyRoot, { recursive: true, force: true });
     }
+  });
+});
+
+describe("TASK-J.29 八项检查体", () => {
+  it("J29-P1：写范围与测试完整性是真实检查体，干净样本 0、违规样本非 0", () => {
+    for (const id of [
+      "baseline-safety-writable-scope",
+      "baseline-safety-test-integrity",
+    ]) {
+      const def = runCheckCommand(["baseline-gate", "--id", id]);
+      expect(def.exitCode, id).toBe(0);
+      const defBody = JSON.parse(def.stdout) as { stub: boolean; body: string };
+      expect(defBody.stub).toBe(false);
+      expect(defBody.body).toBe("TASK-J.29");
+
+      const clean = runCheckCommand([
+        "baseline-gate",
+        "--id",
+        id,
+        "--sample",
+        "clean",
+      ]);
+      expect(clean.exitCode, `${id} clean`).toBe(0);
+
+      const violating = runCheckCommand([
+        "baseline-gate",
+        "--id",
+        id,
+        "--sample",
+        "violating",
+      ]);
+      expect(violating.exitCode, `${id} violating`).not.toBe(0);
+    }
+  });
+
+  it("J29-P2：三类回滚检查可执行，无上一个 LIVE 不得假装成功", () => {
+    for (const id of [
+      "baseline-rollback-auto",
+      "baseline-rollback-manual",
+      "baseline-rollback-no-live",
+    ]) {
+      const def = runCheckCommand(["baseline-gate", "--id", id]);
+      expect(def.exitCode, id).toBe(0);
+      expect(JSON.parse(def.stdout).stub).toBe(false);
+
+      const clean = runCheckCommand([
+        "baseline-gate",
+        "--id",
+        id,
+        "--sample",
+        "clean",
+      ]);
+      expect(clean.exitCode, `${id} clean`).toBe(0);
+
+      const violating = runCheckCommand([
+        "baseline-gate",
+        "--id",
+        id,
+        "--sample",
+        "violating",
+      ]);
+      expect(violating.exitCode, `${id} violating`).not.toBe(0);
+    }
+
+    const noLive = runBaselineGateBody("baseline-rollback-no-live", {
+      sample: "violating",
+    });
+    expect(noLive.ok).toBe(false);
+    expect(noLive.reason).toBe("E_RELEASE_NO_PREVIOUS");
+  });
+
+  it("J29-P3：退出码路径、主线回归与知识库漂移复用既有检查", () => {
+    for (const id of [
+      "baseline-path-exit-codes",
+      "baseline-path-mainline-regression",
+      "baseline-path-knowledge",
+    ]) {
+      const def = runCheckCommand(["baseline-gate", "--id", id]);
+      expect(def.exitCode, id).toBe(0);
+      expect(JSON.parse(def.stdout).stub).toBe(false);
+
+      const clean = runCheckCommand([
+        "baseline-gate",
+        "--id",
+        id,
+        "--sample",
+        "clean",
+      ]);
+      expect(clean.exitCode, `${id} clean`).toBe(0);
+
+      const violating = runCheckCommand([
+        "baseline-gate",
+        "--id",
+        id,
+        "--sample",
+        "violating",
+      ]);
+      expect(violating.exitCode, `${id} violating`).not.toBe(0);
+    }
+  });
+
+  it("J29-P4：八项全 0 且其它门禁通过时才可能 can_merge=true；secrets 仍为桩；LLM 不能单独置真", () => {
+    expect(DESTUBBED_BASELINE_GATE_ALIASES).toHaveLength(8);
+    for (const id of DESTUBBED_BASELINE_GATE_ALIASES) {
+      expect(runCheckCommand(["baseline-gate", "--id", id]).exitCode, id).toBe(
+        0,
+      );
+    }
+    const secrets = runCheckCommand([
+      "baseline-gate",
+      "--id",
+      BASELINE_SECRETS_ALIAS,
+    ]);
+    expect(secrets.exitCode).toBe(0);
+    expect(JSON.parse(secrets.stdout).stub).toBe(true);
+
+    const allPassing = evaluateBaselineGateResults(
+      REQUIRED_BASELINE_GATES.map((gate) => ({
+        alias: gate.alias,
+        exitCode: 0,
+        passed: true,
+      })),
+    );
+    expect(allPassing.ok).toBe(true);
+    expect(
+      deriveCanMerge({
+        status: "PASSED",
+        scopePassed: true,
+        budgetExhausted: false,
+        forbiddenViolationCount: 0,
+      }),
+    ).toBe(true);
+
+    const oneFailed = REQUIRED_BASELINE_GATES.map((gate) => ({
+      alias: gate.alias,
+      exitCode: gate.alias === "baseline-safety-writable-scope" ? 1 : 0,
+      passed: gate.alias !== "baseline-safety-writable-scope",
+    }));
+    const blocked = evaluateBaselineGateResults(oneFailed);
+    expect(blocked.ok).toBe(false);
+    expect(
+      deriveCanMerge({
+        status: blocked.ok ? "PASSED" : "FAILED",
+        scopePassed: true,
+        budgetExhausted: false,
+        forbiddenViolationCount: 0,
+      }),
+    ).toBe(false);
+    expect(deriveCanMerge.length).toBe(1);
+  });
+
+  it("J29-P5：没有第二套 deriveCanMerge，八项均非新子系统桩", () => {
+    expect(DESTUBBED_BASELINE_GATE_ALIASES).toEqual([
+      "baseline-safety-writable-scope",
+      "baseline-safety-test-integrity",
+      "baseline-rollback-auto",
+      "baseline-rollback-manual",
+      "baseline-rollback-no-live",
+      "baseline-path-exit-codes",
+      "baseline-path-mainline-regression",
+      "baseline-path-knowledge",
+    ]);
+    for (const id of DESTUBBED_BASELINE_GATE_ALIASES) {
+      const body = runBaselineGateBody(id);
+      expect(body.stub, id).toBe(false);
+      expect(body.body, id).toBe("TASK-J.29");
+      expect(body.ok, id).toBe(true);
+    }
+    expect(deriveCanMerge.length).toBe(1);
   });
 });

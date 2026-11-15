@@ -1,6 +1,6 @@
 《证据与验收标准》
 > **地位**：现行规格（验收材料人工判定规则）。从属 [ADR-0005](../adr/0005-deterministic-verification-gate.md) 与 [`verification-strategy.md`](./verification-strategy.md)（S6 实施口径）；总装位置见 [`delivery-lifecycle.md`](./delivery-lifecycle.md) §2 S6。
-> **怎么用**：卡回写 / PR 审阅按本文三态（PASS / FAIL / INCONCLUSIVE）与必填字段判据；机器侧 `can_merge` 仍只由退出码派生（ADR-0005），本文不替代 Daemon 判卷。固定底线清单（TASK-J.28）必须以真实子进程退出码进入 `can_merge`：缺项、未跑或退出码非 0 时不得 `PASSED` / `can_merge=true`。人工三态与 LLM 审核意见可写入材料供人参考，但不能单独置真或覆盖退出码。检查体见 TASK-J.29。
+> **怎么用**：卡回写 / PR 审阅按本文三态（PASS / FAIL / INCONCLUSIVE）与必填字段判据；机器侧 `can_merge` 仍只由退出码派生（ADR-0005），本文不替代 Daemon 判卷。固定底线清单（TASK-J.28）必须以真实子进程退出码进入 `can_merge`：缺项、未跑或退出码非 0 时不得 `PASSED` / `can_merge=true`。人工三态与 LLM 审核意见可写入材料供人参考，但不能单独置真或覆盖退出码。八项检查体见 TASK-J.29（固定样本薄适配）；凭据项见 TASK-J.30。
 > **仍开放的〔待补〕**：正文内标注〔待补〕的定义与事件描述保持缺口，**不得**当作已裁决事实；补齐另走文档 PR。
 来源标记
 - 〔任务书〕：本任务书对该条款的表述，不是判例。
@@ -82,7 +82,7 @@
 - [ ] 按 §1 判据判 PASS / FAIL / INCONCLUSIVE（判据见 §1〔材料 1〕）。
 §6 固定底线清单（与 verification-strategy.md §2.1 同步）
 地位：本节与 [`verification-strategy.md`](./verification-strategy.md) §2.1 是同一份清单的验收侧复述，不另造定义层。类名「安全、回滚、关键路径」为 `user_said`；类下细项展开为 `ai_inferred`。本卡不改产品代码。
-机制定位（`user_said`）：安全、回滚、关键路径三类检查必须是 Daemon 可执行的硬门禁；结论只由真实子进程退出码进入现有 `can_merge` 派生路径（[ADR-0005](../adr/0005-deterministic-verification-gate.md) / `deriveCanMerge`）。接线见 `TASK-J.28`，三类检查接入见 `TASK-J.29`。
+机制定位（`user_said`）：安全、回滚、关键路径三类检查必须是 Daemon 可执行的硬门禁；结论只由真实子进程退出码进入现有 `can_merge` 派生路径（[ADR-0005](../adr/0005-deterministic-verification-gate.md) / `deriveCanMerge`）。接线见 `TASK-J.28`。`TASK-J.29` 已把除「凭据与秘密不得进入对话」外的八项接到 `stagent check baseline-gate --id <alias>`：调用既有函数，用固定样本给出 0 / 非 0（干净通过、违规失败；默认双向自检）。该项检查体见 `TASK-J.30`，合入前仍为桩。LLM 审核输出不能单独置真 `can_merge`。北极星场景与「无人值守连续三张真实任务卡」仍为未交付。
 人工验收三态不替代 Daemon 判卷：卡回写 / PR 审阅仍按本文 §1 的 PASS / FAIL / INCONCLUSIVE 与 §2～§5 必填字段判据进行；机器侧 `can_merge` 仍只由退出码派生，本文三态不能把 `can_merge` 置真，也不能改写或绕过退出码。
 覆盖范围（细项均为 `ai_inferred`）
 - 安全：写范围只允许改已被授权的路径（现有 `ScopePlan` / `writable_paths` / 网关拦截）；未经授权不得改测试来制造假绿（现有 `stagent check test-integrity`）；凭据与秘密不得进入对话（现有 Vault 口径，出处为 [`../ledger/scheme-settled-decisions.md`](../ledger/scheme-settled-decisions.md) 第 79 行 `conf-6` / q14，不是 `acc-9`；该项退出码检查见 `TASK-J.30`，不在 `TASK-J.29`。P-211 已拍板采用 Vault 口径运行时断言：失败必须非 0 且上下文不发出，不得脱敏后继续；`currentValues()` 只覆盖已缓存且长度 ≥6 的密钥，未 `get()` 过的密钥不在断言范围；去桩后跑固定样本，不做全仓库落盘扫描）。不覆盖可维护性、架构品味或安全细节的包装式审查（第二块「质量边界」，本批不立卡），也不新增漏洞扫描子系统。
