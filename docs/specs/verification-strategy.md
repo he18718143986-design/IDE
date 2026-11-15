@@ -42,15 +42,15 @@
 
 ### 2.1 固定底线清单（硬门禁）
 
-本节把「固定底线」写成必须由 Daemon 执行的硬门禁。类名「安全、回滚、关键路径」为 `user_said`；类下细项凡超出这三个词本身的展开，一律标 `ai_inferred`，供 `TASK-J.28`（接线）与 `TASK-J.29`（三类检查接入）使用。本卡只写规格，不改产品代码，也不发明新的扫描器或回滚子系统。
+本节把「固定底线」写成必须由 Daemon 执行的硬门禁。类名「安全、回滚、关键路径」为 `user_said`；类下细项凡超出这三个词本身的展开，一律标 `ai_inferred`，供 `TASK-J.28`（接线）、`TASK-J.29`（其余八项既有检查接入）与 `TASK-J.30`（凭据与秘密不得进入对话的退出码检查）使用。本卡只写规格，不改产品代码，也不发明新的扫描器或回滚子系统。
 
-**机制定位**（`user_said`）：这三类检查必须是 Daemon 可执行的硬门禁；结论只由真实子进程退出码进入现有 `can_merge` 派生路径（[ADR-0005](../adr/0005-deterministic-verification-gate.md) / `deriveCanMerge`）。模型对 `can_merge` 没有设定权。接线与命令注入见 `TASK-J.28`；把既有检查适配进登记表见 `TASK-J.29`。若某细项在实施时需要全新子系统，应停下来拆卡（R-11），不得在施工中另开产品方向。
+**机制定位**（`user_said`）：这三类检查必须是 Daemon 可执行的硬门禁；结论只由真实子进程退出码进入现有 `can_merge` 派生路径（[ADR-0005](../adr/0005-deterministic-verification-gate.md) / `deriveCanMerge`）。模型对 `can_merge` 没有设定权。接线与命令注入见 `TASK-J.28`；把除「凭据与秘密不得进入对话」外的八项既有检查适配进登记表见 `TASK-J.29`；该项退出码检查见 `TASK-J.30`。若某细项在实施时需要全新子系统，应停下来拆卡（R-11），不得在施工中另开产品方向。
 
 #### 覆盖范围
 
 | 类 | 来源 | 覆盖（细项） | 不覆盖 |
 | :--- | :--- | :--- | :--- |
-| **安全** | `user_said`（类名） | `ai_inferred`：① 写范围——只允许改已被授权的路径（现有 `ScopePlan` / `writable_paths` / 网关拦截）；② 测试完整性——未经授权不得改测试来制造假绿（现有 `stagent check test-integrity`）；③ 凭据与秘密不得进入对话（现有 Vault 口径，[`../scheme.md`](../scheme.md) acc-9）。 | 可维护性、架构品味、安全细节的包装式审查（属第二块「质量边界」，本批不立卡）；本清单不新增漏洞扫描子系统。 |
+| **安全** | `user_said`（类名） | `ai_inferred`：① 写范围——只允许改已被授权的路径（现有 `ScopePlan` / `writable_paths` / 网关拦截）；② 测试完整性——未经授权不得改测试来制造假绿（现有 `stagent check test-integrity`）；③ 凭据与秘密不得进入对话（现有 Vault 口径，出处为 [`../ledger/scheme-settled-decisions.md`](../ledger/scheme-settled-decisions.md) 第 79 行 `conf-6` / q14，不是 `acc-9`；`acc-9` 是发布失败回到上一个 LIVE。退出码检查见 `TASK-J.30`，不在 `TASK-J.29`）。 | 可维护性、架构品味、安全细节的包装式审查（属第二块「质量边界」，本批不立卡）；本清单不新增漏洞扫描子系统。 |
 | **回滚** | `user_said`（类名） | `ai_inferred`：① 发布探活失败且存在上一个 LIVE 时，自动回滚到上一个 LIVE（[`release-and-operations.md`](./release-and-operations.md) §3.3）；② 手动回滚 = 以上一个 LIVE 的 `commit_sha` 新建一次发布（R-INV-4）；③ 没有上一个 LIVE 时必须失败并告知，不得假装回滚成功。 | 合入前工作区里的随手撤销 / 保护清单恢复（不是本清单所说的发布回滚）。 |
 | **关键路径** | `user_said`（类名） | `ai_inferred`：① 现有 V0～V3 验证命令必须以真实子进程退出码进入 `deriveCanMerge`（本节上文与 ADR-0005）；② 主线回归（现有 `mainline-regression`）；③ 知识库漂移检查（现有 `stagent check knowledge`）。 | 北极星场景（[`../scheme.md`](../scheme.md) goal-2）端到端交付、以及「无人值守连续三张真实任务卡」——二者继续标明**未交付**；条目级高亮属 `TASK-J.22`，不在本清单。 |
 
@@ -66,7 +66,7 @@ LLM 对测试义务或其它材料做的「独立审核 / 审阅」只是补充�
 
 #### 接线后的命令与 fail-closed（TASK-J.28）
 
-Daemon 在签署前（`withSystemScope` / `buildScopePlan`）向 `verification` 命令清单注入下列桩命令；若合同已登记任一条底线命令，验证循环在构建网关前补齐缺项。检查体留给 TASK-J.29；本卡用桩把机制测绿。形态为 `stagent check baseline-gate --id <alias>`，默认退出码 0；`--exit <n>` 仅供测试强制非 0。
+Daemon 在签署前（`withSystemScope` / `buildScopePlan`）向 `verification` 命令清单注入下列桩命令；若合同已登记任一条底线命令，验证循环在构建网关前补齐缺项。除 `baseline-safety-secrets` 外的八项检查体留给 `TASK-J.29`；`baseline-safety-secrets` 的检查体留给 `TASK-J.30`。在对应卡合入前，本处仍用桩把机制测绿。形态为 `stagent check baseline-gate --id <alias>`，默认退出码 0；`--exit <n>` 仅供测试强制非 0。
 
 | 类 | 别名 |
 |:--|:--|
