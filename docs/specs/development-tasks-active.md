@@ -1438,22 +1438,24 @@ governance:
 
 ### 3.4g 第二块判分表与卡文案、密封前意图完整性核对（2026-11-15 · 立卡 P-215；J.31 / J.33 已完工迁出）
 
-> **立卡说明（2026-11-15 · P-215）**：授权来源为 Tina t1286u。本条只立卡 / 拆卡，不写产品代码，不开工。第二块按 R-11 拆为 [`TASK-J.31`](./development-tasks-completed.md#task-j.31)（判分表升级，纯文档，估算 S；已 `[COMPLETED]`，施工 #264 `03acf2a`，完工回写 P-216）与 [`TASK-J.33`](./development-tasks-completed.md#task-j.33)（`card-copy-standard.md` + 校验器，估算 M；已 `[COMPLETED]`，施工 #266 `838d1f4`，完工回写 P-217）。「密封前意图完整性核对」立 [`TASK-J.32`](#task-j.32)（估算 M，须复用 J.16 `frozen_quotes` 登记与封存链路）。`TASK-J.22` 的拆卡正文在既有卡位，不迁入本节。J.32 仍为 `[NEW_TASK]`。**立卡 ≠ 开工**。J.32 / J.22 子卡待逐张授权。`prompt-builder.ts` 对齐可并入 J.32 或后续卡，报方案时说明。CI.2 攒样本；文档计划暂缓；不暗示条目级高亮已交付。
+> **立卡说明（2026-11-15 · P-215）**：授权来源为 Tina t1286u。本条只立卡 / 拆卡，不写产品代码，不开工。第二块按 R-11 拆为 [`TASK-J.31`](./development-tasks-completed.md#task-j.31)（判分表升级，纯文档，估算 S；已 `[COMPLETED]`，施工 #264 `03acf2a`，完工回写 P-216）与 [`TASK-J.33`](./development-tasks-completed.md#task-j.33)（`card-copy-standard.md` + 校验器，估算 M；已 `[COMPLETED]`，施工 #266 `838d1f4`，完工回写 P-217）。「密封前意图完整性核对」立 [`TASK-J.32`](#task-j.32)（估算 M，须复用 J.16 `frozen_quotes` 登记与封存链路）。`TASK-J.22` 的拆卡正文在既有卡位，不迁入本节。
+>
+> **修卡说明（2026-11-15 · P-221）**：授权来源为 Tina t1310u。J.32 只读定位简报已核对通过。施工实际需要的对照面前端组件与 `SchemeItemMeta` / `TurnRef` 补哈希字段均不在原 `writable_paths` 内；把对照面与信任档确认形态并入原 M 卡后范围明显超出，按 R-11 先拆再开工。`TASK-J.32` 改标 **`[SPLIT]`**，保留追溯，**不再作为施工依据**，施工以子卡正文为准：[`TASK-J.32a`](#task-j.32a)（密封前原话回链内核，估算 M）、[`TASK-J.32b`](#task-j.32b)（回链对照面与信任档确认形态，估算 M；硬依赖 J.32a）。卡面三条硬约束：缺登记或哈希不一致不得标已覆盖；`ai_inferred` 不得冒充 `user_said`；轻确认档机械回链仍须用已登记原话，不得接受事后拼凑。`prompt-builder.ts` 仍不列入必须可写，对齐留后续另卡。**修卡 ≠ 开工**；子卡施工须在本修卡合入后再逐张授权。`TASK-J.22a` / `TASK-J.22b` / `TASK-J.22c` 不动。CI.2 攒样本；文档计划暂缓；不暗示条目级高亮已交付。
 
 <a id="task-j.32"></a>
 
-#### 【Task J.32】密封前意图完整性核对（方案卡回链用户原话）`[NEW_TASK · 立卡 P-215 · 未开工]`
+#### 【Task J.32】密封前意图完整性核对（方案卡回链用户原话）`[SPLIT · 立卡 P-215 · 修卡拆分 P-221]`
 
-> **立卡说明（2026-11-15 · P-215）**：把「密封前意图完整性核对」立为独立卡（估算 M；若施工前方案超出 M，必须再拆，不得在未拆时扩成 L）。业主签字前，方案卡须逐项回链到用户消息 `U<seq>` 原话，对照「说过的每件事都有着落」。**与 J.16 `frozen_quotes` 封存机制的复用关系**：说话时已登记 `turn_id` + `sha256(utf8)`，冻结时封入快照的既有链路必须复用；回链应建立在已登记原话上，禁止事后拼凑一段未登记文本冒充原话。登记点须写入 [`supervisor.md`](./supervisor.md) 密封判定与 [`delivery-lifecycle.md`](./delivery-lifecycle.md) S2→Seal 环。`prompt-builder.ts` 第 248 行「对话上下文」拼装不是活发送点，其对齐可并入本卡施工或留待后续另卡，本条立卡不把它列入必须可写；归并方式在本卡合入后的施工方案里说明。**立卡 ≠ 开工**。施工须另授权。
+> **拆卡说明（2026-11-15 · P-221）**：原估算 M 只覆盖规格落点与快照回链内核。补入对照面前端与信任档确认形态后范围明显超出单张 M，按 R-11 拆为 [`TASK-J.32a`](#task-j.32a) 与 [`TASK-J.32b`](#task-j.32b)。本卡保留追溯，**不再作为施工依据**。
 
 ```yaml task-card
 id: TASK-J.32
-status: NEW_TASK
+status: SPLIT
 contract:
   intent:
-    title: 密封前让业主能对照方案卡是否覆盖说过的每句原话
+    title: 密封前意图完整性核对（方案卡回链用户原话）
     description: >-
-      在业主签字（密封）前，方案卡的每一项都回链到用户消息 U<seq> 原话，
+      在用户确认方案之前，把方案卡每项回链到该用户自己说过、且已登记的原话，
       使业主可以对照「说过的每件事都有着落」。
       回链必须复用 J.16 已有的 frozen_quotes 链路：说话时登记 turn_id 与 sha256(utf8)，
       冻结时封入快照；不得在签字前事后拼凑未登记文本。
@@ -1495,18 +1497,15 @@ contract:
       - { alias: docs, executable: npm, args: [run, check:docs] }
 design:
   approach: >-
-    复用已有 turn 登记与 frozen_quotes 封存，在密封判定增加「方案项 → 已登记原话」回链与缺口标出；
-    不另造一套原话存储。prompt-builder.ts 不对齐进必须可写，归并方式留待施工方案。
+    本卡已拆分，不再作为施工依据。内核见 TASK-J.32a，对照面与信任档确认形态见 TASK-J.32b。
   touches:
-    - { path: docs/specs/supervisor.md, change: modify, why: 在密封判定写入登记点与完整性核对要求, symbols: [] }
-    - { path: docs/specs/delivery-lifecycle.md, change: modify, why: 在 S2→Seal 环写入同一登记点, symbols: [] }
-    - { path: daemon/pipeline/scheme-snapshot-store.ts, change: modify, why: 回链复用 frozen_quotes，禁止事后拼凑, symbols: [] }
+    - { path: docs/specs/supervisor.md, change: modify, why: 登记点与完整性核对要求改由子卡写入, symbols: [] }
   interfaces: []
   test_plan:
-    - { acceptance_id: J32-P1, test_path: tests/unit/scheme-snapshot-frozen-quotes.test.ts, level: unit, debt: "立卡阶段；测试体待授权施工后再写" }
-    - { acceptance_id: J32-P2, test_path: tests/unit/dispute-seal-turn-register.test.ts, level: unit, debt: "立卡阶段；真实对照面须 Tina 试玩，jsdom 不替代" }
-    - { acceptance_id: J32-P3, test_path: tests/unit/scheme-snapshot-frozen-quotes.test.ts, level: unit, debt: "立卡阶段；测试体待授权施工后再写" }
-    - { acceptance_id: J32-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "立卡阶段；规格落点待授权施工后再写" }
+    - { acceptance_id: J32-P1, test_path: tests/unit/scheme-snapshot-frozen-quotes.test.ts, level: unit, debt: "改由 TASK-J.32a 施工" }
+    - { acceptance_id: J32-P2, test_path: tests/ui/scheme-quote-backlink.test.tsx, level: integration, debt: "改由 TASK-J.32b 施工；真实对照面须 Tina 试玩，jsdom 不替代" }
+    - { acceptance_id: J32-P3, test_path: tests/unit/scheme-snapshot-frozen-quotes.test.ts, level: unit, debt: "改由 TASK-J.32a 施工" }
+    - { acceptance_id: J32-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "改由 TASK-J.32a 施工" }
 governance:
   spec_refs:
     - docs/specs/supervisor.md
@@ -1515,25 +1514,232 @@ governance:
   depends_on:
     - { id: TASK-J.16, kind: hard }
   code_facts:
-    - { ref: "docs/specs/delivery-lifecycle.md:42", note: "S2→Seal 环现行定义；本卡要把原话登记与完整性核对写进这一环" }
-    - { ref: "docs/specs/supervisor.md:485-497", note: "D3 主按钮密封/开工事务与规划密封子集；登记点写在密封判定，不另起一套按钮" }
-    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:36-50", note: "冻结引用已含 turn_id 与 turn_text_sha256；回链应建立在此结构上" }
-    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:315-362", note: "密封成功返回 frozen_quotes；不得另造一套原话封存" }
+    - { ref: "docs/specs/delivery-lifecycle.md:42", note: "S2→Seal 环现行定义；回链登记点改由 TASK-J.32a 写入" }
     - { ref: "daemon/supervisor/intent-compiler/host.ts:202", note: "commitUserTurn 是说话时登记的既有入口（只读，复用）" }
-    - { ref: "daemon/server.ts:4160", note: "登记成功返回 turn_id 与 turn_text_sha256 的既有接口" }
-    - { ref: "daemon/supervisor/prompt-builder.ts:248", note: "「对话上下文」拼装不是活发送点；本卡不列入必须可写，归并方式待施工方案" }
   non_goals:
-    - 本条立卡 ≠ 开工；施工须另授权；方案超出 M 必须再拆（R-11）
-    - 不事后拼凑未登记文本冒充用户原话，不另造一套原话存储
-    - 不把 prompt-builder.ts 列为必须可写；对齐可并入本卡或后续卡，报方案时说明
+    - 本卡已拆分，不再作为施工依据；不得按本卡开工
+    - 不把 prompt-builder.ts 列为必须可写；对齐留后续另卡
     - 不实现 §3.3 条目级自动点亮，不暗示条目级高亮已交付（条目级高亮见 TASK-J.22b）
-    - 不开工 J.31 / J.33 / J.22 子卡 / CI.2；不改 D.1e / S.3
+    - 不开工 J.22 子卡 / CI.2；不改 D.1e / S.3
     - 不宣称北极星或无人值守三连卡已交付
   fail:
-    - 回链使用事后拼凑、未登记或哈希不一致的文本仍能通过密封
-    - 业主签字前没有「说过的每件事都有着落」的对照，或缺口被静默跳过
+    - 在子卡未授权时按本卡开工，或把已拆的母卡重新标为可开工
+    - 方案超出 M 却不拆卡（R-11）
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+<a id="task-j.32a"></a>
+
+#### 【Task J.32a】密封前原话回链内核`[NEW_TASK · 拆自 J.32 · 修卡 P-221 · 未开工]`
+
+> **立卡说明（2026-11-15 · P-221）**：拆自 [`TASK-J.32`](#task-j.32)。负责密封判定里的「方案项 → 已登记原话」回链、项上可选哈希字段、快照信任档存证，以及规格落点。不写对照面 UI。**立卡 ≠ 开工**。
+
+```yaml task-card
+id: TASK-J.32a
+status: NEW_TASK
+contract:
+  intent:
+    title: 密封前原话回链内核
+    description: >-
+      复用 J.16 已有 turn 登记与 frozen_quotes 封存，在密封判定增加「方案项 → 已登记原话」回链：
+      按 evidence[].ref.turn_id 取 user_alias_seq 展示为 U<seq>，并核 sha256(utf8)。
+      硬约束：缺登记或哈希不一致不得标已覆盖；ai_inferred 不得冒充 user_said；
+      轻确认档机械回链仍须用已登记原话，不得接受事后拼凑。
+      信任档选择写入快照存证（默认标准档）；不另造一套原话存储。
+      登记与核对点写入 supervisor.md 密封判定和 delivery-lifecycle.md 的 S2→Seal 环。
+    risk_level: HIGH
+  acceptance:
+    - id: J32A-P1
+      check: auto
+      text: >-
+        方案卡逐项回链到已登记的用户消息 U<seq> 原话（turn_id + sha256(utf8)），缺登记或哈希不一致则不得当作已覆盖（承接 J32-P1）。
+    - id: J32A-P2
+      check: auto
+      text: >-
+        回链只使用说话时已登记、冻结时已封入 frozen_quotes 的原话；用事后拼凑文本冒充原话必须失败（承接 J32-P3）。
+    - id: J32A-P3
+      check: auto
+      text: >-
+        ai_inferred 项不得标成 user_said 或已覆盖；轻确认档机械回链仍须用已登记原话，不得因档位变轻而接受事后拼凑文本。
+    - id: J32A-P4
+      check: auto
+      text: >-
+        supervisor.md 密封判定与 delivery-lifecycle.md S2→Seal 环已写明该登记点、核对要求与三条硬约束（承接 J32-P4）。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - docs/specs/supervisor.md
+      - docs/specs/delivery-lifecycle.md
+      - daemon/pipeline/scheme-snapshot-store.ts
+      - daemon/server.ts
+      - src/lib/daemon-api.ts
+      - src/lib/journey/scheme-patch-types.ts
+      - src/lib/journey/scheme-patch-engine.ts
+      - src/lib/journey/evidence-anchor.ts
+      - tests/unit/scheme-snapshot-frozen-quotes.test.ts
+      - tests/unit/dispute-seal-turn-register.test.ts
+      - tests/unit/evidence-anchor.test.ts
+    readonly_paths:
+      - daemon/supervisor/intent-compiler/host.ts
+      - daemon/supervisor/intent-compiler/transcript-store.ts
+      - daemon/supervisor/prompt-builder.ts
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    复用 commitUserTurn 与 frozen_quotes，不另造原话库。项到 U<seq> 经 turn_id 查 transcript / 封存清单取 user_alias_seq 并核哈希。
+    若需在 TurnRef / SchemeItemMeta 持久化 turn_text_sha256，仅在 scheme-patch-types 增可选字段，engine 与 evidence-anchor 只透传、不改合并语义。
+    信任档字段写入快照（默认标准档）；对照面 UI 不在本卡。compiler-output-schema 不在可写范围，若必须改则停工先修卡。
+    prompt-builder.ts 不对齐进必须可写，对齐留后续另卡。
+  touches:
+    - { path: docs/specs/supervisor.md, change: modify, why: 在密封判定写入登记点、完整性核对与三条硬约束, symbols: [] }
+    - { path: docs/specs/delivery-lifecycle.md, change: modify, why: 在 S2→Seal 环写入同一登记点与三条硬约束, symbols: [] }
+    - { path: daemon/pipeline/scheme-snapshot-store.ts, change: modify, why: 方案项回链复用 frozen_quotes，写入信任档存证，禁止事后拼凑, symbols: [] }
+    - { path: src/lib/journey/scheme-patch-types.ts, change: modify, why: TurnRef / SchemeItemMeta 可补可选 turn_text_sha256, symbols: [TurnRef, SchemeItemMeta] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J32A-P1, test_path: tests/unit/scheme-snapshot-frozen-quotes.test.ts, level: unit, debt: "修卡阶段；测试体待授权施工后再写" }
+    - { acceptance_id: J32A-P2, test_path: tests/unit/scheme-snapshot-frozen-quotes.test.ts, level: unit, debt: "修卡阶段；测试体待授权施工后再写" }
+    - { acceptance_id: J32A-P3, test_path: tests/unit/scheme-snapshot-frozen-quotes.test.ts, level: unit, debt: "修卡阶段；测试体待授权施工后再写" }
+    - { acceptance_id: J32A-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "修卡阶段；规格落点待授权施工后再写" }
+governance:
+  spec_refs:
+    - docs/specs/supervisor.md
+    - docs/specs/delivery-lifecycle.md
+  depends_on:
+    - { id: TASK-J.16, kind: hard }
+  code_facts:
+    - { ref: "docs/specs/delivery-lifecycle.md:42", note: "S2→Seal 环现行定义；本卡要把原话登记与完整性核对写进这一环" }
+    - { ref: "docs/specs/supervisor.md:485-497", note: "D3 主按钮密封/开工事务与规划密封子集；登记点写在密封判定，不另起一套按钮" }
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:31-51", note: "FrozenQuote 已含 turn_id / seq / user_alias_seq / 原文 / turn_text_sha256；SourceTurnRef 只回传 id 与哈希" }
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:330-362", note: "verifyFrozenQuotes 已核结构、逐句哈希与 digest；本卡在此上增加方案项回链，不得另造原话封存" }
+    - { ref: "src/lib/journey/scheme-patch-types.ts:42-71", note: "TurnRef 现有 turn_id 与可选 quote，尚无哈希字段；SchemeItemMeta 已有 source 与 evidence[]" }
+    - { ref: "daemon/supervisor/intent-compiler/host.ts:202", note: "commitUserTurn 是说话时登记的既有入口（只读，复用）" }
+    - { ref: "daemon/server.ts:4160", note: "登记成功返回 turn_id 与 turn_text_sha256 的既有接口" }
+    - { ref: "daemon/supervisor/prompt-builder.ts:248", note: "「对话上下文」拼装不是活发送点；本卡不列入必须可写，对齐留后续另卡" }
+  non_goals:
+    - 本条修卡 ≠ 开工；施工须在 P-221 合入后另授权
+    - 不写对照面 UI、不改 SchemeReviewPane / 路由接线（见 TASK-J.32b）
+    - 不事后拼凑未登记文本冒充用户原话，不另造一套原话存储
+    - 不把 prompt-builder.ts 列为必须可写；对齐留后续另卡
+    - 不实现 §3.3 条目级自动点亮，不暗示条目级高亮已交付（见 TASK-J.22b）
+    - 不开工 J.32b / J.22 子卡 / CI.2；不改 D.1e / S.3
+    - 不宣称北极星或无人值守三连卡已交付
+  fail:
+    - 回链使用事后拼凑、未登记或哈希不一致的文本仍能通过密封，或被标成已覆盖
+    - ai_inferred 被标成 user_said 或已覆盖
+    - 轻确认档因档位变轻而接受事后拼凑文本
     - 规格未写入 supervisor.md 密封判定或 delivery-lifecycle.md S2→Seal 环
-    - 方案超出 M 却不拆卡，或本条合入前开工（R-11）
+    - 越界改对照面 UI 或 prompt-builder.ts
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+<a id="task-j.32b"></a>
+
+#### 【Task J.32b】回链对照面与信任档确认形态`[NEW_TASK · 拆自 J.32 · 修卡 P-221 · 未开工]`
+
+> **立卡说明（2026-11-15 · P-221）**：拆自 [`TASK-J.32`](#task-j.32)。在中栏方案审阅页挂上签字前对照面，并按信任档呈现形态差异。硬依赖 [`TASK-J.32a`](#task-j.32a)。**立卡 ≠ 开工**。
+
+```yaml task-card
+id: TASK-J.32b
+status: NEW_TASK
+contract:
+  intent:
+    title: 回链对照面与信任档确认形态
+    description: >-
+      在现有中栏 SchemeReviewPane 挂上签字前对照面（新增 SchemeQuoteBacklinkBlock），
+      让业主看见「说过的每件事都有着落」；未覆盖项必须明确标出，不得静默跳过。
+      展示 U<seq> 须按 evidence[].ref.turn_id 取 user_alias_seq，再核 sha256。
+      信任档确认形态：标准档（默认）出示回链对照；重确认档在对照之上再逐项勾选；
+      轻确认档不把对照面或逐项勾选作为默认确认步骤，但机械回链仍须用已登记原话，不得接受事后拼凑。
+      档位由用户确认时选择，选择写入快照（存证字段由 TASK-J.32a 落地，本卡只做确认形态）。
+      硬约束：缺登记或哈希不一致不得标已覆盖；ai_inferred 不得冒充 user_said；
+      轻确认档机械回链仍须用已登记原话，不得接受事后拼凑。
+    risk_level: HIGH
+  acceptance:
+    - id: J32B-P1
+      check: playtest
+      text: >-
+        业主在签字前可以看到「说过的每件事都有着落」的对照面；未覆盖项被明确标出，不得静默跳过（承接 J32-P2）。jsdom 不替代真实试玩。
+    - id: J32B-P2
+      check: auto
+      text: >-
+        标准档默认出示回链对照；重确认档在对照之上提供逐项勾选；轻确认档不把对照面或逐项勾选作为默认确认步骤。
+    - id: J32B-P3
+      check: auto
+      text: >-
+        对照面展示的已覆盖项均能回链到已登记原话；缺登记或哈希不一致不得标已覆盖；ai_inferred 不得冒充 user_said。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/components/studio/SchemeReviewPane.tsx
+      - src/components/studio/SchemeQuoteBacklinkBlock.tsx
+      - src/routes/index.tsx
+      - tests/ui/scheme-quote-backlink.test.tsx
+    readonly_paths:
+      - daemon/pipeline/scheme-snapshot-store.ts
+      - src/lib/daemon-api.ts
+      - src/lib/journey/scheme-patch-types.ts
+      - docs/specs/supervisor.md
+      - docs/specs/delivery-lifecycle.md
+      - daemon/supervisor/prompt-builder.ts
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    对照面是中栏方案审阅页上的一块，不另开整页，也不改质疑面板（质疑左栏仍属 J.16 已交付范围）。
+    新增 SchemeQuoteBacklinkBlock，由 SchemeReviewPane 在确认按钮前挂载；index.tsx 只接线对照面数据与档位选择，不得改其他旅程。
+    档位存证与回链内核只读复用 TASK-J.32a；本卡不改快照封存实现。
+    商业层冷静期时长不在本卡。prompt-builder.ts 不在可写范围。
+  touches:
+    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 在确认前挂载对照面与档位选择，不另开整页, symbols: [] }
+    - { path: src/components/studio/SchemeQuoteBacklinkBlock.tsx, change: create, why: 新增签字前对照面：覆盖与缺口、U<seq> 展示、重确认逐项勾选, symbols: [] }
+    - { path: src/routes/index.tsx, change: modify, why: 仅接线对照面数据与信任档选择，不得改其他旅程, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J32B-P1, test_path: tests/ui/scheme-quote-backlink.test.tsx, level: integration, debt: "修卡阶段；真实对照面须 Tina 试玩，jsdom 不替代" }
+    - { acceptance_id: J32B-P2, test_path: tests/ui/scheme-quote-backlink.test.tsx, level: unit, debt: "修卡阶段；测试体待授权施工后再写" }
+    - { acceptance_id: J32B-P3, test_path: tests/ui/scheme-quote-backlink.test.tsx, level: unit, debt: "修卡阶段；测试体待授权施工后再写" }
+governance:
+  spec_refs:
+    - docs/specs/supervisor.md
+    - docs/specs/delivery-lifecycle.md
+    - docs/specs/playtest-self-check.md
+  depends_on:
+    - { id: TASK-J.32a, kind: hard }
+    - { id: TASK-J.16, kind: hard }
+  code_facts:
+    - { ref: "src/components/studio/SchemeReviewPane.tsx:580-651", note: "中栏最底确认方案按钮区；对照面应挂在确认前，不另开整页或新路由" }
+    - { ref: "src/lib/journey/scheme-patch-types.ts:42-71", note: "展示 U<seq> 按 evidence[].ref.turn_id 取 user_alias_seq 再核哈希；项上哈希字段由 TASK-J.32a 补" }
+  non_goals:
+    - 本条修卡 ≠ 开工；施工须在 P-221 与 TASK-J.32a 合入后另授权
+    - 不改回链内核、快照封存或 TurnRef schema（见 TASK-J.32a）
+    - 不改质疑面板左栏（J.16 已交付）；不另开整页对照
+    - 不把 prompt-builder.ts 列为必须可写
+    - 不定商业层冷静期时长；不立托管部署档或商业契约层
+    - 不实现 §3.3 条目级自动点亮，不暗示条目级高亮已交付（见 TASK-J.22b）
+    - 不开工 J.22 子卡 / CI.2；不改 D.1e / S.3
+    - 不宣称北极星或无人值守三连卡已交付
+  fail:
+    - 签字前没有对照面，或缺口被静默跳过
+    - 缺登记或哈希不一致仍标已覆盖，或 ai_inferred 冒充 user_said
+    - 轻确认档接受事后拼凑文本
+    - 越界改快照封存内核、质疑面板或其他旅程
+    - 以 jsdom 替代真实试玩验收
   estimate: M
   invariants:
     auth: unchanged
