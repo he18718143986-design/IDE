@@ -1550,7 +1550,9 @@ contract:
       按 evidence[].ref.turn_id 取 user_alias_seq 展示为 U<seq>，并核 sha256(utf8)。
       硬约束：缺登记或哈希不一致不得标已覆盖；ai_inferred 不得冒充 user_said；
       轻确认档机械回链仍须用已登记原话，不得接受事后拼凑。
-      信任档选择写入快照存证（默认标准档）；不另造一套原话存储。
+      信任档口径写入本卡（规格与快照存证）：标准档（默认）出示对照面；重确认档逐项勾选；
+      轻确认快照即可，但回链不降级。对照面 UI 仍由 TASK-J.32b 施工。
+      不另造一套原话存储。
       登记与核对点写入 supervisor.md 密封判定和 delivery-lifecycle.md 的 S2→Seal 环。
     risk_level: HIGH
   acceptance:
@@ -1569,7 +1571,7 @@ contract:
     - id: J32A-P4
       check: auto
       text: >-
-        supervisor.md 密封判定与 delivery-lifecycle.md S2→Seal 环已写明该登记点、核对要求与三条硬约束（承接 J32-P4）。
+        supervisor.md 密封判定与 delivery-lifecycle.md S2→Seal 环已写明该登记点、核对要求、三条硬约束，以及信任档口径：标准档（默认）出示对照面、重确认档逐项勾选、轻确认快照即可但回链不降级（承接 J32-P4）。
   scheme_item_ids: []
   scope:
     writable_paths:
@@ -1596,12 +1598,12 @@ design:
   approach: >-
     复用 commitUserTurn 与 frozen_quotes，不另造原话库。项到 U<seq> 经 turn_id 查 transcript / 封存清单取 user_alias_seq 并核哈希。
     若需在 TurnRef / SchemeItemMeta 持久化 turn_text_sha256，仅在 scheme-patch-types 增可选字段，engine 与 evidence-anchor 只透传、不改合并语义。
-    信任档字段写入快照（默认标准档）；对照面 UI 不在本卡。compiler-output-schema 不在可写范围，若必须改则停工先修卡。
+    信任档口径写入规格与快照存证：标准档（默认）出示对照面，重确认档逐项勾选，轻确认快照即可但回链不降级。对照面 UI 不在本卡。compiler-output-schema 不在可写范围，若必须改则停工先修卡。
     prompt-builder.ts 不对齐进必须可写，对齐留后续另卡。
   touches:
-    - { path: docs/specs/supervisor.md, change: modify, why: 在密封判定写入登记点、完整性核对与三条硬约束, symbols: [] }
-    - { path: docs/specs/delivery-lifecycle.md, change: modify, why: 在 S2→Seal 环写入同一登记点与三条硬约束, symbols: [] }
-    - { path: daemon/pipeline/scheme-snapshot-store.ts, change: modify, why: 方案项回链复用 frozen_quotes，写入信任档存证，禁止事后拼凑, symbols: [] }
+    - { path: docs/specs/supervisor.md, change: modify, why: 在密封判定写入登记点、完整性核对、三条硬约束与信任档口径, symbols: [] }
+    - { path: docs/specs/delivery-lifecycle.md, change: modify, why: 在 S2→Seal 环写入同一登记点、三条硬约束与信任档口径, symbols: [] }
+    - { path: daemon/pipeline/scheme-snapshot-store.ts, change: modify, why: 方案项回链复用 frozen_quotes，写入信任档存证与档位口径，禁止事后拼凑, symbols: [] }
     - { path: src/lib/journey/scheme-patch-types.ts, change: modify, why: TurnRef / SchemeItemMeta 可补可选 turn_text_sha256, symbols: [TurnRef, SchemeItemMeta] }
   interfaces: []
   test_plan:
