@@ -795,6 +795,298 @@ export function checkHardcodedCounts(repo: Repo, files: string[]): Finding[] {
   return findings;
 }
 
+// ── 卡文案规范（TASK-J.33）──────────────────────────────────────────────
+
+export const CARD_COPY_STANDARD_FILE = "docs/specs/card-copy-standard.md";
+export const GLOSSARY_FILE = "docs/glossary.md";
+export const CARD_COPY_TYPES = ["冲突卡", "意外卡", "线上卡"] as const;
+export type CardCopyType = (typeof CARD_COPY_TYPES)[number];
+export const CARD_COPY_BLACKLIST_FENCE = "yaml card-copy-blacklist";
+export const CARD_COPY_OPTIONS_FENCE = "yaml card-copy-options";
+/** 规范正文里必须出现的稳定标记；只证明声明存在，不派生 can_merge。 */
+export const UNDERSTANDING_NOT_A_GATE_MARKER = "j33-understanding-not-a-gate";
+/** 「是否真懂不是门禁」的完整声明句，供门禁做存在性检查。 */
+export const UNDERSTANDING_NOT_A_GATE_SENTENCE =
+  "用户是否真懂，只能靠非技术用户试用验证，不是门禁，不得做成 can_merge 派生输入或退出码门禁。";
+
+const OPTION_FIELD_RECOMMENDED = "推荐项";
+const OPTION_FIELD_CONSEQUENCE = "后果一句话";
+
+/**
+ * 术语表已收录词：`##` 标题与 `<a id>` 锚点都算（因此 PAB/pab、DesignNote/designnote 都能对上）。
+ * 拉丁别名同时收录大小写两种写法，避免黑名单写 PAB 却对不上锚点 pab。
+ */
+export function parseGlossaryTerms(content: string): Set<string> {
+  const terms = new Set<string>();
+  const add = (raw: string) => {
+    const t = raw.trim();
+    if (!t) return;
+    terms.add(t);
+    terms.add(t.toLowerCase());
+  };
+  for (const line of content.split(/\r?\n/)) {
+    const heading = /^##\s+(.+?)\s*$/.exec(line);
+    if (heading) add(heading[1]!);
+    for (const m of line.matchAll(/<a\s+id="([^"]+)"\s*>\s*<\/a>/gi)) {
+      add(m[1]!);
+    }
+  }
+  return terms;
+}
+
+function isGlossaryTerm(term: string, glossary: Set<string>): boolean {
+  const t = term.trim();
+  return glossary.has(t) || glossary.has(t.toLowerCase());
+}
+
+function bodyLine(fenceLine: number, body: string, needle: string): number {
+  const idx = body.split(/\r?\n/).findIndex((l) => l.includes(needle));
+  return idx >= 0 ? fenceLine + 1 + idx : fenceLine;
+}
+
+function loadYaml(
+  body: string,
+): { ok: true; value: unknown } | { ok: false; error: string } {
+  try {
+    return { ok: true, value: yaml.load(body) ?? null };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+function isCardCopyType(s: string): s is CardCopyType {
+  return (CARD_COPY_TYPES as readonly string[]).includes(s);
+}
+
+export function checkCardCopyStandard(repo: Repo): Finding[] {
+  const findings: Finding[] = [];
+  const content = repo.read(CARD_COPY_STANDARD_FILE);
+  if (content === null) {
+    findings.push({
+      severity: "error",
+      rule: "card-copy-standard",
+      file: CARD_COPY_STANDARD_FILE,
+      message: "缺少卡文案规范文件 docs/specs/card-copy-standard.md",
+    });
+    return findings;
+  }
+
+  if (!content.includes(`<!-- ${UNDERSTANDING_NOT_A_GATE_MARKER} -->`)) {
+    findings.push({
+      severity: "error",
+      rule: "card-copy-understanding-gate",
+      file: CARD_COPY_STANDARD_FILE,
+      message: `缺少稳定标记 <!-- ${UNDERSTANDING_NOT_A_GATE_MARKER} -->：「是否真懂」只能靠非技术用户试用验证，不是门禁`,
+    });
+  }
+  if (!content.includes(UNDERSTANDING_NOT_A_GATE_SENTENCE)) {
+    const line =
+      content
+        .split(/\r?\n/)
+        .findIndex(
+          (l) => l.includes("是否真懂") || l.includes("用户是否真懂"),
+        ) + 1;
+    findings.push({
+      severity: "error",
+      rule: "card-copy-understanding-gate",
+      file: CARD_COPY_STANDARD_FILE,
+      ...(line > 0 ? { line } : {}),
+      message: `缺少声明句：「${UNDERSTANDING_NOT_A_GATE_SENTENCE}」`,
+    });
+  }
+
+  const glossaryContent = repo.read(GLOSSARY_FILE);
+  const glossary = parseGlossaryTerms(glossaryContent ?? "");
+  const blocks = fencedBlocks(content);
+  const blacklistBlocks = blocks.filter(
+    (b) => b.info === CARD_COPY_BLACKLIST_FENCE,
+  );
+  const optionBlocks = blocks.filter((b) => b.info === CARD_COPY_OPTIONS_FENCE);
+
+  if (glossaryContent === null) {
+    findings.push({
+      severity: "error",
+      rule: "card-copy-blacklist",
+      file: GLOSSARY_FILE,
+      message: "缺少术语表 docs/glossary.md，无法校验黑名单是否只用已收录词",
+    });
+  }
+
+  if (blacklistBlocks.length === 0) {
+    findings.push({
+      severity: "error",
+      rule: "card-copy-blacklist",
+      file: CARD_COPY_STANDARD_FILE,
+      message: `缺少 \`${CARD_COPY_BLACKLIST_FENCE}\` 围栏；术语黑名单必须可被机器解析`,
+    });
+  } else if (blacklistBlocks.length > 1) {
+    findings.push({
+      severity: "error",
+      rule: "card-copy-blacklist",
+      file: CARD_COPY_STANDARD_FILE,
+      line: blacklistBlocks[1]!.line,
+      message: "术语黑名单围栏只能有一块，避免名单分散后漏检",
+    });
+  }
+
+  if (blacklistBlocks.length === 1 && glossaryContent !== null) {
+    const block = blacklistBlocks[0]!;
+    const parsed = loadYaml(block.body);
+    if (!parsed.ok) {
+      findings.push({
+        severity: "error",
+        rule: "card-copy-blacklist",
+        file: CARD_COPY_STANDARD_FILE,
+        line: block.line,
+        message: `术语黑名单 YAML 无法解析：${parsed.error}`,
+      });
+    } else {
+      const value = parsed.value;
+      const terms =
+        value &&
+        typeof value === "object" &&
+        !Array.isArray(value) &&
+        "terms" in value
+          ? (value as { terms: unknown }).terms
+          : undefined;
+      if (!Array.isArray(terms) || terms.length === 0) {
+        findings.push({
+          severity: "error",
+          rule: "card-copy-blacklist",
+          file: CARD_COPY_STANDARD_FILE,
+          line: block.line,
+          message: "术语黑名单必须是含非空 terms 列表的 YAML 对象",
+        });
+      } else {
+        for (const item of terms) {
+          if (typeof item !== "string" || item.trim() === "") {
+            findings.push({
+              severity: "error",
+              rule: "card-copy-blacklist",
+              file: CARD_COPY_STANDARD_FILE,
+              line: block.line,
+              message: "术语黑名单条目必须是非空字符串",
+            });
+            continue;
+          }
+          if (!isGlossaryTerm(item, glossary)) {
+            findings.push({
+              severity: "error",
+              rule: "card-copy-blacklist",
+              file: CARD_COPY_STANDARD_FILE,
+              line: bodyLine(block.line, block.body, item),
+              message: `术语黑名单含术语表未收录词「${item}」，未收录词不得进入黑名单`,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  const seenTypes = new Map<string, number>();
+  for (const block of optionBlocks) {
+    const parsed = loadYaml(block.body);
+    if (!parsed.ok) {
+      findings.push({
+        severity: "error",
+        rule: "card-copy-option-fields",
+        file: CARD_COPY_STANDARD_FILE,
+        line: block.line,
+        message: `选项块 YAML 无法解析：${parsed.error}`,
+      });
+      continue;
+    }
+    const value = parsed.value;
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      findings.push({
+        severity: "error",
+        rule: "card-copy-option-fields",
+        file: CARD_COPY_STANDARD_FILE,
+        line: block.line,
+        message: "选项块必须是含 card_type 与 options 的 YAML 对象",
+      });
+      continue;
+    }
+    const rec = value as Record<string, unknown>;
+    const rawType =
+      typeof rec["card_type"] === "string" ? rec["card_type"].trim() : "";
+    if (!rawType || !isCardCopyType(rawType)) {
+      findings.push({
+        severity: "error",
+        rule: "card-copy-option-fields",
+        file: CARD_COPY_STANDARD_FILE,
+        line: block.line,
+        message: `选项块 card_type 必须是 ${CARD_COPY_TYPES.join(" / ")} 之一`,
+      });
+      continue;
+    }
+    if (seenTypes.has(rawType)) {
+      findings.push({
+        severity: "error",
+        rule: "card-copy-option-fields",
+        file: CARD_COPY_STANDARD_FILE,
+        line: block.line,
+        message: `${rawType} 的选项块重复`,
+      });
+    } else {
+      seenTypes.set(rawType, block.line);
+    }
+    const options = rec["options"];
+    if (!Array.isArray(options) || options.length === 0) {
+      findings.push({
+        severity: "error",
+        rule: "card-copy-option-fields",
+        file: CARD_COPY_STANDARD_FILE,
+        line: block.line,
+        message: `${rawType} 的 options 必须是非空列表`,
+      });
+      continue;
+    }
+    options.forEach((opt, i) => {
+      if (!opt || typeof opt !== "object" || Array.isArray(opt)) {
+        findings.push({
+          severity: "error",
+          rule: "card-copy-option-fields",
+          file: CARD_COPY_STANDARD_FILE,
+          line: block.line,
+          message: `${rawType} 第 ${i + 1} 个选项必须是对象，并含「${OPTION_FIELD_RECOMMENDED}」和「${OPTION_FIELD_CONSEQUENCE}」`,
+        });
+        return;
+      }
+      const row = opt as Record<string, unknown>;
+      for (const field of [
+        OPTION_FIELD_RECOMMENDED,
+        OPTION_FIELD_CONSEQUENCE,
+      ]) {
+        const v = row[field];
+        if (typeof v !== "string" || v.trim() === "") {
+          const needle = typeof v === "string" ? `${field}:` : `${field}`;
+          findings.push({
+            severity: "error",
+            rule: "card-copy-option-fields",
+            file: CARD_COPY_STANDARD_FILE,
+            line: bodyLine(block.line, block.body, needle),
+            message: `${rawType} 第 ${i + 1} 个选项缺少非空「${field}」`,
+          });
+        }
+      }
+    });
+  }
+
+  for (const t of CARD_COPY_TYPES) {
+    if (!seenTypes.has(t)) {
+      findings.push({
+        severity: "error",
+        rule: "card-copy-option-fields",
+        file: CARD_COPY_STANDARD_FILE,
+        message: `缺少「${t}」的 \`${CARD_COPY_OPTIONS_FENCE}\` 选项块`,
+      });
+    }
+  }
+
+  return findings;
+}
+
 // ── 汇总 ───────────────────────────────────────────────────────────────────
 
 export interface RunOptions {
@@ -829,6 +1121,7 @@ export function runAllChecks(
     ...checkFilenames(docs),
     ...checkArchiveRefs(repo, docs),
     ...checkHardcodedCounts(repo, docs),
+    ...checkCardCopyStandard(repo),
   ];
   return { findings, cards };
 }
