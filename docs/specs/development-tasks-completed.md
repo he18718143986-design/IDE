@@ -7010,3 +7010,134 @@ governance:
 * **背景**：现有 can_merge 已只由退出码与门禁派生，但没有「固定底线清单必须全部跑到，缺项即失败」的接线。
 * **取舍**：先接线与桩测，再让 J.29 把三类真实检查接进同一登记表，避免一张卡跨机制与三个领域而变成 L。
 
+
+### 3.4aj 八项既有检查接入硬门禁（J.29 · 完工回写 P-212）
+
+<a id="task-j.29"></a>
+
+### 【Task J.29】把八项既有检查接到固定底线硬门禁`[COMPLETED · 立卡 P-206 · 修订 P-210 · 施工 #258 · 完工回写 P-212]`
+
+> **立卡说明（2026-11-14 · P-206）**：第三块施工的检查适配卡。只把 J.27 清单里的安全 / 回滚 / 关键路径项接到 J.28 登记表，复用已有代码事实，不新造扫描器、回滚子系统或新的主路径测试框架。若 J.27 落盘后的清单要求新子系统，必须先拆卡再授权（R-11）。硬依赖 J.27 与 J.28。**立卡 ≠ 开工**。
+>
+> **修订说明（2026-11-15 · P-210）**：施工前核对发现「凭据与秘密不得进入对话」没有可调用的退出码检查（`stagent check` 无凭据子命令；`redactSecrets` / `redactText` 是运行时遮蔽；`daemon/vault/` 是存取）。按 Tina t1269u 拆分口径，本卡缩为八项薄适配：写范围、`stagent check test-integrity`、三类回滚、退出码路径、`mainline-regression`、`stagent check knowledge`。该项从本卡验收移出，另立 `TASK-J.30`。J.27 清单里把该项出处写成 `scheme.md` acc-9 的引用一并改为 `conf-6` / q14（settled `acc-9` 是发布失败回到上一个 LIVE）。本卡仍 `[NEW_TASK]`，等本条 docs 合入后再施工。**修订 ≠ 开工**。
+>
+> **归档注记（2026-11-15 · P-212）**：本卡已 **COMPLETED**。Tina t1275u 授权由我施工（非 Opus 5.5）、t1276u 授权先合入 [#257](https://github.com/he18718143986-design/IDE/pull/257)（P-211）再合入本施工 PR。[#257](https://github.com/he18718143986-design/IDE/pull/257) 于 2026-11-15 14:21 香港时间 squash 合入 `554c8f4cd99fcd1dc08d804307d4605005f2be33`。[#258](https://github.com/he18718143986-design/IDE/pull/258) 原基于 `0f6b78d7c0678d99375b99c16ee837cdfacea487`；#257 合入后因两份规格文档重叠，GitHub 报 `dirty`，已变基到 `554c8f4` 并手工合并 `verification-strategy.md` 一处冲突，本地重跑 `tests/unit/baseline-gates.test.ts` 12/12 与 `tsc --noEmit` 退出 0。变基后 head `1a5e779f06d1bd9859daccf15640723be50f3457`，CI run [`43685199644`](https://github.com/he18718143986-design/IDE/actions/runs/43685199644) 必需项（Docs / Knowledge / Perf 与 ubuntu/macos lint、typecheck、unit）全绿；`Unit tests (windows-latest)` 为 `continue-on-error` 非必需存量失败，同 run 中 `baseline-gates.test.ts` 在 Windows 为 12/12，故 `mergeable=MERGEABLE` / `mergeStateStatus=UNSTABLE` 仅由该项导致。macOS 单测首次红在卡外 `tests/unit/app-preview-runner.test.ts`（用例「不监听端口时 timeoutMs:3000 失败且含 stderr 尾部」，期望 `ready===false`、实际 `ready===true`），job [`132724150832`](https://github.com/he18718143986-design/IDE/actions/jobs/132724150832)；`gh run rerun --failed` 后 job [`132725701420`](https://github.com/he18718143986-design/IDE/actions/runs/43685199644/job/132725701420) 转绿，未改该文件，已按纪律记入挂账⑨样本池。[#258](https://github.com/he18718143986-design/IDE/pull/258) squash `fa514dceda00493015be181fc0f68cd9a9e64bab` 于 2026-11-15 14:36 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `1a5e779f06d1bd9859daccf15640723be50f3457`）。**八项薄适配完成，`baseline-safety-secrets` 仍为桩（J.30 范畴）。** 不宣称端到端闭环；北极星与无人值守三连卡仍为未交付。
+
+```yaml task-card
+id: TASK-J.29
+status: COMPLETED
+contract:
+  intent:
+    title: 将八项既有底线检查接到退出码硬门禁
+    description: >-
+      J.27 清单中除「凭据与秘密不得进入对话」外的八项检查，均以真实子进程形式出现在 J.28 登记表中：
+      写范围、测试完整性、自动回滚、手动回滚、无上一个 LIVE 必须失败、V0～V3 退出码路径、主线回归、知识库漂移。
+      退出码 0 表示该条通过，非 0 或未跑则 can_merge 为 false。
+      实现以现有门禁为适配对象，不新造独立扫描器或第二套 can_merge。LLM 审核仍不得置真 can_merge。
+      凭据与秘密不得进入对话的退出码检查见 TASK-J.30，不在本卡实施。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J29-P1
+      check: auto
+      text: >-
+        「安全」类本卡只覆盖写范围与测试完整性两项，并作为真实子进程接入 J.28 登记表（baseline-safety-writable-scope、baseline-safety-test-integrity）；非 0 或缺失时 can_merge 为 false。凭据与秘密不得进入对话不在本卡验收，见 TASK-J.30。
+    - id: J29-P2
+      check: auto
+      text: >-
+        「回滚」类底线检查同样接入；须能体现发布失败回到上一个 LIVE 这一既有口径（acc-9 / release-and-operations.md）的可执行判定，而不是只写文档。没有上一个 LIVE 时必须失败并告知，不得假装成功。
+    - id: J29-P3
+      check: auto
+      text: >-
+        「关键路径」类底线检查同样接入；覆盖 V0～V3 退出码进入 deriveCanMerge、主线回归（mainline-regression）与知识库漂移（stagent check knowledge），复用既有检查，不新开测试框架。
+    - id: J29-P4
+      check: auto
+      text: >-
+        本卡八项检查全部 0 且其它既有门禁通过时，才可能 can_merge=true；任一失败则 false。LLM 审核输出不能单独置真。baseline-safety-secrets 的检查体不在本卡范围，合入前仍为 J.28 桩。
+    - id: J29-P5
+      check: auto
+      text: >-
+        本卡没有新增与现有网关/发布/回归子系统并行的第二套实现；规格回写与修订后的 J.27 清单一致，并继续标明北极星与无人值守三连卡未交付。
+  scheme_item_ids: [goal-7, acc-5, acc-7, acc-9]
+  scope:
+    writable_paths:
+      - daemon/guard/baseline-gates.ts
+      - bin/stagent.ts
+      - tests/unit/baseline-gates.test.ts
+      - docs/specs/verification-strategy.md
+      - docs/specs/evidence-and-acceptance-criteria.md
+    readonly_paths:
+      - src/lib/evidence.schema.ts
+      - daemon/pipeline/orchestrator.ts
+      - daemon/supervisor/scope-plan-builder.ts
+      - daemon/pipeline/merger.ts
+      - docs/specs/release-and-operations.md
+      - daemon/pipeline/mainline-regression.ts
+      - docs/adr/0005-deterministic-verification-gate.md
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/baseline-gates.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    施工以修订后的 J.27 清单为产品口径，只做八项薄适配：
+    安全对既有范围/网关拦截与 stagent check test-integrity；回滚对发布失败自动回到上一个 LIVE 的既有路径（无上一个 LIVE 必须失败）；
+    关键路径对既有退出码派生、mainline-regression 与 stagent check knowledge。
+    只读文件（orchestrator.ts、scope-plan-builder.ts、mainline-regression.ts、release-and-operations.md 等）只能调用不能改；必须改则先修卡。
+    不实施凭据与秘密不得进入对话（TASK-J.30）。不重做 J.28 注入，不改 deriveCanMerge。
+  touches:
+    - { path: daemon/guard/baseline-gates.ts, change: modify, why: 把八项真实检查接到登记表（J.28 已创建该文件，P-209 将 change 改为 modify）, symbols: [] }
+    - { path: bin/stagent.ts, change: modify, why: 为八项检查补齐 check 子命令分发（J.28 已留 baseline-gate 扩展点，只接实现）, symbols: [runCheckCommand] }
+    - { path: tests/unit/baseline-gates.test.ts, change: modify, why: 为八项检查的退出码与 can_merge 派生补用例, symbols: [] }
+    - { path: docs/specs/verification-strategy.md, change: modify, why: 回写八项检查的命令与覆盖范围, symbols: [] }
+    - { path: docs/specs/evidence-and-acceptance-criteria.md, change: modify, why: 回写证据与软层界限, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J29-P1, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "已由 #258 交付；写范围调用 checkWriteAccess，测试完整性调用 detectTestWeakening；固定样本 0 / 非 0" }
+    - { acceptance_id: J29-P2, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "已由 #258 交付；三类回滚调用 canTransition 与上一个 LIVE / E_RELEASE_NO_PREVIOUS 口径，不调用真实发布" }
+    - { acceptance_id: J29-P3, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "已由 #258 交付；退出码路径经 evaluateBaselineGateResults + deriveCanMerge；主线核对 MAINLINE_NODES / REGRESSION_FINGERPRINT；知识库调用 coversPath / hasDependsOnCycle" }
+    - { acceptance_id: J29-P4, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "已由 #258 交付；八项固定样本双向自检；deriveCanMerge 签名未改；baseline-safety-secrets 仍为桩" }
+    - { acceptance_id: J29-P5, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "已由 #258 交付；未新造扫描器或第二套 can_merge；规格已回写八项薄适配与凭据项仍为桩；北极星与三连卡仍标明未交付" }
+governance:
+  spec_refs:
+    - docs/specs/verification-strategy.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+    - docs/specs/release-and-operations.md
+    - docs/adr/0005-deterministic-verification-gate.md
+    - docs/scheme.md
+  depends_on:
+    - { id: TASK-J.27, kind: hard }
+    - { id: TASK-J.28, kind: hard }
+  code_facts:
+    - { ref: "src/lib/evidence.schema.ts::deriveCanMerge", note: "合入门禁仍只经此函数派生；本卡调用、未改签名（#258 对 evidence.schema.ts 无 diff）" }
+    - { ref: "daemon/guard/baseline-gates.ts:256-268", note: "写范围调用 checkWriteAccess；测试完整性调用 detectTestWeakening" }
+    - { ref: "daemon/guard/baseline-gates.ts:270-310", note: "三类回滚调用 canTransition 与上一个 LIVE / E_RELEASE_NO_PREVIOUS 口径，不调用真实发布" }
+    - { ref: "daemon/guard/baseline-gates.ts:312-326", note: "退出码路径经 evaluateBaselineGateResults 后调用 deriveCanMerge" }
+    - { ref: "daemon/guard/baseline-gates.ts:332-361", note: "主线回归核对 MAINLINE_NODES / REGRESSION_FINGERPRINT；知识库漂移调用 hasDependsOnCycle / coversPath" }
+    - { ref: "daemon/guard/baseline-gates.ts:373-381", note: "baseline-safety-secrets 仍返回桩（stub: true，body: TASK-J.30）" }
+    - { ref: "bin/stagent.ts:677-734", note: "runCheckCommand 已分发八项检查体（runBaselineGateBody）；--sample 可选，--exit 仍为测试强制覆盖；未改 deriveCanMerge" }
+  non_goals:
+    - 不实施「凭据与秘密不得进入对话」的退出码检查（已拆至 TASK-J.30）
+    - 不新造安全扫描器、第二套回滚子系统或新的主路径测试框架
+    - 不重做 J.28 的注入与 deriveCanMerge 接线，不改 sandbox / 网关写范围
+    - 不做第二块质量边界、判分表、card-copy-standard，不做密封前意图核对
+    - 不动三条铁律、q* 溯源、标注；ADR 只 SUPERSEDE 不删改
+    - 不宣称北极星或无人值守三连卡已交付；不加新文档层
+    - 不暗示条目级高亮已交付；不开工 J.22 / CI.2；不改 D.1e / S.3 / 已完工的 TASK-J.16
+  fail:
+    - 某类本卡范围内的清单检查只写文档、没有真实子进程退出码
+    - 把凭据与秘密不得进入对话做进本卡，或新造扫描器
+    - LLM 审核或手写布尔把 can_merge 置真
+    - 本卡膨胀为新子系统却不拆卡（R-11）
+    - 改只读文件却不先修卡
+    - 在本条修订（P-210）合入前开工，或在 J.27 / J.28 未完成时开工
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 258, commit: fa514dceda00493015be181fc0f68cd9a9e64bab }
+```
+
+* **背景**：三类检查是原方案点名的硬门禁内容；与接线拆开是为了避免单卡 L。施工前发现凭据项没有可调用退出码检查，故从本卡拆出。
+* **取舍**：只做八项薄适配。凭据项见 `TASK-J.30`（P-211 已拍板 Vault 口径运行时断言并补代码路径；本卡合入后 J.30 可基于新 main 变基开工），不在本卡发明产品方向。
