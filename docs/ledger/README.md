@@ -14,6 +14,7 @@
 | [`w3-known-gaps.md`](./w3-known-gaps.md) | W.3 环境 / 秘密 / 网络守卫的已知缺口 | 7 项中 2 项未修（`tmpRoot` GC、`splitShellSegments` 引号边界） |
 | [`scheme-settled-decisions.md`](./scheme-settled-decisions.md) | 自 [`../scheme.md`](../scheme.md) 迁出的已落盘裁决（原 §6）及其余非 L0 正文（原 §2 / §4 / §5 / §7～§11）；不是施工权威 | 2026-11-14（TASK-J.26）迁入；原位只留指针 |
 | [`removed-and-moved.md`](./removed-and-moved.md) | 已删除与已移动的文档索引（原 `docs/README.md` §9） | 2026-11-09 迁入；旧路径勿再引用 |
+| [`blueprint-absorption-ruling.md`](./blueprint-absorption-ruling.md) | 蓝图机制吸收七分歧裁决（P-220）：Tina t1309u 确认，标 `user_confirmed` | 已拍板；不立卡、不施工、不改 ADR；吸收内容规格落地前一律标 `ai_inferred`；托管部署档 / 商业契约层 / 理解度校验另立不决 |
 
 ## 文档治理挂账（2026-10-29 新增）
 
