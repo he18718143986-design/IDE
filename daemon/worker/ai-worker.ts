@@ -20,6 +20,7 @@ import {
 } from "../guard/worker-graveyard-gate";
 import { artifactChangesFromProposedWrites } from "../guard/graveyard-wiring";
 import type { SandboxWitness } from "./sandbox/container-host";
+import { assertContextHasNoVaultSecrets } from "../vault/active";
 
 /**
  * 受控 AI Worker（Daemon 侧，替代已删除的浏览器 Worker）。
@@ -241,6 +242,10 @@ export class AiWorker {
     const contract = this.gateway.getContract();
     const task = this.prepare();
     const context = await this.collectContext(task);
+    assertContextHasNoVaultSecrets(task.system_prompt);
+    for (const file of context) {
+      assertContextHasNoVaultSecrets(file.content);
+    }
 
     // G-09：上下文读取本身也消耗工具调用配额；熔断后不得再发起模型调用
     if (this.gateway.isBudgetTripped()) {

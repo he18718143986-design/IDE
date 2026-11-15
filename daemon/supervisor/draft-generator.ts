@@ -10,6 +10,7 @@ import type { SupervisorBudgetLedger } from "./budget";
 import { formatDirtyExclusionsPlain } from "../baseline/scope-defaults";
 import { buildL0Plan, type L0DraftInput, type L0DraftPlan } from "./rules-l0";
 import type { SupervisorMessage } from "./types";
+import { assertContextHasNoVaultSecrets } from "../vault/active";
 
 /**
  * 按需合同草案生成器（TASK-S.2 精简版 / v1.3.3）。
@@ -200,6 +201,7 @@ export async function generateContractDraft(
       );
     }
     const prompt = buildEnrichmentPrompt(plan, input.messages);
+    assertContextHasNoVaultSecrets(prompt);
     const outcome = await input.budgetLedger.runModelCall({
       call: async () => {
         const enrichment = await input.enrich!(prompt);

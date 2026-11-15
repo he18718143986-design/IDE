@@ -66,7 +66,7 @@ LLM 对测试义务或其它材料做的「独立审核 / 审阅」只是补充�
 
 #### 接线后的命令与 fail-closed（TASK-J.28）
 
-Daemon 在签署前（`withSystemScope` / `buildScopePlan`）向 `verification` 命令清单注入下列命令；若合同已登记任一条底线命令，验证循环在构建网关前补齐缺项。形态为 `stagent check baseline-gate --id <alias>`。`TASK-J.29` 已把除 `baseline-safety-secrets` 外的八项从桩换成对既有函数的薄适配：写范围调用 `checkWriteAccess`，测试完整性调用 `detectTestWeakening`，三类回滚调用 `canTransition` 与「上一个 LIVE / `E_RELEASE_NO_PREVIOUS`」口径，退出码路径调用 `evaluateBaselineGateResults` + `deriveCanMerge`，主线回归核对 `MAINLINE_NODES` / `REGRESSION_FINGERPRINT`，知识库漂移调用 `coversPath` / `hasDependsOnCycle`。各检查用固定样本做机制自检（干净样本须退出 0，违规样本须非 0；默认同时跑双向，全部成立才退出 0）。`--sample clean|violating` 供单测分别取值；`--exit <n>` 仅供测试强制退出码。不做全仓库落盘扫描，不新造扫描器或第二套 `can_merge`。`baseline-safety-secrets` 仍为桩，检查体留给 `TASK-J.30`；施工去桩后，`--id baseline-safety-secrets` 改为用同一断言函数跑固定样本（干净上下文退出 0，夹带保险库值非 0），不做全仓库落盘文本扫描，并须基于已合入的 `TASK-J.29` 变基。北极星场景与「无人值守连续三张真实任务卡」仍为未交付。
+Daemon 在签署前（`withSystemScope` / `buildScopePlan`）向 `verification` 命令清单注入下列命令；若合同已登记任一条底线命令，验证循环在构建网关前补齐缺项。形态为 `stagent check baseline-gate --id <alias>`。`TASK-J.29` 已把除 `baseline-safety-secrets` 外的八项从桩换成对既有函数的薄适配：写范围调用 `checkWriteAccess`，测试完整性调用 `detectTestWeakening`，三类回滚调用 `canTransition` 与「上一个 LIVE / `E_RELEASE_NO_PREVIOUS`」口径，退出码路径调用 `evaluateBaselineGateResults` + `deriveCanMerge`，主线回归核对 `MAINLINE_NODES` / `REGRESSION_FINGERPRINT`，知识库漂移调用 `coversPath` / `hasDependsOnCycle`。各检查用固定样本做机制自检（干净样本须退出 0，违规样本须非 0；默认同时跑双向，全部成立才退出 0）。`--sample clean|violating` 供单测分别取值；`--exit <n>` 仅供测试强制退出码。不做全仓库落盘扫描，不新造扫描器或第二套 `can_merge`。`TASK-J.30` 已把 `baseline-safety-secrets` 去桩：`--id baseline-safety-secrets` 用同一断言函数跑固定样本（干净上下文退出 0，夹带固定样本保险库值非 0），不做全仓库落盘文本扫描。北极星场景与「无人值守连续三张真实任务卡」仍为未交付。
 
 | 类 | 别名 |
 |:--|:--|
@@ -85,7 +85,7 @@ Tina t1271u / t1273u 拍板、t1281u 修订：`TASK-J.30` 采用 Vault 口径运
 - 方案编译器：`daemon/supervisor/intent-compiler/compile-loop.ts` 的 `callModel`（第 435 行）在第 451 行 `client.generate` 之前；
 - 工人：`daemon/worker/session-task-injector.ts` 的 `buildWorkerTaskInstruction`（第 382 行），以及 `daemon/worker/ai-worker.ts` 的 `collectContext`（第 345 行）之后、发起模型调用前（指令 + 已收集文件双重断言）。
 
-断言失败必须非 0 且上下文不发出，不得降级为「脱敏后继续」。`stagent check baseline-gate --id baseline-safety-secrets` 去桩后用同一断言函数跑固定样本，不做全仓库落盘文本扫描。`daemon/supervisor/prompt-builder.ts` 第 248 行「对话上下文」拼装不是活的发送点，不列入必须可写。P-213 只修卡；代码施工必须等 P-213 合入后基于新 main 变基。不改 `deriveCanMerge`。
+断言失败必须非 0 且上下文不发出，不得降级为「脱敏后继续」。`stagent check baseline-gate --id baseline-safety-secrets` 已去桩，用同一断言函数跑固定样本，不做全仓库落盘文本扫描。`daemon/supervisor/prompt-builder.ts` 第 248 行「对话上下文」拼装不是活的发送点，本条不对齐，对齐须另修卡。不改 `deriveCanMerge`。
 
 北极星场景（[`../scheme.md`](../scheme.md) goal-2）与「无人值守连续三张真实任务卡」在本节落地后仍为**未交付**；本节不加新的文档层。
 

@@ -27,6 +27,11 @@ import {
 } from "../../../src/lib/journey/scheme-draft";
 import type { SupervisorBudgetLedger } from "../budget";
 import {
+  assertContextHasNoVaultSecrets,
+  E_VAULT_SECRET_IN_CONTEXT,
+  VaultSecretInContextError,
+} from "../../vault/active";
+import {
   COMPILER_PROMPT_VERSION,
   renderCompilerSystemPrompt,
 } from "./system-prompt";
@@ -439,6 +444,20 @@ export class IntentCompileLoop {
   ): Promise<IntentCompilerModelResult> {
     const client = this.deps.modelClient;
     if (!client) return { ok: false, reason: "invalid", detail: "no_client" };
+
+    try {
+      assertContextHasNoVaultSecrets(system);
+      assertContextHasNoVaultSecrets(rendered.prompt);
+    } catch (err) {
+      if (err instanceof VaultSecretInContextError) {
+        return {
+          ok: false,
+          reason: "invalid",
+          detail: E_VAULT_SECRET_IN_CONTEXT,
+        };
+      }
+      throw err;
+    }
 
     const controller = new AbortController();
     const setTimeoutFn = this.deps.setTimeoutFn ?? setTimeout;

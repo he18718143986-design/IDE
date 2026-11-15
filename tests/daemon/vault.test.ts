@@ -16,6 +16,11 @@ import {
   vaultEncPath,
   MemoryVaultBackend,
 } from "../../daemon/vault";
+import {
+  assertContextHasNoVaultSecrets,
+  E_VAULT_SECRET_IN_CONTEXT,
+  VaultSecretInContextError,
+} from "../../daemon/vault/active";
 import { redactSecrets as redactCmd } from "../../daemon/runner/command-runner";
 import { redactSecrets as redactLog } from "../../daemon/core/debug-log";
 import { buildCommandEnvironment } from "../../daemon/worker/policy-guard";
@@ -215,6 +220,64 @@ describe("TASK-L.14 凭据保险库", () => {
     expect(JSON.stringify(envPack.env).includes(SECRET)).toBe(false);
     // 脱敏清单应含保险库值（供输出遮蔽），但 env 本身不含
     // （gateway 合并 secretValues；此处直接测 policy-guard 不注入）
+  });
+
+  it("RO-08 延伸：上下文夹带保险库值时 fail-closed，不返回脱敏后的指令", async () => {
+    const vault = await createVault({
+      repoRoot: repo,
+      backend: new MemoryVaultBackend(),
+    });
+    setActiveVault(vault);
+    await vault.setSecret(SECRET_NAME, SECRET);
+
+    expect(() => assertContextHasNoVaultSecrets(`deploy ${SECRET}`)).toThrow(
+      VaultSecretInContextError,
+    );
+    try {
+      assertContextHasNoVaultSecrets(`deploy ${SECRET}`);
+      throw new Error("expected VaultSecretInContextError");
+    } catch (err) {
+      expect(err).toBeInstanceOf(VaultSecretInContextError);
+      expect((err as VaultSecretInContextError).code).toBe(
+        E_VAULT_SECRET_IN_CONTEXT,
+      );
+      expect((err as Error).message).not.toContain(SECRET);
+    }
+
+    // 短于 6 的值不在断言范围；无活跃库时不硬失败
+    expect(() =>
+      assertContextHasNoVaultSecrets("abcde in text", ["abcde"]),
+    ).not.toThrow();
+    setActiveVault(null);
+    expect(() =>
+      assertContextHasNoVaultSecrets(`deploy ${SECRET}`),
+    ).not.toThrow();
+    setActiveVault(vault);
+
+    const draft = createContractDraft({
+      title: "task",
+      description: `deploy with ${SECRET}`,
+      acceptanceCriteria: ["ok"],
+      writablePaths: ["src/**"],
+    });
+    const contract = softwareContractSchema.parse({
+      ...draft,
+      lifecycle_state: "EXECUTING",
+      approval: {
+        status: "APPROVED",
+        approved_by: "tester",
+        approved_at: new Date().toISOString(),
+      },
+    });
+    const worktreeRoot = path.join(repo, ".stagent", "worktrees", "c1");
+    fs.mkdirSync(worktreeRoot, { recursive: true });
+    expect(() =>
+      buildWorkerTaskInstruction({
+        contract,
+        worktreeRoot,
+        repoRoot: repo,
+      }),
+    ).toThrow(VaultSecretInContextError);
   });
 
   describe("HTTP /api/vault（生产主路径）", () => {

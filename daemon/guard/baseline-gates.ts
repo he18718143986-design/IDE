@@ -4,7 +4,7 @@
  * J.28 提供登记表、命令注入与写证据前的缺项判定。
  * J.29 把除 baseline-safety-secrets 外的八项从桩换成对既有函数的薄适配：
  * 用固定样本做机制自检（干净样本须通过、违规样本须失败），默认同时跑双向才退出 0。
- * baseline-safety-secrets 仍为桩，检查体留给 TASK-J.30。
+ * J.30 把 baseline-safety-secrets 去桩：用同一断言函数跑固定样本，不做全仓库扫描。
  * can_merge 仍只经 deriveCanMerge 派生，本模块不写、不改其签名。
  */
 
@@ -28,6 +28,11 @@ import {
   hasDependsOnCycle,
   type ModuleEntry,
 } from "../../src/lib/knowledge/modules-schema";
+import {
+  assertContextHasNoVaultSecrets,
+  E_VAULT_SECRET_IN_CONTEXT,
+  VaultSecretInContextError,
+} from "../vault/active";
 
 export type BaselineGateCategory = "safety" | "rollback" | "critical_path";
 
@@ -162,9 +167,7 @@ export function evaluateBaselineGateResults(
 export const BASELINE_SECRETS_ALIAS = "baseline-safety-secrets";
 
 export const DESTUBBED_BASELINE_GATE_ALIASES: readonly string[] =
-  REQUIRED_BASELINE_GATES.filter(
-    (gate) => gate.alias !== BASELINE_SECRETS_ALIAS,
-  ).map((gate) => gate.alias);
+  REQUIRED_BASELINE_GATES.map((gate) => gate.alias);
 
 export type BaselineGateSample = "clean" | "violating" | "self-check";
 
@@ -210,12 +213,13 @@ function bodyResult(
   ok: boolean,
   mode: BaselineGateBodyResult["mode"],
   reason?: string,
+  body: BaselineGateBodyResult["body"] = "TASK-J.29",
 ): BaselineGateBodyResult {
   return {
     ok,
     exitCode: ok ? 0 : 1,
     stub: false,
-    body: "TASK-J.29",
+    body,
     id: alias,
     mode,
     ...(reason === undefined ? {} : { reason }),
@@ -227,12 +231,13 @@ function pickSample(
   mode: BaselineGateSample,
   clean: { ok: boolean; reason?: string },
   violating: { ok: boolean; reason?: string },
+  body: BaselineGateBodyResult["body"] = "TASK-J.29",
 ): BaselineGateBodyResult {
   if (mode === "clean") {
-    return bodyResult(alias, clean.ok, mode, clean.reason);
+    return bodyResult(alias, clean.ok, mode, clean.reason, body);
   }
   if (mode === "violating") {
-    return bodyResult(alias, violating.ok, mode, violating.reason);
+    return bodyResult(alias, violating.ok, mode, violating.reason, body);
   }
   if (!clean.ok) {
     return bodyResult(
@@ -240,6 +245,7 @@ function pickSample(
       false,
       "self-check",
       clean.reason ?? "clean_sample_failed",
+      body,
     );
   }
   if (violating.ok) {
@@ -248,9 +254,10 @@ function pickSample(
       false,
       "self-check",
       "violating_sample_did_not_fail",
+      body,
     );
   }
-  return bodyResult(alias, true, "self-check");
+  return bodyResult(alias, true, "self-check", undefined, body);
 }
 
 function evaluateWritableScope(filePath: string, scope: FileSystemScope) {
@@ -360,9 +367,24 @@ function evaluateKnowledge(
   return { ok: true };
 }
 
+/** 固定样本密钥，不是真实钥匙，也不读取活跃保险库。长度 ≥8。 */
+const FIXTURE_VAULT_SECRET = "j30-fixture-vault-secret";
+
+function evaluateSecrets(text: string): { ok: boolean; reason?: string } {
+  try {
+    assertContextHasNoVaultSecrets(text, [FIXTURE_VAULT_SECRET]);
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof VaultSecretInContextError) {
+      return { ok: false, reason: E_VAULT_SECRET_IN_CONTEXT };
+    }
+    throw err;
+  }
+}
+
 /**
- * 八项检查体：调用既有函数，用固定样本给出 0 / 非 0。
- * `baseline-safety-secrets` 仍返回桩（body: TASK-J.30）。
+ * 九项检查体：调用既有函数，用固定样本给出 0 / 非 0。
+ * `baseline-safety-secrets` 用同一断言函数跑固定样本（body: TASK-J.30）。
  */
 export function runBaselineGateBody(
   alias: string,
@@ -370,18 +392,15 @@ export function runBaselineGateBody(
 ): BaselineGateBodyResult {
   const mode: BaselineGateSample = options?.sample ?? "self-check";
 
-  if (alias === BASELINE_SECRETS_ALIAS) {
-    return {
-      ok: true,
-      exitCode: 0,
-      stub: true,
-      body: "TASK-J.30",
-      id: alias,
-      mode,
-    };
-  }
-
   switch (alias) {
+    case "baseline-safety-secrets":
+      return pickSample(
+        alias,
+        mode,
+        evaluateSecrets("clean context without the planted fixture value"),
+        evaluateSecrets(`context includes ${FIXTURE_VAULT_SECRET} on purpose`),
+        "TASK-J.30",
+      );
     case "baseline-safety-writable-scope":
       return pickSample(
         alias,
