@@ -1192,6 +1192,8 @@ governance:
 #### 【Task J.28】固定底线硬门禁接线：清单检查以子进程退出码进入 can_merge`[NEW_TASK · 立卡 P-206 · 未开工]`
 
 > **立卡说明（2026-11-14 · P-206）**：第三块施工的机制卡。把 J.27 清单中的检查登记为必须跑到的真实子进程，沿用现有 `verification_spec` → `executeWithSignal` → `deriveCanMerge` 路径；不手写 `can_merge`。三类检查的具体适配见 `TASK-J.29`。硬依赖 J.27（清单未落盘前不得开工）。**立卡 ≠ 开工**。
+>
+> **修订说明（2026-11-15 · 施工前核对 writable_paths）**：按卡在 `withSystemScope` / `buildScopePlan` 注入固定底线命令后，既有单测会落在原名单之外：`tests/unit/test-obligations.test.ts`（「无 auto 条目且无知识库时不变」现要求返回同一对象与同一 digest）、`tests/unit/scope-plan.test.ts`（绿野 / 无 typecheck·test 脚本场景下 `buildScopePlan` 后 `manual_only===true`）。本修订只把这两份测试补进 `writable_paths` 与 `touches`，不改验收、不改产品代码、不开工。若施工中还需改其它测试文件，必须再修卡，不得越写。
 
 ```yaml task-card
 id: TASK-J.28
@@ -1229,6 +1231,8 @@ contract:
       - bin/stagent.ts
       - daemon/guard/baseline-gates.ts
       - tests/unit/baseline-gates.test.ts
+      - tests/unit/test-obligations.test.ts
+      - tests/unit/scope-plan.test.ts
       - docs/specs/verification-strategy.md
       - docs/specs/evidence-and-acceptance-criteria.md
     readonly_paths:
@@ -1254,6 +1258,8 @@ design:
     - { path: bin/stagent.ts, change: modify, why: 为底线检查增加 stagent check 子命令分发, symbols: [runCheckCommand] }
     - { path: daemon/guard/baseline-gates.ts, change: create, why: 清单登记与缺项判定（ai_inferred 路径）, symbols: [] }
     - { path: tests/unit/baseline-gates.test.ts, change: create, why: 用桩命令锁定退出码派生与缺项 fail-closed, symbols: [] }
+    - { path: tests/unit/test-obligations.test.ts, change: modify, why: 注入底线命令后，「无 auto 且无知识库」不再是 identity；只改该断言以匹配强制注入，不改 L.3 其它验收, symbols: [] }
+    - { path: tests/unit/scope-plan.test.ts, change: modify, why: 注入底线命令后，绿野/无脚本场景的 manual_only 不再为 true；只改该断言以匹配强制注入，不改 J.2 其它验收, symbols: [] }
     - { path: docs/specs/verification-strategy.md, change: modify, why: 回写接线后的命令别名与 fail-closed 行为, symbols: [] }
     - { path: docs/specs/evidence-and-acceptance-criteria.md, change: modify, why: 回写证据字段与人工三态仍不替代退出码, symbols: [] }
   interfaces: []
