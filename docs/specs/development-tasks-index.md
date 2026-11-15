@@ -176,7 +176,10 @@
 | `TASK-E.2` | `COMPLETED` | Stagent 仓库自举 (Dogfooding) 与发版交付 | [打开](./development-tasks-completed.md#task-e.2) |
 | `TASK-J.16` | `COMPLETED` | 试玩幕 · 质疑自查续作：surface_log → K-14 归因账本 → K-16 trigger 闭集（立卡 P-176；P-202 J16-P5 五条 PASS；P-203 J16-P6 无封存段分支 PASS；P-204 #244 `8e98538` 官方中栏走查 J16-P7 PASS；P-205 就事论事收口标完成，estimate 仍为 L） | [正文](./development-tasks-completed.md#task-j.16) |
 | `TASK-J.21` | `COMPLETED` | intent-compiler 重启后状态恢复（挂账⑫；立卡 P-187；施工 P-194 · #229 `21b8b35`） | [正文](./development-tasks-completed.md#task-j21) |
-| `TASK-J.22` | `NEW_TASK` | 中栏方案来源统一为编译器台账（挂账⑬ 方案 B；立卡 P-187；估算 L，施工前须拆卡） | [正文](./development-tasks-active.md) |
+| `TASK-J.22` | `SPLIT` | 中栏方案来源统一为编译器台账（挂账⑬ 方案 B；立卡 P-187；拆卡 P-215；母卡不再作为施工依据） | [正文](./development-tasks-active.md#task-j.22) |
+| `TASK-J.22a` | `NEW_TASK` | 中栏方案来源改为编译器台账，含无台账降级标注（拆自 J.22；立卡 P-215；估算 M；硬依赖 J.21 / J.16 已满足；未开工） | [正文](./development-tasks-active.md#task-j.22a) |
+| `TASK-J.22b` | `NEW_TASK` | 中栏验收条目的条目级呈现（拆自 J.22，承接 J.16 延期项；立卡 P-215；估算 M；硬依赖 J.22a；未开工） | [正文](./development-tasks-active.md#task-j.22b) |
+| `TASK-J.22c` | `NEW_TASK` | 中栏方案来源统一的真实试玩验收（拆自 J.22；立卡 P-215；估算 S；硬依赖 J.22a；未开工） | [正文](./development-tasks-active.md#task-j.22c) |
 | `TASK-J.23` | `COMPLETED` | 质疑自查生产链路接线：面板挂载 + DISPUTE 路由 + turn_text_sha256 落盘（立卡 P-195；修订 P-196；施工 P-198 · #233 `ab40f3a`；J23-P4 真实界面走查通过 · P-199） | [正文](./development-tasks-completed.md#task-j23) |
 | `TASK-J.24` | `COMPLETED` | 开工路径三缺口：脏目录确认 + 空仓库 main 引用 + Worker provider 选择器（立卡 P-195；修订 P-197；施工 P-198 · #235 `72b52ab`；真实开工路径试玩验证通过 · P-199） | [正文](./development-tasks-completed.md#task-j24) |
 | `TASK-J.25` | `COMPLETED` | 新增用户旅程与术语表（user-journey.md + glossary.md；立卡 P-206；施工 #248 `f90c881`；完工回写 P-207；估算 S） | [正文](./development-tasks-completed.md#task-j.25) |
@@ -185,6 +188,9 @@
 | `TASK-J.28` | `COMPLETED` | 固定底线硬门禁接线：清单检查以子进程退出码进入 can_merge（立卡 P-206；施工 #254 `31c69ec`；完工回写 P-209；估算 M） | [正文](./development-tasks-completed.md#task-j.28) |
 | `TASK-J.29` | `COMPLETED` | 把八项既有检查接到固定底线硬门禁（立卡 P-206；修订 P-210 缩范围；施工 #258 `fa514dc`；完工回写 P-212；估算 M） | [正文](./development-tasks-completed.md#task-j.29) |
 | `TASK-J.30` | `COMPLETED` | 凭据与秘密不得进入对话的退出码检查（立卡 P-210；修订 P-211 拍板 Vault 运行时断言；修订 P-213：共享断言放 `active.ts` 叶子，接缝不直接引用 `vault.ts`；施工 #261 `27d9c41`；完工回写 P-214；估算 M） | [正文](./development-tasks-completed.md#task-j.30) |
+| `TASK-J.31` | `NEW_TASK` | 把试玩自查升级为非技术用户可执行的判分表（立卡 P-215；估算 S；纯文档；未开工） | [正文](./development-tasks-active.md#task-j.31) |
+| `TASK-J.32` | `NEW_TASK` | 密封前意图完整性核对：方案卡回链用户原话（立卡 P-215；估算 M；须复用 J.16 frozen_quotes；未开工） | [正文](./development-tasks-active.md#task-j.32) |
+| `TASK-J.33` | `NEW_TASK` | 新增卡文案规范并做成机器可校验项（立卡 P-215；估算 M；文档 + 校验器；未开工） | [正文](./development-tasks-active.md#task-j.33) |
 
 ---
 
