@@ -3,7 +3,12 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import type { DemoGate, SchemeDraft } from "../../src/lib/journey/scheme-draft";
 import type { ScopePlan } from "../../src/lib/journey/scope-plan";
-import type { GraveyardEntry } from "../../src/lib/journey/scheme-patch-types";
+import type {
+  GraveyardEntry,
+  ItemSource,
+  SchemeDraftV2,
+  SchemeItemMeta,
+} from "../../src/lib/journey/scheme-patch-types";
 import type { SchemeBinding } from "../../src/lib/contract.schema";
 import { writeJsonAtomic } from "../../src/lib/state-machine";
 import type { TranscriptRecord } from "../supervisor/intent-compiler/transcript-store";
@@ -65,6 +70,231 @@ export type FrozenQuotesFailureReason =
   | "turn_hash_mismatch"
   | "quote_too_long";
 
+/** TASK-J.32a：信任档。标准档为默认；旧快照无此段视为未选档。 */
+export const TRUST_TIERS = ["light", "standard", "reconfirm"] as const;
+export type TrustTier = (typeof TRUST_TIERS)[number];
+
+const TRUST_TIER_ALIASES: Record<string, TrustTier> = {
+  light: "light",
+  standard: "standard",
+  reconfirm: "reconfirm",
+  轻确认: "light",
+  轻确认档: "light",
+  标准密封: "standard",
+  标准档: "standard",
+  重确认: "reconfirm",
+  重确认档: "reconfirm",
+};
+
+export function parseTrustTier(
+  raw: unknown,
+):
+  | { ok: true; value: TrustTier | undefined }
+  | { ok: false; reason: "trust_tier_malformed" } {
+  if (raw === undefined || raw === null) return { ok: true, value: undefined };
+  if (typeof raw !== "string")
+    return { ok: false, reason: "trust_tier_malformed" };
+  const mapped = TRUST_TIER_ALIASES[raw];
+  if (!mapped) return { ok: false, reason: "trust_tier_malformed" };
+  return { ok: true, value: mapped };
+}
+
+export interface ItemQuoteBacklinkRef {
+  turn_id: string;
+  turn_text_sha256?: string;
+}
+
+export interface ItemQuoteBacklinkItem {
+  id: string;
+  source: ItemSource;
+  evidence: ItemQuoteBacklinkRef[];
+}
+
+export interface ItemQuoteBacklinks {
+  items: ItemQuoteBacklinkItem[];
+}
+
+export function itemQuoteBacklinksDigest(
+  backlinks: ItemQuoteBacklinks,
+): string {
+  return createHash("sha256").update(stableStringify(backlinks)).digest("hex");
+}
+
+const ITEM_COLLECTIONS = [
+  "goals",
+  "out_of_scope",
+  "modules",
+  "flows",
+  "entities",
+  "decisions",
+  "conflicts",
+  "open_questions",
+  "acceptance",
+] as const;
+
+function pushTurnRef(
+  refs: ItemQuoteBacklinkRef[],
+  turn_id: unknown,
+  hash: unknown,
+): void {
+  if (typeof turn_id !== "string" || turn_id.length === 0) return;
+  refs.push({
+    turn_id,
+    ...(typeof hash === "string" && hash.length > 0
+      ? { turn_text_sha256: hash }
+      : {}),
+  });
+}
+
+function turnRefsOf(
+  item: SchemeItemMeta & { options?: Array<{ evidence?: unknown }> },
+): ItemQuoteBacklinkRef[] {
+  const refs: ItemQuoteBacklinkRef[] = [];
+  for (const ev of item.evidence ?? []) {
+    if (ev.kind === "turn") {
+      pushTurnRef(refs, ev.ref.turn_id, ev.ref.turn_text_sha256);
+    }
+  }
+  if (Array.isArray(item.options)) {
+    for (const opt of item.options) {
+      if (!Array.isArray(opt.evidence)) continue;
+      for (const ev of opt.evidence) {
+        if (ev && typeof ev === "object" && ev !== null && "turn_id" in ev) {
+          const r = ev as { turn_id: string; turn_text_sha256?: string };
+          pushTurnRef(refs, r.turn_id, r.turn_text_sha256);
+        }
+      }
+    }
+  }
+  return refs;
+}
+
+/** 从 SchemeDraftV2 抽出回链输入；不写入「已覆盖」标记。 */
+export function collectItemQuoteBacklinks(
+  draft: SchemeDraftV2,
+): ItemQuoteBacklinks {
+  const items: ItemQuoteBacklinkItem[] = [];
+  for (const key of ITEM_COLLECTIONS) {
+    const arr = draft[key];
+    if (!Array.isArray(arr)) continue;
+    for (const raw of arr) {
+      if (!raw || typeof raw !== "object") continue;
+      const item = raw as SchemeItemMeta;
+      if (typeof item.id !== "string" || item.id.length === 0) continue;
+      if (
+        item.source !== "user_said" &&
+        item.source !== "user_confirmed" &&
+        item.source !== "ai_inferred" &&
+        item.source !== "user_edited"
+      ) {
+        continue;
+      }
+      items.push({
+        id: item.id,
+        source: item.source,
+        evidence: turnRefsOf(item),
+      });
+    }
+  }
+  return { items };
+}
+
+export type ItemBacklinkSkipReason =
+  "ai_inferred" | "no_turn_evidence" | "unregistered";
+
+export type ItemBacklinkVerdict =
+  | {
+      id: string;
+      source: ItemSource;
+      covered: true;
+      turn_id: string;
+      user_alias_seq?: number;
+    }
+  | {
+      id: string;
+      source: ItemSource;
+      covered: false;
+      reason: ItemBacklinkSkipReason;
+    };
+
+export type ItemBacklinkEvaluation =
+  | { ok: true; verdicts: ItemBacklinkVerdict[] }
+  | {
+      ok: false;
+      reason: "hash_mismatch";
+      item_id: string;
+      turn_id: string;
+    };
+
+/**
+ * 当场计算覆盖：只有已登记且哈希一致的原话才能标已覆盖。
+ * ai_inferred 不得标已覆盖。哈希不一致整体失败（不得当已覆盖，也不得通过密封）。
+ * 信任档不改变本判定——轻确认档回链不降级。
+ */
+export function evaluateSchemeItemBacklinks(
+  items: readonly ItemQuoteBacklinkItem[],
+  frozen: FrozenQuotes,
+): ItemBacklinkEvaluation {
+  const byId = new Map(frozen.quotes.map((quote) => [quote.turn_id, quote]));
+  const verdicts: ItemBacklinkVerdict[] = [];
+  for (const item of items) {
+    let sawRegistered = false;
+    let sawUnregistered = false;
+    let firstHit: FrozenQuote | undefined;
+    for (const ev of item.evidence) {
+      const quote = byId.get(ev.turn_id);
+      if (!quote) {
+        sawUnregistered = true;
+        continue;
+      }
+      if (
+        ev.turn_text_sha256 !== undefined &&
+        ev.turn_text_sha256 !== quote.turn_text_sha256
+      ) {
+        return {
+          ok: false,
+          reason: "hash_mismatch",
+          item_id: item.id,
+          turn_id: ev.turn_id,
+        };
+      }
+      sawRegistered = true;
+      if (!firstHit) firstHit = quote;
+    }
+    if (item.source === "ai_inferred") {
+      verdicts.push({
+        id: item.id,
+        source: item.source,
+        covered: false,
+        reason: "ai_inferred",
+      });
+      continue;
+    }
+    if (sawRegistered && firstHit) {
+      verdicts.push({
+        id: item.id,
+        source: item.source,
+        covered: true,
+        turn_id: firstHit.turn_id,
+        ...(firstHit.user_alias_seq !== undefined
+          ? { user_alias_seq: firstHit.user_alias_seq }
+          : {}),
+      });
+      continue;
+    }
+    verdicts.push({
+      id: item.id,
+      source: item.source,
+      covered: false,
+      reason:
+        item.evidence.length === 0 || !sawUnregistered
+          ? "no_turn_evidence"
+          : "unregistered",
+    });
+  }
+  return { ok: true, verdicts };
+}
+
 export interface SchemeSnapshot {
   schema_version:
     | typeof SCHEME_SNAPSHOT_SCHEMA_VERSION
@@ -97,6 +327,16 @@ export interface SchemeSnapshot {
    */
   frozen_quotes?: FrozenQuotes;
   quotes_digest?: string;
+  /**
+   * TASK-J.32a：信任档存证。以 1.2 追加段落地、不升 schema_version，计入 digest。
+   * 旧快照没有此段，视为未选档。
+   */
+  trust_tier?: TrustTier;
+  /**
+   * TASK-J.32a：方案项 → 已登记原话的回链输入（不含「已覆盖」标记）。
+   * 覆盖与否密封时当场计算。计入 digest。旧快照没有此段。
+   */
+  item_quote_backlinks?: ItemQuoteBacklinks;
 }
 
 export class SchemeSnapshotConflictError extends Error {
@@ -173,6 +413,10 @@ export function schemeSnapshotDigest(input: {
   graveyard?: readonly GraveyardEntry[];
   /** P-201：纳入 quotes_digest；缺省（未封存的旧快照）不参与。 */
   frozen_quotes?: FrozenQuotes;
+  /** TASK-J.32a：纳入信任档；缺省（未选档的旧快照）不参与。 */
+  trust_tier?: TrustTier;
+  /** TASK-J.32a：纳入回链输入摘要；缺省不参与。 */
+  item_quote_backlinks?: ItemQuoteBacklinks;
 }): string {
   const payload = stableStringify({
     scheme_revision: input.scheme_revision,
@@ -186,6 +430,14 @@ export function schemeSnapshotDigest(input: {
       : {}),
     ...(input.frozen_quotes !== undefined
       ? { quotes_digest: frozenQuotesDigest(input.frozen_quotes) }
+      : {}),
+    ...(input.trust_tier !== undefined ? { trust_tier: input.trust_tier } : {}),
+    ...(input.item_quote_backlinks !== undefined
+      ? {
+          item_quote_backlinks_digest: itemQuoteBacklinksDigest(
+            input.item_quote_backlinks,
+          ),
+        }
       : {}),
   });
   return createHash("sha256").update(payload).digest("hex");
@@ -355,11 +607,82 @@ export function verifyFrozenQuotes(
       ? {}
       : { graveyard: snapshot.graveyard }),
     frozen_quotes: frozen,
+    ...(snapshot.trust_tier === undefined
+      ? {}
+      : { trust_tier: snapshot.trust_tier }),
+    ...(snapshot.item_quote_backlinks === undefined
+      ? {}
+      : { item_quote_backlinks: snapshot.item_quote_backlinks }),
   });
   if (recomputed !== snapshot.digest) {
     return { ok: false, reason: "digest_mismatch" };
   }
   return { ok: true, sealed: true, frozen_quotes: frozen };
+}
+
+export type ItemQuoteBacklinksIntegrity =
+  | { ok: true; present: false }
+  | { ok: true; present: true; verdicts: ItemBacklinkVerdict[] }
+  | {
+      ok: false;
+      reason:
+        | "backlinks_malformed"
+        | "hash_mismatch"
+        | "quotes_missing"
+        | "digest_mismatch";
+      item_id?: string;
+      turn_id?: string;
+    };
+
+/**
+ * 回链段完整性：有段则当场重算覆盖，哈希不一致不得标已覆盖且判定失败。
+ * 旧快照无此段视为未写入（不是失败）。信任档不改变本判定。
+ */
+export function verifyItemQuoteBacklinks(
+  snapshot: SchemeSnapshot,
+): ItemQuoteBacklinksIntegrity {
+  const backlinks = snapshot.item_quote_backlinks;
+  if (backlinks === undefined) return { ok: true, present: false };
+  if (
+    typeof backlinks !== "object" ||
+    backlinks === null ||
+    !Array.isArray(backlinks.items)
+  ) {
+    return { ok: false, reason: "backlinks_malformed" };
+  }
+  const frozen = snapshot.frozen_quotes;
+  if (!frozen || !isFrozenQuotesShape(frozen)) {
+    return { ok: false, reason: "quotes_missing" };
+  }
+  const evaluated = evaluateSchemeItemBacklinks(backlinks.items, frozen);
+  if (!evaluated.ok) {
+    return {
+      ok: false,
+      reason: evaluated.reason,
+      item_id: evaluated.item_id,
+      turn_id: evaluated.turn_id,
+    };
+  }
+  const recomputed = schemeSnapshotDigest({
+    scheme_revision: snapshot.scheme.scheme_revision,
+    scheme: snapshot.scheme,
+    demo: snapshot.demo,
+    ...(snapshot.scope_plan ? { scope_plan: snapshot.scope_plan } : {}),
+    ...(snapshot.graveyard === undefined
+      ? {}
+      : { graveyard: snapshot.graveyard }),
+    ...(snapshot.frozen_quotes === undefined
+      ? {}
+      : { frozen_quotes: snapshot.frozen_quotes }),
+    ...(snapshot.trust_tier === undefined
+      ? {}
+      : { trust_tier: snapshot.trust_tier }),
+    item_quote_backlinks: backlinks,
+  });
+  if (recomputed !== snapshot.digest) {
+    return { ok: false, reason: "digest_mismatch" };
+  }
+  return { ok: true, present: true, verdicts: evaluated.verdicts };
 }
 
 export function schemeSnapshotPath(
@@ -436,17 +759,21 @@ export function readSchemeSnapshot(
         graveyard_digest: _dropGd,
         frozen_quotes: _dropFq,
         quotes_digest: _dropQd,
+        trust_tier: _dropTt,
+        item_quote_backlinks: _dropBl,
         ...rest
       } = parsed;
       return rest;
     }
-    // 1.1：graveyard / 封存段视为缺失
+    // 1.1：graveyard / 封存段 / 信任档与回链段视为缺失
     if (parsed.schema_version === SCHEME_SNAPSHOT_SCHEMA_VERSION_V11) {
       const {
         graveyard: _dropGy,
         graveyard_digest: _dropGd,
         frozen_quotes: _dropFq,
         quotes_digest: _dropQd,
+        trust_tier: _dropTt,
+        item_quote_backlinks: _dropBl,
         ...rest
       } = parsed;
       return rest;
@@ -477,6 +804,10 @@ export function writeSchemeSnapshot(
     graveyard?: readonly GraveyardEntry[];
     /** P-201：确认时封存的原话；生产冻结路由必传，缺省即未封存。 */
     frozen_quotes?: FrozenQuotes;
+    /** TASK-J.32a：缺省即不写该段（旧口径）；生产冻结路由默认写入 standard。 */
+    trust_tier?: TrustTier;
+    /** TASK-J.32a：方案项回链输入；缺省即不写该段。 */
+    item_quote_backlinks?: ItemQuoteBacklinks;
     now?: () => Date;
   },
 ): { snapshot: SchemeSnapshot; idempotent: boolean } {
@@ -492,6 +823,10 @@ export function writeSchemeSnapshot(
     ...(input.frozen_quotes === undefined
       ? {}
       : { frozen_quotes: input.frozen_quotes }),
+    ...(input.trust_tier === undefined ? {} : { trust_tier: input.trust_tier }),
+    ...(input.item_quote_backlinks === undefined
+      ? {}
+      : { item_quote_backlinks: input.item_quote_backlinks }),
   });
   const existing = readSchemeSnapshot(repoRoot, confirmationId);
   if (existing) {
@@ -525,6 +860,10 @@ export function writeSchemeSnapshot(
           frozen_quotes: input.frozen_quotes,
           quotes_digest: frozenQuotesDigest(input.frozen_quotes),
         }),
+    ...(input.trust_tier === undefined ? {} : { trust_tier: input.trust_tier }),
+    ...(input.item_quote_backlinks === undefined
+      ? {}
+      : { item_quote_backlinks: input.item_quote_backlinks }),
   };
   writeJsonAtomic(schemeSnapshotPath(repoRoot, confirmationId), snapshot);
   return { snapshot, idempotent: false };

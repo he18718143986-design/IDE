@@ -2179,6 +2179,11 @@ export interface SchemeSnapshotView {
   idempotent: boolean;
   /** P-201：快照里封存的原话条数 */
   frozen_quotes_count?: number;
+  /** TASK-J.32a：本次冻结写入的信任档 */
+  trust_tier?: "light" | "standard" | "reconfirm";
+  /** TASK-J.32a：当场算出已覆盖 / 未覆盖的方案项条数 */
+  item_quote_backlink_covered_count?: number;
+  item_quote_backlink_uncovered_count?: number;
 }
 
 /** P-201：Daemon 登记过的一句右栏原话；前端只持有 id 与哈希，不持有可冒充原文的副本。 */
@@ -2214,6 +2219,8 @@ export async function freezeSchemeSnapshot(
     scope_plan: ScopePlan;
     /** P-201：本修订折进方案的已登记原话；Daemon 据此从 transcript 逐字封存 */
     source_turns: readonly SchemeSourceTurn[];
+    /** TASK-J.32a：信任档；省略时 Daemon 默认 standard */
+    trust_tier?: "light" | "standard" | "reconfirm";
   },
 ): Promise<SchemeSnapshotView> {
   return request<SchemeSnapshotView>(conn, "/api/supervisor/scheme/freeze", {

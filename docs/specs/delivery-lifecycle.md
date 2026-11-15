@@ -50,6 +50,8 @@ Release ── 引用一个已合并提交，可覆盖多份合同（.stagent/re
 
 > **进度已迁出**：原「现状 → 卡」列与文后「横切」进度已于 2026-11-14（TASK-J.26）迁入 [`development-tasks-index.md`](./development-tasks-index.md)「七环进度」。本表不再维护进度，避免与索引 / 卡头双写。
 
+S2→Seal 冻结时，Daemon 按 TASK-J.32a 把方案项与已登记原话做回链核验：覆盖当场计算；哈希对不上则冻结失败、不写快照；`ai_inferred` 不得标已覆盖；信任档（轻确认 / 标准档 / 重确认）写入 1.2 追加段且计入 digest，不升 `schema_version`，轻确认也不降级回链。对照面 UI 见 TASK-J.32b。判定正文见 [`supervisor.md`](./supervisor.md)「密封前原话回链」。
+
 ---
 
 ## 3. 可编译判定（S2 → 合同的入口条件）

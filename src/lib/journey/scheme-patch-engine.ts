@@ -182,6 +182,16 @@ function isEditEvidence(
   return "kind" in e && e.kind === "edit";
 }
 
+/** TASK-J.32a：只透传可选哈希，不改合并语义。 */
+function passthroughTurnHash(ref: { turn_text_sha256?: unknown }): {
+  turn_text_sha256?: string;
+} {
+  return typeof ref.turn_text_sha256 === "string" &&
+    ref.turn_text_sha256.length > 0
+    ? { turn_text_sha256: ref.turn_text_sha256 }
+    : {};
+}
+
 function turnEvidence(e: EvidenceItem[]): TurnRef[] {
   return e.flatMap((x) => (x.kind === "turn" ? [x.ref] : []));
 }
@@ -283,6 +293,7 @@ function normalizePayload(
                   ...(typeof r["quote"] === "string"
                     ? { quote: r["quote"] }
                     : {}),
+                  ...passthroughTurnHash(r),
                 },
               ]
             : [],
@@ -516,6 +527,7 @@ function parseEvidence(
       ...(r.data.occurrence !== undefined
         ? { occurrence: r.data.occurrence }
         : {}),
+      ...passthroughTurnHash(r.data),
     });
   }
   return out;
@@ -611,6 +623,7 @@ function parseOp(
           turn_id: r.turn_id,
           ...(r.quote !== undefined ? { quote: r.quote } : {}),
           ...(r.occurrence !== undefined ? { occurrence: r.occurrence } : {}),
+          ...passthroughTurnHash(r),
         };
       }),
     };
@@ -968,12 +981,16 @@ export function stageClassifyOps(
           ref: {
             turn_id: e.turn_id,
             ...(e.quote !== undefined ? { quote: e.quote } : {}),
+            ...passthroughTurnHash(e),
             anchor: a.anchor,
           },
         });
         c.opWarnings.push(...a.warnings);
       } else {
-        anchored.push({ kind: "turn", ref: { turn_id: e.turn_id } });
+        anchored.push({
+          kind: "turn",
+          ref: { turn_id: e.turn_id, ...passthroughTurnHash(e) },
+        });
       }
     }
     if (p1Failed) {
