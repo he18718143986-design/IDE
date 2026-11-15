@@ -1,6 +1,6 @@
 《证据与验收标准》
 > **地位**：现行规格（验收材料人工判定规则）。从属 [ADR-0005](../adr/0005-deterministic-verification-gate.md) 与 [`verification-strategy.md`](./verification-strategy.md)（S6 实施口径）；总装位置见 [`delivery-lifecycle.md`](./delivery-lifecycle.md) §2 S6。
-> **怎么用**：卡回写 / PR 审阅按本文三态（PASS / FAIL / INCONCLUSIVE）与必填字段判据；机器侧 `can_merge` 仍只由退出码派生（ADR-0005），本文不替代 Daemon 判卷。
+> **怎么用**：卡回写 / PR 审阅按本文三态（PASS / FAIL / INCONCLUSIVE）与必填字段判据；机器侧 `can_merge` 仍只由退出码派生（ADR-0005），本文不替代 Daemon 判卷。固定底线清单（TASK-J.28）必须以真实子进程退出码进入 `can_merge`：缺项、未跑或退出码非 0 时不得 `PASSED` / `can_merge=true`。人工三态与 LLM 审核意见可写入材料供人参考，但不能单独置真或覆盖退出码。检查体见 TASK-J.29。
 > **仍开放的〔待补〕**：正文内标注〔待补〕的定义与事件描述保持缺口，**不得**当作已裁决事实；补齐另走文档 PR。
 来源标记
 - 〔任务书〕：本任务书对该条款的表述，不是判例。
