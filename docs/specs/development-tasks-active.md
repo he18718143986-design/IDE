@@ -1183,49 +1183,52 @@ governance:
 
 ---
 
-### 3.4f 文档可读性与固定底线清单（2026-11-14 · 立卡 P-206；J.25 / J.26 / J.27 / J.28 已完工迁出，J.29 仍待授权）
+### 3.4f 文档可读性与固定底线清单（2026-11-14 · 立卡 P-206；J.25 / J.26 / J.27 / J.28 已完工迁出，J.29 经 P-210 缩为八项薄适配，J.30 已立卡待方案）
 
 > **立卡说明（2026-11-14 · P-206）**：授权来源为 Tina t1250u「按这个立卡」。目标是让非软件专业用户能走完「表达偏好 → 签字开工 → 试玩验收」并稳定得到高质量结果。本批只立第一块（文档可读性与结构分家）与第三块「固定底线清单硬门禁」。**不立**第二块（质量边界 / 判分表 / `card-copy-standard` / 校验器），**不立**「密封前意图完整性核对（`U<seq>` 回链）」卡——这两块留给 Opus 5.5。五张卡均为 `[NEW_TASK]`，估算均为 S 或 M（R-11；不立 L，不重演 J.16）。**立卡 ≠ 授权 ≠ 开工**；待 Tina 逐张授权。J.22 不开工；CI.2 攒样本。不改已完工的 `TASK-J.16`，不碰 `TASK-D.1e` / `TASK-S.3`，不改 runtime/contract ScopePlan sandbox。北极星场景（`scheme.md` goal-2）与「无人值守连续三张真实任务卡」继续标明未交付，不加新文档层。不暗示条目级高亮已交付（J.22 范围）。
 
 <a id="task-j.29"></a>
 
-#### 【Task J.29】把安全、回滚、关键路径检查接到固定底线硬门禁`[NEW_TASK · 立卡 P-206 · 未开工]`
+#### 【Task J.29】把八项既有检查接到固定底线硬门禁`[NEW_TASK · 立卡 P-206 · 修订 P-210 · 未开工]`
 
 > **立卡说明（2026-11-14 · P-206）**：第三块施工的检查适配卡。只把 J.27 清单里的安全 / 回滚 / 关键路径项接到 J.28 登记表，复用已有代码事实，不新造扫描器、回滚子系统或新的主路径测试框架。若 J.27 落盘后的清单要求新子系统，必须先拆卡再授权（R-11）。硬依赖 J.27 与 J.28。**立卡 ≠ 开工**。
+>
+> **修订说明（2026-11-15 · P-210）**：施工前核对发现「凭据与秘密不得进入对话」没有可调用的退出码检查（`stagent check` 无凭据子命令；`redactSecrets` / `redactText` 是运行时遮蔽；`daemon/vault/` 是存取）。按 Tina t1269u 拆分口径，本卡缩为八项薄适配：写范围、`stagent check test-integrity`、三类回滚、退出码路径、`mainline-regression`、`stagent check knowledge`。该项从本卡验收移出，另立 `TASK-J.30`。J.27 清单里把该项出处写成 `scheme.md` acc-9 的引用一并改为 `conf-6` / q14（settled `acc-9` 是发布失败回到上一个 LIVE）。本卡仍 `[NEW_TASK]`，等本条 docs 合入后再施工。**修订 ≠ 开工**。
 
 ```yaml task-card
 id: TASK-J.29
 status: NEW_TASK
 contract:
   intent:
-    title: 将安全、回滚、关键路径三类底线检查接到退出码硬门禁
+    title: 将八项既有底线检查接到退出码硬门禁
     description: >-
-      J.27 清单中的安全、回滚、关键路径检查均以真实子进程形式出现在 J.28 登记表中：
+      J.27 清单中除「凭据与秘密不得进入对话」外的八项检查，均以真实子进程形式出现在 J.28 登记表中：
+      写范围、测试完整性、自动回滚、手动回滚、无上一个 LIVE 必须失败、V0～V3 退出码路径、主线回归、知识库漂移。
       退出码 0 表示该条通过，非 0 或未跑则 can_merge 为 false。
-      实现以现有门禁为适配对象（如范围/鉴权相关守卫、发布失败回滚、主路径/回归检查），
-      不新造独立扫描器或第二套 can_merge。LLM 审核仍不得置真 can_merge。
+      实现以现有门禁为适配对象，不新造独立扫描器或第二套 can_merge。LLM 审核仍不得置真 can_merge。
+      凭据与秘密不得进入对话的退出码检查见 TASK-J.30，不在本卡实施。
     risk_level: MEDIUM
   acceptance:
     - id: J29-P1
       check: auto
       text: >-
-        「安全」类底线检查已作为真实子进程接入 J.28 登记表；非 0 或缺失时 can_merge 为 false。检查覆盖范围以 J.27 正文为准，测试锁定退出码行为。
+        「安全」类本卡只覆盖写范围与测试完整性两项，并作为真实子进程接入 J.28 登记表（baseline-safety-writable-scope、baseline-safety-test-integrity）；非 0 或缺失时 can_merge 为 false。凭据与秘密不得进入对话不在本卡验收，见 TASK-J.30。
     - id: J29-P2
       check: auto
       text: >-
-        「回滚」类底线检查同样接入；须能体现发布失败回到上一个 LIVE 这一既有口径（acc-9 / release-and-operations.md）的可执行判定，而不是只写文档。
+        「回滚」类底线检查同样接入；须能体现发布失败回到上一个 LIVE 这一既有口径（acc-9 / release-and-operations.md）的可执行判定，而不是只写文档。没有上一个 LIVE 时必须失败并告知，不得假装成功。
     - id: J29-P3
       check: auto
       text: >-
-        「关键路径」类底线检查同样接入；以 J.27 清单为准，复用既有主路径/回归检查，不新开测试框架。
+        「关键路径」类底线检查同样接入；覆盖 V0～V3 退出码进入 deriveCanMerge、主线回归（mainline-regression）与知识库漂移（stagent check knowledge），复用既有检查，不新开测试框架。
     - id: J29-P4
       check: auto
       text: >-
-        三类检查全部 0 且其它既有门禁通过时，才可能 can_merge=true；任一失败则 false。LLM 审核输出不能单独置真。
+        本卡八项检查全部 0 且其它既有门禁通过时，才可能 can_merge=true；任一失败则 false。LLM 审核输出不能单独置真。baseline-safety-secrets 的检查体不在本卡范围，合入前仍为 J.28 桩。
     - id: J29-P5
       check: auto
       text: >-
-        本卡没有新增与现有网关/发布/回归子系统并行的第二套实现；规格回写与 J.27 清单一致，并继续标明北极星与无人值守三连卡未交付。
+        本卡没有新增与现有网关/发布/回归子系统并行的第二套实现；规格回写与修订后的 J.27 清单一致，并继续标明北极星与无人值守三连卡未交付。
   scheme_item_ids: [goal-7, acc-5, acc-7, acc-9]
   scope:
     writable_paths:
@@ -1248,15 +1251,16 @@ contract:
       - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
 design:
   approach: >-
-    施工以 J.27 已落盘清单为唯一产品口径。每类检查优先适配已有命令或模块：
-    安全对既有范围/鉴权/测试完整性等退出码门禁；回滚对发布失败自动回到上一个 LIVE 的既有路径；
-    关键路径对既有主路径/回归检查（如 mainline-regression）。
-    只做薄适配接到 J.28 登记表。若清单要求新子系统，停止并拆卡，不得在本卡膨胀为 L。
+    施工以修订后的 J.27 清单为产品口径，只做八项薄适配：
+    安全对既有范围/网关拦截与 stagent check test-integrity；回滚对发布失败自动回到上一个 LIVE 的既有路径（无上一个 LIVE 必须失败）；
+    关键路径对既有退出码派生、mainline-regression 与 stagent check knowledge。
+    只读文件（orchestrator.ts、scope-plan-builder.ts、mainline-regression.ts、release-and-operations.md 等）只能调用不能改；必须改则先修卡。
+    不实施凭据与秘密不得进入对话（TASK-J.30）。不重做 J.28 注入，不改 deriveCanMerge。
   touches:
-    - { path: daemon/guard/baseline-gates.ts, change: modify, why: 把三类真实检查接到登记表（J.28 已创建该文件，P-209 按卡要求将 change 改为 modify）, symbols: [] }
-    - { path: bin/stagent.ts, change: modify, why: 为三类检查补齐 check 子命令分发（若 J.28 已留扩展点则只接实现）, symbols: [runCheckCommand] }
-    - { path: tests/unit/baseline-gates.test.ts, change: modify, why: 为三类检查的退出码与 can_merge 派生补用例（J.28 已创建该文件，P-209 按卡要求将 change 改为 modify）, symbols: [] }
-    - { path: docs/specs/verification-strategy.md, change: modify, why: 回写三类检查的命令与覆盖范围, symbols: [] }
+    - { path: daemon/guard/baseline-gates.ts, change: modify, why: 把八项真实检查接到登记表（J.28 已创建该文件，P-209 将 change 改为 modify）, symbols: [] }
+    - { path: bin/stagent.ts, change: modify, why: 为八项检查补齐 check 子命令分发（J.28 已留 baseline-gate 扩展点，只接实现）, symbols: [runCheckCommand] }
+    - { path: tests/unit/baseline-gates.test.ts, change: modify, why: 为八项检查的退出码与 can_merge 派生补用例, symbols: [] }
+    - { path: docs/specs/verification-strategy.md, change: modify, why: 回写八项检查的命令与覆盖范围, symbols: [] }
     - { path: docs/specs/evidence-and-acceptance-criteria.md, change: modify, why: 回写证据与软层界限, symbols: [] }
   interfaces: []
   test_plan:
@@ -1279,8 +1283,9 @@ governance:
     - { ref: "src/lib/evidence.schema.ts::deriveCanMerge", note: "合入门禁仍须经此函数派生" }
     - { ref: "daemon/pipeline/mainline-regression.ts:1-20", note: "已有主路径/回归机制，关键路径检查应优先适配而非另起框架（具体导出符号施工时以文件为准）" }
     - { ref: "docs/specs/release-and-operations.md:112-114", note: "发布失败自动回滚到上一个 LIVE 已有规格与 L.15 机制；本卡要把它变成可进入 can_merge 的退出码检查，而不是重写发布子系统" }
-    - { ref: "bin/stagent.ts::runCheckCommand", note: "J.28 已留 stagent check baseline-gate 桩扩展点；本卡替换三类检查体，不重做注入接线" }
+    - { ref: "bin/stagent.ts::runCheckCommand", note: "J.28 已留 stagent check baseline-gate 桩扩展点；本卡替换八项检查体，不重做注入接线，也不实现 baseline-safety-secrets" }
   non_goals:
+    - 不实施「凭据与秘密不得进入对话」的退出码检查（已拆至 TASK-J.30）
     - 不新造安全扫描器、第二套回滚子系统或新的主路径测试框架
     - 不重做 J.28 的注入与 deriveCanMerge 接线，不改 sandbox / 网关写范围
     - 不做第二块质量边界、判分表、card-copy-standard，不做密封前意图核对
@@ -1288,10 +1293,12 @@ governance:
     - 不宣称北极星或无人值守三连卡已交付；不加新文档层
     - 不暗示条目级高亮已交付；不开工 J.22 / CI.2；不改 D.1e / S.3 / 已完工的 TASK-J.16
   fail:
-    - 某类清单检查只写文档、没有真实子进程退出码
+    - 某类本卡范围内的清单检查只写文档、没有真实子进程退出码
+    - 把凭据与秘密不得进入对话做进本卡，或新造扫描器
     - LLM 审核或手写布尔把 can_merge 置真
     - 本卡膨胀为新子系统却不拆卡（R-11）
-    - 在 J.27 / J.28 未完成时开工
+    - 改只读文件却不先修卡
+    - 在本条修订（P-210）合入前开工，或在 J.27 / J.28 未完成时开工
   estimate: M
   invariants:
     auth: unchanged
@@ -1300,5 +1307,115 @@ governance:
     gateway_write_scope: unchanged
 ```
 
-* **背景**：三类检查是原方案点名的硬门禁内容；与接线拆开是为了避免单卡 L。
-* **取舍**：只做薄适配。清单若要求全新能力，先拆卡，不在本卡发明产品方向。
+* **背景**：三类检查是原方案点名的硬门禁内容；与接线拆开是为了避免单卡 L。施工前发现凭据项没有可调用退出码检查，故从本卡拆出。
+* **取舍**：只做八项薄适配。凭据项见 `TASK-J.30`，由 Opus 5.5 先出方案再定实现，不在本卡发明产品方向。
+
+<a id="task-j.30"></a>
+
+#### 【Task J.30】凭据与秘密不得进入对话的退出码检查`[NEW_TASK · 立卡 P-210 · 未开工]`
+
+> **立卡说明（2026-11-15 · P-210）**：从 `TASK-J.29` 拆出的安全类第③项。J.27 清单要求「凭据与秘密不得进入对话」以真实子进程退出码进入 J.28 登记表（别名 `baseline-safety-secrets`），但施工前核对确认：`stagent check` 现有子命令只有 `obligations` / `test-integrity` / `knowledge` / `playtest` 与 J.28 的 `baseline-gate` 桩，没有凭据检查项；`redactSecrets` / `redactText` 是运行时遮蔽，`daemon/vault/` 是存取能力，都不是 0 / 1 门禁。出处应写 [`../ledger/scheme-settled-decisions.md`](../ledger/scheme-settled-decisions.md) 第 79 行 `conf-6`（q14 拍板，受控+Vault，账密严禁进入对话上下文），不是 settled 第 138 行 `acc-9`（发布失败回到上一个 LIVE）。设计方向为「复用既有 `redactSecrets` 模式表做静态扫描器」还是「Vault 口径的运行时断言」，先由 Opus 5.5 出方案再定代码 `writable_paths`，本卡不预设实现。硬依赖 J.27 清单口径，与 J.29 无代码依赖，可并行立卡。估算 M（R-11：若方案需要新子系统再拆，不得在未拆时把本卡扩成 L）。**立卡 ≠ 开工**。
+
+```yaml task-card
+id: TASK-J.30
+status: NEW_TASK
+contract:
+  intent:
+    title: 把凭据与秘密不得进入对话做成退出码硬门禁
+    description: >-
+      将 J.27 清单安全类第③项「凭据与秘密不得进入对话」做成真实子进程，接入 J.28 登记表别名 baseline-safety-secrets：
+      退出码 0 表示该条通过，非 0 或未跑则 can_merge 为 false。
+      口径对齐 conf-6 / q14（账密严禁进入对话上下文），不得把 acc-9（发布回滚）当作本项出处。
+      实现方案（复用既有 redactSecrets 模式表做静态扫描器，或做 Vault 口径的运行时断言）待 Opus 5.5 写出后再定，本卡不预设实现。
+      LLM 审核仍不得置真 can_merge。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J30-P1
+      check: auto
+      text: >-
+        「凭据与秘密不得进入对话」已作为真实子进程接入 J.28 登记表别名 baseline-safety-secrets；退出码 0 为通过，非 0 或缺失时 can_merge 为 false。测试锁定退出码行为。
+    - id: J30-P2
+      check: auto
+      text: >-
+        检查口径对齐 conf-6 / q14（账密严禁进入对话上下文），并在规格中明确此项出处不是 acc-9。
+    - id: J30-P3
+      check: auto
+      text: >-
+        实现采用经授权的方案（复用既有 redactSecrets 模式表做静态扫描器，或 Vault 口径的运行时断言），不另造与这两条既有模式无关的并行扫描子系统；can_merge 仍只经 deriveCanMerge 派生。
+    - id: J30-P4
+      check: auto
+      text: >-
+        规格回写与修订后的 J.27 清单一致，并继续标明北极星与无人值守三连卡未交付。
+  scheme_item_ids: [conf-6]
+  scope:
+    writable_paths:
+      - docs/specs/verification-strategy.md
+      - docs/specs/evidence-and-acceptance-criteria.md
+    readonly_paths:
+      - docs/ledger/scheme-settled-decisions.md
+      - docs/scheme.md
+      - daemon/runner/command-runner.ts
+      - daemon/core/debug-log.ts
+      - src/lib/ipc/redaction.ts
+      - daemon/vault/vault.ts
+      - src/lib/evidence.schema.ts
+      - daemon/pipeline/orchestrator.ts
+      - daemon/guard/baseline-gates.ts
+      - bin/stagent.ts
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    先由 Opus 5.5 比较两种方向并写出方案：「复用既有 redactSecrets 模式表做静态扫描器」，或「Vault 口径的运行时断言」。
+    方案经授权后，再修卡补入代码 writable_paths 与测试路径，然后施工。立卡阶段不预设实现、不写产品代码。
+    硬依赖仅为 J.27 清单口径；不重做 J.28 注入，不改 deriveCanMerge。
+  touches:
+    - { path: docs/specs/verification-strategy.md, change: modify, why: 方案与命令落盘后回写本项覆盖与出处（立卡阶段已先修正 acc-9 误引）, symbols: [] }
+    - { path: docs/specs/evidence-and-acceptance-criteria.md, change: modify, why: 回写本项证据与软层界限, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J30-P1, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "未施工；测试路径待方案授权后修卡补入" }
+    - { acceptance_id: J30-P2, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "未施工；测试路径待方案授权后修卡补入" }
+    - { acceptance_id: J30-P3, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "未施工；测试路径待方案授权后修卡补入" }
+    - { acceptance_id: J30-P4, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "未施工；测试路径待方案授权后修卡补入" }
+governance:
+  spec_refs:
+    - docs/specs/verification-strategy.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+    - docs/ledger/scheme-settled-decisions.md
+    - docs/scheme.md
+  depends_on:
+    - { id: TASK-J.27, kind: hard }
+  code_facts:
+    - { ref: "docs/ledger/scheme-settled-decisions.md:79", note: "conf-6 / q14：账密严禁进入对话上下文，是本项口径出处" }
+    - { ref: "docs/ledger/scheme-settled-decisions.md:138", note: "settled acc-9 是发布失败回到上一个 LIVE，不是本项出处" }
+    - { ref: "bin/stagent.ts:707", note: "stagent check 可识别子命令目前为 obligations、test-integrity、knowledge、playtest、baseline-gate，无凭据检查项" }
+    - { ref: "daemon/runner/command-runner.ts:100", note: "既有 redactSecrets 为运行时遮蔽，不是 0/1 门禁" }
+    - { ref: "daemon/core/debug-log.ts:156", note: "另一份 redactSecrets，同样是运行时遮蔽" }
+    - { ref: "src/lib/ipc/redaction.ts:105", note: "既有 redactText 为运行时遮蔽，不是 0/1 门禁" }
+    - { ref: "daemon/vault/vault.ts:1-8", note: "Vault 是凭据存取门面，不是检查器" }
+    - { ref: "daemon/guard/baseline-gates.ts::REQUIRED_BASELINE_GATES", note: "J.28 已登记 baseline-safety-secrets 别名，当前仍为桩命令" }
+  non_goals:
+    - 不在方案授权前写产品代码，不预设实现，不提前填代码 writable_paths
+    - 不新造与「redactSecrets 模式表静态扫描」和「Vault 口径运行时断言」无关的并行扫描子系统
+    - 不重做 J.28 的注入与 deriveCanMerge 接线，不改 sandbox / 网关写范围
+    - 不做 J.29 的八项薄适配，不开工 J.22 / CI.2
+    - 不宣称北极星或无人值守三连卡已交付；不加新文档层
+    - 不改 D.1e / S.3 / 已完工的 TASK-J.16
+  fail:
+    - 未出方案、未经授权就写产品代码或新造扫描器
+    - 把 acc-9（发布回滚）当作本项出处
+    - 只写文档、没有真实子进程退出码就把本项标完成
+    - LLM 审核或手写布尔把 can_merge 置真
+    - 本卡膨胀为 L 却不拆卡（R-11）
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：该项是 J.27 清单已点名的硬门禁，但没有可调用的退出码检查，不能塞进 J.29 的薄适配。
+* **取舍**：先立卡、先把引用改对，方案与代码路径留给 Opus 5.5；不在立卡时发明实现。
