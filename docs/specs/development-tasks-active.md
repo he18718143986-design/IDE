@@ -1183,129 +1183,9 @@ governance:
 
 ---
 
-### 3.4f 文档可读性与固定底线清单（2026-11-14 · 立卡 P-206；J.25 / J.26 / J.27 已完工迁出，J.28 / J.29 仍待授权）
+### 3.4f 文档可读性与固定底线清单（2026-11-14 · 立卡 P-206；J.25 / J.26 / J.27 / J.28 已完工迁出，J.29 仍待授权）
 
 > **立卡说明（2026-11-14 · P-206）**：授权来源为 Tina t1250u「按这个立卡」。目标是让非软件专业用户能走完「表达偏好 → 签字开工 → 试玩验收」并稳定得到高质量结果。本批只立第一块（文档可读性与结构分家）与第三块「固定底线清单硬门禁」。**不立**第二块（质量边界 / 判分表 / `card-copy-standard` / 校验器），**不立**「密封前意图完整性核对（`U<seq>` 回链）」卡——这两块留给 Opus 5.5。五张卡均为 `[NEW_TASK]`，估算均为 S 或 M（R-11；不立 L，不重演 J.16）。**立卡 ≠ 授权 ≠ 开工**；待 Tina 逐张授权。J.22 不开工；CI.2 攒样本。不改已完工的 `TASK-J.16`，不碰 `TASK-D.1e` / `TASK-S.3`，不改 runtime/contract ScopePlan sandbox。北极星场景（`scheme.md` goal-2）与「无人值守连续三张真实任务卡」继续标明未交付，不加新文档层。不暗示条目级高亮已交付（J.22 范围）。
-
-<a id="task-j.28"></a>
-
-#### 【Task J.28】固定底线硬门禁接线：清单检查以子进程退出码进入 can_merge`[NEW_TASK · 立卡 P-206 · 未开工]`
-
-> **立卡说明（2026-11-14 · P-206）**：第三块施工的机制卡。把 J.27 清单中的检查登记为必须跑到的真实子进程，沿用现有 `verification_spec` → `executeWithSignal` → `deriveCanMerge` 路径；不手写 `can_merge`。三类检查的具体适配见 `TASK-J.29`。硬依赖 J.27（清单未落盘前不得开工）。**立卡 ≠ 开工**。
->
-> **修订说明（2026-11-15 · 施工前核对 writable_paths）**：按卡在 `withSystemScope` / `buildScopePlan` 注入固定底线命令后，既有单测会落在原名单之外：`tests/unit/test-obligations.test.ts`（「无 auto 条目且无知识库时不变」现要求返回同一对象与同一 digest）、`tests/unit/scope-plan.test.ts`（绿野 / 无 typecheck·test 脚本场景下 `buildScopePlan` 后 `manual_only===true`）。本修订只把这两份测试补进 `writable_paths` 与 `touches`，不改验收、不改产品代码、不开工。若施工中还需改其它测试文件，必须再修卡，不得越写。
-
-```yaml task-card
-id: TASK-J.28
-status: NEW_TASK
-contract:
-  intent:
-    title: 固定底线检查必须作为真实子进程跑完，can_merge 仍只由退出码派生
-    description: >-
-      Daemon 在验证阶段始终注入并执行 J.27 固定底线清单登记的检查命令（真实子进程，退出码 0/1）；
-      任一项缺失、未跑或退出码非 0 时，verdict.status 不得为 PASSED，deriveCanMerge 结果必须为 false。
-      禁止手写 can_merge，禁止用 LLM 审核结果把 can_merge 置真。本卡只做登记表与接线，不实现安全/回滚/关键路径的具体检查体。
-    risk_level: MEDIUM
-  acceptance:
-    - id: J28-P1
-      check: auto
-      text: >-
-        ScopePlan / 合同 verification_spec 会注入 J.27 清单登记的底线检查命令（建议沿用 stagent check <subcommand> 形态，具体子命令名以施工为准并在卡回写中写清）。
-    - id: J28-P2
-      check: auto
-      text: >-
-        这些命令由现有验证循环以真实子进程执行，结果写入 evidence.verification_results（含 exit_code）；passed 只由退出码派生。
-    - id: J28-P3
-      check: auto
-      text: >-
-        清单中任一项缺失、被跳过或退出码非 0 时，writeEvidence 不得得到 can_merge=true；can_merge 仍只经 deriveCanMerge 计算，测试中不存在手写 true 的旁路。
-    - id: J28-P4
-      check: auto
-      text: >-
-        单测或集成测试用桩命令证明：全部退出码 0 时才可能 can_merge=true（其它门禁也通过的前提下）；任一非 0 或缺项则 can_merge=false；LLM / 人工评语不能单独置真。
-  scheme_item_ids: [goal-7, acc-7]
-  scope:
-    writable_paths:
-      - daemon/supervisor/scope-plan-builder.ts
-      - daemon/pipeline/orchestrator.ts
-      - bin/stagent.ts
-      - daemon/guard/baseline-gates.ts
-      - tests/unit/baseline-gates.test.ts
-      - tests/unit/test-obligations.test.ts
-      - tests/unit/scope-plan.test.ts
-      - docs/specs/verification-strategy.md
-      - docs/specs/evidence-and-acceptance-criteria.md
-    readonly_paths:
-      - src/lib/evidence.schema.ts
-      - daemon/pipeline/two-phase-runner.ts
-      - daemon/pipeline/merger.ts
-      - docs/specs/task-card-standard.md
-  verification:
-    commands:
-      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/baseline-gates.test.ts] }
-      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
-design:
-  approach: >-
-    参照 withSystemScope 注入 stagent check obligations / test-integrity / knowledge 的既有模式：
-    在 buildScopePlan / withSystemScope 注入底线命令，runCheckCommand 增加对应子命令分发，
-    executeWithSignal 验证循环跑子进程。缺项 fail-closed：在写证据前核对清单别名是否都出现在 verification_results。
-    deriveCanMerge 保持唯一布尔派生器，本卡默认不改其签名（若必须扩展输入，须在 PR 说明且仍禁止手写 can_merge）。
-    具体安全/回滚/关键路径检查体留给 TASK-J.29；本卡可用桩命令把机制测绿。
-    新文件 daemon/guard/baseline-gates.ts 为 ai_inferred 落点，施工前若更名须先修卡。
-  touches:
-    - { path: daemon/supervisor/scope-plan-builder.ts, change: modify, why: 向 verification_spec 注入固定底线检查命令, symbols: [withSystemScope, buildScopePlan] }
-    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: 验证循环对清单做缺项 fail-closed，仍经 deriveCanMerge 写 can_merge, symbols: [executeWithSignal] }
-    - { path: bin/stagent.ts, change: modify, why: 为底线检查增加 stagent check 子命令分发, symbols: [runCheckCommand] }
-    - { path: daemon/guard/baseline-gates.ts, change: create, why: 清单登记与缺项判定（ai_inferred 路径）, symbols: [] }
-    - { path: tests/unit/baseline-gates.test.ts, change: create, why: 用桩命令锁定退出码派生与缺项 fail-closed, symbols: [] }
-    - { path: tests/unit/test-obligations.test.ts, change: modify, why: 注入底线命令后，「无 auto 且无知识库」不再是 identity；只改该断言以匹配强制注入，不改 L.3 其它验收, symbols: [] }
-    - { path: tests/unit/scope-plan.test.ts, change: modify, why: 注入底线命令后，绿野/无脚本场景的 manual_only 不再为 true；只改该断言以匹配强制注入，不改 J.2 其它验收, symbols: [] }
-    - { path: docs/specs/verification-strategy.md, change: modify, why: 回写接线后的命令别名与 fail-closed 行为, symbols: [] }
-    - { path: docs/specs/evidence-and-acceptance-criteria.md, change: modify, why: 回写证据字段与人工三态仍不替代退出码, symbols: [] }
-  interfaces: []
-  test_plan:
-    - { acceptance_id: J28-P1, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "未施工" }
-    - { acceptance_id: J28-P2, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "未施工" }
-    - { acceptance_id: J28-P3, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "未施工" }
-    - { acceptance_id: J28-P4, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "未施工" }
-governance:
-  spec_refs:
-    - docs/specs/verification-strategy.md
-    - docs/specs/evidence-and-acceptance-criteria.md
-    - docs/adr/0005-deterministic-verification-gate.md
-    - docs/specs/delivery-lifecycle.md
-  depends_on:
-    - { id: TASK-J.27, kind: hard }
-  code_facts:
-    - { ref: "src/lib/evidence.schema.ts::deriveCanMerge", note: "can_merge 唯一派生函数；本卡只调用，默认不改签名" }
-    - { ref: "daemon/pipeline/orchestrator.ts::executeWithSignal", note: "验证循环已按 verification_spec.commands 起真实子进程，并用 deriveCanMerge 写 can_merge；尚未对固定底线清单做缺项 fail-closed" }
-    - { ref: "daemon/supervisor/scope-plan-builder.ts::withSystemScope", note: "已注入 obligations / test-integrity / knowledge 命令，尚未注入固定底线清单" }
-    - { ref: "bin/stagent.ts::runCheckCommand", note: "check 子命令目前只分发 obligations / test-integrity / knowledge / playtest" }
-  non_goals:
-    - 不实现安全 / 回滚 / 关键路径的具体检查体（TASK-J.29）
-    - 不改 deriveCanMerge 的「禁止手写」纪律，不让 LLM 审核置真 can_merge
-    - 不改 runtime/contract ScopePlan sandbox 语义，不扩网关写范围
-    - 不动三条铁律、q* 溯源、标注；ADR 只 SUPERSEDE 不删改
-    - 不宣称北极星或无人值守三连卡已交付；不加新文档层
-    - 不暗示条目级高亮已交付；不开工 J.22 / CI.2；不改 D.1e / S.3 / 已完工的 TASK-J.16
-  fail:
-    - 手写 can_merge=true，或用 LLM / 人工评语绕过退出码
-    - 清单项缺失或未跑时仍出现 can_merge=true
-    - 在本卡实现三类检查的产品行为（越界到 J.29）
-    - 把本卡估成 L 后直接开工而不拆
-  defaults:
-    - 新模块路径采用 daemon/guard/baseline-gates.ts，测试采用 tests/unit/baseline-gates.test.ts（ai_inferred）
-    - 默认不修改 deriveCanMerge 签名
-  estimate: M
-  invariants:
-    auth: unchanged
-    demo_origin: unchanged
-    illumination: unchanged
-    gateway_write_scope: unchanged
-```
-
-* **背景**：现有 can_merge 已只由退出码与门禁派生，但没有「固定底线清单必须全部跑到，缺项即失败」的接线。
-* **取舍**：先接线与桩测，再让 J.29 把三类真实检查接进同一登记表，避免一张卡跨机制与三个领域而变成 L。
 
 <a id="task-j.29"></a>
 
@@ -1373,9 +1253,9 @@ design:
     关键路径对既有主路径/回归检查（如 mainline-regression）。
     只做薄适配接到 J.28 登记表。若清单要求新子系统，停止并拆卡，不得在本卡膨胀为 L。
   touches:
-    - { path: daemon/guard/baseline-gates.ts, change: create, why: 把三类真实检查接到登记表；文件由 J.28 创建，J.28 合入后开工前须改 touch 为 modify, symbols: [] }
+    - { path: daemon/guard/baseline-gates.ts, change: modify, why: 把三类真实检查接到登记表（J.28 已创建该文件，P-209 按卡要求将 change 改为 modify）, symbols: [] }
     - { path: bin/stagent.ts, change: modify, why: 为三类检查补齐 check 子命令分发（若 J.28 已留扩展点则只接实现）, symbols: [runCheckCommand] }
-    - { path: tests/unit/baseline-gates.test.ts, change: create, why: 为三类检查的退出码与 can_merge 派生补用例；J.28 合入后开工前须改 touch 为 modify, symbols: [] }
+    - { path: tests/unit/baseline-gates.test.ts, change: modify, why: 为三类检查的退出码与 can_merge 派生补用例（J.28 已创建该文件，P-209 按卡要求将 change 改为 modify）, symbols: [] }
     - { path: docs/specs/verification-strategy.md, change: modify, why: 回写三类检查的命令与覆盖范围, symbols: [] }
     - { path: docs/specs/evidence-and-acceptance-criteria.md, change: modify, why: 回写证据与软层界限, symbols: [] }
   interfaces: []
@@ -1399,7 +1279,7 @@ governance:
     - { ref: "src/lib/evidence.schema.ts::deriveCanMerge", note: "合入门禁仍须经此函数派生" }
     - { ref: "daemon/pipeline/mainline-regression.ts:1-20", note: "已有主路径/回归机制，关键路径检查应优先适配而非另起框架（具体导出符号施工时以文件为准）" }
     - { ref: "docs/specs/release-and-operations.md:112-114", note: "发布失败自动回滚到上一个 LIVE 已有规格与 L.15 机制；本卡要把它变成可进入 can_merge 的退出码检查，而不是重写发布子系统" }
-    - { ref: "bin/stagent.ts::runCheckCommand", note: "现有 check 分发尚无安全/回滚/关键路径底线子命令（J.28 会先留扩展点）" }
+    - { ref: "bin/stagent.ts::runCheckCommand", note: "J.28 已留 stagent check baseline-gate 桩扩展点；本卡替换三类检查体，不重做注入接线" }
   non_goals:
     - 不新造安全扫描器、第二套回滚子系统或新的主路径测试框架
     - 不重做 J.28 的注入与 deriveCanMerge 接线，不改 sandbox / 网关写范围

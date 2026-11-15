@@ -6881,3 +6881,132 @@ governance:
 * **背景**：scheme.md 与七环表同时承担意图、进度和指针，非技术用户与施工者都难读；README 仍留空壳节与互相矛盾的计数。
 * **取舍**：硬编码计数看守放进既有 `check:docs`，不另做文档层。建议 J.25 先做，以免两边同时改 README / lifecycle。
 
+
+### 3.4ai 固定底线硬门禁接线（J.28 · 完工回写 P-209）
+
+<a id="task-j.28"></a>
+
+### 【Task J.28】固定底线硬门禁接线：清单检查以子进程退出码进入 can_merge`[COMPLETED · 立卡 P-206 · 施工 #254 · 完工回写 P-209]`
+
+> **立卡说明（2026-11-14 · P-206）**：第三块施工的机制卡。把 J.27 清单中的检查登记为必须跑到的真实子进程，沿用现有 `verification_spec` → `executeWithSignal` → `deriveCanMerge` 路径；不手写 `can_merge`。三类检查的具体适配见 `TASK-J.29`。硬依赖 J.27（清单未落盘前不得开工）。**立卡 ≠ 开工**。
+>
+> **修订说明（2026-11-15 · 施工前核对 writable_paths）**：按卡在 `withSystemScope` / `buildScopePlan` 注入固定底线命令后，既有单测会落在原名单之外：`tests/unit/test-obligations.test.ts`（「无 auto 条目且无知识库时不变」现要求返回同一对象与同一 digest）、`tests/unit/scope-plan.test.ts`（绿野 / 无 typecheck·test 脚本场景下 `buildScopePlan` 后 `manual_only===true`）。本修订只把这两份测试补进 `writable_paths` 与 `touches`，不改验收、不改产品代码、不开工。若施工中还需改其它测试文件，必须再修卡，不得越写。
+>
+> **归档注记（2026-11-15 · P-209）**：本卡已 **COMPLETED**。Tina t1263u 授权由我直接施工（当时 Opus 5.5 额度不足以再开一轮）、t1265u 授权按卡施工并合入修卡 [#253](https://github.com/he18718143986-design/IDE/pull/253)、t1266u 授权合入施工 PR。[#253](https://github.com/he18718143986-design/IDE/pull/253) 于 2026-11-15 11:02 香港时间 squash 合入 `dd85eb3ee40295be327f9ece20b7619ffb9d726c`（施工前补 `writable_paths`）。[#254](https://github.com/he18718143986-design/IDE/pull/254) squash `31c69ec5effe432df03a8e060933b4c9af716bfe` 于 2026-11-15 13:05 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `f713f37578be772e56d804e46ca20406129b4067`；合入前必需检查 SUCCESS；`Unit tests (windows-latest)` 为 `continue-on-error` 非必需存量失败，故 `mergeable=MERGEABLE` / `mergeStateStatus=UNSTABLE` 仅由该项导致）。macOS 单测首次红在卡外 `tests/unit/app-preview-runner.test.ts`（用例「不监听端口时 timeoutMs:3000 失败且含 stderr 尾部」，第 199 行期望 `ready===false`、实际 `ready===true`），重跑转绿且未改该文件，已按纪律记入挂账⑨样本池。`ai_inferred` 落点 `daemon/guard/baseline-gates.ts` 未更名。机制接线完成：九项底线桩命令注入、缺项/未跑/非 0 在写证据前 fail-closed，`can_merge` 仍只经 `deriveCanMerge` 派生、未改签名。**安全 / 回滚 / 关键路径检查体未实现（J.29 范畴），当前以桩命令测绿。**
+
+```yaml task-card
+id: TASK-J.28
+status: COMPLETED
+contract:
+  intent:
+    title: 固定底线检查必须作为真实子进程跑完，can_merge 仍只由退出码派生
+    description: >-
+      Daemon 在验证阶段始终注入并执行 J.27 固定底线清单登记的检查命令（真实子进程，退出码 0/1）；
+      任一项缺失、未跑或退出码非 0 时，verdict.status 不得为 PASSED，deriveCanMerge 结果必须为 false。
+      禁止手写 can_merge，禁止用 LLM 审核结果把 can_merge 置真。本卡只做登记表与接线，不实现安全/回滚/关键路径的具体检查体。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J28-P1
+      check: auto
+      text: >-
+        ScopePlan / 合同 verification_spec 会注入 J.27 清单登记的底线检查命令（建议沿用 stagent check <subcommand> 形态，具体子命令名以施工为准并在卡回写中写清）。
+    - id: J28-P2
+      check: auto
+      text: >-
+        这些命令由现有验证循环以真实子进程执行，结果写入 evidence.verification_results（含 exit_code）；passed 只由退出码派生。
+    - id: J28-P3
+      check: auto
+      text: >-
+        清单中任一项缺失、被跳过或退出码非 0 时，writeEvidence 不得得到 can_merge=true；can_merge 仍只经 deriveCanMerge 计算，测试中不存在手写 true 的旁路。
+    - id: J28-P4
+      check: auto
+      text: >-
+        单测或集成测试用桩命令证明：全部退出码 0 时才可能 can_merge=true（其它门禁也通过的前提下）；任一非 0 或缺项则 can_merge=false；LLM / 人工评语不能单独置真。
+  scheme_item_ids: [goal-7, acc-7]
+  scope:
+    writable_paths:
+      - daemon/supervisor/scope-plan-builder.ts
+      - daemon/pipeline/orchestrator.ts
+      - bin/stagent.ts
+      - daemon/guard/baseline-gates.ts
+      - tests/unit/baseline-gates.test.ts
+      - tests/unit/test-obligations.test.ts
+      - tests/unit/scope-plan.test.ts
+      - docs/specs/verification-strategy.md
+      - docs/specs/evidence-and-acceptance-criteria.md
+    readonly_paths:
+      - src/lib/evidence.schema.ts
+      - daemon/pipeline/two-phase-runner.ts
+      - daemon/pipeline/merger.ts
+      - docs/specs/task-card-standard.md
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/baseline-gates.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    参照 withSystemScope 注入 stagent check obligations / test-integrity / knowledge 的既有模式：
+    在 buildScopePlan / withSystemScope 注入底线命令，runCheckCommand 增加对应子命令分发，
+    executeWithSignal 验证循环跑子进程。缺项 fail-closed：在写证据前核对清单别名是否都出现在 verification_results。
+    deriveCanMerge 保持唯一布尔派生器，本卡默认不改其签名（若必须扩展输入，须在 PR 说明且仍禁止手写 can_merge）。
+    具体安全/回滚/关键路径检查体留给 TASK-J.29；本卡可用桩命令把机制测绿。
+    新文件 daemon/guard/baseline-gates.ts 为 ai_inferred 落点，施工前若更名须先修卡。
+  touches:
+    - { path: daemon/supervisor/scope-plan-builder.ts, change: modify, why: 向 verification_spec 注入固定底线检查命令, symbols: [withSystemScope, buildScopePlan] }
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: 验证循环对清单做缺项 fail-closed，仍经 deriveCanMerge 写 can_merge, symbols: [executeWithSignal] }
+    - { path: bin/stagent.ts, change: modify, why: 为底线检查增加 stagent check 子命令分发, symbols: [runCheckCommand] }
+    - { path: daemon/guard/baseline-gates.ts, change: modify, why: "已新增清单登记与缺项判定（ai_inferred 路径未更名；施工 #254 落盘后改记为 modify，消除 create-vs-exists warn）", symbols: [REQUIRED_BASELINE_GATES, evaluateBaselineGateResults, injectBaselineGateCommands] }
+    - { path: tests/unit/baseline-gates.test.ts, change: modify, why: "已用桩命令锁定退出码派生与缺项 fail-closed（施工 #254 落盘后改记为 modify，消除 create-vs-exists warn）", symbols: [] }
+    - { path: tests/unit/test-obligations.test.ts, change: modify, why: 注入底线命令后，「无 auto 且无知识库」不再是 identity；只改该断言以匹配强制注入，不改 L.3 其它验收, symbols: [] }
+    - { path: tests/unit/scope-plan.test.ts, change: modify, why: 注入底线命令后，绿野/无脚本场景的 manual_only 不再为 true；只改该断言以匹配强制注入，不改 J.2 其它验收, symbols: [] }
+    - { path: docs/specs/verification-strategy.md, change: modify, why: 回写接线后的命令别名与 fail-closed 行为, symbols: [] }
+    - { path: docs/specs/evidence-and-acceptance-criteria.md, change: modify, why: 回写证据字段与人工三态仍不替代退出码, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J28-P1, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "已由 #254 交付；withSystemScope 始终注入九项别名" }
+    - { acceptance_id: J28-P2, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "已由 #254 交付；桩命令以真实子进程退出码写入结果" }
+    - { acceptance_id: J28-P3, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "已由 #254 交付；缺项/非 0 fail-closed，deriveCanMerge 签名未改" }
+    - { acceptance_id: J28-P4, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "已由 #254 交付；机制以桩命令测绿，检查体属 J.29" }
+governance:
+  spec_refs:
+    - docs/specs/verification-strategy.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+    - docs/adr/0005-deterministic-verification-gate.md
+    - docs/specs/delivery-lifecycle.md
+  depends_on:
+    - { id: TASK-J.27, kind: hard }
+  code_facts:
+    - { ref: "src/lib/evidence.schema.ts::deriveCanMerge", note: "can_merge 唯一派生函数；本卡只调用，未改签名" }
+    - { ref: "daemon/guard/baseline-gates.ts:21-76", note: "REQUIRED_BASELINE_GATES 登记 J.27 九项别名；ai_inferred 落点未更名" }
+    - { ref: "daemon/guard/baseline-gates.ts:125-139", note: "evaluateBaselineGateResults 对缺项（结果中无别名）或退出码非 0 / passed===false fail-closed" }
+    - { ref: "daemon/pipeline/orchestrator.ts:1048-1061", note: "合同已登记任一条底线别名时，buildRuntime 前补齐缺项；空命令合同保持零命令兜底" }
+    - { ref: "daemon/pipeline/orchestrator.ts:1230-1347", note: "baselineRequired 时写证据前 fail-closed；失败则 status=FAILED、reason_code=UNSAFE_EXECUTION；can_merge 仍经 deriveCanMerge" }
+    - { ref: "daemon/supervisor/scope-plan-builder.ts:885-891", note: "withSystemScope 始终 injectBaselineGateCommands，并将 manual_only 置为 false" }
+    - { ref: "bin/stagent.ts:673-702", note: "runCheckCommand 已分发 stagent check baseline-gate --id <alias>（桩命令，检查体留给 J.29）" }
+  non_goals:
+    - 不实现安全 / 回滚 / 关键路径的具体检查体（TASK-J.29）
+    - 不改 deriveCanMerge 的「禁止手写」纪律，不让 LLM 审核置真 can_merge
+    - 不改 runtime/contract ScopePlan sandbox 语义，不扩网关写范围
+    - 不动三条铁律、q* 溯源、标注；ADR 只 SUPERSEDE 不删改
+    - 不宣称北极星或无人值守三连卡已交付；不加新文档层
+    - 不暗示条目级高亮已交付；不开工 J.22 / CI.2；不改 D.1e / S.3 / 已完工的 TASK-J.16
+  fail:
+    - 手写 can_merge=true，或用 LLM / 人工评语绕过退出码
+    - 清单项缺失或未跑时仍出现 can_merge=true
+    - 在本卡实现三类检查的产品行为（越界到 J.29）
+    - 把本卡估成 L 后直接开工而不拆
+  defaults:
+    - 新模块路径采用 daemon/guard/baseline-gates.ts，测试采用 tests/unit/baseline-gates.test.ts（ai_inferred）
+    - 默认不修改 deriveCanMerge 签名
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 254, commit: 31c69ec5effe432df03a8e060933b4c9af716bfe }
+```
+
+* **背景**：现有 can_merge 已只由退出码与门禁派生，但没有「固定底线清单必须全部跑到，缺项即失败」的接线。
+* **取舍**：先接线与桩测，再让 J.29 把三类真实检查接进同一登记表，避免一张卡跨机制与三个领域而变成 L。
+
