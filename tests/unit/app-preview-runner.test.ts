@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
 import net from "node:net";
@@ -25,6 +26,13 @@ import { REAL_PREVIEW_PORT_RANGE } from "../../daemon/supervisor/preview/types";
 
 const tmpRoots: string[] = [];
 const running: AppPreviewHandle[] = [];
+const usedPorts: number[] = [];
+
+const PREVIEW_PROBE_HEADER = "x-stagent-preview-probe";
+
+function newProbeToken(): string {
+  return randomBytes(8).toString("hex");
+}
 
 function newRepo(): string {
   const base = path.join(process.cwd(), ".tmp", "unit-app-preview");
@@ -53,8 +61,9 @@ function writePkg(
   }
 }
 
-/** 读 PORT 并监听；任意 GET 回 200 */
-const LISTENING_SERVER = `
+/** 读 PORT 并监听；任意 GET 回 200，并带上来源探测头 */
+function listeningServerSource(token: string): string {
+  return `
 const http = require("node:http");
 const port = Number(process.env.PORT);
 if (!Number.isInteger(port) || port <= 0) {
@@ -62,13 +71,46 @@ if (!Number.isInteger(port) || port <= 0) {
   process.exit(2);
 }
 const server = http.createServer((req, res) => {
-  res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
+  res.writeHead(200, {
+    "content-type": "text/plain; charset=utf-8",
+    "${PREVIEW_PROBE_HEADER}": ${JSON.stringify(token)},
+  });
   res.end("preview-ok");
 });
 server.listen(port, "127.0.0.1", () => {
   console.error("listening on " + port);
 });
 `;
+}
+
+async function waitUntilPortFree(
+  port: number,
+  timeoutMs = 5_000,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await canBindPort(port)) return true;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return false;
+}
+
+async function allocatePreviewPort(): Promise<number> {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    const port = await findAvailablePort({
+      host: "127.0.0.1",
+      startPort: REAL_PREVIEW_PORT_RANGE.start,
+      endPort: REAL_PREVIEW_PORT_RANGE.end,
+    });
+    if (await canBindPort(port)) {
+      usedPorts.push(port);
+      return port;
+    }
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  throw new Error("无法在 4200～4210 分配到已释放的预览端口");
+}
 
 /** 不监听端口，只往 stderr 打日志并挂起 */
 const HANGING_SERVER = `
@@ -86,6 +128,10 @@ afterEach(async () => {
         // ignore
       }
     }
+  }
+  const ports = usedPorts.splice(0);
+  for (const port of ports) {
+    await waitUntilPortFree(port);
   }
   for (const dir of tmpRoots.splice(0)) {
     safeRmSync(dir);
@@ -144,12 +190,9 @@ describe("app-preview-runner（TASK-L.5）", () => {
   describe("start / waitReady / stop", () => {
     it("启动后 waitReady 成功，GET 得到 200；端口落在 4200～4210", async () => {
       const dir = newRepo();
-      writePkg(dir, { dev: "node server.cjs" }, LISTENING_SERVER);
-      const port = await findAvailablePort({
-        host: "127.0.0.1",
-        startPort: REAL_PREVIEW_PORT_RANGE.start,
-        endPort: REAL_PREVIEW_PORT_RANGE.end,
-      });
+      const token = newProbeToken();
+      writePkg(dir, { dev: "node server.cjs" }, listeningServerSource(token));
+      const port = await allocatePreviewPort();
       expect(port).toBeGreaterThanOrEqual(4200);
       expect(port).toBeLessThanOrEqual(4210);
 
@@ -159,6 +202,7 @@ describe("app-preview-runner（TASK-L.5）", () => {
       const ready = await waitReady(port, {
         timeoutMs: 30_000,
         getStderr: () => handle.stderr(),
+        expectedHeader: { name: PREVIEW_PROBE_HEADER, value: token },
       });
       expect(ready).toEqual({ ready: true });
 
@@ -181,12 +225,9 @@ describe("app-preview-runner（TASK-L.5）", () => {
 
     it("不监听端口时 timeoutMs:3000 失败且含 stderr 尾部", async () => {
       const dir = newRepo();
+      const token = newProbeToken();
       writePkg(dir, { start: "node server.cjs" }, HANGING_SERVER);
-      const port = await findAvailablePort({
-        host: "127.0.0.1",
-        startPort: REAL_PREVIEW_PORT_RANGE.start,
-        endPort: REAL_PREVIEW_PORT_RANGE.end,
-      });
+      const port = await allocatePreviewPort();
 
       const handle = await startAppPreview({ worktreeDir: dir, port });
       running.push(handle);
@@ -195,25 +236,63 @@ describe("app-preview-runner（TASK-L.5）", () => {
         intervalMs: 200,
         timeoutMs: 3_000,
         getStderr: () => handle.stderr(),
+        expectedHeader: { name: PREVIEW_PROBE_HEADER, value: token },
       });
       expect(ready.ready).toBe(false);
       if (ready.ready) throw new Error("unreachable");
       expect(ready.stderrTail).toContain("fixture-stderr-tail");
     }, 20_000);
 
+    it("不监听时外来 HTTP 监听不得判为 ready", async () => {
+      const dir = newRepo();
+      const token = newProbeToken();
+      writePkg(dir, { start: "node server.cjs" }, HANGING_SERVER);
+      const port = await allocatePreviewPort();
+
+      const foreign = http.createServer((_req, res) => {
+        res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
+        res.end("foreign-ok");
+      });
+      await new Promise<void>((resolve, reject) => {
+        foreign.once("error", reject);
+        foreign.listen(port, "127.0.0.1", () => resolve());
+      });
+
+      try {
+        const handle = await startAppPreview({ worktreeDir: dir, port });
+        running.push(handle);
+
+        const ready = await waitReady(port, {
+          intervalMs: 200,
+          timeoutMs: 3_000,
+          getStderr: () => handle.stderr(),
+          expectedHeader: { name: PREVIEW_PROBE_HEADER, value: token },
+        });
+        expect(ready.ready).toBe(false);
+        if (ready.ready) throw new Error("unreachable");
+        expect(ready.stderrTail).toContain("fixture-stderr-tail");
+      } finally {
+        await new Promise<void>((resolve, reject) => {
+          foreign.close((err) => (err ? reject(err) : resolve()));
+        });
+      }
+    }, 20_000);
+
     it("stopAppPreview 后端口可再次绑定", async () => {
       const dir = newRepo();
-      writePkg(dir, { preview: "node server.cjs" }, LISTENING_SERVER);
-      const port = await findAvailablePort({
-        host: "127.0.0.1",
-        startPort: REAL_PREVIEW_PORT_RANGE.start,
-        endPort: REAL_PREVIEW_PORT_RANGE.end,
-      });
+      const token = newProbeToken();
+      writePkg(
+        dir,
+        { preview: "node server.cjs" },
+        listeningServerSource(token),
+      );
+      const port = await allocatePreviewPort();
 
       const handle = await startAppPreview({ worktreeDir: dir, port });
       const ready = await waitReady(port, {
         timeoutMs: 30_000,
         getStderr: () => handle.stderr(),
+        expectedHeader: { name: PREVIEW_PROBE_HEADER, value: token },
       });
       expect(ready.ready).toBe(true);
 
