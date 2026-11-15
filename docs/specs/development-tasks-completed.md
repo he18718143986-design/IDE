@@ -7515,3 +7515,107 @@ governance:
 * **背景**：冲突卡 / 意外卡 / 线上卡如果术语不受控、选项不写后果，非技术用户难以选择；机器只能校验格式与用词来源，不能替用户判断「是否真懂」。
 * **取舍**：规范 + 门禁接线放在同一张 M 卡；「是否真懂」明确排除在门禁之外。诚实口径：规范为文案结构层交付，不表示界面已按两列展示；条目级高亮未交付（J.22b 范畴）。
 
+
+### 3.4an 专修 app-preview-runner 单测端口隔离（CI.5 · 完工回写 P-219）
+
+<a id="task-ci.5"></a>
+
+### 【Task CI.5】专修 app-preview-runner 单测端口隔离 `[COMPLETED · 立卡 P-218 · 施工 #269 · 完工回写 P-219]`
+
+> **立卡说明（2026-11-15 · P-218）**：授权来源为 Tina t1296u「立这张小卡，专修 app-preview-runner.test.ts 的端口隔离」。挂账⑨样本 `:199`（用例「不监听端口时 timeoutMs:3000 失败且含 stderr 尾部」，`expect(ready.ready).toBe(false)` 得到 `true`）已在⑤ [#254](https://github.com/he18718143986-design/IDE/pull/254) run [`43671164676`](https://github.com/he18718143986-design/IDE/actions/runs/43671164676)、⑥ [#258](https://github.com/he18718143986-design/IDE/pull/258) run [`43685199644`](https://github.com/he18718143986-design/IDE/actions/runs/43685199644)、⑦ [#266](https://github.com/he18718143986-design/IDE/pull/266) run [`43695882208`](https://github.com/he18718143986-design/IDE/actions/runs/43695882208) 三次出现；同文件 `:163`（用例「启动后 waitReady 成功，GET 得到 200；端口落在 4200～4210」）在⑦第一次失败中表现为 `EADDRINUSE: address already in use 127.0.0.1:4200`。分类为「反复出现的端口隔离缺陷」，CI.2 攒样本时单独标注，**不计入中位数依据**。该文件不在任何在队卡的 `writable_paths` 内，不能带病在其他卡上修。
+
+> **归档注记（2026-11-15 · P-219）**：本卡已 **COMPLETED**。Tina t1297u 授权施工、t1299u 授权合入施工 PR。[#269](https://github.com/he18718143986-design/IDE/pull/269) squash `e12b7b76641769746901cd73c084242812dbf35b` 于 2026-11-15 17:58:11 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `a6df64fa8d3a0029cfca4618699fde3dc8cd696c`；父提交 `8f6997a9bdcb9094f475a4864dce79683ba7acd8`）。估算仍为 S。交付：用例结束后等待端口释放再进入下一例；`waitReady` / `probeOnce` 增加可选 `expectedHeader`，测试夹具用探测头校验响应来自本用例进程；缺省仍是任意 HTTP 响应（含 3xx / 4xx）即就绪，未改 `daemon/server.ts`；原 `:163` / `:199` 断言未删除、未放宽；新增「不监听时外来 HTTP 监听不得判为 ready」回归。合入前必需检查全绿，含 macOS 单测 job `132771678277` SUCCESS，`:163` / `:199` 未再出现。诚实口径：`:163` / `:199` 端口隔离缺陷已修；Windows `spawn EINVAL`（`startAppPreview` → `spawnManaged`，既有拉起 `npm.cmd` 存量问题）不在本卡范围，不归本卡修；后续样本继续观察。不宣称 macOS 单测永久全绿。不并入、不开工 `TASK-CI.2`。不把本缺陷样本计入 CI.2 中位数依据。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-CI.5
+status: COMPLETED
+contract:
+  intent:
+    title: 专修 app-preview-runner 单测端口隔离
+    description: >-
+      修好 tests/unit/app-preview-runner.test.ts 的端口隔离，使同一文件内前一用例残留的监听
+      不再把后一用例打成 EADDRINUSE:4200，也不再让「不监听」夹具被判为 ready。
+      macOS 必需检查上这两类失败不再因用例间端口污染而复发。
+    risk_level: LOW
+  acceptance:
+    - id: CI5-P1
+      check: auto
+      text: >-
+        用例「启动后 waitReady 成功，GET 得到 200；端口落在 4200～4210」不得因同一文件前一用例未释放端口，
+        而以 EADDRINUSE: address already in use 127.0.0.1:4200 失败。
+    - id: CI5-P2
+      check: auto
+      text: >-
+        用例「不监听端口时 timeoutMs:3000 失败且含 stderr 尾部」在夹具未监听时得到 ready.ready === false，
+        即使 4200～4210 范围内另有残留或外来 HTTP 监听在应答，也不得被判为 ready。
+    - id: CI5-P3
+      check: auto
+      text: >-
+        既有「启动后 waitReady 成功…」「stopAppPreview 后端口可再次绑定」「无脚本时 startAppPreview 抛出白话错误」
+        仍通过；不以删除或放宽 :163 / :199 断言换绿。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - tests/unit/app-preview-runner.test.ts
+      - daemon/supervisor/preview/app-runner.ts
+    readonly_paths:
+      - daemon/core/port-finder.ts
+      - daemon/supervisor/preview/types.ts
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/app-preview-runner.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    先在测试层做用例间端口隔离：前一用例须确认端口已释放再进入下一用例，避免共享 4200～4210 残留监听。
+    若根因是 waitReady / probeOnce 把任意 HTTP 响应都当成就绪（含外来或残留监听），允许只收窄这两处，
+    使探测能区分本夹具与外来应答；不改预览端口默认范围，不改 pickPreviewCommand，不改其他预览文件。
+    为 :163 的 EADDRINUSE 与 :199 的误判 ready 各留回归。
+  touches:
+    - { path: tests/unit/app-preview-runner.test.ts, change: modify, why: "补齐用例间端口隔离，并为 :163 / :199 复发补回归", symbols: [] }
+    - { path: daemon/supervisor/preview/app-runner.ts, change: modify, why: "收窄 waitReady / probeOnce：可选 expectedHeader；缺省仍任意 HTTP 即就绪", symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: CI5-P1, test_path: tests/unit/app-preview-runner.test.ts, level: unit, case: "启动后 waitReady 成功，GET 得到 200；端口落在 4200～4210" }
+    - { acceptance_id: CI5-P2, test_path: tests/unit/app-preview-runner.test.ts, level: unit, case: "不监听端口时 timeoutMs:3000 失败且含 stderr 尾部" }
+    - { acceptance_id: CI5-P2, test_path: tests/unit/app-preview-runner.test.ts, level: unit, case: "不监听时外来 HTTP 监听不得判为 ready" }
+    - { acceptance_id: CI5-P3, test_path: tests/unit/app-preview-runner.test.ts, level: unit, case: "stopAppPreview 后端口可再次绑定" }
+governance:
+  spec_refs:
+    - docs/ledger/README.md
+    - docs/specs/development-tasks-completed.md#task-l.5
+    - docs/specs/development-tasks-active.md#task-ci.2
+  depends_on: []
+  code_facts:
+    - { ref: "tests/unit/app-preview-runner.test.ts:121-135", note: "afterEach：stopAppPreview 后等待 usedPorts 可再次绑定，再进入下一例" }
+    - { ref: "tests/unit/app-preview-runner.test.ts:86-113", note: "waitUntilPortFree / allocatePreviewPort：分配前复验 canBindPort" }
+    - { ref: "tests/unit/app-preview-runner.test.ts:65-83", note: "listeningServerSource 把一次性探测头写进夹具响应，不用 extraEnv" }
+    - { ref: "tests/unit/app-preview-runner.test.ts:191-224", note: "用例「启动后 waitReady 成功…」；第 207 行仍 expect(ready).toEqual({ ready: true })，并带 expectedHeader" }
+    - { ref: "tests/unit/app-preview-runner.test.ts:226-244", note: "用例「不监听端口时 timeoutMs:3000 失败且含 stderr 尾部」；第 237-243 行仍 timeoutMs: 3_000、ready.ready === false、含 fixture-stderr-tail" }
+    - { ref: "tests/unit/app-preview-runner.test.ts:246-279", note: "新增回归：不监听时外来 HTTP 监听不得判为 ready" }
+    - { ref: "daemon/supervisor/preview/app-runner.ts:69-75", note: "WaitReadyOptions 可选 expectedHeader；缺省保持任意 HTTP（含 3xx / 4xx）即就绪" }
+    - { ref: "daemon/supervisor/preview/app-runner.ts:230-259", note: "headerValueEquals 在未传 expectedHeader 时返回 true；probeOnce 仅在传入时校验头" }
+    - { ref: "daemon/supervisor/preview/app-runner.ts:266-289", note: "waitReady 把 options.expectedHeader 传给 probeOnce；缺省口径不变" }
+  non_goals:
+    - 不并入、不开工 TASK-CI.2；不把本缺陷样本计入 CI.2 中位数依据
+    - 不以删除或放宽 :163 / :199 断言换绿
+    - 不改预览端口默认范围、不改 pickPreviewCommand，不改其他预览文件（real-preview-server 等）
+    - 不改 D.1e / S.3；不销 OP-34；不动 J.32 / J.22 子卡
+    - 不宣称 macOS 单测永久全绿，不宣称端到端闭环
+    - 不把 Windows spawn EINVAL（startAppPreview / spawnManaged 存量问题）归本卡修
+  fail:
+    - 把端口隔离修到 CI.2 或其他在队卡上
+    - 以删除或放宽 :163 / :199 断言的方式让测试变绿
+    - 把本样本计入 CI.2 中位数依据
+    - 以一次 CI 转绿宣称 macOS 单测已永久稳定
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 269, commit: e12b7b76641769746901cd73c084242812dbf35b }
+```
+
+* **背景**：该单测属于已完成的 `TASK-L.5`（真实预览 runner）。缺陷已在必需 macOS 单测上三次复发，且文件不在 J.32 / J.22 子卡或 CI.2 的可写范围内。
+* **取舍**：测试隔离优先；仅当「任意 HTTP 即就绪」仍会把外来监听判成功时，才允许收窄 `waitReady` / `probeOnce`。不并入 CI.2，因为 CI.2 只收性能断言口径，本缺陷不计入中位数依据。诚实口径：`:163` / `:199` 端口隔离缺陷已修；Windows `spawn EINVAL` 为存量问题，不在本卡范围；后续样本继续观察。
