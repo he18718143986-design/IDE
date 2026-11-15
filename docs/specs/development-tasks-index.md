@@ -191,8 +191,8 @@
 | `TASK-J.30` | `COMPLETED` | 凭据与秘密不得进入对话的退出码检查（立卡 P-210；修订 P-211 拍板 Vault 运行时断言；修订 P-213：共享断言放 `active.ts` 叶子，接缝不直接引用 `vault.ts`；施工 #261 `27d9c41`；完工回写 P-214；估算 M） | [正文](./development-tasks-completed.md#task-j.30) |
 | `TASK-J.31` | `COMPLETED` | 把试玩自查升级为非技术用户可执行的判分表（立卡 P-215；施工 #264 `03acf2a`；完工回写 P-216；估算 S） | [正文](./development-tasks-completed.md#task-j.31) |
 | `TASK-J.32` | `SPLIT` | 密封前意图完整性核对：方案卡回链用户原话（立卡 P-215；修卡拆分 P-221；原估算 M，补对照面与信任档后按 R-11 拆出 J.32a / J.32b；不再作为施工依据） | [正文](./development-tasks-active.md#task-j.32) |
-| `TASK-J.32a` | `NEW_TASK` | 密封前原话回链内核（拆自 J.32；修卡 P-221；估算 M；硬依赖 J.16；未开工） | [正文](./development-tasks-active.md#task-j.32a) |
-| `TASK-J.32b` | `NEW_TASK` | 回链对照面与信任档确认形态（拆自 J.32；修卡 P-221；估算 M；硬依赖 J.32a；未开工） | [正文](./development-tasks-active.md#task-j.32b) |
+| `TASK-J.32a` | `COMPLETED` | 密封前原话回链内核（拆自 J.32；修卡 P-221；施工 #273 `2d48303`；完工回写 P-222；估算 M；硬依赖 J.16） | [正文](./development-tasks-completed.md#task-j.32a) |
+| `TASK-J.32b` | `NEW_TASK` | 回链对照面与信任档确认形态（拆自 J.32；修卡 P-221；估算 M；硬依赖 J.32a 已由 #273 满足；未开工） | [正文](./development-tasks-active.md#task-j.32b) |
 | `TASK-J.33` | `COMPLETED` | 新增卡文案规范并做成机器可校验项（立卡 P-215；施工 #266 `838d1f4`；完工回写 P-217；估算 M） | [正文](./development-tasks-completed.md#task-j.33) |
 
 ---
