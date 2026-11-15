@@ -6749,3 +6749,135 @@ governance:
 
 * **背景**：质量安全网要求「固定底线」先有规格口径，再接线。现有 ADR-0005 / deriveCanMerge 已是机制样板，但规格没有把安全 / 回滚 / 关键路径写成固定清单，也未写清 LLM 审核局限。
 * **取舍**：本卡只写规格；不在立卡时发明新的扫描器或回滚子系统。
+
+### 3.4ah 文档结构分家（J.26 · 完工回写 P-208）
+
+<a id="task-j.26"></a>
+
+### 【Task J.26】文档结构分家（生命周期进度、scheme L0、README 空壳与硬编码计数）`[COMPLETED · 立卡 P-206 · 施工 #251 · 完工回写 P-208]`
+
+> **立卡说明（2026-11-14 · P-206）**：第一块的结构迁移切片，风险略高于 J.25，估算 M，不是 L。建议在 J.25 之后施工，以免术语链接与搬迁互相覆盖；无硬依赖。**立卡 ≠ 开工**。
+
+> **归档注记（2026-11-15 · P-208）**：本卡已 **COMPLETED**。Tina t1254u 授权施工、t1257u 授权合入。[#251](https://github.com/he18718143986-design/IDE/pull/251) squash `9852cff93cb28fa033ae22cea937d52c71e35576` 于 2026-11-15 10:41 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `a1d0201f7ea8257ace4b870e50bd1609e4646cde`）。交付：`delivery-lifecycle.md` 七环表已删除「现状 → 卡」列，进度迁入索引「七环进度」；`scheme.md` 只留 L0 意图，§2 / §4～§13 原位只留指针；已新建 `docs/reports/scheme-physical-pointers.md` 与 `docs/ledger/scheme-settled-decisions.md`；`docs/README.md` 已删空壳节、补项目简介、去掉硬编码计数；`check:docs` 新增计数看守并有正负两向单测。施工中因 `scheme.md` 缩短，卡内两条 `code_facts` 行号越界，不改指则 `check:docs` 报 error；该两处改动落在 `readonly_paths` 所列的 `docs/specs/development-tasks-active.md`。Tina t1256u 拍板口径 A，记为既成事实：「`code_facts` 行号因本卡自身迁移失效而改指，属自指性必要修正，非产品改动，经 Tina 裁决记为既成事实」。本条将两份新文件的 `touches.change` 由 `create` 改为 `modify`，并按迁后行号回写 `code_facts`。J.28 / J.29 仍 `[NEW_TASK]`；J.29 等 J.28 合入后再报方案；不开工 J.22；CI.2 攒样本。
+
+```yaml task-card
+id: TASK-J.26
+status: COMPLETED
+contract:
+  intent:
+    title: 文档结构分家：进度进索引、scheme 只留 L0、去掉 README 空壳与硬编码计数
+    description: >-
+      delivery-lifecycle.md 删除「现状 → 卡」列，该列进度迁入 development-tasks-index.md；
+      scheme.md 只留 L0 意图（原话、目标、模块），物理指针快照迁 docs/reports/，已落盘裁决迁 docs/ledger/，
+      作废正文迁出只留指针；docs/README.md 删除「已迁走」空壳节（现 §3 / §8 / §9），顶部加 3～5 句项目简介；
+      索引与卡片状态一致性继续由 check:docs 校验，并消除 docs/ 内除 docs/adr/README.md 以外的硬编码计数。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J26-P1
+      check: auto
+      text: >-
+        docs/specs/delivery-lifecycle.md 七环表已删除「现状 → 卡」列；该列原先记录的进度已迁入 docs/specs/development-tasks-index.md，
+        且迁后索引状态与卡头 / §1.1 矩阵仍被 check:docs 校验为一致。
+    - id: J26-P2
+      check: auto
+      text: >-
+        docs/scheme.md 正文只保留 L0 意图（§0 原话、§1 目标、§3 模块及溯源所需的 source/evidence 列）；
+        物理指针快照已迁至 docs/reports/scheme-physical-pointers.md，已落盘裁决已迁至 docs/ledger/scheme-settled-decisions.md，
+        作废正文迁出后在原位只留指针；user_said 仍能追到 §0 原话（check:docs / acc-4），q* 溯源与 user_said/ai_inferred 标注不丢。
+    - id: J26-P3
+      check: auto
+      text: >-
+        docs/README.md 已删除「已迁走」空壳节（现 §3 / §8 / §9 仅剩「已迁至 …」的空壳），顶部有 3～5 句项目简介；
+        三条铁律仍在；分层表如因 J.25 已登记新文件则保持登记。
+    - id: J26-P4
+      check: auto
+      text: >-
+        docs/ 内除 docs/adr/README.md 以外，不再出现以正文硬编码维护的 ADR / 篇数计数；
+        check:docs 新增规则在此类硬编码出现时判红；历史 changelog 中的过时计数不在本卡清扫范围。
+  scheme_item_ids: [goal-5, goal-6]
+  scope:
+    writable_paths:
+      - docs/specs/delivery-lifecycle.md
+      - docs/specs/development-tasks-index.md
+      - docs/scheme.md
+      - docs/README.md
+      - docs/reports/README.md
+      - docs/reports/scheme-physical-pointers.md
+      - docs/ledger/README.md
+      - docs/ledger/scheme-settled-decisions.md
+      - scripts/docs-check/checks.ts
+      - tests/unit/docs-check.test.ts
+    readonly_paths:
+      - docs/adr/README.md
+      - docs/specs/task-card-standard.md
+      - docs/specs/development-tasks-active.md
+      - docs/specs/development-tasks-completed.md
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/docs-check.test.ts] }
+design:
+  approach: >-
+    先列出 scheme.md 各节迁出清单再搬迁，避免一次改丢溯源。L0 只留原话、目标、模块；
+    物理指针进 reports，已落盘裁决进 ledger（只迁 scheme 正文中的裁决叙述并加指针，不改 ADR 原文）。
+    生命周期进度列整列删除，文字迁入索引（可增注或附列，但不得与卡头/矩阵状态打架）。
+    README 去空壳、补项目简介。硬编码计数清除后，在 scripts/docs-check/checks.ts 加看守规则，
+    并在 tests/unit/docs-check.test.ts 补用例。三条铁律、q* 溯源、标注与 ADR SUPERSEDE 纪律不动。
+  touches:
+    - { path: docs/specs/delivery-lifecycle.md, change: modify, why: 删除「现状 → 卡」列, symbols: [] }
+    - { path: docs/specs/development-tasks-index.md, change: modify, why: 承接七环进度文字，保持与矩阵/卡头状态一致, symbols: [] }
+    - { path: docs/scheme.md, change: modify, why: 只留 L0，其余迁出只留指针, symbols: [] }
+    - { path: docs/reports/scheme-physical-pointers.md, change: modify, why: "已承接 scheme.md 物理指针快照（施工 #251 落盘后改记为 modify，消除 create-vs-exists warn）", symbols: [] }
+    - { path: docs/ledger/scheme-settled-decisions.md, change: modify, why: "已承接 scheme.md 已落盘裁决叙述并指向 ADR/ledger（施工 #251 落盘后改记为 modify，消除 create-vs-exists warn）", symbols: [] }
+    - { path: docs/reports/README.md, change: modify, why: 登记迁入的指针快照, symbols: [] }
+    - { path: docs/ledger/README.md, change: modify, why: 登记迁入的裁决叙述, symbols: [] }
+    - { path: docs/README.md, change: modify, why: 删空壳节、顶部加项目简介、去掉硬编码计数, symbols: [] }
+    - { path: scripts/docs-check/checks.ts, change: modify, why: 新增硬编码计数看守，计数只允许出现在 docs/adr/README.md, symbols: [] }
+    - { path: tests/unit/docs-check.test.ts, change: modify, why: 为硬编码计数规则补用例, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J26-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #251 交付；门禁仍为 npm run check:docs" }
+    - { acceptance_id: J26-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #251 交付；迁后仍通过既有 scheme user_said 溯源检查；门禁仍为 npm run check:docs" }
+    - { acceptance_id: J26-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #251 交付；门禁仍为 npm run check:docs" }
+    - { acceptance_id: J26-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #251 交付；tests/unit/docs-check.test.ts 新增硬编码计数正负向用例" }
+governance:
+  spec_refs:
+    - docs/specs/delivery-lifecycle.md
+    - docs/scheme.md
+    - docs/README.md
+    - docs/adr/README.md
+    - docs/specs/task-card-standard.md
+  depends_on:
+    - { id: TASK-J.25, kind: soft }
+  code_facts:
+    - { ref: "docs/specs/delivery-lifecycle.md:38-51", note: "七环表已删除「现状 → 卡」列；第 51 行指针指向索引「七环进度」（施工 #251 落盘后回写）" }
+    - { ref: "docs/ledger/scheme-settled-decisions.md:9-28", note: "原 scheme.md §6 已落盘裁决已迁至此；scheme.md 对应节只留指针" }
+    - { ref: "docs/reports/scheme-physical-pointers.md:29-90", note: "原 scheme.md 文末物理指针已迁至此；scheme.md 对应节只留指针" }
+    - { ref: "docs/README.md:55", note: "阅读顺序改为「已拍板决策的索引（篇数以该索引为准，此处不维护数字）」，已去掉硬编码计数" }
+    - { ref: "docs/README.md:3-5", note: "文首已补项目简介；原 §3 / §8 / §9 空壳已删，现存 §3 起为 L1 决策（第 64 行）" }
+  non_goals:
+    - 不改 ADR 原文（只可在迁出叙述中加指针；ADR 只 SUPERSEDE 不删改）
+    - 不改写三条铁律、q* 原话、user_said/ai_inferred 标注；迁出后 acc-4 溯源不得破
+    - 不清扫历史 changelog 里的过时计数；不重写已完成任务卡正文
+    - 不宣称北极星场景或「无人值守连续三张真实任务卡」已交付；不加新文档层
+    - 不暗示条目级高亮已交付；不开工 J.22 / CI.2；不改 D.1e / S.3 / 已完工的 TASK-J.16
+    - 不写第二块验收约定，不做密封前意图完整性核对
+  fail:
+    - scheme.md 迁出后 user_said 无法追到 §0 原话，或丢掉 ai_inferred 标注
+    - 删除「现状 → 卡」列后进度丢失，未迁入索引
+    - 改了 ADR 原文，或在 adr/README.md 以外继续用正文维护篇数计数且门禁不报
+    - 把本卡做成产品代码改动，或改 runtime sandbox
+  defaults:
+    - 迁出文件名采用 docs/reports/scheme-physical-pointers.md 与 docs/ledger/scheme-settled-decisions.md（ai_inferred；若需更名须先修卡）
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 251, commit: 9852cff93cb28fa033ae22cea937d52c71e35576 }
+```
+
+* **背景**：scheme.md 与七环表同时承担意图、进度和指针，非技术用户与施工者都难读；README 仍留空壳节与互相矛盾的计数。
+* **取舍**：硬编码计数看守放进既有 `check:docs`，不另做文档层。建议 J.25 先做，以免两边同时改 README / lifecycle。
+
