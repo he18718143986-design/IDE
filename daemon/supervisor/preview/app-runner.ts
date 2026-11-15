@@ -72,8 +72,7 @@ export interface WaitReadyOptions {
    * 供测试把本夹具与同一端口上的外来 / 残留监听区分开。
    */
   readonly expectedHeader?:
-    | { readonly name: string; readonly value: string }
-    | undefined;
+    { readonly name: string; readonly value: string } | undefined;
 }
 
 export type WaitReadyResult =

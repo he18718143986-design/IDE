@@ -281,7 +281,11 @@ describe("app-preview-runner（TASK-L.5）", () => {
     it("stopAppPreview 后端口可再次绑定", async () => {
       const dir = newRepo();
       const token = newProbeToken();
-      writePkg(dir, { preview: "node server.cjs" }, listeningServerSource(token));
+      writePkg(
+        dir,
+        { preview: "node server.cjs" },
+        listeningServerSource(token),
+      );
       const port = await allocatePreviewPort();
 
       const handle = await startAppPreview({ worktreeDir: dir, port });
