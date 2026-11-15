@@ -45,6 +45,8 @@ export interface TurnRef {
   /** 编译器可选提示（0 起） */
   occurrence?: number;
   anchor?: QuoteAnchor;
+  /** 说话时登记的 sha256(utf8)；可选。密封回链核验用，不另扩 evidence[] 形态 */
+  turn_text_sha256?: string;
 }
 
 export interface EditRef {
@@ -467,6 +469,7 @@ export const TurnRefSchema = z
     quote: z.string().optional(),
     occurrence: z.number().int().nonnegative().optional(),
     anchor: z.unknown().optional(),
+    turn_text_sha256: z.string().optional(),
   })
   .passthrough();
 

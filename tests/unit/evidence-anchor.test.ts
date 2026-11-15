@@ -197,6 +197,23 @@ describe("anchorQuote 判例（§3.4 Q-01～Q-23）", () => {
       t.text_sha256,
     );
   });
+
+  it("TurnRef 可选哈希不改变锚点，本文件不核验条目级哈希", () => {
+    const t = turn("我要导出报表");
+    const r = anchorQuote(
+      t,
+      {
+        turn_id: "T1",
+        quote: "导出报表",
+        turn_text_sha256: "ab".repeat(32),
+      },
+      { requireQuote: true },
+    );
+    expect(r.ok && r.kind === "span").toBe(true);
+    if (!(r.ok && r.kind === "span")) return;
+    expect(r.anchor.turn_text_sha256).toBe(t.text_sha256);
+    expect(r.anchor.turn_text_sha256).not.toBe("ab".repeat(32));
+  });
 });
 
 describe("辅助函数", () => {

@@ -17,7 +17,11 @@ import {
   sealFrozenQuotes,
   verifyFrozenQuotes,
   writeSchemeSnapshot,
+  evaluateSchemeItemBacklinks,
+  parseTrustTier,
+  verifyItemQuoteBacklinks,
   type FrozenQuotes,
+  type ItemQuoteBacklinkItem,
 } from "../../daemon/pipeline/scheme-snapshot-store";
 import type { TranscriptRecord } from "../../daemon/supervisor/intent-compiler/transcript-store";
 import type { DemoGate, SchemeDraft } from "../../src/lib/journey/scheme-draft";
@@ -102,6 +106,8 @@ afterEach(() => {
 interface RawSnapshot {
   frozen_quotes?: FrozenQuotes;
   quotes_digest?: string;
+  trust_tier?: string;
+  item_quote_backlinks?: unknown;
 }
 
 function rewrite(confirmationId: string, mutate: (raw: RawSnapshot) => void) {
@@ -396,10 +402,267 @@ describe("快照封存段", () => {
         scope_plan: plan,
         frozen_quotes: sealed(),
         quotes_digest: "q".repeat(64),
+        trust_tier: "standard",
+        item_quote_backlinks: { items: [] },
       }),
     );
     const read = readSchemeSnapshot(repo, "scheme-confirm-old-11");
     expect(read?.frozen_quotes).toBeUndefined();
     expect(read?.quotes_digest).toBeUndefined();
+    expect(read?.trust_tier).toBeUndefined();
+    expect(read?.item_quote_backlinks).toBeUndefined();
+  });
+});
+
+describe("TASK-J.32a 方案项回链与信任档", () => {
+  const coveredItem = (): ItemQuoteBacklinkItem => ({
+    id: "G-said",
+    source: "user_said",
+    evidence: [{ turn_id: "T1", turn_text_sha256: sha256Utf8(REQUIREMENT) }],
+  });
+
+  it("信任档与回链段计入 digest；省略时保持旧口径", () => {
+    const frozen = sealed();
+    const backlinks = { items: [coveredItem()] };
+    const { snapshot: legacy } = writeSchemeSnapshot(repo, {
+      confirmation_id: "scheme-confirm-tier-legacy",
+      scheme,
+      demo,
+      decision,
+      scope_plan: plan,
+      frozen_quotes: frozen,
+    });
+    expect(legacy.trust_tier).toBeUndefined();
+    expect(legacy.item_quote_backlinks).toBeUndefined();
+
+    const { snapshot } = writeSchemeSnapshot(repo, {
+      confirmation_id: "scheme-confirm-tier-1",
+      scheme,
+      demo,
+      decision,
+      scope_plan: plan,
+      frozen_quotes: frozen,
+      trust_tier: "standard",
+      item_quote_backlinks: backlinks,
+    });
+    expect(snapshot.schema_version).toBe("1.2");
+    expect(snapshot.trust_tier).toBe("standard");
+    expect(snapshot.item_quote_backlinks).toEqual(backlinks);
+    const withoutSegments = schemeSnapshotDigest({
+      scheme_revision: scheme.scheme_revision,
+      scheme,
+      demo,
+      scope_plan: plan,
+      graveyard: [],
+      frozen_quotes: frozen,
+    });
+    expect(snapshot.digest).not.toBe(withoutSegments);
+    expect(snapshot.digest).not.toBe(legacy.digest);
+    expect(
+      schemeSnapshotDigest({
+        scheme_revision: scheme.scheme_revision,
+        scheme,
+        demo,
+        scope_plan: plan,
+        graveyard: [],
+        frozen_quotes: frozen,
+        trust_tier: "standard",
+        item_quote_backlinks: backlinks,
+      }),
+    ).toBe(snapshot.digest);
+    const intact = readSchemeSnapshot(repo, "scheme-confirm-tier-1");
+    expect(intact && verifyFrozenQuotes(intact)).toMatchObject({
+      ok: true,
+      sealed: true,
+    });
+    expect(intact && verifyItemQuoteBacklinks(intact)).toMatchObject({
+      ok: true,
+      present: true,
+    });
+  });
+
+  it("缺登记的原话不得标已覆盖", () => {
+    const frozen = sealed();
+    const items: ItemQuoteBacklinkItem[] = [
+      coveredItem(),
+      {
+        id: "G-missing",
+        source: "user_confirmed",
+        evidence: [
+          { turn_id: "T99", turn_text_sha256: sha256Utf8(REQUIREMENT) },
+        ],
+      },
+      { id: "G-empty", source: "user_said", evidence: [] },
+    ];
+    const evaluated = evaluateSchemeItemBacklinks(items, frozen);
+    expect(evaluated.ok).toBe(true);
+    if (!evaluated.ok) return;
+    expect(evaluated.verdicts).toEqual([
+      expect.objectContaining({
+        id: "G-said",
+        covered: true,
+        turn_id: "T1",
+      }),
+      {
+        id: "G-missing",
+        source: "user_confirmed",
+        covered: false,
+        reason: "unregistered",
+      },
+      {
+        id: "G-empty",
+        source: "user_said",
+        covered: false,
+        reason: "no_turn_evidence",
+      },
+    ]);
+  });
+
+  it("哈希不一致整体失败，不得标已覆盖", () => {
+    const frozen = sealed();
+    const evaluated = evaluateSchemeItemBacklinks(
+      [
+        {
+          id: "G-forged",
+          source: "user_said",
+          evidence: [
+            { turn_id: "T1", turn_text_sha256: sha256Utf8("被改过的需求") },
+          ],
+        },
+      ],
+      frozen,
+    );
+    expect(evaluated).toEqual({
+      ok: false,
+      reason: "hash_mismatch",
+      item_id: "G-forged",
+      turn_id: "T1",
+    });
+  });
+
+  it("ai_inferred 不得冒充已对照；若哈希不一致仍整体失败", () => {
+    const frozen = sealed();
+    const honest = evaluateSchemeItemBacklinks(
+      [
+        {
+          id: "G-ai",
+          source: "ai_inferred",
+          evidence: [
+            { turn_id: "T1", turn_text_sha256: sha256Utf8(REQUIREMENT) },
+          ],
+        },
+      ],
+      frozen,
+    );
+    expect(honest).toEqual({
+      ok: true,
+      verdicts: [
+        {
+          id: "G-ai",
+          source: "ai_inferred",
+          covered: false,
+          reason: "ai_inferred",
+        },
+      ],
+    });
+    expect(
+      evaluateSchemeItemBacklinks(
+        [
+          {
+            id: "G-ai-forged",
+            source: "ai_inferred",
+            evidence: [{ turn_id: "T1", turn_text_sha256: sha256Utf8("伪造") }],
+          },
+        ],
+        frozen,
+      ),
+    ).toEqual({
+      ok: false,
+      reason: "hash_mismatch",
+      item_id: "G-ai-forged",
+      turn_id: "T1",
+    });
+  });
+
+  it("轻确认档回链不降级：同样因哈希失败", () => {
+    expect(parseTrustTier("轻确认")).toEqual({ ok: true, value: "light" });
+    expect(parseTrustTier(undefined)).toEqual({ ok: true, value: undefined });
+    const frozen = sealed();
+    const backlinks = {
+      items: [
+        {
+          id: "G-forged",
+          source: "user_said" as const,
+          evidence: [
+            { turn_id: "T1", turn_text_sha256: sha256Utf8("被改过的需求") },
+          ],
+        },
+      ],
+    };
+    expect(evaluateSchemeItemBacklinks(backlinks.items, frozen).ok).toBe(false);
+    const { snapshot } = writeSchemeSnapshot(repo, {
+      confirmation_id: "scheme-confirm-light-1",
+      scheme,
+      demo,
+      decision,
+      scope_plan: plan,
+      frozen_quotes: frozen,
+      trust_tier: "light",
+      item_quote_backlinks: backlinks,
+    });
+    expect(snapshot.trust_tier).toBe("light");
+    expect(verifyItemQuoteBacklinks(snapshot)).toMatchObject({
+      ok: false,
+      reason: "hash_mismatch",
+      item_id: "G-forged",
+      turn_id: "T1",
+    });
+  });
+
+  it("旧快照无信任档与回链段视为未选档，校验仍通过", () => {
+    const { snapshot } = writeSchemeSnapshot(repo, {
+      confirmation_id: "scheme-confirm-old-no-tier",
+      scheme,
+      demo,
+      decision,
+      scope_plan: plan,
+      frozen_quotes: sealed(),
+    });
+    expect(snapshot.trust_tier).toBeUndefined();
+    expect(snapshot.item_quote_backlinks).toBeUndefined();
+    expect(verifyFrozenQuotes(snapshot)).toMatchObject({
+      ok: true,
+      sealed: true,
+    });
+    expect(verifyItemQuoteBacklinks(snapshot)).toEqual({
+      ok: true,
+      present: false,
+    });
+  });
+
+  it("1.0 旧快照里的信任档与回链段不采信", () => {
+    const file = schemeSnapshotPath(repo, "scheme-confirm-old-10");
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        schema_version: "1.0",
+        snapshot_id: "scheme-confirm-old-10",
+        confirmation_id: "scheme-confirm-old-10",
+        status: "FROZEN",
+        created_at: "2026-11-01T00:00:00.000Z",
+        scheme_revision: 2,
+        scheme,
+        demo,
+        decision,
+        digest: "d".repeat(64),
+        trust_tier: "reconfirm",
+        item_quote_backlinks: { items: [coveredItem()] },
+      }),
+    );
+    const read = readSchemeSnapshot(repo, "scheme-confirm-old-10");
+    expect(read?.trust_tier).toBeUndefined();
+    expect(read?.item_quote_backlinks).toBeUndefined();
+    expect(read?.frozen_quotes).toBeUndefined();
   });
 });

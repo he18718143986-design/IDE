@@ -29,6 +29,9 @@ interface Body {
   seq?: number;
   turn_text_sha256?: string;
   frozen_quotes_count?: number;
+  trust_tier?: string;
+  item_quote_backlink_covered_count?: number;
+  item_quote_backlink_uncovered_count?: number;
 }
 
 function sha256Utf8(text: string): string {
@@ -206,13 +209,18 @@ describe("P-201 原话登记与冻结校验（真 Daemon）", () => {
     );
     expect(ok.status).toBe(201);
     expect(ok.body.frozen_quotes_count).toBe(1);
+    expect(ok.body.trust_tier).toBe("standard");
+    expect(ok.body.item_quote_backlink_covered_count).toBe(0);
+    expect(ok.body.item_quote_backlink_uncovered_count).toBe(0);
     const snapshot = JSON.parse(
       fs.readFileSync(snapshotFile("scheme-confirm-seal-ok"), "utf8"),
     ) as {
+      trust_tier?: string;
       frozen_quotes: {
         quotes: Array<{ text: string; turn_text_sha256: string }>;
       };
     };
+    expect(snapshot.trust_tier).toBe("standard");
     expect(snapshot.frozen_quotes.quotes).toEqual([
       expect.objectContaining({
         turn_id: turnId,
@@ -220,6 +228,175 @@ describe("P-201 原话登记与冻结校验（真 Daemon）", () => {
         turn_text_sha256: sha,
       }),
     ]);
+  });
+
+  function plantLedgerGoals(
+    goals: Array<{
+      id: string;
+      text: string;
+      source: "user_said" | "user_confirmed" | "ai_inferred" | "user_edited";
+      turn_id: string;
+      turn_text_sha256?: string;
+    }>,
+  ): void {
+    const dir = path.join(repo, ".stagent", "drafts", "scheme-ledger");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "active.json"),
+      JSON.stringify({
+        schema_version: "1.0",
+        updated_at: "2026-11-15T15:00:00.000Z",
+        state: {
+          draft: {
+            scheme_id: "scheme-active",
+            scheme_revision: 2,
+            frozen: false,
+            title: "工程项目进度管控台",
+            summary: "按项目维度汇总进度与预算",
+            audience: null,
+            size_hint: "standard",
+            goals: goals.map((g) => ({
+              id: g.id,
+              text: g.text,
+              source: g.source,
+              user_pinned: false,
+              updated_in_revision: 2,
+              evidence: [
+                {
+                  kind: "turn",
+                  ref: {
+                    turn_id: g.turn_id,
+                    ...(g.turn_text_sha256 === undefined
+                      ? {}
+                      : { turn_text_sha256: g.turn_text_sha256 }),
+                  },
+                },
+              ],
+            })),
+            out_of_scope: [],
+            modules: [],
+            flows: [],
+            entities: [],
+            decisions: [],
+            conflicts: [],
+            open_questions: [],
+            acceptance: [],
+          },
+          graveyard: [],
+          suggestions: [],
+          attributions: [],
+        },
+        last_journal: null,
+        last_model_id: null,
+        last_prompt_version: null,
+        offline: false,
+      }),
+    );
+  }
+
+  it("条目回链：缺登记未覆盖、哈希不一致 409、ai_inferred 不得冒充、轻确认不降级", async () => {
+    const registered = await call("POST", "/api/supervisor/turns", {
+      text: "按项目维度汇总进度与预算",
+    });
+    const turnId = registered.body.turn_id!;
+    const sha = registered.body.turn_text_sha256!;
+    const sourceTurns = [{ turn_id: turnId, turn_text_sha256: sha }];
+
+    plantLedgerGoals([
+      {
+        id: "G-missing",
+        text: "未登记的依据",
+        source: "user_said",
+        turn_id: "T99",
+        turn_text_sha256: sha,
+      },
+    ]);
+    const gap = await call(
+      "POST",
+      "/api/supervisor/scheme/freeze",
+      freezeBody("scheme-confirm-backlink-gap", sourceTurns),
+    );
+    expect(gap.status).toBe(201);
+    expect(gap.body.trust_tier).toBe("standard");
+    expect(gap.body.item_quote_backlink_covered_count).toBe(0);
+    expect(gap.body.item_quote_backlink_uncovered_count).toBe(1);
+
+    plantLedgerGoals([
+      {
+        id: "G-forged",
+        text: "哈希被改",
+        source: "user_said",
+        turn_id: turnId,
+        turn_text_sha256: sha256Utf8("被改过的需求"),
+      },
+    ]);
+    const forged = await call(
+      "POST",
+      "/api/supervisor/scheme/freeze",
+      freezeBody("scheme-confirm-backlink-forged", sourceTurns),
+    );
+    expect(forged.status).toBe(409);
+    expect(forged.body.code).toBe("E_SCHEME_SNAPSHOT_MISMATCH");
+    expect(forged.body.reason).toBe("turn_hash_mismatch");
+    expect(fs.existsSync(snapshotFile("scheme-confirm-backlink-forged"))).toBe(
+      false,
+    );
+
+    plantLedgerGoals([
+      {
+        id: "G-ai",
+        text: "模型推断",
+        source: "ai_inferred",
+        turn_id: turnId,
+        turn_text_sha256: sha,
+      },
+    ]);
+    const inferred = await call("POST", "/api/supervisor/scheme/freeze", {
+      ...freezeBody("scheme-confirm-backlink-ai", sourceTurns),
+      trust_tier: "light",
+    });
+    expect(inferred.status).toBe(201);
+    expect(inferred.body.trust_tier).toBe("light");
+    expect(inferred.body.item_quote_backlink_covered_count).toBe(0);
+    expect(inferred.body.item_quote_backlink_uncovered_count).toBe(1);
+
+    plantLedgerGoals([
+      {
+        id: "G-forged-light",
+        text: "轻确认仍核验",
+        source: "user_said",
+        turn_id: turnId,
+        turn_text_sha256: sha256Utf8("被改过的需求"),
+      },
+    ]);
+    const lightForged = await call("POST", "/api/supervisor/scheme/freeze", {
+      ...freezeBody("scheme-confirm-backlink-light-forged", sourceTurns),
+      trust_tier: "轻确认",
+    });
+    expect(lightForged.status).toBe(409);
+    expect(lightForged.body.reason).toBe("turn_hash_mismatch");
+    expect(
+      fs.existsSync(snapshotFile("scheme-confirm-backlink-light-forged")),
+    ).toBe(false);
+
+    plantLedgerGoals([
+      {
+        id: "G-said",
+        text: "按项目维度汇总进度与预算",
+        source: "user_said",
+        turn_id: turnId,
+        turn_text_sha256: sha,
+      },
+    ]);
+    const covered = await call(
+      "POST",
+      "/api/supervisor/scheme/freeze",
+      freezeBody("scheme-confirm-backlink-ok", sourceTurns),
+    );
+    expect(covered.status).toBe(201);
+    expect(covered.body.trust_tier).toBe("standard");
+    expect(covered.body.item_quote_backlink_covered_count).toBe(1);
+    expect(covered.body.item_quote_backlink_uncovered_count).toBe(0);
   });
 
   it("journey 带已登记 turn 不重复登记", async () => {

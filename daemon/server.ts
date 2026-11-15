@@ -62,8 +62,12 @@ import {
   SchemeSnapshotConflictError,
   parseSourceTurnRefs,
   sealFrozenQuotes,
+  parseTrustTier,
+  collectItemQuoteBacklinks,
+  evaluateSchemeItemBacklinks,
   FROZEN_QUOTE_MAX_CHARS,
   type FrozenQuotesFailureReason,
+  type TrustTier,
 } from "./pipeline/scheme-snapshot-store";
 import {
   computeTurnTextSha256,
@@ -2294,6 +2298,7 @@ export class StagentDaemon {
       decision?: unknown;
       scope_plan?: unknown;
       source_turns?: unknown;
+      trust_tier?: unknown;
     };
     try {
       body = (await this.readJsonBody(req)) as typeof body;
@@ -2388,8 +2393,32 @@ export class StagentDaemon {
         this.sendQuotesUnverified(res, sealed.reason, sealed.turn_id);
         return;
       }
+      const parsedTier = parseTrustTier(body.trust_tier);
+      if (!parsedTier.ok) {
+        this.sendJson(res, 400, {
+          error: "invalid_scheme_snapshot",
+          code: "E_SCHEME_SNAPSHOT_INVALID",
+          message: "trust_tier 不是约定的信任档",
+        });
+        return;
+      }
+      // 请求省略时默认标准档，新冻结一定落档；旧快照无此段仍视为未选档。
+      const trustTier: TrustTier = parsedTier.value ?? "standard";
       // TASK-J.18b / GAP-W2：冻结时从账本拷贝完整墓地（含 revived）进快照 1.2
-      const ledgerGraveyard = loadOrInitLedgerState(this.repoRoot).graveyard;
+      const ledgerState = loadOrInitLedgerState(this.repoRoot);
+      const ledgerGraveyard = ledgerState.graveyard;
+      // TASK-J.32a：条目级回链取自账本 V2 草案，不从 v1 快照 scheme 推断。
+      const backlinks = collectItemQuoteBacklinks(ledgerState.draft);
+      const evaluated = evaluateSchemeItemBacklinks(
+        backlinks.items,
+        sealed.value,
+      );
+      if (!evaluated.ok) {
+        this.sendQuotesUnverified(res, "turn_hash_mismatch", evaluated.turn_id);
+        return;
+      }
+      const coveredCount = evaluated.verdicts.filter((v) => v.covered).length;
+      const uncoveredCount = evaluated.verdicts.length - coveredCount;
       const written = writeSchemeSnapshot(this.repoRoot, {
         confirmation_id: confirmationId,
         scheme: schemeDraft,
@@ -2403,12 +2432,17 @@ export class StagentDaemon {
         scope_plan: freshPlan,
         graveyard: ledgerGraveyard,
         frozen_quotes: sealed.value,
+        trust_tier: trustTier,
+        item_quote_backlinks: backlinks,
       });
       this.sendJson(res, written.idempotent ? 200 : 201, {
         snapshot_id: written.snapshot.snapshot_id,
         digest: written.snapshot.digest,
         idempotent: written.idempotent,
         frozen_quotes_count: written.snapshot.frozen_quotes?.quotes.length ?? 0,
+        trust_tier: written.snapshot.trust_tier,
+        item_quote_backlink_covered_count: coveredCount,
+        item_quote_backlink_uncovered_count: uncoveredCount,
       });
     } catch (err) {
       if (err instanceof ScopePlanDriftError) {
