@@ -188,7 +188,7 @@
 | `TASK-J.28` | `COMPLETED` | 固定底线硬门禁接线：清单检查以子进程退出码进入 can_merge（立卡 P-206；施工 #254 `31c69ec`；完工回写 P-209；估算 M） | [正文](./development-tasks-completed.md#task-j.28) |
 | `TASK-J.29` | `COMPLETED` | 把八项既有检查接到固定底线硬门禁（立卡 P-206；修订 P-210 缩范围；施工 #258 `fa514dc`；完工回写 P-212；估算 M） | [正文](./development-tasks-completed.md#task-j.29) |
 | `TASK-J.30` | `COMPLETED` | 凭据与秘密不得进入对话的退出码检查（立卡 P-210；修订 P-211 拍板 Vault 运行时断言；修订 P-213：共享断言放 `active.ts` 叶子，接缝不直接引用 `vault.ts`；施工 #261 `27d9c41`；完工回写 P-214；估算 M） | [正文](./development-tasks-completed.md#task-j.30) |
-| `TASK-J.31` | `NEW_TASK` | 把试玩自查升级为非技术用户可执行的判分表（立卡 P-215；估算 S；纯文档；未开工） | [正文](./development-tasks-active.md#task-j.31) |
+| `TASK-J.31` | `COMPLETED` | 把试玩自查升级为非技术用户可执行的判分表（立卡 P-215；施工 #264 `03acf2a`；完工回写 P-216；估算 S） | [正文](./development-tasks-completed.md#task-j.31) |
 | `TASK-J.32` | `NEW_TASK` | 密封前意图完整性核对：方案卡回链用户原话（立卡 P-215；估算 M；须复用 J.16 frozen_quotes；未开工） | [正文](./development-tasks-active.md#task-j.32) |
 | `TASK-J.33` | `NEW_TASK` | 新增卡文案规范并做成机器可校验项（立卡 P-215；估算 M；文档 + 校验器；未开工） | [正文](./development-tasks-active.md#task-j.33) |
 

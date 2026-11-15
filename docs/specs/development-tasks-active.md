@@ -1436,88 +1436,9 @@ governance:
 > **立卡说明（2026-11-14 · P-206）**：授权来源为 Tina t1250u「按这个立卡」。目标是让非软件专业用户能走完「表达偏好 → 签字开工 → 试玩验收」并稳定得到高质量结果。本批只立第一块（文档可读性与结构分家）与第三块「固定底线清单硬门禁」。**不立**第二块（质量边界 / 判分表 / `card-copy-standard` / 校验器），**不立**「密封前意图完整性核对（`U<seq>` 回链）」卡——这两块留给 Opus 5.5。五张卡均为 `[NEW_TASK]`，估算均为 S 或 M（R-11；不立 L，不重演 J.16）。**立卡 ≠ 授权 ≠ 开工**；待 Tina 逐张授权。J.22 不开工；CI.2 攒样本。不改已完工的 `TASK-J.16`，不碰 `TASK-D.1e` / `TASK-S.3`，不改 runtime/contract ScopePlan sandbox。北极星场景（`scheme.md` goal-2）与「无人值守连续三张真实任务卡」继续标明未交付，不加新文档层。不暗示条目级高亮已交付（J.22 范围）。
 
 
-### 3.4g 第二块判分表与卡文案、密封前意图完整性核对（2026-11-15 · 立卡 P-215）
+### 3.4g 第二块判分表与卡文案、密封前意图完整性核对（2026-11-15 · 立卡 P-215；J.31 已完工迁出）
 
-> **立卡说明（2026-11-15 · P-215）**：授权来源为 Tina t1286u。本条只立卡 / 拆卡，不写产品代码，不开工。第二块按 R-11 拆为 [`TASK-J.31`](#task-j.31)（判分表升级，纯文档，估算 S）与 [`TASK-J.33`](#task-j.33)（`card-copy-standard.md` + 校验器，估算 M）。「密封前意图完整性核对」立 [`TASK-J.32`](#task-j.32)（估算 M，须复用 J.16 `frozen_quotes` 登记与封存链路）。`TASK-J.22` 的拆卡正文在既有卡位，不迁入本节。所有新卡均为 `[NEW_TASK]`。**立卡 ≠ 开工**。J.31 合入后可先行报施工方案；J.33 / J.32 / J.22 子卡待逐张授权。`prompt-builder.ts` 对齐可并入 J.32 或后续卡，报方案时说明。CI.2 攒样本；文档计划暂缓；不暗示条目级高亮已交付。
-
-<a id="task-j.31"></a>
-
-#### 【Task J.31】把试玩自查升级为非技术用户可执行的判分表`[NEW_TASK · 立卡 P-215 · 未开工]`
-
-> **立卡说明（2026-11-15 · P-215）**：第二块的纯文档切片（估算 S）。把 [`playtest-self-check.md`](./playtest-self-check.md) 升级为非技术用户可执行的判分表：每一步写成「看到 X 即通过 / 看到 Y 即失败」，试玩认可须留证据。不改产品代码，不接线校验器（校验器见 `TASK-J.33`），不实现 [`playtest-self-check.md`](./playtest-self-check.md) §3.3「条目级自动点亮」（该口子仍为「本版不实现」）。**立卡 ≠ 开工**。合入后可先行报本卡施工方案；施工须另授权。
-
-```yaml task-card
-id: TASK-J.31
-status: NEW_TASK
-contract:
-  intent:
-    title: 把试玩自查升级为非技术用户可执行的判分表
-    description: >-
-      将 playtest-self-check.md 改写成非技术用户可按步执行的判分表：
-      每一步写明「看到 X 即通过 / 看到 Y 即失败」，试玩认可必须留下可核对的证据。
-    risk_level: LOW
-  acceptance:
-    - id: J31-P1
-      check: auto
-      text: >-
-        判分表每一步都写成「看到 X 即通过 / 看到 Y 即失败」，读者不必懂工程术语也能执行。
-    - id: J31-P2
-      check: auto
-      text: >-
-        文中规定试玩认可必须留证据，并写明证据留在何处、至少包含哪些可核对字段。
-    - id: J31-P3
-      check: auto
-      text: >-
-        不把 §3.3 条目级自动点亮写成已交付或本卡范围；该口子仍标明「本版不实现」。
-  scheme_item_ids: []
-  scope:
-    writable_paths:
-      - docs/specs/playtest-self-check.md
-    readonly_paths:
-      - docs/specs/evidence-and-acceptance-criteria.md
-      - docs/glossary.md
-  verification:
-    commands:
-      - { alias: docs, executable: npm, args: [run, check:docs] }
-design:
-  approach: >-
-    只改 playtest-self-check.md 的判分表述与证据要求，不新增文档层，不改 Daemon / UI。
-  touches:
-    - { path: docs/specs/playtest-self-check.md, change: modify, why: 升级为非技术用户可执行的逐步判分表并写明证据要求, symbols: [] }
-  interfaces: []
-  test_plan:
-    - { acceptance_id: J31-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "立卡阶段；测试体待授权施工后再写；门禁仍为 npm run check:docs" }
-    - { acceptance_id: J31-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "立卡阶段；测试体待授权施工后再写" }
-    - { acceptance_id: J31-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "立卡阶段；测试体待授权施工后再写" }
-governance:
-  spec_refs:
-    - docs/specs/playtest-self-check.md
-    - docs/specs/evidence-and-acceptance-criteria.md
-  depends_on: []
-  code_facts:
-    - { ref: "docs/specs/playtest-self-check.md:1-16", note: "现行试玩自查规格正文；本卡只升级判分表表述，不改其上位口径" }
-    - { ref: "docs/specs/playtest-self-check.md:132-141", note: "§3.3 条目级自动点亮仍为「本版不实现」；本卡不得改写成已交付" }
-  non_goals:
-    - 本条立卡 ≠ 开工；施工须另授权
-    - 不改产品代码，不接线校验器（见 TASK-J.33）
-    - 不实现 §3.3 条目级自动点亮，不暗示条目级高亮已交付
-    - 不开工 J.22 子卡 / J.32 / J.33 / CI.2；不改 D.1e / S.3
-    - 不宣称北极星或无人值守三连卡已交付；不加新文档层
-  fail:
-    - 判分表仍依赖工程术语，或某步没有「看到 X 即通过 / 看到 Y 即失败」
-    - 试玩认可不要求留证据
-    - 把 §3.3 自动点亮或条目级高亮写成已交付
-    - 本条合入前开工，或把本卡做成 L 却不拆（R-11）
-  estimate: S
-  invariants:
-    auth: unchanged
-    demo_origin: unchanged
-    illumination: unchanged
-    gateway_write_scope: unchanged
-```
-
-* **背景**：第二块要让非技术用户自己能做试玩判定；现规格对实施者友好，对业主逐步判分与证据留存不够直白。
-* **取舍**：只改一份已有规格，不做校验器、不做自动点亮；施工方案等本条合入后再报。
+> **立卡说明（2026-11-15 · P-215）**：授权来源为 Tina t1286u。本条只立卡 / 拆卡，不写产品代码，不开工。第二块按 R-11 拆为 [`TASK-J.31`](./development-tasks-completed.md#task-j.31)（判分表升级，纯文档，估算 S；已 `[COMPLETED]`，施工 #264 `03acf2a`，完工回写 P-216）与 [`TASK-J.33`](#task-j.33)（`card-copy-standard.md` + 校验器，估算 M）。「密封前意图完整性核对」立 [`TASK-J.32`](#task-j.32)（估算 M，须复用 J.16 `frozen_quotes` 登记与封存链路）。`TASK-J.22` 的拆卡正文在既有卡位，不迁入本节。J.33 / J.32 仍为 `[NEW_TASK]`。**立卡 ≠ 开工**。J.33 / J.32 / J.22 子卡待逐张授权。`prompt-builder.ts` 对齐可并入 J.32 或后续卡，报方案时说明。CI.2 攒样本；文档计划暂缓；不暗示条目级高亮已交付。
 
 <a id="task-j.33"></a>
 

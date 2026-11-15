@@ -7324,3 +7324,89 @@ governance:
 
 * **背景**：该项是 J.27 清单已点名的硬门禁，但没有可调用的退出码检查，不能塞进 J.29 的薄适配。P-211 已拍板实现方向并补齐代码路径；P-213 因 TASK-S.1 闭包把共享断言函数改放到 `active.ts` 叶子；#261 在 P-213 合入后的 main 上施工并合入。
 * **取舍**：采用 Vault 口径运行时断言，不做落盘扫描、不新建断言文件；共享函数放 `active.ts`，接缝不直接引用 `vault.ts`。诚实口径：`prompt-builder.ts` 未对齐（须另修卡）；`currentValues()` 仅覆盖已缓存且长度 ≥6 的密钥。不在本卡发明产品方向。
+
+### 3.4al 试玩自查升级为非技术用户判分表（J.31 · 完工回写 P-216）
+
+<a id="task-j.31"></a>
+
+### 【Task J.31】把试玩自查升级为非技术用户可执行的判分表`[COMPLETED · 立卡 P-215 · 施工 #264 · 完工回写 P-216]`
+
+> **立卡说明（2026-11-15 · P-215）**：第二块的纯文档切片（估算 S）。把 [`playtest-self-check.md`](./playtest-self-check.md) 升级为非技术用户可执行的判分表：每一步写成「看到 X 即通过 / 看到 Y 即失败」，试玩认可须留证据。不改产品代码，不接线校验器（校验器见 `TASK-J.33`），不实现 [`playtest-self-check.md`](./playtest-self-check.md) §3.3「条目级自动点亮」（该口子仍为「本版不实现」）。**立卡 ≠ 开工**。合入后可先行报本卡施工方案；施工须另授权。
+>
+> **归档注记（2026-11-15 · P-216）**：本卡已 **COMPLETED**。Tina t1288u 授权施工、t1289u 授权合入施工 PR。[#264](https://github.com/he18718143986-design/IDE/pull/264) squash `03acf2a68da80526f0251260bf9716e9a82f3eba` 于 2026-11-15 16:17:29 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `62a348b3bbd9399fe824e12842fd23a9f74bebf8`；父提交 `e10cf25101cec5c319d68ce34cd44c81980ad214`）。合入前 13/13 SUCCESS、`mergeable=MERGEABLE`、`mergeStateStatus=CLEAN`（CI run [`43693275714`](https://github.com/he18718143986-design/IDE/actions/runs/43693275714)），仅改 `docs/specs/playtest-self-check.md`（+58/−1）。交付：§0.1 非技术用户判分表（第 21 行起，九步均用「看到 X 即通过 / 看到 Y 即失败」）与文末「试玩证据」表（第 726–736 行）。§1–§8 未改写、未重编号；§3.3 扩展口子仍在第 184 行，以「这条留作扩展口子，本版不实现。」收束。不暗示条目级高亮已交付。**诚实口径：判分表为文档层交付，非技术用户实际试用验证属后续真实试玩范畴。** 不宣称非技术用户已完成一次计分试玩。门禁为 `npm run check:docs`，本卡未新增 vitest 文件。J.33 / J.32 / J.22 子卡待逐张授权；CI.2 攒样本；文档计划暂缓。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.31
+status: COMPLETED
+contract:
+  intent:
+    title: 把试玩自查升级为非技术用户可执行的判分表
+    description: >-
+      将 playtest-self-check.md 改写成非技术用户可按步执行的判分表：
+      每一步写明「看到 X 即通过 / 看到 Y 即失败」，试玩认可必须留下可核对的证据。
+    risk_level: LOW
+  acceptance:
+    - id: J31-P1
+      check: auto
+      text: >-
+        判分表每一步都写成「看到 X 即通过 / 看到 Y 即失败」，读者不必懂工程术语也能执行。
+    - id: J31-P2
+      check: auto
+      text: >-
+        文中规定试玩认可必须留证据，并写明证据留在何处、至少包含哪些可核对字段。
+    - id: J31-P3
+      check: auto
+      text: >-
+        不把 §3.3 条目级自动点亮写成已交付或本卡范围；该口子仍标明「本版不实现」。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - docs/specs/playtest-self-check.md
+    readonly_paths:
+      - docs/specs/evidence-and-acceptance-criteria.md
+      - docs/glossary.md
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    只改 playtest-self-check.md 的判分表述与证据要求，不新增文档层，不改 Daemon / UI。
+  touches:
+    - { path: docs/specs/playtest-self-check.md, change: modify, why: 升级为非技术用户可执行的逐步判分表并写明证据要求, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J31-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #264 交付；门禁仍为 npm run check:docs，本卡未新增 vitest 文件" }
+    - { acceptance_id: J31-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #264 交付；门禁仍为 npm run check:docs，本卡未新增 vitest 文件" }
+    - { acceptance_id: J31-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #264 交付；门禁仍为 npm run check:docs，本卡未新增 vitest 文件" }
+governance:
+  spec_refs:
+    - docs/specs/playtest-self-check.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+  depends_on: []
+  code_facts:
+    - { ref: "docs/specs/playtest-self-check.md:3", note: "状态行写明判分表已按 TASK-J.31 落地；引擎裁决口径仍以 §1–§8 为准，本卡未改写" }
+    - { ref: "docs/specs/playtest-self-check.md:21-59", note: "§0.1 非技术用户判分表；九步标题在第 25/29/33/37/41/45/49/53/57 行，通过/失败句在第 27/31/35/39/43/47/51/55/59 行，均用「看到 X 即通过 / 看到 Y 即失败」" }
+    - { ref: "docs/specs/playtest-self-check.md:184", note: "§3.3 仍以「这条留作扩展口子，本版不实现。」收束；本卡未把条目级自动点亮写成已交付" }
+    - { ref: "docs/specs/playtest-self-check.md:726-736", note: "「试玩证据」表；第 728 行写明「没有这行，不算试玩认可。」；字段含日期时区（Asia/Hong_Kong）、所试 main SHA、步骤编号、实际看到的原文、通过或失败、操作者" }
+  non_goals:
+    - 本条立卡 ≠ 开工；施工须另授权
+    - 不改产品代码，不接线校验器（见 TASK-J.33）
+    - 不实现 §3.3 条目级自动点亮，不暗示条目级高亮已交付
+    - 不开工 J.22 子卡 / J.32 / J.33 / CI.2；不改 D.1e / S.3
+    - 不宣称北极星或无人值守三连卡已交付；不加新文档层
+  fail:
+    - 判分表仍依赖工程术语，或某步没有「看到 X 即通过 / 看到 Y 即失败」
+    - 试玩认可不要求留证据
+    - 把 §3.3 自动点亮或条目级高亮写成已交付
+    - 本条合入前开工，或把本卡做成 L 却不拆（R-11）
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 264, commit: 03acf2a68da80526f0251260bf9716e9a82f3eba }
+```
+
+* **背景**：第二块要让非技术用户自己能做试玩判定；现规格对实施者友好，对业主逐步判分与证据留存不够直白。#264 已把判分表与「试玩证据」表写入 `playtest-self-check.md`。
+* **取舍**：只改一份已有规格，不做校验器、不做自动点亮；§1–§8 未改写，§3.3 仍为「本版不实现」。诚实口径：判分表为文档层交付，非技术用户实际试用验证属后续真实试玩范畴。
