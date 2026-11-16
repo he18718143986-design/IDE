@@ -785,7 +785,7 @@ governance:
 >
 > **拆卡说明（2026-11-15 · P-215）**：按 R-11，估算 L 的母卡不得开工，必须先拆。Tina t1286u 授权拆为三张子卡，本卡改标 **`[SPLIT]`**，保留追溯，**不再作为施工依据**，施工以子卡正文为准：[`TASK-J.22a`](./development-tasks-completed.md#task-j.22a)（来源统一 + 无台账降级；P-226 COMPLETED）、[`TASK-J.22b`](./development-tasks-completed.md#task-j.22b)（条目级呈现；P-228 COMPLETED）、[`TASK-J.22c`](./development-tasks-completed.md#task-j.22c)（真实试玩；P-229 COMPLETED）。硬依赖 `TASK-J.21` 与 `TASK-J.16` 均已 `[COMPLETED]`。
 >
-> **归档注记（2026-11-16 · P-229）**：三子卡均已 **COMPLETED**。母卡维持 **`[SPLIT]`** 追溯归档，**不再作为施工依据**。诚实口径：来源统一、条目级呈现、真实试玩已交付；§3.3 自动点亮未实现；`prompt-builder.ts` 对齐见 [`TASK-J.35`](#task-j.35)（P-230 立卡，未开工）。业主 SOP 见 [`TASK-J.34`](#task-j.34)。蓝图第一批卡暂不立；信任档规格卡仅出划界简报暂不立；CI.2 攒样本。不宣称端到端闭环。
+> **归档注记（2026-11-16 · P-229）**：三子卡均已 **COMPLETED**。母卡维持 **`[SPLIT]`** 追溯归档，**不再作为施工依据**。诚实口径：来源统一、条目级呈现、真实试玩已交付；§3.3 自动点亮未实现；`prompt-builder.ts` 对齐见 [`TASK-J.35`](#task-j.35)（P-230 立卡，未开工）。业主 SOP 见 [`TASK-J.34`](./development-tasks-completed.md#task-j.34)（P-231 COMPLETED）。蓝图第一批卡暂不立；信任档规格卡仅出划界简报暂不立；CI.2 攒样本。不宣称端到端闭环。
 > **已知限制（K-14 第一刀 #217 记录）**：台账 `scheme_revision` 与中栏启发式方案修订号未对齐校验——根治已由子卡承接；本母卡不再施工。
 
 ```yaml task-card
@@ -1318,114 +1318,17 @@ governance:
 
 > 本卡已 **COMPLETED**（施工 [#276](https://github.com/he18718143986-design/IDE/pull/276) squash `b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b`；完工回写 P-224）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.32b) §3.4ap。
 
-### 3.4h 业主 SOP 与 prompt-builder 对齐（2026-11-16 · 立卡 P-230）
+### 3.4h 业主 SOP 与 prompt-builder 对齐（2026-11-16 · 立卡 P-230；J.34 已完工迁出）
 
 > **立卡说明（2026-11-16 · P-230）**：授权来源为 Tina「立 SOP 卡 + prompt-builder.ts 对齐卡（P-230），同时做信任档规格卡划界简报」。本条只立两张卡 + 落划界简报，**不写产品代码、不开工**。信任档规格卡**不立**（见 [`../ledger/trust-tier-spec-boundary-brief.md`](../ledger/trust-tier-spec-boundary-brief.md)）；蓝图第一批卡暂不立；CI.2 攒样本。§3.3 自动点亮仍 Hold。立卡 ≠ 授权 ≠ 开工。不宣称端到端闭环。
+>
+> **归档注记（2026-11-16 · P-231）**：[`TASK-J.34`](./development-tasks-completed.md#task-j.34) 已 **COMPLETED**（施工 #286/`51c643e`）。`TASK-J.35` 仍 `[NEW_TASK]`，待报正式方案后授权。诚实口径：SOP 为文档层交付，业主实际按 SOP 走完确认+试玩属后续真实使用验证。
 
 <a id="task-j.34"></a>
 
-#### 【Task J.34】业主确认与试玩操作规程（SOP · S2→Seal + 试玩）`[NEW_TASK · 立卡 P-230 · 未开工]`
+#### 【Task J.34】业主确认与试玩操作规程（SOP · S2→Seal + 试玩）`[COMPLETED · 正文已迁]`
 
-> **立卡说明（2026-11-16 · P-230）**：纯 docs。把业主在签字前「对照原话 → 选信任档 → 确认密封」与试玩验收的可执行步骤写进旅程与 runbook；不改产品代码、不重写 J.32 硬约束。**立卡 ≠ 开工**。
-
-```yaml task-card
-id: TASK-J.34
-status: NEW_TASK
-contract:
-  intent:
-    title: 业主确认与试玩操作规程（SOP · S2→Seal + 试玩）
-    description: >-
-      非技术业主打开 docs/user-journey.md 的 S2→Seal 与试玩相关环，以及
-      docs/runbooks/owner-confirm-and-playtest.md，能按步骤完成：查看对照面、
-      选择信任档（轻确认 / 标准 / 重确认）、确认密封、按判分表试玩并留下证据。
-      glossary 补「信任档」「对照面」白话定义；docs/README.md 登记 runbook 落点。
-      不改产品代码；不重写 J.32a/b 已交付硬约束与 UI。
-    risk_level: LOW
-  acceptance:
-    - id: J34-P1
-      check: auto
-      text: >-
-        docs/user-journey.md 的 S2→Seal 环已写明业主在签字前须对照已登记原话、
-        选择信任档、再点确认；并链到术语表与 runbook；不得把 §3.3 自动点亮写成已交付。
-    - id: J34-P2
-      check: auto
-      text: >-
-        docs/runbooks/owner-confirm-and-playtest.md 已落盘：分步写清对照面、三档含义、
-        确认密封、试玩判分与证据表用法；明确轻确认可跳过对照面 UI 但机械回链不降级。
-    - id: J34-P3
-      check: auto
-      text: >-
-        docs/glossary.md 已为「信任档」「对照面」各提供一句话白话定义与权威出处链接
-        （指向 supervisor.md / J.32a·b 交付面），不另造与规格冲突的定义。
-    - id: J34-P4
-      check: auto
-      text: >-
-        docs/README.md 已登记 runbook 落点与「谁能改」；不新增 L7 或其它文档层。
-  scheme_item_ids: []
-  scope:
-    writable_paths:
-      - docs/user-journey.md
-      - docs/glossary.md
-      - docs/README.md
-      - docs/runbooks/owner-confirm-and-playtest.md
-    readonly_paths:
-      - docs/specs/supervisor.md
-      - docs/specs/delivery-lifecycle.md
-      - docs/specs/playtest-self-check.md
-      - docs/ledger/trust-tier-spec-boundary-brief.md
-  verification:
-    commands:
-      - { alias: docs, executable: npm, args: [run, check:docs] }
-design:
-  approach: >-
-    在既有 user-journey S2→Seal / 试玩环补业主操作步骤，不重写七环骨架。
-    新建 owner-confirm-and-playtest runbook 作可打印步骤清单；术语只补两词。
-    信任档语义以 J.32a/b 与划界简报为准，本卡只写「业主怎么做」。
-  touches:
-    - { path: docs/user-journey.md, change: modify, why: S2→Seal/试玩环补对照面与信任档业主步骤, symbols: [] }
-    - { path: docs/glossary.md, change: modify, why: 增补信任档与对照面白话定义, symbols: [] }
-    - { path: docs/README.md, change: modify, why: 登记 runbook 落点与谁能改, symbols: [] }
-    - { path: docs/runbooks/owner-confirm-and-playtest.md, change: create, why: 业主确认与试玩分步操作规程, symbols: [] }
-  interfaces: []
-  test_plan:
-    - { acceptance_id: J34-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "未施工；门禁为 npm run check:docs" }
-    - { acceptance_id: J34-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "未施工" }
-    - { acceptance_id: J34-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "未施工" }
-    - { acceptance_id: J34-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "未施工" }
-governance:
-  spec_refs:
-    - docs/user-journey.md
-    - docs/specs/supervisor.md
-    - docs/specs/playtest-self-check.md
-    - docs/ledger/trust-tier-spec-boundary-brief.md
-  depends_on:
-    - { id: TASK-J.25, kind: soft }
-    - { id: TASK-J.32b, kind: soft }
-    - { id: TASK-J.31, kind: soft }
-    - { id: TASK-J.22c, kind: soft }
-  code_facts:
-    - { ref: "docs/user-journey.md:47-59", note: "S2→Seal 环已有密封白话，尚未写对照面 / 信任档业主步骤" }
-    - { ref: "docs/glossary.md:1-106", note: "现行术语表无「信任档」「对照面」词条" }
-    - { ref: "docs/specs/evidence-and-acceptance-criteria.md:107", note: "曾建议 docs/runbooks/ 路径；仓库尚无 runbooks 目录" }
-  non_goals:
-    - 不改产品代码；不重写 J.32a/b 硬约束与对照面 UI
-    - 不立信任档规格卡；不立蓝图第一批卡；不开工 J.35 / CI.2
-    - 不实现 §3.3 自动点亮；不宣称北极星或无人值守三连卡已交付
-    - 不写商业冷静期 / ChangeOrder
-  fail:
-    - 把未交付能力（§3.3 自动点亮、北极星）写成已交付
-    - 另造与 J.32a/b 冲突的信任档定义
-    - 借 SOP 改产品代码或扩 writable_paths 到 daemon/src
-  estimate: S
-  invariants:
-    auth: unchanged
-    demo_origin: unchanged
-    illumination: unchanged
-    gateway_write_scope: unchanged
-```
-
-* **背景**：J.32b / J.22c / J.31 已交付对照面、真实试玩与判分表，但业主侧仍缺一份「按键顺序」SOP。
-* **取舍**：不把规格缝（v1/V2 双形等）写进 SOP；那些归信任档规格卡划界简报，本卡只写操作。
+> 本卡已 **COMPLETED**（施工 [#286](https://github.com/he18718143986-design/IDE/pull/286) squash `51c643ede74ec3423f6ed36cb670650cf3272e86`；完工回写 P-231）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.34) §3.4at。
 
 <a id="task-j.35"></a>
 
