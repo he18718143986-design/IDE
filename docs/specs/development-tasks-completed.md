@@ -7747,3 +7747,145 @@ governance:
     gateway_write_scope: unchanged
   delivered: { pr: 273, commit: 2d48303ed858b2861161c4b89f4bc06f04744ae3 }
 ```
+
+### 3.4ap 回链对照面与信任档确认形态（J.32b · 完工回写 P-224）
+
+<a id="task-j.32b"></a>
+
+### 【Task J.32b】回链对照面与信任档确认形态`[COMPLETED · 拆自 J.32 · 修卡 P-221 · 修卡 P-223 · 施工 #276 · 完工回写 P-224]`
+
+> **立卡说明（2026-11-15 · P-221）**：拆自 [`TASK-J.32`](./development-tasks-active.md#task-j.32)。在中栏方案审阅页挂上签字前对照面，并按信任档呈现形态差异。硬依赖 [`TASK-J.32a`](#task-j.32a)。**立卡 ≠ 开工**。
+
+> **依赖更新（2026-11-16 · P-222）**：硬依赖 [`TASK-J.32a`](#task-j.32a) 已由 [#273](https://github.com/he18718143986-design/IDE/pull/273) squash `2d48303ed858b2861161c4b89f4bc06f04744ae3` 交付。本卡仍为 `[NEW_TASK]`，未开工；施工须另授权。
+
+> **修卡说明（2026-11-16 · P-223）**：授权来源为 Tina t1318u。施工前核对确认：前端 `SchemeSourceTurn`（`src/lib/daemon-api.ts` 第 2189-2193 行）只持有 `turn_id` 与 `turn_text_sha256`，明确不持有可冒充原文的副本；`SchemeSnapshotView` 的覆盖 / 未覆盖条数（第 2184-2186 行）只在冻结后返回，确认前没有回链预览接口。中栏现有 `SchemeDraft` 为 v1、条目上无 `evidence[]`；封存当下的核对从台账算出。按卡面取舍先修卡。`writable_paths` 增加 `src/lib/daemon-api.ts`、`daemon/server.ts`（仅限新增确认前只读预览接口）。预览接口返回与封存时同一套核对结果（复用 `evaluateSchemeItemBacklinks`，不得另写一套核对逻辑），以及已登记原话的 `U<seq>` 序号与原文。预览接口只读、不产生副作用、不触发封存。边界不变：不改回链规则、不改快照封存、不改质疑面板、不对齐 `prompt-builder.ts`、不另造存储。本条只修卡，不写产品代码，不开工。施工须在本修卡合入后另授权；合入后 `feat/j32b-quote-backlink-ui` 变基到新 main 再施工。`TASK-J.22a` / `TASK-J.22b` / `TASK-J.22c` 不动。CI.2 攒样本；文档计划暂缓。
+
+> **归档注记（2026-11-16 · P-224）**：本卡已 **COMPLETED**。Tina 本回合授权正式试玩与完工回写；施工 PR [#276](https://github.com/he18718143986-design/IDE/pull/276) squash `b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b` 于 2026-11-16 10:37:27 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `04ad5b9a83c02249f11b0acd1a776ddcadf2f5a3`；父提交 `dfcb6e0a23babe7cf5d9d1f05b1068e697349b3e`）。估算仍为 M。交付：确认前只读预览接口（复用 `evaluateSchemeItemBacklinks`；哈希对不上返回 `{ok:false, reason:"hash_mismatch"}` 且不改封存）；`SchemeQuoteBacklinkBlock` 由 `SchemeReviewPane` 在确认区前挂载；`canConfirm` 纳入 `quoteBacklinkBlocksConfirm`；`index.tsx` 只接线对照面数据与档位选择（`trust_tier` 传入既有 `freezeSchemeSnapshot`）；三档形态齐备。正式试玩（官方 Daemon · main `b751b4a`）按 J.31 判分表口径留证据，覆盖对照面可见、未覆盖标出、三档门禁、hash_mismatch 拒落盘、预览无副作用——全部通过。诚实口径：对照面 UI 已交付，`prompt-builder.ts` 未对齐（另卡）、商业层冷静期不在本卡。不并入、不开工 `TASK-J.22a` / `TASK-J.22b` / `TASK-J.22c`。CI.2 攒样本；文档计划暂缓。不暗示条目级高亮已交付。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.32b
+status: COMPLETED
+contract:
+  intent:
+    title: 回链对照面与信任档确认形态
+    description: >-
+      在现有中栏 SchemeReviewPane 挂上签字前对照面（新增 SchemeQuoteBacklinkBlock），
+      让业主看见「说过的每件事都有着落」；未覆盖项必须明确标出，不得静默跳过。
+      展示 U<seq> 须按 evidence[].ref.turn_id 取 user_alias_seq，再核 sha256。
+      信任档确认形态：标准档（默认）出示回链对照；重确认档在对照之上再逐项勾选；
+      轻确认档不把对照面或逐项勾选作为默认确认步骤，但机械回链仍须用已登记原话，不得接受事后拼凑。
+      档位由用户确认时选择，选择写入快照（存证字段由 TASK-J.32a 落地，本卡只做确认形态）。
+      对照面数据由确认前只读预览接口提供：返回与封存时同一套核对结果（复用 evaluateSchemeItemBacklinks，不得另写一套核对逻辑），以及已登记原话的 U<seq> 序号与原文；预览接口只读、不产生副作用、不触发封存。
+      硬约束：缺登记或哈希不一致不得标已覆盖；ai_inferred 不得冒充 user_said；
+      轻确认档机械回链仍须用已登记原话，不得接受事后拼凑。
+    risk_level: HIGH
+  acceptance:
+    - id: J32B-P1
+      check: playtest
+      text: >-
+        业主在签字前可以看到「说过的每件事都有着落」的对照面；未覆盖项被明确标出，不得静默跳过（承接 J32-P2）。jsdom 不替代真实试玩。
+    - id: J32B-P2
+      check: auto
+      text: >-
+        标准档默认出示回链对照；重确认档在对照之上提供逐项勾选；轻确认档不把对照面或逐项勾选作为默认确认步骤。
+    - id: J32B-P3
+      check: auto
+      text: >-
+        对照面展示的已覆盖项均能回链到已登记原话；缺登记或哈希不一致不得标已覆盖；ai_inferred 不得冒充 user_said。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/components/studio/SchemeReviewPane.tsx
+      - src/components/studio/SchemeQuoteBacklinkBlock.tsx
+      - src/routes/index.tsx
+      - tests/ui/scheme-quote-backlink.test.tsx
+      - src/lib/daemon-api.ts
+      - daemon/server.ts
+    readonly_paths:
+      - daemon/pipeline/scheme-snapshot-store.ts
+      - src/lib/journey/scheme-patch-types.ts
+      - docs/specs/supervisor.md
+      - docs/specs/delivery-lifecycle.md
+      - daemon/supervisor/prompt-builder.ts
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    对照面是中栏方案审阅页上的一块，不另开整页，也不改质疑面板（质疑左栏仍属 J.16 已交付范围）。
+    新增 SchemeQuoteBacklinkBlock，由 SchemeReviewPane 在确认按钮前挂载；index.tsx 只接线对照面数据与档位选择，不得改其他旅程。
+    对照面数据经新增的确认前只读预览接口取得（daemon-api.ts 与 daemon/server.ts 仅限该新增，不得改既有封存或登记接口）。
+    预览必须复用 evaluateSchemeItemBacklinks，返回与封存时同一套核对结果，以及已登记原话的 U<seq> 序号与原文；不得另写一套核对逻辑，不得另造存储。
+    预览接口只读、不产生副作用、不触发封存。
+    档位存证与回链内核只读复用 TASK-J.32a；本卡不改快照封存实现、不改回链规则。
+    商业层冷静期时长不在本卡。prompt-builder.ts 不在可写范围。
+  touches:
+    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 在确认前挂载对照面与档位选择，不另开整页, symbols: [] }
+    - { path: src/components/studio/SchemeQuoteBacklinkBlock.tsx, change: modify, why: 新增签字前对照面：覆盖与缺口、U<seq> 展示、重确认逐项勾选, symbols: [] }
+    - { path: src/routes/index.tsx, change: modify, why: 仅接线对照面数据与信任档选择，不得改其他旅程, symbols: [] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: 仅新增确认前只读预览接口的客户端封装，不改既有登记或封存接口, symbols: [] }
+    - { path: daemon/server.ts, change: modify, why: 仅新增确认前只读预览接口；复用 evaluateSchemeItemBacklinks；只读、无副作用、不触发封存, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J32B-P1, test_path: tests/ui/scheme-quote-backlink.test.tsx, level: integration, debt: "正式试玩已在 main b751b4a 官方 Daemon 通过；jsdom 仅辅助" }
+    - { acceptance_id: J32B-P2, test_path: tests/ui/scheme-quote-backlink.test.tsx, level: unit, debt: "施工后 jsdom 用例已落地；正式试玩另见归档注记" }
+    - { acceptance_id: J32B-P3, test_path: tests/ui/scheme-quote-backlink.test.tsx, level: unit, debt: "施工后 jsdom 用例已落地；正式试玩另见归档注记" }
+governance:
+  spec_refs:
+    - docs/specs/supervisor.md
+    - docs/specs/delivery-lifecycle.md
+    - docs/specs/playtest-self-check.md
+  depends_on:
+    - { id: TASK-J.32a, kind: hard }
+    - { id: TASK-J.16, kind: hard }
+  code_facts:
+    - { ref: "src/components/studio/SchemeReviewPane.tsx:601-604", note: "对照面在确认区前挂载 SchemeQuoteBacklinkBlock" }
+    - { ref: "src/lib/journey/scheme-patch-types.ts:42-71", note: "展示 U<seq> 按 evidence[].ref.turn_id 取 user_alias_seq 再核哈希；项上可选哈希已由 TASK-J.32a 落在 TurnRef" }
+    - { ref: "src/lib/daemon-api.ts:2279-2296", note: "previewSchemeItemBacklinks 确认前只读预览客户端封装" }
+    - { ref: "daemon/server.ts:2555-2653", note: "handleSchemeBacklinkPreview 复用 evaluateSchemeItemBacklinks；hash_mismatch 不改封存" }
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:234-296", note: "evaluateSchemeItemBacklinks 为封存时核对入口；预览必须复用，不得另写一套" }
+  non_goals:
+    - 施工已合入；本条为完工回写，不改产品代码
+    - 不改回链内核、快照封存或 TurnRef schema（见 TASK-J.32a）；不得另写一套核对逻辑
+    - 预览接口不得有副作用、不得触发封存；不另造存储
+    - daemon-api.ts 与 daemon/server.ts 仅限新增确认前只读预览接口，不得改既有登记或封存实现
+    - 不改质疑面板左栏（J.16 已交付）；不另开整页对照
+    - 不把 prompt-builder.ts 列为必须可写
+    - 不定商业层冷静期时长；不立托管部署档或商业契约层
+    - 不实现 §3.3 条目级自动点亮，不暗示条目级高亮已交付（见 TASK-J.22b）
+    - 不开工 J.22 子卡 / CI.2；不改 D.1e / S.3
+    - 不宣称北极星或无人值守三连卡已交付
+  fail:
+    - 签字前没有对照面，或缺口被静默跳过
+    - 缺登记或哈希不一致仍标已覆盖，或 ai_inferred 冒充 user_said
+    - 轻确认档接受事后拼凑文本
+    - 越界改快照封存内核、质疑面板或其他旅程
+    - 另写一套核对逻辑，或预览接口触发封存、产生副作用，或另造存储
+    - 以 jsdom 替代真实试玩验收
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 276, commit: b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b }
+```
+
+* **背景**：密封是业主对方案的签字点；没有回链到已登记原话，就无法核对应办事项是否都有着落。J.16 已经把说话登记和冻结封存做完，本卡复用这条链路，不另起炉灶。
+* **取舍**：确认前对照面必须通过只读预览接口取得与封存时同一套核对结果，并展示已登记原话的 U<seq> 与原文；预览复用 evaluateSchemeItemBacklinks，不得另写一套、不得另造存储。本条已把 daemon-api.ts 与 daemon/server.ts 列入可写，但仅限新增该预览接口。prompt-builder 对齐仍不在本卡。
+
+* **正式试玩证据（官方 Daemon · main `b751b4a` · Asia/Hong_Kong · 操作者：Cursor Cloud Agent / Tina 本回合授权）**：
+
+| 日期与时区（Asia/Hong_Kong） | 所试 main SHA | 步骤编号 | 实际看到的原文 | 通过或失败 | 操作者 | 失败时的现象（通过则留空） |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| 2026-11-16T11:42:00+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | U1-对照面在确认前可见 | 签字前对照；选择确认档位。标准档会出示「说过的每件事都有着落」；重确认还要逐项勾选；轻确认不把对照面作为默认确认步骤。；标准档（默认）选中 | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T11:48:00+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | U2-未覆盖项明确标出 | 已覆盖 1 项，未覆盖 2 项。未覆盖的会明确标出，不会被跳过。；还要导出报表 / 未覆盖 · 引用的原话还没登记；推荐加一个日历模块 / 未覆盖 · 这是推断出来的，不是你亲口说的 | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T12:05:00+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | U4-重确认未勾完 | tier=reconfirm；三项勾选均为 false；确认方案 disabled=true | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T12:05:00+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | U5-重确认勾完 | 三项勾选均为 true；确认方案 disabled=false | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T12:05:00+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | U6-轻确认 | surface=false；轻确认不把对照面或逐项勾选作为默认确认步骤；冻结时仍会按已登记原话做机械回链。；确认方案 disabled=false | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T12:05:00+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | U7-标准档再出示 | tier=standard；surface=true；已覆盖 1 项，未覆盖 2 项。未覆盖的会明确标出，不会被跳过。；确认方案 disabled=false | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T11:25:52+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | A3-预览只读无副作用 | preview前快照=[] preview后快照=[] | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T11:25:52+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | A4-预览 hash_mismatch | {"ok":false,"reason":"hash_mismatch","item_id":"G-forged","turn_id":"T1","message":"有一句原话和登记记录对不上，不能标已覆盖。没有改任何封存。"} | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T11:25:52+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | A5-冻结拒落盘 | status=409 code=E_SCHEME_SNAPSHOT_MISMATCH reason=turn_hash_mismatch；快照文件不存在 | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T11:25:52+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | A6-轻确认回链不降级 | status=409 reason=turn_hash_mismatch；轻确认伪造哈希仍拒绝 | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |

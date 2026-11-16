@@ -733,4 +733,13 @@ export const selfCheckReportSchema = z.object({
 
 | 日期与时区（Asia/Hong_Kong） | 所试 main SHA | 步骤编号 | 实际看到的原文 | 通过或失败 | 操作者 | 失败时的现象（通过则留空） |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-|  |  |  |  |  |  |  |
+| 2026-11-16T11:42:00+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | J.32b / §0.1 第2步·对照面可见 | 签字前对照；选择确认档位。标准档会出示「说过的每件事都有着落」；重确认还要逐项勾选；轻确认不把对照面作为默认确认步骤。；标准档（默认）选中 | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T11:48:00+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | J.32b / 未覆盖项标出 | 已覆盖 1 项，未覆盖 2 项。未覆盖的会明确标出，不会被跳过。；还要导出报表 / 未覆盖 · 引用的原话还没登记；推荐加一个日历模块 / 未覆盖 · 这是推断出来的，不是你亲口说的 | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T12:05:00+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | J.32b / 重确认未勾完 | tier=reconfirm；三项勾选均为 false；确认方案 disabled=true | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T12:05:00+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | J.32b / 重确认勾完 | 三项勾选均为 true；确认方案 disabled=false | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T12:05:00+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | J.32b / 轻确认 | surface=false；轻确认不把对照面或逐项勾选作为默认确认步骤；冻结时仍会按已登记原话做机械回链。；确认方案 disabled=false | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T12:05:00+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | J.32b / 标准档再出示 | tier=standard；surface=true；已覆盖 1 项，未覆盖 2 项。未覆盖的会明确标出，不会被跳过。；确认方案 disabled=false | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T11:25:52+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | J.32b / 预览只读无副作用 | preview前快照=[] preview后快照=[] | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T11:25:52+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | J.32b / 预览 hash_mismatch | {"ok":false,"reason":"hash_mismatch","item_id":"G-forged","turn_id":"T1","message":"有一句原话和登记记录对不上，不能标已覆盖。没有改任何封存。"} | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T11:25:52+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | J.32b / 冻结拒落盘 | status=409 code=E_SCHEME_SNAPSHOT_MISMATCH reason=turn_hash_mismatch；快照文件不存在 | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T11:25:52+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | J.32b / 轻确认回链不降级 | status=409 reason=turn_hash_mismatch；轻确认伪造哈希仍拒绝 | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
