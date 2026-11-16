@@ -783,7 +783,7 @@ governance:
 
 > **立卡说明（2026-11-11 · P-187）**：挂账⑬ 方案 B。当前中栏方案由前端 `rebuildSchemeFromCorpus` 从对话语料启发式拼出，编译器台账不进入中栏。TASK-J.16 J16-P7 以只读投影（方案 A）作过渡；本卡为根本解，范围远超 J.16，故另立。**估算 L：施工前须先拆卡**，拆卡前不得开工。依赖 TASK-J.21（重启后台账可用）与 TASK-J.16 J16-P7（过渡投影已合）。**立卡 ≠ 开工**。
 >
-> **拆卡说明（2026-11-15 · P-215）**：按 R-11，估算 L 的母卡不得开工，必须先拆。Tina t1286u 授权拆为三张子卡，本卡改标 **`[SPLIT]`**，保留追溯，**不再作为施工依据**，施工以子卡正文为准：[`TASK-J.22a`](#task-j.22a)（来源统一 + 无台账降级，承接 J22-P1 / J22-P3，估算 M）、[`TASK-J.22b`](#task-j.22b)（条目级呈现，J.16 延期项，估算 M）、[`TASK-J.22c`](#task-j.22c)（真实试玩，承接 J22-P2，估算 S）。硬依赖 `TASK-J.21` 与 `TASK-J.16` 均已 `[COMPLETED]`。**拆卡 ≠ 开工**；子卡施工须逐张授权。不暗示条目级高亮已交付。
+> **拆卡说明（2026-11-15 · P-215）**：按 R-11，估算 L 的母卡不得开工，必须先拆。Tina t1286u 授权拆为三张子卡，本卡改标 **`[SPLIT]`**，保留追溯，**不再作为施工依据**，施工以子卡正文为准：[`TASK-J.22a`](./development-tasks-completed.md#task-j.22a)（来源统一 + 无台账降级，承接 J22-P1 / J22-P3，估算 M；P-226 已 COMPLETED）、[`TASK-J.22b`](#task-j.22b)（条目级呈现，J.16 延期项，估算 M）、[`TASK-J.22c`](#task-j.22c)（真实试玩，承接 J22-P2，估算 S）。硬依赖 `TASK-J.21` 与 `TASK-J.16` 均已 `[COMPLETED]`。**拆卡 ≠ 开工**；子卡施工须逐张授权。不暗示条目级高亮已交付。
 > **已知限制（K-14 第一刀 #217 记录）**：台账 `scheme_revision` 与中栏启发式方案修订号未对齐校验，二者可能不是同一份方案；J16-P5 真实数据验收须核对此点，根治依赖本卡。
 
 ```yaml task-card
@@ -856,111 +856,15 @@ governance:
 
 <a id="task-j.22a"></a>
 
-#### 【Task J.22a】中栏方案来源改为编译器台账（含无台账降级标注）`[NEW_TASK · 立卡 P-215 · 修卡 P-225 · 未开工]`
+#### 【Task J.22a】中栏方案来源改为编译器台账（含无台账降级标注）`[COMPLETED · 正文已迁]`
 
-> **立卡说明（2026-11-15 · P-215）**：由 `TASK-J.22` 按 R-11 拆出。承接原验收 J22-P1（来源统一）并合理归并 J22-P3（无台账时明确标注「方案尚未生成」，不以启发式拼接冒充台账方案），因为二者是同一数据源切换。估算 M。硬依赖 `TASK-J.21` 与 `TASK-J.16` 均已 `[COMPLETED]`，依赖已满足。条目级高亮见 `TASK-J.22b`，真实试玩见 `TASK-J.22c`。**立卡 ≠ 开工**。施工须另授权。
-
-> **修卡说明（2026-11-16 · P-225）**：授权来源为 Tina 本回合。施工前核对确认：现网中栏默认源仍是 `rebuildSchemeFromCorpus`（`src/routes/index.tsx` 第 1222 行）；台账 SSOT 为 `SchemeDraftV2`（`.stagent/drafts/scheme-ledger/active.json`），目前仅有 `GET /api/supervisor/scheme-acceptance` 投影验收条目，标题 / 目标等未进中栏。按方案先修卡补投影通路。`writable_paths` 增加 `src/lib/daemon-api.ts`、`daemon/server.ts`（**仅限**新增或扩展只读投影路由）、`daemon/supervisor/intent-compiler/acceptance-projection.ts` **或**新建 `daemon/supervisor/intent-compiler/scheme-midpane-projection.ts`（施工择一，不得两套并行）、对应单测（`tests/unit/scheme-midpane-projection.test.ts` 或扩既有 acceptance 投影测）。卡面硬约束：投影接口只读、无副作用、不写盘、不触发封存；无台账降级标注用验收原文「方案尚未生成」，不得静默空白或编造；`rebuildSchemeFromCorpus` 必须退出默认发送路径，禁止作为无标注默认源（函数体可暂留）；mermaid 三图不强行交付 `renderSchemeDiagrams`（J.9b / V-07），台账路径下图可空，不得用语料启发式图冒充台账结构。`prompt-builder.ts` **不并入**（留另卡，与 J.32 系列口径一致）。本条只修卡，不写产品代码，不开工。施工须在本修卡合入后另授权；合入后从新 main 拉 `feat/j22a-source-unify-degrade` 再施工。`TASK-J.22b` / `TASK-J.22c` 不动。CI.2 攒样本；文档计划暂缓。不暗示条目级高亮已交付。
-
-```yaml task-card
-id: TASK-J.22a
-status: NEW_TASK
-contract:
-  intent:
-    title: 中栏方案来源改为编译器台账，无台账时明确降级
-    description: >-
-      中栏方案（标题、目标、验收条目等）改为来自编译器台账 SchemeDraftV2，
-      不再由 rebuildSchemeFromCorpus 从对话语料启发式拼接。
-      无台账时降级态必须明确标注「方案尚未生成」，不得用启发式内容冒充台账方案。
-    risk_level: HIGH
-  acceptance:
-    - id: J22A-P1
-      check: auto
-      text: >-
-        中栏渲染的方案内容与台账 SchemeDraftV2 逐项一致（标题、目标、验收条目）；不再由对话语料拼接（承接 J22-P1）。
-    - id: J22A-P2
-      check: auto
-      text: >-
-        无台账时降级态明确标注「方案尚未生成」，不以启发式拼接内容冒充台账方案（承接 J22-P3）。
-  scheme_item_ids: []
-  scope:
-    writable_paths:
-      - src/routes/index.tsx
-      - src/lib/journey/scheme-draft.ts
-      - src/components/studio/SchemeReviewPane.tsx
-      - tests/ui/scheme-source-unification.test.tsx
-      - src/lib/daemon-api.ts
-      - daemon/server.ts
-      - daemon/supervisor/intent-compiler/acceptance-projection.ts
-      - daemon/supervisor/intent-compiler/scheme-midpane-projection.ts
-      - tests/unit/scheme-midpane-projection.test.ts
-    readonly_paths:
-      - daemon/supervisor/intent-compiler/scheme-ledger-store.ts
-  verification:
-    commands:
-      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
-design:
-  approach: >-
-    把中栏数据源切换到编译器台账：Daemon 只读投影 SchemeDraftV2（扩展既有 acceptance
-    投影或新建 scheme-midpane-projection，择一），经 daemon-api 取数，映射为中栏
-    SchemeDraft；rebuildSchemeFromCorpus 退出默认发送路径，禁止作为无标注默认源。
-    无台账时只出示验收原文「方案尚未生成」，不填启发式条目。投影只读、无副作用。
-    mermaid 三图不强行交付 renderSchemeDiagrams；台账路径下图可空，不得用语料图冒充。
-  touches:
-    - { path: src/routes/index.tsx, change: modify, why: 中栏数据源改为台账投影，拆除默认 rebuildSchemeFromCorpus, symbols: [rebuildSchemeFromCorpus] }
-    - { path: src/lib/journey/scheme-draft.ts, change: modify, why: 台账 V2 到中栏 SchemeDraft 的映射与无台账降级态, symbols: [rebuildSchemeFromCorpus] }
-    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 无台账时标注「方案尚未生成」；有台账渲染投影, symbols: [] }
-    - { path: src/lib/daemon-api.ts, change: modify, why: 新增/扩展中栏只读投影客户端, symbols: [] }
-    - { path: daemon/server.ts, change: modify, why: 仅限新增或扩展只读投影路由（无副作用、不写盘）, symbols: [] }
-    - { path: daemon/supervisor/intent-compiler/acceptance-projection.ts, change: modify, why: 可选：扩展为中栏投影；与新建 midpane 投影二选一, symbols: [projectSchemeAcceptance] }
-    - { path: daemon/supervisor/intent-compiler/scheme-midpane-projection.ts, change: create, why: 可选：新建中栏只读投影；与扩展 acceptance 投影二选一, symbols: [] }
-    - { path: tests/unit/scheme-midpane-projection.test.ts, change: create, why: 锁定投影只读与无台账空投影, symbols: [] }
-    - { path: tests/ui/scheme-source-unification.test.tsx, change: create, why: 锁定来源一致与无台账降级标注, symbols: [] }
-  interfaces: []
-  test_plan:
-    - { acceptance_id: J22A-P1, test_path: tests/ui/scheme-source-unification.test.tsx, level: integration, debt: "修卡阶段；测试体待授权施工后再写" }
-    - { acceptance_id: J22A-P2, test_path: tests/ui/scheme-source-unification.test.tsx, level: integration, debt: "修卡阶段；测试体待授权施工后再写" }
-governance:
-  spec_refs:
-    - docs/specs/playtest-self-check.md
-    - docs/specs/supervisor.md
-  depends_on:
-    - { id: TASK-J.21, kind: hard }
-    - { id: TASK-J.16, kind: hard }
-  code_facts:
-    - { ref: "src/lib/journey/scheme-draft.ts:578", note: "rebuildSchemeFromCorpus 定义处；必须退出默认发送路径，禁止作为无标注默认源" }
-    - { ref: "src/routes/index.tsx:1222", note: "中栏调用 rebuildSchemeFromCorpus 的现网接缝（P-225 修正行号；原 1167 已漂移）" }
-    - { ref: "src/lib/journey/scheme-draft.ts:46-74", note: "SchemeDraft 及可选 acceptance 字段；来源切换后应由台账投影填充" }
-    - { ref: "src/components/studio/SchemeReviewPane.tsx:62-64", note: "中栏已能接收验收条目投影；本卡负责数据源，不在此做条目级高亮" }
-    - { ref: "src/lib/daemon-api.ts:2543", note: "现行仅有 fetchSchemeAcceptance；本卡须扩展或新增中栏只读投影客户端" }
-    - { ref: "daemon/server.ts:5913", note: "现行仅有 GET /api/supervisor/scheme-acceptance；本卡仅限新增/扩展只读投影路由" }
-  non_goals:
-    - 本条修卡 ≠ 开工；施工须在本修卡合入后另授权
-    - 不改台账 schema 与编译器提示词；不对齐 prompt-builder.ts（另卡，与 J.32 系列口径一致）
-    - 不做条目级高亮（见 TASK-J.22b），不以 jsdom 替代真实试玩（见 TASK-J.22c）
-    - 不强行交付 renderSchemeDiagrams（mermaid 台账路径下可空，不得用语料图冒充）
-    - 不暗示条目级高亮已交付；不开工 CI.2；不改 D.1e / S.3
-  fail:
-    - 中栏与台账不一致仍出现而未标注，或无台账时仍用启发式内容冒充台账方案
-    - 投影路由有写盘/封存/副作用，或改只读的 scheme-ledger-store.ts 却不先修卡
-    - rebuildSchemeFromCorpus 仍为无标注默认源，或用语料 mermaid 冒充台账结构
-    - 本条合入前开工，或把 prompt-builder.ts 并入本卡，或本卡膨胀为 L 却不拆（R-11）
-  estimate: M
-  invariants:
-    auth: unchanged
-    demo_origin: unchanged
-    illumination: unchanged
-    gateway_write_scope: unchanged
-```
-
-* **背景**：挂账⑬ 方案 B。J16-P7 只做了只读投影过渡；本卡是把中栏默认来源换成台账。
-* **取舍**：把来源统一与无台账降级放在同一张卡，因为是同一条数据通路；高亮与真实试玩另卡。
+> 本卡已 **COMPLETED**（施工 [#279](https://github.com/he18718143986-design/IDE/pull/279) squash `d5a994dbc4973a3894cf78a217a1f1ec906017f1`；完工回写 P-226）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.22a) §3.4aq。
 
 <a id="task-j.22b"></a>
 
 #### 【Task J.22b】中栏验收条目的条目级呈现（J.16 延期项）`[NEW_TASK · 立卡 P-215 · 未开工]`
 
-> **立卡说明（2026-11-15 · P-215）**：由 `TASK-J.22` 按 R-11 拆出。J.16 已明确「条目级高亮不在本条（J.22 之后另记）」「`frozen_quotes` 不含条目关联」。本卡承接该项呈现，估算 M；若施工前发现必须改冻结快照结构才能做条目关联，先报修卡或再拆，不得带病扩大。硬依赖 `TASK-J.22a`（先有台账来源，再谈条目呈现）。**不实现** [`playtest-self-check.md`](./playtest-self-check.md) §3.3 的条目级自动点亮（该口子仍为「本版不实现」）。不暗示该项已交付。硬依赖 `TASK-J.21` 与 `TASK-J.16` 均已 `[COMPLETED]`。**立卡 ≠ 开工**。施工须另授权。
+> **立卡说明（2026-11-15 · P-215）**：由 `TASK-J.22` 按 R-11 拆出。J.16 已明确「条目级高亮不在本条（J.22 之后另记）」「`frozen_quotes` 不含条目关联」。本卡承接该项呈现，估算 M；若施工前发现必须改冻结快照结构才能做条目关联，先报修卡或再拆，不得带病扩大。硬依赖 [`TASK-J.22a`](./development-tasks-completed.md#task-j.22a)（先有台账来源，再谈条目呈现；P-226 已 COMPLETED）。**不实现** [`playtest-self-check.md`](./playtest-self-check.md) §3.3 的条目级自动点亮（该口子仍为「本版不实现」）。不暗示该项已交付。硬依赖 `TASK-J.21` 与 `TASK-J.16` 均已 `[COMPLETED]`。**立卡 ≠ 开工**。施工须另授权。
 
 ```yaml task-card
 id: TASK-J.22b
@@ -1048,7 +952,7 @@ governance:
 
 #### 【Task J.22c】中栏方案来源统一的真实试玩验收`[NEW_TASK · 立卡 P-215 · 未开工]`
 
-> **立卡说明（2026-11-15 · P-215）**：由 `TASK-J.22` 按 R-11 拆出，承接原验收 J22-P2。估算 S。硬依赖 `TASK-J.22a`（须先有来源切换）。`TASK-J.22b` 为软依赖：本卡原文验收是「台账与中栏方案在确认前后保持一致」；条目级呈现的试玩可在 J.22b 合入后一并做，但不把 J.22b 当成硬门槛，以免拖延来源一致性验收。jsdom 不替代真实打开方案面板。硬依赖 `TASK-J.21` 与 `TASK-J.16` 均已 `[COMPLETED]`。**立卡 ≠ 开工**。施工须另授权。
+> **立卡说明（2026-11-15 · P-215）**：由 `TASK-J.22` 按 R-11 拆出，承接原验收 J22-P2。估算 S。硬依赖 [`TASK-J.22a`](./development-tasks-completed.md#task-j.22a)（须先有来源切换；P-226 已 COMPLETED）。`TASK-J.22b` 为软依赖：本卡原文验收是「台账与中栏方案在确认前后保持一致」；条目级呈现的试玩可在 J.22b 合入后一并做，但不把 J.22b 当成硬门槛，以免拖延来源一致性验收。jsdom 不替代真实打开方案面板。硬依赖 `TASK-J.21` 与 `TASK-J.16` 均已 `[COMPLETED]`。**立卡 ≠ 开工**。施工须另授权。
 
 ```yaml task-card
 id: TASK-J.22c
@@ -1094,7 +998,7 @@ governance:
     - { id: TASK-J.21, kind: hard }
     - { id: TASK-J.16, kind: hard }
   code_facts:
-    - { ref: "src/routes/index.tsx:1167", note: "中栏现网仍调用 rebuildSchemeFromCorpus；本卡在 J.22a 切换后再做真实核对" }
+    - { ref: "src/routes/index.tsx:1237", note: "J.22a 已拆除默认 rebuildSchemeFromCorpus；本卡在真实会话中核对台账投影" }
     - { ref: "src/components/studio/SchemeReviewPane.tsx:62-64", note: "真实打开的方案面板组件；jsdom 不替代本次验收" }
   non_goals:
     - 本条立卡 ≠ 开工；施工须另授权
