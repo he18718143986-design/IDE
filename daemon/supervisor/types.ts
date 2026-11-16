@@ -150,7 +150,12 @@ export type SupervisorBacklinkItemSummary =
   | {
       id: string;
       covered: false;
-      reason: "ai_inferred" | "no_turn_evidence" | "unregistered" | "hash_mismatch" | string;
+      reason:
+        | "ai_inferred"
+        | "no_turn_evidence"
+        | "unregistered"
+        | "hash_mismatch"
+        | string;
     };
 
 /**

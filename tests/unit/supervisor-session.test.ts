@@ -600,7 +600,11 @@ describe("Prompt 组装流水线", () => {
       context: {
         project: { repo_root: repo },
         architecture: { constraints: ["单一职责"] },
-        scheme_summary: { title: "对齐段", summary: "不改裁剪", scheme_revision: 1 },
+        scheme_summary: {
+          title: "对齐段",
+          summary: "不改裁剪",
+          scheme_revision: 1,
+        },
         trust_tier: "light",
         backlink_summary: {
           evaluation_ok: true,
