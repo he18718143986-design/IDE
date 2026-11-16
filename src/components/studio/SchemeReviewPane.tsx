@@ -23,6 +23,7 @@ import type {
 } from "@/lib/journey/scheme-draft";
 import {
   EMPTY_DEMO_GATE,
+  NO_SCHEME_YET_LABEL,
   evaluateSchemeConfirmation,
 } from "@/lib/journey/scheme-draft";
 import type { ScopePlan } from "@/lib/journey/scope-plan";
@@ -50,6 +51,10 @@ import {
 
 export interface SchemeReviewPaneProps {
   scheme: SchemeDraft | null;
+  /**
+   * TASK-J.22a：台账缺失或无实质内容时为 true，空态标注「方案尚未生成」。
+   */
+  ledgerAbsent?: boolean | undefined;
   demoUrl?: string | null | undefined;
   demoStatus?: string | null | undefined;
   demoGate?: DemoGate | undefined;
@@ -236,20 +241,30 @@ export function SchemeReviewPane(props: SchemeReviewPaneProps) {
     (demoGate.status === "ready" || demoGate.status === "degraded_flowcard") &&
     demoGate.scheme_revision !== scheme.scheme_revision;
 
-  if (!scheme || (!scheme.title && scheme.modules.length === 0)) {
+  if (
+    props.ledgerAbsent === true ||
+    !scheme ||
+    (!scheme.title && scheme.modules.length === 0)
+  ) {
+    const emptyLabel =
+      props.ledgerAbsent === true
+        ? NO_SCHEME_YET_LABEL
+        : "在右侧自由聊需求。Supervisor 旁观足够后，这里会陆续出现架构图、流程、模块脑图和待你拍板的决策——不用做选择题剧本。";
     return (
       <div
         data-testid="scheme-review-pane"
         data-empty="true"
+        data-ledger-absent={props.ledgerAbsent === true ? "true" : "false"}
         className="flex h-full min-h-0 flex-col overflow-auto p-4 text-sm"
       >
         <h2 className="text-sm font-semibold">方案审阅</h2>
         <p
-          data-testid="scheme-empty"
+          data-testid={
+            props.ledgerAbsent === true ? "scheme-no-ledger" : "scheme-empty"
+          }
           className="mt-3 text-xs leading-relaxed text-muted-foreground"
         >
-          在右侧自由聊需求。Supervisor
-          旁观足够后，这里会陆续出现架构图、流程、模块脑图和待你拍板的决策——不用做选择题剧本。
+          {emptyLabel}
         </p>
         {props.playtest ? (
           <div className="mt-4">
@@ -313,6 +328,18 @@ export function SchemeReviewPane(props: SchemeReviewPaneProps) {
         >
           {scheme.summary}
         </p>
+        {scheme.goals && scheme.goals.length > 0 ? (
+          <ul
+            data-testid="scheme-goals"
+            className="mt-2 list-disc space-y-1 pl-4 text-xs text-foreground"
+          >
+            {scheme.goals.map((g) => (
+              <li key={g.id} data-goal-id={g.id}>
+                {g.text}
+              </li>
+            ))}
+          </ul>
+        ) : null}
         {scheme.modules.length > 0 ? (
           <ul
             data-testid="scheme-modules"

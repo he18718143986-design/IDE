@@ -2550,6 +2550,43 @@ export async function fetchSchemeAcceptance(
   );
 }
 
+/** TASK-J.22a：中栏只读投影（标题/目标/模块/决策/冲突/验收）；不写盘。 */
+export interface SchemeMidpaneProjection {
+  available: boolean;
+  scheme_id: string | null;
+  scheme_revision: number | null;
+  frozen: boolean;
+  title: string;
+  summary: string;
+  goals: Array<{ id: string; text: string }>;
+  modules: Array<{ id: string; name: string }>;
+  decisions: Array<{
+    id: string;
+    label: string;
+    recommended: string;
+    alternatives: string[];
+    confirmed: boolean;
+    source: "ai_default" | "user";
+  }>;
+  conflicts: Array<{
+    id: string;
+    question: string;
+    options: { id: string; label: string }[];
+    chosenId: string | null;
+  }>;
+  acceptance: Array<{ id: string; text: string }>;
+}
+
+export async function fetchSchemeMidpane(
+  conn: DaemonConnection,
+): Promise<SchemeMidpaneProjection> {
+  return request<SchemeMidpaneProjection>(
+    conn,
+    "/api/supervisor/scheme-midpane",
+    { method: "GET" },
+  );
+}
+
 /** 上报用户确认时实际呈现过的条目。调用方须在 DOM 已展示后再调用。 */
 export async function reportSurfacePresentation(
   conn: DaemonConnection,

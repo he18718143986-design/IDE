@@ -327,4 +327,59 @@ describe("POST /api/supervisor/surface-log", () => {
     const unauth = await fetch(url, { headers: { connection: "close" } });
     expect(unauth.status).toBe(401);
   });
+
+  it("GET /api/supervisor/scheme-midpane：只读；无台账 available=false；有台账投影标题与验收且不写盘", async () => {
+    const url = `${base}/api/supervisor/scheme-midpane`;
+    await waitForPort(Number(new URL(base).port));
+    const empty = await fetch(url, { headers: headers() });
+    expect(empty.status).toBe(200);
+    expect(await empty.json()).toMatchObject({
+      available: false,
+      scheme_id: null,
+      title: "",
+      acceptance: [],
+    });
+
+    const file = schemeLedgerPath(repo);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        schema_version: "1.0",
+        updated_at: "2026-11-16T00:00:00.000Z",
+        state: emptyLedgerState({
+          draft: emptySchemeDraftV2({
+            scheme_id: "scheme-mid",
+            scheme_revision: 5,
+            title: "逾期看板",
+            acceptance: [
+              {
+                id: "ITEM-1",
+                text: "首页显示逾期数",
+                source: "user_said",
+                evidence: [],
+                user_pinned: false,
+                updated_in_revision: 1,
+              },
+            ],
+          }),
+        }),
+        last_journal: null,
+        last_model_id: null,
+        last_prompt_version: null,
+        offline: true,
+      }),
+    );
+    const before = fs.readFileSync(file, "utf8");
+    const res = await fetch(url, { headers: headers() });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      available: true,
+      scheme_id: "scheme-mid",
+      scheme_revision: 5,
+      title: "逾期看板",
+      acceptance: [{ id: "ITEM-1", text: "首页显示逾期数" }],
+    });
+    expect(fs.readFileSync(file, "utf8")).toBe(before);
+  });
 });

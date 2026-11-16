@@ -277,6 +277,7 @@ import {
 import { synthesizeSchemeFromPlan } from "./supervisor/design/scheme-from-plan";
 import { readSchemeLedger } from "./supervisor/intent-compiler/scheme-ledger-store";
 import { projectSchemeAcceptance } from "./supervisor/intent-compiler/acceptance-projection";
+import { projectSchemeMidpane } from "./supervisor/intent-compiler/scheme-midpane-projection";
 import {
   applyContractStubTerminal,
   findInFlightContract,
@@ -5924,6 +5925,24 @@ export class StagentDaemon {
         res,
         200,
         projectSchemeAcceptance(readSchemeLedger(this.repoRoot)),
+      );
+      return;
+    }
+
+    if (pathname === "/api/supervisor/scheme-midpane") {
+      // TASK-J.22a：中栏只读投影；不写盘、无副作用、不触发封存。
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      if (method !== "GET") {
+        this.sendJson(res, 405, { error: "Method not allowed" });
+        return;
+      }
+      this.sendJson(
+        res,
+        200,
+        projectSchemeMidpane(readSchemeLedger(this.repoRoot)),
       );
       return;
     }

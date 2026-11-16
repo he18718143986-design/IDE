@@ -67,6 +67,20 @@ vi.mock("@/lib/daemon-api", async (orig) => {
       files: ["README.md", "src/routes/index.tsx", "package.json"],
     })),
     fetchSettings: vi.fn(async () => ({ configured: false })),
+    // TASK-J.22a：Console 连接后会拉中栏投影；本文件不测台账，回空投影。
+    fetchSchemeMidpane: vi.fn(async () => ({
+      available: false,
+      scheme_id: null,
+      scheme_revision: null,
+      frozen: false,
+      title: "",
+      summary: "",
+      goals: [],
+      modules: [],
+      decisions: [],
+      conflicts: [],
+      acceptance: [],
+    })),
     readWorktreeFile: vi.fn(async (_c: unknown, p: string) => ({
       path: p,
       root: "/r",
@@ -110,6 +124,7 @@ beforeEach(() => {
   // TASK-CI.3：本文件发出的未桩接口，以离线失败应答（与哨兵行为一致）
   stubOfflineFetch([
     "/api/supervisor/journey",
+    "/api/supervisor/scheme-midpane",
     "/api/project/plan",
     "/api/chat/adapters",
     "/api/chat/sessions",

@@ -77,9 +77,152 @@ export interface SchemeDraft {
     check: "auto" | "playtest" | "both";
   }>;
   /**
+   * TASK-J.22a：台账目标条目（只读投影；中栏展示用，不参与确认门禁）。
+   */
+  goals?: Array<{ id: string; text: string }>;
+  /**
    * TASK-C.22 / TASK-L.17a：参考源 URL 列表（可选，投影进合同 references 字段）。
    */
   references?: string[];
+}
+
+/** TASK-J.22a：无台账 / 无实质台账内容时的降级标注（验收原文）。 */
+export const NO_SCHEME_YET_LABEL = "方案尚未生成" as const;
+
+/** Daemon 中栏只读投影的前端视图（与 scheme-midpane-projection 同形）。 */
+export interface SchemeMidpaneView {
+  available: boolean;
+  scheme_id: string | null;
+  scheme_revision: number | null;
+  frozen: boolean;
+  title: string;
+  summary: string;
+  goals: Array<{ id: string; text: string }>;
+  modules: Array<{ id: string; name: string }>;
+  decisions: Array<{
+    id: string;
+    label: string;
+    recommended: string;
+    alternatives: string[];
+    confirmed: boolean;
+    source: "ai_default" | "user";
+  }>;
+  conflicts: Array<{
+    id: string;
+    question: string;
+    options: { id: string; label: string }[];
+    chosenId: string | null;
+  }>;
+  acceptance: Array<{ id: string; text: string }>;
+}
+
+/**
+ * TASK-J.22a：把台账中栏投影映射为 UI SchemeDraft。
+ * - available=false → null（前端标「方案尚未生成」）；
+ * - 已冻结的 previous 原样返回；
+ * - mermaid 三图留空（不强交 renderSchemeDiagrams，不得用语料图冒充）；
+ * - 同 revision 时保留本地点选的确认/抉择。
+ */
+export function schemeDraftFromMidpane(
+  view: SchemeMidpaneView,
+  previous: SchemeDraft | null,
+): SchemeDraft | null {
+  if (!view.available || !view.scheme_id || view.scheme_revision == null) {
+    return null;
+  }
+  if (previous?.frozen === true) {
+    return previous;
+  }
+
+  const baseDecisions: SchemeDecision[] = view.decisions.map((d) => ({
+    id: d.id,
+    label: d.label,
+    recommended: d.recommended,
+    alternatives: [...d.alternatives],
+    confirmed: d.confirmed,
+    source: d.source,
+  }));
+  const baseConflicts: SchemeConflict[] = view.conflicts.map((c) => ({
+    id: c.id,
+    question: c.question,
+    options: c.options.map((o) => ({ id: o.id, label: o.label })),
+    chosenId: c.chosenId,
+  }));
+
+  const sameRevision =
+    previous != null &&
+    previous.scheme_id === view.scheme_id &&
+    previous.scheme_revision === view.scheme_revision;
+
+  const decisions = sameRevision
+    ? baseDecisions.map((d) => {
+        const old = previous.decisions.find((x) => x.id === d.id);
+        if (!old) return d;
+        if (old.user_pinned === true || old.confirmed) {
+          return {
+            ...d,
+            confirmed: old.confirmed,
+            recommended: old.recommended,
+            source: old.source,
+            ...(old.user_pinned !== undefined
+              ? { user_pinned: old.user_pinned }
+              : {}),
+          };
+        }
+        return d;
+      })
+    : baseDecisions;
+
+  const conflicts = sameRevision
+    ? baseConflicts.map((c) => {
+        const old = previous.conflicts.find((x) => x.id === c.id);
+        if (!old) return c;
+        if (old.user_pinned === true || old.chosenId) {
+          return {
+            ...c,
+            chosenId: old.chosenId,
+            ...(old.user_pinned !== undefined
+              ? { user_pinned: old.user_pinned }
+              : {}),
+          };
+        }
+        return c;
+      })
+    : baseConflicts;
+
+  const notes =
+    sameRevision && previous.pinned_fields.includes("notes")
+      ? previous.notes
+      : "";
+
+  const draft = emptySchemeDraft({
+    scheme_id: view.scheme_id,
+    scheme_revision: view.scheme_revision,
+    title: view.title,
+    summary: view.summary,
+    modules: view.modules.map((m) => m.name),
+    mermaidArchitecture: "",
+    mermaidFlow: "",
+    mermaidMindmap: "",
+    decisions,
+    conflicts,
+    frozen: view.frozen,
+    notes,
+    pinned_fields: sameRevision ? [...previous.pinned_fields] : [],
+    business_input_rounds: sameRevision ? previous.business_input_rounds : 0,
+    goals: view.goals.map((g) => ({ id: g.id, text: g.text })),
+    acceptance: view.acceptance.map((a) => ({
+      id: a.id,
+      text: a.text,
+      check: "playtest" as const,
+    })),
+  });
+  const completeness = scoreCompleteness(draft);
+  return {
+    ...draft,
+    completeness,
+    demoReady: computeDemoReady({ ...draft, completeness }),
+  };
 }
 
 /**

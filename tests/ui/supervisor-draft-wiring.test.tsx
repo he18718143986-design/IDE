@@ -119,6 +119,8 @@ vi.mock("@/lib/daemon-api", async (orig) => {
     listChatSessions: offlineDaemon("listChatSessions"),
     fetchTaskGraph: offlineDaemon("fetchTaskGraph"),
     fetchJourneyHistory: offlineDaemon("fetchJourneyHistory"),
+    // TASK-J.22a：Console 连接后会拉中栏投影；本文件不测台账。
+    fetchSchemeMidpane: offlineDaemon("fetchSchemeMidpane"),
   };
 });
 
