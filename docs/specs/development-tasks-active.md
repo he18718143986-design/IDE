@@ -856,9 +856,11 @@ governance:
 
 <a id="task-j.22a"></a>
 
-#### 【Task J.22a】中栏方案来源改为编译器台账（含无台账降级标注）`[NEW_TASK · 立卡 P-215 · 未开工]`
+#### 【Task J.22a】中栏方案来源改为编译器台账（含无台账降级标注）`[NEW_TASK · 立卡 P-215 · 修卡 P-225 · 未开工]`
 
 > **立卡说明（2026-11-15 · P-215）**：由 `TASK-J.22` 按 R-11 拆出。承接原验收 J22-P1（来源统一）并合理归并 J22-P3（无台账时明确标注「方案尚未生成」，不以启发式拼接冒充台账方案），因为二者是同一数据源切换。估算 M。硬依赖 `TASK-J.21` 与 `TASK-J.16` 均已 `[COMPLETED]`，依赖已满足。条目级高亮见 `TASK-J.22b`，真实试玩见 `TASK-J.22c`。**立卡 ≠ 开工**。施工须另授权。
+
+> **修卡说明（2026-11-16 · P-225）**：授权来源为 Tina 本回合。施工前核对确认：现网中栏默认源仍是 `rebuildSchemeFromCorpus`（`src/routes/index.tsx` 第 1222 行）；台账 SSOT 为 `SchemeDraftV2`（`.stagent/drafts/scheme-ledger/active.json`），目前仅有 `GET /api/supervisor/scheme-acceptance` 投影验收条目，标题 / 目标等未进中栏。按方案先修卡补投影通路。`writable_paths` 增加 `src/lib/daemon-api.ts`、`daemon/server.ts`（**仅限**新增或扩展只读投影路由）、`daemon/supervisor/intent-compiler/acceptance-projection.ts` **或**新建 `daemon/supervisor/intent-compiler/scheme-midpane-projection.ts`（施工择一，不得两套并行）、对应单测（`tests/unit/scheme-midpane-projection.test.ts` 或扩既有 acceptance 投影测）。卡面硬约束：投影接口只读、无副作用、不写盘、不触发封存；无台账降级标注用验收原文「方案尚未生成」，不得静默空白或编造；`rebuildSchemeFromCorpus` 必须退出默认发送路径，禁止作为无标注默认源（函数体可暂留）；mermaid 三图不强行交付 `renderSchemeDiagrams`（J.9b / V-07），台账路径下图可空，不得用语料启发式图冒充台账结构。`prompt-builder.ts` **不并入**（留另卡，与 J.32 系列口径一致）。本条只修卡，不写产品代码，不开工。施工须在本修卡合入后另授权；合入后从新 main 拉 `feat/j22a-source-unify-degrade` 再施工。`TASK-J.22b` / `TASK-J.22c` 不动。CI.2 攒样本；文档计划暂缓。不暗示条目级高亮已交付。
 
 ```yaml task-card
 id: TASK-J.22a
@@ -887,6 +889,11 @@ contract:
       - src/lib/journey/scheme-draft.ts
       - src/components/studio/SchemeReviewPane.tsx
       - tests/ui/scheme-source-unification.test.tsx
+      - src/lib/daemon-api.ts
+      - daemon/server.ts
+      - daemon/supervisor/intent-compiler/acceptance-projection.ts
+      - daemon/supervisor/intent-compiler/scheme-midpane-projection.ts
+      - tests/unit/scheme-midpane-projection.test.ts
     readonly_paths:
       - daemon/supervisor/intent-compiler/scheme-ledger-store.ts
   verification:
@@ -894,15 +901,25 @@ contract:
       - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
 design:
   approach: >-
-    把中栏数据源切换到编译器台账；启发式拼接仅保留为无台账时的明确降级态并标注。施工前核对改动范围，多出的只读文件须先修卡。
+    把中栏数据源切换到编译器台账：Daemon 只读投影 SchemeDraftV2（扩展既有 acceptance
+    投影或新建 scheme-midpane-projection，择一），经 daemon-api 取数，映射为中栏
+    SchemeDraft；rebuildSchemeFromCorpus 退出默认发送路径，禁止作为无标注默认源。
+    无台账时只出示验收原文「方案尚未生成」，不填启发式条目。投影只读、无副作用。
+    mermaid 三图不强行交付 renderSchemeDiagrams；台账路径下图可空，不得用语料图冒充。
   touches:
-    - { path: src/routes/index.tsx, change: modify, why: 中栏数据源改为台账，去掉对启发式拼接的默认依赖, symbols: [rebuildSchemeFromCorpus] }
-    - { path: src/lib/journey/scheme-draft.ts, change: modify, why: 台账到中栏的映射与无台账降级态, symbols: [rebuildSchemeFromCorpus] }
+    - { path: src/routes/index.tsx, change: modify, why: 中栏数据源改为台账投影，拆除默认 rebuildSchemeFromCorpus, symbols: [rebuildSchemeFromCorpus] }
+    - { path: src/lib/journey/scheme-draft.ts, change: modify, why: 台账 V2 到中栏 SchemeDraft 的映射与无台账降级态, symbols: [rebuildSchemeFromCorpus] }
+    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 无台账时标注「方案尚未生成」；有台账渲染投影, symbols: [] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: 新增/扩展中栏只读投影客户端, symbols: [] }
+    - { path: daemon/server.ts, change: modify, why: 仅限新增或扩展只读投影路由（无副作用、不写盘）, symbols: [] }
+    - { path: daemon/supervisor/intent-compiler/acceptance-projection.ts, change: modify, why: 可选：扩展为中栏投影；与新建 midpane 投影二选一, symbols: [projectSchemeAcceptance] }
+    - { path: daemon/supervisor/intent-compiler/scheme-midpane-projection.ts, change: create, why: 可选：新建中栏只读投影；与扩展 acceptance 投影二选一, symbols: [] }
+    - { path: tests/unit/scheme-midpane-projection.test.ts, change: create, why: 锁定投影只读与无台账空投影, symbols: [] }
     - { path: tests/ui/scheme-source-unification.test.tsx, change: create, why: 锁定来源一致与无台账降级标注, symbols: [] }
   interfaces: []
   test_plan:
-    - { acceptance_id: J22A-P1, test_path: tests/ui/scheme-source-unification.test.tsx, level: integration, debt: "立卡阶段；测试体待授权施工后再写" }
-    - { acceptance_id: J22A-P2, test_path: tests/ui/scheme-source-unification.test.tsx, level: integration, debt: "立卡阶段；测试体待授权施工后再写" }
+    - { acceptance_id: J22A-P1, test_path: tests/ui/scheme-source-unification.test.tsx, level: integration, debt: "修卡阶段；测试体待授权施工后再写" }
+    - { acceptance_id: J22A-P2, test_path: tests/ui/scheme-source-unification.test.tsx, level: integration, debt: "修卡阶段；测试体待授权施工后再写" }
 governance:
   spec_refs:
     - docs/specs/playtest-self-check.md
@@ -911,19 +928,23 @@ governance:
     - { id: TASK-J.21, kind: hard }
     - { id: TASK-J.16, kind: hard }
   code_facts:
-    - { ref: "src/lib/journey/scheme-draft.ts:578", note: "rebuildSchemeFromCorpus 定义处；中栏启发式来源的根函数" }
-    - { ref: "src/routes/index.tsx:1167", note: "中栏调用 rebuildSchemeFromCorpus 的现网接缝" }
-    - { ref: "src/lib/journey/scheme-draft.ts:46-74", note: "SchemeDraft 及可选 acceptance 字段；来源切换后应由台账填充" }
+    - { ref: "src/lib/journey/scheme-draft.ts:578", note: "rebuildSchemeFromCorpus 定义处；必须退出默认发送路径，禁止作为无标注默认源" }
+    - { ref: "src/routes/index.tsx:1222", note: "中栏调用 rebuildSchemeFromCorpus 的现网接缝（P-225 修正行号；原 1167 已漂移）" }
+    - { ref: "src/lib/journey/scheme-draft.ts:46-74", note: "SchemeDraft 及可选 acceptance 字段；来源切换后应由台账投影填充" }
     - { ref: "src/components/studio/SchemeReviewPane.tsx:62-64", note: "中栏已能接收验收条目投影；本卡负责数据源，不在此做条目级高亮" }
+    - { ref: "src/lib/daemon-api.ts:2543", note: "现行仅有 fetchSchemeAcceptance；本卡须扩展或新增中栏只读投影客户端" }
+    - { ref: "daemon/server.ts:5913", note: "现行仅有 GET /api/supervisor/scheme-acceptance；本卡仅限新增/扩展只读投影路由" }
   non_goals:
-    - 本条立卡 ≠ 开工；施工须另授权
-    - 不改台账 schema 与编译器提示词
+    - 本条修卡 ≠ 开工；施工须在本修卡合入后另授权
+    - 不改台账 schema 与编译器提示词；不对齐 prompt-builder.ts（另卡，与 J.32 系列口径一致）
     - 不做条目级高亮（见 TASK-J.22b），不以 jsdom 替代真实试玩（见 TASK-J.22c）
+    - 不强行交付 renderSchemeDiagrams（mermaid 台账路径下可空，不得用语料图冒充）
     - 不暗示条目级高亮已交付；不开工 CI.2；不改 D.1e / S.3
   fail:
     - 中栏与台账不一致仍出现而未标注，或无台账时仍用启发式内容冒充台账方案
-    - 改只读的 scheme-ledger-store.ts 却不先修卡
-    - 本条合入前开工，或本卡膨胀为 L 却不拆（R-11）
+    - 投影路由有写盘/封存/副作用，或改只读的 scheme-ledger-store.ts 却不先修卡
+    - rebuildSchemeFromCorpus 仍为无标注默认源，或用语料 mermaid 冒充台账结构
+    - 本条合入前开工，或把 prompt-builder.ts 并入本卡，或本卡膨胀为 L 却不拆（R-11）
   estimate: M
   invariants:
     auth: unchanged

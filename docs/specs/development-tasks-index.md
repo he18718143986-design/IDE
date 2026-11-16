@@ -178,7 +178,7 @@
 | `TASK-J.16` | `COMPLETED` | 试玩幕 · 质疑自查续作：surface_log → K-14 归因账本 → K-16 trigger 闭集（立卡 P-176；P-202 J16-P5 五条 PASS；P-203 J16-P6 无封存段分支 PASS；P-204 #244 `8e98538` 官方中栏走查 J16-P7 PASS；P-205 就事论事收口标完成，estimate 仍为 L） | [正文](./development-tasks-completed.md#task-j.16) |
 | `TASK-J.21` | `COMPLETED` | intent-compiler 重启后状态恢复（挂账⑫；立卡 P-187；施工 P-194 · #229 `21b8b35`） | [正文](./development-tasks-completed.md#task-j21) |
 | `TASK-J.22` | `SPLIT` | 中栏方案来源统一为编译器台账（挂账⑬ 方案 B；立卡 P-187；拆卡 P-215；母卡不再作为施工依据） | [正文](./development-tasks-active.md#task-j.22) |
-| `TASK-J.22a` | `NEW_TASK` | 中栏方案来源改为编译器台账，含无台账降级标注（拆自 J.22；立卡 P-215；估算 M；硬依赖 J.21 / J.16 已满足；未开工） | [正文](./development-tasks-active.md#task-j.22a) |
+| `TASK-J.22a` | `NEW_TASK` | 中栏方案来源改为编译器台账，含无台账降级标注（拆自 J.22；立卡 P-215；修卡 P-225；估算 M；硬依赖 J.21 / J.16 已满足；未开工） | [正文](./development-tasks-active.md#task-j.22a) |
 | `TASK-J.22b` | `NEW_TASK` | 中栏验收条目的条目级呈现（拆自 J.22，承接 J.16 延期项；立卡 P-215；估算 M；硬依赖 J.22a；未开工） | [正文](./development-tasks-active.md#task-j.22b) |
 | `TASK-J.22c` | `NEW_TASK` | 中栏方案来源统一的真实试玩验收（拆自 J.22；立卡 P-215；估算 S；硬依赖 J.22a；未开工） | [正文](./development-tasks-active.md#task-j.22c) |
 | `TASK-J.23` | `COMPLETED` | 质疑自查生产链路接线：面板挂载 + DISPUTE 路由 + turn_text_sha256 落盘（立卡 P-195；修订 P-196；施工 P-198 · #233 `ab40f3a`；J23-P4 真实界面走查通过 · P-199） | [正文](./development-tasks-completed.md#task-j23) |
