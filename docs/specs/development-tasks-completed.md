@@ -7991,3 +7991,105 @@ governance:
 
 * **背景**：挂账⑬ 方案 B。J16-P7 只做了只读投影过渡；本卡把中栏默认来源换成台账。
 * **取舍**：来源统一与无台账降级同卡；高亮与真实试玩另卡。诚实口径见归档注记。
+
+### 3.4ar 中栏验收条目的条目级呈现（J.22b · 完工回写 P-228）
+
+<a id="task-j.22b"></a>
+
+### 【Task J.22b】中栏验收条目的条目级呈现（J.16 延期项）`[COMPLETED · 拆自 J.22 · 立卡 P-215 · 修卡 P-227 · 施工 #282 · 完工回写 P-228]`
+
+> **立卡说明（2026-11-15 · P-215）**：由 `TASK-J.22` 按 R-11 拆出。J.16 已明确「条目级高亮不在本条（J.22 之后另记）」「`frozen_quotes` 不含条目关联」。本卡承接该项呈现，估算 M；若施工前发现必须改冻结快照结构才能做条目关联，先报修卡或再拆，不得带病扩大。硬依赖 [`TASK-J.22a`](./development-tasks-completed.md#task-j.22a)（先有台账来源，再谈条目呈现；P-226 已 COMPLETED）。**不实现** [`playtest-self-check.md`](./playtest-self-check.md) §3.3 的条目级自动点亮（该口子仍为「本版不实现」）。不暗示该项已交付。硬依赖 `TASK-J.21` 与 `TASK-J.16` 均已 `[COMPLETED]`。**立卡 ≠ 开工**。施工须另授权。
+
+> **修卡说明（2026-11-16 · P-227）**：授权来源为 Tina 本回合。施工前核对确认：条目列表实际渲染在 `ScopeAcceptanceBlock.tsx`。`writable_paths` 增加 `src/components/studio/ScopeAcceptanceBlock.tsx`。卡面写明：条目级呈现形态为「逐条 id+文案、空台账不伪造、空态口径明确」；不重做 J.22a 数据源切换。边界不变：不实现 §3.3 条目级自动点亮（J22B-P3）；不以 jsdom 替代 J.22c 真实试玩；不改 `frozen_quotes` 结构；不对齐 `prompt-builder.ts`。本条只修卡，不写产品代码。
+
+> **归档注记（2026-11-16 · P-228）**：本卡已 **COMPLETED**。Tina 本回合授权施工与合入。[#282](https://github.com/he18718143986-design/IDE/pull/282) squash `7677ca79590e708346372fcf01bd9930e5c7ffde` 于 2026-11-16 15:15:53 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `f7a2641b920fb40358d33e7b9601dac415675a42`；父提交 `65c2f06e88f2266444de30aecb6fe68785bd83d2`）。合入前必需检查全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE` 仅由 Windows 非必需 Unit 失败导致（spawn/路径/CRLF 存量；本卡呈现层套件在 Windows 仍通过）；Bugbot NEUTRAL 不挡合入。估算仍为 M。交付：`presentableAcceptanceItems`（`ScopeAcceptanceBlock.tsx`）逐条 id+文案；`acceptanceItemsFromSchemeDraft`（`scheme-draft.ts`）从中栏草稿抽出条目；空台账不伪造、空态沿用「无呈现记录」；`SchemeReviewPane` 接线。诚实口径：**条目级呈现已交付，§3.3 自动点亮未实现、真实试玩未做（J.22c 范畴）、`prompt-builder.ts` 未对齐（另卡）**。未改 `frozen_quotes` / `scheme-snapshot-store.ts`。不并入、不开工 `TASK-J.22c`。蓝图第一批卡暂不立；CI.2 攒样本；文档计划暂缓。不暗示条目级高亮/自动点亮已交付。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.22b
+status: COMPLETED
+contract:
+  intent:
+    title: 中栏按台账条目呈现验收项，并把关联建立在已登记原话上
+    description: >-
+      在中栏按编译器台账逐条呈现验收条目（条目级呈现）。
+      呈现形态：逐条 id+文案、空台账不伪造、空态口径明确。
+      若需要把条目与用户原话关联，必须复用已登记 turn_id + sha256(utf8) / frozen_quotes，
+      不得事后拼凑。不实现 playtest-self-check.md §3.3 的条目级自动点亮。
+      不重做 J.22a 的数据源切换。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J22B-P1
+      check: auto
+      text: >-
+        中栏按台账逐条呈现验收条目（逐条 id+文案）；空台账时沿用已有「无呈现记录」或本卡规定的等价标注，不伪造条目；空态口径明确。
+    - id: J22B-P2
+      check: auto
+      text: >-
+        如本卡实现条目与原话的关联，关联只指向已登记并封存的原话；未登记文本不得被当成条目依据。
+    - id: J22B-P3
+      check: auto
+      text: >-
+        不实现 §3.3 条目级自动点亮；文档与界面均不得把它写成已交付。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/components/studio/SchemeReviewPane.tsx
+      - src/components/studio/ScopeAcceptanceBlock.tsx
+      - src/lib/journey/scheme-draft.ts
+      - tests/ui/scope-acceptance-surface-log.test.tsx
+      - tests/unit/scheme-acceptance-projection.test.ts
+    readonly_paths:
+      - daemon/pipeline/scheme-snapshot-store.ts
+      - docs/specs/playtest-self-check.md
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    在 J.22a 把数据源换成台账之后，补中栏的条目级呈现（逐条 id+文案、空台账不伪造、空态口径明确）。
+    实际列表渲染在 ScopeAcceptanceBlock；SchemeReviewPane 只做接线。
+    本卡未实现条目与原话关联，未改 frozen_quotes。
+  touches:
+    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 接线台账验收条目到 ScopeAcceptanceBlock, symbols: [] }
+    - { path: src/components/studio/ScopeAcceptanceBlock.tsx, change: modify, why: 逐条 id+文案呈现；空台账不伪造；空态口径明确, symbols: [presentableAcceptanceItems, ScopeAcceptanceBlock] }
+    - { path: src/lib/journey/scheme-draft.ts, change: modify, why: 从中栏 SchemeDraft 抽出验收条目 id+文案, symbols: [acceptanceItemsFromSchemeDraft] }
+    - { path: tests/unit/scheme-acceptance-projection.test.ts, change: modify, why: 锁定条目呈现与空台账不伪造, symbols: [] }
+    - { path: tests/ui/scope-acceptance-surface-log.test.tsx, change: modify, why: 锁定条目级呈现与空态口径, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J22B-P1, test_path: tests/unit/scheme-acceptance-projection.test.ts, level: unit, debt: "已由 #282 交付；UI 见 tests/ui/scope-acceptance-surface-log.test.tsx" }
+    - { acceptance_id: J22B-P2, test_path: tests/ui/scope-acceptance-surface-log.test.tsx, level: integration, debt: "本卡未实现条目-原话关联；标为不适用；若后续做关联须先修卡" }
+    - { acceptance_id: J22B-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "归档注记与界面均未把 §3.3 自动点亮写成已交付" }
+governance:
+  spec_refs:
+    - docs/specs/playtest-self-check.md
+    - docs/specs/supervisor.md
+  depends_on:
+    - { id: TASK-J.22a, kind: hard }
+    - { id: TASK-J.21, kind: hard }
+    - { id: TASK-J.16, kind: hard }
+  code_facts:
+    - { ref: "src/components/studio/ScopeAcceptanceBlock.tsx:30", note: "presentableAcceptanceItems；空 id/文案丢弃、重复 id 只留首条" }
+    - { ref: "src/components/studio/ScopeAcceptanceBlock.tsx:258-320", note: "逐条 id+文案渲染；空台账且 settled 时标「无呈现记录」" }
+    - { ref: "src/lib/journey/scheme-draft.ts:96", note: "acceptanceItemsFromSchemeDraft" }
+    - { ref: "src/components/studio/SchemeReviewPane.tsx:472-475", note: "未传入 acceptanceItems 时从中栏草稿接线" }
+    - { ref: "docs/specs/playtest-self-check.md:175-184", note: "§3.3 条目级自动点亮仍为「本版不实现」" }
+  non_goals:
+    - 不实现 §3.3 条目级自动点亮，不暗示该项已交付
+    - 不以 jsdom 替代 TASK-J.22c 的真实试玩
+    - 不改 frozen_quotes / scheme-snapshot-store.ts；不对齐 prompt-builder.ts
+    - 不重做 J.22a 的数据源切换；不开工 CI.2；不改 D.1e / S.3
+  fail:
+    - 伪造验收条目，或把未登记文本当成条目依据
+    - 把 §3.3 自动点亮做成功能或写成已交付
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 282, commit: 7677ca79590e708346372fcf01bd9930e5c7ffde }
+```
+
+* **背景**：J.16 把条目级高亮明确推迟到 J.22 之后；本卡把它从母卡拆出并交付条目级呈现。
+* **取舍**：先呈现台账条目（逐条 id+文案、空态明确）；自动点亮仍不做；条目-原话关联未做（未改 frozen_quotes）。诚实口径见归档注记。
