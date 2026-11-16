@@ -7889,3 +7889,105 @@ governance:
 | 2026-11-16T11:25:52+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | A4-预览 hash_mismatch | {"ok":false,"reason":"hash_mismatch","item_id":"G-forged","turn_id":"T1","message":"有一句原话和登记记录对不上，不能标已覆盖。没有改任何封存。"} | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
 | 2026-11-16T11:25:52+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | A5-冻结拒落盘 | status=409 code=E_SCHEME_SNAPSHOT_MISMATCH reason=turn_hash_mismatch；快照文件不存在 | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
 | 2026-11-16T11:25:52+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | A6-轻确认回链不降级 | status=409 reason=turn_hash_mismatch；轻确认伪造哈希仍拒绝 | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+
+### 3.4aq 中栏方案来源改为编译器台账（J.22a · 完工回写 P-226）
+
+<a id="task-j.22a"></a>
+
+### 【Task J.22a】中栏方案来源改为编译器台账（含无台账降级标注）`[COMPLETED · 拆自 J.22 · 立卡 P-215 · 修卡 P-225 · 施工 #279 · 完工回写 P-226]`
+
+> **立卡说明（2026-11-15 · P-215）**：由 `TASK-J.22` 按 R-11 拆出。承接原验收 J22-P1（来源统一）并合理归并 J22-P3（无台账时明确标注「方案尚未生成」，不以启发式拼接冒充台账方案），因为二者是同一数据源切换。估算 M。硬依赖 `TASK-J.21` 与 `TASK-J.16` 均已 `[COMPLETED]`，依赖已满足。条目级高亮见 `TASK-J.22b`，真实试玩见 `TASK-J.22c`。**立卡 ≠ 开工**。施工须另授权。
+
+> **修卡说明（2026-11-16 · P-225）**：授权来源为 Tina 本回合。施工前核对确认：现网中栏默认源仍是 `rebuildSchemeFromCorpus`；台账仅有验收条目只读投影。`writable_paths` 增加 `src/lib/daemon-api.ts`、`daemon/server.ts`（仅限新增或扩展只读投影路由）、`acceptance-projection.ts` 或新建 `scheme-midpane-projection.ts`（择一）、对应单测。卡面硬约束：投影只读、无副作用；无台账降级用验收原文「方案尚未生成」；`rebuildSchemeFromCorpus` 退出默认发送路径；mermaid 不强交 `renderSchemeDiagrams`；`prompt-builder.ts` 不并入。本条只修卡，不写产品代码。
+
+> **归档注记（2026-11-16 · P-226）**：本卡已 **COMPLETED**。Tina 本回合授权施工与合入。[#279](https://github.com/he18718143986-design/IDE/pull/279) squash `d5a994dbc4973a3894cf78a217a1f1ec906017f1` 于 2026-11-16 14:11:48 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `42b3b2a7ec347ab93465859a67326ccc58965a85`；父提交 `a53d1f3d235c8b8d5480c63a9d5cbabf2eb6abef`）。估算仍为 M。交付：新建 `scheme-midpane-projection.ts`（V2→中栏只读映射）；`GET /api/supervisor/scheme-midpane`（`daemon/server.ts` + `daemon-api.ts`，只读、无副作用、不写盘）；`schemeDraftFromMidpane`；`index.tsx` 拆除默认 `rebuildSchemeFromCorpus`，发消息后刷新台账投影；无台账 / 无实质内容时中栏标注验收原文「方案尚未生成」；mermaid 三图留空，不强交 `renderSchemeDiagrams`、不得用语料图冒充。诚实口径：**来源统一与降级已交付，条目级呈现未交付（J.22b 范畴）、真实试玩未做（J.22c 范畴）、`prompt-builder.ts` 未对齐（另卡）**。未改 `scheme-ledger-store.ts`。不并入、不开工 `TASK-J.22b` / `TASK-J.22c`。CI.2 攒样本；文档计划暂缓。不暗示条目级高亮已交付。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.22a
+status: COMPLETED
+contract:
+  intent:
+    title: 中栏方案来源改为编译器台账，无台账时明确降级
+    description: >-
+      中栏方案（标题、目标、验收条目等）改为来自编译器台账 SchemeDraftV2，
+      不再由 rebuildSchemeFromCorpus 从对话语料启发式拼接。
+      无台账时降级态必须明确标注「方案尚未生成」，不得用启发式内容冒充台账方案。
+    risk_level: HIGH
+  acceptance:
+    - id: J22A-P1
+      check: auto
+      text: >-
+        中栏渲染的方案内容与台账 SchemeDraftV2 逐项一致（标题、目标、验收条目）；不再由对话语料拼接（承接 J22-P1）。
+    - id: J22A-P2
+      check: auto
+      text: >-
+        无台账时降级态明确标注「方案尚未生成」，不以启发式拼接内容冒充台账方案（承接 J22-P3）。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/routes/index.tsx
+      - src/lib/journey/scheme-draft.ts
+      - src/components/studio/SchemeReviewPane.tsx
+      - tests/ui/scheme-source-unification.test.tsx
+      - src/lib/daemon-api.ts
+      - daemon/server.ts
+      - daemon/supervisor/intent-compiler/acceptance-projection.ts
+      - daemon/supervisor/intent-compiler/scheme-midpane-projection.ts
+      - tests/unit/scheme-midpane-projection.test.ts
+    readonly_paths:
+      - daemon/supervisor/intent-compiler/scheme-ledger-store.ts
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    把中栏数据源切换到编译器台账：Daemon 只读投影 SchemeDraftV2（新建 scheme-midpane-projection），
+    经 daemon-api 取数，映射为中栏 SchemeDraft；rebuildSchemeFromCorpus 退出默认发送路径。
+    无台账时只出示验收原文「方案尚未生成」。mermaid 三图留空。
+  touches:
+    - { path: src/routes/index.tsx, change: modify, why: 中栏数据源改为台账投影，拆除默认 rebuildSchemeFromCorpus, symbols: [refreshSchemeFromLedger] }
+    - { path: src/lib/journey/scheme-draft.ts, change: modify, why: 台账 V2 到中栏 SchemeDraft 的映射与无台账降级态, symbols: [schemeDraftFromMidpane] }
+    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 无台账时标注「方案尚未生成」；有台账渲染投影, symbols: [] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: 新增中栏只读投影客户端 fetchSchemeMidpane, symbols: [fetchSchemeMidpane] }
+    - { path: daemon/server.ts, change: modify, why: 新增 GET /api/supervisor/scheme-midpane 只读投影路由, symbols: [] }
+    - { path: daemon/supervisor/intent-compiler/scheme-midpane-projection.ts, change: create, why: 中栏只读投影纯函数, symbols: [projectSchemeMidpane] }
+    - { path: tests/unit/scheme-midpane-projection.test.ts, change: create, why: 锁定投影只读与无台账空投影, symbols: [] }
+    - { path: tests/ui/scheme-source-unification.test.tsx, change: create, why: 锁定来源一致与无台账降级标注, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J22A-P1, test_path: tests/ui/scheme-source-unification.test.tsx, level: integration, debt: "已由 #279 交付；unit 见 tests/unit/scheme-midpane-projection.test.ts" }
+    - { acceptance_id: J22A-P2, test_path: tests/ui/scheme-source-unification.test.tsx, level: integration, debt: "已由 #279 交付；降级标注「方案尚未生成」；真实试玩见 TASK-J.22c" }
+governance:
+  spec_refs:
+    - docs/specs/playtest-self-check.md
+    - docs/specs/supervisor.md
+  depends_on:
+    - { id: TASK-J.21, kind: hard }
+    - { id: TASK-J.16, kind: hard }
+  code_facts:
+    - { ref: "daemon/supervisor/intent-compiler/scheme-midpane-projection.ts:87", note: "projectSchemeMidpane 只读投影入口" }
+    - { ref: "daemon/server.ts:5932", note: "GET /api/supervisor/scheme-midpane" }
+    - { ref: "src/lib/daemon-api.ts:2580", note: "fetchSchemeMidpane 客户端" }
+    - { ref: "src/routes/index.tsx:1237", note: "拆除默认 rebuildSchemeFromCorpus；刷新台账投影" }
+    - { ref: "src/lib/journey/scheme-draft.ts:90", note: "NO_SCHEME_YET_LABEL = 方案尚未生成" }
+    - { ref: "src/lib/journey/scheme-draft.ts:126", note: "schemeDraftFromMidpane 映射入口" }
+    - { ref: "src/lib/journey/scheme-draft.ts:204", note: "mermaidArchitecture 留空（Flow/Mindmap 同段）" }
+  non_goals:
+    - 不做条目级高亮（见 TASK-J.22b），不以 jsdom 替代真实试玩（见 TASK-J.22c）
+    - 不对齐 prompt-builder.ts（另卡）
+    - 不暗示条目级高亮已交付；不开工 CI.2；不改 D.1e / S.3
+  fail:
+    - 中栏与台账不一致仍出现而未标注，或无台账时仍用启发式内容冒充台账方案
+    - 投影路由有写盘/封存/副作用
+    - rebuildSchemeFromCorpus 仍为无标注默认源，或用语料 mermaid 冒充台账结构
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 279, commit: d5a994dbc4973a3894cf78a217a1f1ec906017f1 }
+```
+
+* **背景**：挂账⑬ 方案 B。J16-P7 只做了只读投影过渡；本卡把中栏默认来源换成台账。
+* **取舍**：来源统一与无台账降级同卡；高亮与真实试玩另卡。诚实口径见归档注记。
