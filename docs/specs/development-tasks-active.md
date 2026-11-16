@@ -783,8 +783,10 @@ governance:
 
 > **立卡说明（2026-11-11 · P-187）**：挂账⑬ 方案 B。当前中栏方案由前端 `rebuildSchemeFromCorpus` 从对话语料启发式拼出，编译器台账不进入中栏。TASK-J.16 J16-P7 以只读投影（方案 A）作过渡；本卡为根本解，范围远超 J.16，故另立。**估算 L：施工前须先拆卡**，拆卡前不得开工。依赖 TASK-J.21（重启后台账可用）与 TASK-J.16 J16-P7（过渡投影已合）。**立卡 ≠ 开工**。
 >
-> **拆卡说明（2026-11-15 · P-215）**：按 R-11，估算 L 的母卡不得开工，必须先拆。Tina t1286u 授权拆为三张子卡，本卡改标 **`[SPLIT]`**，保留追溯，**不再作为施工依据**，施工以子卡正文为准：[`TASK-J.22a`](./development-tasks-completed.md#task-j.22a)（来源统一 + 无台账降级，承接 J22-P1 / J22-P3，估算 M；P-226 已 COMPLETED）、[`TASK-J.22b`](#task-j.22b)（条目级呈现，J.16 延期项，估算 M）、[`TASK-J.22c`](#task-j.22c)（真实试玩，承接 J22-P2，估算 S）。硬依赖 `TASK-J.21` 与 `TASK-J.16` 均已 `[COMPLETED]`。**拆卡 ≠ 开工**；子卡施工须逐张授权。不暗示条目级高亮已交付。
-> **已知限制（K-14 第一刀 #217 记录）**：台账 `scheme_revision` 与中栏启发式方案修订号未对齐校验，二者可能不是同一份方案；J16-P5 真实数据验收须核对此点，根治依赖本卡。
+> **拆卡说明（2026-11-15 · P-215）**：按 R-11，估算 L 的母卡不得开工，必须先拆。Tina t1286u 授权拆为三张子卡，本卡改标 **`[SPLIT]`**，保留追溯，**不再作为施工依据**，施工以子卡正文为准：[`TASK-J.22a`](./development-tasks-completed.md#task-j.22a)（来源统一 + 无台账降级；P-226 COMPLETED）、[`TASK-J.22b`](./development-tasks-completed.md#task-j.22b)（条目级呈现；P-228 COMPLETED）、[`TASK-J.22c`](./development-tasks-completed.md#task-j.22c)（真实试玩；P-229 COMPLETED）。硬依赖 `TASK-J.21` 与 `TASK-J.16` 均已 `[COMPLETED]`。
+>
+> **归档注记（2026-11-16 · P-229）**：三子卡均已 **COMPLETED**。母卡维持 **`[SPLIT]`** 追溯归档，**不再作为施工依据**。诚实口径：来源统一、条目级呈现、真实试玩已交付；§3.3 自动点亮未实现；`prompt-builder.ts` 未对齐（另卡）。蓝图第一批卡暂不立；CI.2 攒样本；文档计划暂缓。不宣称端到端闭环。
+> **已知限制（K-14 第一刀 #217 记录）**：台账 `scheme_revision` 与中栏启发式方案修订号未对齐校验——根治已由子卡承接；本母卡不再施工。
 
 ```yaml task-card
 id: TASK-J.22
@@ -868,75 +870,9 @@ governance:
 
 <a id="task-j.22c"></a>
 
-#### 【Task J.22c】中栏方案来源统一的真实试玩验收`[NEW_TASK · 立卡 P-215 · 未开工]`
+#### 【Task J.22c】中栏方案来源统一的真实试玩验收`[COMPLETED · 正文已迁]`
 
-> **立卡说明（2026-11-15 · P-215）**：由 `TASK-J.22` 按 R-11 拆出，承接原验收 J22-P2。估算 S。硬依赖 [`TASK-J.22a`](./development-tasks-completed.md#task-j.22a)（须先有来源切换；P-226 已 COMPLETED）。`TASK-J.22b` 为软依赖：本卡原文验收是「台账与中栏方案在确认前后保持一致」；条目级呈现的试玩可在 J.22b 合入后一并做，但不把 J.22b 当成硬门槛，以免拖延来源一致性验收。jsdom 不替代真实打开方案面板。硬依赖 `TASK-J.21` 与 `TASK-J.16` 均已 `[COMPLETED]`。**立卡 ≠ 开工**。施工须另授权。
-
-```yaml task-card
-id: TASK-J.22c
-status: NEW_TASK
-contract:
-  intent:
-    title: 用真实会话验收中栏方案与台账一致
-    description: >-
-      在真实会话中打开方案面板，人工核对编译器台账与中栏方案在确认前后保持一致。
-      jsdom 或集成测试不得替代这次真实试玩。
-    risk_level: LOW
-  acceptance:
-    - id: J22C-P1
-      check: playtest
-      text: >-
-        真实会话中，编译器台账与中栏方案在确认前后保持一致；真实打开方案面板人工核对（承接 J22-P2；jsdom 不替代）。
-  scheme_item_ids: []
-  scope:
-    writable_paths:
-      - tests/ui/scheme-source-unification.test.tsx
-      - docs/specs/evidence-and-acceptance-criteria.md
-    readonly_paths:
-      - src/components/studio/SchemeReviewPane.tsx
-      - src/routes/index.tsx
-  verification:
-    commands:
-      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
-design:
-  approach: >-
-    本卡几乎不改产品代码，只做真实会话试玩并留下证据；集成测试只能作辅助，不能代替人工核对。
-  touches:
-    - { path: docs/specs/evidence-and-acceptance-criteria.md, change: modify, why: 回写真实试玩证据与结论, symbols: [] }
-  interfaces: []
-  test_plan:
-    - { acceptance_id: J22C-P1, test_path: tests/ui/scheme-source-unification.test.tsx, level: integration, debt: "立卡阶段；须 Tina 真实试玩，jsdom 不替代；证据回写待授权施工后补" }
-governance:
-  spec_refs:
-    - docs/specs/playtest-self-check.md
-    - docs/specs/evidence-and-acceptance-criteria.md
-  depends_on:
-    - { id: TASK-J.22a, kind: hard }
-    - { id: TASK-J.22b, kind: soft }
-    - { id: TASK-J.21, kind: hard }
-    - { id: TASK-J.16, kind: hard }
-  code_facts:
-    - { ref: "src/routes/index.tsx:1237", note: "J.22a 已拆除默认 rebuildSchemeFromCorpus；本卡在真实会话中核对台账投影" }
-    - { ref: "src/components/studio/SchemeReviewPane.tsx:62-64", note: "真实打开的方案面板组件；jsdom 不替代本次验收" }
-  non_goals:
-    - 本条立卡 ≠ 开工；施工须另授权
-    - 不以 jsdom 或单测替代真实会话验收
-    - 不重做 J.22a / J.22b 的产品改动；不暗示条目级高亮已交付
-    - 不开工 CI.2；不改 D.1e / S.3
-  fail:
-    - 只用 jsdom 或书面说明就宣称 J22-P2 通过
-    - 在 J.22a 未完成时开工
-    - 本条合入前开工
-  estimate: S
-  invariants:
-    auth: unchanged
-    demo_origin: unchanged
-    illumination: unchanged
-    gateway_write_scope: unchanged
-```
-
-* **背景**：原 J.22 把真实试玩写成 J22-P2，且明确 jsdom 不能替代；拆出后才不会和代码改造混在一张 L 卡里。
-* **取舍**：硬依赖来源切换，条目呈现只作软依赖，避免试玩卡被高亮方案卡住。
+> 本卡已 **COMPLETED**（真实试玩 tip `71fd5b302862347a2f516ac4113f76e297042080`；完工回写 P-229）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.22c) §3.4as。
 
 <a id="task-j.23"></a>
 

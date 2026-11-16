@@ -743,3 +743,8 @@ export const selfCheckReportSchema = z.object({
 | 2026-11-16T11:25:52+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | J.32b / 预览 hash_mismatch | {"ok":false,"reason":"hash_mismatch","item_id":"G-forged","turn_id":"T1","message":"有一句原话和登记记录对不上，不能标已覆盖。没有改任何封存。"} | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
 | 2026-11-16T11:25:52+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | J.32b / 冻结拒落盘 | status=409 code=E_SCHEME_SNAPSHOT_MISMATCH reason=turn_hash_mismatch；快照文件不存在 | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
 | 2026-11-16T11:25:52+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | J.32b / 轻确认回链不降级 | status=409 reason=turn_hash_mismatch；轻确认伪造哈希仍拒绝 | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T16:46:00+08:00 | 71fd5b302862347a2f516ac4113f76e297042080 | J.22c / ①有台账·确认前 | 标题「走查用方案」；摘要「进度看板：首页显示逾期数，报表可导出 CSV。」；ITEM-1「首页显示逾期数」；ITEM-2「报表可导出 CSV」；与 `active.json` rev=3 一致 | 通过 | Cursor 代打（Tina 授权） |  |
+| 2026-11-16T16:52:00+08:00 | 71fd5b302862347a2f516ac4113f76e297042080 | J.22c / ①有台账·确认后 | 冻结快照 `scheme-confirm-mwj0sqpt-nau31ywf`：title/summary/ITEM-1·2 与台账一致；确认后中栏仍为同文，未出现语料拼接冒充；`GET scheme-midpane` 仍投影台账 | 通过 | Cursor 代打（Tina 授权） |  |
+| 2026-11-16T16:52:00+08:00 | 71fd5b302862347a2f516ac4113f76e297042080 | J.22c / ③有验收条目 id+文案 | `scope-acceptance-criterion-row`：ITEM-1 / ITEM-2 可见 | 通过 | Cursor 代打（Tina 授权） |  |
+| 2026-11-16T17:20:00+08:00 | 71fd5b302862347a2f516ac4113f76e297042080 | J.22c / ②空台账·方案尚未生成 | `data-ledger-absent=true`；中栏原文「方案尚未生成」；无 ITEM / 无「走查用方案」伪造 | 通过 | Cursor 代打（Tina 授权） |  |
+| 2026-11-16T17:21:00+08:00 | 71fd5b302862347a2f516ac4113f76e297042080 | J.22c / ②空验收·无呈现记录 | `data-testid=scope-acceptance-no-surface-record` 原文「无呈现记录」；rowCount=0 | 通过 | Cursor 代打（Tina 授权） |  |

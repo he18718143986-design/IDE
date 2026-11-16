@@ -108,3 +108,19 @@ LLM 独立审核测试义务只是补充软层，不具独立性：不能单独�
 12. 引用格式：本文引用逐步替换为真实仓库文件+节号。
 13. “不假绿”的出处（已补齐）：已填入 `docs/adr/0005-deterministic-verification-gate.md` §决策 1 & §决策 3 与 `docs/specs/system-architecture.md` §3.2.2。
 14. 过时文字清理（已落实）：开头来源标记与 §2.2 备注已按裁决完成清理。
+
+
+## TASK-J.22c 真实试玩回写（2026-11-16 · P-229）
+
+> **地位**：本卡验收材料登记（承接 J22-P2 / J22C-P1）。判定口径见 [`playtest-self-check.md`](./playtest-self-check.md) §0.1；机器 `can_merge` 仍只由退出码派生，本表不替代 Daemon 判卷。
+> **环境**：官方 Daemon · main `71fd5b302862347a2f516ac4113f76e297042080` · `127.0.0.1:3006` · 项目 `/tmp/stagent-j16p7-items-playtest`。
+> **操作者**：Cursor 代打（Tina 授权）。Cloud Agent 过目通过后回写。
+> **结论**：J22C-P1 **PASS**。三项核对（确认前/后中栏=台账、空台账降级、有条目 id+文案）均通过。附注：脏工作区弹窗后二次确认撞上幂等键「已冻结另一版方案」；合同 `contract_1794819109821_p9qh5` 为 ABORTED——不挡本卡判定。未实现 §3.3 自动点亮；未对齐 `prompt-builder.ts`；未开工 CI.2。
+
+| 日期与时区（Asia/Hong_Kong） | 所试 main SHA | 步骤编号 | 实际看到的原文 | 通过或失败 | 操作者 | 失败时的现象（通过则留空） |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| 2026-11-16T16:46:00+08:00 | 71fd5b302862347a2f516ac4113f76e297042080 | J.22c / ①有台账·确认前 | 标题「走查用方案」；摘要「进度看板：首页显示逾期数，报表可导出 CSV。」；ITEM-1「首页显示逾期数」；ITEM-2「报表可导出 CSV」；与 `active.json` rev=3 一致 | 通过 | Cursor 代打（Tina 授权） |  |
+| 2026-11-16T16:52:00+08:00 | 71fd5b302862347a2f516ac4113f76e297042080 | J.22c / ①有台账·确认后 | 冻结快照 `scheme-confirm-mwj0sqpt-nau31ywf`：title/summary/ITEM-1·2 与台账一致；确认后中栏仍为同文，未出现语料拼接冒充；`GET scheme-midpane` 仍投影台账 | 通过 | Cursor 代打（Tina 授权） |  |
+| 2026-11-16T16:52:00+08:00 | 71fd5b302862347a2f516ac4113f76e297042080 | J.22c / ③有验收条目 id+文案 | `scope-acceptance-criterion-row`：ITEM-1 / ITEM-2 可见 | 通过 | Cursor 代打（Tina 授权） |  |
+| 2026-11-16T17:20:00+08:00 | 71fd5b302862347a2f516ac4113f76e297042080 | J.22c / ②空台账·方案尚未生成 | `data-ledger-absent=true`；中栏原文「方案尚未生成」；无 ITEM / 无「走查用方案」伪造 | 通过 | Cursor 代打（Tina 授权） |  |
+| 2026-11-16T17:21:00+08:00 | 71fd5b302862347a2f516ac4113f76e297042080 | J.22c / ②空验收·无呈现记录 | `data-testid=scope-acceptance-no-surface-record` 原文「无呈现记录」；rowCount=0 | 通过 | Cursor 代打（Tina 授权） |  |
