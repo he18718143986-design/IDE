@@ -862,9 +862,11 @@ governance:
 
 <a id="task-j.22b"></a>
 
-#### 【Task J.22b】中栏验收条目的条目级呈现（J.16 延期项）`[NEW_TASK · 立卡 P-215 · 未开工]`
+#### 【Task J.22b】中栏验收条目的条目级呈现（J.16 延期项）`[NEW_TASK · 立卡 P-215 · 修卡 P-227 · 未开工]`
 
 > **立卡说明（2026-11-15 · P-215）**：由 `TASK-J.22` 按 R-11 拆出。J.16 已明确「条目级高亮不在本条（J.22 之后另记）」「`frozen_quotes` 不含条目关联」。本卡承接该项呈现，估算 M；若施工前发现必须改冻结快照结构才能做条目关联，先报修卡或再拆，不得带病扩大。硬依赖 [`TASK-J.22a`](./development-tasks-completed.md#task-j.22a)（先有台账来源，再谈条目呈现；P-226 已 COMPLETED）。**不实现** [`playtest-self-check.md`](./playtest-self-check.md) §3.3 的条目级自动点亮（该口子仍为「本版不实现」）。不暗示该项已交付。硬依赖 `TASK-J.21` 与 `TASK-J.16` 均已 `[COMPLETED]`。**立卡 ≠ 开工**。施工须另授权。
+
+> **修卡说明（2026-11-16 · P-227）**：授权来源为 Tina 本回合。施工前核对确认：条目列表实际渲染在 `ScopeAcceptanceBlock.tsx`（第 34 行 props / 第 173 行组件），不在原卡 `writable_paths`（第 895–899 行）。按 J.32b 先例先修卡。`writable_paths` 增加 `src/components/studio/ScopeAcceptanceBlock.tsx`。卡面写明：条目级呈现形态为「逐条 id+文案、空台账不伪造、空态口径明确」；不重做 J.22a 数据源切换。边界不变：不实现 §3.3 条目级自动点亮（J22B-P3）；不以 jsdom 替代 J.22c 真实试玩；不改 `frozen_quotes` 结构（若必须改 `scheme-snapshot-store.ts` 停工再修卡）；不对齐 `prompt-builder.ts`。本条只修卡，不写产品代码，不开工。施工须在本修卡合入后另授权；合入后从新 main 拉 `feat/j22b-acceptance-item-presentation` 再施工。`TASK-J.22c` 不动。CI.2 攒样本；文档计划暂缓。不暗示条目级高亮已交付。不宣称端到端闭环。
 
 ```yaml task-card
 id: TASK-J.22b
@@ -874,14 +876,16 @@ contract:
     title: 中栏按台账条目呈现验收项，并把关联建立在已登记原话上
     description: >-
       在中栏按编译器台账逐条呈现验收条目（条目级呈现）。
+      呈现形态：逐条 id+文案、空台账不伪造、空态口径明确。
       若需要把条目与用户原话关联，必须复用已登记 turn_id + sha256(utf8) / frozen_quotes，
       不得事后拼凑。不实现 playtest-self-check.md §3.3 的条目级自动点亮。
+      不重做 J.22a 的数据源切换。
     risk_level: MEDIUM
   acceptance:
     - id: J22B-P1
       check: auto
       text: >-
-        中栏按台账逐条呈现验收条目；空台账时沿用已有「无呈现记录」或本卡规定的等价标注，不伪造条目。
+        中栏按台账逐条呈现验收条目（逐条 id+文案）；空台账时沿用已有「无呈现记录」或本卡规定的等价标注，不伪造条目；空态口径明确。
     - id: J22B-P2
       check: auto
       text: >-
@@ -894,6 +898,7 @@ contract:
   scope:
     writable_paths:
       - src/components/studio/SchemeReviewPane.tsx
+      - src/components/studio/ScopeAcceptanceBlock.tsx
       - src/lib/journey/scheme-draft.ts
       - tests/ui/scope-acceptance-surface-log.test.tsx
       - tests/unit/scheme-acceptance-projection.test.ts
@@ -905,11 +910,14 @@ contract:
       - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
 design:
   approach: >-
-    在 J.22a 把数据源换成台账之后，补中栏的条目级呈现。
-    frozen_quotes 目前不含条目关联：若必须改冻结结构，停工报修卡，不把 scheme-snapshot-store.ts 偷偷写入本卡范围。
+    在 J.22a 把数据源换成台账之后，补中栏的条目级呈现（逐条 id+文案、空台账不伪造、空态口径明确）。
+    实际列表渲染在 ScopeAcceptanceBlock；SchemeReviewPane 只做接线。
+    不重做 J.22a 数据源切换。frozen_quotes 目前不含条目关联：若必须改冻结结构，停工报修卡，不把 scheme-snapshot-store.ts 偷偷写入本卡范围。
   touches:
-    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 按台账逐条呈现验收条目, symbols: [] }
+    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 接线台账验收条目到 ScopeAcceptanceBlock, symbols: [] }
+    - { path: src/components/studio/ScopeAcceptanceBlock.tsx, change: modify, why: 逐条 id+文案呈现；空台账不伪造；空态口径明确, symbols: [ScopeAcceptanceBlock] }
     - { path: tests/unit/scheme-acceptance-projection.test.ts, change: modify, why: 锁定条目呈现与空台账不伪造, symbols: [] }
+    - { path: tests/ui/scope-acceptance-surface-log.test.tsx, change: modify, why: 锁定条目级呈现与 surface_log 上报, symbols: [] }
   interfaces: []
   test_plan:
     - { acceptance_id: J22B-P1, test_path: tests/unit/scheme-acceptance-projection.test.ts, level: unit, debt: "立卡阶段；测试体待授权施工后再写" }
@@ -924,19 +932,23 @@ governance:
     - { id: TASK-J.21, kind: hard }
     - { id: TASK-J.16, kind: hard }
   code_facts:
-    - { ref: "src/components/studio/SchemeReviewPane.tsx:62-64", note: "中栏已能接收 acceptanceItems / acceptanceSettled；条目级呈现在此扩展" }
-    - { ref: "docs/specs/playtest-self-check.md:132-141", note: "§3.3 条目级自动点亮仍为「本版不实现」；本卡不得实施或宣称已交付" }
+    - { ref: "src/components/studio/ScopeAcceptanceBlock.tsx:34", note: "ScopeAcceptanceBlockProps；验收条目列表实际渲染入口" }
+    - { ref: "src/components/studio/ScopeAcceptanceBlock.tsx:173", note: "ScopeAcceptanceBlock 组件；逐条呈现落点" }
+    - { ref: "src/components/studio/SchemeReviewPane.tsx:72-74", note: "中栏已能接收 acceptanceItems / acceptanceSettled；接线至 ScopeAcceptanceBlock" }
+    - { ref: "docs/specs/playtest-self-check.md:175-184", note: "§3.3 条目级自动点亮仍为「本版不实现」；本卡不得实施或宣称已交付" }
     - { ref: "daemon/pipeline/scheme-snapshot-store.ts:36-50", note: "frozen_quotes 现结构只有 turn_id 与 turn_text_sha256，不含条目关联；改结构须先修卡" }
   non_goals:
-    - 本条立卡 ≠ 开工；施工须另授权
+    - 本条立卡 / 修卡 ≠ 开工；施工须在本修卡合入后另授权
     - 不实现 §3.3 条目级自动点亮，不暗示该项已交付
     - 不重做 J.22a 的数据源切换，不以 jsdom 替代 TASK-J.22c 的真实试玩
-    - 不改冻结快照结构除非先修卡；不开工 CI.2；不改 D.1e / S.3
+    - 不改 frozen_quotes / scheme-snapshot-store.ts 除非先再修卡；不对齐 prompt-builder.ts
+    - 不开工 CI.2；不改 D.1e / S.3
   fail:
     - 伪造验收条目，或把未登记文本当成条目依据
     - 把 §3.3 自动点亮做成功能或写成已交付
     - 发现必须改 frozen_quotes 结构却不报修卡、带病施工
     - 本条合入前开工，或在 J.22a 未完成时开工，或本卡膨胀为 L 却不拆（R-11）
+    - 漏改 ScopeAcceptanceBlock 却宣称条目级呈现已交付
   estimate: M
   invariants:
     auth: unchanged
@@ -946,7 +958,7 @@ governance:
 ```
 
 * **背景**：J.16 把条目级高亮明确推迟到 J.22 之后；本卡把它从母卡拆出，避免与来源切换混成一张 L。
-* **取舍**：先呈现台账条目；条目与原话的关联若触及冻结结构，先修卡再做。自动点亮仍不做。
+* **取舍**：先呈现台账条目（逐条 id+文案、空态明确）；条目与原话的关联若触及冻结结构，先修卡再做。自动点亮仍不做。不重做 J.22a 数据源。
 
 <a id="task-j.22c"></a>
 

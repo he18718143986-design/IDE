@@ -179,7 +179,7 @@
 | `TASK-J.21` | `COMPLETED` | intent-compiler 重启后状态恢复（挂账⑫；立卡 P-187；施工 P-194 · #229 `21b8b35`） | [正文](./development-tasks-completed.md#task-j21) |
 | `TASK-J.22` | `SPLIT` | 中栏方案来源统一为编译器台账（挂账⑬ 方案 B；立卡 P-187；拆卡 P-215；母卡不再作为施工依据） | [正文](./development-tasks-active.md#task-j.22) |
 | `TASK-J.22a` | `COMPLETED` | 中栏方案来源改为编译器台账，含无台账降级标注（拆自 J.22；立卡 P-215；修卡 P-225；施工 #279 `d5a994d`；完工回写 P-226；估算 M） | [正文](./development-tasks-completed.md#task-j.22a) |
-| `TASK-J.22b` | `NEW_TASK` | 中栏验收条目的条目级呈现（拆自 J.22，承接 J.16 延期项；立卡 P-215；估算 M；硬依赖 J.22a 已满足；未开工） | [正文](./development-tasks-active.md#task-j.22b) |
+| `TASK-J.22b` | `NEW_TASK` | 中栏验收条目的条目级呈现（拆自 J.22，承接 J.16 延期项；立卡 P-215；修卡 P-227；估算 M；硬依赖 J.22a 已满足；未开工） | [正文](./development-tasks-active.md#task-j.22b) |
 | `TASK-J.22c` | `NEW_TASK` | 中栏方案来源统一的真实试玩验收（拆自 J.22；立卡 P-215；估算 S；硬依赖 J.22a 已满足；未开工） | [正文](./development-tasks-active.md#task-j.22c) |
 | `TASK-J.23` | `COMPLETED` | 质疑自查生产链路接线：面板挂载 + DISPUTE 路由 + turn_text_sha256 落盘（立卡 P-195；修订 P-196；施工 P-198 · #233 `ab40f3a`；J23-P4 真实界面走查通过 · P-199） | [正文](./development-tasks-completed.md#task-j23) |
 | `TASK-J.24` | `COMPLETED` | 开工路径三缺口：脏目录确认 + 空仓库 main 引用 + Worker provider 选择器（立卡 P-195；修订 P-197；施工 P-198 · #235 `72b52ab`；真实开工路径试玩验证通过 · P-199） | [正文](./development-tasks-completed.md#task-j24) |
