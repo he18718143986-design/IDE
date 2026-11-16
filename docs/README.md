@@ -28,6 +28,7 @@ Stagent 是一个本地优先的软件开发工作台：用户用日常语言提
 | **L0 意图** | 用户要什么、为什么；哪些还没定 | 原话摘录 + `SchemeDraftV2` | [`scheme.md`](./scheme.md) | 原话只能追加；`ai_inferred` 条目经用户确认才升格 |
 | 用户旅程 | 非技术用户会看到什么、要做什么、不必做什么 | — | [`user-journey.md`](./user-journey.md) | 走任务卡修订；不改三条铁律；不宣称未交付能力已交付 |
 | 术语表 | 一句话白话定义，并链到现行规格或 ADR | — | [`glossary.md`](./glossary.md) | 定义必须带权威出处链接，不另造定义层 |
+| 操作规程 | 业主确认密封与试玩的分步怎么做 | — | [`runbooks/owner-confirm-and-playtest.md`](./runbooks/owner-confirm-and-playtest.md) | 走任务卡修订；不改产品代码；规格仍以 supervisor / playtest-self-check 为准 |
 | **L1 决策** | 已拍板、难逆转的技术选择 | `decisions[]`（已确认） | [`adr/`](./adr/README.md) | 只能 SUPERSEDE，不能删改原文 |
 | **L2 规格** | 系统必须怎样表现（契约） | 冻结快照 + `ScopePlan` | `specs/`（见 [`specs/README.md`](./specs/README.md)） | 走规格修订任务卡 |
 | **L3 任务卡** | 交给 Worker 的机器指令 | [合同](./glossary.md#合同) + 任务图节点 | [`specs/development-tasks.md`](./specs/development-tasks.md)（就绪标准 [`specs/task-card-standard.md`](./specs/task-card-standard.md)） | 按卡施工；开工前过就绪标准；按 supervisor §10 判定口径回写状态 |
@@ -48,16 +49,17 @@ Stagent 是一个本地优先的软件开发工作台：用户用日常语言提
 
 1. [`user-journey.md`](./user-journey.md) — 非技术用户会看到什么、要做什么、不必做什么（按七环）
 2. [`glossary.md`](./glossary.md) — 术语一句话白话定义与权威出处
-3. [`scheme.md`](./scheme.md) — 用户原话、三 Agent 设想、目标能力、待你拍板的分歧（约 15 分钟）
-4. [`specs/delivery-lifecycle.md`](./specs/delivery-lifecycle.md) — **总装图**：从一句话到上线的七环、用户触点、追踪链、里程碑 M1～M5
-5. [`specs/supervisor.md`](./specs/supervisor.md) 第三部分 §13 — 一个页面、一条旅程、五个决定
-6. [`specs/runtime-contract-and-safety.md`](./specs/runtime-contract-and-safety.md) — **写代码前必读**的运行时硬契约
-7. [`adr/README.md`](./adr/README.md) — 已拍板决策的索引（篇数以该索引为准，此处不维护数字）
-8. [`specs/development-tasks.md`](./specs/development-tasks.md) §3.4c（J 系列，含 ADR-0014 修订块）与 §3.4d（L 系列）— 当前要做的卡
+3. [`runbooks/owner-confirm-and-playtest.md`](./runbooks/owner-confirm-and-playtest.md) — 业主确认密封与试玩分步（对照面 / 信任档 / 判分与证据表）
+4. [`scheme.md`](./scheme.md) — 用户原话、三 Agent 设想、目标能力、待你拍板的分歧（约 15 分钟）
+5. [`specs/delivery-lifecycle.md`](./specs/delivery-lifecycle.md) — **总装图**：从一句话到上线的七环、用户触点、追踪链、里程碑 M1～M5
+6. [`specs/supervisor.md`](./specs/supervisor.md) 第三部分 §13 — 一个页面、一条旅程、五个决定
+7. [`specs/runtime-contract-and-safety.md`](./specs/runtime-contract-and-safety.md) — **写代码前必读**的运行时硬契约
+8. [`adr/README.md`](./adr/README.md) — 已拍板决策的索引（篇数以该索引为准，此处不维护数字）
+9. [`specs/development-tasks.md`](./specs/development-tasks.md) §3.4c（J 系列，含 ADR-0014 修订块）与 §3.4d（L 系列）— 当前要做的卡
 
-**要施工的 Worker**：只读第 4、6、8 项加卡内引用的规格节；开工前用 [`specs/task-card-standard.md`](./specs/task-card-standard.md) 核对卡是否就绪，未就绪不开工；有疑问先查 [`ledger/`](./ledger/README.md) 是否已挂账，不要自行补全。
+**要施工的 Worker**：只读第 5、7、9 项加卡内引用的规格节；开工前用 [`specs/task-card-standard.md`](./specs/task-card-standard.md) 核对卡是否就绪，未就绪不开工；有疑问先查 [`ledger/`](./ledger/README.md) 是否已挂账，不要自行补全。
 
-**要审阅的用户**：先看 [`user-journey.md`](./user-journey.md) 和 [`glossary.md`](./glossary.md)，再看 [`ledger/scheme-settled-decisions.md`](./ledger/scheme-settled-decisions.md)（原 `scheme.md` §6～§8：决定、分歧、待澄清）。其余是 Agent 的活。
+**要审阅的用户**：先看 [`user-journey.md`](./user-journey.md)、[`glossary.md`](./glossary.md) 与 [`runbooks/owner-confirm-and-playtest.md`](./runbooks/owner-confirm-and-playtest.md)，再看 [`ledger/scheme-settled-decisions.md`](./ledger/scheme-settled-decisions.md)（原 `scheme.md` §6～§8：决定、分歧、待澄清）。其余是 Agent 的活。
 
 ---
 
