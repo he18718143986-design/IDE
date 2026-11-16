@@ -1,7 +1,7 @@
 # 信任档规格卡 · 划界简报（P-230）
 
 > **地位**：planning brief（2026-11-16 · Asia/Hong_Kong）。授权来源为 Tina「立 SOP 卡 + prompt-builder 对齐卡（P-230），同时做信任档规格卡划界简报」。  
-> **本条只划界**：**不立卡、不施工、不改 ADR、不把蓝图原文并入 `docs/specs/`**。立卡须另授权。  
+> **本条只划界**：**不施工、不改 ADR、不把蓝图原文并入 `docs/specs/`**。P-230 当时不立卡；**P-233 已另授权立 [`TASK-J.36`](../specs/development-tasks-active.md#task-j.36)**（仍 `[NEW_TASK]`，立卡 ≠ 开工）。  
 > **依据**：P-220 [`blueprint-absorption-ruling.md`](./blueprint-absorption-ruling.md) 分歧 3；P-225「信任档规格卡只补 J.32a/b 未覆盖缝」；[`TASK-J.32a`](../specs/development-tasks-completed.md#task-j.32a) / [`TASK-J.32b`](../specs/development-tasks-completed.md#task-j.32b) 已交付面；细模型简报存档（planning archive）。
 
 ## 1. 已交付（规格卡禁止重写）
@@ -30,17 +30,17 @@
 
 - 商业冷静期 / ChangeOrder / 责任归因（P-220「另立不决」）
 - 理解度校验、「是否真懂」门禁化（J.33 已声明不是门禁）
-- `prompt-builder.ts` 对齐（见 [`TASK-J.35`](../specs/development-tasks-active.md#task-j.35)）
+- `prompt-builder.ts` 对齐（见 [`TASK-J.35`](../specs/development-tasks-completed.md#task-j.35)；活发送路径见 [`prompt-builder-live-send-path-brief.md`](./prompt-builder-live-send-path-brief.md)）
 - 业主操作规程文案（见 [`TASK-J.34`](../specs/development-tasks-completed.md#task-j.34)）
 - 细模型加层 + 视图投影实现（蓝图第一批规格卡 S / 实现 L，另授权；见细模型简报）
 
-## 3. 建议立卡形态（待 Tina 授权，本条不立）
+## 3. 立卡形态（P-233 已立；仍未开工）
 
-| 建议卡号 | 估算 | 状态建议 | 一句话 |
+| 卡号 | 估算 | 状态 | 一句话 |
 | :--- | :--- | :--- | :--- |
-| `TASK-J.36`（建议） | **S** | 待授权后立 `[NEW_TASK]` | 信任档规格缝补丁：只写 §2 三缝的契约与失败语义；`writable_paths` 限规格与类型声明，不含对照面 UI / 冻结内核重写 |
+| [`TASK-J.36`](../specs/development-tasks-active.md#task-j.36) | **S** | `[NEW_TASK]`（P-233 立卡；立卡 ≠ 开工） | 信任档规格缝补丁：只写 §2 三缝的契约与失败语义；`writable_paths` 限规格与类型声明，不含对照面 UI / 冻结内核重写 |
 
-立卡时卡面必须原样写入：
+卡面必须原样写入（P-233 已写入）：
 
 - non_goals：不重写 J.32a/b 已交付硬约束与 UI；不开工商业冷静期；不立双 SSOT
 - 硬依赖：`TASK-J.32a`、`TASK-J.32b`（均 COMPLETED）
@@ -49,5 +49,6 @@
 ## 4. 结论
 
 - **J.32a/b 已覆盖信任档工程主面**；再立「信任档规格卡」若不以 §2 三缝为界，就会与已交付内核重复。
-- **P-230 本回合**：只落本简报；**不立** `TASK-J.36`；不施工。
+- **P-230**：只落本简报；当时不立 `TASK-J.36`。
+- **P-233**：已立 [`TASK-J.36`](../specs/development-tasks-active.md#task-j.36)（仍未开工）；另落活发送路径只读定位简报，**不立**接线卡。
 - 蓝图「细模型加层 + 视图投影」规格卡仍暂不立（与本简报分治）。
