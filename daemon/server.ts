@@ -66,6 +66,7 @@ import {
   collectItemQuoteBacklinks,
   evaluateSchemeItemBacklinks,
   FROZEN_QUOTE_MAX_CHARS,
+  type FrozenQuotes,
   type FrozenQuotesFailureReason,
   type TrustTier,
 } from "./pipeline/scheme-snapshot-store";
@@ -426,6 +427,56 @@ function workerRegistrationHttpStatus(code: string): number {
     default:
       return 400;
   }
+}
+
+function schemeItemPreviewLabel(
+  draft: {
+    goals?: unknown;
+    out_of_scope?: unknown;
+    modules?: unknown;
+    flows?: unknown;
+    entities?: unknown;
+    decisions?: unknown;
+    conflicts?: unknown;
+    open_questions?: unknown;
+    acceptance?: unknown;
+  },
+  id: string,
+): string {
+  const collections = [
+    draft.goals,
+    draft.out_of_scope,
+    draft.modules,
+    draft.flows,
+    draft.entities,
+    draft.decisions,
+    draft.conflicts,
+    draft.open_questions,
+    draft.acceptance,
+  ];
+  for (const arr of collections) {
+    if (!Array.isArray(arr)) continue;
+    for (const raw of arr) {
+      if (!raw || typeof raw !== "object") continue;
+      const item = raw as Record<string, unknown>;
+      if (item["id"] !== id) continue;
+      for (const key of [
+        "text",
+        "name",
+        "title",
+        "question",
+        "purpose",
+        "statement",
+      ]) {
+        const value = item[key];
+        if (typeof value === "string" && value.trim().length > 0) {
+          return value.trim();
+        }
+      }
+      return id;
+    }
+  }
+  return id;
 }
 
 export class StagentDaemon {
@@ -2492,6 +2543,112 @@ export class StagentDaemon {
       reason,
       ...(turnId === undefined ? {} : { turn_id: turnId }),
       message,
+    });
+  }
+
+  /**
+   * TASK-J.32b：确认前只读预览。
+   * POST /api/supervisor/scheme/backlink-preview
+   * 复用 collectItemQuoteBacklinks + evaluateSchemeItemBacklinks，
+   * 以及封存时同一套 sealFrozenQuotes；不写快照、不触发封存、无副作用。
+   */
+  private async handleSchemeBacklinkPreview(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    method: string,
+  ): Promise<void> {
+    if (method !== "POST") {
+      this.sendJson(res, 405, { error: "Method not allowed" });
+      return;
+    }
+    let body: { source_turns?: unknown };
+    try {
+      body = (await this.readJsonBody(req)) as typeof body;
+    } catch (err) {
+      this.sendJson(res, 400, {
+        error: "invalid_json",
+        message: (err as Error).message,
+      });
+      return;
+    }
+
+    const emptyFrozen: FrozenQuotes = {
+      source: "intent-compiler-transcript",
+      sealed_through_seq: 0,
+      quotes: [],
+    };
+    let frozen: FrozenQuotes = emptyFrozen;
+    const rawTurns = body.source_turns;
+    if (
+      rawTurns !== undefined &&
+      rawTurns !== null &&
+      !(Array.isArray(rawTurns) && rawTurns.length === 0)
+    ) {
+      const parsed = parseSourceTurnRefs(rawTurns);
+      if (!parsed.ok) {
+        this.sendJson(res, 200, {
+          ok: false,
+          reason: parsed.reason,
+          message: "确认前预览用的原话清单不完整，没有改任何封存。",
+        });
+        return;
+      }
+      let transcript: ReturnType<typeof readTranscript>;
+      try {
+        transcript = readTranscript(this.repoRoot);
+      } catch {
+        this.sendJson(res, 200, {
+          ok: false,
+          reason: "transcript_unreadable",
+          message: "暂时读不到已登记的原话，没有改任何封存。",
+        });
+        return;
+      }
+      const sealed = sealFrozenQuotes(transcript, parsed.value);
+      if (!sealed.ok) {
+        this.sendJson(res, 200, {
+          ok: false,
+          reason: sealed.reason,
+          ...(sealed.turn_id === undefined ? {} : { turn_id: sealed.turn_id }),
+          message: "有一句原话和登记记录对不上，不能标已覆盖。没有改任何封存。",
+        });
+        return;
+      }
+      frozen = sealed.value;
+    }
+
+    const ledgerState = loadOrInitLedgerState(this.repoRoot);
+    const backlinks = collectItemQuoteBacklinks(ledgerState.draft);
+    const evaluated = evaluateSchemeItemBacklinks(backlinks.items, frozen);
+    if (!evaluated.ok) {
+      this.sendJson(res, 200, {
+        ok: false,
+        reason: "hash_mismatch",
+        item_id: evaluated.item_id,
+        turn_id: evaluated.turn_id,
+        message: "有一句原话和登记记录对不上，不能标已覆盖。没有改任何封存。",
+      });
+      return;
+    }
+    const items = evaluated.verdicts.map((verdict) => ({
+      ...verdict,
+      label: schemeItemPreviewLabel(ledgerState.draft, verdict.id),
+    }));
+    const coveredCount = items.filter((item) => item.covered).length;
+    this.sendJson(res, 200, {
+      ok: true,
+      items,
+      quotes: frozen.quotes.map((quote) => ({
+        turn_id: quote.turn_id,
+        seq: quote.seq,
+        ...(quote.user_alias_seq === undefined
+          ? {}
+          : { user_alias_seq: quote.user_alias_seq }),
+        text: quote.text,
+        turn_text_sha256: quote.turn_text_sha256,
+      })),
+      covered_count: coveredCount,
+      uncovered_count: items.length - coveredCount,
     });
   }
 
@@ -5854,6 +6011,15 @@ export class StagentDaemon {
         return;
       }
       await this.handleClientEvents(req, res, method);
+      return;
+    }
+
+    if (pathname === "/api/supervisor/scheme/backlink-preview") {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      await this.handleSchemeBacklinkPreview(req, res, method);
       return;
     }
 
