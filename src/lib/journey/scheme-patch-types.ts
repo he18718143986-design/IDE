@@ -108,11 +108,7 @@ export type AcceptanceItem = SchemeItemMeta & {
  * 视图实现归细模型子卡；本类型仅契约（可标 ai_inferred 直至业主确认）。
  */
 export type SchemeItemProjectionStatus =
-  | "draft"
-  | "proposed"
-  | "confirmed"
-  | "rejected"
-  | "deferred";
+  "draft" | "proposed" | "confirmed" | "rejected" | "deferred";
 
 export interface SchemeItemProjectionDto {
   /** 投影态；不得回写为 ItemSource */
