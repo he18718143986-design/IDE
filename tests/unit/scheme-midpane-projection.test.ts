@@ -10,9 +10,7 @@ import {
   type SchemeLedgerRecord,
 } from "../../daemon/supervisor/intent-compiler/scheme-ledger-store";
 
-function recordWith(
-  over: Partial<SchemeDraftV2> = {},
-): SchemeLedgerRecord {
+function recordWith(over: Partial<SchemeDraftV2> = {}): SchemeLedgerRecord {
   return {
     schema_version: "1.0",
     updated_at: "2026-11-16T00:00:00.000Z",

@@ -74,7 +74,13 @@ describe("TASK-J.22a · 来源统一与无台账降级", () => {
 
   it("available=false 时映射为 null", () => {
     const draft = schemeDraftFromMidpane(
-      midpane({ available: false, title: "", goals: [], modules: [], acceptance: [] }),
+      midpane({
+        available: false,
+        title: "",
+        goals: [],
+        modules: [],
+        acceptance: [],
+      }),
       null,
     );
     expect(draft).toBeNull();

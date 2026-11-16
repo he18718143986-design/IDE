@@ -209,9 +209,7 @@ export function schemeDraftFromMidpane(
     frozen: view.frozen,
     notes,
     pinned_fields: sameRevision ? [...previous.pinned_fields] : [],
-    business_input_rounds: sameRevision
-      ? previous.business_input_rounds
-      : 0,
+    business_input_rounds: sameRevision ? previous.business_input_rounds : 0,
     goals: view.goals.map((g) => ({ id: g.id, text: g.text })),
     acceptance: view.acceptance.map((a) => ({
       id: a.id,
