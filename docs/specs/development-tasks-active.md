@@ -785,7 +785,7 @@ governance:
 >
 > **拆卡说明（2026-11-15 · P-215）**：按 R-11，估算 L 的母卡不得开工，必须先拆。Tina t1286u 授权拆为三张子卡，本卡改标 **`[SPLIT]`**，保留追溯，**不再作为施工依据**，施工以子卡正文为准：[`TASK-J.22a`](./development-tasks-completed.md#task-j.22a)（来源统一 + 无台账降级；P-226 COMPLETED）、[`TASK-J.22b`](./development-tasks-completed.md#task-j.22b)（条目级呈现；P-228 COMPLETED）、[`TASK-J.22c`](./development-tasks-completed.md#task-j.22c)（真实试玩；P-229 COMPLETED）。硬依赖 `TASK-J.21` 与 `TASK-J.16` 均已 `[COMPLETED]`。
 >
-> **归档注记（2026-11-16 · P-229）**：三子卡均已 **COMPLETED**。母卡维持 **`[SPLIT]`** 追溯归档，**不再作为施工依据**。诚实口径：来源统一、条目级呈现、真实试玩已交付；§3.3 自动点亮未实现；`prompt-builder.ts` 对齐见 [`TASK-J.35`](#task-j.35)（P-230 立卡，未开工）。业主 SOP 见 [`TASK-J.34`](./development-tasks-completed.md#task-j.34)（P-231 COMPLETED）。蓝图第一批卡暂不立；信任档规格卡仅出划界简报暂不立；CI.2 攒样本。不宣称端到端闭环。
+> **归档注记（2026-11-16 · P-229）**：三子卡均已 **COMPLETED**。母卡维持 **`[SPLIT]`** 追溯归档，**不再作为施工依据**。诚实口径：来源统一、条目级呈现、真实试玩已交付；§3.3 自动点亮未实现；`prompt-builder.ts` 对齐见 [`TASK-J.35`](./development-tasks-completed.md#task-j.35)（P-232 COMPLETED；活发送路径未接）。业主 SOP 见 [`TASK-J.34`](./development-tasks-completed.md#task-j.34)（P-231 COMPLETED）。蓝图第一批卡暂不立；信任档规格卡仅出划界简报暂不立；CI.2 攒样本。不宣称端到端闭环。
 > **已知限制（K-14 第一刀 #217 记录）**：台账 `scheme_revision` 与中栏启发式方案修订号未对齐校验——根治已由子卡承接；本母卡不再施工。
 
 ```yaml task-card
@@ -1219,7 +1219,7 @@ governance:
 
 > **立卡说明（2026-11-15 · P-215）**：授权来源为 Tina t1286u。本条只立卡 / 拆卡，不写产品代码，不开工。第二块按 R-11 拆为 [`TASK-J.31`](./development-tasks-completed.md#task-j.31)（判分表升级，纯文档，估算 S；已 `[COMPLETED]`，施工 #264 `03acf2a`，完工回写 P-216）与 [`TASK-J.33`](./development-tasks-completed.md#task-j.33)（`card-copy-standard.md` + 校验器，估算 M；已 `[COMPLETED]`，施工 #266 `838d1f4`，完工回写 P-217）。「密封前意图完整性核对」立 [`TASK-J.32`](#task-j.32)（估算 M，须复用 J.16 `frozen_quotes` 登记与封存链路）。`TASK-J.22` 的拆卡正文在既有卡位，不迁入本节。
 >
-> **修卡说明（2026-11-15 · P-221）**：授权来源为 Tina t1310u。J.32 只读定位简报已核对通过。施工实际需要的对照面前端组件与 `SchemeItemMeta` / `TurnRef` 补哈希字段均不在原 `writable_paths` 内；把对照面与信任档确认形态并入原 M 卡后范围明显超出，按 R-11 先拆再开工。`TASK-J.32` 改标 **`[SPLIT]`**，保留追溯，**不再作为施工依据**，施工以子卡正文为准：[`TASK-J.32a`](./development-tasks-completed.md#task-j.32a)（密封前原话回链内核，估算 M）、[`TASK-J.32b`](./development-tasks-completed.md#task-j.32b)（回链对照面与信任档确认形态，估算 M；硬依赖 J.32a）。卡面三条硬约束：缺登记或哈希不一致不得标已覆盖；`ai_inferred` 不得冒充 `user_said`；轻确认档机械回链仍须用已登记原话，不得接受事后拼凑。`prompt-builder.ts` 当时不列入必须可写；对齐已于 P-230 立为 [`TASK-J.35`](#task-j.35)（未开工）。**修卡 ≠ 开工**；子卡施工须在本修卡合入后再逐张授权。`TASK-J.22a` / `TASK-J.22b` / `TASK-J.22c` 已完工迁出。CI.2 攒样本；不暗示条目级高亮/自动点亮已交付。
+> **修卡说明（2026-11-15 · P-221）**：授权来源为 Tina t1310u。J.32 只读定位简报已核对通过。施工实际需要的对照面前端组件与 `SchemeItemMeta` / `TurnRef` 补哈希字段均不在原 `writable_paths` 内；把对照面与信任档确认形态并入原 M 卡后范围明显超出，按 R-11 先拆再开工。`TASK-J.32` 改标 **`[SPLIT]`**，保留追溯，**不再作为施工依据**，施工以子卡正文为准：[`TASK-J.32a`](./development-tasks-completed.md#task-j.32a)（密封前原话回链内核，估算 M）、[`TASK-J.32b`](./development-tasks-completed.md#task-j.32b)（回链对照面与信任档确认形态，估算 M；硬依赖 J.32a）。卡面三条硬约束：缺登记或哈希不一致不得标已覆盖；`ai_inferred` 不得冒充 `user_said`；轻确认档机械回链仍须用已登记原话，不得接受事后拼凑。`prompt-builder.ts` 当时不列入必须可写；对齐已于 P-230 立为 [`TASK-J.35`](./development-tasks-completed.md#task-j.35)（P-232 COMPLETED；活发送路径未接）。**修卡 ≠ 开工**；子卡施工须在本修卡合入后再逐张授权。`TASK-J.22a` / `TASK-J.22b` / `TASK-J.22c` 已完工迁出。CI.2 攒样本；不暗示条目级高亮/自动点亮已交付。
 
 <a id="task-j.32"></a>
 
@@ -1318,11 +1318,13 @@ governance:
 
 > 本卡已 **COMPLETED**（施工 [#276](https://github.com/he18718143986-design/IDE/pull/276) squash `b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b`；完工回写 P-224）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.32b) §3.4ap。
 
-### 3.4h 业主 SOP 与 prompt-builder 对齐（2026-11-16 · 立卡 P-230；J.34 已完工迁出）
+### 3.4h 业主 SOP 与 prompt-builder 对齐（2026-11-16 · 立卡 P-230；J.34 / J.35 已完工迁出）
 
 > **立卡说明（2026-11-16 · P-230）**：授权来源为 Tina「立 SOP 卡 + prompt-builder.ts 对齐卡（P-230），同时做信任档规格卡划界简报」。本条只立两张卡 + 落划界简报，**不写产品代码、不开工**。信任档规格卡**不立**（见 [`../ledger/trust-tier-spec-boundary-brief.md`](../ledger/trust-tier-spec-boundary-brief.md)）；蓝图第一批卡暂不立；CI.2 攒样本。§3.3 自动点亮仍 Hold。立卡 ≠ 授权 ≠ 开工。不宣称端到端闭环。
 >
-> **归档注记（2026-11-16 · P-231）**：[`TASK-J.34`](./development-tasks-completed.md#task-j.34) 已 **COMPLETED**（施工 #286/`51c643e`）。`TASK-J.35` 仍 `[NEW_TASK]`，待报正式方案后授权。诚实口径：SOP 为文档层交付，业主实际按 SOP 走完确认+试玩属后续真实使用验证。
+> **归档注记（2026-11-16 · P-231）**：[`TASK-J.34`](./development-tasks-completed.md#task-j.34) 已 **COMPLETED**（施工 #286/`51c643e`）。诚实口径：SOP 为文档层交付，业主实际按 SOP 走完确认+试玩属后续真实使用验证。
+>
+> **归档注记（2026-11-16 · P-232）**：[`TASK-J.35`](./development-tasks-completed.md#task-j.35) 已 **COMPLETED**（施工 #288/`306ff11`）。诚实口径：`prompt-builder.ts` 已对齐台账/信任档/回链，活发送路径未接（另卡或后续接线范畴）。
 
 <a id="task-j.34"></a>
 
@@ -1332,106 +1334,9 @@ governance:
 
 <a id="task-j.35"></a>
 
-#### 【Task J.35】prompt-builder.ts 对齐台账 / 信任档 / 回链事实`[NEW_TASK · 立卡 P-230 · 未开工]`
+#### 【Task J.35】prompt-builder.ts 对齐台账 / 信任档 / 回链事实`[COMPLETED · 正文已迁]`
 
-> **立卡说明（2026-11-16 · P-230）**：承接 J.22 / J.30 / J.32 多次挂账的「prompt-builder 未对齐」。本卡把 `buildSupervisorPrompt` 组装结果对齐台账、信任档与回链事实，并在出口调用 `assertContextHasNoVaultSecrets`。**不**把 builder 接进生产活发送路径（另开接线卡）。**立卡 ≠ 开工**。
+> 本卡已 **COMPLETED**（施工 [#288](https://github.com/he18718143986-design/IDE/pull/288) squash `306ff11674da7307bb09c12dcd74e17f80e2f52e`；完工回写 P-232）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.35) §3.4au。
 
-```yaml task-card
-id: TASK-J.35
-status: NEW_TASK
-contract:
-  intent:
-    title: prompt-builder.ts 对齐台账 / 信任档 / 回链事实
-    description: >-
-      buildSupervisorPrompt 的组装结果须反映编译器台账方案摘要、信任档（trust_tier）与
-      原话回链核对结论（缺登记 / 哈希不一致不得标已覆盖；ai_inferred 不得冒充 user_said）；
-      出口对完整 text 调用 assertContextHasNoVaultSecrets（来自 daemon/vault/active.ts 叶子）。
-      当前 builder 仍可为测试/预览纯组装器；本卡不强制接进活发送路径。
-    risk_level: MEDIUM
-  acceptance:
-    - id: J35-P1
-      check: auto
-      text: >-
-        SupervisorContextBundle（或等价输入）可携带台账方案摘要、trust_tier、回链核对摘要；
-        buildSupervisorPrompt 输出分段中可见这些事实，不得静默省略已提供的字段。
-    - id: J35-P2
-      check: auto
-      text: >-
-        当上下文标明缺登记或哈希不一致时，组装文案不得把该项写成「已覆盖」；
-        ai_inferred 来源不得写成用户原话已确认。
-    - id: J35-P3
-      check: auto
-      text: >-
-        buildSupervisorPrompt 在返回前对完整 text 调用 assertContextHasNoVaultSecrets；
-        单测证明含保险库密钥的上下文会抛错且不返回脱敏后继续的结果。
-    - id: J35-P4
-      check: auto
-      text: >-
-        既有 supervisor-session 组装单测仍绿；新增对齐用例覆盖 P1～P3；tsc 通过。
-  scheme_item_ids: []
-  scope:
-    writable_paths:
-      - daemon/supervisor/prompt-builder.ts
-      - daemon/supervisor/types.ts
-      - tests/unit/supervisor-session.test.ts
-      - tests/daemon/vault.test.ts
-    readonly_paths:
-      - daemon/vault/active.ts
-      - daemon/pipeline/scheme-snapshot-store.ts
-      - daemon/supervisor/intent-compiler/scheme-ledger-store.ts
-  verification:
-    commands:
-      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/supervisor-session.test.ts, tests/daemon/vault.test.ts] }
-      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
-design:
-  approach: >-
-    扩展 SupervisorContextBundle 可选字段（台账摘要 / trust_tier / 回链摘要），
-    在 buildSupervisorPrompt 增加对应分段；出口调用 assertContextHasNoVaultSecrets。
-    保持纯函数、零 I/O。不改活发送路由；接线另卡。
-  touches:
-    - { path: daemon/supervisor/types.ts, change: modify, why: ContextBundle 增台账/信任档/回链可选字段, symbols: [SupervisorContextBundle] }
-    - { path: daemon/supervisor/prompt-builder.ts, change: modify, why: 渲染新分段并在出口断言无保险库密钥, symbols: [buildSupervisorPrompt] }
-    - { path: tests/unit/supervisor-session.test.ts, change: modify, why: 覆盖台账/信任档/回链组装与负例, symbols: [] }
-    - { path: tests/daemon/vault.test.ts, change: modify, why: 锁定 builder 出口调用 assertContextHasNoVaultSecrets, symbols: [] }
-  interfaces:
-    - { kind: type, name: SupervisorContextBundle, signature: "可选 scheme_summary / trust_tier / backlink_summary 字段（施工时定名）", consumers: [] }
-  test_plan:
-    - { acceptance_id: J35-P1, test_path: tests/unit/supervisor-session.test.ts, level: unit, debt: "未施工" }
-    - { acceptance_id: J35-P2, test_path: tests/unit/supervisor-session.test.ts, level: unit, debt: "未施工" }
-    - { acceptance_id: J35-P3, test_path: tests/daemon/vault.test.ts, level: unit, debt: "未施工" }
-    - { acceptance_id: J35-P4, test_path: tests/unit/supervisor-session.test.ts, level: unit, debt: "未施工" }
-governance:
-  spec_refs:
-    - docs/specs/supervisor.md
-    - docs/ledger/trust-tier-spec-boundary-brief.md
-    - docs/specs/development-tasks-completed.md#task-j.30
-    - docs/specs/development-tasks-completed.md#task-j.32a
-  depends_on:
-    - { id: TASK-J.30, kind: soft }
-    - { id: TASK-J.32a, kind: soft }
-    - { id: TASK-J.22a, kind: soft }
-  code_facts:
-    - { ref: "daemon/supervisor/prompt-builder.ts:210", note: "buildSupervisorPrompt 现行只组装 project/architecture/events/conversation，无台账/信任档/回链段" }
-    - { ref: "daemon/supervisor/types.ts:131-136", note: "SupervisorContextBundle 仅 project/architecture/event_digests" }
-    - { ref: "daemon/vault/active.ts:40", note: "assertContextHasNoVaultSecrets 已在 J.30 落地；builder 尚未调用" }
-  non_goals:
-    - 不把 builder 接进生产活发送路径（另开接线卡）
-    - 不重写 J.32a/b 回链内核或对照面 UI；不升 schema_version
-    - 不实现 §3.3 自动点亮；不开工 CI.2；不立信任档规格卡 / 蓝图第一批
-    - 不改 vault 门面或 Gateway 写范围
-  fail:
-    - 组装文案把缺登记 / 哈希不一致项标成已覆盖，或把 ai_inferred 写成用户已确认原话
-    - 出口跳过 assertContextHasNoVaultSecrets，或密钥命中后脱敏继续返回
-    - 借本卡改对照面 UI / 冻结内核 / 活发送路由
-  estimate: M
-  invariants:
-    auth: unchanged
-    demo_origin: unchanged
-    illumination: unchanged
-    gateway_write_scope: unchanged
-```
-
-* **背景**：J.22 / J.30 / J.32 多次注明 prompt-builder 未对齐；现行函数仍是 S.1 纯组装器，测试在用、生产发送未接。
-* **取舍**：本卡先对齐组装语义与密钥断言；活路径接线另卡，避免本卡升 L。
 
 

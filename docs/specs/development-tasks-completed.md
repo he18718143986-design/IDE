@@ -8279,3 +8279,113 @@ governance:
 
 * **背景**：J.32b / J.22c / J.31 已交付对照面、真实试玩与判分表，业主侧缺「按键顺序」SOP。
 * **取舍**：不把规格缝写进 SOP；诚实口径见归档注记。
+
+### 3.4au prompt-builder 对齐台账 / 信任档 / 回链（J.35 · 完工回写 P-232）
+
+<a id="task-j.35"></a>
+
+### 【Task J.35】prompt-builder.ts 对齐台账 / 信任档 / 回链事实`[COMPLETED · 立卡 P-230 · 施工 #288 · 完工回写 P-232]`
+
+> **立卡说明（2026-11-16 · P-230）**：承接 J.22 / J.30 / J.32 多次挂账的「prompt-builder 未对齐」。本卡把 `buildSupervisorPrompt` 组装结果对齐台账、信任档与回链事实，并在出口调用 `assertContextHasNoVaultSecrets`。**不**把 builder 接进生产活发送路径（另开接线卡）。
+
+> **归档注记（2026-11-16 · P-232）**：本卡已 **COMPLETED**。Tina 授权施工与合入。[#288](https://github.com/he18718143986-design/IDE/pull/288) squash `306ff11674da7307bb09c12dcd74e17f80e2f52e` 于 2026-11-16 22:09:29 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `a74edc949a3438223eec6c2f08cad97cafad4939`；父提交 `bc3de8983ac022ac53aa8ed0583b407c47c9104e`；含 lint 修复 `78db03aec8d770997f8876a41e69902786db5a26` 与空提交重跑 macOS）。合入前必需面全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit；macOS 3214 passed，含本卡 supervisor-session 23 + vault 8），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非阻断存量失败，`continue-on-error`，本卡两份测试 Windows 均绿，同 #266 先例）；Bugbot NEUTRAL 不挡合入。估算仍为 M。交付：`SupervisorContextBundle` 可选 `scheme_summary`/`trust_tier`/`backlink_summary`；`buildSupervisorPrompt` 有字段才插入「台账方案摘要 / 信任档 / 回链核对摘要」；`return` 前 `assertContextHasNoVaultSecrets(text)` 命中即抛。诚实口径：**`prompt-builder.ts` 已对齐台账/信任档/回链，活发送路径未接（另卡或后续接线范畴）**。不实现 §3.3；不开工 CI.2；不立 J.36 / 蓝图。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.35
+status: COMPLETED
+contract:
+  intent:
+    title: prompt-builder.ts 对齐台账 / 信任档 / 回链事实
+    description: >-
+      buildSupervisorPrompt 的组装结果须反映编译器台账方案摘要、信任档（trust_tier）与
+      原话回链核对结论（缺登记 / 哈希不一致不得标已覆盖；ai_inferred 不得冒充 user_said）；
+      出口对完整 text 调用 assertContextHasNoVaultSecrets（来自 daemon/vault/active.ts 叶子）。
+      当前 builder 仍可为测试/预览纯组装器；本卡不强制接进活发送路径。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J35-P1
+      check: auto
+      text: >-
+        SupervisorContextBundle（或等价输入）可携带台账方案摘要、trust_tier、回链核对摘要；
+        buildSupervisorPrompt 输出分段中可见这些事实，不得静默省略已提供的字段。
+    - id: J35-P2
+      check: auto
+      text: >-
+        当上下文标明缺登记或哈希不一致时，组装文案不得把该项写成「已覆盖」；
+        ai_inferred 来源不得写成用户原话已确认。
+    - id: J35-P3
+      check: auto
+      text: >-
+        buildSupervisorPrompt 在返回前对完整 text 调用 assertContextHasNoVaultSecrets；
+        单测证明含保险库密钥的上下文会抛错且不返回脱敏后继续的结果。
+    - id: J35-P4
+      check: auto
+      text: >-
+        既有 supervisor-session 组装单测仍绿；新增对齐用例覆盖 P1～P3；tsc 通过。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/supervisor/prompt-builder.ts
+      - daemon/supervisor/types.ts
+      - tests/unit/supervisor-session.test.ts
+      - tests/daemon/vault.test.ts
+    readonly_paths:
+      - daemon/vault/active.ts
+      - daemon/pipeline/scheme-snapshot-store.ts
+      - daemon/supervisor/intent-compiler/scheme-ledger-store.ts
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/supervisor-session.test.ts, tests/daemon/vault.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    扩展 SupervisorContextBundle 可选字段（台账摘要 / trust_tier / 回链摘要），
+    在 buildSupervisorPrompt 增加对应分段；出口调用 assertContextHasNoVaultSecrets。
+    保持纯函数、零 I/O。不改活发送路由；接线另卡。
+  touches:
+    - { path: daemon/supervisor/types.ts, change: modify, why: ContextBundle 增台账/信任档/回链可选字段, symbols: [SupervisorContextBundle] }
+    - { path: daemon/supervisor/prompt-builder.ts, change: modify, why: 渲染新分段并在出口断言无保险库密钥, symbols: [buildSupervisorPrompt] }
+    - { path: tests/unit/supervisor-session.test.ts, change: modify, why: 覆盖台账/信任档/回链组装与负例, symbols: [] }
+    - { path: tests/daemon/vault.test.ts, change: modify, why: 锁定 builder 出口调用 assertContextHasNoVaultSecrets, symbols: [] }
+  interfaces:
+    - { kind: type, name: SupervisorContextBundle, signature: "可选 scheme_summary / trust_tier / backlink_summary 字段（施工时定名）", consumers: [] }
+  test_plan:
+    - { acceptance_id: J35-P1, test_path: tests/unit/supervisor-session.test.ts, level: unit, debt: "已由 #288 交付" }
+    - { acceptance_id: J35-P2, test_path: tests/unit/supervisor-session.test.ts, level: unit, debt: "已由 #288 交付" }
+    - { acceptance_id: J35-P3, test_path: tests/daemon/vault.test.ts, level: unit, debt: "已由 #288 交付" }
+    - { acceptance_id: J35-P4, test_path: tests/unit/supervisor-session.test.ts, level: unit, debt: "已由 #288 交付" }
+governance:
+  spec_refs:
+    - docs/specs/supervisor.md
+    - docs/ledger/trust-tier-spec-boundary-brief.md
+    - docs/specs/development-tasks-completed.md#task-j.30
+    - docs/specs/development-tasks-completed.md#task-j.32a
+  depends_on:
+    - { id: TASK-J.30, kind: soft }
+    - { id: TASK-J.32a, kind: soft }
+    - { id: TASK-J.22a, kind: soft }
+  code_facts:
+    - { ref: "daemon/supervisor/prompt-builder.ts:313-343", note: "有字段才插入三段；return 前 assertContextHasNoVaultSecrets" }
+    - { ref: "daemon/supervisor/types.ts:170-180", note: "ContextBundle 已含 scheme_summary/trust_tier/backlink_summary 可选字段" }
+    - { ref: "daemon/vault/active.ts:40", note: "assertContextHasNoVaultSecrets；builder 出口已调用（#288）" }
+  non_goals:
+    - 不把 builder 接进生产活发送路径（另开接线卡）
+    - 不重写 J.32a/b 回链内核或对照面 UI；不升 schema_version
+    - 不实现 §3.3 自动点亮；不开工 CI.2；不立信任档规格卡 / 蓝图第一批
+    - 不改 vault 门面或 Gateway 写范围
+  fail:
+    - 组装文案把缺登记 / 哈希不一致项标成已覆盖，或把 ai_inferred 写成用户已确认原话
+    - 出口跳过 assertContextHasNoVaultSecrets，或密钥命中后脱敏继续返回
+    - 借本卡改对照面 UI / 冻结内核 / 活发送路由
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 288, commit: 306ff11674da7307bb09c12dcd74e17f80e2f52e }
+```
+
+* **背景**：J.22 / J.30 / J.32 多次注明 prompt-builder 未对齐；现行函数仍是 S.1 纯组装器，测试在用、生产发送未接。
+* **取舍**：本卡先对齐组装语义与密钥断言；活路径接线另卡，避免本卡升 L。
+
