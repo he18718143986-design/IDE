@@ -1,10 +1,14 @@
+import { assertContextHasNoVaultSecrets } from "../vault/active";
 import type {
+  SupervisorBacklinkSummary,
   SupervisorBuiltPrompt,
   SupervisorContextBundle,
   SupervisorMessage,
   SupervisorPromptPolicy,
   SupervisorPromptSection,
+  SupervisorSchemeSummary,
   SupervisorSession,
+  SupervisorTrustTier,
 } from "./types";
 
 /**
@@ -203,6 +207,70 @@ function renderOutputSection(): string {
   ].join("\n");
 }
 
+const TRUST_TIER_LABEL: Record<SupervisorTrustTier, string> = {
+  light: "轻确认",
+  standard: "标准",
+  reconfirm: "重确认",
+};
+
+/** 有字段才渲染；全部缺省则返回 null（不插入该段、不伪造）。 */
+function renderSchemeSummarySection(
+  summary: SupervisorSchemeSummary | undefined,
+): string | null {
+  if (!summary) return null;
+  const lines: string[] = [];
+  if (summary.title !== undefined && summary.title !== "") {
+    lines.push(`- 标题：${summary.title}`);
+  }
+  if (summary.summary !== undefined && summary.summary !== "") {
+    lines.push(`- 摘要：${summary.summary}`);
+  }
+  if (summary.scheme_revision !== undefined) {
+    lines.push(`- 方案修订号：${summary.scheme_revision}`);
+  }
+  if (lines.length === 0) return null;
+  return lines.join("\n");
+}
+
+function renderTrustTierSection(
+  trustTier: SupervisorTrustTier | undefined,
+): string | null {
+  if (trustTier === undefined) return null;
+  return `- 信任档：${TRUST_TIER_LABEL[trustTier]}（${trustTier}）`;
+}
+
+/**
+ * 只消费调用方注入的 J.32a 摘要。
+ * 缺登记 / 哈希不一致 / ai_inferred 一律标「未覆盖」并写 reason，不得写成已覆盖。
+ */
+function renderBacklinkSummarySection(
+  summary: SupervisorBacklinkSummary | undefined,
+): string | null {
+  if (!summary) return null;
+  const lines: string[] = [];
+  if (summary.evaluation_ok === false) {
+    lines.push(
+      `- 回链核对失败：${summary.failure_reason ?? "unknown"}（不得将任何项标为已覆盖）`,
+    );
+  }
+  if (summary.items && summary.items.length > 0) {
+    for (const item of summary.items) {
+      if (item.covered === true && summary.evaluation_ok !== false) {
+        const turn =
+          item.turn_id !== undefined ? `（turn ${item.turn_id}）` : "";
+        lines.push(`- ${item.id}：已覆盖${turn}`);
+      } else if (item.covered === true) {
+        // 整体核对失败时即使传入 covered 也不宣称已覆盖
+        lines.push(`- ${item.id}：未覆盖（evaluation_failed）`);
+      } else {
+        lines.push(`- ${item.id}：未覆盖（${item.reason}）`);
+      }
+    }
+  }
+  if (lines.length === 0) return null;
+  return lines.join("\n");
+}
+
 /**
  * 组装 Supervisor 提示词。
  * 返回的分段结构同时供 UI 展示「模型看到了什么」（§2.2 上下文采集需可见）。
@@ -242,8 +310,24 @@ export function buildSupervisorPrompt(input: {
     max_messages: maxMessages,
   });
 
+  // 台账 / 信任档 / 回链：有字段才插入；不改 selectWindow 与预算算法。
+  const alignmentSections: SupervisorPromptSection[] = [];
+  const schemeBody = renderSchemeSummarySection(context.scheme_summary);
+  if (schemeBody !== null) {
+    alignmentSections.push({ title: "台账方案摘要", body: schemeBody });
+  }
+  const trustBody = renderTrustTierSection(context.trust_tier);
+  if (trustBody !== null) {
+    alignmentSections.push({ title: "信任档", body: trustBody });
+  }
+  const backlinkBody = renderBacklinkSummarySection(context.backlink_summary);
+  if (backlinkBody !== null) {
+    alignmentSections.push({ title: "回链核对摘要", body: backlinkBody });
+  }
+
   const sections: SupervisorPromptSection[] = [
     ...baseSections,
+    ...alignmentSections,
     {
       title: "对话上下文",
       body: renderConversation(window, session.messages.length),
@@ -254,6 +338,9 @@ export function buildSupervisorPrompt(input: {
   const text = sections
     .map((section) => `## ${section.title}\n${section.body}`)
     .join("\n\n");
+
+  // 命中即抛；不得脱敏后继续返回（与 vault/active.ts 口径一致）。
+  assertContextHasNoVaultSecrets(text);
 
   return {
     text,

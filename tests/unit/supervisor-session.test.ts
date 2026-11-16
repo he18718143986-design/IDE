@@ -483,4 +483,137 @@ describe("Prompt 组装流水线", () => {
     expect(prompt.text).toContain("消息 11");
     expect(prompt.text).not.toContain("消息 8");
   });
+
+  it("J.35：有台账/信任档/回链字段时插入三段；缺省不伪造", () => {
+    const repo = newRepoDir();
+    const manager = new SupervisorSessionManager(repo, { clock: makeClock() });
+    const session = manager.create();
+
+    const without = buildSupervisorPrompt({
+      session,
+      context: {
+        project: { repo_root: repo },
+        architecture: { constraints: ["单一职责"] },
+      },
+    });
+    expect(without.sections.map((s) => s.title)).not.toContain("台账方案摘要");
+    expect(without.sections.map((s) => s.title)).not.toContain("信任档");
+    expect(without.sections.map((s) => s.title)).not.toContain("回链核对摘要");
+    expect(without.text).not.toContain("已覆盖");
+
+    const withFields = buildSupervisorPrompt({
+      session,
+      context: {
+        project: { repo_root: repo },
+        architecture: { constraints: ["单一职责"] },
+        scheme_summary: {
+          title: "走查用方案",
+          summary: "只改文案",
+          scheme_revision: 3,
+        },
+        trust_tier: "standard",
+        backlink_summary: {
+          evaluation_ok: true,
+          items: [
+            { id: "ITEM-1", covered: true, turn_id: "turn_a" },
+            { id: "ITEM-2", covered: false, reason: "unregistered" },
+          ],
+        },
+      },
+    });
+    const titles = withFields.sections.map((s) => s.title);
+    expect(titles).toContain("台账方案摘要");
+    expect(titles).toContain("信任档");
+    expect(titles).toContain("回链核对摘要");
+    // 三段插在「对话上下文」之前
+    expect(titles.indexOf("台账方案摘要")).toBeLessThan(
+      titles.indexOf("对话上下文"),
+    );
+    expect(withFields.text).toContain("走查用方案");
+    expect(withFields.text).toContain("只改文案");
+    expect(withFields.text).toContain("方案修订号：3");
+    expect(withFields.text).toContain("信任档：标准（standard）");
+    expect(withFields.text).toContain("ITEM-1：已覆盖");
+    expect(withFields.text).toContain("ITEM-2：未覆盖（unregistered）");
+  });
+
+  it("J.35：缺登记 / ai_inferred / 哈希不一致不得写成已覆盖", () => {
+    const repo = newRepoDir();
+    const manager = new SupervisorSessionManager(repo, { clock: makeClock() });
+    const session = manager.create();
+
+    const prompt = buildSupervisorPrompt({
+      session,
+      context: {
+        project: { repo_root: repo },
+        architecture: { constraints: [] },
+        backlink_summary: {
+          evaluation_ok: true,
+          items: [
+            { id: "G-1", covered: false, reason: "unregistered" },
+            { id: "G-2", covered: false, reason: "ai_inferred" },
+            { id: "G-3", covered: false, reason: "no_turn_evidence" },
+          ],
+        },
+      },
+    });
+    expect(prompt.text).toContain("G-1：未覆盖（unregistered）");
+    expect(prompt.text).toContain("G-2：未覆盖（ai_inferred）");
+    expect(prompt.text).toContain("G-3：未覆盖（no_turn_evidence）");
+    expect(prompt.text).not.toMatch(/G-1：已覆盖/);
+    expect(prompt.text).not.toMatch(/G-2：已覆盖/);
+    expect(prompt.text).not.toMatch(/G-3：已覆盖/);
+
+    const hashFail = buildSupervisorPrompt({
+      session,
+      context: {
+        project: { repo_root: repo },
+        architecture: { constraints: [] },
+        backlink_summary: {
+          evaluation_ok: false,
+          failure_reason: "hash_mismatch",
+          items: [{ id: "G-4", covered: true, turn_id: "turn_x" }],
+        },
+      },
+    });
+    expect(hashFail.text).toContain("回链核对失败：hash_mismatch");
+    expect(hashFail.text).toContain("G-4：未覆盖（evaluation_failed）");
+    expect(hashFail.text).not.toMatch(/G-4：已覆盖/);
+  });
+
+  it("J.35：插入对齐段后对话窗裁剪与 dropped_message_ids 仍按预算生效", () => {
+    const repo = newRepoDir();
+    const manager = new SupervisorSessionManager(repo, { clock: makeClock() });
+    const session = manager.create();
+    const messages = Array.from({ length: 30 }, (_, index) => ({
+      message_id: `msg_${String(index).padStart(3, "0")}`,
+      role: "user" as const,
+      source: "ui" as const,
+      text: `第 ${index} 条消息：${"上下文".repeat(30)}`,
+      created_at: new Date(
+        Date.parse("2026-10-20T00:00:00.000Z") + index * 1000,
+      ).toISOString(),
+    }));
+
+    const prompt = buildSupervisorPrompt({
+      session: { ...session, messages },
+      context: {
+        project: { repo_root: repo },
+        architecture: { constraints: ["单一职责"] },
+        scheme_summary: { title: "对齐段", summary: "不改裁剪", scheme_revision: 1 },
+        trust_tier: "light",
+        backlink_summary: {
+          evaluation_ok: true,
+          items: [{ id: "X", covered: false, reason: "unregistered" }],
+        },
+      },
+      policy: { max_input_tokens: 500, max_messages: 30 },
+    });
+
+    expect(prompt.truncated).toBe(true);
+    expect(prompt.dropped_message_ids.length).toBeGreaterThan(0);
+    expect(prompt.text).toContain("第 29 条消息");
+    expect(prompt.text).not.toContain("第 0 条消息");
+    expect(prompt.text).toContain("台账方案摘要");
+  });
 });

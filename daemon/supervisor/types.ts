@@ -128,11 +128,51 @@ export interface SupervisorArchitectureContext {
   forbidden_dependencies?: string[] | undefined;
 }
 
+/**
+ * 台账方案摘要（调用方注入；builder 零 I/O）。
+ * 字段均可选：有什么渲染什么，缺省不伪造。
+ */
+export interface SupervisorSchemeSummary {
+  title?: string | undefined;
+  summary?: string | undefined;
+  scheme_revision?: number | undefined;
+}
+
+/** 与 J.32a TrustTier 对齐的字面量（不在此文件 import pipeline，避免类型层耦合） */
+export type SupervisorTrustTier = "light" | "standard" | "reconfirm";
+
+/**
+ * 单条回链核对摘要（只消费 J.32a 已算好的 verdict；不得在 builder 内重算）。
+ * covered:false 时必须带 reason；组装文案不得把该项写成「已覆盖」。
+ */
+export type SupervisorBacklinkItemSummary =
+  | { id: string; covered: true; turn_id?: string | undefined }
+  | {
+      id: string;
+      covered: false;
+      reason: "ai_inferred" | "no_turn_evidence" | "unregistered" | "hash_mismatch" | string;
+    };
+
+/**
+ * 回链核对摘要。evaluation_ok===false（如整体 hash_mismatch）时不得宣称任何项已覆盖。
+ */
+export interface SupervisorBacklinkSummary {
+  evaluation_ok?: boolean | undefined;
+  failure_reason?: string | undefined;
+  items?: readonly SupervisorBacklinkItemSummary[] | undefined;
+}
+
 export interface SupervisorContextBundle {
   project: SupervisorProjectSnapshot;
   architecture: SupervisorArchitectureContext;
   /** 最近 Daemon 事件摘要（脱敏后） */
   event_digests?: string[] | undefined;
+  /** 编译器台账方案摘要（可选；缺省不渲染该段） */
+  scheme_summary?: SupervisorSchemeSummary | undefined;
+  /** 信任档（可选；缺省不渲染该段） */
+  trust_tier?: SupervisorTrustTier | undefined;
+  /** 原话回链核对摘要（可选；缺省不渲染该段；只消费 J.32a 结果） */
+  backlink_summary?: SupervisorBacklinkSummary | undefined;
 }
 
 export interface SupervisorPromptPolicy {

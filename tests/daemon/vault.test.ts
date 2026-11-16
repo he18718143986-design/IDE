@@ -280,6 +280,58 @@ describe("TASK-L.14 凭据保险库", () => {
     ).toThrow(VaultSecretInContextError);
   });
 
+  it("J.35：buildSupervisorPrompt 出口调用 assertContextHasNoVaultSecrets，含密钥必抛且不脱敏继续", async () => {
+    const vault = await createVault({
+      repoRoot: repo,
+      backend: new MemoryVaultBackend(),
+    });
+    setActiveVault(vault);
+    await vault.setSecret(SECRET_NAME, SECRET);
+
+    const now = new Date().toISOString();
+    const session: SupervisorSession = {
+      schema_version: SUPERVISOR_SESSION_SCHEMA_VERSION,
+      session_id: "s-j35",
+      created_at: now,
+      updated_at: now,
+      messages: [
+        {
+          message_id: "m1",
+          role: "user",
+          text: "普通需求",
+          created_at: now,
+          source: "ui",
+        },
+      ],
+    };
+    const context: SupervisorContextBundle = {
+      project: { repo_root: repo, branch: "main", dirty: false },
+      architecture: { constraints: ["local-first"] },
+      scheme_summary: {
+        title: "夹带密钥",
+        summary: `deploy with ${SECRET}`,
+        scheme_revision: 1,
+      },
+    };
+
+    expect(() => buildSupervisorPrompt({ session, context })).toThrow(
+      VaultSecretInContextError,
+    );
+    try {
+      buildSupervisorPrompt({ session, context });
+      throw new Error("expected VaultSecretInContextError");
+    } catch (err) {
+      expect(err).toBeInstanceOf(VaultSecretInContextError);
+      expect((err as VaultSecretInContextError).code).toBe(
+        E_VAULT_SECRET_IN_CONTEXT,
+      );
+      expect((err as Error).message).not.toContain(SECRET);
+      // 不得返回脱敏后的 BuiltPrompt
+      expect(err).not.toHaveProperty("text");
+      expect(err).not.toHaveProperty("sections");
+    }
+  });
+
   describe("HTTP /api/vault（生产主路径）", () => {
     let daemon: StagentDaemon | null = null;
 
