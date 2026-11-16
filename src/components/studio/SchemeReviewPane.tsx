@@ -24,6 +24,7 @@ import type {
 import {
   EMPTY_DEMO_GATE,
   NO_SCHEME_YET_LABEL,
+  acceptanceItemsFromSchemeDraft,
   evaluateSchemeConfirmation,
 } from "@/lib/journey/scheme-draft";
 import type { ScopePlan } from "@/lib/journey/scope-plan";
@@ -68,9 +69,12 @@ export interface SchemeReviewPaneProps {
   forceExpandSensitive?: boolean | undefined;
   onDeclineSensitive?: (() => void) | undefined;
   /** J.16：当前方案修订的确认 ID（与确认按钮使用同一键）；缺省则不上报呈现 */
-  /** 挂账⑬ 方案 A：台账验收条目（只读投影），缺省不渲染条目 */
+  /**
+   * TASK-J.22b / 挂账⑬：台账验收条目（只读投影）。
+   * 缺省时回退到 scheme.acceptance（同批 midpane 投影）；空数组表示已结算且无条目。
+   */
   acceptanceItems?: readonly SchemeAcceptanceItem[] | undefined;
-  /** J16-P7：取数完成或失败后为 true，空条目时标「无呈现记录」 */
+  /** J16-P7 / J.22b：取数完成或失败后为 true，空条目时标「无呈现记录」 */
   acceptanceSettled?: boolean | undefined;
   surfaceConfirmationId?: string | null | undefined;
   onSurfacePresented?: ScopeAcceptanceSurfaceProps["onReport"] | undefined;
@@ -465,7 +469,11 @@ export function SchemeReviewPane(props: SchemeReviewPaneProps) {
         forceExpandSensitive={props.forceExpandSensitive}
         busy={props.confirmBusy}
         onDeclineSensitive={props.onDeclineSensitive}
-        acceptanceItems={props.acceptanceItems}
+        acceptanceItems={
+          props.acceptanceItems !== undefined
+            ? props.acceptanceItems
+            : acceptanceItemsFromSchemeDraft(scheme)
+        }
         acceptanceSettled={props.acceptanceSettled}
         surface={
           props.surfaceConfirmationId && props.onSurfacePresented

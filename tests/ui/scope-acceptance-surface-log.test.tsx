@@ -209,7 +209,7 @@ describe("TASK-J.16 · 区块呈现上报（surface_log 接线）", () => {
 });
 
 describe("TASK-J.16 J16-P7 · 台账验收条目渲染与 acceptance 段上报", () => {
-  it("渲染台账条目原文，并在展示后按 acceptance 段上报台账 id", async () => {
+  it("TASK-J.22b：逐条渲染 id+文案，并在展示后按 acceptance 段上报台账 id", async () => {
     const onReport = vi.fn(() =>
       Promise.resolve({ written: 2, confirmation_id: "c-acc" }),
     );
@@ -233,7 +233,20 @@ describe("TASK-J.16 J16-P7 · 台账验收条目渲染与 acceptance 段上报",
       "ITEM-1",
       "ITEM-2",
     ]);
-    expect(rows[0]?.textContent).toBe("首页显示逾期数");
+    expect(
+      rows.map(
+        (r) =>
+          r.querySelector('[data-testid="scope-acceptance-criterion-id"]')
+            ?.textContent,
+      ),
+    ).toEqual(["ITEM-1", "ITEM-2"]);
+    expect(
+      rows.map(
+        (r) =>
+          r.querySelector('[data-testid="scope-acceptance-criterion-text"]')
+            ?.textContent,
+      ),
+    ).toEqual(["首页显示逾期数", "报表可导出 CSV"]);
     await waitFor(() => expect(onReport).toHaveBeenCalledTimes(1));
     const payload = onReport.mock.calls[0]?.[0] as SurfacePresentationReport;
     expect(payload.shown.filter((s) => s.section === "acceptance")).toEqual([
@@ -242,6 +255,29 @@ describe("TASK-J.16 J16-P7 · 台账验收条目渲染与 acceptance 段上报",
     ]);
     // P-201：冻结后的只读展示记为确认后，不冒充确认当时
     expect(payload.phase).toBe("post_confirm");
+  });
+
+  it("TASK-J.22b：空白 id/文案与重复 id 不渲染、不伪造条目", () => {
+    render(
+      <ScopeAcceptanceBlock
+        plan={makePlan()}
+        mode="frozen"
+        acceptanceItems={[
+          { id: "ITEM-1", text: "首页显示逾期数" },
+          { id: "  ", text: "无 id" },
+          { id: "ITEM-2", text: "   " },
+          { id: "ITEM-1", text: "重复后条" },
+        ]}
+        acceptanceSettled
+      />,
+    );
+    const rows = screen.getAllByTestId("scope-acceptance-criterion-row");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.getAttribute("data-item-ref")).toBe("ITEM-1");
+    expect(
+      rows[0]?.querySelector('[data-testid="scope-acceptance-criterion-text"]')
+        ?.textContent,
+    ).toBe("首页显示逾期数");
   });
 
   it("没有台账条目时不渲染验收条目区块，也不上报 acceptance 段", () => {
@@ -312,7 +348,7 @@ describe("TASK-J.16 J16-P7 · 台账验收条目渲染与 acceptance 段上报",
     expect(payload.shown.filter((s) => s.section === "acceptance")).toEqual([]);
   });
 
-  it("取数已完成且有条目时不标「无呈现记录」", () => {
+  it("取数已完成且有条目时不标「无呈现记录」，并露出 id+文案", () => {
     render(
       <ScopeAcceptanceBlock
         plan={makePlan()}
@@ -321,11 +357,16 @@ describe("TASK-J.16 J16-P7 · 台账验收条目渲染与 acceptance 段上报",
         acceptanceSettled
       />,
     );
+    const row = screen.getByTestId("scope-acceptance-criterion-row");
+    expect(row.getAttribute("data-item-ref")).toBe("ITEM-1");
     expect(
-      screen
-        .getByTestId("scope-acceptance-criterion-row")
-        .getAttribute("data-item-ref"),
+      row.querySelector('[data-testid="scope-acceptance-criterion-id"]')
+        ?.textContent,
     ).toBe("ITEM-1");
+    expect(
+      row.querySelector('[data-testid="scope-acceptance-criterion-text"]')
+        ?.textContent,
+    ).toBe("首页显示逾期数");
     expect(
       screen.queryByTestId("scope-acceptance-no-surface-record"),
     ).toBeNull();

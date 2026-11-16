@@ -23,6 +23,26 @@ export const SCOPE_ACCEPTANCE_PLAIN_TEXT_VERSION =
 export const NO_ACCEPTANCE_SURFACE_RECORD_LABEL = "无呈现记录" as const;
 
 /**
+ * TASK-J.22b：把台账验收条目收成可呈现列表。
+ * - 只保留非空 id + 非空文案；重复 id 只留首条；
+ * - 不伪造条目、不补默认文案。
+ */
+export function presentableAcceptanceItems(
+  items: readonly SchemeAcceptanceItem[] = [],
+): SchemeAcceptanceItem[] {
+  const seen = new Set<string>();
+  const out: SchemeAcceptanceItem[] = [];
+  for (const item of items) {
+    const id = typeof item.id === "string" ? item.id.trim() : "";
+    const text = typeof item.text === "string" ? item.text.trim() : "";
+    if (id === "" || text === "" || seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, text });
+  }
+  return out;
+}
+
+/**
  * 呈现上报（J.16 / GAP-P8）。`confirmationId` 由父级在方案修订期间铸造并保持稳定；
  * `onReport` 失败不阻塞渲染，只留痕（console.warn + data-surface-log="failed"）。
  */
@@ -66,10 +86,12 @@ export function scopeAcceptanceShownItems(
   mode: ScopeAcceptanceMode,
   acceptanceItems: readonly SchemeAcceptanceItem[] = [],
 ): { item_ref: string; section: SurfacePresentationSection }[] {
-  const acceptanceShown = acceptanceItems.map((item) => ({
-    item_ref: item.id,
-    section: "acceptance" as const,
-  }));
+  const acceptanceShown = presentableAcceptanceItems(acceptanceItems).map(
+    (item) => ({
+      item_ref: item.id,
+      section: "acceptance" as const,
+    }),
+  );
   return [...acceptanceShown, ...planShownItems(plan, mode)];
 }
 
@@ -233,6 +255,11 @@ export function ScopeAcceptanceBlock(props: ScopeAcceptanceBlockProps) {
     }
   }, [props.approvalRequired, props.forceExpandSensitive]);
 
+  // TASK-J.22b：逐条 id+文案；空台账不伪造；空态口径明确（「无呈现记录」）。
+  const acceptanceRows = presentableAcceptanceItems(
+    props.acceptanceItems ?? [],
+  );
+
   return (
     <section
       data-testid="scope-acceptance-block"
@@ -254,20 +281,32 @@ export function ScopeAcceptanceBlock(props: ScopeAcceptanceBlockProps) {
         </p>
       ) : null}
 
-      {props.acceptanceItems && props.acceptanceItems.length > 0 ? (
+      {acceptanceRows.length > 0 ? (
         <div
           data-testid="scope-acceptance-criteria"
           className="mb-2 space-y-1 text-xs"
         >
           <h4 className="font-medium text-foreground">验收条目</h4>
-          <ul className="list-inside list-disc space-y-0.5 text-muted-foreground">
-            {props.acceptanceItems.map((item) => (
+          <ul className="space-y-0.5 text-muted-foreground">
+            {acceptanceRows.map((item) => (
               <li
                 key={item.id}
                 data-testid="scope-acceptance-criterion-row"
                 data-item-ref={item.id}
+                className="flex gap-1.5 leading-relaxed"
               >
-                {item.text}
+                <span
+                  data-testid="scope-acceptance-criterion-id"
+                  className="shrink-0 font-mono text-[11px] text-foreground"
+                >
+                  {item.id}
+                </span>
+                <span
+                  data-testid="scope-acceptance-criterion-text"
+                  className="min-w-0"
+                >
+                  {item.text}
+                </span>
               </li>
             ))}
           </ul>

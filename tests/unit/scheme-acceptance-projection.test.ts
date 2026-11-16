@@ -1,5 +1,6 @@
 /**
  * TASK-J.16 J16-P7（挂账⑬ 方案 A）：台账验收条目只读投影的单元测试。
+ * TASK-J.22b：条目级呈现（presentableAcceptanceItems / acceptanceItemsFromSchemeDraft）。
  */
 import { describe, it, expect } from "vitest";
 import type { SchemeDraftV2 } from "../../src/lib/journey/scheme-patch-types";
@@ -9,6 +10,11 @@ import {
   emptySchemeDraftV2,
   type SchemeLedgerRecord,
 } from "../../daemon/supervisor/intent-compiler/scheme-ledger-store";
+import { presentableAcceptanceItems } from "../../src/components/studio/ScopeAcceptanceBlock";
+import {
+  acceptanceItemsFromSchemeDraft,
+  emptySchemeDraft,
+} from "../../src/lib/journey/scheme-draft";
 
 type AcceptanceEntry = SchemeDraftV2["acceptance"][number];
 
@@ -89,5 +95,42 @@ describe("TASK-J.16 J16-P7 · 台账验收条目只读投影", () => {
     const before = JSON.stringify(record);
     projectSchemeAcceptance(record);
     expect(JSON.stringify(record)).toBe(before);
+  });
+});
+
+describe("TASK-J.22b · 条目级呈现（id+文案 / 空台账不伪造）", () => {
+  it("presentableAcceptanceItems 保留逐条 id+文案，丢弃空白与重复", () => {
+    expect(
+      presentableAcceptanceItems([
+        { id: "ITEM-1", text: "  首页显示逾期数  " },
+        { id: "  ", text: "无 id" },
+        { id: "ITEM-2", text: "   " },
+        { id: "ITEM-1", text: "重复后条" },
+        { id: "ITEM-3", text: "报表可导出 CSV" },
+      ]),
+    ).toEqual([
+      { id: "ITEM-1", text: "首页显示逾期数" },
+      { id: "ITEM-3", text: "报表可导出 CSV" },
+    ]);
+  });
+
+  it("空输入不伪造条目", () => {
+    expect(presentableAcceptanceItems([])).toEqual([]);
+    expect(presentableAcceptanceItems()).toEqual([]);
+  });
+
+  it("acceptanceItemsFromSchemeDraft 从中栏草稿抽出 id+文案", () => {
+    const draft = emptySchemeDraft({
+      acceptance: [
+        { id: "ITEM-1", text: "首页显示逾期数", check: "playtest" },
+        { id: "", text: "无 id", check: "playtest" },
+        { id: "ITEM-2", text: "报表可导出 CSV", check: "auto" },
+      ],
+    });
+    expect(acceptanceItemsFromSchemeDraft(draft)).toEqual([
+      { id: "ITEM-1", text: "首页显示逾期数" },
+      { id: "ITEM-2", text: "报表可导出 CSV" },
+    ]);
+    expect(acceptanceItemsFromSchemeDraft(null)).toEqual([]);
   });
 });

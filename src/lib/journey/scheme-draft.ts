@@ -89,6 +89,26 @@ export interface SchemeDraft {
 /** TASK-J.22a：无台账 / 无实质台账内容时的降级标注（验收原文）。 */
 export const NO_SCHEME_YET_LABEL = "方案尚未生成" as const;
 
+/**
+ * TASK-J.22b：从中栏 SchemeDraft 抽出验收条目（id+文案），供 ScopeAcceptanceBlock 呈现。
+ * 空白 id/文案丢弃；不伪造条目。
+ */
+export function acceptanceItemsFromSchemeDraft(
+  draft: SchemeDraft | null | undefined,
+): Array<{ id: string; text: string }> {
+  const rows = draft?.acceptance ?? [];
+  const seen = new Set<string>();
+  const out: Array<{ id: string; text: string }> = [];
+  for (const row of rows) {
+    const id = typeof row.id === "string" ? row.id.trim() : "";
+    const text = typeof row.text === "string" ? row.text.trim() : "";
+    if (id === "" || text === "" || seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, text });
+  }
+  return out;
+}
+
 /** Daemon 中栏只读投影的前端视图（与 scheme-midpane-projection 同形）。 */
 export interface SchemeMidpaneView {
   available: boolean;
