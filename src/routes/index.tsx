@@ -64,6 +64,7 @@ import {
   createSupervisorPrototype,
   confirmSupervisorPrototype,
   freezeSchemeSnapshot,
+  previewSchemeItemBacklinks,
   preflightScope,
   getProjectPlan,
   patchProjectPlan,
@@ -101,6 +102,8 @@ import {
   type SchemeAcceptanceItem,
   registerSchemeTurn,
   type SchemeSourceTurn,
+  type SchemeTrustTier,
+  type SchemeBacklinkPreviewView,
   type DisputeSealApiView,
 } from "@/lib/daemon-api";
 import { ContractCard } from "@/components/contract/ContractCard";
@@ -457,6 +460,14 @@ function Console() {
   const [schemeDraft, setSchemeDraft] = useState<SchemeDraft | null>(null);
   const [schemeSources, setSchemeSources] =
     useState<SchemeSources>(EMPTY_SCHEME_SOURCES);
+  const [schemeTrustTier, setSchemeTrustTier] =
+    useState<SchemeTrustTier>("standard");
+  const [schemeBacklinkPreview, setSchemeBacklinkPreview] =
+    useState<SchemeBacklinkPreviewView | null>(null);
+  const [schemeBacklinkBusy, setSchemeBacklinkBusy] = useState(false);
+  const [schemeReconfirmChecked, setSchemeReconfirmChecked] = useState<
+    ReadonlySet<string>
+  >(new Set());
   const [schemeDemoBusy, setSchemeDemoBusy] = useState(false);
   const [schemeDemoGate, setSchemeDemoGate] =
     useState<DemoGate>(EMPTY_DEMO_GATE);
@@ -650,6 +661,10 @@ function Console() {
      */
     setSchemeDraft(null);
     setSchemeSources(EMPTY_SCHEME_SOURCES);
+    setSchemeTrustTier("standard");
+    setSchemeBacklinkPreview(null);
+    setSchemeBacklinkBusy(false);
+    setSchemeReconfirmChecked(new Set());
     setSchemeDemoGate(EMPTY_DEMO_GATE);
     setSchemeChatLocked(false);
     setHandoffStep(null);
@@ -665,6 +680,46 @@ function Console() {
    * 在方案修订出现时即铸造（与确认按钮同一键，修订变化才换新），
    * 使区块渲染时就能把实际呈现的条目绑定到将来的确认上。
    */
+  const schemeFrozen = schemeDraft?.frozen === true;
+  const schemeRevisionForPreview = schemeDraft?.scheme_revision;
+  useEffect(() => {
+    if (!conn || !connected || !schemeDraft || schemeFrozen) {
+      return;
+    }
+    let cancelled = false;
+    setSchemeBacklinkBusy(true);
+    void previewSchemeItemBacklinks(conn, {
+      source_turns: schemeSources.turns,
+    })
+      .then((view) => {
+        if (cancelled) return;
+        setSchemeBacklinkPreview(view);
+        setSchemeReconfirmChecked(new Set());
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setSchemeBacklinkPreview({
+          ok: false,
+          reason: "preview_failed",
+          message:
+            err instanceof Error ? err.message : "对照预览没取到，请稍后重试。",
+        });
+      })
+      .finally(() => {
+        if (!cancelled) setSchemeBacklinkBusy(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    conn,
+    connected,
+    schemeDraft,
+    schemeFrozen,
+    schemeRevisionForPreview,
+    schemeSources,
+  ]);
+
   const [schemeSurfaceConfirmId, setSchemeSurfaceConfirmId] = useState<
     string | null
   >(null);
@@ -1501,6 +1556,7 @@ function Console() {
               },
               scope_plan: planForConfirm,
               source_turns: sourceTurnsForConfirm,
+              trust_tier: schemeTrustTier,
             });
             return {
               snapshot_id: view.snapshot_id,
@@ -1680,6 +1736,7 @@ function Console() {
       conn,
       schemeDraft,
       schemeSources,
+      schemeTrustTier,
       scopePlan,
       schemeDemoGate,
       schemeConfirmBusy,
@@ -3885,6 +3942,25 @@ function Console() {
                     onAcceptDegradedDemo={() => {
                       handleAcceptDegradedDemo();
                     }}
+                    quoteBacklink={
+                      schemeDraft && !schemeDraft.frozen
+                        ? {
+                            trustTier: schemeTrustTier,
+                            onTrustTierChange: setSchemeTrustTier,
+                            preview: schemeBacklinkPreview,
+                            busy: schemeBacklinkBusy,
+                            checkedIds: schemeReconfirmChecked,
+                            onToggleChecked: (itemId) => {
+                              setSchemeReconfirmChecked((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(itemId)) next.delete(itemId);
+                                else next.add(itemId);
+                                return next;
+                              });
+                            },
+                          }
+                        : undefined
+                    }
                     onConfirmScheme={() => {
                       void handleConfirmScheme();
                     }}

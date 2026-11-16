@@ -2229,6 +2229,72 @@ export async function freezeSchemeSnapshot(
   });
 }
 
+/** TASK-J.32a / J.32b：信任档。标准档为默认。 */
+export type SchemeTrustTier = "light" | "standard" | "reconfirm";
+
+export type SchemeBacklinkSkipReason =
+  "ai_inferred" | "no_turn_evidence" | "unregistered";
+
+export type SchemeBacklinkPreviewItem =
+  | {
+      id: string;
+      source: "user_said" | "user_confirmed" | "ai_inferred" | "user_edited";
+      covered: true;
+      turn_id: string;
+      user_alias_seq?: number;
+      label: string;
+    }
+  | {
+      id: string;
+      source: "user_said" | "user_confirmed" | "ai_inferred" | "user_edited";
+      covered: false;
+      reason: SchemeBacklinkSkipReason;
+      label: string;
+    };
+
+export interface SchemeBacklinkPreviewQuote {
+  turn_id: string;
+  seq: number;
+  user_alias_seq?: number;
+  text: string;
+  turn_text_sha256: string;
+}
+
+export type SchemeBacklinkPreviewView =
+  | {
+      ok: true;
+      items: SchemeBacklinkPreviewItem[];
+      quotes: SchemeBacklinkPreviewQuote[];
+      covered_count: number;
+      uncovered_count: number;
+    }
+  | {
+      ok: false;
+      reason: string;
+      item_id?: string;
+      turn_id?: string;
+      message: string;
+    };
+
+/**
+ * TASK-J.32b：确认前只读预览。
+ * 返回与封存时同一套核对结果（服务端复用 evaluateSchemeItemBacklinks），
+ * 以及已登记原话的 U<seq> 与原文。不写快照、不触发封存。
+ */
+export async function previewSchemeItemBacklinks(
+  conn: DaemonConnection,
+  input: { source_turns: readonly SchemeSourceTurn[] },
+): Promise<SchemeBacklinkPreviewView> {
+  return request<SchemeBacklinkPreviewView>(
+    conn,
+    "/api/supervisor/scheme/backlink-preview",
+    {
+      method: "POST",
+      body: JSON.stringify({ source_turns: input.source_turns }),
+    },
+  );
+}
+
 /** TASK-J.4：范围预检（只读、零模型、零落盘）。 */
 export async function preflightScope(
   conn: DaemonConnection,

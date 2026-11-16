@@ -42,6 +42,11 @@ import {
   type PlaytestAcceptBlockProps,
 } from "@/components/studio/PlaytestAcceptBlock";
 import type { ProjectPlan } from "@/lib/project/project-plan";
+import {
+  SchemeQuoteBacklinkBlock,
+  reconfirmChecksComplete,
+  type SchemeQuoteBacklinkBlockProps,
+} from "@/components/studio/SchemeQuoteBacklinkBlock";
 
 export interface SchemeReviewPaneProps {
   scheme: SchemeDraft | null;
@@ -97,6 +102,10 @@ export interface SchemeReviewPaneProps {
   onProjectMapReorderForward?: ((stubId: string) => void) | undefined;
   /** TASK-L.17c：中栏同页对照试玩 + 原话认可（可选；缺省不渲染提交能力） */
   playtest?: PlaytestAcceptBlockProps | null | undefined;
+  /**
+   * TASK-J.32b：签字前对照面与信任档。缺省不渲染对照面，确认门禁与原来一致。
+   */
+  quoteBacklink?: SchemeQuoteBacklinkBlockProps | undefined;
 }
 
 /** 决议区白话投影的版本号；措辞变化时递增，写入 surface_log 的 plain_text_version。 */
@@ -192,11 +201,23 @@ export function SchemeReviewPane(props: SchemeReviewPaneProps) {
         });
   // SA-1：E_SCOPE_APPROVAL_REQUIRED 仍可点确认——点击时一键授权并提交。
   const approvalRequired = confirmation.code === "E_SCOPE_APPROVAL_REQUIRED";
+  const quoteBacklink = props.quoteBacklink;
+  const quoteBacklinkBlocksConfirm =
+    quoteBacklink !== undefined &&
+    (quoteBacklink.busy === true ||
+      quoteBacklink.preview == null ||
+      quoteBacklink.preview.ok === false ||
+      !reconfirmChecksComplete(
+        quoteBacklink.trustTier,
+        quoteBacklink.preview,
+        quoteBacklink.checkedIds,
+      ));
   const canConfirm =
     Boolean(scheme) &&
     props.confirmBusy !== true &&
     !frozen &&
-    (confirmation.ok || approvalRequired);
+    (confirmation.ok || approvalRequired) &&
+    !quoteBacklinkBlocksConfirm;
   const pendingSensitiveCount =
     props.scopePlan?.needs_approval.filter((i) => i.approved === null).length ??
     0;
@@ -575,6 +596,11 @@ export function SchemeReviewPane(props: SchemeReviewPaneProps) {
             打开运行诊断
           </button>
         </section>
+      ) : null}
+
+      {/* TASK-J.32b：对照面挂在最底确认区之前，不另开整页 */}
+      {!frozen && quoteBacklink ? (
+        <SchemeQuoteBacklinkBlock {...quoteBacklink} />
       ) : null}
 
       {/* 最底只有确认方案；无「继续澄清」 */}
