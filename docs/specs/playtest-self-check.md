@@ -733,4 +733,12 @@ export const selfCheckReportSchema = z.object({
 
 | 日期与时区（Asia/Hong_Kong） | 所试 main SHA | 步骤编号 | 实际看到的原文 | 通过或失败 | 操作者 | 失败时的现象（通过则留空） |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| 2026-11-16 11:37 Asia/Hong_Kong | `b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b` | J.31-2 / J32B-P1 | 签字前对照；标准档会出示「说过的每件事都有着落」；已覆盖 1 项，未覆盖 2 项。未覆盖的会明确标出，不会被跳过；对照面在「确认方案」按钮上方 | 通过 | Cursor Cloud Agent（方案回链对照面） |  |
+| 2026-11-16 11:37 Asia/Hong_Kong | `b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b` | J32B-P1 未覆盖标出 | 「未覆盖 · 引用的原话还没登记」「未覆盖 · 这是推断出来的，不是你亲口说的」；已覆盖「已覆盖 · U9：对照刷新需求句」 | 通过 | Cursor Cloud Agent（方案回链对照面） |  |
+| 2026-11-16 11:54 Asia/Hong_Kong | `b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b` | J32B-P2 标准档 | `scheme-trust-tier-standard` data-selected=true；出示对照面 | 通过 | Cursor Cloud Agent（方案回链对照面） |  |
+| 2026-11-16 11:54 Asia/Hong_Kong | `b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b` | J32B-P2 重确认 | 逐项勾选 checkbox_count=3；未勾完 scheme-confirm disabled=true；勾完 disabled=false | 通过 | Cursor Cloud Agent（方案回链对照面） |  |
+| 2026-11-16 11:54 Asia/Hong_Kong | `b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b` | J32B-P2 轻确认 | 无对照面 surface；「轻确认不把对照面或逐项勾选作为默认确认步骤；冻结时仍会按已登记原话做机械回链。」 | 通过 | Cursor Cloud Agent（方案回链对照面） |  |
+| 2026-11-16 11:07 Asia/Hong_Kong | `b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b` | J32B-P3 预览 hash_mismatch | backlink-preview → ok=false reason=hash_mismatch；未改封存 | 通过 | Cursor Cloud Agent（方案回链对照面） |  |
+| 2026-11-16 11:07 Asia/Hong_Kong | `b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b` | 预览只读无副作用 | 预览前后 schemes 快照列表均为空 | 通过 | Cursor Cloud Agent（方案回链对照面） |  |
+| 2026-11-16 11:08 Asia/Hong_Kong | `b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b` | 哈希不一致不能落盘 | freeze → 409 turn_hash_mismatch；轻确认伪造同样 409；snap_exists=false | 通过 | Cursor Cloud Agent（方案回链对照面） |  |
 |  |  |  |  |  |  |  |
