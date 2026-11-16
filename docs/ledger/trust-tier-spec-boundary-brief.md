@@ -34,11 +34,11 @@
 - 业主操作规程文案（见 [`TASK-J.34`](../specs/development-tasks-completed.md#task-j.34)）
 - 细模型加层 + 视图投影实现（蓝图第一批规格卡 S / 实现 L，另授权；见细模型简报）
 
-## 3. 立卡形态（P-233 已立；仍未开工）
+## 3. 立卡形态（P-233 已立；施工另授权）
 
 | 卡号 | 估算 | 状态 | 一句话 |
 | :--- | :--- | :--- | :--- |
-| [`TASK-J.36`](../specs/development-tasks-active.md#task-j.36) | **S** | `[NEW_TASK]`（P-233 立卡；立卡 ≠ 开工） | 信任档规格缝补丁：只写 §2 三缝的契约与失败语义；`writable_paths` 限规格与类型声明，不含对照面 UI / 冻结内核重写 |
+| [`TASK-J.36`](../specs/development-tasks-active.md#task-j.36) | **S** | `[NEW_TASK]`（P-233 立卡；Tina 授权施工中） | 信任档规格缝补丁：只写 §2 三缝的契约与失败语义；`writable_paths` 限规格与类型声明，不含对照面 UI / 冻结内核重写 |
 
 卡面必须原样写入（P-233 已写入）：
 
@@ -46,9 +46,15 @@
 - 硬依赖：`TASK-J.32a`、`TASK-J.32b`（均 COMPLETED）
 - 与细模型规格卡的分界：五字段投影 DTO 可在本卡定契约，视图实现归细模型实现子卡
 
+**施工落点指针（J.36）**：
+
+- 契约与失败语义：[`../specs/supervisor.md`](../specs/supervisor.md)「快照 v1/V2 双形缝」「`acceptance.check` / `notes` 字段契约」「条目投影五字段 DTO」
+- 类型声明：`src/lib/journey/scheme-patch-types.ts`（`AcceptanceCheckKind` / `AcceptanceItem` / `SchemeDraftV2.notes` / `SchemeItemProjectionDto`；`BUSINESS_KEYS.acceptance` 透传 `check`）
+
 ## 4. 结论
 
 - **J.32a/b 已覆盖信任档工程主面**；再立「信任档规格卡」若不以 §2 三缝为界，就会与已交付内核重复。
 - **P-230**：只落本简报；当时不立 `TASK-J.36`。
-- **P-233**：已立 [`TASK-J.36`](../specs/development-tasks-active.md#task-j.36)（仍未开工）；另落活发送路径只读定位简报，**不立**接线卡。
+- **P-233**：已立 [`TASK-J.36`](../specs/development-tasks-active.md#task-j.36)；另落活发送路径只读定位简报，**不立**接线卡。
+- **J.36 施工**：规格 + 类型声明按 §2 三缝落地；不改冻结内核 / 对照面 / 不升 `schema_version`；视图实现与活发送接线仍另卡。
 - 蓝图「细模型加层 + 视图投影」规格卡仍暂不立（与本简报分治）。
