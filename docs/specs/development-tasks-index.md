@@ -194,6 +194,8 @@
 | `TASK-J.32a` | `COMPLETED` | 密封前原话回链内核（拆自 J.32；修卡 P-221；施工 #273 `2d48303`；完工回写 P-222；估算 M；硬依赖 J.16） | [正文](./development-tasks-completed.md#task-j.32a) |
 | `TASK-J.32b` | `COMPLETED` | 回链对照面与信任档确认形态（拆自 J.32；修卡 P-221；修卡 P-223；施工 #276 `b751b4a`；完工回写 P-224；估算 M） | [正文](./development-tasks-completed.md#task-j.32b) |
 | `TASK-J.33` | `COMPLETED` | 新增卡文案规范并做成机器可校验项（立卡 P-215；施工 #266 `838d1f4`；完工回写 P-217；估算 M） | [正文](./development-tasks-completed.md#task-j.33) |
+| `TASK-J.34` | `NEW_TASK` | 业主确认与试玩操作规程（SOP · S2→Seal + 试玩；立卡 P-230；未开工；估算 S） | [正文](./development-tasks-active.md#task-j.34) |
+| `TASK-J.35` | `NEW_TASK` | prompt-builder.ts 对齐台账 / 信任档 / 回链事实（立卡 P-230；未开工；估算 M） | [正文](./development-tasks-active.md#task-j.35) |
 
 ---
 

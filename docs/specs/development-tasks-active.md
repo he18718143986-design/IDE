@@ -785,7 +785,7 @@ governance:
 >
 > **拆卡说明（2026-11-15 · P-215）**：按 R-11，估算 L 的母卡不得开工，必须先拆。Tina t1286u 授权拆为三张子卡，本卡改标 **`[SPLIT]`**，保留追溯，**不再作为施工依据**，施工以子卡正文为准：[`TASK-J.22a`](./development-tasks-completed.md#task-j.22a)（来源统一 + 无台账降级；P-226 COMPLETED）、[`TASK-J.22b`](./development-tasks-completed.md#task-j.22b)（条目级呈现；P-228 COMPLETED）、[`TASK-J.22c`](./development-tasks-completed.md#task-j.22c)（真实试玩；P-229 COMPLETED）。硬依赖 `TASK-J.21` 与 `TASK-J.16` 均已 `[COMPLETED]`。
 >
-> **归档注记（2026-11-16 · P-229）**：三子卡均已 **COMPLETED**。母卡维持 **`[SPLIT]`** 追溯归档，**不再作为施工依据**。诚实口径：来源统一、条目级呈现、真实试玩已交付；§3.3 自动点亮未实现；`prompt-builder.ts` 未对齐（另卡）。蓝图第一批卡暂不立；CI.2 攒样本；文档计划暂缓。不宣称端到端闭环。
+> **归档注记（2026-11-16 · P-229）**：三子卡均已 **COMPLETED**。母卡维持 **`[SPLIT]`** 追溯归档，**不再作为施工依据**。诚实口径：来源统一、条目级呈现、真实试玩已交付；§3.3 自动点亮未实现；`prompt-builder.ts` 对齐见 [`TASK-J.35`](#task-j.35)（P-230 立卡，未开工）。业主 SOP 见 [`TASK-J.34`](#task-j.34)。蓝图第一批卡暂不立；信任档规格卡仅出划界简报暂不立；CI.2 攒样本。不宣称端到端闭环。
 > **已知限制（K-14 第一刀 #217 记录）**：台账 `scheme_revision` 与中栏启发式方案修订号未对齐校验——根治已由子卡承接；本母卡不再施工。
 
 ```yaml task-card
@@ -1219,7 +1219,7 @@ governance:
 
 > **立卡说明（2026-11-15 · P-215）**：授权来源为 Tina t1286u。本条只立卡 / 拆卡，不写产品代码，不开工。第二块按 R-11 拆为 [`TASK-J.31`](./development-tasks-completed.md#task-j.31)（判分表升级，纯文档，估算 S；已 `[COMPLETED]`，施工 #264 `03acf2a`，完工回写 P-216）与 [`TASK-J.33`](./development-tasks-completed.md#task-j.33)（`card-copy-standard.md` + 校验器，估算 M；已 `[COMPLETED]`，施工 #266 `838d1f4`，完工回写 P-217）。「密封前意图完整性核对」立 [`TASK-J.32`](#task-j.32)（估算 M，须复用 J.16 `frozen_quotes` 登记与封存链路）。`TASK-J.22` 的拆卡正文在既有卡位，不迁入本节。
 >
-> **修卡说明（2026-11-15 · P-221）**：授权来源为 Tina t1310u。J.32 只读定位简报已核对通过。施工实际需要的对照面前端组件与 `SchemeItemMeta` / `TurnRef` 补哈希字段均不在原 `writable_paths` 内；把对照面与信任档确认形态并入原 M 卡后范围明显超出，按 R-11 先拆再开工。`TASK-J.32` 改标 **`[SPLIT]`**，保留追溯，**不再作为施工依据**，施工以子卡正文为准：[`TASK-J.32a`](./development-tasks-completed.md#task-j.32a)（密封前原话回链内核，估算 M）、[`TASK-J.32b`](./development-tasks-completed.md#task-j.32b)（回链对照面与信任档确认形态，估算 M；硬依赖 J.32a）。卡面三条硬约束：缺登记或哈希不一致不得标已覆盖；`ai_inferred` 不得冒充 `user_said`；轻确认档机械回链仍须用已登记原话，不得接受事后拼凑。`prompt-builder.ts` 仍不列入必须可写，对齐留后续另卡。**修卡 ≠ 开工**；子卡施工须在本修卡合入后再逐张授权。`TASK-J.22a` / `TASK-J.22b` / `TASK-J.22c` 不动。CI.2 攒样本；文档计划暂缓；不暗示条目级高亮已交付。
+> **修卡说明（2026-11-15 · P-221）**：授权来源为 Tina t1310u。J.32 只读定位简报已核对通过。施工实际需要的对照面前端组件与 `SchemeItemMeta` / `TurnRef` 补哈希字段均不在原 `writable_paths` 内；把对照面与信任档确认形态并入原 M 卡后范围明显超出，按 R-11 先拆再开工。`TASK-J.32` 改标 **`[SPLIT]`**，保留追溯，**不再作为施工依据**，施工以子卡正文为准：[`TASK-J.32a`](./development-tasks-completed.md#task-j.32a)（密封前原话回链内核，估算 M）、[`TASK-J.32b`](./development-tasks-completed.md#task-j.32b)（回链对照面与信任档确认形态，估算 M；硬依赖 J.32a）。卡面三条硬约束：缺登记或哈希不一致不得标已覆盖；`ai_inferred` 不得冒充 `user_said`；轻确认档机械回链仍须用已登记原话，不得接受事后拼凑。`prompt-builder.ts` 当时不列入必须可写；对齐已于 P-230 立为 [`TASK-J.35`](#task-j.35)（未开工）。**修卡 ≠ 开工**；子卡施工须在本修卡合入后再逐张授权。`TASK-J.22a` / `TASK-J.22b` / `TASK-J.22c` 已完工迁出。CI.2 攒样本；不暗示条目级高亮/自动点亮已交付。
 
 <a id="task-j.32"></a>
 
@@ -1317,4 +1317,218 @@ governance:
 #### 【Task J.32b】回链对照面与信任档确认形态`[COMPLETED · 正文已迁]`
 
 > 本卡已 **COMPLETED**（施工 [#276](https://github.com/he18718143986-design/IDE/pull/276) squash `b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b`；完工回写 P-224）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.32b) §3.4ap。
+
+### 3.4h 业主 SOP 与 prompt-builder 对齐（2026-11-16 · 立卡 P-230）
+
+> **立卡说明（2026-11-16 · P-230）**：授权来源为 Tina「立 SOP 卡 + prompt-builder.ts 对齐卡（P-230），同时做信任档规格卡划界简报」。本条只立两张卡 + 落划界简报，**不写产品代码、不开工**。信任档规格卡**不立**（见 [`../ledger/trust-tier-spec-boundary-brief.md`](../ledger/trust-tier-spec-boundary-brief.md)）；蓝图第一批卡暂不立；CI.2 攒样本。§3.3 自动点亮仍 Hold。立卡 ≠ 授权 ≠ 开工。不宣称端到端闭环。
+
+<a id="task-j.34"></a>
+
+#### 【Task J.34】业主确认与试玩操作规程（SOP · S2→Seal + 试玩）`[NEW_TASK · 立卡 P-230 · 未开工]`
+
+> **立卡说明（2026-11-16 · P-230）**：纯 docs。把业主在签字前「对照原话 → 选信任档 → 确认密封」与试玩验收的可执行步骤写进旅程与 runbook；不改产品代码、不重写 J.32 硬约束。**立卡 ≠ 开工**。
+
+```yaml task-card
+id: TASK-J.34
+status: NEW_TASK
+contract:
+  intent:
+    title: 业主确认与试玩操作规程（SOP · S2→Seal + 试玩）
+    description: >-
+      非技术业主打开 docs/user-journey.md 的 S2→Seal 与试玩相关环，以及
+      docs/runbooks/owner-confirm-and-playtest.md，能按步骤完成：查看对照面、
+      选择信任档（轻确认 / 标准 / 重确认）、确认密封、按判分表试玩并留下证据。
+      glossary 补「信任档」「对照面」白话定义；docs/README.md 登记 runbook 落点。
+      不改产品代码；不重写 J.32a/b 已交付硬约束与 UI。
+    risk_level: LOW
+  acceptance:
+    - id: J34-P1
+      check: auto
+      text: >-
+        docs/user-journey.md 的 S2→Seal 环已写明业主在签字前须对照已登记原话、
+        选择信任档、再点确认；并链到术语表与 runbook；不得把 §3.3 自动点亮写成已交付。
+    - id: J34-P2
+      check: auto
+      text: >-
+        docs/runbooks/owner-confirm-and-playtest.md 已落盘：分步写清对照面、三档含义、
+        确认密封、试玩判分与证据表用法；明确轻确认可跳过对照面 UI 但机械回链不降级。
+    - id: J34-P3
+      check: auto
+      text: >-
+        docs/glossary.md 已为「信任档」「对照面」各提供一句话白话定义与权威出处链接
+        （指向 supervisor.md / J.32a·b 交付面），不另造与规格冲突的定义。
+    - id: J34-P4
+      check: auto
+      text: >-
+        docs/README.md 已登记 runbook 落点与「谁能改」；不新增 L7 或其它文档层。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - docs/user-journey.md
+      - docs/glossary.md
+      - docs/README.md
+      - docs/runbooks/owner-confirm-and-playtest.md
+    readonly_paths:
+      - docs/specs/supervisor.md
+      - docs/specs/delivery-lifecycle.md
+      - docs/specs/playtest-self-check.md
+      - docs/ledger/trust-tier-spec-boundary-brief.md
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    在既有 user-journey S2→Seal / 试玩环补业主操作步骤，不重写七环骨架。
+    新建 owner-confirm-and-playtest runbook 作可打印步骤清单；术语只补两词。
+    信任档语义以 J.32a/b 与划界简报为准，本卡只写「业主怎么做」。
+  touches:
+    - { path: docs/user-journey.md, change: modify, why: S2→Seal/试玩环补对照面与信任档业主步骤, symbols: [] }
+    - { path: docs/glossary.md, change: modify, why: 增补信任档与对照面白话定义, symbols: [] }
+    - { path: docs/README.md, change: modify, why: 登记 runbook 落点与谁能改, symbols: [] }
+    - { path: docs/runbooks/owner-confirm-and-playtest.md, change: create, why: 业主确认与试玩分步操作规程, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J34-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "未施工；门禁为 npm run check:docs" }
+    - { acceptance_id: J34-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "未施工" }
+    - { acceptance_id: J34-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "未施工" }
+    - { acceptance_id: J34-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "未施工" }
+governance:
+  spec_refs:
+    - docs/user-journey.md
+    - docs/specs/supervisor.md
+    - docs/specs/playtest-self-check.md
+    - docs/ledger/trust-tier-spec-boundary-brief.md
+  depends_on:
+    - { id: TASK-J.25, kind: soft }
+    - { id: TASK-J.32b, kind: soft }
+    - { id: TASK-J.31, kind: soft }
+    - { id: TASK-J.22c, kind: soft }
+  code_facts:
+    - { ref: "docs/user-journey.md:47-59", note: "S2→Seal 环已有密封白话，尚未写对照面 / 信任档业主步骤" }
+    - { ref: "docs/glossary.md:1-106", note: "现行术语表无「信任档」「对照面」词条" }
+    - { ref: "docs/specs/evidence-and-acceptance-criteria.md:107", note: "曾建议 docs/runbooks/ 路径；仓库尚无 runbooks 目录" }
+  non_goals:
+    - 不改产品代码；不重写 J.32a/b 硬约束与对照面 UI
+    - 不立信任档规格卡；不立蓝图第一批卡；不开工 J.35 / CI.2
+    - 不实现 §3.3 自动点亮；不宣称北极星或无人值守三连卡已交付
+    - 不写商业冷静期 / ChangeOrder
+  fail:
+    - 把未交付能力（§3.3 自动点亮、北极星）写成已交付
+    - 另造与 J.32a/b 冲突的信任档定义
+    - 借 SOP 改产品代码或扩 writable_paths 到 daemon/src
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：J.32b / J.22c / J.31 已交付对照面、真实试玩与判分表，但业主侧仍缺一份「按键顺序」SOP。
+* **取舍**：不把规格缝（v1/V2 双形等）写进 SOP；那些归信任档规格卡划界简报，本卡只写操作。
+
+<a id="task-j.35"></a>
+
+#### 【Task J.35】prompt-builder.ts 对齐台账 / 信任档 / 回链事实`[NEW_TASK · 立卡 P-230 · 未开工]`
+
+> **立卡说明（2026-11-16 · P-230）**：承接 J.22 / J.30 / J.32 多次挂账的「prompt-builder 未对齐」。本卡把 `buildSupervisorPrompt` 组装结果对齐台账、信任档与回链事实，并在出口调用 `assertContextHasNoVaultSecrets`。**不**把 builder 接进生产活发送路径（另开接线卡）。**立卡 ≠ 开工**。
+
+```yaml task-card
+id: TASK-J.35
+status: NEW_TASK
+contract:
+  intent:
+    title: prompt-builder.ts 对齐台账 / 信任档 / 回链事实
+    description: >-
+      buildSupervisorPrompt 的组装结果须反映编译器台账方案摘要、信任档（trust_tier）与
+      原话回链核对结论（缺登记 / 哈希不一致不得标已覆盖；ai_inferred 不得冒充 user_said）；
+      出口对完整 text 调用 assertContextHasNoVaultSecrets（来自 daemon/vault/active.ts 叶子）。
+      当前 builder 仍可为测试/预览纯组装器；本卡不强制接进活发送路径。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J35-P1
+      check: auto
+      text: >-
+        SupervisorContextBundle（或等价输入）可携带台账方案摘要、trust_tier、回链核对摘要；
+        buildSupervisorPrompt 输出分段中可见这些事实，不得静默省略已提供的字段。
+    - id: J35-P2
+      check: auto
+      text: >-
+        当上下文标明缺登记或哈希不一致时，组装文案不得把该项写成「已覆盖」；
+        ai_inferred 来源不得写成用户原话已确认。
+    - id: J35-P3
+      check: auto
+      text: >-
+        buildSupervisorPrompt 在返回前对完整 text 调用 assertContextHasNoVaultSecrets；
+        单测证明含保险库密钥的上下文会抛错且不返回脱敏后继续的结果。
+    - id: J35-P4
+      check: auto
+      text: >-
+        既有 supervisor-session 组装单测仍绿；新增对齐用例覆盖 P1～P3；tsc 通过。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/supervisor/prompt-builder.ts
+      - daemon/supervisor/types.ts
+      - tests/unit/supervisor-session.test.ts
+      - tests/daemon/vault.test.ts
+    readonly_paths:
+      - daemon/vault/active.ts
+      - daemon/pipeline/scheme-snapshot-store.ts
+      - daemon/supervisor/intent-compiler/scheme-ledger-store.ts
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/supervisor-session.test.ts, tests/daemon/vault.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    扩展 SupervisorContextBundle 可选字段（台账摘要 / trust_tier / 回链摘要），
+    在 buildSupervisorPrompt 增加对应分段；出口调用 assertContextHasNoVaultSecrets。
+    保持纯函数、零 I/O。不改活发送路由；接线另卡。
+  touches:
+    - { path: daemon/supervisor/types.ts, change: modify, why: ContextBundle 增台账/信任档/回链可选字段, symbols: [SupervisorContextBundle] }
+    - { path: daemon/supervisor/prompt-builder.ts, change: modify, why: 渲染新分段并在出口断言无保险库密钥, symbols: [buildSupervisorPrompt] }
+    - { path: tests/unit/supervisor-session.test.ts, change: modify, why: 覆盖台账/信任档/回链组装与负例, symbols: [] }
+    - { path: tests/daemon/vault.test.ts, change: modify, why: 锁定 builder 出口调用 assertContextHasNoVaultSecrets, symbols: [] }
+  interfaces:
+    - { kind: type, name: SupervisorContextBundle, signature: "可选 scheme_summary / trust_tier / backlink_summary 字段（施工时定名）", consumers: [] }
+  test_plan:
+    - { acceptance_id: J35-P1, test_path: tests/unit/supervisor-session.test.ts, level: unit, debt: "未施工" }
+    - { acceptance_id: J35-P2, test_path: tests/unit/supervisor-session.test.ts, level: unit, debt: "未施工" }
+    - { acceptance_id: J35-P3, test_path: tests/daemon/vault.test.ts, level: unit, debt: "未施工" }
+    - { acceptance_id: J35-P4, test_path: tests/unit/supervisor-session.test.ts, level: unit, debt: "未施工" }
+governance:
+  spec_refs:
+    - docs/specs/supervisor.md
+    - docs/ledger/trust-tier-spec-boundary-brief.md
+    - docs/specs/development-tasks-completed.md#task-j.30
+    - docs/specs/development-tasks-completed.md#task-j.32a
+  depends_on:
+    - { id: TASK-J.30, kind: soft }
+    - { id: TASK-J.32a, kind: soft }
+    - { id: TASK-J.22a, kind: soft }
+  code_facts:
+    - { ref: "daemon/supervisor/prompt-builder.ts:210", note: "buildSupervisorPrompt 现行只组装 project/architecture/events/conversation，无台账/信任档/回链段" }
+    - { ref: "daemon/supervisor/types.ts:131-136", note: "SupervisorContextBundle 仅 project/architecture/event_digests" }
+    - { ref: "daemon/vault/active.ts:40", note: "assertContextHasNoVaultSecrets 已在 J.30 落地；builder 尚未调用" }
+  non_goals:
+    - 不把 builder 接进生产活发送路径（另开接线卡）
+    - 不重写 J.32a/b 回链内核或对照面 UI；不升 schema_version
+    - 不实现 §3.3 自动点亮；不开工 CI.2；不立信任档规格卡 / 蓝图第一批
+    - 不改 vault 门面或 Gateway 写范围
+  fail:
+    - 组装文案把缺登记 / 哈希不一致项标成已覆盖，或把 ai_inferred 写成用户已确认原话
+    - 出口跳过 assertContextHasNoVaultSecrets，或密钥命中后脱敏继续返回
+    - 借本卡改对照面 UI / 冻结内核 / 活发送路由
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：J.22 / J.30 / J.32 多次注明 prompt-builder 未对齐；现行函数仍是 S.1 纯组装器，测试在用、生产发送未接。
+* **取舍**：本卡先对齐组装语义与密钥断言；活路径接线另卡，避免本卡升 L。
+
 
