@@ -15,7 +15,8 @@
 | [`scheme-settled-decisions.md`](./scheme-settled-decisions.md) | 自 [`../scheme.md`](../scheme.md) 迁出的已落盘裁决（原 §6）及其余非 L0 正文（原 §2 / §4 / §5 / §7～§11）；不是施工权威 | 2026-11-14（TASK-J.26）迁入；原位只留指针 |
 | [`removed-and-moved.md`](./removed-and-moved.md) | 已删除与已移动的文档索引（原 `docs/README.md` §9） | 2026-11-09 迁入；旧路径勿再引用 |
 | [`blueprint-absorption-ruling.md`](./blueprint-absorption-ruling.md) | 蓝图机制吸收七分歧裁决（P-220）：Tina t1309u 确认，标 `user_confirmed` | 已拍板；不立卡、不施工、不改 ADR；吸收内容规格落地前一律标 `ai_inferred`；托管部署档 / 商业契约层 / 理解度校验另立不决 |
-| [`trust-tier-spec-boundary-brief.md`](./trust-tier-spec-boundary-brief.md) | 信任档规格卡划界简报（P-230）：只补 J.32a/b 未覆盖三缝；本回合不立卡 | planning brief；建议 `TASK-J.36` 待 Tina 另授权；不施工 |
+| [`trust-tier-spec-boundary-brief.md`](./trust-tier-spec-boundary-brief.md) | 信任档规格卡划界简报（P-230）：只补 J.32a/b 未覆盖三缝；P-233 已立 [`TASK-J.36`](../specs/development-tasks-active.md#task-j.36) | planning brief；卡仍 `[NEW_TASK]`，立卡 ≠ 开工 |
+| [`prompt-builder-live-send-path-brief.md`](./prompt-builder-live-send-path-brief.md) | prompt-builder 活发送路径只读定位（P-233）：J.35 已对齐但生产零调用；四缝事实 + 接线前置 | planning brief；**不立**接线卡；不施工 |
 
 ## 文档治理挂账（2026-10-29 新增）
 
