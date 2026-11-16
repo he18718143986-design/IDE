@@ -104,3 +104,19 @@
 目标是：你只提供原网站网址和登录信息，自己不参与任何技术决策，就能得到一个一模一样的网站。见 `scheme.md` 的 goal-2。**当前做不到**。
 
 权威出处：[scheme.md 目标 goal-2](./scheme.md)。
+
+<a id="信任档"></a>
+
+## 信任档
+
+签字确认前你选的一档「这次确认有多严」：标准档（默认）出示对照面；重确认档还要逐项勾选；轻确认档可以不把对照面当作默认步骤，但机械回链不降级。选择会写入方案快照。
+
+权威出处：[supervisor.md 密封前原话回链](./specs/supervisor.md)（`trust_tier`）；业主步骤见 [操作规程](./runbooks/owner-confirm-and-playtest.md)。
+
+<a id="对照面"></a>
+
+## 对照面
+
+签字前用来核对自己说过的事是否都在方案里有着落的界面：已覆盖与未覆盖应分开标明，未覆盖不得被悄悄跳过。
+
+权威出处：[supervisor.md 密封前原话回链](./specs/supervisor.md)；判分见 [试玩自查 §0.1 第 2 步](./specs/playtest-self-check.md)；业主步骤见 [操作规程](./runbooks/owner-confirm-and-playtest.md)。
