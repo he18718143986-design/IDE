@@ -8093,3 +8093,79 @@ governance:
 
 * **背景**：J.16 把条目级高亮明确推迟到 J.22 之后；本卡把它从母卡拆出并交付条目级呈现。
 * **取舍**：先呈现台账条目（逐条 id+文案、空态明确）；自动点亮仍不做；条目-原话关联未做（未改 frozen_quotes）。诚实口径见归档注记。
+
+### 3.4as 中栏方案来源统一的真实试玩验收（J.22c · 完工回写 P-229）
+
+<a id="task-j.22c"></a>
+
+### 【Task J.22c】中栏方案来源统一的真实试玩验收`[COMPLETED · 拆自 J.22 · 立卡 P-215 · 完工回写 P-229]`
+
+> **立卡说明（2026-11-15 · P-215）**：由 `TASK-J.22` 按 R-11 拆出，承接原验收 J22-P2。估算 S。硬依赖 [`TASK-J.22a`](./development-tasks-completed.md#task-j.22a)（P-226 已 COMPLETED）。`TASK-J.22b` 为软依赖（P-228 已 COMPLETED）。jsdom 不替代真实打开方案面板。
+
+> **归档注记（2026-11-16 · P-229）**：本卡已 **COMPLETED**。Tina 授权本机官方 Daemon 真实试玩（操作者「Cursor 代打（Tina 授权）」）；Cloud Agent 过目通过后回写。试玩 tip `71fd5b302862347a2f516ac4113f76e297042080`（官方 Daemon `127.0.0.1:3006` · 项目 `/tmp/stagent-j16p7-items-playtest`）。估算仍为 S。J22C-P1 **PASS**：①确认前中栏=台账（标题「走查用方案」；ITEM-1/2）；②确认后冻结快照与中栏仍=台账、无语料冒充；③逐条 id+文案可见；④空台账「方案尚未生成」；⑤空验收「无呈现记录」。证据表见 [`evidence-and-acceptance-criteria.md`](./evidence-and-acceptance-criteria.md)「TASK-J.22c」与 [`playtest-self-check.md`](./playtest-self-check.md) 试玩证据表。附注：脏工作区二次确认撞幂等键、合同 ABORTED——不挡判定。诚实口径：**真实试玩已交付；§3.3 自动点亮未实现、`prompt-builder.ts` 未对齐（另卡）**。未改 J.22a/J.22b 产品代码。母卡 `TASK-J.22` 维持 `[SPLIT]` 追溯归档。蓝图第一批卡暂不立；CI.2 攒样本；文档计划暂缓。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.22c
+status: COMPLETED
+contract:
+  intent:
+    title: 用真实会话验收中栏方案与台账一致
+    description: >-
+      在真实会话中打开方案面板，人工核对编译器台账与中栏方案在确认前后保持一致。
+      jsdom 或集成测试不得替代这次真实试玩。
+    risk_level: LOW
+  acceptance:
+    - id: J22C-P1
+      check: playtest
+      text: >-
+        真实会话中，编译器台账与中栏方案在确认前后保持一致；真实打开方案面板人工核对（承接 J22-P2；jsdom 不替代）。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - tests/ui/scheme-source-unification.test.tsx
+      - docs/specs/evidence-and-acceptance-criteria.md
+      - docs/specs/playtest-self-check.md
+    readonly_paths:
+      - src/components/studio/SchemeReviewPane.tsx
+      - src/routes/index.tsx
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    本卡几乎不改产品代码，只做真实会话试玩并留下证据；集成测试只能作辅助，不能代替人工核对。
+  touches:
+    - { path: docs/specs/evidence-and-acceptance-criteria.md, change: modify, why: 回写真实试玩证据与结论, symbols: [] }
+    - { path: docs/specs/playtest-self-check.md, change: modify, why: J.31 试玩证据表附入 J.22c 五行, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J22C-P1, test_path: tests/ui/scheme-source-unification.test.tsx, level: integration, debt: "真实试玩证据已回写；jsdom 仅辅助不替代；见 evidence-and-acceptance-criteria.md / playtest-self-check.md" }
+governance:
+  spec_refs:
+    - docs/specs/playtest-self-check.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+  depends_on:
+    - { id: TASK-J.22a, kind: hard }
+    - { id: TASK-J.22b, kind: soft }
+    - { id: TASK-J.21, kind: hard }
+    - { id: TASK-J.16, kind: hard }
+  code_facts:
+    - { ref: "src/routes/index.tsx:1237", note: "J.22a 已拆除默认 rebuildSchemeFromCorpus；本卡在真实会话中核对台账投影" }
+    - { ref: "src/components/studio/SchemeReviewPane.tsx:62-64", note: "真实打开的方案面板组件；jsdom 不替代本次验收" }
+  non_goals:
+    - 不以 jsdom 或单测替代真实会话验收
+    - 不重做 J.22a / J.22b 的产品改动；不实现 §3.3 自动点亮
+    - 不对齐 prompt-builder.ts；不开工 CI.2；不改 D.1e / S.3
+  fail:
+    - 只用 jsdom 或书面说明就宣称 J22-P2 通过
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 284, commit: 71fd5b302862347a2f516ac4113f76e297042080 }
+```
+
+* **背景**：原 J.22 把真实试玩写成 J22-P2；拆出后与代码改造分卡。
+* **取舍**：硬依赖来源切换，条目呈现为软依赖。诚实口径见归档注记。
