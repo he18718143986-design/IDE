@@ -98,7 +98,7 @@ import {
   type WorkerRunResult,
   DaemonApiError,
   reportSurfacePresentation,
-  fetchSchemeAcceptance,
+  fetchSchemeMidpane,
   type SchemeAcceptanceItem,
   registerSchemeTurn,
   type SchemeSourceTurn,
@@ -150,7 +150,7 @@ import {
   type ClarificationSessionState,
 } from "@/lib/journey/clarification";
 import {
-  rebuildSchemeFromCorpus,
+  schemeDraftFromMidpane,
   confirmSchemeDecision,
   resolveSchemeConflict,
   updateSchemeNotes,
@@ -458,6 +458,12 @@ function Console() {
   >(null);
   /** TASK-C.18：中间方案审阅（随右栏自由对话更新） */
   const [schemeDraft, setSchemeDraft] = useState<SchemeDraft | null>(null);
+  /** TASK-J.22a：台账不可用或无实质内容 → 中栏标「方案尚未生成」 */
+  const [schemeLedgerAbsent, setSchemeLedgerAbsent] = useState(true);
+  const [schemeAcceptanceItems, setSchemeAcceptanceItems] = useState<
+    SchemeAcceptanceItem[]
+  >([]);
+  const [schemeAcceptanceSettled, setSchemeAcceptanceSettled] = useState(false);
   const [schemeSources, setSchemeSources] =
     useState<SchemeSources>(EMPTY_SCHEME_SOURCES);
   const [schemeTrustTier, setSchemeTrustTier] =
@@ -655,11 +661,11 @@ function Console() {
     setShowForm(true);
     setStudioNonce((n) => n + 1);
     /**
-     * 已签署的方案是冻结态：`rebuildSchemeFromCorpus` 会原样返回冻结稿，
-     * 右栏看起来能打字、其实改动全被丢弃。所以换需求必须同时丢弃旧方案
-     * 与确认幂等键，让右栏回到可写态。
+     * 已签署的方案是冻结态：台账投影不会覆盖 frozen 稿。
+     * 换需求必须同时丢弃旧方案与确认幂等键，让右栏回到可写态。
      */
     setSchemeDraft(null);
+    setSchemeLedgerAbsent(true);
     setSchemeSources(EMPTY_SCHEME_SOURCES);
     setSchemeTrustTier("standard");
     setSchemeBacklinkPreview(null);
@@ -737,37 +743,57 @@ function Console() {
     }
     setSchemeSurfaceConfirmId(schemeConfirmIdRef.current.id);
   }, [schemeRevisionForSurface]);
-  // 挂账⑬ 方案 A：台账验收条目只读投影进中栏；修订变化或连接变化时重取，失败则为空（标无呈现记录）。
-  const [schemeAcceptanceItems, setSchemeAcceptanceItems] = useState<
-    SchemeAcceptanceItem[]
-  >([]);
-  const [schemeAcceptanceSettled, setSchemeAcceptanceSettled] = useState(false);
+  // TASK-J.22a：中栏来自台账只读投影；无台账标「方案尚未生成」。验收条目同批投影。
+  const refreshSchemeFromLedger = useCallback(async () => {
+    if (!conn) {
+      setSchemeDraft(null);
+      setSchemeLedgerAbsent(true);
+      setSchemeAcceptanceItems([]);
+      setSchemeAcceptanceSettled(false);
+      return;
+    }
+    try {
+      const projection = await fetchSchemeMidpane(conn);
+      setSchemeDraft((cur) => schemeDraftFromMidpane(projection, cur));
+      setSchemeLedgerAbsent(!projection.available);
+      setSchemeAcceptanceItems(projection.acceptance);
+      setSchemeAcceptanceSettled(true);
+    } catch {
+      setSchemeDraft((cur) => (cur?.frozen === true ? cur : null));
+      setSchemeLedgerAbsent(true);
+      setSchemeAcceptanceItems([]);
+      setSchemeAcceptanceSettled(true);
+    }
+  }, [conn]);
   useEffect(() => {
-    if (!conn || schemeRevisionForSurface === undefined) {
+    if (!conn) {
+      setSchemeDraft(null);
+      setSchemeLedgerAbsent(true);
       setSchemeAcceptanceItems([]);
       setSchemeAcceptanceSettled(false);
       return;
     }
     let cancelled = false;
-    setSchemeAcceptanceItems([]);
     setSchemeAcceptanceSettled(false);
-    fetchSchemeAcceptance(conn)
+    fetchSchemeMidpane(conn)
       .then((projection) => {
-        if (!cancelled) {
-          setSchemeAcceptanceItems(projection.items);
-          setSchemeAcceptanceSettled(true);
-        }
+        if (cancelled) return;
+        setSchemeDraft((cur) => schemeDraftFromMidpane(projection, cur));
+        setSchemeLedgerAbsent(!projection.available);
+        setSchemeAcceptanceItems(projection.acceptance);
+        setSchemeAcceptanceSettled(true);
       })
       .catch(() => {
-        if (!cancelled) {
-          setSchemeAcceptanceItems([]);
-          setSchemeAcceptanceSettled(true);
-        }
+        if (cancelled) return;
+        setSchemeDraft((cur) => (cur?.frozen === true ? cur : null));
+        setSchemeLedgerAbsent(true);
+        setSchemeAcceptanceItems([]);
+        setSchemeAcceptanceSettled(true);
       });
     return () => {
       cancelled = true;
     };
-  }, [conn, schemeRevisionForSurface]);
+  }, [conn]);
   const handleSchemeSurfacePresented = useCallback(
     (report: SurfacePresentationReport) => {
       if (!conn) return Promise.reject(new Error("daemon 未连接"));
@@ -1208,7 +1234,7 @@ function Console() {
         };
       }
 
-      // J.7 / D9：方案未冻结时，随对话更新方案草案；方案已冻结后，绝不回写方案。
+      // J.7 / D9 / J.22a：方案未冻结时只登记原话并刷新台账投影；禁止 rebuildSchemeFromCorpus 作默认源。
       if (partnerMessageMayRebuildScheme(schemeDraft)) {
         const { sources, notice } = applySchemeTurnRegistration(
           schemeSources,
@@ -1216,14 +1242,8 @@ function Console() {
           registration,
         );
         if (notice === null) {
-          // 语料、原话清单与方案草案同一批更新，不出现语料已换而清单未换的中间态
           setSchemeSources(sources);
-          setSchemeDraft((cur) =>
-            rebuildSchemeFromCorpus(cur, sources.corpus, {
-              titleHint:
-                trimmed.length > 48 ? `${trimmed.slice(0, 48)}…` : trimmed,
-            }),
-          );
+          void refreshSchemeFromLedger();
           setStudioNonce((n) => n + 1);
         } else {
           setJourneyCards((prev) => [
@@ -1295,6 +1315,7 @@ function Console() {
       schemeSources,
       schemeDraft,
       schemeSurfaceConfirmId,
+      refreshSchemeFromLedger,
     ],
   );
 
@@ -3909,6 +3930,7 @@ function Console() {
                   ) : null}
                   <SchemeReviewPane
                     scheme={schemeDraft}
+                    ledgerAbsent={schemeLedgerAbsent}
                     demoUrl={demoPreview?.url ?? retainedDemoUrl ?? null}
                     demoStatus={demoPreview?.status ?? null}
                     demoGate={schemeDemoGate}
