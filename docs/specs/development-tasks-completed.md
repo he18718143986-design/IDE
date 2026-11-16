@@ -8050,7 +8050,7 @@ design:
     实际列表渲染在 ScopeAcceptanceBlock；SchemeReviewPane 只做接线。
     本卡未实现条目与原话关联，未改 frozen_quotes。
   touches:
-    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 接线台账验收条目到 ScopeAcceptanceBlock, symbols: [acceptanceItemsFromSchemeDraft] }
+    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 接线台账验收条目到 ScopeAcceptanceBlock, symbols: [] }
     - { path: src/components/studio/ScopeAcceptanceBlock.tsx, change: modify, why: 逐条 id+文案呈现；空台账不伪造；空态口径明确, symbols: [presentableAcceptanceItems, ScopeAcceptanceBlock] }
     - { path: src/lib/journey/scheme-draft.ts, change: modify, why: 从中栏 SchemeDraft 抽出验收条目 id+文案, symbols: [acceptanceItemsFromSchemeDraft] }
     - { path: tests/unit/scheme-acceptance-projection.test.ts, change: modify, why: 锁定条目呈现与空台账不伪造, symbols: [] }
