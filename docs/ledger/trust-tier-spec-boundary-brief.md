@@ -31,7 +31,7 @@
 - 商业冷静期 / ChangeOrder / 责任归因（P-220「另立不决」）
 - 理解度校验、「是否真懂」门禁化（J.33 已声明不是门禁）
 - `prompt-builder.ts` 对齐（见 [`TASK-J.35`](../specs/development-tasks-active.md#task-j.35)）
-- 业主操作规程文案（见 [`TASK-J.34`](../specs/development-tasks-active.md#task-j.34)）
+- 业主操作规程文案（见 [`TASK-J.34`](../specs/development-tasks-completed.md#task-j.34)）
 - 细模型加层 + 视图投影实现（蓝图第一批规格卡 S / 实现 L，另授权；见细模型简报）
 
 ## 3. 建议立卡形态（待 Tina 授权，本条不立）

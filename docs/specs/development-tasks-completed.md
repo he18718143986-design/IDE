@@ -8169,3 +8169,113 @@ governance:
 
 * **背景**：原 J.22 把真实试玩写成 J22-P2；拆出后与代码改造分卡。
 * **取舍**：硬依赖来源切换，条目呈现为软依赖。诚实口径见归档注记。
+
+### 3.4at 业主确认与试玩操作规程（J.34 · 完工回写 P-231）
+
+<a id="task-j.34"></a>
+
+### 【Task J.34】业主确认与试玩操作规程（SOP · S2→Seal + 试玩）`[COMPLETED · 立卡 P-230 · 施工 #286 · 完工回写 P-231]`
+
+> **立卡说明（2026-11-16 · P-230）**：纯 docs。把业主在签字前「对照原话 → 选信任档 → 确认密封」与试玩验收的可执行步骤写进旅程与 runbook；不改产品代码、不重写 J.32 硬约束。
+
+> **归档注记（2026-11-16 · P-231）**：本卡已 **COMPLETED**。Tina 授权施工与合入。[#286](https://github.com/he18718143986-design/IDE/pull/286) squash `51c643ede74ec3423f6ed36cb670650cf3272e86` 于 2026-11-16 21:05:15 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `6e0d50c7ac50246e9f96a5077f07d3bf063d6c19`；父提交 `81a8560ad29bcbeec0a2467a5b9beca92e51ed30`）。合入前必需检查全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck/Unit，含 Windows Unit SUCCESS），`mergeable=MERGEABLE`、`mergeStateStatus=CLEAN`；Bugbot NEUTRAL 不挡合入。估算仍为 S。交付：`docs/runbooks/owner-confirm-and-playtest.md` 六节；`user-journey.md` S2→Seal/S6 补步骤；`glossary.md`「信任档」「对照面」；`docs/README.md` 分层表与阅读顺序登记。诚实口径：**SOP 为文档层交付，业主实际按 SOP 走完确认+试玩属后续真实使用验证**；不实现 §3.3 自动点亮；不改产品代码；不开工 J.35。蓝图第一批暂不立；CI.2 攒样本；文档计划暂缓；J.36 待另授权。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.34
+status: COMPLETED
+contract:
+  intent:
+    title: 业主确认与试玩操作规程（SOP · S2→Seal + 试玩）
+    description: >-
+      非技术业主打开 docs/user-journey.md 的 S2→Seal 与试玩相关环，以及
+      docs/runbooks/owner-confirm-and-playtest.md，能按步骤完成：查看对照面、
+      选择信任档（轻确认 / 标准 / 重确认）、确认密封、按判分表试玩并留下证据。
+      glossary 补「信任档」「对照面」白话定义；docs/README.md 登记 runbook 落点。
+      不改产品代码；不重写 J.32a/b 已交付硬约束与 UI。
+    risk_level: LOW
+  acceptance:
+    - id: J34-P1
+      check: auto
+      text: >-
+        docs/user-journey.md 的 S2→Seal 环已写明业主在签字前须对照已登记原话、
+        选择信任档、再点确认；并链到术语表与 runbook；不得把 §3.3 自动点亮写成已交付。
+    - id: J34-P2
+      check: auto
+      text: >-
+        docs/runbooks/owner-confirm-and-playtest.md 已落盘：分步写清对照面、三档含义、
+        确认密封、试玩判分与证据表用法；明确轻确认可跳过对照面 UI 但机械回链不降级。
+    - id: J34-P3
+      check: auto
+      text: >-
+        docs/glossary.md 已为「信任档」「对照面」各提供一句话白话定义与权威出处链接
+        （指向 supervisor.md / J.32a·b 交付面），不另造与规格冲突的定义。
+    - id: J34-P4
+      check: auto
+      text: >-
+        docs/README.md 已登记 runbook 落点与「谁能改」；不新增 L7 或其它文档层。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - docs/user-journey.md
+      - docs/glossary.md
+      - docs/README.md
+      - docs/runbooks/owner-confirm-and-playtest.md
+    readonly_paths:
+      - docs/specs/supervisor.md
+      - docs/specs/delivery-lifecycle.md
+      - docs/specs/playtest-self-check.md
+      - docs/ledger/trust-tier-spec-boundary-brief.md
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    在既有 user-journey S2→Seal / 试玩环补业主操作步骤，不重写七环骨架。
+    新建 owner-confirm-and-playtest runbook 作可打印步骤清单；术语只补两词。
+    信任档语义以 J.32a/b 与划界简报为准，本卡只写「业主怎么做」。
+  touches:
+    - { path: docs/user-journey.md, change: modify, why: S2→Seal/试玩环补对照面与信任档业主步骤, symbols: [] }
+    - { path: docs/glossary.md, change: modify, why: 增补信任档与对照面白话定义, symbols: [] }
+    - { path: docs/README.md, change: modify, why: 登记 runbook 落点与谁能改, symbols: [] }
+    - { path: docs/runbooks/owner-confirm-and-playtest.md, change: modify, why: "已新建业主确认与试玩分步操作规程（施工 #286 落盘后改记为 modify，消除 create-vs-exists warn）", symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J34-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #286 交付；门禁仍为 npm run check:docs，本卡未新增 vitest 文件" }
+    - { acceptance_id: J34-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #286 交付；门禁仍为 npm run check:docs" }
+    - { acceptance_id: J34-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #286 交付；门禁仍为 npm run check:docs" }
+    - { acceptance_id: J34-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #286 交付；门禁仍为 npm run check:docs" }
+governance:
+  spec_refs:
+    - docs/user-journey.md
+    - docs/specs/supervisor.md
+    - docs/specs/playtest-self-check.md
+    - docs/ledger/trust-tier-spec-boundary-brief.md
+  depends_on:
+    - { id: TASK-J.25, kind: soft }
+    - { id: TASK-J.32b, kind: soft }
+    - { id: TASK-J.31, kind: soft }
+    - { id: TASK-J.22c, kind: soft }
+  code_facts:
+    - { ref: "docs/user-journey.md:47-59", note: "施工前 S2→Seal 环已有密封白话，尚未写对照面 / 信任档业主步骤；#286 已补" }
+    - { ref: "docs/glossary.md:108-122", note: "已增「信任档」「对照面」词条" }
+    - { ref: "docs/runbooks/owner-confirm-and-playtest.md:9-74", note: "六节 SOP 已落盘" }
+  non_goals:
+    - 不改产品代码；不重写 J.32a/b 硬约束与对照面 UI
+    - 不立信任档规格卡；不立蓝图第一批卡；不开工 J.35 / CI.2
+    - 不实现 §3.3 自动点亮；不宣称北极星或无人值守三连卡已交付
+    - 不写商业冷静期 / ChangeOrder
+  fail:
+    - 把未交付能力（§3.3 自动点亮、北极星）写成已交付
+    - 另造与 J.32a/b 冲突的信任档定义
+    - 借 SOP 改产品代码或扩 writable_paths 到 daemon/src
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 286, commit: 51c643ede74ec3423f6ed36cb670650cf3272e86 }
+```
+
+* **背景**：J.32b / J.22c / J.31 已交付对照面、真实试玩与判分表，业主侧缺「按键顺序」SOP。
+* **取舍**：不把规格缝写进 SOP；诚实口径见归档注记。
