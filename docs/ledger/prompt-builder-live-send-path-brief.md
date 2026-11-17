@@ -60,8 +60,8 @@ J.30 已写明：`prompt-builder.ts`「对话上下文」拼装**不是**活的�
 
 | 项 | 本简报 |
 | :--- | :--- |
-| [`TASK-J.36`](../specs/development-tasks-active.md#task-j.36) 信任档规格缝 | **分治**：规格契约 ≠ 活路径接线 |
-| 蓝图第一批卡（细模型加层 + 视图投影） | **暂不立** |
+| [`TASK-J.36`](../specs/development-tasks-completed.md#task-j.36) 信任档规格缝 | **分治**：规格契约 ≠ 活路径接线；已 COMPLETED |
+| [`TASK-J.37`](../specs/development-tasks-active.md#task-j.37) 细模型加层 + 视图投影规格 | **分治**：P-235 已立规格卡（只定口径）；实现 / 活路径接线仍另授权 |
 | CI.2 / §3.3 / 文档计划 | 攒样本 / Hold / 暂缓 |
 
 ## 8. 结论
