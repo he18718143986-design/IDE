@@ -57,4 +57,4 @@
 - **P-230**：只落本简报；当时不立 `TASK-J.36`。
 - **P-233**：已立 [`TASK-J.36`](../specs/development-tasks-active.md#task-j.36)；另落活发送路径只读定位简报，**不立**接线卡。
 - **J.36**：已 COMPLETED（#291/`4dc5617`；P-234）；规格 + 类型声明按 §2 三缝落地；商业冷静期/ChangeOrder 未开；活发送未接。
-- **P-235**：蓝图「细模型加层 + 视图投影」规格卡已立 [`TASK-J.37`](../specs/development-tasks-active.md#task-j.37)（与本简报分治；只定口径不实现）。
+- **P-235 / J.37**：蓝图「细模型加层 + 视图投影」规格卡已立 [`TASK-J.37`](../specs/development-tasks-active.md#task-j.37)；规格正文落点见 [`../specs/supervisor.md`](../specs/supervisor.md)「细模型加层 + 视图投影」与 [`blueprint-fine-layer-spec-brief.md`](./blueprint-fine-layer-spec-brief.md) §5（与本简报分治；只定口径不实现）。

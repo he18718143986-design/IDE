@@ -1044,7 +1044,64 @@ interface SchemeDraftV2 {
 1. **禁止**用五字段替换或覆写 `source` / `evidence`。
 2. **禁止**另起第二套条目 SSOT；权威条目仍是 `SchemeItemMeta` + 集合业务字段。
 3. 投影字段均可标 `ai_inferred` 直至业主确认；**不得**冒充 `user_said`。
-4. **视图实现**（把 DTO 画进中栏）归细模型 / 蓝图第一批实现子卡；本卡只定契约，不交付 UI。
+4. **视图实现**（把 DTO 画进中栏）归细模型实现子卡（估算 L，按 R-11 另立）；映射口径与附录 C 并轨见下方「细模型加层 + 视图投影」（TASK-J.37）。J.36 只定 DTO 契约，不交付 UI。
+
+#### 细模型加层 + 视图投影（TASK-J.37）
+
+> **范围**：只定口径；**不**实现 UI / 细模型运行时 / `renderSchemeDiagrams`。吸收内容规格落地前一律标 `ai_inferred`，不得冒充 `user_said`。  
+> **与 J.36 关系**：v1/V2 双形、`acceptance.check`/`notes`、`SchemeItemProjectionDto` **已交付**——本条只引用指针，**不重开**类型声明或信任档三缝。  
+> **权威**：P-220 [`../ledger/blueprint-absorption-ruling.md`](../ledger/blueprint-absorption-ruling.md) 分歧 2+7；简报 [`../ledger/blueprint-fine-layer-spec-brief.md`](../ledger/blueprint-fine-layer-spec-brief.md)。
+
+##### 五字段 ↔ `SchemeDraftV2` / `SchemeItemMeta` 映射
+
+权威条目仍是 `SchemeItemMeta`（`id` / `source` / `evidence` / `updated_in_revision` / `user_pinned`）+ 各集合业务字段；五字段只作**投影加层**（类型面已由 J.36 落在 `SchemeItemProjectionDto`）。
+
+| 五字段 | 投影语义 | 与现行权威的关系 | 缺省 / 失败语义 |
+| :--- | :--- | :--- | :--- |
+| `status` | 展示态：`draft` / `proposed` / `confirmed` / `rejected` / `deferred` | **不得**回写为 `ItemSource`；确认态仍以密封 / 用户动作与 `source` 为准 | 缺省不伪造为 `confirmed`；非法枚举 → 丢弃该投影字段，不得改 `source` |
+| `scope` | 人读范围提示（白话） | **非** `ScopePlan` / 快照权威；不得替代可写范围预检 | 缺省视为未写；不得从本字段推导 `writable_paths` |
+| `provenance` | 人读来源说明 | **不得**替代 `evidence[]` / `TurnRef`；不得冒充已登记原话 | 缺省视为未写；写侧若无 evidence 支撑须标 `ai_inferred` |
+| `links` | 外链或相关条目 id | **非** `TurnRef`；不参与回链哈希核验 | 缺省空；断链不阻断密封，仅作展示告警 |
+| `confidence` | 展示置信：`low` / `medium` / `high` | **非**门禁；不得旁路 `can_merge` / 回链三条硬约束 | 缺省不伪造为 `high`；非法枚举 → 丢弃该字段 |
+
+**硬禁止**：用五字段替换 / 覆写 `source` 或 `evidence`；另起第二套条目 SSOT；把投影字段写入冻结快照作为密封权威。
+
+##### 细模型可选加层（口径）
+
+蓝图式细模型（Actor / UseCase / Process / Rule / Screen / AC）为**可选加层 / 投影源**，随方案 `size_hint` 或行业模板开启：
+
+1. **`SchemeDraftV2` 仍是唯一可签执行层 SSOT**；细模型若存在，必须从 SSOT 派生或回写 SSOT；二者不一致以 SSOT 为准并标渲染 / 投影版本。
+2. **禁止双 SSOT**：细模型不得平行存储可独立编辑的「第二套方案」。
+3. 加层实体在业主确认前一律 `ai_inferred`；确认路径复用既有密封 / 回链，不新造确认语义。
+4. **本条不交付**加层 schema 实现、持久化或 UI；实现估算 L，按 R-11 另立子卡。
+
+##### 视图投影与 RFC 附录 C 并轨
+
+卡片流仍是拍板面骨架（ADR-0014）；流程图、时序故事、规则卡、范围对照等为 SchemeDraft / 细模型的**投影**——不单独存储、不可独立编辑；图上批注须回写 SSOT 后重新投影。
+
+与 [`TASK-C.10q`](./development-tasks-completed.md#task-c.10q) 遗留债及 [`../rfc/v0.2-multi-agent-pipeline.md`](../rfc/v0.2-multi-agent-pipeline.md) **附录 C**（三张真全景：业务功能脑图 / 用户旅程泳道 / 业务概念图，DEFERRED）并轨：
+
+| 附录 C 卡 | 与本口径的关系 | 缺省 / 失败语义 |
+| :--- | :--- | :--- |
+| 业务功能脑图 | 优先复用附录 C 锚定定义作投影目标之一；对应细模型 / SSOT 的功能向投影 | 未立项真图前：占位或空态；**不得**用全景进度冒充施工点亮 |
+| 用户旅程泳道 | 同上；3～5 步白话，非工程师时序图 | 同上；不得另起第二套「旅程」视图体系 |
+| 业务概念图 | 同上；方块与关系，不展示字段/索引细节 | 同上 |
+
+**纪律**：不得另起第二套视图体系；任一视图与 SSOT 不一致时以 SSOT 为准；C.10q 已交双视角壳 ≠ 三张真图已交付；`renderSchemeDiagrams`（J.9b / V-07）未交付，本条不把它写成已实现。
+
+##### 已知缺口 · 失败 / 缺省语义（核对 J.36 后）
+
+| 缺口 | 状态 | 本条要求的失败 / 缺省语义 |
+| :--- | :--- | :--- |
+| 快照 v1/V2 双形 | **J.36 已交付** | 只引「快照 v1/V2 双形缝」；不重开 |
+| `acceptance.check` / `notes` | **J.36 已交付** | 只引「`acceptance.check` / `notes` 字段契约」；不重开 |
+| 五字段 DTO 类型 | **J.36 已交付** | 复用 `SchemeItemProjectionDto`；本条只定映射与加层语义 |
+| quote 无哈希 | **已有**（J.32a `frozen_quotes` / 回链） | 吸收时**不得**照抄「无哈希」蓝图原文；缺登记 / 哈希不一致仍拒冻 |
+| 无确认快照实体 | **已有**（密封快照 + digest） | 不得另起平行「确认快照」实体替代现行密封 |
+| deprecated 无墓地语义 | **已有**（墓地 / reject 链） | 不得引入第二套 deprecated 语义绕过墓地 |
+| 缺 ChangeOrder | **另立不决**（商业层） | 本条**不定**冷静期 / 计价 / 责任归因；不得写入可签执行层 |
+| 测试目标自生成 | **仍开** | 规格允许将来由加层/投影**建议**测试目标，但须标 `ai_inferred`；**不得**自动写入硬门禁或冒充用户验收；缺省 = 不生成；实现归后续卡 |
+| `renderSchemeDiagrams` | **未交付**（实现面） | 本条不交付；缺省 = 无图 / 占位；不得宣称已渲染 |
 
 ### 14.3 补丁协议 `SchemePatch`
 
