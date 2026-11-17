@@ -1355,6 +1355,8 @@ governance:
 ### 3.4j 细模型加层 + 视图投影规格（2026-11-17 · 立卡 P-235）
 
 > **立卡说明（2026-11-17 · P-235）**：授权来源为 Tina「立蓝图第一批主体卡（P-235）」。本条只立一张**规格卡**（`TASK-J.37`，估算 S），**不写产品代码、不开工、不实现**。口径依据 P-220 [`../ledger/blueprint-absorption-ruling.md`](../ledger/blueprint-absorption-ruling.md) 分歧 2+7、细模型简报存档与 J.36 已补三缝。活发送路径接线**暂不立**；§3.3 自动点亮仍 Hold；CI.2 攒样本；文档计划暂缓。立卡 ≠ 授权 ≠ 开工。不宣称端到端闭环。
+>
+> **施工注记（2026-11-17）**：Tina 授权 J.37 施工（纯文档）。规格正文写入 [`supervisor.md`](./supervisor.md)「细模型加层 + 视图投影」；简报 [`../ledger/blueprint-fine-layer-spec-brief.md`](../ledger/blueprint-fine-layer-spec-brief.md) §5 回写落点指针。只定口径；不实现；不重开 J.36 三缝。
 
 <a id="task-j.37"></a>
 
@@ -1415,17 +1417,17 @@ contract:
       - { alias: docs, executable: npm, args: [run, check:docs] }
 design:
   approach: >-
-    先落卡面口径与已知缺口清单，再在授权施工后写入 supervisor.md 映射表与
-    ledger 细模型规格简报；复用 J.36 SchemeItemProjectionDto，不重开信任档三缝。
-    视图/细模型实现归后续 L 子卡（R-11）。本立卡回合只写任务文档与简报指针，不写产品代码。
+    授权施工后写入 supervisor.md「细模型加层 + 视图投影」：五字段映射表、细模型可选加层、
+    附录 C 并轨、剩余缺口失败/缺省语义；简报 §5 回写落点指针。复用 J.36
+    SchemeItemProjectionDto，不重开信任档三缝。视图/细模型实现归后续 L 子卡（R-11）。不写产品代码。
   touches:
-    - { path: docs/specs/supervisor.md, change: modify, why: 施工时写入五字段映射与附录 C 并轨口径（立卡回合不改）, symbols: [] }
-    - { path: docs/ledger/blueprint-fine-layer-spec-brief.md, change: modify, why: 细模型规格简报（立卡指针 + 缺口清单；P-235 已落盘）, symbols: [] }
-    - { path: docs/ledger/trust-tier-spec-boundary-brief.md, change: modify, why: 分治指针：细模型卡已立, symbols: [] }
+    - { path: docs/specs/supervisor.md, change: modify, why: 写入五字段映射、附录 C 并轨与剩余缺口失败/缺省语义, symbols: [] }
+    - { path: docs/ledger/blueprint-fine-layer-spec-brief.md, change: modify, why: 施工落点指针 §5, symbols: [] }
+    - { path: docs/ledger/trust-tier-spec-boundary-brief.md, change: modify, why: 分治指针：J.37 规格落点, symbols: [] }
   interfaces:
-    - { kind: type, name: SchemeItemProjectionDto, signature: "J.36 已交付五字段投影 DTO；本卡定细模型加层与视图投影映射口径，不改类型声明除非另授权", consumers: [] }
+    - { kind: type, name: SchemeItemProjectionDto, signature: "J.36 已交付五字段投影 DTO；本卡定细模型加层与视图投影映射口径，不改类型声明", consumers: [] }
   test_plan:
-    - { acceptance_id: J37-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "立卡阶段门禁为 npm run check:docs；规格正文待另授权施工" }
+    - { acceptance_id: J37-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "门禁 npm run check:docs；规格正文见 supervisor.md「细模型加层 + 视图投影」；本卡未新增 vitest 文件" }
     - { acceptance_id: J37-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "同上" }
     - { acceptance_id: J37-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "同上" }
     - { acceptance_id: J37-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "同上" }
