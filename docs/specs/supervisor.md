@@ -506,6 +506,27 @@ Stagent 的灵魂不是「另一个能写码的聊天框」，而是：**自由�
 
 覆盖与否在密封时当场计算，不在条目上存可改写的「已覆盖」标记。快照写入的是回链输入（`item_quote_backlinks`）和信任档（`trust_tier`），两者计入 digest。信任档口径：标准档（默认，请求省略时也写 `standard`）出示对照面；重确认档逐项勾选；轻确认档快照即可，但回链判定与标准档同一套，不降级。旧快照没有这两段视为未选档、无回链段。对照面 UI 已由 TASK-J.32b 交付，本条只规定密封判定。
 
+#### 快照 v1/V2 双形缝（TASK-J.36）
+
+冻结快照与账本方案目前是**双形并存**，本条只钉契约与失败语义，**不**重写上方三条硬约束、不升 `schema_version`、不改对照面 UI。
+
+| 面 | 权威形 | 说明 |
+| :--- | :--- | :--- |
+| 快照内 `scheme` | 前端 v1 `SchemeDraft`（`scheme-snapshot-store.ts`） | 展示 / Demo 门禁 / 旧路径消费；计入 digest |
+| 回链核验输入 | 账本 `SchemeDraftV2`（经 `evaluateSchemeItemBacklinks`） | 密封时当场计算，写入 `item_quote_backlinks`；**不**把「已覆盖」存成可改写标记 |
+| 信任档 | 快照追加段 `trust_tier` | 与回链段一并计入 digest（J.32a 已交付） |
+
+**对照以哪一侧为准**：密封后的「是否已对照」以快照内 `item_quote_backlinks` + `frozen_quotes` 为准（由 V2 账本在冻结瞬间算出）；不得事后用 v1 `scheme` 正文重算并改写覆盖结论。
+
+**digest 以哪一侧为准**：`digest` 绑定整份快照（含 v1 `scheme`、`trust_tier`、`item_quote_backlinks`、`frozen_quotes` 等既有段）。双形内容不一致时**不得**静默改 digest 或降级跳过回链。
+
+**失败语义**（沿用既有码，不新造第二套）：
+
+1. 回链哈希不一致 / 缺登记导致无法核验 → 冻结失败，复用 `E_SCHEME_SNAPSHOT_MISMATCH`，不写快照（同 J.32a）。
+2. `ai_inferred` 不得因双形缝被标成已对照；不得因此降级回链（同硬约束 3）。
+3. 旧快照缺 `trust_tier` / `item_quote_backlinks` → 视为未选档、无回链段；**不**自动补算为已覆盖。
+4. 禁止借本缝把 v1 `scheme` 升格为 V2、或把 V2 整树塞进快照以「消除双形」——那是另卡范围。
+
 **幂等契约**：
 - `confirmation_id` 由前端生成，**同一修订重试必须复用同一 id**；换修订才换 id。
 - 同 id + 同内容 → 返回原结果（`idempotent: true`），**不重复签署**。
@@ -1003,7 +1024,27 @@ interface SchemeDraftV2 {
 }
 ```
 
-> 与现有 `SchemeDraft` 的关系：V2 是超集。`mermaidArchitecture` / `mermaidFlow` / `mermaidMindmap` 不再存储，改为由渲染函数 `renderSchemeDiagrams(draft)` 按需生成；快照摘要以 V2 结构为准（剔除 `updated_in_revision` 与时间戳，承接 §8 R3）。
+> 与现有 `SchemeDraft` 的关系：V2 是超集。`mermaidArchitecture` / `mermaidFlow` / `mermaidMindmap` 不再存储，改为由渲染函数 `renderSchemeDiagrams(draft)` 按需生成；快照摘要以 V2 结构为准（剔除 `updated_in_revision` 与时间戳，承接 §8 R3）。冻结快照内 `scheme` 仍为 v1 形，见上方「快照 v1/V2 双形缝」。
+
+#### `acceptance.check` / `notes` 字段契约（TASK-J.36）
+
+类型声明落在 `src/lib/journey/scheme-patch-types.ts`（`AcceptanceCheckKind` / `AcceptanceItem` / `SchemeDraftV2.notes`）。本条只定契约与投影，**不**改 J.32 三条硬约束。
+
+| 字段 | 契约 | 失败 / 缺省语义 |
+| :--- | :--- | :--- |
+| `acceptance[].check` | `"auto" \| "playtest" \| "both"` | 缺省**不伪造**（读侧不得写成已选定的某一档）；非法枚举 → 补丁/投影拒绝该字段，不得静默改成别的档。合并引擎对 upsert 仍强制 `text`；`check` 经 `BUSINESS_KEYS` 透传。 |
+| `notes` | 草稿级字符串；**只由用户写** | 缺省视为未写；编译器 / Worker / 回链核验**不得**填充或改写。`notes` 不参与「已覆盖」判定。 |
+
+前端 v1 `SchemeDraft.acceptance[].check` 与草稿级 `notes` 已存在；本卡把账本 V2 类型面与 §14.2 对齐，消除「规格有、V2 类型无」的缝。
+
+#### 条目投影五字段 DTO（TASK-J.36）
+
+蓝图外壳五字段（`status` / `scope` / `provenance` / `links` / `confidence`）与现行 `SchemeItemMeta` 不对齐时，**只允许**作投影加层 DTO（类型名 `SchemeItemProjectionDto`），对齐 P-220 分歧 2+7：
+
+1. **禁止**用五字段替换或覆写 `source` / `evidence`。
+2. **禁止**另起第二套条目 SSOT；权威条目仍是 `SchemeItemMeta` + 集合业务字段。
+3. 投影字段均可标 `ai_inferred` 直至业主确认；**不得**冒充 `user_said`。
+4. **视图实现**（把 DTO 画进中栏）归细模型 / 蓝图第一批实现子卡；本卡只定契约，不交付 UI。
 
 ### 14.3 补丁协议 `SchemePatch`
 

@@ -90,6 +90,39 @@ export type SchemeCollection =
 
 export type WithText = SchemeItemMeta & { text: string };
 
+/** supervisor.md §14.2；TASK-J.36 类型落地 */
+export type AcceptanceCheckKind = "auto" | "playtest" | "both";
+
+/**
+ * 白话验收条目。`check` 与 §14.2 对齐；缺省不伪造（读侧不得写成已选定）。
+ * 合并引擎仍只强制 `text`；`check` 经 BUSINESS_KEYS 透传。
+ */
+export type AcceptanceItem = SchemeItemMeta & {
+  text: string;
+  check?: AcceptanceCheckKind;
+};
+
+/**
+ * 蓝图外壳五字段投影加层（TASK-J.36 · P-220 分歧 2+7）。
+ * 只作投影 DTO：禁止写入/替换 `SchemeItemMeta.source` 或 `evidence`；禁止另起 SSOT。
+ * 视图实现归细模型子卡；本类型仅契约（可标 ai_inferred 直至业主确认）。
+ */
+export type SchemeItemProjectionStatus =
+  "draft" | "proposed" | "confirmed" | "rejected" | "deferred";
+
+export interface SchemeItemProjectionDto {
+  /** 投影态；不得回写为 ItemSource */
+  status?: SchemeItemProjectionStatus;
+  /** 范围提示（白话）；非 ScopePlan / 快照权威 */
+  scope?: string;
+  /** 来源说明（人读）；不得替代 evidence[] */
+  provenance?: string;
+  /** 外链或相关条目 id；非 TurnRef */
+  links?: string[];
+  /** 置信提示（展示）；非门禁 */
+  confidence?: "low" | "medium" | "high";
+}
+
 export interface SchemeDraftV2 {
   scheme_id: string;
   scheme_revision: number;
@@ -127,7 +160,12 @@ export interface SchemeDraftV2 {
     chosen_id: string | null;
   })[];
   open_questions: WithText[];
-  acceptance: WithText[];
+  acceptance: AcceptanceItem[];
+  /**
+   * 用户备注（只由用户写；supervisor.md §14.2）。
+   * 缺省视为未写；编译器 / Worker 不得填充。
+   */
+  notes?: string;
 }
 
 // ───────────── 墓地（§14.11 RejectedAlternative + K-4） ─────────────
@@ -517,7 +555,8 @@ export const UPSERT_OP_COLLECTION: Record<string, SchemeCollection> = {
 export const BUSINESS_KEYS: Record<SchemeCollection, readonly string[]> = {
   goals: ["text"],
   out_of_scope: ["text"],
-  acceptance: ["text"],
+  /** text 必填；check 可选透传（TASK-J.36） */
+  acceptance: ["text", "check"],
   open_questions: ["text"],
   modules: ["name", "purpose", "user_visible", "kind", "project_anchor"],
   flows: ["name", "steps"],
