@@ -34,7 +34,7 @@
 | 交付物 | 估算 | 卡 |
 | :--- | :--- | :--- |
 | 规格（口径 + 附录 C 并轨 + 缺口清单） | **S** | [`TASK-J.37`](../specs/development-tasks-completed.md#task-j.37) **COMPLETED**（本简报） |
-| 实现（细模型加层 + 视图投影全套） | **L** | **未立**；授权后按 R-11 拆子卡（另出拆分简报过目） |
+| 实现（细模型加层 + 视图投影全套） | **L** | **未立**；拆分建议见 [`blueprint-fine-layer-impl-split-brief.md`](./blueprint-fine-layer-impl-split-brief.md)（过目后再逐张立卡） |
 
 ## 4. 分治
 
@@ -52,4 +52,4 @@
 
 - **P-235**：已立 `TASK-J.37`；只定口径；**不开工实现**。
 - **J.37**：已 COMPLETED（#294/`2c6c7b4`；P-236）；规格正文已写入 `supervisor.md`；诚实口径：口径已交付，实现未做（L 按 R-11 后拆另立）、ChangeOrder/冷静期另立不决。
-- 实现 L 与活发送接线均待另授权。
+- 实现 L：拆分简报见 [`blueprint-fine-layer-impl-split-brief.md`](./blueprint-fine-layer-impl-split-brief.md)；过目后再逐张立卡。活发送接线仍待另授权。
