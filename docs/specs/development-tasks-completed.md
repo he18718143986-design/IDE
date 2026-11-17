@@ -8504,3 +8504,122 @@ governance:
 * **背景**：划界简报已确认 J.32a/b 覆盖信任档工程主面；剩余三缝须规格补丁，否则再立「信任档卡」必与已交付内核重复。
 * **取舍**：本卡只定契约与类型声明；视图实现与活发送接线分治另卡。
 
+### 3.4aw 细模型加层 + 视图投影规格（J.37 · 完工回写 P-236）
+
+<a id="task-j.37"></a>
+
+### 【Task J.37】细模型加层 + 视图投影规格卡`[COMPLETED · 立卡 P-235 · 施工 #294 · 完工回写 P-236]`
+
+> **立卡说明（2026-11-17 · P-235）**：按 P-220 分歧 2+7 只定口径：五字段映射、RFC 附录 C 并轨、已知缺口清单；`writable_paths` 限规格与简报。不实现 UI / 细模型运行时。
+
+> **归档注记（2026-11-17 · P-236）**：本卡已 **COMPLETED**。Tina 授权施工与合入。[#294](https://github.com/he18718143986-design/IDE/pull/294) squash `2c6c7b4320920db6970a8974e606936fed936360` 于 2026-11-17 12:57:36 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `1a24014afb11277961b77441081ff2e650f0e9da`；父提交 `3598c054d66e0b55f710f0be8671db52260c5ed8`）。合入前必需检查全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck/Unit，含 Windows Unit SUCCESS），`mergeable=MERGEABLE`、`mergeStateStatus=CLEAN`；Bugbot NEUTRAL（额度未跑）不挡合入。估算仍为 S。交付：`supervisor.md`「细模型加层 + 视图投影」五字段映射表、细模型可选加层、RFC 附录 C 并轨、剩余缺口失败/缺省语义；简报 §5 施工落点指针。诚实口径：**口径已交付，实现未做（L 按 R-11 后拆另立）、ChangeOrder/冷静期另立不决**。活发送路径未接；不实现 §3.3；不开工 CI.2。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.37
+status: COMPLETED
+contract:
+  intent:
+    title: 细模型加层 + 视图投影规格卡（口径 + RFC 附录 C 并轨）
+    description: >-
+      蓝图第一批主体规格卡（P-220 分歧 2+7）：只定口径，不实现。
+      （1）五字段外壳 status/scope/provenance/links/confidence 与现行 SchemeDraftV2 /
+      SchemeItemMeta 的映射口径（复用 J.36 已交付 SchemeItemProjectionDto，禁止替换 source/evidence）；
+      （2）与 RFC 附录 C 三卡并轨、对齐 TASK-C.10q 遗留债（不得另起第二套视图体系）；
+      （3）已知缺口清单：核对 J.36 已补的 v1/V2 双形与 acceptance.check/notes，只记剩余缝；
+      蓝图评审五缺口吸收时须补齐而非照抄（quote 哈希/确认快照/墓地语义已有；测试目标自生成仍开；
+      ChangeOrder 商业层另立不决）。
+      实现（细模型加层 + 视图投影全套）估算 L，按 R-11 后拆另卡；本卡不含实现。
+    risk_level: LOW
+  acceptance:
+    - id: J37-P1
+      check: auto
+      text: >-
+        规格已写清五字段外壳与 SchemeDraftV2/SchemeItemMeta 的映射口径：
+        只作投影加层；禁止替换 source/evidence；禁止双 SSOT；吸收内容标 ai_inferred。
+    - id: J37-P2
+      check: auto
+      text: >-
+        规格已写清与 RFC 附录 C（业务功能脑图 / 用户旅程泳道 / 业务概念图）并轨口径，
+        并标明 TASK-C.10q 遗留债对齐点；不得另起第二套视图体系。
+    - id: J37-P3
+      check: auto
+      text: >-
+        已知缺口清单已落入规格：J.36 已补缝（v1/V2 双形、acceptance.check/notes、
+        五字段 DTO 契约）标为已交付只记指针；剩余缝（细模型加层语义、视图投影并轨、
+        测试目标自生成）与另立不决（ChangeOrder）分列清楚。
+    - id: J37-P4
+      check: auto
+      text: >-
+        npm run check:docs 通过；卡面 non_goals / 硬依赖 / 与实现 L 分界（R-11）一致；
+        不把蓝图原文并入 docs/specs/。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - docs/specs/supervisor.md
+      - docs/ledger/blueprint-fine-layer-spec-brief.md
+      - docs/ledger/trust-tier-spec-boundary-brief.md
+    readonly_paths:
+      - docs/ledger/blueprint-absorption-ruling.md
+      - docs/rfc/v0.2-multi-agent-pipeline.md
+      - docs/specs/development-tasks-completed.md
+      - src/lib/journey/scheme-patch-types.ts
+      - docs/ledger/prompt-builder-live-send-path-brief.md
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    授权施工后写入 supervisor.md「细模型加层 + 视图投影」：五字段映射表、细模型可选加层、
+    附录 C 并轨、剩余缺口失败/缺省语义；简报 §5 回写落点指针。复用 J.36
+    SchemeItemProjectionDto，不重开信任档三缝。视图/细模型实现归后续 L 子卡（R-11）。不写产品代码。
+  touches:
+    - { path: docs/specs/supervisor.md, change: modify, why: 写入五字段映射、附录 C 并轨与剩余缺口失败/缺省语义, symbols: [] }
+    - { path: docs/ledger/blueprint-fine-layer-spec-brief.md, change: modify, why: 施工落点指针 §5, symbols: [] }
+    - { path: docs/ledger/trust-tier-spec-boundary-brief.md, change: modify, why: 分治指针：J.37 规格落点, symbols: [] }
+  interfaces:
+    - { kind: type, name: SchemeItemProjectionDto, signature: "J.36 已交付五字段投影 DTO；本卡定细模型加层与视图投影映射口径，不改类型声明", consumers: [] }
+  test_plan:
+    - { acceptance_id: J37-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #294 交付；门禁仍为 npm run check:docs，本卡未新增 vitest 文件" }
+    - { acceptance_id: J37-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #294 交付" }
+    - { acceptance_id: J37-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #294 交付" }
+    - { acceptance_id: J37-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #294 交付" }
+governance:
+  spec_refs:
+    - docs/ledger/blueprint-absorption-ruling.md
+    - docs/ledger/blueprint-fine-layer-spec-brief.md
+    - docs/rfc/v0.2-multi-agent-pipeline.md
+    - docs/specs/development-tasks-completed.md#task-c.10q
+    - docs/specs/development-tasks-completed.md#task-j.36
+    - docs/specs/supervisor.md
+  depends_on:
+    - { id: TASK-J.36, kind: hard }
+    - { id: TASK-C.10q, kind: soft }
+  code_facts:
+    - { ref: "docs/ledger/blueprint-absorption-ruling.md:61-68", note: "分歧 2：多视图为投影；须与 C.10q 遗留债 + RFC 附录 C 并轨，不得另起第二套视图体系" }
+    - { ref: "docs/ledger/blueprint-absorption-ruling.md:106-113", note: "分歧 7：SchemeDraftV2 唯一 SSOT；细模型可选加层；五字段外壳作底稿；五缺口吸收须补齐非照抄" }
+    - { ref: "src/lib/journey/scheme-patch-types.ts:93-168", note: "J.36 已交付 AcceptanceItem/notes/SchemeItemProjectionDto；本卡不重开该类型缝" }
+    - { ref: "docs/rfc/v0.2-multi-agent-pipeline.md:398-424", note: "附录 C 三卡 DEFERRED；C.10q 只交双视角壳，真图另立项" }
+  non_goals:
+    - 不实现细模型加层或视图投影 UI / 渲染（实现 L 按 R-11 后拆）
+    - 不立双 SSOT；不替换 SchemeDraftV2；不替换 source / evidence
+    - 不把蓝图原文整份并入 docs/specs/；吸收内容规格落地前一律标 ai_inferred
+    - 不开工商业冷静期 / ChangeOrder / 责任归因（另立不决）
+    - 不接活发送路径（builder 生产零调用；暂不立接线卡）
+    - 不重写 J.36 已交付三缝；不实现 §3.3；不开工 CI.2；不宣称端到端闭环
+  fail:
+    - 借本卡实现视图/细模型 UI 或升 L 却不按 R-11 拆卡
+    - 另起第二套视图体系或第二套条目 SSOT
+    - 把 ChangeOrder / 冷静期 / 活发送接线并入本卡
+    - 把蓝图原文整份并入 specs 或把未决项写成已决
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 294, commit: 2c6c7b4320920db6970a8974e606936fed936360 }
+```
+
+* **背景**：P-220 第一批路线「分歧 2+7」；信任档规格缝已由 J.36 清掉；本卡是蓝图第一批**主体**规格卡。
+* **取舍**：只定口径与缺口清单；实现另拆 L；活发送接线暂不立。
+

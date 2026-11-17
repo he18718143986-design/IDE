@@ -1,8 +1,8 @@
 # 细模型加层 + 视图投影 · 规格简报（P-235）
 
-> **地位**：planning brief（2026-11-17 · Asia/Hong_Kong）。授权来源为 Tina「立蓝图第一批主体卡（P-235）」；**J.37 施工**另授权（本回合）。  
+> **地位**：planning brief（2026-11-17 · Asia/Hong_Kong）。授权来源为 Tina「立蓝图第一批主体卡（P-235）」；施工 #294 / 完工回写 P-236。  
 > **本条只定规格指针**：**不实现 UI / 细模型运行时、不改 ADR、不把蓝图原文并入 `docs/specs/`**。  
-> **卡**：[`TASK-J.37`](../specs/development-tasks-active.md#task-j.37)（`[NEW_TASK]`，估算 S；立卡 ≠ 开工；施工授权后写规格正文）。  
+> **卡**：[`TASK-J.37`](../specs/development-tasks-completed.md#task-j.37)（`[COMPLETED]`，估算 S；施工 #294/`2c6c7b4`）。  
 > **依据**：P-220 [`blueprint-absorption-ruling.md`](./blueprint-absorption-ruling.md) 分歧 2+7；细模型简报存档（P-225）；[`TASK-J.36`](../specs/development-tasks-completed.md#task-j.36) 已补信任档三缝。
 
 ## 1. 规格卡范围（只定口径）
@@ -33,8 +33,8 @@
 
 | 交付物 | 估算 | 卡 |
 | :--- | :--- | :--- |
-| 规格（口径 + 附录 C 并轨 + 缺口清单） | **S** | [`TASK-J.37`](../specs/development-tasks-active.md#task-j.37)（本简报） |
-| 实现（细模型加层 + 视图投影全套） | **L** | **未立**；授权后按 R-11 拆子卡 |
+| 规格（口径 + 附录 C 并轨 + 缺口清单） | **S** | [`TASK-J.37`](../specs/development-tasks-completed.md#task-j.37) **COMPLETED**（本简报） |
+| 实现（细模型加层 + 视图投影全套） | **L** | **未立**；授权后按 R-11 拆子卡（另出拆分简报过目） |
 
 ## 4. 分治
 
@@ -51,5 +51,5 @@
 ## 6. 结论
 
 - **P-235**：已立 `TASK-J.37`；只定口径；**不开工实现**。
-- **J.37 施工**：规格正文写入 `supervisor.md` 上述节；本简报回写指针；不改产品代码。
+- **J.37**：已 COMPLETED（#294/`2c6c7b4`；P-236）；规格正文已写入 `supervisor.md`；诚实口径：口径已交付，实现未做（L 按 R-11 后拆另立）、ChangeOrder/冷静期另立不决。
 - 实现 L 与活发送接线均待另授权。

@@ -118,7 +118,7 @@
 
 1. 本文件为 ledger 裁决记录，标 `user_confirmed`，逐行附用户原话（见上）。
 2. 第一批卡（无 ADR 冲突）：分歧 2+7「细模型加层 + 视图投影」规格卡；分歧 3「信任档 + 档位存证」规格卡。本条只规定路线，**当时不立卡**。
-   - **后续回写**：分歧 3 规格缝由 [`TASK-J.36`](../specs/development-tasks-completed.md#task-j.36) 交付（P-233/P-234）；分歧 2+7 主体规格卡由 [`TASK-J.37`](../specs/development-tasks-active.md#task-j.37) 立卡（P-235，仍只定口径不实现）。
+   - **后续回写**：分歧 3 规格缝由 [`TASK-J.36`](../specs/development-tasks-completed.md#task-j.36) 交付（P-233/P-234）；分歧 2+7 主体规格卡由 [`TASK-J.37`](../specs/development-tasks-completed.md#task-j.37) 交付口径（P-235 立卡 / #294 施工 / P-236 完工；实现 L 另拆）。
 3. 第二批（需先评估增补/SUPERSEDE）：分歧 1「探索模式 + 触发器 + 覆盖度提示卡」，配套 ADR-0014 评估。
 4. 另立不决：托管部署档、商业契约层（冷静期/变更单计价/责任归因）、理解度校验。
 5. 全程禁止：把蓝图原文整份并入 `docs/specs/`；把未决项写成已决；双 SSOT。
