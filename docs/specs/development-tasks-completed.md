@@ -8389,3 +8389,118 @@ governance:
 * **背景**：J.22 / J.30 / J.32 多次注明 prompt-builder 未对齐；现行函数仍是 S.1 纯组装器，测试在用、生产发送未接。
 * **取舍**：本卡先对齐组装语义与密钥断言；活路径接线另卡，避免本卡升 L。
 
+
+### 3.4av 信任档规格缝补丁（J.36 · 完工回写 P-234）
+
+<a id="task-j.36"></a>
+
+### 【Task J.36】信任档规格缝补丁（v1/V2 双形 + acceptance.check/notes + 五字段投影 DTO）`[COMPLETED · 立卡 P-233 · 施工 #291 · 完工回写 P-234]`
+
+> **立卡说明（2026-11-16 · P-233）**：按划界简报只补 J.32a/b 未覆盖三缝的契约与失败语义；`writable_paths` 限规格与类型声明。不重写已交付硬约束与对照面 UI。
+
+> **归档注记（2026-11-17 · P-234）**：本卡已 **COMPLETED**。Tina 授权施工与合入。[#291](https://github.com/he18718143986-design/IDE/pull/291) squash `4dc5617ffd89afdce7613cad9edd19158159caed` 于 2026-11-17 12:01:07 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `390314207243547e8038839d15d16961fdf40611`；父提交 `92e89917054bc695caecf494b6fd283db5a25c72`；含 lint 修复 `390314207243547e8038839d15d16961fdf40611`）。合入前必需面全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit；本卡相关 scheme-patch 套件 Windows 亦绿），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非阻断存量失败，`continue-on-error`，同 #266/#288 先例）；Bugbot NEUTRAL 不挡合入。估算仍为 S。交付：`supervisor.md` 三缝契约（v1/V2 双形对照/digest/失败语义、`acceptance.check`/`notes`、五字段投影 DTO）；`scheme-patch-types.ts` 的 `AcceptanceItem`/`notes`/`SchemeItemProjectionDto` 与 `BUSINESS_KEYS.acceptance` 透传 `check`；划界简报施工落点指针。诚实口径：**三缝规格与类型声明已交付，商业冷静期/ChangeOrder 未开（另立不决）、活发送路径未接（builder 生产零调用）**。不实现 §3.3；不开工 CI.2；蓝图第一批暂不立。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.36
+status: COMPLETED
+contract:
+  intent:
+    title: 信任档规格缝补丁（v1/V2 双形 + acceptance.check/notes + 五字段投影 DTO）
+    description: >-
+      在不重写 J.32a/b 已交付信任档硬约束与对照面 UI 的前提下，只补三缝：
+      （1）快照 SchemeSnapshot.scheme 仍为前端 v1 SchemeDraft、回链取自账本 SchemeDraftV2 的双形并存契约与失败语义；
+      （2）supervisor.md §14.2 已有、SchemeDraftV2 / scheme-patch-types 尚缺的 acceptance.check 与 notes 字段契约与投影；
+      （3）蓝图外壳五字段（status / scope / provenance / links / confidence）相对 SchemeItemMeta 的投影 DTO 加层契约（禁止替换 source/evidence、禁止双 SSOT）。
+      可写范围限规格与类型声明；不含对照面 UI / 冻结内核重写 / 视图实现。
+    risk_level: LOW
+  acceptance:
+    - id: J36-P1
+      check: auto
+      text: >-
+        规格已写清：对照与 digest 以哪一侧为准、v1/V2 双形并存时的失败语义；
+        不得借机重做 J.32a 回链三条硬约束。
+    - id: J36-P2
+      check: auto
+      text: >-
+        acceptance.check（auto|playtest|both）与 notes 的字段契约已落入规格，
+        并在 scheme-patch-types（或等价类型声明）中有对应类型；不改 J.32 硬约束。
+    - id: J36-P3
+      check: auto
+      text: >-
+        五字段投影 DTO 契约已写入规格（只作加层投影）；明确禁止替换 source/evidence、禁止双 SSOT；
+        视图实现归细模型实现子卡，本卡不交付 UI。
+    - id: J36-P4
+      check: auto
+      text: >-
+        npm run check:docs 通过；卡面 non_goals / 硬依赖 / 与细模型分界与划界简报一致。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - docs/specs/supervisor.md
+      - src/lib/journey/scheme-patch-types.ts
+      - docs/ledger/trust-tier-spec-boundary-brief.md
+    readonly_paths:
+      - docs/ledger/blueprint-absorption-ruling.md
+      - docs/specs/development-tasks-completed.md
+      - daemon/pipeline/scheme-snapshot-store.ts
+      - src/lib/journey/scheme-draft.ts
+      - docs/ledger/prompt-builder-live-send-path-brief.md
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    以划界简报 §2 三缝为唯一范围：先在 supervisor.md 写清契约与失败语义，
+    再在 scheme-patch-types.ts 补类型声明（acceptance.check / notes / 投影 DTO 类型）。
+    不改 evaluateSchemeItemBacklinks、不改对照面组件、不升 schema_version。
+    五字段只定投影契约，视图实现另卡。
+  touches:
+    - { path: docs/specs/supervisor.md, change: modify, why: 写入三缝契约与失败语义（不重写 J.32 硬约束）, symbols: [] }
+    - { path: src/lib/journey/scheme-patch-types.ts, change: modify, why: acceptance.check/notes 与五字段投影 DTO 类型声明, symbols: [SchemeDraftV2, SchemeItemMeta] }
+    - { path: docs/ledger/trust-tier-spec-boundary-brief.md, change: modify, why: 立卡后指针回写（若需）, symbols: [] }
+  interfaces:
+    - { kind: type, name: SchemeDraftV2.acceptance, signature: "SchemeItemMeta & { text; check: auto|playtest|both }（施工时定稿）", consumers: [] }
+    - { kind: type, name: SchemeItemProjectionDto, signature: "五字段投影加层 DTO（status/scope/provenance/links/confidence）；不替换 source/evidence", consumers: [] }
+  test_plan:
+    - { acceptance_id: J36-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #291 交付；门禁仍为 npm run check:docs，本卡未新增 vitest 文件" }
+    - { acceptance_id: J36-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #291 交付；类型声明以 tsc --noEmit 锁" }
+    - { acceptance_id: J36-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #291 交付" }
+    - { acceptance_id: J36-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #291 交付" }
+governance:
+  spec_refs:
+    - docs/ledger/trust-tier-spec-boundary-brief.md
+    - docs/ledger/blueprint-absorption-ruling.md
+    - docs/specs/supervisor.md
+    - docs/specs/development-tasks-completed.md#task-j.32a
+    - docs/specs/development-tasks-completed.md#task-j.32b
+  depends_on:
+    - { id: TASK-J.32a, kind: hard }
+    - { id: TASK-J.32b, kind: hard }
+  code_facts:
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:308", note: "SchemeSnapshot.scheme 仍为前端 v1 SchemeDraft；回链从 SchemeDraftV2 抽出" }
+    - { ref: "src/lib/journey/scheme-patch-types.ts:130", note: "SchemeDraftV2.acceptance 现为 WithText[]，无 check 字段；draft 级 notes 在前端 SchemeDraft，V2 类型面未对齐 §14.2" }
+    - { ref: "docs/specs/supervisor.md:996-1002", note: "§14.2 已规定 acceptance.check 与 notes；代码类型未全落地" }
+    - { ref: "docs/ledger/blueprint-absorption-ruling.md:1-40", note: "五字段外壳与 SchemeItemMeta 并轨：只允许投影 DTO 加层（P-220 分歧 2+7）" }
+  non_goals:
+    - 不重写 J.32a/b 已交付硬约束与对照面 UI；不升 schema_version
+    - 不开工商业冷静期 / ChangeOrder / 责任归因
+    - 不立双 SSOT；不替换 source / evidence
+    - 不实现细模型视图投影 UI（蓝图第一批另授权）；不接活发送路径（见活发送定位简报）
+    - 不实现 §3.3 自动点亮；不开工 CI.2；不宣称端到端闭环
+  fail:
+    - 借本卡重写回链三条硬约束或对照面 UI
+    - 以五字段替换 source/evidence 或另起第二套信任档语义
+    - 把视图实现 / 活发送接线并入本卡导致升 L 却不拆
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 291, commit: 4dc5617ffd89afdce7613cad9edd19158159caed }
+```
+
+* **背景**：划界简报已确认 J.32a/b 覆盖信任档工程主面；剩余三缝须规格补丁，否则再立「信任档卡」必与已交付内核重复。
+* **取舍**：本卡只定契约与类型声明；视图实现与活发送接线分治另卡。
+
