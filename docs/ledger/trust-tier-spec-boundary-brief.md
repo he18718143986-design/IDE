@@ -1,8 +1,8 @@
 # 信任档规格卡 · 划界简报（P-230）
 
 > **地位**：planning brief（2026-11-16 · Asia/Hong_Kong）。授权来源为 Tina「立 SOP 卡 + prompt-builder 对齐卡（P-230），同时做信任档规格卡划界简报」。  
-> **本条只划界**：**不施工、不改 ADR、不把蓝图原文并入 `docs/specs/`**。P-230 当时不立卡；**P-233 已另授权立 [`TASK-J.36`](../specs/development-tasks-active.md#task-j.36)**（仍 `[NEW_TASK]`，立卡 ≠ 开工）。  
-> **依据**：P-220 [`blueprint-absorption-ruling.md`](./blueprint-absorption-ruling.md) 分歧 3；P-225「信任档规格卡只补 J.32a/b 未覆盖缝」；[`TASK-J.32a`](../specs/development-tasks-completed.md#task-j.32a) / [`TASK-J.32b`](../specs/development-tasks-completed.md#task-j.32b) 已交付面；细模型简报存档（planning archive）。
+> **本条只划界**：**不施工、不改 ADR、不把蓝图原文并入 `docs/specs/`**。P-230 当时不立卡；**P-233 已另授权立 [`TASK-J.36`](../specs/development-tasks-completed.md#task-j.36)**（P-234 已 `[COMPLETED]`）。  
+> **依据**：P-220 [`blueprint-absorption-ruling.md`](./blueprint-absorption-ruling.md) 分歧 3；P-225「信任档规格卡只补 J.32a/b 未覆盖缝」；[`TASK-J.32a`](../specs/development-tasks-completed.md#task-j.32a) / [`TASK-J.32b`](../specs/development-tasks-completed.md#task-j.32b) 已交付面；细模型规格见 [`blueprint-fine-layer-spec-brief.md`](./blueprint-fine-layer-spec-brief.md) / [`TASK-J.37`](../specs/development-tasks-active.md#task-j.37)。
 
 ## 1. 已交付（规格卡禁止重写）
 
@@ -32,7 +32,7 @@
 - 理解度校验、「是否真懂」门禁化（J.33 已声明不是门禁）
 - `prompt-builder.ts` 对齐（见 [`TASK-J.35`](../specs/development-tasks-completed.md#task-j.35)；活发送路径见 [`prompt-builder-live-send-path-brief.md`](./prompt-builder-live-send-path-brief.md)）
 - 业主操作规程文案（见 [`TASK-J.34`](../specs/development-tasks-completed.md#task-j.34)）
-- 细模型加层 + 视图投影实现（蓝图第一批规格卡 S / 实现 L，另授权；见细模型简报）
+- 细模型加层 + 视图投影实现（规格卡已立 [`TASK-J.37`](../specs/development-tasks-active.md#task-j.37) S；实现 L 按 R-11 后拆，另授权；见 [`blueprint-fine-layer-spec-brief.md`](./blueprint-fine-layer-spec-brief.md)）
 
 ## 3. 立卡形态（P-233 已立；施工另授权）
 
@@ -56,5 +56,5 @@
 - **J.32a/b 已覆盖信任档工程主面**；再立「信任档规格卡」若不以 §2 三缝为界，就会与已交付内核重复。
 - **P-230**：只落本简报；当时不立 `TASK-J.36`。
 - **P-233**：已立 [`TASK-J.36`](../specs/development-tasks-active.md#task-j.36)；另落活发送路径只读定位简报，**不立**接线卡。
-- **J.36**：已 COMPLETED（#291/`4dc5617`；P-234）；规格 + 类型声明按 §2 三缝落地；商业冷静期/ChangeOrder 未开；活发送未接；视图实现仍另卡。
-- 蓝图「细模型加层 + 视图投影」规格卡仍暂不立（与本简报分治）。
+- **J.36**：已 COMPLETED（#291/`4dc5617`；P-234）；规格 + 类型声明按 §2 三缝落地；商业冷静期/ChangeOrder 未开；活发送未接。
+- **P-235**：蓝图「细模型加层 + 视图投影」规格卡已立 [`TASK-J.37`](../specs/development-tasks-active.md#task-j.37)（与本简报分治；只定口径不实现）。
