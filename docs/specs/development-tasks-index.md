@@ -196,7 +196,7 @@
 | `TASK-J.33` | `COMPLETED` | 新增卡文案规范并做成机器可校验项（立卡 P-215；施工 #266 `838d1f4`；完工回写 P-217；估算 M） | [正文](./development-tasks-completed.md#task-j.33) |
 | `TASK-J.34` | `COMPLETED` | 业主确认与试玩操作规程（SOP · S2→Seal + 试玩；立卡 P-230；施工 #286 `51c643e`；完工回写 P-231；估算 S） | [正文](./development-tasks-completed.md#task-j.34) |
 | `TASK-J.35` | `COMPLETED` | prompt-builder.ts 对齐台账 / 信任档 / 回链事实（立卡 P-230；施工 #288 `306ff11`；完工回写 P-232；估算 M） | [正文](./development-tasks-completed.md#task-j.35) |
-| `TASK-J.36` | `NEW_TASK` | 信任档规格缝补丁（v1/V2 双形 + acceptance.check/notes + 五字段投影 DTO；立卡 P-233；估算 S；未开工） | [正文](./development-tasks-active.md#task-j.36) |
+| `TASK-J.36` | `COMPLETED` | 信任档规格缝补丁（v1/V2 双形 + acceptance.check/notes + 五字段投影 DTO；立卡 P-233；施工 #291 `4dc5617`；完工回写 P-234；估算 S） | [正文](./development-tasks-completed.md#task-j.36) |
 
 ---
 
