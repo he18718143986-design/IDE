@@ -17,7 +17,7 @@
 | [`blueprint-absorption-ruling.md`](./blueprint-absorption-ruling.md) | 蓝图机制吸收七分歧裁决（P-220）：Tina t1309u 确认，标 `user_confirmed` | 已拍板；P-235 已立第一批主体规格卡 [`TASK-J.37`](../specs/development-tasks-active.md#task-j.37)（仍不施工、不改 ADR）；吸收内容规格落地前一律标 `ai_inferred`；托管部署档 / 商业契约层 / 理解度校验另立不决 |
 | [`trust-tier-spec-boundary-brief.md`](./trust-tier-spec-boundary-brief.md) | 信任档规格卡划界简报（P-230）：只补 J.32a/b 未覆盖三缝；[`TASK-J.36`](../specs/development-tasks-completed.md#task-j.36) 已 COMPLETED（P-234） | planning brief；三缝已交付；与细模型卡分治 |
 | [`blueprint-fine-layer-spec-brief.md`](./blueprint-fine-layer-spec-brief.md) | 细模型加层 + 视图投影规格简报（P-235）：五字段映射 + 附录 C 并轨 + 缺口清单；[`TASK-J.37`](../specs/development-tasks-completed.md#task-j.37) 已 COMPLETED（#294 / P-236） | planning brief；口径已交付；实现 L 未立 |
-| [`blueprint-fine-layer-impl-split-brief.md`](./blueprint-fine-layer-impl-split-brief.md) | 细模型加层 + 视图投影实现拆分（R-11）：A/B COMPLETED；C=J.38c 已立 NEW_TASK（P-241）；D–E 待立卡 | planning brief；E 暂不与 C 并行；D 硬等 J.9b；不施工 |
+| [`blueprint-fine-layer-impl-split-brief.md`](./blueprint-fine-layer-impl-split-brief.md) | 细模型加层 + 视图投影实现拆分（R-11）：A/B/C COMPLETED（C=#304/`d2e2b83`；P-242）；D–E 待立卡 | planning brief；E 暂不立（C 回写后再点名）；D 硬等 J.9b；不施工 |
 | [`prompt-builder-live-send-path-brief.md`](./prompt-builder-live-send-path-brief.md) | prompt-builder 活发送路径只读定位（P-233）：J.35 已对齐但生产零调用；四缝事实 + 接线前置 | planning brief；**不立**接线卡；不施工 |
 
 ## 文档治理挂账（2026-10-29 新增）
