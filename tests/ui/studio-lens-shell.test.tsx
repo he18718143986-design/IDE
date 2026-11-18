@@ -78,7 +78,7 @@ describe("StudioLensShell / PanoramaPane (TASK-C.10q)", () => {
     );
   });
 
-  it("全景摘要可读合同；三张 v0.2 卡为占位；无施工绿灯节点", () => {
+  it("全景摘要可读合同；三张附录 C 投影壳空态；无施工绿灯节点", () => {
     render(
       <PanoramaPane
         summary={{
@@ -96,12 +96,99 @@ describe("StudioLensShell / PanoramaPane (TASK-C.10q)", () => {
     expect(
       screen.getByTestId("panorama-acceptance-list").children,
     ).toHaveLength(2);
-    expect(screen.getByTestId("panorama-card-capability")).toBeInTheDocument();
-    expect(screen.getByTestId("panorama-card-journey")).toBeInTheDocument();
-    expect(screen.getByTestId("panorama-card-domain")).toBeInTheDocument();
+    const section = screen.getByTestId("panorama-v02-placeholders");
+    expect(section).toHaveAttribute("data-forbid-illumination", "true");
+    expect(section).toHaveAttribute("data-has-diagram", "false");
+    for (const id of ["capability", "journey", "domain"] as const) {
+      const card = screen.getByTestId(`panorama-card-${id}`);
+      expect(card).toBeInTheDocument();
+      expect(card).toHaveAttribute("data-empty", "true");
+      expect(card).toHaveAttribute("data-forbid-illumination", "true");
+      expect(card).toHaveAttribute("data-has-diagram", "false");
+      expect(card).toHaveAttribute("data-source", "ssot:none");
+      expect(card).toHaveTextContent(/暂无投影数据（空态合法）/);
+    }
     expect(screen.queryByTestId("functional-tree")).toBeNull();
     expect(screen.queryByTestId("execution-dag")).toBeNull();
     expect(screen.getByText(/不会出现施工绿灯/)).toBeInTheDocument();
+  });
+
+  it("有 SchemeDraftV2 时三卡消费 SSOT 投影契约（无 mermaid / 无假绿）", () => {
+    render(
+      <PanoramaPane
+        schemeDraft={{
+          scheme_id: "demo",
+          scheme_revision: 1,
+          frozen: false,
+          title: "演示",
+          summary: "",
+          audience: null,
+          size_hint: "tiny",
+          goals: [],
+          out_of_scope: [],
+          modules: [
+            {
+              id: "M1",
+              source: "user_said",
+              evidence: [],
+              user_pinned: false,
+              updated_in_revision: 1,
+              name: "能力甲",
+              purpose: "演示",
+              user_visible: true,
+              kind: "new",
+            },
+          ],
+          flows: [
+            {
+              id: "F1",
+              source: "user_said",
+              evidence: [],
+              user_pinned: false,
+              updated_in_revision: 1,
+              name: "旅程甲",
+              steps: [{ actor: "用户", action: "走" }],
+            },
+          ],
+          entities: [
+            {
+              id: "E1",
+              source: "user_said",
+              evidence: [],
+              user_pinned: false,
+              updated_in_revision: 1,
+              name: "概念甲",
+              fields_hint: [],
+            },
+          ],
+          decisions: [],
+          conflicts: [],
+          open_questions: [],
+          acceptance: [],
+        }}
+      />,
+    );
+    expect(screen.getByTestId("panorama-card-capability")).toHaveAttribute(
+      "data-empty",
+      "false",
+    );
+    expect(screen.getByTestId("panorama-card-capability")).toHaveTextContent(
+      "能力甲",
+    );
+    expect(screen.getByTestId("panorama-card-journey")).toHaveTextContent(
+      "旅程甲",
+    );
+    expect(screen.getByTestId("panorama-card-domain")).toHaveTextContent(
+      "概念甲",
+    );
+    expect(
+      screen.getByTestId("panorama-card-capability-source"),
+    ).toHaveTextContent(/ssot:SchemeDraftV2\.modules/);
+    expect(screen.queryByText(/mermaid/i)).toBeNull();
+    expect(screen.getByTestId("panorama-v02-placeholders")).toHaveAttribute(
+      "data-forbid-illumination",
+      "true",
+    );
   });
 
   it("TaskGraphPane：无图进全景；施工侧改名为本轮施工·功能汇总", () => {
