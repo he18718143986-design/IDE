@@ -8858,3 +8858,126 @@ governance:
 * **背景**：J.38a 已关闭；B 吃五字段 DTO + 可选 FineModelLayer。
 * **取舍**：首期只接五字段中栏只读；C–E 待立卡；客户端字面同形另立不决。
 
+
+### 3.4az 附录 C 投影壳并轨（J.38c · 完工回写 P-242）
+
+<a id="task-j.38c"></a>
+
+### 【Task J.38c】附录 C 投影壳并轨（复用 C.10q 三占位）`[COMPLETED · 立卡 P-241 · 施工 #304 · 完工回写 P-242]`
+
+> **立卡说明（2026-11-18 · P-241）**：按拆分简报 C 在 C.10q 三占位挂附录 C 投影契约；仍可不交真渲染。
+
+> **归档注记（2026-11-18 · P-242）**：本卡已 **COMPLETED**。Tina 授权施工与合入（选 A：Windows Unit 非阻断存量，同 #266/#288/#291/#298/#301）。[#304](https://github.com/he18718143986-design/IDE/pull/304) squash `d2e2b83804946a624a5638b5c125d1891e376227` 于 2026-11-18 19:07:46 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `19b4fdf8dc1bc52b1af7b22c1c7c1ec2e524996a`；父提交 `3c379439dd6f9932c3a5da1a76bc0563d90a40ef`）。合入前必需面全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非阻断存量失败，`continue-on-error`；本卡 `panorama-projection.test.ts` 5/5、`studio-lens-shell.test.tsx` 5/5、`studio-lens-routing.test.ts` 3/3 在 Windows 亦绿）；Bugbot NEUTRAL 不挡合入。估算仍为 M。交付：`panorama-projection.ts`（`projectAppendixCShell`）；`PanoramaPane` 三占位消费契约；`lens-routing` illumination 守卫；对应测。修卡未触发：未扩 `writable_paths`。诚实口径：**附录 C 投影壳已交付（空态合法、无真渲染），真图归 D 硬等 J.9b、建议层归 E 待立卡**。活发送路径未接；不实现 §3.3；不开工 CI.2。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.38c
+status: COMPLETED
+contract:
+  intent:
+    title: 附录 C 投影壳并轨（复用 C.10q 三占位）
+    description: >-
+      按拆分简报 C：在 C.10q PanoramaPane 三占位（业务功能脑图 / 用户旅程 /
+      业务概念图）上挂「附录 C 三卡」投影契约——数据源声明、空态合法、与 SSOT
+      不一致时以 SSOT 为准。仍可不交付真渲染（归 J.38d）。不得另起第二套全景
+      视图体系；全景进度不得冒充施工点亮（假绿禁止）。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J38C-P1
+      check: auto
+      text: >-
+        PanoramaPane 三占位挂附录 C 投影契约（数据源声明 + 空态）；无真图时空态合法，
+        不得伪造施工点亮或假绿。
+    - id: J38C-P2
+      check: auto
+      text: >-
+        投影与 SchemeDraftV2 / 可选 FineModelLayer 不一致时以 SSOT 为准；
+        不得平行持久化第二套全景方案（禁双 SSOT）。
+    - id: J38C-P3
+      check: auto
+      text: >-
+        不交付 mermaid/结构真渲染（归 J.38d）；不另起全景路由体系；
+        lens-routing 全景禁 illumination 口径保持。
+    - id: J38C-P4
+      check: auto
+      text: >-
+        npm run check:docs 与对应 unit/ui 测通过；卡面 non_goals 与拆分简报 C 一致。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/components/studio/PanoramaPane.tsx
+      - src/lib/studio/lens-routing.ts
+      - src/lib/studio/panorama-projection.ts
+      - tests/unit/panorama-projection.test.ts
+      - tests/ui/studio-lens-shell.test.tsx
+    readonly_paths:
+      - src/lib/journey/scheme-patch-types.ts
+      - src/lib/journey/fine-model-derive.ts
+      - docs/specs/supervisor.md
+      - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+      - docs/specs/development-tasks-completed.md
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+      - { alias: unit-panorama, executable: npx, args: [vitest, run, tests/unit/panorama-projection.test.ts] }
+      - { alias: ui-lens, executable: npx, args: [vitest, run, tests/ui/studio-lens-shell.test.tsx] }
+design:
+  approach: >-
+    新建 panorama-projection.ts：附录 C 三卡投影契约纯函数（数据源声明、空态、
+    SSOT 优先）；接线 PanoramaPane 既有 panorama-v02-placeholders 三卡；
+    lens-routing 增加 PANORAMA_LENS_FORBIDS_ILLUMINATION / assertPanoramaLensContract。
+    不渲染真图。未扩 writable_paths。
+  touches:
+    - { path: src/components/studio/PanoramaPane.tsx, change: modify, why: 三占位挂附录 C 投影契约/空态, symbols: [PanoramaPane] }
+    - { path: src/lib/studio/lens-routing.ts, change: modify, why: 保持全景禁 illumination；守卫常量+断言, symbols: [assertPanoramaLensContract, resolveDefaultLens, resolveActiveLens] }
+    - { path: src/lib/studio/panorama-projection.ts, change: create, why: 附录 C 三卡投影契约纯函数, symbols: [projectAppendixCShell] }
+    - { path: tests/unit/panorama-projection.test.ts, change: create, why: 空态/SSOT优先/禁假绿断言, symbols: [] }
+    - { path: tests/ui/studio-lens-shell.test.tsx, change: modify, why: 三占位投影契约 UI 回归, symbols: [] }
+  interfaces:
+    - { kind: type, name: AppendixCProjectionShell, signature: "三卡数据源声明 + 空态；无可独立编辑图存储", consumers: [] }
+    - { kind: type, name: projectAppendixCShell, signature: "(draft V2 + optional FineModelLayer) => 三卡投影视图（可空）", consumers: [] }
+  test_plan:
+    - { acceptance_id: J38C-P1, test_path: tests/unit/panorama-projection.test.ts, level: unit, debt: "已由 #304 交付；5 用例；Windows 亦 5/5 绿" }
+    - { acceptance_id: J38C-P2, test_path: tests/unit/panorama-projection.test.ts, level: unit, debt: "已由 #304 交付；SSOT 优先 / 不对齐加层忽略" }
+    - { acceptance_id: J38C-P3, test_path: tests/ui/studio-lens-shell.test.tsx, level: unit, debt: "已由 #304 交付；5 用例含空态+SSOT UI；Windows 亦 5/5 绿" }
+    - { acceptance_id: J38C-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #304 交付；门禁另含 npm run check:docs" }
+governance:
+  spec_refs:
+    - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+    - docs/specs/supervisor.md
+    - docs/specs/development-tasks-completed.md
+  depends_on:
+    - { id: TASK-C.10q, kind: hard }
+    - { id: TASK-J.37, kind: hard }
+    - { id: TASK-J.38a, kind: soft }
+    - { id: TASK-J.38, kind: soft }
+  code_facts:
+    - { ref: "src/lib/studio/panorama-projection.ts:93-152", note: "projectAppendixCShell；SSOT modules/flows/entities；禁 illumination" }
+    - { ref: "src/components/studio/PanoramaPane.tsx:155-172", note: "三 PlaceholderCard 消费投影契约" }
+    - { ref: "src/lib/studio/lens-routing.ts:19-40", note: "PANORAMA_LENS_FORBIDS_ILLUMINATION + assertPanoramaLensContract" }
+    - { ref: "tests/unit/panorama-projection.test.ts:31-151", note: "空态/SSOT优先/禁假绿；Windows 亦 5/5 绿" }
+    - { ref: "tests/ui/studio-lens-shell.test.tsx:81-191", note: "三占位契约 UI 回归；Windows 亦 5/5 绿" }
+  non_goals:
+    - 无 mermaid/结构真渲染（归 J.38d / renderSchemeDiagrams）
+    - 不另起第二套全景路由或视图体系；不假绿 / 不冒充施工点亮
+    - 不实现 §3.3 自动点亮；不开工 CI.2；不立 J.41
+    - 禁双 SSOT；不替换 source/evidence；吸收标 ai_inferred
+    - 不重开 J.36 三缝；不把蓝图原文并入 docs/specs/
+    - ChangeOrder/冷静期另立不决；活发送暂不立
+    - 不与 E 并行开卡；不宣称端到端闭环
+  fail:
+    - 借本卡交付真图或另起第二套全景体系
+    - 全景进度冒充施工点亮（假绿）
+    - 平行持久化第二套方案或改写 source/evidence
+    - 擅自扩 writable_paths 而不修卡停工上报
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 304, commit: d2e2b83804946a624a5638b5c125d1891e376227 }
+```
+
+* **背景**：J.38b 已关闭；C 在 C.10q 三占位上挂附录 C 投影契约，仍可不交真图。
+* **取舍**：投影壳已交付；真图归 D 硬等 J.9b；建议层归 E 待立卡。
