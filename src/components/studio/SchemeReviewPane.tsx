@@ -28,6 +28,7 @@ import {
   evaluateSchemeConfirmation,
 } from "@/lib/journey/scheme-draft";
 import type { ScopePlan } from "@/lib/journey/scope-plan";
+import type { TestTargetSuggestion } from "@/lib/journey/test-target-suggest";
 import {
   ScopeAcceptanceBlock,
   type ScopeAcceptanceItemView,
@@ -74,6 +75,11 @@ export interface SchemeReviewPaneProps {
   acceptanceItems?: readonly ScopeAcceptanceItemView[] | undefined;
   /** J16-P7 / J.22b：取数完成或失败后为 true，空条目时标「无呈现记录」 */
   acceptanceSettled?: boolean | undefined;
+  /**
+   * TASK-J.38e：测试目标建议（只读；ai_inferred）。
+   * 透传 ScopeAcceptanceBlock；不写入台账 / 不进 can_merge。
+   */
+  testTargetSuggestions?: readonly TestTargetSuggestion[] | undefined;
   surfaceConfirmationId?: string | null | undefined;
   onSurfacePresented?: ScopeAcceptanceSurfaceProps["onReport"] | undefined;
   onConfirmDecision?: ((decisionId: string) => void) | undefined;
@@ -473,6 +479,7 @@ export function SchemeReviewPane(props: SchemeReviewPaneProps) {
             : acceptanceItemsFromSchemeDraft(scheme)
         }
         acceptanceSettled={props.acceptanceSettled}
+        testTargetSuggestions={props.testTargetSuggestions}
         surface={
           props.surfaceConfirmationId && props.onSurfacePresented
             ? {
