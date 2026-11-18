@@ -8623,3 +8623,109 @@ governance:
 * **背景**：P-220 第一批路线「分歧 2+7」；信任档规格缝已由 J.36 清掉；本卡是蓝图第一批**主体**规格卡。
 * **取舍**：只定口径与缺口清单；实现另拆 L；活发送接线暂不立。
 
+### 3.4ax 细模型类型 + V2 派生/回写（J.38a · 完工回写 P-238）
+
+<a id="task-j.38a"></a>
+
+### 【Task J.38a】细模型可选加层：类型与 SSOT 派生/回写`[COMPLETED · 立卡 P-237 · 施工 #298 · 完工回写 P-238]`
+
+> **立卡说明（2026-11-18 · P-237）**：按拆分简报 A 交付六实体类型 + V2 派生/回写纯函数；无 UI。
+
+> **归档注记（2026-11-18 · P-238）**：本卡已 **COMPLETED**。Tina 授权施工与合入（选 A：Windows Unit 非阻断存量，同 #266/#288/#291）。[#298](https://github.com/he18718143986-design/IDE/pull/298) squash `8cabadcdcc43aaf481190a77f63521e4f4611d9a` 于 2026-11-18 17:52:36 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `ad2e470b664a464a94c5b820ba591f4e578569d7`；父提交 `d9b1eefde6ffd8360d373bfbc603e11a50d22e2e`）。合入前必需面全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非阻断存量失败，`continue-on-error`；本卡 `fine-model-derive.test.ts` 7/7 在 Windows 亦绿）；Bugbot NEUTRAL 不挡合入。估算仍为 M。交付：`scheme-patch-types.ts` 六实体 + `FineModelLayer`；`fine-model-derive.ts`（`deriveFineModelFromV2` / `applyFineModelToV2`）；`tests/unit/fine-model-derive.test.ts`。诚实口径：**细模型类型与派生/回写纯函数已交付，中栏投影/附录 C 壳/真图/建议层未做（B–E 待立卡）**。活发送路径未接；不实现 §3.3；不开工 CI.2。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.38a
+status: COMPLETED
+contract:
+  intent:
+    title: 细模型可选加层：类型与 SSOT 派生/回写
+    description: >-
+      按拆分简报 A（L52–62）：交付 Actor / UseCase / Process / Rule / Screen / AC 的类型声明，
+      以及从 SchemeDraftV2 派生 / 回写 SSOT 的纯函数；不一致以 SSOT 为准并标投影版本；
+      默认 ai_inferred。无 UI；无附录 C 真图；无五字段中栏绘制。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J38A-P1
+      check: auto
+      text: >-
+        Actor/UseCase/Process/Rule/Screen/AC 类型可编译（tsc --noEmit）；
+        类型面落在 scheme-patch-types（或 fine-model-types 再导出）且不替换 SchemeItemMeta.source/evidence。
+    - id: J38A-P2
+      check: auto
+      text: >-
+        派生/回写纯函数输入为 SchemeDraftV2；二者不一致以 SSOT 为准；不得平行持久化第二套方案（禁双 SSOT）。
+    - id: J38A-P3
+      check: auto
+      text: >-
+        加层实体默认 ai_inferred，不得冒充 user_said；不重开 J.36 三缝（v1/V2、acceptance.check/notes、SchemeItemProjectionDto 只引用）。
+    - id: J38A-P4
+      check: auto
+      text: >-
+        无 UI 交付；npm run check:docs 与对应 unit 测通过；卡面 non_goals 与拆分简报 A 一致。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/lib/journey/scheme-patch-types.ts
+      - src/lib/journey/fine-model-derive.ts
+      - tests/unit/fine-model-derive.test.ts
+    readonly_paths:
+      - docs/specs/supervisor.md
+      - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+      - docs/specs/development-tasks-completed.md
+      - src/lib/journey/scheme-draft.ts
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+      - { alias: unit-fine-model, executable: npx, args: [vitest, run, tests/unit/fine-model-derive.test.ts] }
+design:
+  approach: >-
+    在 scheme-patch-types 声明六实体 + FineModelLayer；fine-model-derive 实现 V2→加层派生与加层→SSOT 回写；
+    失败/不一致以 SSOT 为准。不改冻结内核、不改对照面。
+  touches:
+    - { path: src/lib/journey/scheme-patch-types.ts, change: modify, why: 细模型六实体 + FineModelLayer, symbols: [FineActor, FineUseCase, FineProcess, FineRule, FineScreen, FineAcceptance, FineModelLayer] }
+    - { path: src/lib/journey/fine-model-derive.ts, change: create, why: V2 派生/回写 SSOT 纯函数, symbols: [deriveFineModelFromV2, applyFineModelToV2] }
+    - { path: tests/unit/fine-model-derive.test.ts, change: create, why: 派生/回写与禁双 SSOT 断言, symbols: [] }
+  interfaces:
+    - { kind: type, name: FineModelLayer, signature: "Actor|UseCase|Process|Rule|Screen|AC 加层 + projection_version/source_scheme_id/source_scheme_revision", consumers: [] }
+    - { kind: type, name: deriveFineModelFromV2, signature: "(draft: SchemeDraftV2) => FineModelLayer（ai_inferred；纯函数）", consumers: [] }
+  test_plan:
+    - { acceptance_id: J38A-P1, test_path: tests/unit/fine-model-derive.test.ts, level: unit, debt: "已由 #298 交付；tsc --noEmit + 本文件类型冒烟" }
+    - { acceptance_id: J38A-P2, test_path: tests/unit/fine-model-derive.test.ts, level: unit, debt: "已由 #298 交付" }
+    - { acceptance_id: J38A-P3, test_path: tests/unit/fine-model-derive.test.ts, level: unit, debt: "已由 #298 交付" }
+    - { acceptance_id: J38A-P4, test_path: tests/unit/fine-model-derive.test.ts, level: unit, debt: "已由 #298 交付；门禁另含 npm run check:docs" }
+governance:
+  spec_refs:
+    - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+    - docs/specs/supervisor.md
+    - docs/specs/development-tasks-completed.md
+  depends_on:
+    - { id: TASK-J.37, kind: hard }
+    - { id: TASK-J.36, kind: hard }
+    - { id: TASK-J.38, kind: soft }
+  code_facts:
+    - { ref: "src/lib/journey/scheme-patch-types.ts:131-186", note: "六实体 + FineModelLayer 已落地" }
+    - { ref: "src/lib/journey/fine-model-derive.ts:70-181", note: "deriveFineModelFromV2 / applyFineModelToV2" }
+    - { ref: "tests/unit/fine-model-derive.test.ts:1-263", note: "7 用例；Windows 亦 7/7 绿" }
+  non_goals:
+    - 无 UI；无附录 C 真图；无五字段中栏绘制（归 J.38b/c/d）
+    - 禁双 SSOT；不替换 source/evidence；吸收标 ai_inferred
+    - 不重开 J.36 三缝；不把蓝图原文并入 docs/specs/
+    - ChangeOrder/冷静期另立不决；活发送暂不立；§3.3 不实现
+    - 不开工 CI.2；不立 J.41 终态规格；不宣称端到端闭环
+  fail:
+    - 平行持久化第二套方案或替换 source/evidence
+    - 借本卡交付 UI / 真图 / 中栏五字段绘制
+    - 派生输入绕过 SchemeDraftV2 或重开 v1/V2 双形缝
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 298, commit: 8cabadcdcc43aaf481190a77f63521e4f4611d9a }
+```
+
+* **背景**：J.37 规格已关闭；实现 L 按拆分简报先立 A。
+* **取舍**：本卡只交类型 + 纯函数；B–E（中栏/附录 C 壳/真图/建议层）待立卡。
+
