@@ -52,7 +52,7 @@
 | `TASK-H.9` | `COMPLETED` | 废止 `.stagent/metadata/` 写入（DLV-4 · ADR-0011） | [打开](./development-tasks-completed.md#task-h.9) |
 | `TASK-B.1` | `COMPLETED` | 本地 AST 增量依赖图分析引擎（parser/graph 增强 + 性能基准 + 恶魔测试 + 契约兼容超集；#124/9c177e9） | [打开](./development-tasks-completed.md#task-b.1) |
 | `TASK-CI.1` | `COMPLETED` | B.1 Tarjan 门禁抗 macos CI 抖动（[#161](https://github.com/he18718143986-design/IDE/pull/161)/`bf971d5`；P-159 回写；门禁 4 ≤150ms；抗抖动≠永久全绿） | [打开](./development-tasks-completed.md#task-ci.1) |
-| `TASK-CI.2` | `NEW_TASK` | macOS 性能门禁抗抖动（含 RadarGraph 16ms；arch P100 还原见 [#192](https://github.com/he18718143986-design/IDE/pull/192)；pre-merge 80ms 挂账；立卡 P-177；未开工） | [正文](./development-tasks-active.md#task-ci.2) |
+| `TASK-CI.2` | `NEW_TASK` · Hold | macOS 性能门禁抗抖动（含 RadarGraph 16ms；arch P100 还原见 [#192](https://github.com/he18718143986-design/IDE/pull/192)；pre-merge 80ms 挂账；立卡 P-177；P-245 评估「不够整卡放宽」· Hold 未开工） | [正文](./development-tasks-active.md#task-ci.2) · [评估简报](../ledger/ci2-sample-assessment-brief.md) |
 | `TASK-CI.3` | `COMPLETED` | 测试 fetch 哨兵清零未桩请求并切判红（10 文件；判红已切；立卡 P-178；施工 P-179 · #201 `bdde65c`） | [正文](./development-tasks-completed.md#task-ci.3) |
 | `TASK-CI.4` | `COMPLETED` | 判红开关与离线桩回归用例（挂账⑦；立卡 P-180；施工 P-193 · #227 `f8bfbad`） | [正文](./development-tasks-completed.md#task-ci.4) |
 | `TASK-CI.5` | `COMPLETED` | 专修 `app-preview-runner.test.ts` 端口隔离（挂账⑨ `:163` / `:199` 三次复发已修；立卡 P-218；施工 [#269](https://github.com/he18718143986-design/IDE/pull/269)/`e12b7b7`；完工回写 P-219；估算 S） | [打开](./development-tasks-completed.md#task-ci.5) |
