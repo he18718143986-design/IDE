@@ -1380,13 +1380,17 @@ governance:
 >
 > **归档注记（2026-11-18 · P-242）**：[`TASK-J.38c`](./development-tasks-completed.md#task-j.38c) 已 **COMPLETED**（施工 #304/`d2e2b83`）。诚实口径：**附录 C 投影壳已交付（空态合法、无真渲染），真图归 D 硬等 J.9b、建议层归 E 待立卡**。
 >
-> **立卡注记（2026-11-18 · P-243）**：Tina 点名立 E。新增 [`TASK-J.38e`](#task-j.38e) `[NEW_TASK]`（测试目标建议层；估算 S）。一律 `ai_inferred`；缺省不生成；不进 `can_merge`/硬门禁。D 硬等 J.9b（禁双开）。活发送暂不立；§3.3 仍 Hold；CI.2 攒样本；J.41 新会话并行。
+> **立卡注记（2026-11-18 · P-243）**：Tina 点名立 E。新增 [`TASK-J.38e`](./development-tasks-completed.md#task-j.38e)（当时 `[NEW_TASK]`；测试目标建议层；估算 S）。一律 `ai_inferred`；缺省不生成；不进 `can_merge`/硬门禁。D 硬等 J.9b（禁双开）。活发送暂不立；§3.3 仍 Hold；CI.2 攒样本；J.41 新会话并行。
+>
+> **归档注记（2026-11-18 · P-244）**：[`TASK-J.38e`](./development-tasks-completed.md#task-j.38e) 已 **COMPLETED**（施工 #307/`6d7faca`）。诚实口径：**测试目标建议层已交付（一律 `ai_inferred`、缺省不生成、不进 `can_merge`），真图归 D 硬等 J.9b**。母卡维持 `[SPLIT]`，**子卡除 D 外全交付**；J.9b 仍 Hold 暂不立卡。
 
 <a id="task-j.38"></a>
 
-#### 【Task J.38】细模型加层 + 视图投影实现（拆分母卡）`[SPLIT · 立卡 P-237]`
+#### 【Task J.38】细模型加层 + 视图投影实现（拆分母卡）`[SPLIT · 立卡 P-237 · 子卡除 D 外全交付]`
 
 > **拆卡说明（2026-11-18 · P-237）**：整包实现估算 L，按 R-11 拆子卡。本母卡保留追溯，**不再作为施工依据**；施工以已立子卡正文为准。依赖序见拆分简报：`A → B`；`A → C`（C 可与 B 并行若类型面已合）；`C → D`；`E` 软依赖 A。
+>
+> **口径（2026-11-18 · P-244）**：A/B/C/E 均已 COMPLETED；**子卡除 D 外全交付**。母卡保持 `[SPLIT]`，**不**标 COMPLETED（D 未交付）。J.9b 仍 Hold 暂不立卡；D 继续硬等禁双开。
 
 **子卡登记（待立卡占位 · 不展开卡面）**：
 
@@ -1396,7 +1400,7 @@ governance:
 | [`TASK-J.38b`](./development-tasks-completed.md#task-j.38b) | **`[COMPLETED]`**（施工 #301/`cb37efe`；完工回写 P-240） | 五字段投影加层接入中栏 | S～M | 硬：J.37、J.38a；首期仅五字段（细模型实体可选） |
 | [`TASK-J.38c`](./development-tasks-completed.md#task-j.38c) | **`[COMPLETED]`**（施工 #304/`d2e2b83`；完工回写 P-242） | 附录 C 投影壳并轨（复用 C.10q） | M | 硬：C.10q、J.37；建议依赖 J.38a |
 | `TASK-J.38d` | **待立卡** | 真图 / `renderSchemeDiagrams` | M | 硬：C、J.37；建议 A；**硬依赖 `TASK-J.9b`（或与 J.9b 合并立项，禁双开）** |
-| [`TASK-J.38e`](#task-j.38e) | **`[NEW_TASK]`**（立卡 P-243；未开工） | 测试目标建议层（`ai_inferred`） | S | 硬：J.37；软：J.38a |
+| [`TASK-J.38e`](./development-tasks-completed.md#task-j.38e) | **`[COMPLETED]`**（施工 #307/`6d7faca`；完工回写 P-244） | 测试目标建议层（`ai_inferred`） | S | 硬：J.37；软：J.38a |
 
 ```yaml task-card
 id: TASK-J.38
@@ -1425,7 +1429,8 @@ contract:
       - { alias: docs, executable: npm, args: [run, check:docs] }
 design:
   approach: >-
-    本卡已拆分。J.38a / J.38b / J.38c 已 COMPLETED；J.38e 已立 NEW_TASK；D 待 Tina 授权后再立（硬等 J.9b）。
+    本卡已拆分。J.38a / J.38b / J.38c / J.38e 已 COMPLETED（子卡除 D 外全交付）；
+    D 待 Tina 授权后再立（硬等 J.9b；J.9b 仍 Hold）。母卡保持 SPLIT，不标 COMPLETED。
   touches:
     - { path: docs/specs/development-tasks-active.md, change: modify, why: 母卡 SPLIT 追溯与子卡占位登记, symbols: [] }
   interfaces: []
@@ -1442,11 +1447,11 @@ governance:
     - { ref: "docs/ledger/blueprint-fine-layer-impl-split-brief.md:42-50", note: "依赖序 A→B / A→C / C→D；E 软依赖 A" }
   non_goals:
     - 本卡已拆分，不再作为施工依据；不得按本卡开工
-    - 不批量立 B–E；不写产品代码
+    - 不把母卡标 COMPLETED（D 未交付）；不立 J.9b（仍 Hold）
     - 不接活发送；不实现 §3.3；不开工 CI.2；不立 J.41 终态规格
   fail:
     - 在子卡未授权时按本母卡开工
-    - 把 B–E 未立卡面写成已立或已开工
+    - 把 D 未立卡面写成已立或已开工；或把母卡误标 COMPLETED
   estimate: L
   invariants:
     auth: unchanged
@@ -1475,107 +1480,7 @@ governance:
 
 <a id="task-j.38e"></a>
 
-#### 【Task J.38e】测试目标建议层（`ai_inferred`）`[NEW_TASK · 立卡 P-243]`
+#### 【Task J.38e】测试目标建议层（`ai_inferred`）`[COMPLETED · 正文已迁]`
 
-```yaml task-card
-id: TASK-J.38e
-status: NEW_TASK
-contract:
-  intent:
-    title: 测试目标建议层（ai_inferred）
-    description: >-
-      按拆分简报 E：由细模型加层 / 投影建议测试目标；一律标 ai_inferred；
-      缺省 = 不生成；不得自动写入硬门禁或冒充用户验收；不得改写 can_merge 派生。
-      可选中栏只读展示「建议」块；不落第二套 SSOT。
-    risk_level: LOW
-  acceptance:
-    - id: J38E-P1
-      check: auto
-      text: >-
-        建议层纯函数产出测试目标时一律 source=ai_inferred；缺省输入返回空列表（不生成）。
-    - id: J38E-P2
-      check: auto
-      text: >-
-        建议不得写入 can_merge / Evidence 硬门禁 / 用户验收条目权威；禁双 SSOT。
-    - id: J38E-P3
-      check: auto
-      text: >-
-        可选中栏只读展示建议；不冒充 user_said / user_confirmed；不实现 §3.3 自动点亮。
-    - id: J38E-P4
-      check: auto
-      text: >-
-        npm run check:docs 与对应 unit 测通过；卡面 non_goals 与拆分简报 E 一致。
-  scheme_item_ids: []
-  scope:
-    writable_paths:
-      - src/lib/journey/test-target-suggest.ts
-      - src/components/studio/ScopeAcceptanceBlock.tsx
-      - src/components/studio/SchemeReviewPane.tsx
-      - tests/unit/test-target-suggest.test.ts
-    readonly_paths:
-      - src/lib/journey/scheme-patch-types.ts
-      - src/lib/journey/fine-model-derive.ts
-      - src/lib/evidence.schema.ts
-      - docs/specs/supervisor.md
-      - docs/ledger/blueprint-fine-layer-impl-split-brief.md
-      - docs/specs/development-tasks-completed.md
-  verification:
-    commands:
-      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
-      - { alias: docs, executable: npm, args: [run, check:docs] }
-      - { alias: unit-suggest, executable: npx, args: [vitest, run, tests/unit/test-target-suggest.test.ts] }
-design:
-  approach: >-
-    新建 test-target-suggest.ts：从 SchemeDraftV2 / 可选 FineModelLayer 建议测试目标
-    （纯函数；缺省空；一律 ai_inferred）。可选接线 ScopeAcceptanceBlock /
-    SchemeReviewPane 只读展示。禁止触碰 evidence.schema can_merge 派生。
-    施工中若 writable_paths 不够：按修卡流程停工上报，不得擅自扩面。
-  touches:
-    - { path: src/lib/journey/test-target-suggest.ts, change: create, why: 测试目标建议纯函数, symbols: [suggestTestTargets] }
-    - { path: src/components/studio/ScopeAcceptanceBlock.tsx, change: modify, why: 可选只读展示建议块, symbols: [ScopeAcceptanceBlock] }
-    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 中栏可选接线建议层, symbols: [] }
-    - { path: tests/unit/test-target-suggest.test.ts, change: create, why: 缺省空/ai_inferred/禁门禁写入断言, symbols: [] }
-  interfaces:
-    - { kind: type, name: TestTargetSuggestion, signature: "{ text; source: 'ai_inferred'; derived_from[] }", consumers: [] }
-    - { kind: type, name: suggestTestTargets, signature: "(draft V2 + optional FineModelLayer) => TestTargetSuggestion[]", consumers: [] }
-  test_plan:
-    - { acceptance_id: J38E-P1, test_path: tests/unit/test-target-suggest.test.ts, level: unit, debt: "立卡阶段；施工后兑现" }
-    - { acceptance_id: J38E-P2, test_path: tests/unit/test-target-suggest.test.ts, level: unit, debt: "立卡阶段；施工后兑现" }
-    - { acceptance_id: J38E-P3, test_path: tests/unit/test-target-suggest.test.ts, level: unit, debt: "立卡阶段；UI 接线可选，纯函数断言为主" }
-    - { acceptance_id: J38E-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "门禁 npm run check:docs；立卡阶段" }
-governance:
-  spec_refs:
-    - docs/ledger/blueprint-fine-layer-impl-split-brief.md
-    - docs/specs/supervisor.md
-    - docs/specs/development-tasks-completed.md
-  depends_on:
-    - { id: TASK-J.37, kind: hard }
-    - { id: TASK-J.38a, kind: soft }
-    - { id: TASK-J.38, kind: soft }
-  code_facts:
-    - { ref: "docs/ledger/blueprint-fine-layer-impl-split-brief.md:101-111", note: "子卡 E：测试目标建议层；ai_inferred；缺省不生成" }
-    - { ref: "docs/specs/supervisor.md:1103", note: "缺口「测试目标自生成仍开」失败/缺省语义" }
-    - { ref: "src/lib/evidence.schema.ts:146-261", note: "can_merge 派生只读；本卡不得改写" }
-    - { ref: "src/lib/journey/fine-model-derive.ts:1-70", note: "可选加层输入；派生实体已 ai_inferred" }
-  non_goals:
-    - 不改 can_merge / Evidence 硬门禁 / 底线验收权威
-    - 不实现 §3.3 自动点亮；不开工 CI.2；不立 J.41
-    - 禁双 SSOT；不替换 source/evidence；吸收标 ai_inferred
-    - 不重开 J.36 三缝；不把蓝图原文并入 docs/specs/
-    - ChangeOrder/冷静期另立不决；活发送暂不立
-    - 不立 D（硬等 J.9b）；不宣称端到端闭环
-  fail:
-    - 建议自动写入硬门禁或冒充用户验收
-    - 改写 can_merge 派生或平行持久化第二套方案
-    - 擅自扩 writable_paths 而不修卡停工上报
-  estimate: S
-  invariants:
-    auth: unchanged
-    demo_origin: unchanged
-    illumination: unchanged
-    gateway_write_scope: unchanged
-```
-
-* **背景**：J.38c 已关闭；E 兑现 J.37 缺口「测试目标自生成仍开」。
-* **取舍**：缺省不生成；不进门禁；D 硬等 J.9b。
+> 本卡已 **COMPLETED**（施工 [#307](https://github.com/he18718143986-design/IDE/pull/307) squash `6d7faca20890bf8421942808c91d3b072dbac41d`；完工回写 P-244）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.38e) §3.4ba。诚实口径：**测试目标建议层已交付（一律 `ai_inferred`、缺省不生成、不进 `can_merge`），真图归 D 硬等 J.9b**。
 
