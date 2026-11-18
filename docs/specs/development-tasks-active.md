@@ -1076,9 +1076,11 @@ governance:
 
 <a id="task-ci.2"></a>
 
-#### 【Task CI.2】macOS 性能门禁抗抖动（arch P100 / 合并前指纹中位数 / RadarGraph 16ms 的测试口径）`[NEW_TASK · 立卡 P-177 · 未开工]`
+#### 【Task CI.2】macOS 性能门禁抗抖动（arch P100 / 合并前指纹中位数 / RadarGraph 16ms 的测试口径）`[NEW_TASK · 立卡 P-177 · 未开工 · Hold]`
 
 > **立卡说明（2026-11-09 · P-177）**：承接 #189 合入后暴露的 macOS 性能门禁抖动。本卡收「同一类问题」：macOS 性能断言贴着 runner 正常波动上限，范围含 `arch-graph-cache`、`pre-merge-fingerprint`、`RadarGraph.perf` 及后续同类断言，一张卡收一类，不按断言逐条开卡。两处测试阈值由 #189 内的提交放宽：`arch-graph-cache`（P100 50→80，`987e276d`；**#192 还原为 50ms**）与 `pre-merge-fingerprint-fallback`（门禁③中位数 50→80，`58cf6057`；**保留并挂账**）。按 TASK-CI.1 口径：**依据多次 macOS run 中位数，仅放宽测试断言；产品判据不动**。**立卡 ≠ 开工 ≠ 销项**；抗抖动 ≠ 永久全绿；本卡不标 COMPLETED。
+>
+> **Hold 注记（2026-11-18 · P-245）**：只读评估见 [`../ledger/ci2-sample-assessment-brief.md`](../ledger/ci2-sample-assessment-brief.md)。Tina 拍板：**不够整卡放宽开工**；arch 中位 ≈59.8ms 超 50 → 不放宽；Radar n=2 不够；pre-merge 现 80 勿再放宽。下次评估触发：Radar ≥3 且 arch 中位回到 ≤50，或明确点名。**不开工。**
 
 映射关系（施工前须更新「依据」列为已核实的 run id）：
 
