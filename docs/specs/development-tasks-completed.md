@@ -8729,3 +8729,132 @@ governance:
 * **背景**：J.37 规格已关闭；实现 L 按拆分简报先立 A。
 * **取舍**：本卡只交类型 + 纯函数；B–E（中栏/附录 C 壳/真图/建议层）待立卡。
 
+### 3.4ay 五字段投影加层接入中栏（J.38b · 完工回写 P-240）
+
+<a id="task-j.38b"></a>
+
+### 【Task J.38b】五字段投影加层接入中栏`[COMPLETED · 立卡 P-239 · 施工 #301 · 完工回写 P-240]`
+
+> **立卡说明（2026-11-18 · P-239）**：按拆分简报 B 交付中栏只读五字段投影；首期仅五字段、细模型实体可选。
+
+> **归档注记（2026-11-18 · P-240）**：本卡已 **COMPLETED**。Tina 授权施工与合入（选 A：Windows Unit 非阻断存量，同 #266/#288/#291/#298）。[#301](https://github.com/he18718143986-design/IDE/pull/301) squash `cb37efefc58eb6dee28a6af1703c0cf307f51134` 于 2026-11-18 18:37:58 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `5b148846b83db1ad76584736fee20c19ade27aff`；父提交 `c1878d49c599c315c290b41d33dced37e83ccd75`）。合入前必需面全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非阻断存量失败，`continue-on-error`；本卡 `scheme-item-projection.test.ts` 8/8、`scheme-midpane-projection.test.ts` 5/5 在 Windows 亦绿）；Bugbot NEUTRAL 不挡合入。估算仍为 M（简报/矩阵 S～M 上界）。交付：`scheme-item-projection.ts`（`projectSchemeItemFiveFields`）；`scheme-midpane-projection.ts` 在 acceptance/goals/modules 挂五字段；`ScopeAcceptanceItemView` + `ScopeAcceptanceBlock` 只读呈现；对应测。修卡未触发：未改 `scheme-draft.ts`/`daemon-api.ts`，UI 以交叉类型承接运行时多余字段。诚实口径：**五字段中栏投影已交付，附录 C 壳/真图/建议层未做（C–E 待立卡）、客户端字面同形未做（另立不决）**。活发送路径未接；不实现 §3.3；不开工 CI.2。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.38b
+status: COMPLETED
+contract:
+  intent:
+    title: 五字段投影加层接入中栏
+    description: >-
+      按拆分简报 B：中栏只读展示 SchemeItemProjectionDto 五字段
+      （status / scope / provenance / links / confidence）。
+      吃 J.36 DTO + J.38a FineModelLayer/deriveFineModelFromV2 已交付物；
+      首期仅五字段，细模型实体可选（不强制渲染 Actor/…/AC）。
+      非法/缺省枚举按 J.37 失败语义丢弃字段、不改 source；复用 J.22a 中栏只读通路；
+      禁止投影写入快照密封权威。无真图；无 §3.3 自动点亮。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J38B-P1
+      check: auto
+      text: >-
+        中栏条目级只读展示五字段投影；缺省或非法枚举按 J.37 丢弃该字段，
+        不得改写 SchemeItemMeta.source / evidence。
+    - id: J38B-P2
+      check: auto
+      text: >-
+        投影复用 J.22a 中栏只读通路（scheme-midpane-projection / 前端同形消费）；
+        投影层无写盘、不触发封存、不写入快照密封权威。
+    - id: J38B-P3
+      check: auto
+      text: >-
+        首期可不渲染细模型六实体；若接线 FineModelLayer 仅作可选加层源，
+        不得平行持久化第二套方案（禁双 SSOT）。
+    - id: J38B-P4
+      check: auto
+      text: >-
+        无真图 / 无附录 C 壳 / 无 §3.3 自动点亮；npm run check:docs 与对应 unit/ui 测通过；
+        卡面 non_goals 与拆分简报 B 一致。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/supervisor/intent-compiler/scheme-midpane-projection.ts
+      - src/lib/journey/scheme-item-projection.ts
+      - src/components/studio/ScopeAcceptanceBlock.tsx
+      - src/components/studio/SchemeReviewPane.tsx
+      - tests/unit/scheme-item-projection.test.ts
+      - tests/unit/scheme-midpane-projection.test.ts
+    readonly_paths:
+      - src/lib/journey/scheme-patch-types.ts
+      - src/lib/journey/fine-model-derive.ts
+      - docs/specs/supervisor.md
+      - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+      - docs/specs/development-tasks-completed.md
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+      - { alias: unit-item-proj, executable: npx, args: [vitest, run, tests/unit/scheme-item-projection.test.ts] }
+      - { alias: unit-midpane, executable: npx, args: [vitest, run, tests/unit/scheme-midpane-projection.test.ts] }
+design:
+  approach: >-
+    新建 scheme-item-projection.ts：DTO→视图纯函数，落实 J.37 丢字段语义；
+    扩展 scheme-midpane-projection（现位 daemon）与 ScopeAcceptanceBlock / SchemeReviewPane
+    只读展示；可选消费 FineModelLayer，不落盘。未改 scheme-draft/daemon-api（交叉类型承接）。
+  touches:
+    - { path: daemon/supervisor/intent-compiler/scheme-midpane-projection.ts, change: modify, why: 中栏只读投影挂五字段（现位核对）, symbols: [projectSchemeMidpane] }
+    - { path: src/lib/journey/scheme-item-projection.ts, change: create, why: 五字段 DTO 只读投影纯函数 + J.37 丢字段, symbols: [projectSchemeItemFiveFields] }
+    - { path: src/components/studio/ScopeAcceptanceBlock.tsx, change: modify, why: 条目级五字段只读呈现 + ScopeAcceptanceItemView, symbols: [ScopeAcceptanceBlock, ScopeAcceptanceItemView] }
+    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 中栏接线五字段投影, symbols: [] }
+    - { path: tests/unit/scheme-item-projection.test.ts, change: create, why: 丢字段/不改 source/禁密封写入断言, symbols: [] }
+    - { path: tests/unit/scheme-midpane-projection.test.ts, change: modify, why: 中栏投影回归含五字段, symbols: [] }
+  interfaces:
+    - { kind: type, name: SchemeItemProjectionDto, signature: "J.36 已交付；本卡只读消费，不改契约", consumers: [] }
+    - { kind: type, name: projectSchemeItemFiveFields, signature: "(item meta + optional DTO) => 视图五字段（非法丢弃）", consumers: [] }
+    - { kind: type, name: ScopeAcceptanceItemView, signature: "SchemeAcceptanceItem & SchemeItemProjectionDto", consumers: [] }
+  test_plan:
+    - { acceptance_id: J38B-P1, test_path: tests/unit/scheme-item-projection.test.ts, level: unit, debt: "已由 #301 交付；8 用例；Windows 亦 8/8 绿" }
+    - { acceptance_id: J38B-P2, test_path: tests/unit/scheme-midpane-projection.test.ts, level: unit, debt: "已由 #301 交付；含五字段回归；Windows 亦 5/5 绿" }
+    - { acceptance_id: J38B-P3, test_path: tests/unit/scheme-item-projection.test.ts, level: unit, debt: "已由 #301 交付；FineModelLayer 仅 provenance" }
+    - { acceptance_id: J38B-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #301 交付；门禁另含 npm run check:docs" }
+governance:
+  spec_refs:
+    - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+    - docs/specs/supervisor.md
+    - docs/specs/development-tasks-completed.md
+  depends_on:
+    - { id: TASK-J.37, kind: hard }
+    - { id: TASK-J.38a, kind: hard }
+    - { id: TASK-J.36, kind: soft }
+    - { id: TASK-J.22a, kind: soft }
+    - { id: TASK-J.38, kind: soft }
+  code_facts:
+    - { ref: "src/lib/journey/scheme-item-projection.ts:122-156", note: "projectSchemeItemFiveFields；非法丢字段；零写 source/evidence" }
+    - { ref: "daemon/supervisor/intent-compiler/scheme-midpane-projection.ts:157-209", note: "goals/modules/acceptance 三处挂五字段；可选 deriveFineModelFromV2" }
+    - { ref: "src/components/studio/ScopeAcceptanceBlock.tsx:24-25", note: "ScopeAcceptanceItemView 交叉类型" }
+    - { ref: "src/components/studio/ScopeAcceptanceBlock.tsx:332-379", note: "验收行旁只读呈现五字段" }
+    - { ref: "tests/unit/scheme-item-projection.test.ts:1-152", note: "8 用例；Windows 亦 8/8 绿" }
+  non_goals:
+    - 无真图；无附录 C 投影壳（归 J.38c）；无 renderSchemeDiagrams（归 J.38d）
+    - 不实现 §3.3 自动点亮；不开工 CI.2；不立 J.41
+    - 禁双 SSOT；不替换 source/evidence；吸收标 ai_inferred
+    - 不重开 J.36 三缝；不把蓝图原文并入 docs/specs/
+    - ChangeOrder/冷静期另立不决；活发送暂不立
+    - 客户端字面同形（daemon-api SchemeAcceptanceItem 扩面）另立不决
+    - 不与 C 并行开卡；不宣称端到端闭环
+  fail:
+    - 投影写入快照密封权威或改写 source/evidence
+    - 借本卡交付真图 / 附录 C 壳 / §3.3 自动点亮
+    - 平行持久化第二套方案或另起中栏视图体系
+    - 擅自扩 writable_paths 而不修卡停工上报
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 301, commit: cb37efefc58eb6dee28a6af1703c0cf307f51134 }
+```
+
+* **背景**：J.38a 已关闭；B 吃五字段 DTO + 可选 FineModelLayer。
+* **取舍**：首期只接五字段中栏只读；C–E 待立卡；客户端字面同形另立不决。
+
