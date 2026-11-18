@@ -201,6 +201,7 @@
 | `TASK-J.38` | `SPLIT` | 细模型加层 + 视图投影实现（拆分母卡；立卡 P-237；估算 L；不再作为施工依据） | [正文](./development-tasks-active.md#task-j.38) |
 | `TASK-J.38a` | `COMPLETED` | 细模型类型 + V2 派生/回写 SSOT 纯函数（立卡 P-237；施工 #298 `8cabadc`；完工回写 P-238；估算 M） | [正文](./development-tasks-completed.md#task-j.38a) |
 | `TASK-J.38b` | `COMPLETED` | 五字段投影加层接入中栏（立卡 P-239；施工 #301 `cb37efe`；完工回写 P-240；估算 S～M） | [正文](./development-tasks-completed.md#task-j.38b) |
+| `TASK-J.38c` | `NEW_TASK` | 附录 C 投影壳并轨（复用 C.10q 三占位；立卡 P-241；估算 M；硬依赖 C.10q/J.37；未开工） | [正文](./development-tasks-active.md#task-j.38c) |
 
 ---
 
