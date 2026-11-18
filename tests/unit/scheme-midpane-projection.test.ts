@@ -90,11 +90,60 @@ describe("TASK-J.22a · 中栏只读投影", () => {
     expect(projection.available).toBe(true);
     expect(projection.title).toBe("逾期看板");
     expect(projection.summary).toBe("老板看本月逾期");
-    expect(projection.goals).toEqual([{ id: "G1", text: "看清逾期" }]);
-    expect(projection.modules).toEqual([{ id: "M1", name: "首页看板" }]);
-    expect(projection.acceptance).toEqual([
-      { id: "AC-1", text: "首页显示逾期数" },
+    expect(projection.goals).toEqual([
+      expect.objectContaining({
+        id: "G1",
+        text: "看清逾期",
+        status: "proposed",
+        provenance: "业主原话",
+      }),
     ]);
+    expect(projection.modules).toEqual([
+      expect.objectContaining({
+        id: "M1",
+        name: "首页看板",
+        status: "proposed",
+        provenance: "业主原话",
+      }),
+    ]);
+    expect(projection.acceptance).toEqual([
+      expect.objectContaining({
+        id: "AC-1",
+        text: "首页显示逾期数",
+        status: "proposed",
+        provenance: expect.stringContaining("业主原话"),
+      }),
+    ]);
+    expect(projection.acceptance[0]).not.toHaveProperty("source");
+    expect(projection.acceptance[0]).not.toHaveProperty("evidence");
+  });
+
+  it("TASK-J.38b：验收五字段只读；不改台账 source/evidence", () => {
+    const record = recordWith({
+      title: "逾期看板",
+      frozen: true,
+      acceptance: [
+        {
+          id: "AC-1",
+          text: "首页显示逾期数",
+          source: "ai_inferred",
+          evidence: [{ kind: "turn", ref: { turn_id: "t-a" } }],
+          user_pinned: false,
+          updated_in_revision: 1,
+        },
+      ],
+    });
+    const beforeSource = record.state.draft.acceptance[0]?.source;
+    const beforeEvidence = JSON.stringify(
+      record.state.draft.acceptance[0]?.evidence,
+    );
+    const projection = projectSchemeMidpane(record);
+    expect(projection.acceptance[0]?.status).toBe("confirmed");
+    expect(projection.acceptance[0]?.provenance).toContain("AI 推断");
+    expect(record.state.draft.acceptance[0]?.source).toBe(beforeSource);
+    expect(JSON.stringify(record.state.draft.acceptance[0]?.evidence)).toBe(
+      beforeEvidence,
+    );
   });
 
   it("只读：投影不修改台账记录", () => {

@@ -30,13 +30,11 @@ import {
 import type { ScopePlan } from "@/lib/journey/scope-plan";
 import {
   ScopeAcceptanceBlock,
+  type ScopeAcceptanceItemView,
   type ScopeAcceptanceMode,
   type ScopeAcceptanceSurfaceProps,
 } from "@/components/studio/ScopeAcceptanceBlock";
-import type {
-  SchemeAcceptanceItem,
-  SurfacePresentationReport,
-} from "@/lib/daemon-api";
+import type { SurfacePresentationReport } from "@/lib/daemon-api";
 import { ProjectMapPane } from "@/components/project/ProjectMapPane";
 import { SystemMapPane } from "@/components/project/SystemMapPane";
 import {
@@ -70,10 +68,10 @@ export interface SchemeReviewPaneProps {
   onDeclineSensitive?: (() => void) | undefined;
   /** J.16：当前方案修订的确认 ID（与确认按钮使用同一键）；缺省则不上报呈现 */
   /**
-   * TASK-J.22b / 挂账⑬：台账验收条目（只读投影）。
+   * TASK-J.22b / J.38b / 挂账⑬：台账验收条目（只读投影，可含五字段）。
    * 缺省时回退到 scheme.acceptance（同批 midpane 投影）；空数组表示已结算且无条目。
    */
-  acceptanceItems?: readonly SchemeAcceptanceItem[] | undefined;
+  acceptanceItems?: readonly ScopeAcceptanceItemView[] | undefined;
   /** J16-P7 / J.22b：取数完成或失败后为 true，空条目时标「无呈现记录」 */
   acceptanceSettled?: boolean | undefined;
   surfaceConfirmationId?: string | null | undefined;
