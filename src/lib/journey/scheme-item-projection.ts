@@ -38,7 +38,10 @@ export type ProjectSchemeItemFiveFieldsInput = {
   /** 显式投影 DTO（可含非法值；本函数只读清洗） */
   dto?: SchemeItemProjectionDto | null;
   /** 条目 meta；只读推导缺省展示，不得被回写 */
-  meta?: Pick<SchemeItemMeta, "id" | "source" | "evidence" | "user_pinned"> | null;
+  meta?: Pick<
+    SchemeItemMeta,
+    "id" | "source" | "evidence" | "user_pinned"
+  > | null;
   /** 方案已冻结时，缺省 status 倾向 confirmed（仍不改 source） */
   schemeFrozen?: boolean;
   /**
@@ -49,11 +52,15 @@ export type ProjectSchemeItemFiveFieldsInput = {
 };
 
 function isStatus(v: unknown): v is SchemeItemProjectionStatus {
-  return typeof v === "string" && STATUS_SET.has(v as SchemeItemProjectionStatus);
+  return (
+    typeof v === "string" && STATUS_SET.has(v as SchemeItemProjectionStatus)
+  );
 }
 
 function isConfidence(v: unknown): v is "low" | "medium" | "high" {
-  return typeof v === "string" && CONFIDENCE_SET.has(v as "low" | "medium" | "high");
+  return (
+    typeof v === "string" && CONFIDENCE_SET.has(v as "low" | "medium" | "high")
+  );
 }
 
 function sanitizeLinks(v: unknown): string[] | undefined {
@@ -95,7 +102,9 @@ function provenanceFromMetaAndLayer(
     const base = SOURCE_PROVENANCE[meta.source];
     if (base) {
       if (fineLayer && meta.id) {
-        const hit = fineLayer.acceptance.some((a) => a.acceptance_id === meta.id);
+        const hit = fineLayer.acceptance.some(
+          (a) => a.acceptance_id === meta.id,
+        );
         if (hit) return `${base} · 细模型加层对齐`;
       }
       return base;
@@ -158,7 +167,9 @@ export function assertProjectionDoesNotTouchAuthority(
   if (metaBefore.source !== metaAfter.source) {
     throw new Error("五字段投影不得改写 SchemeItemMeta.source");
   }
-  if (JSON.stringify(metaBefore.evidence) !== JSON.stringify(metaAfter.evidence)) {
+  if (
+    JSON.stringify(metaBefore.evidence) !== JSON.stringify(metaAfter.evidence)
+  ) {
     throw new Error("五字段投影不得改写 SchemeItemMeta.evidence");
   }
   const projKeys = Object.keys(projection);

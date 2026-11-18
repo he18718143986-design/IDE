@@ -134,7 +134,9 @@ describe("TASK-J.22a · 中栏只读投影", () => {
       ],
     });
     const beforeSource = record.state.draft.acceptance[0]?.source;
-    const beforeEvidence = JSON.stringify(record.state.draft.acceptance[0]?.evidence);
+    const beforeEvidence = JSON.stringify(
+      record.state.draft.acceptance[0]?.evidence,
+    );
     const projection = projectSchemeMidpane(record);
     expect(projection.acceptance[0]?.status).toBe("confirmed");
     expect(projection.acceptance[0]?.provenance).toContain("AI 推断");
