@@ -1366,3 +1366,180 @@ governance:
 
 > 本卡已 **COMPLETED**（施工 [#294](https://github.com/he18718143986-design/IDE/pull/294) squash `2c6c7b4320920db6970a8974e606936fed936360`；完工回写 P-236）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.37) §3.4aw。
 
+### 3.4k 细模型加层 + 视图投影实现（2026-11-18 · 立卡 P-237 · R-11 拆分）
+
+> **立卡说明（2026-11-18 · P-237）**：授权来源为 Tina「立卡 PR（P-237）：只立 `TASK-J.38` 母卡 + `TASK-J.38a`」。依据 [`../ledger/blueprint-fine-layer-impl-split-brief.md`](../ledger/blueprint-fine-layer-impl-split-brief.md)。本条只立母卡 `[SPLIT]` 与首张实现子卡 `J.38a`（`[NEW_TASK]`，估算 M）；**B–E 仅占位待立卡，不展开卡面**。**不写产品代码、不开工**。立卡 ≠ 授权 ≠ 开工。活发送接线暂不立；§3.3 仍 Hold；CI.2 攒样本；文档大计划（J.41 终态规格）待对照审计第三轮拍板后另立。不宣称端到端闭环。
+
+<a id="task-j.38"></a>
+
+#### 【Task J.38】细模型加层 + 视图投影实现（拆分母卡）`[SPLIT · 立卡 P-237]`
+
+> **拆卡说明（2026-11-18 · P-237）**：整包实现估算 L，按 R-11 拆子卡。本母卡保留追溯，**不再作为施工依据**；施工以已立子卡正文为准。依赖序见拆分简报：`A → B`；`A → C`（C 可与 B 并行若类型面已合）；`C → D`；`E` 软依赖 A。
+
+**子卡登记（待立卡占位 · 不展开卡面）**：
+
+| 建议号 | 状态 | 一句话 | 估算初判 | 依赖 |
+| :--- | :--- | :--- | :--- | :--- |
+| [`TASK-J.38a`](#task-j.38a) | **`[NEW_TASK]`**（本 PR 已立） | 细模型类型 + V2 派生/回写 SSOT 纯函数 | M | 硬：J.37、J.36 |
+| `TASK-J.38b` | **待立卡** | 五字段投影加层接入中栏 | S～M | 硬：J.37；建议硬/软依赖 A |
+| `TASK-J.38c` | **待立卡** | 附录 C 投影壳并轨（复用 C.10q） | M | 硬：C.10q、J.37；建议依赖 A |
+| `TASK-J.38d` | **待立卡** | 真图 / `renderSchemeDiagrams` | M | 硬：C、J.37；建议 A；**硬依赖 `TASK-J.9b`（或与 J.9b 合并立项，禁双开）** |
+| `TASK-J.38e` | **待立卡** | 测试目标建议层（`ai_inferred`） | S | 硬：J.37；软：A |
+
+```yaml task-card
+id: TASK-J.38
+status: SPLIT
+contract:
+  intent:
+    title: 细模型加层 + 视图投影实现（拆分母卡）
+    description: >-
+      蓝图第一批实现面（P-220 分歧 2+7）：在 J.37 规格口径之上交付细模型可选加层与视图投影。
+      整包估算 L，按 R-11 拆为 J.38a–e；本母卡不再作为施工依据。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J38-P1
+      check: auto
+      text: >-
+        母卡已标 SPLIT；施工仅以已授权子卡为准；不得按本母卡开工。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - docs/specs/development-tasks-active.md
+      - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+    readonly_paths:
+      - docs/specs/development-tasks-completed.md
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    本卡已拆分。首张实现子卡见 TASK-J.38a；B–E 待 Tina 逐张授权后再立。
+  touches:
+    - { path: docs/specs/development-tasks-active.md, change: modify, why: 母卡 SPLIT 追溯与子卡占位登记, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J38-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "母卡 SPLIT 追溯；门禁 npm run check:docs" }
+governance:
+  spec_refs:
+    - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+    - docs/ledger/blueprint-fine-layer-spec-brief.md
+    - docs/specs/development-tasks-completed.md
+  depends_on:
+    - { id: TASK-J.37, kind: hard }
+  code_facts:
+    - { ref: "docs/ledger/blueprint-fine-layer-impl-split-brief.md:42-50", note: "依赖序 A→B / A→C / C→D；E 软依赖 A" }
+  non_goals:
+    - 本卡已拆分，不再作为施工依据；不得按本卡开工
+    - 不批量立 B–E；不写产品代码
+    - 不接活发送；不实现 §3.3；不开工 CI.2；不立 J.41 终态规格
+  fail:
+    - 在子卡未授权时按本母卡开工
+    - 把 B–E 未立卡面写成已立或已开工
+  estimate: L
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+<a id="task-j.38a"></a>
+
+#### 【Task J.38a】细模型可选加层：类型与 SSOT 派生/回写`[NEW_TASK · 立卡 P-237]`
+
+```yaml task-card
+id: TASK-J.38a
+status: NEW_TASK
+contract:
+  intent:
+    title: 细模型可选加层：类型与 SSOT 派生/回写
+    description: >-
+      按拆分简报 A（L52–62）：交付 Actor / UseCase / Process / Rule / Screen / AC 的类型声明，
+      以及从 SchemeDraftV2 派生 / 回写 SSOT 的纯函数；不一致以 SSOT 为准并标投影版本；
+      默认 ai_inferred。无 UI；无附录 C 真图；无五字段中栏绘制。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J38A-P1
+      check: auto
+      text: >-
+        Actor/UseCase/Process/Rule/Screen/AC 类型可编译（tsc --noEmit）；
+        类型面落在 scheme-patch-types（或 fine-model-types 再导出）且不替换 SchemeItemMeta.source/evidence。
+    - id: J38A-P2
+      check: auto
+      text: >-
+        派生/回写纯函数输入为 SchemeDraftV2；二者不一致以 SSOT 为准；不得平行持久化第二套方案（禁双 SSOT）。
+    - id: J38A-P3
+      check: auto
+      text: >-
+        加层实体默认 ai_inferred，不得冒充 user_said；不重开 J.36 三缝（v1/V2、acceptance.check/notes、SchemeItemProjectionDto 只引用）。
+    - id: J38A-P4
+      check: auto
+      text: >-
+        无 UI 交付；npm run check:docs 与对应 unit 测通过；卡面 non_goals 与拆分简报 A 一致。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/lib/journey/scheme-patch-types.ts
+      - src/lib/journey/fine-model-derive.ts
+      - tests/unit/fine-model-derive.test.ts
+    readonly_paths:
+      - docs/specs/supervisor.md
+      - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+      - docs/specs/development-tasks-completed.md
+      - src/lib/journey/scheme-draft.ts
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+      - { alias: unit-fine-model, executable: npx, args: [vitest, run, tests/unit/fine-model-derive.test.ts] }
+design:
+  approach: >-
+    先在类型面声明细模型可选加层（可新建 fine-model-types 再由 scheme-patch-types 导出，或直接扩 patch-types）；
+    再实现 fine-model-derive.ts：V2→加层派生、加层→SSOT 回写；失败/不一致以 SSOT 为准。
+    不改冻结内核、不改对照面、不升 schema_version 除非另授权。
+  touches:
+    - { path: src/lib/journey/scheme-patch-types.ts, change: modify, why: 细模型类型声明或再导出, symbols: [] }
+    - { path: src/lib/journey/fine-model-derive.ts, change: create, why: V2 派生/回写 SSOT 纯函数, symbols: [] }
+    - { path: tests/unit/fine-model-derive.test.ts, change: create, why: 派生/回写与禁双 SSOT 断言, symbols: [] }
+  interfaces:
+    - { kind: type, name: FineModelLayer, signature: "Actor|UseCase|Process|Rule|Screen|AC 加层类型（施工时定稿）", consumers: [] }
+    - { kind: type, name: deriveFineModelFromV2, signature: "(draft: SchemeDraftV2) => FineModelLayer（ai_inferred；纯函数）", consumers: [] }
+  test_plan:
+    - { acceptance_id: J38A-P1, test_path: tests/unit/fine-model-derive.test.ts, level: unit, debt: "立卡阶段；施工后兑现 tsc + 本文件" }
+    - { acceptance_id: J38A-P2, test_path: tests/unit/fine-model-derive.test.ts, level: unit, debt: "立卡阶段；施工后兑现" }
+    - { acceptance_id: J38A-P3, test_path: tests/unit/fine-model-derive.test.ts, level: unit, debt: "立卡阶段；施工后兑现" }
+    - { acceptance_id: J38A-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "门禁 npm run check:docs；立卡阶段" }
+governance:
+  spec_refs:
+    - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+    - docs/specs/supervisor.md
+    - docs/specs/development-tasks-completed.md
+  depends_on:
+    - { id: TASK-J.37, kind: hard }
+    - { id: TASK-J.36, kind: hard }
+    - { id: TASK-J.38, kind: soft }
+  code_facts:
+    - { ref: "docs/ledger/blueprint-fine-layer-impl-split-brief.md:52-62", note: "子卡 A：类型 + 派生；writable_paths 示意 patch-types + fine-model-derive" }
+    - { ref: "src/lib/journey/scheme-patch-types.ts:93-168", note: "J.36 已交付 AcceptanceItem/notes/SchemeItemProjectionDto；本卡不重开该缝" }
+    - { ref: "docs/specs/supervisor.md:1049-1076", note: "细模型可选加层口径；禁双 SSOT；ai_inferred" }
+  non_goals:
+    - 无 UI；无附录 C 真图；无五字段中栏绘制（归 J.38b/c/d）
+    - 禁双 SSOT；不替换 source/evidence；吸收标 ai_inferred
+    - 不重开 J.36 三缝；不把蓝图原文并入 docs/specs/
+    - ChangeOrder/冷静期另立不决；活发送暂不立；§3.3 不实现
+    - 不开工 CI.2；不立 J.41 终态规格；不宣称端到端闭环
+  fail:
+    - 平行持久化第二套方案或替换 source/evidence
+    - 借本卡交付 UI / 真图 / 中栏五字段绘制
+    - 派生输入绕过 SchemeDraftV2 或重开 v1/V2 双形缝
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：J.37 规格已关闭；实现 L 按拆分简报先立 A。
+* **取舍**：本 PR 只立母卡 + A；B–E 待逐张授权。
+

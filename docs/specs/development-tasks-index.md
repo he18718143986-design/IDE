@@ -198,6 +198,8 @@
 | `TASK-J.35` | `COMPLETED` | prompt-builder.ts 对齐台账 / 信任档 / 回链事实（立卡 P-230；施工 #288 `306ff11`；完工回写 P-232；估算 M） | [正文](./development-tasks-completed.md#task-j.35) |
 | `TASK-J.36` | `COMPLETED` | 信任档规格缝补丁（v1/V2 双形 + acceptance.check/notes + 五字段投影 DTO；立卡 P-233；施工 #291 `4dc5617`；完工回写 P-234；估算 S） | [正文](./development-tasks-completed.md#task-j.36) |
 | `TASK-J.37` | `COMPLETED` | 细模型加层 + 视图投影规格卡（五字段映射 + RFC 附录 C 并轨 + 缺口清单；立卡 P-235；施工 #294 `2c6c7b4`；完工回写 P-236；估算 S；只定口径不实现） | [正文](./development-tasks-completed.md#task-j.37) |
+| `TASK-J.38` | `SPLIT` | 细模型加层 + 视图投影实现（拆分母卡；立卡 P-237；估算 L；不再作为施工依据） | [正文](./development-tasks-active.md#task-j.38) |
+| `TASK-J.38a` | `NEW_TASK` | 细模型类型 + V2 派生/回写 SSOT 纯函数（立卡 P-237；估算 M；硬依赖 J.37/J.36；未开工） | [正文](./development-tasks-active.md#task-j.38a) |
 
 ---
 
