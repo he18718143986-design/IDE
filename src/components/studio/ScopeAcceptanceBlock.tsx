@@ -3,6 +3,7 @@
  * 开工前只展示三行白话概览 + 敏感项「不碰这些」；
  * 无路径树、无区域按钮、无逐项授权；
  * 冻结后 / 验收幕：完整清单只读。
+ * TASK-J.38e：可选只读挂测试目标建议块（ai_inferred · 非验收）。
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -14,6 +15,7 @@ import type {
 } from "@/lib/daemon-api";
 import type { SchemeItemProjectionDto } from "@/lib/journey/scheme-patch-types";
 import { projectSchemeItemFiveFields } from "@/lib/journey/scheme-item-projection";
+import type { TestTargetSuggestion } from "@/lib/journey/test-target-suggest";
 
 export type ScopeAcceptanceMode = "pre_start" | "frozen" | "acceptance";
 
@@ -91,6 +93,11 @@ export interface ScopeAcceptanceBlockProps {
   acceptanceSettled?: boolean | undefined;
   /** J.16：存在时，在区块真正展示之后上报实际呈现的条目 */
   surface?: ScopeAcceptanceSurfaceProps | undefined;
+  /**
+   * TASK-J.38e：测试目标建议（只读；一律 ai_inferred）。
+   * 不写入台账 / 不进 can_merge；空或未传则不渲染建议块。
+   */
+  testTargetSuggestions?: readonly TestTargetSuggestion[] | undefined;
 }
 
 /**
@@ -221,6 +228,8 @@ export function ScopeAcceptanceBlock(props: ScopeAcceptanceBlockProps) {
   const [expanded, setExpanded] = useState(
     Boolean(props.approvalRequired || props.forceExpandSensitive),
   );
+  const suggestions = props.testTargetSuggestions ?? [];
+  const [suggestOpen, setSuggestOpen] = useState(false);
 
   const shown = scopeAcceptanceShownItems(
     plan,
@@ -391,6 +400,52 @@ export function ScopeAcceptanceBlock(props: ScopeAcceptanceBlockProps) {
         >
           {NO_ACCEPTANCE_SURFACE_RECORD_LABEL}
         </p>
+      ) : null}
+
+      {suggestions.length > 0 ? (
+        <div
+          data-testid="scope-acceptance-test-target-suggest"
+          data-suggest-count={String(suggestions.length)}
+          className="mb-2 rounded border border-dashed border-border/80 bg-muted/20 px-2 py-1.5 text-xs"
+        >
+          <button
+            type="button"
+            data-testid="scope-acceptance-test-target-suggest-toggle"
+            aria-expanded={suggestOpen}
+            onClick={() => setSuggestOpen((v) => !v)}
+            className="flex w-full items-center justify-between gap-2 text-left text-[11px] font-medium text-foreground"
+          >
+            <span>
+              AI 建议·非验收
+              <span className="ml-1 font-normal text-muted-foreground">
+                （{suggestions.length} 条，不进合并门禁）
+              </span>
+            </span>
+            <span className="text-muted-foreground">
+              {suggestOpen ? "收起" : "展开"}
+            </span>
+          </button>
+          {suggestOpen ? (
+            <ul
+              data-testid="scope-acceptance-test-target-suggest-list"
+              className="mt-1.5 space-y-1 text-[11px] text-muted-foreground"
+            >
+              {suggestions.map((s) => (
+                <li
+                  key={s.suggestion_id}
+                  data-testid="scope-acceptance-test-target-suggest-row"
+                  data-source={s.source}
+                  data-derived-from={s.derived_from.join(",")}
+                >
+                  <span className="mr-1 rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">
+                    AI 建议·非验收
+                  </span>
+                  {s.text}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
       ) : null}
 
       {!plan ? (
