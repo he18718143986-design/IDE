@@ -123,6 +123,70 @@ export interface SchemeItemProjectionDto {
   confidence?: "low" | "medium" | "high";
 }
 
+/**
+ * 细模型可选加层六实体（TASK-J.38a）。
+ * 内存投影源；不得平行持久化为第二套方案；默认 ai_inferred。
+ * 不改 SchemeItemMeta.source / evidence 形状；不改 SchemeItemProjectionDto。
+ */
+export interface FineActor extends SchemeItemMeta {
+  name: string;
+  role_hint?: string;
+  /** 派生自哪些 SSOT 条目 / 步骤键；非第二套 store */
+  derived_from: string[];
+}
+
+export interface FineUseCase extends SchemeItemMeta {
+  name: string;
+  summary: string;
+  goal_ids: string[];
+  module_ids: string[];
+}
+
+export interface FineProcess extends SchemeItemMeta {
+  name: string;
+  /** 对应 SchemeDraftV2.flows[].id */
+  flow_id: string;
+  steps: { actor: string; action: string; module_id?: string }[];
+}
+
+export interface FineRule extends SchemeItemMeta {
+  statement: string;
+  /** 对应 SchemeDraftV2.decisions[].id（若有） */
+  decision_id?: string;
+  risk?: "low" | "high";
+}
+
+export interface FineScreen extends SchemeItemMeta {
+  name: string;
+  purpose: string;
+  /** 对应 SchemeDraftV2.modules[].id */
+  module_id: string;
+}
+
+export interface FineAcceptance extends SchemeItemMeta {
+  text: string;
+  /** 对应 SchemeDraftV2.acceptance[].id */
+  acceptance_id: string;
+  /**
+   * 只引用 AcceptanceItem.check；不重开该字段契约。
+   * 读侧透传，写回时不得借此改 AcceptanceItem 形状。
+   */
+  check?: AcceptanceCheckKind;
+}
+
+/** 细模型加层外壳：与某一版 SchemeDraftV2 对齐的内存投影 */
+export interface FineModelLayer {
+  projection_version: number;
+  source_scheme_id: string;
+  source_scheme_revision: number;
+  actors: FineActor[];
+  use_cases: FineUseCase[];
+  processes: FineProcess[];
+  rules: FineRule[];
+  screens: FineScreen[];
+  acceptance: FineAcceptance[];
+}
+
 export interface SchemeDraftV2 {
   scheme_id: string;
   scheme_revision: number;
