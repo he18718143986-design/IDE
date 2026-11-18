@@ -5,10 +5,7 @@
  * - 不写回 SchemeDraftV2.acceptance；不触碰 Evidence / can_merge
  * - FineModelLayer 仅在 scheme_id/revision 对齐时作可选线索，以 SSOT 文案为准
  */
-import type {
-  FineModelLayer,
-  SchemeDraftV2,
-} from "./scheme-patch-types";
+import type { FineModelLayer, SchemeDraftV2 } from "./scheme-patch-types";
 
 /** 建议层唯一允许的来源字面量 */
 export type TestTargetSuggestionSource = "ai_inferred";
