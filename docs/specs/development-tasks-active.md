@@ -1374,7 +1374,9 @@ governance:
 >
 > **立卡注记（2026-11-18 · P-239）**：Tina 点名立 B。新增 [`TASK-J.38b`](./development-tasks-completed.md#task-j.38b)（当时 `[NEW_TASK]`；五字段投影加层接入中栏；估算 S～M）。**C 暂不立**。
 >
-> **归档注记（2026-11-18 · P-240）**：[`TASK-J.38b`](./development-tasks-completed.md#task-j.38b) 已 **COMPLETED**（施工 #301/`cb37efe`）。诚实口径：**五字段中栏投影已交付，附录 C 壳/真图/建议层未做（C–E 待立卡）、客户端字面同形未做（另立不决）**。C 暂不立（B 回写后再点名 C 或 E）；活发送暂不立；§3.3 仍 Hold；CI.2 攒样本；J.41 新会话并行；D 硬等 J.9b。
+> **归档注记（2026-11-18 · P-240）**：[`TASK-J.38b`](./development-tasks-completed.md#task-j.38b) 已 **COMPLETED**（施工 #301/`cb37efe`）。诚实口径：**五字段中栏投影已交付，附录 C 壳/真图/建议层未做（C–E 待立卡）、客户端字面同形未做（另立不决）**。
+>
+> **立卡注记（2026-11-18 · P-241）**：Tina 点名立 C。新增 [`TASK-J.38c`](#task-j.38c) `[NEW_TASK]`（附录 C 投影壳并轨；估算 M）。**E 暂不立**（C 回写后再点名）；D 硬等 J.9b（或与 J.9b 合并立项，禁双开）。活发送暂不立；§3.3 仍 Hold；CI.2 攒样本；J.41 新会话并行。
 
 <a id="task-j.38"></a>
 
@@ -1388,9 +1390,9 @@ governance:
 | :--- | :--- | :--- | :--- | :--- |
 | [`TASK-J.38a`](./development-tasks-completed.md#task-j.38a) | **`[COMPLETED]`**（施工 #298/`8cabadc`；完工回写 P-238） | 细模型类型 + V2 派生/回写 SSOT 纯函数 | M | 硬：J.37、J.36 |
 | [`TASK-J.38b`](./development-tasks-completed.md#task-j.38b) | **`[COMPLETED]`**（施工 #301/`cb37efe`；完工回写 P-240） | 五字段投影加层接入中栏 | S～M | 硬：J.37、J.38a；首期仅五字段（细模型实体可选） |
-| `TASK-J.38c` | **待立卡**（B 回写后再点名） | 附录 C 投影壳并轨（复用 C.10q） | M | 硬：C.10q、J.37；建议依赖 A |
+| [`TASK-J.38c`](#task-j.38c) | **`[NEW_TASK]`**（立卡 P-241；未开工） | 附录 C 投影壳并轨（复用 C.10q） | M | 硬：C.10q、J.37；建议依赖 J.38a |
 | `TASK-J.38d` | **待立卡** | 真图 / `renderSchemeDiagrams` | M | 硬：C、J.37；建议 A；**硬依赖 `TASK-J.9b`（或与 J.9b 合并立项，禁双开）** |
-| `TASK-J.38e` | **待立卡** | 测试目标建议层（`ai_inferred`） | S | 硬：J.37；软：A |
+| `TASK-J.38e` | **待立卡**（C 回写后再点名） | 测试目标建议层（`ai_inferred`） | S | 硬：J.37；软：A |
 
 ```yaml task-card
 id: TASK-J.38
@@ -1419,7 +1421,7 @@ contract:
       - { alias: docs, executable: npm, args: [run, check:docs] }
 design:
   approach: >-
-    本卡已拆分。J.38a / J.38b 已 COMPLETED；C–E 待 Tina 逐张授权后再立。
+    本卡已拆分。J.38a / J.38b 已 COMPLETED；J.38c 已立 NEW_TASK；D–E 待 Tina 逐张授权后再立。
   touches:
     - { path: docs/specs/development-tasks-active.md, change: modify, why: 母卡 SPLIT 追溯与子卡占位登记, symbols: [] }
   interfaces: []
@@ -1460,4 +1462,119 @@ governance:
 #### 【Task J.38b】五字段投影加层接入中栏`[COMPLETED · 正文已迁]`
 
 > 本卡已 **COMPLETED**（施工 [#301](https://github.com/he18718143986-design/IDE/pull/301) squash `cb37efefc58eb6dee28a6af1703c0cf307f51134`；完工回写 P-240）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.38b) §3.4ay。诚实口径：**五字段中栏投影已交付，附录 C 壳/真图/建议层未做（C–E 待立卡）、客户端字面同形未做（另立不决）**。
+
+<a id="task-j.38c"></a>
+
+#### 【Task J.38c】附录 C 投影壳并轨（复用 C.10q 三占位）`[NEW_TASK · 立卡 P-241]`
+
+```yaml task-card
+id: TASK-J.38c
+status: NEW_TASK
+contract:
+  intent:
+    title: 附录 C 投影壳并轨（复用 C.10q 三占位）
+    description: >-
+      按拆分简报 C：在 C.10q PanoramaPane 三占位（业务功能脑图 / 用户旅程 /
+      业务概念图）上挂「附录 C 三卡」投影契约——数据源声明、空态合法、与 SSOT
+      不一致时以 SSOT 为准。仍可不交付真渲染（归 J.38d）。不得另起第二套全景
+      视图体系；全景进度不得冒充施工点亮（假绿禁止）。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J38C-P1
+      check: auto
+      text: >-
+        PanoramaPane 三占位挂附录 C 投影契约（数据源声明 + 空态）；无真图时空态合法，
+        不得伪造施工点亮或假绿。
+    - id: J38C-P2
+      check: auto
+      text: >-
+        投影与 SchemeDraftV2 / 可选 FineModelLayer 不一致时以 SSOT 为准；
+        不得平行持久化第二套全景方案（禁双 SSOT）。
+    - id: J38C-P3
+      check: auto
+      text: >-
+        不交付 mermaid/结构真渲染（归 J.38d）；不另起全景路由体系；
+        lens-routing 全景禁 illumination 口径保持。
+    - id: J38C-P4
+      check: auto
+      text: >-
+        npm run check:docs 与对应 unit/ui 测通过；卡面 non_goals 与拆分简报 C 一致。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/components/studio/PanoramaPane.tsx
+      - src/lib/studio/lens-routing.ts
+      - src/lib/studio/panorama-projection.ts
+      - tests/unit/panorama-projection.test.ts
+      - tests/ui/studio-lens-shell.test.tsx
+    readonly_paths:
+      - src/lib/journey/scheme-patch-types.ts
+      - src/lib/journey/fine-model-derive.ts
+      - docs/specs/supervisor.md
+      - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+      - docs/specs/development-tasks-completed.md
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+      - { alias: unit-panorama, executable: npx, args: [vitest, run, tests/unit/panorama-projection.test.ts] }
+      - { alias: ui-lens, executable: npx, args: [vitest, run, tests/ui/studio-lens-shell.test.tsx] }
+design:
+  approach: >-
+    新建 panorama-projection.ts：附录 C 三卡投影契约纯函数（数据源声明、空态、
+    SSOT 优先）；接线 PanoramaPane 既有 panorama-v02-placeholders 三卡；
+    必要时微调 lens-routing 注释/守卫以锁死「全景禁假绿」。不渲染真图。
+    施工中若 writable_paths 不够：按修卡流程停工上报，不得擅自扩面。
+  touches:
+    - { path: src/components/studio/PanoramaPane.tsx, change: modify, why: 三占位挂附录 C 投影契约/空态, symbols: [PanoramaPane] }
+    - { path: src/lib/studio/lens-routing.ts, change: modify, why: 保持全景禁 illumination；必要时加契约注释/守卫, symbols: [resolveDefaultLens, resolveActiveLens] }
+    - { path: src/lib/studio/panorama-projection.ts, change: create, why: 附录 C 三卡投影契约纯函数, symbols: [] }
+    - { path: tests/unit/panorama-projection.test.ts, change: create, why: 空态/SSOT优先/禁假绿断言, symbols: [] }
+    - { path: tests/ui/studio-lens-shell.test.tsx, change: modify, why: 三占位投影契约 UI 回归, symbols: [] }
+  interfaces:
+    - { kind: type, name: AppendixCProjectionShell, signature: "三卡数据源声明 + 空态；无可独立编辑图存储", consumers: [] }
+    - { kind: type, name: projectAppendixCShell, signature: "(draft V2 + optional FineModelLayer) => 三卡投影视图（可空）", consumers: [] }
+  test_plan:
+    - { acceptance_id: J38C-P1, test_path: tests/unit/panorama-projection.test.ts, level: unit, debt: "立卡阶段；施工后兑现" }
+    - { acceptance_id: J38C-P2, test_path: tests/unit/panorama-projection.test.ts, level: unit, debt: "立卡阶段；施工后兑现" }
+    - { acceptance_id: J38C-P3, test_path: tests/ui/studio-lens-shell.test.tsx, level: unit, debt: "立卡阶段；施工后兑现（vitest/jsdom UI）" }
+    - { acceptance_id: J38C-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "门禁 npm run check:docs；立卡阶段" }
+governance:
+  spec_refs:
+    - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+    - docs/specs/supervisor.md
+    - docs/specs/development-tasks-completed.md
+  depends_on:
+    - { id: TASK-C.10q, kind: hard }
+    - { id: TASK-J.37, kind: hard }
+    - { id: TASK-J.38a, kind: soft }
+    - { id: TASK-J.38, kind: soft }
+  code_facts:
+    - { ref: "docs/ledger/blueprint-fine-layer-impl-split-brief.md:77-87", note: "子卡 C：附录 C 投影壳；writable 示意 PanoramaPane + panorama-projection" }
+    - { ref: "src/components/studio/PanoramaPane.tsx:139-158", note: "C.10q 三占位 panorama-v02-placeholders（capability/journey/domain）" }
+    - { ref: "src/lib/studio/lens-routing.ts:1-7", note: "全景禁止展示施工绿灯（无 illumination 数据源）" }
+    - { ref: "docs/specs/supervisor.md:1078-1088", note: "J.37 附录 C 并轨与缺省/失败语义" }
+  non_goals:
+    - 无 mermaid/结构真渲染（归 J.38d / renderSchemeDiagrams）
+    - 不另起第二套全景路由或视图体系；不假绿 / 不冒充施工点亮
+    - 不实现 §3.3 自动点亮；不开工 CI.2；不立 J.41
+    - 禁双 SSOT；不替换 source/evidence；吸收标 ai_inferred
+    - 不重开 J.36 三缝；不把蓝图原文并入 docs/specs/
+    - ChangeOrder/冷静期另立不决；活发送暂不立
+    - 不与 E 并行开卡；不宣称端到端闭环
+  fail:
+    - 借本卡交付真图或另起第二套全景体系
+    - 全景进度冒充施工点亮（假绿）
+    - 平行持久化第二套方案或改写 source/evidence
+    - 擅自扩 writable_paths 而不修卡停工上报
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：J.38b 已关闭；C 在 C.10q 三占位上挂附录 C 投影契约，仍可不交真图。
+* **取舍**：E 暂不立；D 硬等 J.9b。
 
