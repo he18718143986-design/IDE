@@ -8981,3 +8981,118 @@ governance:
 
 * **背景**：J.38b 已关闭；C 在 C.10q 三占位上挂附录 C 投影契约，仍可不交真图。
 * **取舍**：投影壳已交付；真图归 D 硬等 J.9b；建议层归 E 待立卡。
+
+
+### 3.4ba 测试目标建议层（J.38e · 完工回写 P-244）
+
+<a id="task-j.38e"></a>
+
+### 【Task J.38e】测试目标建议层（`ai_inferred`）`[COMPLETED · 立卡 P-243 · 施工 #307 · 完工回写 P-244]`
+
+> **立卡说明（2026-11-18 · P-243）**：按拆分简报 E 建议测试目标；一律 `ai_inferred`；缺省不生成；不进 `can_merge`。
+
+> **归档注记（2026-11-18 · P-244）**：本卡已 **COMPLETED**。Tina 授权施工与合入（选 A：Windows Unit 非阻断存量，同 #266/#288/#291/#298/#301/#304）。[#307](https://github.com/he18718143986-design/IDE/pull/307) squash `6d7faca20890bf8421942808c91d3b072dbac41d` 于 2026-11-18 20:01:48 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `672404d4cb8d7819ceab7873d798486c3a67dce6`；父提交 `e4d4f2f32b4303a172c4d4584c61da2bbaf83bd3`）。合入前必需面全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非阻断存量失败，`continue-on-error`；本卡 `test-target-suggest.test.ts` 6/6 在 Windows 亦绿）；Bugbot NEUTRAL 不挡合入。估算仍为 S。交付：`test-target-suggest.ts`（`suggestTestTargets`）；`ScopeAcceptanceBlock` / `SchemeReviewPane` 可选只读「AI 建议·非验收」块；对应测。修卡未触发：未扩 `writable_paths`。诚实口径：**测试目标建议层已交付（一律 `ai_inferred`、缺省不生成、不进 `can_merge`），真图归 D 硬等 J.9b**。母卡 `TASK-J.38` 维持 `[SPLIT]`，标「子卡除 D 外全交付」；J.9b 仍 Hold 暂不立卡。活发送路径未接；不实现 §3.3；不开工 CI.2。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.38e
+status: COMPLETED
+contract:
+  intent:
+    title: 测试目标建议层（ai_inferred）
+    description: >-
+      按拆分简报 E：由细模型加层 / 投影建议测试目标；一律标 ai_inferred；
+      缺省 = 不生成；不得自动写入硬门禁或冒充用户验收；不得改写 can_merge 派生。
+      可选中栏只读展示「建议」块；不落第二套 SSOT。
+    risk_level: LOW
+  acceptance:
+    - id: J38E-P1
+      check: auto
+      text: >-
+        建议层纯函数产出测试目标时一律 source=ai_inferred；缺省输入返回空列表（不生成）。
+    - id: J38E-P2
+      check: auto
+      text: >-
+        建议不得写入 can_merge / Evidence 硬门禁 / 用户验收条目权威；禁双 SSOT。
+    - id: J38E-P3
+      check: auto
+      text: >-
+        可选中栏只读展示建议；不冒充 user_said / user_confirmed；不实现 §3.3 自动点亮。
+    - id: J38E-P4
+      check: auto
+      text: >-
+        npm run check:docs 与对应 unit 测通过；卡面 non_goals 与拆分简报 E 一致。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/lib/journey/test-target-suggest.ts
+      - src/components/studio/ScopeAcceptanceBlock.tsx
+      - src/components/studio/SchemeReviewPane.tsx
+      - tests/unit/test-target-suggest.test.ts
+    readonly_paths:
+      - src/lib/journey/scheme-patch-types.ts
+      - src/lib/journey/fine-model-derive.ts
+      - src/lib/evidence.schema.ts
+      - docs/specs/supervisor.md
+      - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+      - docs/specs/development-tasks-completed.md
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+      - { alias: unit-suggest, executable: npx, args: [vitest, run, tests/unit/test-target-suggest.test.ts] }
+design:
+  approach: >-
+    新建 test-target-suggest.ts：从 SchemeDraftV2 / 可选 FineModelLayer 建议测试目标
+    （纯函数；缺省空；一律 ai_inferred）。可选接线 ScopeAcceptanceBlock /
+    SchemeReviewPane 只读展示。禁止触碰 evidence.schema can_merge 派生。
+    未扩 writable_paths。
+  touches:
+    - { path: src/lib/journey/test-target-suggest.ts, change: create, why: 测试目标建议纯函数, symbols: [suggestTestTargets] }
+    - { path: src/components/studio/ScopeAcceptanceBlock.tsx, change: modify, why: 可选只读展示建议块, symbols: [ScopeAcceptanceBlock] }
+    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 中栏可选接线建议层, symbols: [] }
+    - { path: tests/unit/test-target-suggest.test.ts, change: create, why: 缺省空/ai_inferred/禁门禁写入断言, symbols: [] }
+  interfaces:
+    - { kind: type, name: TestTargetSuggestion, signature: "{ text; source: 'ai_inferred'; derived_from[] }", consumers: [] }
+    - { kind: type, name: suggestTestTargets, signature: "(draft V2 + optional FineModelLayer) => TestTargetSuggestion[]", consumers: [] }
+  test_plan:
+    - { acceptance_id: J38E-P1, test_path: tests/unit/test-target-suggest.test.ts, level: unit, debt: "已由 #307 交付；缺省空 + 一律 ai_inferred；Windows 亦 6/6 绿" }
+    - { acceptance_id: J38E-P2, test_path: tests/unit/test-target-suggest.test.ts, level: unit, debt: "已由 #307 交付；不含 can_merge/evidence；不写回 acceptance" }
+    - { acceptance_id: J38E-P3, test_path: tests/unit/test-target-suggest.test.ts, level: unit, debt: "已由 #307 交付；UI 可折叠「AI 建议·非验收」" }
+    - { acceptance_id: J38E-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "门禁 npm run check:docs；完工回写阶段" }
+governance:
+  spec_refs:
+    - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+    - docs/specs/supervisor.md
+    - docs/specs/development-tasks-completed.md
+  depends_on:
+    - { id: TASK-J.37, kind: hard }
+    - { id: TASK-J.38a, kind: soft }
+    - { id: TASK-J.38, kind: soft }
+  code_facts:
+    - { ref: "src/lib/journey/test-target-suggest.ts:46-99", note: "suggestTestTargets；ai_inferred；derived_from；缺省 []" }
+    - { ref: "src/components/studio/ScopeAcceptanceBlock.tsx:405-449", note: "可折叠 AI 建议·非验收块" }
+    - { ref: "src/components/studio/SchemeReviewPane.tsx:482", note: "透传 testTargetSuggestions" }
+    - { ref: "tests/unit/test-target-suggest.test.ts:51-141", note: "缺省空/ai_inferred/禁门禁；Windows 亦 6/6 绿" }
+    - { ref: "src/lib/evidence.schema.ts:146-261", note: "can_merge 派生只读；本卡未改" }
+  non_goals:
+    - 不改 can_merge / Evidence 硬门禁 / 底线验收权威
+    - 不实现 §3.3 自动点亮；不开工 CI.2；不立 J.41
+    - 禁双 SSOT；不替换 source/evidence；吸收标 ai_inferred
+    - 不重开 J.36 三缝；不把蓝图原文并入 docs/specs/
+    - ChangeOrder/冷静期另立不决；活发送暂不立
+    - 不立 D（硬等 J.9b）；不宣称端到端闭环
+  fail:
+    - 建议自动写入硬门禁或冒充用户验收
+    - 改写 can_merge 派生或平行持久化第二套方案
+    - 擅自扩 writable_paths 而不修卡停工上报
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 307, commit: 6d7faca20890bf8421942808c91d3b072dbac41d }
+```
+
+* **背景**：J.38c 已关闭；E 兑现 J.37 缺口「测试目标自生成仍开」。
+* **取舍**：建议层已交付；真图归 D 硬等 J.9b；母卡子卡除 D 外全交付。
