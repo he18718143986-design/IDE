@@ -1,5 +1,6 @@
 /**
  * TASK-J.22a：台账 → 中栏只读投影。
+ * TASK-J.38b：acceptance / goals / modules 挂可选五字段视图（只读；不写盘）。
  * - 纯函数，不写盘、不修改台账、不触发封存；
  * - 无台账或无实质内容时 available=false，由前端标「方案尚未生成」；
  * - mermaid 三图不在此生成（不强交 renderSchemeDiagrams）。
@@ -7,17 +8,31 @@
 import type {
   SchemeDraftV2,
   SchemeItemMeta,
+  SchemeItemProjectionDto,
+  WithText,
 } from "../../../src/lib/journey/scheme-patch-types";
+import { deriveFineModelFromV2 } from "../../../src/lib/journey/fine-model-derive";
+import { projectSchemeItemFiveFields } from "../../../src/lib/journey/scheme-item-projection";
 import type { SchemeLedgerRecord } from "./scheme-ledger-store";
 
 export interface SchemeMidpaneGoalView {
   id: string;
   text: string;
+  status?: SchemeItemProjectionDto["status"];
+  scope?: SchemeItemProjectionDto["scope"];
+  provenance?: SchemeItemProjectionDto["provenance"];
+  links?: SchemeItemProjectionDto["links"];
+  confidence?: SchemeItemProjectionDto["confidence"];
 }
 
 export interface SchemeMidpaneModuleView {
   id: string;
   name: string;
+  status?: SchemeItemProjectionDto["status"];
+  scope?: SchemeItemProjectionDto["scope"];
+  provenance?: SchemeItemProjectionDto["provenance"];
+  links?: SchemeItemProjectionDto["links"];
+  confidence?: SchemeItemProjectionDto["confidence"];
 }
 
 export interface SchemeMidpaneDecisionView {
@@ -39,6 +54,11 @@ export interface SchemeMidpaneConflictView {
 export interface SchemeMidpaneAcceptanceView {
   id: string;
   text: string;
+  status?: SchemeItemProjectionDto["status"];
+  scope?: SchemeItemProjectionDto["scope"];
+  provenance?: SchemeItemProjectionDto["provenance"];
+  links?: SchemeItemProjectionDto["links"];
+  confidence?: SchemeItemProjectionDto["confidence"];
 }
 
 export interface SchemeMidpaneProjection {
@@ -84,6 +104,30 @@ function hasMeaningfulContent(draft: SchemeDraftV2): boolean {
   return false;
 }
 
+function attachFiveFields(
+  meta: SchemeItemMeta,
+  schemeFrozen: boolean,
+  fineLayer: ReturnType<typeof deriveFineModelFromV2> | null,
+): SchemeItemProjectionDto {
+  return projectSchemeItemFiveFields({
+    meta: {
+      id: meta.id,
+      source: meta.source,
+      evidence: meta.evidence,
+      user_pinned: meta.user_pinned,
+    },
+    schemeFrozen,
+    fineLayer,
+  });
+}
+
+function withFiveFields<T extends { id: string }>(
+  row: T,
+  five: SchemeItemProjectionDto,
+): T & SchemeItemProjectionDto {
+  return { ...row, ...five };
+}
+
 export function projectSchemeMidpane(
   record: SchemeLedgerRecord | null,
 ): SchemeMidpaneProjection {
@@ -99,6 +143,10 @@ export function projectSchemeMidpane(
     };
   }
 
+  const frozen = draft.frozen === true;
+  // 可选加层源：只读派生，不落盘、不渲染六实体列表
+  const fineLayer = deriveFineModelFromV2(draft);
+
   const seenGoal = new Set<string>();
   const goals: SchemeMidpaneGoalView[] = [];
   for (const g of draft.goals) {
@@ -106,7 +154,9 @@ export function projectSchemeMidpane(
     const text = typeof g.text === "string" ? g.text.trim() : "";
     if (id === "" || text === "" || seenGoal.has(id)) continue;
     seenGoal.add(id);
-    goals.push({ id, text });
+    goals.push(
+      withFiveFields({ id, text }, attachFiveFields(g, frozen, fineLayer)),
+    );
   }
 
   const seenMod = new Set<string>();
@@ -116,7 +166,9 @@ export function projectSchemeMidpane(
     const name = typeof m.name === "string" ? m.name.trim() : "";
     if (id === "" || name === "" || seenMod.has(id)) continue;
     seenMod.add(id);
-    modules.push({ id, name });
+    modules.push(
+      withFiveFields({ id, name }, attachFiveFields(m, frozen, fineLayer)),
+    );
   }
 
   const decisions: SchemeMidpaneDecisionView[] = draft.decisions.map((d) => {
@@ -152,14 +204,17 @@ export function projectSchemeMidpane(
     const text = typeof a.text === "string" ? a.text.trim() : "";
     if (id === "" || text === "" || seenAcc.has(id)) continue;
     seenAcc.add(id);
-    acceptance.push({ id, text });
+    const row: WithText = a;
+    acceptance.push(
+      withFiveFields({ id, text }, attachFiveFields(row, frozen, fineLayer)),
+    );
   }
 
   return {
     available: true,
     scheme_id: draft.scheme_id,
     scheme_revision: draft.scheme_revision,
-    frozen: draft.frozen === true,
+    frozen,
     title: draft.title.trim(),
     summary: draft.summary.trim(),
     goals,

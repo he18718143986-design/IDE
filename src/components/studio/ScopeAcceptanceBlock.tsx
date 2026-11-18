@@ -12,8 +12,17 @@ import type {
   SurfacePresentationSection,
   SchemeAcceptanceItem,
 } from "@/lib/daemon-api";
+import type { SchemeItemProjectionDto } from "@/lib/journey/scheme-patch-types";
+import { projectSchemeItemFiveFields } from "@/lib/journey/scheme-item-projection";
 
 export type ScopeAcceptanceMode = "pre_start" | "frozen" | "acceptance";
+
+/**
+ * TASK-J.38b：验收行视图 = J.22b id+文案 + 可选五字段投影（只读）。
+ * 不改 daemon-api 同形类型；以交叉类型承接 midpane 多余字段，禁止 any/断言。
+ */
+export type ScopeAcceptanceItemView = SchemeAcceptanceItem &
+  SchemeItemProjectionDto;
 
 /** §15.4 白话投影的版本号；文案措辞变化时递增，写入 surface_log 的 plain_text_version。 */
 export const SCOPE_ACCEPTANCE_PLAIN_TEXT_VERSION =
@@ -23,21 +32,30 @@ export const SCOPE_ACCEPTANCE_PLAIN_TEXT_VERSION =
 export const NO_ACCEPTANCE_SURFACE_RECORD_LABEL = "无呈现记录" as const;
 
 /**
- * TASK-J.22b：把台账验收条目收成可呈现列表。
+ * TASK-J.22b / J.38b：把台账验收条目收成可呈现列表。
  * - 只保留非空 id + 非空文案；重复 id 只留首条；
- * - 不伪造条目、不补默认文案。
+ * - 不伪造条目、不补默认文案；
+ * - 可选五字段经 projectSchemeItemFiveFields 清洗后保留（非法丢弃）。
  */
 export function presentableAcceptanceItems(
-  items: readonly SchemeAcceptanceItem[] = [],
-): SchemeAcceptanceItem[] {
+  items: readonly ScopeAcceptanceItemView[] = [],
+): ScopeAcceptanceItemView[] {
   const seen = new Set<string>();
-  const out: SchemeAcceptanceItem[] = [];
+  const out: ScopeAcceptanceItemView[] = [];
   for (const item of items) {
     const id = typeof item.id === "string" ? item.id.trim() : "";
     const text = typeof item.text === "string" ? item.text.trim() : "";
     if (id === "" || text === "" || seen.has(id)) continue;
     seen.add(id);
-    out.push({ id, text });
+    const dto: SchemeItemProjectionDto = {
+      ...(item.status !== undefined ? { status: item.status } : {}),
+      ...(item.scope !== undefined ? { scope: item.scope } : {}),
+      ...(item.provenance !== undefined ? { provenance: item.provenance } : {}),
+      ...(item.links !== undefined ? { links: item.links } : {}),
+      ...(item.confidence !== undefined ? { confidence: item.confidence } : {}),
+    };
+    const five = projectSchemeItemFiveFields({ dto });
+    out.push({ id, text, ...five });
   }
   return out;
 }
@@ -64,8 +82,8 @@ export interface ScopeAcceptanceBlockProps {
   forceExpandSensitive?: boolean | undefined;
   busy?: boolean | undefined;
   onDeclineSensitive?: (() => void) | undefined;
-  /** 挂账⑬ 方案 A：台账验收条目（只读投影）；渲染即展示，展示后按 acceptance 段上报 */
-  acceptanceItems?: readonly SchemeAcceptanceItem[] | undefined;
+  /** 挂账⑬ / J.38b：台账验收条目（只读投影，可含五字段）；渲染即展示，展示后按 acceptance 段上报 */
+  acceptanceItems?: readonly ScopeAcceptanceItemView[] | undefined;
   /**
    * J16-P7：取数完成或失败后为 true。仅在此时且条目为空时标「无呈现记录」；
    * 取数完成前或尚无方案时不得提前标，避免加载中闪现该文案。
@@ -84,7 +102,7 @@ export interface ScopeAcceptanceBlockProps {
 export function scopeAcceptanceShownItems(
   plan: ScopePlan | null,
   mode: ScopeAcceptanceMode,
-  acceptanceItems: readonly SchemeAcceptanceItem[] = [],
+  acceptanceItems: readonly ScopeAcceptanceItemView[] = [],
 ): { item_ref: string; section: SurfacePresentationSection }[] {
   const acceptanceShown = presentableAcceptanceItems(acceptanceItems).map(
     (item) => ({
@@ -293,20 +311,75 @@ export function ScopeAcceptanceBlock(props: ScopeAcceptanceBlockProps) {
                 key={item.id}
                 data-testid="scope-acceptance-criterion-row"
                 data-item-ref={item.id}
-                className="flex gap-1.5 leading-relaxed"
+                data-projection-status={item.status}
+                data-projection-confidence={item.confidence}
+                className="flex flex-col gap-0.5 leading-relaxed"
               >
-                <span
-                  data-testid="scope-acceptance-criterion-id"
-                  className="shrink-0 font-mono text-[11px] text-foreground"
-                >
-                  {item.id}
-                </span>
-                <span
-                  data-testid="scope-acceptance-criterion-text"
-                  className="min-w-0"
-                >
-                  {item.text}
-                </span>
+                <div className="flex gap-1.5">
+                  <span
+                    data-testid="scope-acceptance-criterion-id"
+                    className="shrink-0 font-mono text-[11px] text-foreground"
+                  >
+                    {item.id}
+                  </span>
+                  <span
+                    data-testid="scope-acceptance-criterion-text"
+                    className="min-w-0"
+                  >
+                    {item.text}
+                  </span>
+                </div>
+                {item.status ||
+                item.scope ||
+                item.provenance ||
+                (item.links && item.links.length > 0) ||
+                item.confidence ? (
+                  <dl
+                    data-testid="scope-acceptance-criterion-projection"
+                    className="ml-4 grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground"
+                  >
+                    {item.status ? (
+                      <>
+                        <dt>状态</dt>
+                        <dd data-testid="scope-acceptance-projection-status">
+                          {item.status}
+                        </dd>
+                      </>
+                    ) : null}
+                    {item.scope ? (
+                      <>
+                        <dt>范围</dt>
+                        <dd data-testid="scope-acceptance-projection-scope">
+                          {item.scope}
+                        </dd>
+                      </>
+                    ) : null}
+                    {item.provenance ? (
+                      <>
+                        <dt>来源</dt>
+                        <dd data-testid="scope-acceptance-projection-provenance">
+                          {item.provenance}
+                        </dd>
+                      </>
+                    ) : null}
+                    {item.links && item.links.length > 0 ? (
+                      <>
+                        <dt>关联</dt>
+                        <dd data-testid="scope-acceptance-projection-links">
+                          {item.links.join(" · ")}
+                        </dd>
+                      </>
+                    ) : null}
+                    {item.confidence ? (
+                      <>
+                        <dt>置信</dt>
+                        <dd data-testid="scope-acceptance-projection-confidence">
+                          {item.confidence}
+                        </dd>
+                      </>
+                    ) : null}
+                  </dl>
+                ) : null}
               </li>
             ))}
           </ul>
