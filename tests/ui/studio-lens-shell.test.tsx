@@ -113,7 +113,7 @@ describe("StudioLensShell / PanoramaPane (TASK-C.10q)", () => {
     expect(screen.getByText(/不会出现施工绿灯/)).toBeInTheDocument();
   });
 
-  it("有 SchemeDraftV2 时三卡消费 SSOT 投影契约（无 mermaid / 无假绿）", () => {
+  it("有 SchemeDraftV2 时三卡挂确定性真图；空态/禁假绿仍成立", () => {
     render(
       <PanoramaPane
         schemeDraft={{
@@ -172,9 +172,22 @@ describe("StudioLensShell / PanoramaPane (TASK-C.10q)", () => {
       "data-empty",
       "false",
     );
+    expect(screen.getByTestId("panorama-card-capability")).toHaveAttribute(
+      "data-has-diagram",
+      "true",
+    );
     expect(screen.getByTestId("panorama-card-capability")).toHaveTextContent(
       "能力甲",
     );
+    expect(
+      screen.getByTestId("panorama-card-capability-diagram"),
+    ).toHaveTextContent(/mindmap/);
+    expect(
+      screen.getByTestId("panorama-card-journey-diagram"),
+    ).toHaveTextContent(/flowchart TB/);
+    expect(
+      screen.getByTestId("panorama-card-domain-diagram"),
+    ).toHaveTextContent(/erDiagram/);
     expect(screen.getByTestId("panorama-card-journey")).toHaveTextContent(
       "旅程甲",
     );
@@ -184,11 +197,15 @@ describe("StudioLensShell / PanoramaPane (TASK-C.10q)", () => {
     expect(
       screen.getByTestId("panorama-card-capability-source"),
     ).toHaveTextContent(/ssot:SchemeDraftV2\.modules/);
-    expect(screen.queryByText(/mermaid/i)).toBeNull();
-    expect(screen.getByTestId("panorama-v02-placeholders")).toHaveAttribute(
-      "data-forbid-illumination",
-      "true",
-    );
+    const section = screen.getByTestId("panorama-v02-placeholders");
+    expect(section).toHaveAttribute("data-forbid-illumination", "true");
+    expect(section).toHaveAttribute("data-has-diagram", "true");
+    for (const id of ["capability", "journey", "domain"] as const) {
+      expect(screen.getByTestId(`panorama-card-${id}`)).toHaveAttribute(
+        "data-forbid-illumination",
+        "true",
+      );
+    }
   });
 
   it("TaskGraphPane：无图进全景；施工侧改名为本轮施工·功能汇总", () => {

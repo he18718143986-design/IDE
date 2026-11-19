@@ -1,9 +1,9 @@
 /**
- * TASK-C.10q + TASK-C.14b + TASK-J.38c：全景视角。
+ * TASK-C.10q + TASK-C.14b + TASK-J.38c + TASK-J.38d：全景视角。
  *
  * - 合同白话摘要（施工绿灯禁止出现在此）
  * - 项目现状基线档案（打开即扫 / 确认≠授权 / Dirty 管家黄标）
- * - 附录 C 三卡投影壳（数据源声明 + 空态；无真渲染 / 无假绿）
+ * - 附录 C 三卡投影壳（数据源声明 + 空态/真图；无假绿）
  */
 
 import type { BaselineArchivePayload } from "@/lib/daemon-api";
@@ -155,10 +155,14 @@ export function PanoramaPane(props: PanoramaPaneProps) {
       <section
         data-testid="panorama-v02-placeholders"
         data-forbid-illumination="true"
-        data-has-diagram="false"
+        data-has-diagram={appendixShell.has_any_diagram ? "true" : "false"}
         data-fine-aligned={appendixShell.fine_layer_aligned ? "true" : "false"}
         className="space-y-2"
-        aria-label="附录 C 全景投影壳（无真图）"
+        aria-label={
+          appendixShell.has_any_diagram
+            ? "附录 C 全景投影壳（含真图）"
+            : "附录 C 全景投影壳（无真图）"
+        }
       >
         {appendixShell.cards.map((card) => (
           <PlaceholderCard
@@ -168,6 +172,8 @@ export function PanoramaPane(props: PanoramaPaneProps) {
             body={card.body}
             sourceDeclaration={card.source_declaration}
             empty={card.empty}
+            hasDiagram={card.has_diagram}
+            diagram={card.diagram}
           />
         ))}
       </section>
@@ -368,12 +374,14 @@ function PlaceholderCard(props: {
   body: string;
   sourceDeclaration: string;
   empty: boolean;
+  hasDiagram: boolean;
+  diagram: string | null;
 }) {
   return (
     <div
       data-testid={props.testId}
       data-empty={props.empty ? "true" : "false"}
-      data-has-diagram="false"
+      data-has-diagram={props.hasDiagram ? "true" : "false"}
       data-forbid-illumination="true"
       data-source={props.sourceDeclaration}
       className="rounded-md border border-dashed border-border/80 bg-background px-3 py-2"
@@ -383,7 +391,7 @@ function PlaceholderCard(props: {
           {props.title}
         </span>
         <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-          {props.empty ? "空态" : "投影壳"}
+          {props.empty ? "空态" : props.hasDiagram ? "真图" : "投影壳"}
         </span>
       </div>
       <p
@@ -395,6 +403,14 @@ function PlaceholderCard(props: {
       <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
         {props.body}
       </p>
+      {props.hasDiagram && props.diagram ? (
+        <pre
+          data-testid={`${props.testId}-diagram`}
+          className="mt-2 overflow-auto whitespace-pre-wrap rounded bg-muted/40 p-2 font-mono text-[11px] leading-relaxed text-foreground"
+        >
+          {props.diagram}
+        </pre>
+      ) : null}
     </div>
   );
 }

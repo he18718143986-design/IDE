@@ -1,10 +1,14 @@
 /**
- * TASK-J.38c：附录 C 投影壳（只读契约，无真渲染）。
+ * TASK-J.38c + TASK-J.38d：附录 C 投影壳（可挂真图）。
  *
- * - 在 C.10q 三占位上挂数据源声明 + 空态；真图归 J.38d
  * - SchemeDraftV2 是唯一 SSOT；FineModelLayer 仅在 scheme_id/revision 对齐时作可选提示
- * - 不落第二套图存储；全景禁止 illumination / 假绿
+ * - 真图由 renderSchemeDiagrams 确定性生成；无第二套图存储
+ * - 全景禁止 illumination / 假绿；空态合法
  */
+import {
+  renderSchemeDiagrams,
+  type SchemeDiagrams,
+} from "@/lib/journey/render-scheme-diagrams";
 import type {
   FineModelLayer,
   SchemeDraftV2,
@@ -31,12 +35,14 @@ export type AppendixCCardProjection = {
   source_declaration: string;
   /** 无 SSOT 条目时为空态合法 */
   empty: boolean;
-  /** 空态或占位正文（无 mermaid） */
+  /** 空态或占位正文 */
   body: string;
-  /** 来自 SSOT 的只读摘要行（名称级；非真图） */
+  /** 来自 SSOT 的只读摘要行（名称级） */
   summary_lines: string[];
-  /** 本卡永不交付真渲染 */
-  has_diagram: false;
+  /** 是否有可展示 mermaid 真图 */
+  has_diagram: boolean;
+  /** mermaid 源码；无图时为 null */
+  diagram: string | null;
   /** 禁止假绿 / 施工点亮 */
   forbid_illumination: true;
 };
@@ -46,6 +52,8 @@ export type AppendixCProjectionShell = {
   forbid_illumination: true;
   /** 可选加层是否因与 SSOT 对齐而被采纳为提示源 */
   fine_layer_aligned: boolean;
+  /** 任一一卡有真图 */
+  has_any_diagram: boolean;
 };
 
 export type ProjectAppendixCShellInput = {
@@ -54,7 +62,7 @@ export type ProjectAppendixCShellInput = {
 };
 
 const EMPTY_BODY =
-  "暂无投影数据（空态合法）。真图尚未交付；此处不展示施工进度或绿灯。";
+  "暂无投影数据（空态合法）。真图尚未生成；此处不展示施工进度或绿灯。";
 
 function isFineLayerAligned(
   draft: SchemeDraftV2,
@@ -66,29 +74,52 @@ function isFineLayerAligned(
   );
 }
 
+function diagramForCard(
+  id: AppendixCCardId,
+  diagrams: SchemeDiagrams,
+): string | null {
+  const raw =
+    id === "capability"
+      ? diagrams.mindmap
+      : id === "journey"
+        ? diagrams.swimlane
+        : diagrams.concept;
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 function buildCard(
   id: AppendixCCardId,
   sourceDeclaration: string,
   summaryLines: string[],
+  diagram: string | null,
 ): AppendixCCardProjection {
-  const empty = summaryLines.length === 0;
+  const empty = summaryLines.length === 0 && diagram == null;
+  const hasDiagram = diagram != null;
+  let body: string;
+  if (empty) {
+    body = EMPTY_BODY;
+  } else if (hasDiagram) {
+    body = `${summaryLines.join(" · ") || "已生成真图"}（确定性投影；不点亮施工）`;
+  } else {
+    body = `${summaryLines.join(" · ")}（只读投影摘要；无真图，不点亮施工）`;
+  }
   return {
     id,
     title: APPENDIX_C_CARD_TITLE[id],
     source_declaration: sourceDeclaration,
     empty,
-    body: empty
-      ? EMPTY_BODY
-      : `${summaryLines.join(" · ")}（只读投影摘要；无真图，不点亮施工）`,
+    body,
     summary_lines: summaryLines,
-    has_diagram: false,
+    has_diagram: hasDiagram,
+    diagram,
     forbid_illumination: true,
   };
 }
 
 /**
- * 附录 C 三卡投影壳。无草案 → 三卡空态；有草案 → 以 SSOT 集合为唯一条目源。
- * FineModelLayer 不对齐或缺失时忽略；对齐时仅记 fine_layer_aligned，不替换 SSOT 行。
+ * 附录 C 三卡投影壳。无草案 → 三卡空态；有草案 → SSOT 摘要 + 确定性真图。
+ * FineModelLayer 不对齐或缺失时忽略；对齐时仅记 fine_layer_aligned，条目仍只来自 SSOT。
  */
 export function projectAppendixCShell(
   input: ProjectAppendixCShellInput = {},
@@ -97,30 +128,30 @@ export function projectAppendixCShell(
   const fine = input.fineLayer ?? null;
 
   if (!draft) {
+    const cards = [
+      buildCard("capability", "ssot:none", [], null),
+      buildCard("journey", "ssot:none", [], null),
+      buildCard("domain", "ssot:none", [], null),
+    ];
     return {
-      cards: [
-        buildCard("capability", "ssot:none", []),
-        buildCard("journey", "ssot:none", []),
-        buildCard("domain", "ssot:none", []),
-      ],
+      cards,
       forbid_illumination: true,
       fine_layer_aligned: false,
+      has_any_diagram: false,
     };
   }
 
   const fineAligned = fine != null && isFineLayerAligned(draft, fine);
+  const diagrams = renderSchemeDiagrams(draft, fineAligned ? fine : null);
 
-  // 业务功能脑图 ← modules（SSOT）；加层不得另起功能树
   const capabilityLines = draft.modules
     .map((m) => m.name.trim())
     .filter((n) => n.length > 0);
 
-  // 用户旅程 ← flows（SSOT）
   const journeyLines = draft.flows
     .map((f) => f.name.trim())
     .filter((n) => n.length > 0);
 
-  // 业务概念图 ← entities（SSOT）
   const domainLines = draft.entities
     .map((e) => e.name.trim())
     .filter((n) => n.length > 0);
@@ -129,30 +160,36 @@ export function projectAppendixCShell(
     ? "+fineLayer:aligned-hint-only"
     : "+fineLayer:ignored";
 
+  const cards = [
+    buildCard(
+      "capability",
+      `ssot:SchemeDraftV2.modules${sourceSuffix}`,
+      capabilityLines,
+      diagramForCard("capability", diagrams),
+    ),
+    buildCard(
+      "journey",
+      `ssot:SchemeDraftV2.flows${sourceSuffix}`,
+      journeyLines,
+      diagramForCard("journey", diagrams),
+    ),
+    buildCard(
+      "domain",
+      `ssot:SchemeDraftV2.entities${sourceSuffix}`,
+      domainLines,
+      diagramForCard("domain", diagrams),
+    ),
+  ];
+
   return {
-    cards: [
-      buildCard(
-        "capability",
-        `ssot:SchemeDraftV2.modules${sourceSuffix}`,
-        capabilityLines,
-      ),
-      buildCard(
-        "journey",
-        `ssot:SchemeDraftV2.flows${sourceSuffix}`,
-        journeyLines,
-      ),
-      buildCard(
-        "domain",
-        `ssot:SchemeDraftV2.entities${sourceSuffix}`,
-        domainLines,
-      ),
-    ],
+    cards,
     forbid_illumination: true,
     fine_layer_aligned: fineAligned,
+    has_any_diagram: cards.some((c) => c.has_diagram),
   };
 }
 
-/** 自证：壳面不得声明真图或 illumination */
+/** 自证：壳面不得声明 illumination；有图时 diagram 非空 */
 export function assertAppendixCShellContract(
   shell: AppendixCProjectionShell,
 ): void {
@@ -160,11 +197,19 @@ export function assertAppendixCShellContract(
     throw new Error("appendix-c shell must forbid illumination");
   }
   for (const card of shell.cards) {
-    if (card.has_diagram !== false) {
-      throw new Error(`card ${card.id} must not claim a diagram`);
-    }
     if (card.forbid_illumination !== true) {
       throw new Error(`card ${card.id} must forbid illumination`);
+    }
+    if (
+      card.has_diagram &&
+      (card.diagram == null || card.diagram.trim() === "")
+    ) {
+      throw new Error(`card ${card.id} claims diagram but diagram is empty`);
+    }
+    if (!card.has_diagram && card.diagram != null) {
+      throw new Error(
+        `card ${card.id} must not carry diagram when has_diagram=false`,
+      );
     }
     if (
       "illumination" in (card as object) ||
