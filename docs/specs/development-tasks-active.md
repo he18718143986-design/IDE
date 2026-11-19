@@ -1390,13 +1390,15 @@ governance:
 
 <a id="task-j.38"></a>
 
-#### 【Task J.38】细模型加层 + 视图投影实现（拆分母卡）`[SPLIT · 立卡 P-237 · 子卡全交付 · 闭合另拍板]`
+#### 【Task J.38】细模型加层 + 视图投影实现（拆分母卡）`[COMPLETED · 立卡 P-237 · 闭合 P-249 选 B]`
 
 > **拆卡说明（2026-11-18 · P-237）**：整包实现估算 L，按 R-11 拆子卡。本母卡保留追溯，**不再作为施工依据**；施工以已立子卡正文为准。依赖序见拆分简报：`A → B`；`A → C`（C 可与 B 并行若类型面已合）；`C → D`；`E` 软依赖 A。
 >
 > **口径（2026-11-18 · P-246）**：A/B/C/E 均已 COMPLETED；**D 已立卡**（吸收 J.9b）。**J.9b 已由 J.38d 吸收，不另立卡**。
 >
 > **归档注记（2026-11-19 · P-248）**：[`TASK-J.38d`](./development-tasks-completed.md#task-j.38d) 已 **COMPLETED**（施工 #312/`7efb1f7`；修卡 P-247）。诚实口径：**真图渲染已交付（确定性三图挂 C 壳），J.9b/V-07 债清**；**子卡 A–E 全交付**。母卡维持 `[SPLIT]` 留档；**是否 SPLIT→COMPLETED 闭合另报 Tina 拍板，本条不改母卡 status**。
+>
+> **闭合注记（2026-11-19 · P-249）**：Tina 拍板选 B。子卡 A–E 全部 COMPLETED、J.9b 已吸收无遗留；母卡由 `[SPLIT]` → **`[COMPLETED]`** 闭合。`delivered` 锚定子卡 D 施工 [#312](https://github.com/he18718143986-design/IDE/pull/312)/`7efb1f7ec1bc05968b330c166c81d0bf19422b41`（物理交付终点）；本条仅文档闭合。诚实口径：**蓝图第一批实现面母卡已闭合**；不宣称端到端闭环。
 
 **子卡登记**：
 
@@ -1410,7 +1412,7 @@ governance:
 
 ```yaml task-card
 id: TASK-J.38
-status: SPLIT
+status: COMPLETED
 contract:
   intent:
     title: 细模型加层 + 视图投影实现（拆分母卡）
@@ -1422,7 +1424,7 @@ contract:
     - id: J38-P1
       check: auto
       text: >-
-        母卡已标 SPLIT；施工仅以已授权子卡为准；不得按本母卡开工。
+        母卡已标 COMPLETED（Tina 拍板选 B 闭合）；施工仅以已授权子卡为准；不得按本母卡开工。
   scheme_item_ids: []
   scope:
     writable_paths:
@@ -1435,13 +1437,13 @@ contract:
       - { alias: docs, executable: npm, args: [run, check:docs] }
 design:
   approach: >-
-    本卡已拆分。J.38a / J.38b / J.38c / J.38d / J.38e 均已 COMPLETED（子卡全交付）；
-    母卡保持 SPLIT 留档；是否闭合另报 Tina 拍板。J.9b 已由 J.38d 吸收，不另立卡。
+    本卡已拆分并闭合。J.38a / J.38b / J.38c / J.38d / J.38e 均已 COMPLETED（子卡全交付）；
+    Tina 拍板选 B：SPLIT→COMPLETED。J.9b 已由 J.38d 吸收，不另立卡。
   touches:
-    - { path: docs/specs/development-tasks-active.md, change: modify, why: 母卡 SPLIT 追溯与子卡登记, symbols: [] }
+    - { path: docs/specs/development-tasks-active.md, change: modify, why: 母卡 COMPLETED 闭合与子卡登记, symbols: [] }
   interfaces: []
   test_plan:
-    - { acceptance_id: J38-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "母卡 SPLIT 追溯；门禁 npm run check:docs" }
+    - { acceptance_id: J38-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "母卡 COMPLETED 闭合；门禁 npm run check:docs" }
 governance:
   spec_refs:
     - docs/ledger/blueprint-fine-layer-impl-split-brief.md
@@ -1452,18 +1454,19 @@ governance:
   code_facts:
     - { ref: "docs/ledger/blueprint-fine-layer-impl-split-brief.md:42-50", note: "依赖序 A→B / A→C / C→D；E 软依赖 A" }
   non_goals:
-    - 本卡已拆分，不再作为施工依据；不得按本卡开工
-    - 本条不擅自把母卡标 COMPLETED（闭合另拍板）；不另立 J.9b（已由 J.38d 吸收）
+    - 本卡已拆分并闭合，不再作为施工依据；不得按本卡开工
+    - 不另立 J.9b（已由 J.38d 吸收）
     - 不接活发送；不实现 §3.3；不开工 CI.2；不立 J.41 终态规格
   fail:
     - 在子卡未授权时按本母卡开工
-    - 擅自把母卡标 COMPLETED 而未经 Tina 拍板；或另立 J.9b 与 J.38d 双开
+    - 另立 J.9b 与 J.38d 双开
   estimate: L
   invariants:
     auth: unchanged
     demo_origin: unchanged
     illumination: unchanged
     gateway_write_scope: unchanged
+  delivered: { pr: 312, commit: 7efb1f7ec1bc05968b330c166c81d0bf19422b41 }
 ```
 
 <a id="task-j.38a"></a>
