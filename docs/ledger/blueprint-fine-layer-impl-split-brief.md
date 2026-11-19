@@ -2,7 +2,7 @@
 
 > **地位**：planning brief（2026-11-17 · Asia/Hong_Kong）。授权来源为 Tina「J.37 关闭后出实现拆分简报」。  
 > **本条只读拆分建议**：过目后逐张立卡；**不施工、不改 ADR、不改产品代码**。  
-> **立卡进度（P-237～P-246）**：母卡 [`TASK-J.38`](../specs/development-tasks-active.md#task-j.38) `[SPLIT]`（A/B/C/E COMPLETED；**D 已立卡未开工**）；[`TASK-J.38a`](../specs/development-tasks-completed.md#task-j.38a) / [`TASK-J.38b`](../specs/development-tasks-completed.md#task-j.38b) / [`TASK-J.38c`](../specs/development-tasks-completed.md#task-j.38c) / [`TASK-J.38e`](../specs/development-tasks-completed.md#task-j.38e) `[COMPLETED]`；[`TASK-J.38d`](../specs/development-tasks-active.md#task-j.38d) `[NEW_TASK]`（立卡 P-246；**吸收 J.9b / V-07，不另立 J.9b、禁双开**；未开工）。  
+> **立卡进度（P-237～P-248）**：母卡 [`TASK-J.38`](../specs/development-tasks-active.md#task-j.38) `[SPLIT]`（**子卡全交付**；闭合另拍板）；[`TASK-J.38a`](../specs/development-tasks-completed.md#task-j.38a) / [`TASK-J.38b`](../specs/development-tasks-completed.md#task-j.38b) / [`TASK-J.38c`](../specs/development-tasks-completed.md#task-j.38c) / [`TASK-J.38d`](../specs/development-tasks-completed.md#task-j.38d) / [`TASK-J.38e`](../specs/development-tasks-completed.md#task-j.38e) `[COMPLETED]`（D 施工 #312/`7efb1f7`；完工回写 P-248；**吸收 J.9b / V-07，债清**）。  
 > **前置**：[`TASK-J.37`](../specs/development-tasks-completed.md#task-j.37) 规格口径已 COMPLETED（#294/`2c6c7b4`；P-236）。  
 > **依据**：P-220 [`blueprint-absorption-ruling.md`](./blueprint-absorption-ruling.md) 分歧 2+7；[`blueprint-fine-layer-spec-brief.md`](./blueprint-fine-layer-spec-brief.md)；[`../specs/supervisor.md`](../specs/supervisor.md)「细模型加层 + 视图投影」；[`TASK-C.10q`](../specs/development-tasks-completed.md#task-c.10q) / RFC 附录 C；[`TASK-J.36`](../specs/development-tasks-completed.md#task-j.36) 已交付三缝。
 

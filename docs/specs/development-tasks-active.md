@@ -1386,15 +1386,17 @@ governance:
 >
 > **归档注记（2026-11-18 · P-244）**：[`TASK-J.38e`](./development-tasks-completed.md#task-j.38e) 已 **COMPLETED**（施工 #307/`6d7faca`）。诚实口径：**测试目标建议层已交付（一律 `ai_inferred`、缺省不生成、不进 `can_merge`），真图归 D 硬等 J.9b**。母卡维持 `[SPLIT]`，**子卡除 D 外全交付**；J.9b 仍 Hold 暂不立卡。
 >
-> **立卡注记（2026-11-18 · P-246）**：Tina 授权「立卡 J.38d（吸收 J.9b）」。新增 [`TASK-J.38d`](#task-j.38d)（`[NEW_TASK]`；真图渲染 `renderSchemeDiagrams`；估算 M）。**吸收口径**：吸收 J.9b / V-07 范围；J.9b 从未有卡面，不另立卡、禁双开。活发送暂不立；§3.3 仍不实现；CI.2 继续 Hold（P-245）；D.1e / S.3 维持 DEFERRED；J.41 新会话并行。
+> **立卡注记（2026-11-18 · P-246）**：Tina 授权「立卡 J.38d（吸收 J.9b）」。新增 [`TASK-J.38d`](./development-tasks-completed.md#task-j.38d)（当时 `[NEW_TASK]`；真图渲染 `renderSchemeDiagrams`；估算 M）。**吸收口径**：吸收 J.9b / V-07 范围；J.9b 从未有卡面，不另立卡、禁双开。
 
 <a id="task-j.38"></a>
 
-#### 【Task J.38】细模型加层 + 视图投影实现（拆分母卡）`[SPLIT · 立卡 P-237 · D 已立卡未开工]`
+#### 【Task J.38】细模型加层 + 视图投影实现（拆分母卡）`[SPLIT · 立卡 P-237 · 子卡全交付 · 闭合另拍板]`
 
 > **拆卡说明（2026-11-18 · P-237）**：整包实现估算 L，按 R-11 拆子卡。本母卡保留追溯，**不再作为施工依据**；施工以已立子卡正文为准。依赖序见拆分简报：`A → B`；`A → C`（C 可与 B 并行若类型面已合）；`C → D`；`E` 软依赖 A。
 >
-> **口径（2026-11-18 · P-246）**：A/B/C/E 均已 COMPLETED；**D 已立卡 `[NEW_TASK]`（吸收 J.9b，未开工）**。母卡保持 `[SPLIT]`，**不**标 COMPLETED（D 未交付）。**J.9b 已由 J.38d 吸收，不另立卡**——消除「J.9b Hold」与「J.38d 已立」双轨表述。
+> **口径（2026-11-18 · P-246）**：A/B/C/E 均已 COMPLETED；**D 已立卡**（吸收 J.9b）。**J.9b 已由 J.38d 吸收，不另立卡**。
+>
+> **归档注记（2026-11-19 · P-248）**：[`TASK-J.38d`](./development-tasks-completed.md#task-j.38d) 已 **COMPLETED**（施工 #312/`7efb1f7`；修卡 P-247）。诚实口径：**真图渲染已交付（确定性三图挂 C 壳），J.9b/V-07 债清**；**子卡 A–E 全交付**。母卡维持 `[SPLIT]` 留档；**是否 SPLIT→COMPLETED 闭合另报 Tina 拍板，本条不改母卡 status**。
 
 **子卡登记**：
 
@@ -1403,7 +1405,7 @@ governance:
 | [`TASK-J.38a`](./development-tasks-completed.md#task-j.38a) | **`[COMPLETED]`**（施工 #298/`8cabadc`；完工回写 P-238） | 细模型类型 + V2 派生/回写 SSOT 纯函数 | M | 硬：J.37、J.36 |
 | [`TASK-J.38b`](./development-tasks-completed.md#task-j.38b) | **`[COMPLETED]`**（施工 #301/`cb37efe`；完工回写 P-240） | 五字段投影加层接入中栏 | S～M | 硬：J.37、J.38a；首期仅五字段（细模型实体可选） |
 | [`TASK-J.38c`](./development-tasks-completed.md#task-j.38c) | **`[COMPLETED]`**（施工 #304/`d2e2b83`；完工回写 P-242） | 附录 C 投影壳并轨（复用 C.10q） | M | 硬：C.10q、J.37；建议依赖 J.38a |
-| [`TASK-J.38d`](#task-j.38d) | **`[NEW_TASK]`**（立卡 P-246；吸收 J.9b；未开工） | 真图 / `renderSchemeDiagrams` | M | 硬：J.38c、J.37；建议 J.38a；**吸收 J.9b/V-07，不另立 J.9b** |
+| [`TASK-J.38d`](./development-tasks-completed.md#task-j.38d) | **`[COMPLETED]`**（施工 #312/`7efb1f7`；修卡 P-247；完工回写 P-248） | 真图 / `renderSchemeDiagrams` | M | 硬：J.38c、J.37；建议 J.38a；**吸收 J.9b/V-07，不另立 J.9b** |
 | [`TASK-J.38e`](./development-tasks-completed.md#task-j.38e) | **`[COMPLETED]`**（施工 #307/`6d7faca`；完工回写 P-244） | 测试目标建议层（`ai_inferred`） | S | 硬：J.37；软：J.38a |
 
 ```yaml task-card
@@ -1433,8 +1435,8 @@ contract:
       - { alias: docs, executable: npm, args: [run, check:docs] }
 design:
   approach: >-
-    本卡已拆分。J.38a / J.38b / J.38c / J.38e 已 COMPLETED；
-    J.38d 已立卡 NEW_TASK（P-246，吸收 J.9b，未开工）。母卡保持 SPLIT，不标 COMPLETED。
+    本卡已拆分。J.38a / J.38b / J.38c / J.38d / J.38e 均已 COMPLETED（子卡全交付）；
+    母卡保持 SPLIT 留档；是否闭合另报 Tina 拍板。J.9b 已由 J.38d 吸收，不另立卡。
   touches:
     - { path: docs/specs/development-tasks-active.md, change: modify, why: 母卡 SPLIT 追溯与子卡登记, symbols: [] }
   interfaces: []
@@ -1451,11 +1453,11 @@ governance:
     - { ref: "docs/ledger/blueprint-fine-layer-impl-split-brief.md:42-50", note: "依赖序 A→B / A→C / C→D；E 软依赖 A" }
   non_goals:
     - 本卡已拆分，不再作为施工依据；不得按本卡开工
-    - 不把母卡标 COMPLETED（D 未交付）；不另立 J.9b（已由 J.38d 吸收）
+    - 本条不擅自把母卡标 COMPLETED（闭合另拍板）；不另立 J.9b（已由 J.38d 吸收）
     - 不接活发送；不实现 §3.3；不开工 CI.2；不立 J.41 终态规格
   fail:
     - 在子卡未授权时按本母卡开工
-    - 把 D 未开工写成已交付；或把母卡误标 COMPLETED；或另立 J.9b 与 J.38d 双开
+    - 擅自把母卡标 COMPLETED 而未经 Tina 拍板；或另立 J.9b 与 J.38d 双开
   estimate: L
   invariants:
     auth: unchanged
@@ -1486,127 +1488,12 @@ governance:
 
 #### 【Task J.38e】测试目标建议层（`ai_inferred`）`[COMPLETED · 正文已迁]`
 
-> 本卡已 **COMPLETED**（施工 [#307](https://github.com/he18718143986-design/IDE/pull/307) squash `6d7faca20890bf8421942808c91d3b072dbac41d`；完工回写 P-244）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.38e) §3.4ba。诚实口径：**测试目标建议层已交付（一律 `ai_inferred`、缺省不生成、不进 `can_merge`），真图归 D**（P-246 已立 `TASK-J.38d`，吸收原 J.9b）。
+> 本卡已 **COMPLETED**（施工 [#307](https://github.com/he18718143986-design/IDE/pull/307) squash `6d7faca20890bf8421942808c91d3b072dbac41d`；完工回写 P-244）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.38e) §3.4ba。诚实口径：**测试目标建议层已交付（一律 `ai_inferred`、缺省不生成、不进 `can_merge`）**；真图见 [`TASK-J.38d`](./development-tasks-completed.md#task-j.38d)（P-248 COMPLETED）。
 
 <a id="task-j.38d"></a>
 
-#### 【Task J.38d】真图渲染 `renderSchemeDiagrams`（吸收 J.9b / V-07）`[NEW_TASK · 立卡 P-246 · 修卡 P-247 · 未开工]`
+#### 【Task J.38d】真图渲染 `renderSchemeDiagrams`（吸收 J.9b / V-07）`[COMPLETED · 正文已迁]`
 
-> **立卡说明（2026-11-18 · P-246）**：授权来源为 Tina「立卡 J.38d（吸收 J.9b）」。按拆分简报 D：由 SSOT / 细模型**确定性**生成可展示图，挂到 J.38c 已交付的附录 C 投影壳。**吸收口径**：吸收 J.9b / V-07（`renderSchemeDiagrams`）范围；J.9b 从未有卡面，无可继承验收 / `writable_paths`，**不另立 J.9b、禁双开**，合并避免双 SSOT 表述。立卡 ≠ 授权开工；本条只立卡，不写产品代码。
->
-> **修卡说明（2026-11-19 · P-247）**：授权来源为 Tina「修卡授权（仅扩路径）」。J.38d 施工中发现：挂真图后既有 J.38c 壳测 `tests/unit/panorama-projection.test.ts` 断言「有 SSOT → `has_diagram === false` / 无 mermaid」必然反转，该文件不在原五文件 `writable_paths` 内——属图纸与现场不符。**仅**把该文件补进 `writable_paths`（modify）；验收口径不变（空态合法 / 禁假绿 / SSOT 优先 / `forbid_illumination` 保持；`has_diagram`/`diagram` 按契约对齐真图或空态）。**修卡 ≠ 开工**；本条只修卡，不写产品代码；施工须在本修卡合入后再提交。
+> 本卡已 **COMPLETED**（施工 [#312](https://github.com/he18718143986-design/IDE/pull/312) squash `7efb1f7ec1bc05968b330c166c81d0bf19422b41`；修卡 P-247 / [#311](https://github.com/he18718143986-design/IDE/pull/311)；完工回写 P-248）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.38d) §3.4bb。诚实口径：**真图渲染已交付（确定性三图挂 C 壳），J.9b/V-07 债清**；母卡子卡全交付，闭合另拍板。
 
-```yaml task-card
-id: TASK-J.38d
-status: NEW_TASK
-contract:
-  intent:
-    title: 真图渲染 renderSchemeDiagrams（吸收 J.9b / V-07）
-    description: >-
-      按拆分简报 D：由 SchemeDraftV2 / 细模型确定性生成可展示图（业务功能脑图 /
-      用户旅程泳道 / 业务概念图，或 supervisor 既有三 mermaid 目标），挂到
-      J.38c 附录 C 投影壳。吸收历史 J.9b / V-07 范围；J.9b 不另立卡、禁双开。
-      渲染输入用 V2；不得为渲染改写快照 v1 权威。
-    risk_level: MEDIUM
-  acceptance:
-    - id: J38D-P1
-      check: auto
-      text: >-
-        renderSchemeDiagrams（或等价）以 SchemeDraftV2（可选 FineModelLayer）为输入，
-        确定性产出三图（或空态）；不得读取/改写快照内 v1 scheme 作渲染权威。
-    - id: J38D-P2
-      check: auto
-      text: >-
-        图挂到 J.38c 附录 C 投影壳（PanoramaPane 三卡）；空态合法；不得另起第二套视图体系；不得假绿 / 冒充施工点亮。
-    - id: J38D-P3
-      check: auto
-      text: >-
-        无可独立编辑的图存储；图上批注不得直写旁路 SSOT（批注须回写 SSOT 后重投影）；禁双 SSOT；不替换 source/evidence。
-    - id: J38D-P4
-      check: auto
-      text: >-
-        npm run check:docs 与对应 unit/ui 测通过；卡面写明吸收 J.9b/V-07 且不另立 J.9b。
-  scheme_item_ids: []
-  scope:
-    writable_paths:
-      - src/lib/journey/render-scheme-diagrams.ts
-      - src/lib/studio/panorama-projection.ts
-      - src/components/studio/PanoramaPane.tsx
-      - tests/unit/scheme-diagrams.test.ts
-      - tests/ui/studio-lens-shell.test.tsx
-      - tests/unit/panorama-projection.test.ts
-    readonly_paths:
-      - src/lib/journey/scheme-patch-types.ts
-      - src/lib/journey/fine-model-derive.ts
-      - src/lib/studio/lens-routing.ts
-      - docs/specs/supervisor.md
-      - docs/ledger/blueprint-fine-layer-impl-split-brief.md
-      - docs/specs/development-tasks-completed.md
-  verification:
-    commands:
-      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
-      - { alias: docs, executable: npm, args: [run, check:docs] }
-      - { alias: unit-diagrams, executable: npx, args: [vitest, run, tests/unit/scheme-diagrams.test.ts] }
-      - { alias: unit-panorama, executable: npx, args: [vitest, run, tests/unit/panorama-projection.test.ts] }
-      - { alias: ui-lens, executable: npx, args: [vitest, run, tests/ui/studio-lens-shell.test.tsx] }
-design:
-  approach: >-
-    新建 render-scheme-diagrams.ts：由 V2（可选细模型）确定性生成三图字符串/结构；
-    扩展 panorama-projection / PanoramaPane 将真图挂到附录 C 三卡；空态保留合法。
-    吸收 J.9b/V-07；不另立 J.9b。施工中 writable_paths 不够则修卡停工上报。
-  touches:
-    - { path: src/lib/journey/render-scheme-diagrams.ts, change: create, why: 确定性三图渲染纯函数（V-07）, symbols: [renderSchemeDiagrams] }
-    - { path: src/lib/studio/panorama-projection.ts, change: modify, why: 投影壳承接真图/空态字段, symbols: [projectAppendixCShell] }
-    - { path: src/components/studio/PanoramaPane.tsx, change: modify, why: 三卡挂真图展示, symbols: [PanoramaPane] }
-    - { path: tests/unit/scheme-diagrams.test.ts, change: create, why: V-07 三图与 SSOT 对应断言, symbols: [] }
-    - { path: tests/ui/studio-lens-shell.test.tsx, change: modify, why: 真图挂壳 UI 回归, symbols: [] }
-    - { path: tests/unit/panorama-projection.test.ts, change: modify, why: J.38c 壳测对齐 has_diagram/diagram（P-247 修卡）, symbols: [] }
-  interfaces:
-    - { kind: type, name: renderSchemeDiagrams, signature: "(draft: SchemeDraftV2, fine?: FineModelLayer) => { mindmap, swimlane, concept } | 空态", consumers: [] }
-  test_plan:
-    - { acceptance_id: J38D-P1, test_path: tests/unit/scheme-diagrams.test.ts, level: unit, debt: "未施工；V-07 锚定" }
-    - { acceptance_id: J38D-P2, test_path: tests/ui/studio-lens-shell.test.tsx, level: unit, debt: "未施工；挂壳/空态/禁假绿" }
-    - { acceptance_id: J38D-P2, test_path: tests/unit/panorama-projection.test.ts, level: unit, debt: "未施工；壳测 has_diagram/diagram 对齐（P-247）" }
-    - { acceptance_id: J38D-P3, test_path: tests/unit/scheme-diagrams.test.ts, level: unit, debt: "未施工；无独立图存储/批注旁路" }
-    - { acceptance_id: J38D-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "门禁 npm run check:docs；立卡阶段" }
-governance:
-  spec_refs:
-    - docs/ledger/blueprint-fine-layer-impl-split-brief.md
-    - docs/specs/supervisor.md
-    - docs/specs/development-tasks-completed.md
-  depends_on:
-    - { id: TASK-J.38c, kind: hard }
-    - { id: TASK-J.37, kind: hard }
-    - { id: TASK-J.38a, kind: soft }
-    - { id: TASK-J.38, kind: soft }
-  code_facts:
-    - { ref: "docs/ledger/blueprint-fine-layer-impl-split-brief.md:89-99", note: "D 范围/不含/writable 示意；与 J.9b 合并立项禁双开" }
-    - { ref: "docs/specs/supervisor.md:1090", note: "不得另起第二套视图；renderSchemeDiagrams（J.9b/V-07）未交付" }
-    - { ref: "docs/specs/supervisor.md:1752", note: "V-07 锚定 tests/unit/scheme-diagrams.test.ts" }
-    - { ref: "src/lib/studio/panorama-projection.ts::projectAppendixCShell", note: "J.38c 投影壳；本卡挂真图" }
-    - { ref: "src/components/studio/PanoramaPane.tsx::PanoramaPane", note: "附录 C 三卡挂载点" }
-  non_goals:
-    - 不另立 TASK-J.9b；不与 J.9b 双开同范围
-    - 无可独立编辑的图存储；批注不得旁路 SSOT 直写
-    - 不为渲染改写快照 v1 权威；不重开 J.36 三缝
-    - 禁双 SSOT；不替换 source/evidence；吸收标 ai_inferred
-    - 不并入蓝图原文；ChangeOrder/冷静期另立不决
-    - 活发送暂不立；§3.3 不实现；不开工 CI.2；不立 J.41
-    - 不把母卡标 COMPLETED；不宣称端到端闭环
-  fail:
-    - 另立 J.9b 或与本卡范围重叠双开
-    - 另起第二套全景/图体系；假绿 / 冒充施工点亮
-    - 平行持久化图存储或批注旁路 SSOT
-    - 为渲染改写快照 v1 或替换 source/evidence
-    - 擅自扩 writable_paths 而不修卡停工上报
-  estimate: M
-  invariants:
-    auth: unchanged
-    demo_origin: unchanged
-    illumination: unchanged
-    gateway_write_scope: unchanged
-```
-
-* **背景**：J.38c 投影壳已交付；历史 J.9b / V-07 从未立卡面，与 D 同范围。Tina P-246 拍板由本卡吸收，禁双开。
-* **取舍**：真图归本卡；不含可编辑图存储；批注必须回写 SSOT。立卡 ≠ 开工。
 
