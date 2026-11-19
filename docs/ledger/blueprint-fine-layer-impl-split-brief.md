@@ -2,7 +2,7 @@
 
 > **地位**：planning brief（2026-11-17 · Asia/Hong_Kong）。授权来源为 Tina「J.37 关闭后出实现拆分简报」。  
 > **本条只读拆分建议**：过目后逐张立卡；**不施工、不改 ADR、不改产品代码**。  
-> **立卡进度（P-237～P-244）**：母卡 [`TASK-J.38`](../specs/development-tasks-active.md#task-j.38) `[SPLIT]`（**子卡除 D 外全交付**）；[`TASK-J.38a`](../specs/development-tasks-completed.md#task-j.38a) / [`TASK-J.38b`](../specs/development-tasks-completed.md#task-j.38b) / [`TASK-J.38c`](../specs/development-tasks-completed.md#task-j.38c) / [`TASK-J.38e`](../specs/development-tasks-completed.md#task-j.38e) `[COMPLETED]`（E 施工 #307/`6d7faca`；完工回写 P-244）；D 仍待立卡（硬等 J.9b，禁双开；J.9b 仍 Hold 暂不立）。  
+> **立卡进度（P-237～P-246）**：母卡 [`TASK-J.38`](../specs/development-tasks-active.md#task-j.38) `[SPLIT]`（A/B/C/E COMPLETED；**D 已立卡未开工**）；[`TASK-J.38a`](../specs/development-tasks-completed.md#task-j.38a) / [`TASK-J.38b`](../specs/development-tasks-completed.md#task-j.38b) / [`TASK-J.38c`](../specs/development-tasks-completed.md#task-j.38c) / [`TASK-J.38e`](../specs/development-tasks-completed.md#task-j.38e) `[COMPLETED]`；[`TASK-J.38d`](../specs/development-tasks-active.md#task-j.38d) `[NEW_TASK]`（立卡 P-246；**吸收 J.9b / V-07，不另立 J.9b、禁双开**；未开工）。  
 > **前置**：[`TASK-J.37`](../specs/development-tasks-completed.md#task-j.37) 规格口径已 COMPLETED（#294/`2c6c7b4`；P-236）。  
 > **依据**：P-220 [`blueprint-absorption-ruling.md`](./blueprint-absorption-ruling.md) 分歧 2+7；[`blueprint-fine-layer-spec-brief.md`](./blueprint-fine-layer-spec-brief.md)；[`../specs/supervisor.md`](../specs/supervisor.md)「细模型加层 + 视图投影」；[`TASK-C.10q`](../specs/development-tasks-completed.md#task-c.10q) / RFC 附录 C；[`TASK-J.36`](../specs/development-tasks-completed.md#task-j.36) 已交付三缝。
 
@@ -90,7 +90,7 @@ A ──（软）──► E 测试目标建议层
 
 | 项 | 建议 |
 | :--- | :--- |
-| 建议号 | `TASK-J.38d`（可与历史 **J.9b** 合并立项或硬依赖 J.9b，立卡时二选一，禁止双开同范围） |
+| 建议号 | `TASK-J.38d`（**P-246 已立卡**：与历史 **J.9b** 合并吸收，**不另立 J.9b、禁双开**） |
 | 估算初判 | **M** |
 | 范围 | 由 SSOT / 细模型**确定性**生成可展示图（业务功能脑图 / 旅程泳道 / 概念图，或 supervisor 既有三 mermaid 目标）；挂到 C 的投影壳 |
 | 不含 | 可独立编辑的图存储；图上批注直写旁路 SSOT（批注须回写 SSOT 后重投影） |
@@ -124,7 +124,7 @@ A ──（软）──► E 测试目标建议层
 
 1. 是否采纳建议号 `J.38a–e`，或改用其他编号族  
 2. B 对 A：硬依赖还是「首期仅五字段」软依赖  
-3. D 与历史 `TASK-J.9b`：合并 vs 硬依赖（禁止范围重叠双卡）  
+3. D 与历史 `TASK-J.9b`：~~合并 vs 硬依赖~~ → **P-246 已拍板合并吸收**（禁止范围重叠双卡）  
 4. 各卡 `writable_paths` 施工前再核现行行号（中栏组件可能漂移）  
 5. 首张授权开工顺序建议：**A → B**，并行准备 **C**
 

@@ -150,6 +150,7 @@
 | `TASK-J.7` | `COMPLETED` | 交接三步进度与右栏解锁（施工对话过渡态） | [打开](./development-tasks-completed.md#task-j.7) |
 | `TASK-J.8` | `COMPLETED` | JourneyStage 投影与广播 | [打开](./development-tasks-completed.md#task-j.8) |
 | `TASK-J.9` | `COMPLETED` | SchemePatch 零模型确定性合并引擎 | [打开](./development-tasks-completed.md#task-j.9) |
+| `TASK-J.9b` | **已吸收 · 不另立卡** | `renderSchemeDiagrams`（V-07）；**已由 [`TASK-J.38d`](./development-tasks-active.md#task-j.38d) 吸收（P-246），禁双开**；从未有独立卡面 | [见 J.38d](./development-tasks-active.md#task-j.38d) |
 | `TASK-J.10` | `COMPLETED` | 意图编译器生成端与 Daemon 编译循环 | [打开](./development-tasks-completed.md#task-j.10) |
 | `TASK-J.18a` | `COMPLETED` | G-MATCH 纯函数与产出物投影 | [打开](./development-tasks-completed.md#task-j.18a) |
 | `TASK-J.18b` | `COMPLETED` | 合同 scheme_binding 与快照墓地权威源 | [打开](./development-tasks-completed.md#task-j.18b) |
@@ -198,10 +199,11 @@
 | `TASK-J.35` | `COMPLETED` | prompt-builder.ts 对齐台账 / 信任档 / 回链事实（立卡 P-230；施工 #288 `306ff11`；完工回写 P-232；估算 M） | [正文](./development-tasks-completed.md#task-j.35) |
 | `TASK-J.36` | `COMPLETED` | 信任档规格缝补丁（v1/V2 双形 + acceptance.check/notes + 五字段投影 DTO；立卡 P-233；施工 #291 `4dc5617`；完工回写 P-234；估算 S） | [正文](./development-tasks-completed.md#task-j.36) |
 | `TASK-J.37` | `COMPLETED` | 细模型加层 + 视图投影规格卡（五字段映射 + RFC 附录 C 并轨 + 缺口清单；立卡 P-235；施工 #294 `2c6c7b4`；完工回写 P-236；估算 S；只定口径不实现） | [正文](./development-tasks-completed.md#task-j.37) |
-| `TASK-J.38` | `SPLIT` | 细模型加层 + 视图投影实现（拆分母卡；立卡 P-237；估算 L；**子卡除 D 外全交付**；不再作为施工依据；D 待立卡硬等 J.9b） | [正文](./development-tasks-active.md#task-j.38) |
+| `TASK-J.38` | `SPLIT` | 细模型加层 + 视图投影实现（拆分母卡；立卡 P-237；估算 L；A/B/C/E COMPLETED；**D 已立卡未开工**；**J.9b 已由 J.38d 吸收，不另立卡**） | [正文](./development-tasks-active.md#task-j.38) |
 | `TASK-J.38a` | `COMPLETED` | 细模型类型 + V2 派生/回写 SSOT 纯函数（立卡 P-237；施工 #298 `8cabadc`；完工回写 P-238；估算 M） | [正文](./development-tasks-completed.md#task-j.38a) |
 | `TASK-J.38b` | `COMPLETED` | 五字段投影加层接入中栏（立卡 P-239；施工 #301 `cb37efe`；完工回写 P-240；估算 S～M） | [正文](./development-tasks-completed.md#task-j.38b) |
 | `TASK-J.38c` | `COMPLETED` | 附录 C 投影壳并轨（复用 C.10q 三占位；立卡 P-241；施工 #304 `d2e2b83`；完工回写 P-242；估算 M） | [正文](./development-tasks-completed.md#task-j.38c) |
+| `TASK-J.38d` | `NEW_TASK` | 真图渲染 `renderSchemeDiagrams`（立卡 P-246；吸收 J.9b/V-07；估算 M；硬依赖 J.38c/J.37；建议 J.38a；未开工） | [正文](./development-tasks-active.md#task-j.38d) |
 | `TASK-J.38e` | `COMPLETED` | 测试目标建议层（ai_inferred；立卡 P-243；施工 #307 `6d7faca`；完工回写 P-244；估算 S） | [正文](./development-tasks-completed.md#task-j.38e) |
 
 ---
