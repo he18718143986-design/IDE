@@ -1490,9 +1490,11 @@ governance:
 
 <a id="task-j.38d"></a>
 
-#### 【Task J.38d】真图渲染 `renderSchemeDiagrams`（吸收 J.9b / V-07）`[NEW_TASK · 立卡 P-246 · 未开工]`
+#### 【Task J.38d】真图渲染 `renderSchemeDiagrams`（吸收 J.9b / V-07）`[NEW_TASK · 立卡 P-246 · 修卡 P-247 · 未开工]`
 
 > **立卡说明（2026-11-18 · P-246）**：授权来源为 Tina「立卡 J.38d（吸收 J.9b）」。按拆分简报 D：由 SSOT / 细模型**确定性**生成可展示图，挂到 J.38c 已交付的附录 C 投影壳。**吸收口径**：吸收 J.9b / V-07（`renderSchemeDiagrams`）范围；J.9b 从未有卡面，无可继承验收 / `writable_paths`，**不另立 J.9b、禁双开**，合并避免双 SSOT 表述。立卡 ≠ 授权开工；本条只立卡，不写产品代码。
+>
+> **修卡说明（2026-11-19 · P-247）**：授权来源为 Tina「修卡授权（仅扩路径）」。J.38d 施工中发现：挂真图后既有 J.38c 壳测 `tests/unit/panorama-projection.test.ts` 断言「有 SSOT → `has_diagram === false` / 无 mermaid」必然反转，该文件不在原五文件 `writable_paths` 内——属图纸与现场不符。**仅**把该文件补进 `writable_paths`（modify）；验收口径不变（空态合法 / 禁假绿 / SSOT 优先 / `forbid_illumination` 保持；`has_diagram`/`diagram` 按契约对齐真图或空态）。**修卡 ≠ 开工**；本条只修卡，不写产品代码；施工须在本修卡合入后再提交。
 
 ```yaml task-card
 id: TASK-J.38d
@@ -1532,6 +1534,7 @@ contract:
       - src/components/studio/PanoramaPane.tsx
       - tests/unit/scheme-diagrams.test.ts
       - tests/ui/studio-lens-shell.test.tsx
+      - tests/unit/panorama-projection.test.ts
     readonly_paths:
       - src/lib/journey/scheme-patch-types.ts
       - src/lib/journey/fine-model-derive.ts
@@ -1544,6 +1547,7 @@ contract:
       - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
       - { alias: docs, executable: npm, args: [run, check:docs] }
       - { alias: unit-diagrams, executable: npx, args: [vitest, run, tests/unit/scheme-diagrams.test.ts] }
+      - { alias: unit-panorama, executable: npx, args: [vitest, run, tests/unit/panorama-projection.test.ts] }
       - { alias: ui-lens, executable: npx, args: [vitest, run, tests/ui/studio-lens-shell.test.tsx] }
 design:
   approach: >-
@@ -1556,11 +1560,13 @@ design:
     - { path: src/components/studio/PanoramaPane.tsx, change: modify, why: 三卡挂真图展示, symbols: [PanoramaPane] }
     - { path: tests/unit/scheme-diagrams.test.ts, change: create, why: V-07 三图与 SSOT 对应断言, symbols: [] }
     - { path: tests/ui/studio-lens-shell.test.tsx, change: modify, why: 真图挂壳 UI 回归, symbols: [] }
+    - { path: tests/unit/panorama-projection.test.ts, change: modify, why: J.38c 壳测对齐 has_diagram/diagram（P-247 修卡）, symbols: [] }
   interfaces:
     - { kind: type, name: renderSchemeDiagrams, signature: "(draft: SchemeDraftV2, fine?: FineModelLayer) => { mindmap, swimlane, concept } | 空态", consumers: [] }
   test_plan:
     - { acceptance_id: J38D-P1, test_path: tests/unit/scheme-diagrams.test.ts, level: unit, debt: "未施工；V-07 锚定" }
     - { acceptance_id: J38D-P2, test_path: tests/ui/studio-lens-shell.test.tsx, level: unit, debt: "未施工；挂壳/空态/禁假绿" }
+    - { acceptance_id: J38D-P2, test_path: tests/unit/panorama-projection.test.ts, level: unit, debt: "未施工；壳测 has_diagram/diagram 对齐（P-247）" }
     - { acceptance_id: J38D-P3, test_path: tests/unit/scheme-diagrams.test.ts, level: unit, debt: "未施工；无独立图存储/批注旁路" }
     - { acceptance_id: J38D-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "门禁 npm run check:docs；立卡阶段" }
 governance:
