@@ -47,7 +47,7 @@ function isFineAligned(
 function label(raw: string, max = 48): string {
   const cleaned = raw
     .replace(/[\r\n\t]+/g, " ")
-    .replace(/["\[\]]/g, "")
+    .replace(/["[\]]/g, "")
     .trim()
     .replace(/\s+/g, " ");
   if (cleaned.length <= max) return cleaned || "（未命名）";
@@ -107,7 +107,9 @@ function renderSwimlane(
       let prev: string | null = null;
       for (const [si, step] of f.steps.entries()) {
         const sid = `${flowNode}_s${si}`;
-        const text = label(`${step.actor.trim() || "角色"}：${step.action || "（动作）"}`);
+        const text = label(
+          `${step.actor.trim() || "角色"}：${step.action || "（动作）"}`,
+        );
         lines.push(`    ${sid}["${text}"]`);
         if (prev) lines.push(`    ${prev} --> ${sid}`);
         prev = sid;

@@ -179,15 +179,15 @@ describe("StudioLensShell / PanoramaPane (TASK-C.10q)", () => {
     expect(screen.getByTestId("panorama-card-capability")).toHaveTextContent(
       "能力甲",
     );
-    expect(screen.getByTestId("panorama-card-capability-diagram")).toHaveTextContent(
-      /mindmap/,
-    );
-    expect(screen.getByTestId("panorama-card-journey-diagram")).toHaveTextContent(
-      /flowchart TB/,
-    );
-    expect(screen.getByTestId("panorama-card-domain-diagram")).toHaveTextContent(
-      /erDiagram/,
-    );
+    expect(
+      screen.getByTestId("panorama-card-capability-diagram"),
+    ).toHaveTextContent(/mindmap/);
+    expect(
+      screen.getByTestId("panorama-card-journey-diagram"),
+    ).toHaveTextContent(/flowchart TB/);
+    expect(
+      screen.getByTestId("panorama-card-domain-diagram"),
+    ).toHaveTextContent(/erDiagram/);
     expect(screen.getByTestId("panorama-card-journey")).toHaveTextContent(
       "旅程甲",
     );

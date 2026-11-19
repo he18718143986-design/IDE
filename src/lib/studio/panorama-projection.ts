@@ -200,11 +200,16 @@ export function assertAppendixCShellContract(
     if (card.forbid_illumination !== true) {
       throw new Error(`card ${card.id} must forbid illumination`);
     }
-    if (card.has_diagram && (card.diagram == null || card.diagram.trim() === "")) {
+    if (
+      card.has_diagram &&
+      (card.diagram == null || card.diagram.trim() === "")
+    ) {
       throw new Error(`card ${card.id} claims diagram but diagram is empty`);
     }
     if (!card.has_diagram && card.diagram != null) {
-      throw new Error(`card ${card.id} must not carry diagram when has_diagram=false`);
+      throw new Error(
+        `card ${card.id} must not carry diagram when has_diagram=false`,
+      );
     }
     if (
       "illumination" in (card as object) ||
