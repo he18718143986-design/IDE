@@ -1,5 +1,5 @@
 /**
- * TASK-J.38c：附录 C 投影壳（空态 / SSOT 优先 / 禁假绿）。
+ * TASK-J.38c / J.38d：附录 C 投影壳（空态 / SSOT 优先 / 真图挂接 / 禁假绿）。
  */
 import { describe, expect, it } from "vitest";
 import { emptySchemeDraftV2 } from "../../daemon/supervisor/intent-compiler/scheme-ledger-store";
@@ -33,10 +33,12 @@ describe("TASK-J.38c · projectAppendixCShell", () => {
     const shell = projectAppendixCShell({});
     expect(shell.forbid_illumination).toBe(true);
     expect(shell.fine_layer_aligned).toBe(false);
+    expect(shell.has_any_diagram).toBe(false);
     expect(shell.cards).toHaveLength(3);
     for (const card of shell.cards) {
       expect(card.empty).toBe(true);
       expect(card.has_diagram).toBe(false);
+      expect(card.diagram).toBeNull();
       expect(card.forbid_illumination).toBe(true);
       expect(card.source_declaration).toBe("ssot:none");
       expect(card.body).toMatch(/暂无投影数据（空态合法）/);
@@ -47,7 +49,7 @@ describe("TASK-J.38c · projectAppendixCShell", () => {
     assertAppendixCShellContract(shell);
   });
 
-  it("有 SSOT 条目 → 摘要来自 modules/flows/entities，无 mermaid", () => {
+  it("有 SSOT 条目 → 摘要来自 modules/flows/entities，并挂确定性真图", () => {
     const draft = emptySchemeDraftV2({
       scheme_id: "s1",
       scheme_revision: 2,
@@ -74,8 +76,13 @@ describe("TASK-J.38c · projectAppendixCShell", () => {
     expect(shell.cards[1]?.summary_lines).toEqual(["业主开项目"]);
     expect(shell.cards[2]?.summary_lines).toEqual(["合同"]);
     expect(shell.cards.every((c) => c.empty === false)).toBe(true);
-    expect(shell.cards.every((c) => c.has_diagram === false)).toBe(true);
-    expect(shell.cards[0]?.body).not.toMatch(/```|mermaid|graph\s/i);
+    expect(shell.has_any_diagram).toBe(true);
+    expect(shell.cards[0]?.has_diagram).toBe(true);
+    expect(shell.cards[0]?.diagram).toMatch(/^mindmap\n/);
+    expect(shell.cards[0]?.diagram).toContain("登录");
+    expect(shell.cards[1]?.diagram).toMatch(/^flowchart TB\n/);
+    expect(shell.cards[2]?.diagram).toMatch(/^erDiagram\n/);
+    expect(shell.cards.every((c) => c.forbid_illumination === true)).toBe(true);
     assertAppendixCShellContract(shell);
   });
 
