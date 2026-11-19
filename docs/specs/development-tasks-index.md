@@ -203,7 +203,7 @@
 | `TASK-J.38a` | `COMPLETED` | 细模型类型 + V2 派生/回写 SSOT 纯函数（立卡 P-237；施工 #298 `8cabadc`；完工回写 P-238；估算 M） | [正文](./development-tasks-completed.md#task-j.38a) |
 | `TASK-J.38b` | `COMPLETED` | 五字段投影加层接入中栏（立卡 P-239；施工 #301 `cb37efe`；完工回写 P-240；估算 S～M） | [正文](./development-tasks-completed.md#task-j.38b) |
 | `TASK-J.38c` | `COMPLETED` | 附录 C 投影壳并轨（复用 C.10q 三占位；立卡 P-241；施工 #304 `d2e2b83`；完工回写 P-242；估算 M） | [正文](./development-tasks-completed.md#task-j.38c) |
-| `TASK-J.38d` | `NEW_TASK` | 真图渲染 `renderSchemeDiagrams`（立卡 P-246；吸收 J.9b/V-07；估算 M；硬依赖 J.38c/J.37；建议 J.38a；未开工） | [正文](./development-tasks-active.md#task-j.38d) |
+| `TASK-J.38d` | `NEW_TASK` | 真图渲染 `renderSchemeDiagrams`（立卡 P-246；修卡 P-247 扩 writable_paths；吸收 J.9b/V-07；估算 M；硬依赖 J.38c/J.37；建议 J.38a；未开工） | [正文](./development-tasks-active.md#task-j.38d) |
 | `TASK-J.38e` | `COMPLETED` | 测试目标建议层（ai_inferred；立卡 P-243；施工 #307 `6d7faca`；完工回写 P-244；估算 S） | [正文](./development-tasks-completed.md#task-j.38e) |
 
 ---
