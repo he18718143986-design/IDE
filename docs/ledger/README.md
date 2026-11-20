@@ -24,7 +24,7 @@
 
 ## 蓝图存档（目标态未激活 · TASK-J.41a）
 
-与上面的流水台账分开。四份都是 `status: draft` / 目标态未激活：描述 Stagent 未来给用户项目用的治理能力，不是本仓施工规范；不进 `docs/specs/`、不作施工依据。任何条款不得直接覆盖现行 docs/；吸收只能经 J.41b 逐条反哺。
+与上面的流水台账分开。四份都是 `status: draft` / 目标态未激活：描述 Stagent 未来给用户项目用的治理能力，不是本仓施工规范；不进 `docs/specs/`、不作施工依据。任何条款不得直接覆盖现行 docs/；吸收只能经任务卡逐条反哺。J.41b 第一批已交付（施工 [#318](https://github.com/he18718143986-design/IDE/pull/318)/`6f2ec65`，完工回写 P-252）：文档口径五条、白话哈希存证、`escalation_missed` 记录、五类↔八类对照表。R23 / R18 拍板项未施工。蓝图仍未激活。
 
 **编号分家**：蓝图内 Q-n/S-n 为产品拍板编号，与 [`../specs/scheme-patch-engine.md`](../specs/scheme-patch-engine.md) 的引擎测试锚点 Q-n 编号无关（Q-14/Q-15 两侧语义不同）。不改蓝图正文编号。
 
