@@ -21,6 +21,19 @@
 | [`prompt-builder-live-send-path-brief.md`](./prompt-builder-live-send-path-brief.md) | prompt-builder 活发送路径只读定位（P-233）：J.35 已对齐但生产零调用；四缝事实 + 接线前置 | planning brief；**不立**接线卡；不施工 |
 | [`ci2-sample-assessment-brief.md`](./ci2-sample-assessment-brief.md) | CI.2 只读样本量评估（P-245）：三门禁样本表 + 中位数 + 排除口径；结论「不够整卡放宽开工」 | evidence brief；**Hold 不开工**；下次评估触发见简报 §2 |
 
+## 蓝图存档（目标态未激活 · TASK-J.41a）
+
+与上面的流水台账分开。四份都是 `status: draft` / 目标态未激活：描述 Stagent 未来给用户项目用的治理能力，不是本仓施工规范；不进 `docs/specs/`、不作施工依据。任何条款不得直接覆盖现行 docs/；吸收只能经 J.41b 逐条反哺。
+
+**编号分家**：蓝图内 Q-n/S-n 为产品拍板编号，与 [`../specs/scheme-patch-engine.md`](../specs/scheme-patch-engine.md) 的引擎测试锚点 Q-n 编号无关（Q-14/Q-15 两侧语义不同）。不改蓝图正文编号。
+
+| 文件 | 内容 |
+| :--- | :--- |
+| [`target-doc-system-spec.md`](./target-doc-system-spec.md) | v3 终稿。合同单位 = 方案（Q-14）；AI 技术顾问（Q-15）；单方案串行；§8 多需求并行默认关闭 |
+| [`target-doc-system-stress-test.md`](./target-doc-system-stress-test.md) | R17–R23 落点索引。T-1～T-7 与 DEF-1～7 的情节未随终稿粘贴，存档不补写 |
+| [`target-vs-current-gap-brief.md`](./target-vs-current-gap-brief.md) | 合同单位差异、四态标记差异、六件可反哺机制三栏表 |
+| [`target-vs-current-analysis.md`](./target-vs-current-analysis.md) | 区别分析：同源但平行；`.stagent/` 运行时层对照；编号撞车 |
+
 ## 文档治理挂账（2026-10-29 新增）
 
 2026-10-29 通读 `docs/` 时挂账。**第 0 波**已 RESOLVED：DOC-3 / DOC-4 / DOC-11（#40）。**第 1 波（SSOT / 代码对齐，2026-11-01）**已 RESOLVED：DOC-2 / DOC-5 / DOC-6 / DOC-7 / DOC-8 / DOC-9 / DOC-10（见各行；[#41](https://github.com/he18718143986-design/IDE/pull/41)）。**第 2 波（DOC-1 拆卡，2026-11-01）**已 RESOLVED：DOC-1（见下行；#42）。
