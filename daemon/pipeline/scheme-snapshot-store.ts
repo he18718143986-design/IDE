@@ -337,6 +337,12 @@ export interface SchemeSnapshot {
    * 覆盖与否密封时当场计算。计入 digest。旧快照没有此段。
    */
   item_quote_backlinks?: ItemQuoteBacklinks;
+  /**
+   * TASK-J.41b：确认前已展示白话正文的 sha256(utf8)。
+   * 以 1.2 追加段落地、不升 schema_version，字段存在时计入 digest。
+   * 旧快照没有此段。
+   */
+  shown_plain_text_sha256?: string;
 }
 
 export class SchemeSnapshotConflictError extends Error {
@@ -417,6 +423,8 @@ export function schemeSnapshotDigest(input: {
   trust_tier?: TrustTier;
   /** TASK-J.32a：纳入回链输入摘要；缺省不参与。 */
   item_quote_backlinks?: ItemQuoteBacklinks;
+  /** TASK-J.41b：确认前白话正文哈希；缺省（旧快照）不参与。 */
+  shown_plain_text_sha256?: string;
 }): string {
   const payload = stableStringify({
     scheme_revision: input.scheme_revision,
@@ -439,11 +447,29 @@ export function schemeSnapshotDigest(input: {
           ),
         }
       : {}),
+    ...(input.shown_plain_text_sha256 !== undefined
+      ? { shown_plain_text_sha256: input.shown_plain_text_sha256 }
+      : {}),
   });
   return createHash("sha256").update(payload).digest("hex");
 }
 
 const SHA256_HEX = /^[0-9a-f]{64}$/;
+
+/** 冻结请求里的白话正文哈希。缺省表示旧客户端，不写入快照。非法则整单拒绝。 */
+export function parseShownPlainTextSha256(
+  raw: unknown,
+): { ok: true; value: string | undefined } | { ok: false } {
+  if (raw === undefined || raw === null) return { ok: true, value: undefined };
+  if (typeof raw !== "string" || !SHA256_HEX.test(raw)) return { ok: false };
+  return { ok: true, value: raw };
+}
+
+function shownPlainTextDigestField(hash: string | undefined): {
+  shown_plain_text_sha256?: string;
+} {
+  return hash === undefined ? {} : { shown_plain_text_sha256: hash };
+}
 const TURN_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
 /** 解析冻结请求里的原话清单（只含 id 与哈希）；任一条不合法即整体失败，不做部分采纳。 */
@@ -613,6 +639,7 @@ export function verifyFrozenQuotes(
     ...(snapshot.item_quote_backlinks === undefined
       ? {}
       : { item_quote_backlinks: snapshot.item_quote_backlinks }),
+    ...shownPlainTextDigestField(snapshot.shown_plain_text_sha256),
   });
   if (recomputed !== snapshot.digest) {
     return { ok: false, reason: "digest_mismatch" };
@@ -678,6 +705,7 @@ export function verifyItemQuoteBacklinks(
       ? {}
       : { trust_tier: snapshot.trust_tier }),
     item_quote_backlinks: backlinks,
+    ...shownPlainTextDigestField(snapshot.shown_plain_text_sha256),
   });
   if (recomputed !== snapshot.digest) {
     return { ok: false, reason: "digest_mismatch" };
@@ -761,6 +789,7 @@ export function readSchemeSnapshot(
         quotes_digest: _dropQd,
         trust_tier: _dropTt,
         item_quote_backlinks: _dropBl,
+        shown_plain_text_sha256: _dropShown,
         ...rest
       } = parsed;
       return rest;
@@ -774,6 +803,7 @@ export function readSchemeSnapshot(
         quotes_digest: _dropQd,
         trust_tier: _dropTt,
         item_quote_backlinks: _dropBl,
+        shown_plain_text_sha256: _dropShown,
         ...rest
       } = parsed;
       return rest;
@@ -808,6 +838,8 @@ export function writeSchemeSnapshot(
     trust_tier?: TrustTier;
     /** TASK-J.32a：方案项回链输入；缺省即不写该段。 */
     item_quote_backlinks?: ItemQuoteBacklinks;
+    /** TASK-J.41b：确认前白话正文哈希；缺省即不写该段。 */
+    shown_plain_text_sha256?: string;
     now?: () => Date;
   },
 ): { snapshot: SchemeSnapshot; idempotent: boolean } {
@@ -827,6 +859,7 @@ export function writeSchemeSnapshot(
     ...(input.item_quote_backlinks === undefined
       ? {}
       : { item_quote_backlinks: input.item_quote_backlinks }),
+    ...shownPlainTextDigestField(input.shown_plain_text_sha256),
   });
   const existing = readSchemeSnapshot(repoRoot, confirmationId);
   if (existing) {
@@ -864,6 +897,7 @@ export function writeSchemeSnapshot(
     ...(input.item_quote_backlinks === undefined
       ? {}
       : { item_quote_backlinks: input.item_quote_backlinks }),
+    ...shownPlainTextDigestField(input.shown_plain_text_sha256),
   };
   writeJsonAtomic(schemeSnapshotPath(repoRoot, confirmationId), snapshot);
   return { snapshot, idempotent: false };

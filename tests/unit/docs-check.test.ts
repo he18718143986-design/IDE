@@ -772,3 +772,44 @@ describe("卡文案规范（TASK-J.33）", () => {
     ]);
   });
 });
+
+describe("TASK-J.41b 文档五条与对照表", () => {
+  const repoRoot = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "../..",
+  );
+  const read = (rel: string) =>
+    fs.readFileSync(path.join(repoRoot, rel), "utf8");
+
+  it("样板与工厂分开，规格索引不再写待施工，术语与档案说明在", () => {
+    const readme = read("docs/README.md");
+    expect(readme).toContain("样板只有三份");
+    expect(readme).toContain("不是用户合同");
+    const specs = read("docs/specs/README.md");
+    expect(specs).not.toContain("设计定稿 · 待施工");
+    expect(specs).toContain("总装图以");
+    expect(read("docs/glossary.md")).toContain(
+      "方案是用户看见的整件事，合同是系统里单独验收的一段",
+    );
+    expect(read("docs/specs/development-tasks-index.md")).toContain(
+      "不参与「现行条款以谁为准」",
+    );
+    expect(read("docs/user-journey.md")).toContain("确认开工");
+  });
+
+  it("ledger 只留开放项，changelog 仍在，对照表不改五类正文", () => {
+    const ledger = read("docs/ledger/README.md");
+    expect(ledger).toContain("## 开放项");
+    expect(ledger).toContain("GAP-R22");
+    expect(ledger).not.toContain("## 文档治理挂账");
+    const changelog = read("docs/specs/development-tasks-changelog.md");
+    expect(changelog).toContain("P-251");
+    expect(changelog.length).toBeGreaterThan(1000);
+    const cross = read("docs/ledger/decision-class-crosswalk.md");
+    expect(cross).toContain("irreversible");
+    expect(cross).toContain("规则自修改");
+    const tech = read("docs/specs/technical-design-and-knowledge.md");
+    expect(tech).toContain("只有下面五类");
+    expect(tech).not.toContain("规则自修改");
+  });
+});

@@ -224,6 +224,55 @@ export function defaultDesignNoteGenerator(
   return { note };
 }
 
+export interface EscalationMissedDecision {
+  class: string;
+  detail: string;
+  decision_id?: string;
+}
+
+export interface EscalationMissedRecord {
+  contract_id: string;
+  decisions: EscalationMissedDecision[];
+  discovered_at: string;
+  pending_resume: boolean;
+}
+
+export function escalationMissedPath(
+  repoRoot: string,
+  contractId: string,
+): string {
+  return path.join(recordsDir(repoRoot, contractId), "escalation-missed.json");
+}
+
+function writeEscalationMissed(
+  repoRoot: string,
+  contractId: string,
+  missed: readonly { class: string; detail: string; decision_id?: string }[],
+  pendingResume: boolean,
+  discoveredAt: string,
+): void {
+  if (missed.length === 0) return;
+  const dir = recordsDir(repoRoot, contractId);
+  fs.mkdirSync(dir, { recursive: true });
+  const record: EscalationMissedRecord = {
+    contract_id: contractId,
+    decisions: missed.map((item) => ({
+      class: item.class,
+      detail: item.detail,
+      ...(item.decision_id === undefined
+        ? {}
+        : { decision_id: item.decision_id }),
+    })),
+    discovered_at: discoveredAt,
+    pending_resume: pendingResume,
+  };
+  fs.writeFileSync(
+    escalationMissedPath(repoRoot, contractId),
+    `${JSON.stringify(record, null, 2)}\n`,
+    "utf8",
+  );
+}
+
 function writeDesignArtifacts(
   repoRoot: string,
   note: DesignNote,
@@ -359,8 +408,16 @@ export async function runDesignStep(
   }
 
   const detected = detectEscalations(note, protectionList, paidSdkList);
+  const discoveredAt = new Date().toISOString();
   // DN-6：任何 escalation（含二次判定补上的）→ 挂起等用户点头
   if (detected.escalations.length > 0) {
+    writeEscalationMissed(
+      repoRoot,
+      contract.contract_id,
+      detected.escalation_missed,
+      true,
+      discoveredAt,
+    );
     const suspensionPath = writeSuspension(repoRoot, contract.contract_id, {
       reason: "DESIGN_ESCALATION",
       phase: "design",
@@ -381,6 +438,13 @@ export async function runDesignStep(
     };
   }
 
+  writeEscalationMissed(
+    repoRoot,
+    contract.contract_id,
+    detected.escalation_missed,
+    false,
+    discoveredAt,
+  );
   const paths = writeDesignArtifacts(repoRoot, note);
   return {
     status: "ok",

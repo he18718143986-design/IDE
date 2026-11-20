@@ -1,6 +1,6 @@
 # 研发任务卡号索引
 
-> DOC-1：卡号 → 状态 → 一句话 → 正文链接。权威状态以卡头 / 卡内「任务状态」为准；矩阵见 [`development-tasks.md`](./development-tasks.md) §1。
+> DOC-1：卡号 → 状态 → 一句话 → 正文链接。权威状态以卡头 / 卡内「任务状态」为准；矩阵见 [`development-tasks.md`](./development-tasks.md) §1。[`development-tasks-completed.md`](./development-tasks-completed.md) 是档案，不参与「现行条款以谁为准」。
 > 无独立 `#### 【Task …】` 正文的历史卡（如 `TASK-0.1`、`TASK-A.1`～`A.6`、`TASK-S.6b`）仍列入本索引，链到枢纽矩阵 / 修订流水，避免「卡不存在」误读。
 
 | 卡号 | 状态 | 一句话 | 正文 |
