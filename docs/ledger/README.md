@@ -34,6 +34,15 @@
 | [`target-vs-current-gap-brief.md`](./target-vs-current-gap-brief.md) | 合同单位差异、四态标记差异、六件可反哺机制三栏表 |
 | [`target-vs-current-analysis.md`](./target-vs-current-analysis.md) | 区别分析：同源但平行；`.stagent/` 运行时层对照；编号撞车 |
 
+### 存档待补（不挡 #315 合入）
+
+两条都是终稿粘贴时的原文缺口，不是仓库侧读错。补写从 Claude 会话取回，或由业主直接补；补完另开 docs PR 更新存档文件，不改已合入的 v3 正文编号。
+
+| 编号 | 记录 | 补法 |
+| :--- | :--- | :--- |
+| GAP-R22 | spec v3 缺 R22 正文，待补。Q-11 接受 R17–R23，终稿没有 R22 单独条款。待补内容为：验收后翻案（accepted 永不重开）、新 REQ 带 `amends:`、事因三分类。 | 回 Claude 会话或业主直接补，再走 docs PR |
+| GAP-STRESS | `target-doc-system-stress-test.md` 只有 R17–R23 落点索引。T-1～T-7 情节与 DEF-1～7 推演过程未随终稿粘贴。 | 从 Claude 会话取回原文后补入该存档文件 |
+
 ## 文档治理挂账（2026-10-29 新增）
 
 2026-10-29 通读 `docs/` 时挂账。**第 0 波**已 RESOLVED：DOC-3 / DOC-4 / DOC-11（#40）。**第 1 波（SSOT / 代码对齐，2026-11-01）**已 RESOLVED：DOC-2 / DOC-5 / DOC-6 / DOC-7 / DOC-8 / DOC-9 / DOC-10（见各行；[#41](https://github.com/he18718143986-design/IDE/pull/41)）。**第 2 波（DOC-1 拆卡，2026-11-01）**已 RESOLVED：DOC-1（见下行；#42）。
