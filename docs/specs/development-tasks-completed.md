@@ -9227,3 +9227,196 @@ governance:
 
 * **背景**：J.38c 投影壳已交付；历史 J.9b / V-07 从未立卡面，与 D 同范围；P-246 吸收；P-247 修卡扩壳测。
 * **取舍**：真图渲染已交付（确定性三图挂 C 壳），J.9b/V-07 债清；母卡子卡全交付，闭合另拍板。
+
+### 3.4bc 目标态可反哺项第一批（J.41b · 完工回写 P-252）
+
+<a id="task-j.41b"></a>
+
+### 【Task J.41b】目标态可反哺项第一批（文档口径 + 两条存证）`[COMPLETED · 立卡 P-251 · 施工 #318 · 完工回写 P-252]`
+
+> **立卡说明（2026-11-20 · P-251）**：Tina 审过卡面后授权立卡。范围八条：文档口径五条、白话正文哈希计入冻结快照 digest、`escalation_missed` 记录、五类↔八类对照表。R23 / R18 写入卡面不施工。
+
+> **归档注记（2026-11-21 · P-252）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266/#288/#291/#298/#301/#304/#307/#312）。[#318](https://github.com/he18718143986-design/IDE/pull/318) squash `6f2ec657101983d0f263f0a80f8d0225244fa4c6` 于 2026-11-21 00:11:28 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `390429e34f3c9a62cf47b3dd06d60eba144a6858`；父提交 `fc44b98cf65ee75f27fd21f3eec8aaf14db4622d`）。合入前必需面全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit；macOS Unit SUCCESS，本卡改过的冻结 / digest / `design-note` 路径在 macOS 与 ubuntu 均通过），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非阻断存量失败，`continue-on-error`；`spawn EINVAL` / `EFTYPE` 落在 `app-preview-runner` / `cli-host-claude-code` / `deps-reuse` / `diff-files` / `merger` / `worktree-manager` / `golden-slice` / `ipc-stream` / `playtest-gate-execution`；本卡 `shown-text-digest` / `design-note` / `docs-check` / `scheme-snapshot-frozen-quotes` 不在失败名单）；Bugbot NEUTRAL 不挡合入。估算仍为 M。修卡未触发：未扩 `writable_paths`。诚实口径：**可反哺项第一批已交付（文档口径五条 + 白话哈希存证 + escalation_missed 记录 + 五类↔八类对照表），R23/R18 拍板项未施工**。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。GAP-R22 与 GAP-STRESS 仍待原文。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.41b
+status: COMPLETED
+contract:
+  intent:
+    title: 目标态可反哺项第一批（文档口径 + 两条存证）
+    description: >-
+      从已存档的目标态蓝图里吸收八条，不替换现行合同单位。
+      文档五条：样板与工厂分开、台账 README 只留开放项、规格索引改成指针、
+      术语表写明方案与合同的差别、已完成卡标成档案。
+      两条存证：确认前展示的白话正文哈希计入冻结快照 digest；
+      escalation_missed 落一条记录。
+      另落五类与八类的对照表，不改现行五类。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J41B-P1
+      check: auto
+      text: >-
+        docs/README.md 写明样板只有 scheme.md、user-journey.md、glossary.md；
+        adr/、specs/ 与任务卡是造这个产品的工厂，不是用户合同。
+    - id: J41B-P2
+      check: auto
+      text: >-
+        docs/ledger/README.md 正文只留开放项。历史 P-流水留在 development-tasks-changelog.md，
+        不从 changelog 删除原文。
+    - id: J41B-P3
+      check: auto
+      text: >-
+        docs/specs/README.md 第 18 行不再写「设计定稿 · 待施工」。
+        改成指针：能力以任务卡状态和证据为准，总装图以 delivery-lifecycle.md 为准。
+    - id: J41B-P4
+      check: auto
+      text: >-
+        glossary.md 的「合同」条写明：方案是用户看见的整件事，合同是系统里单独验收的一段。
+        user-journey.md 仍按每份工作各点一次开工、一次合入来写，按钮文案不改。
+    - id: J41B-P5
+      check: auto
+      text: >-
+        development-tasks-index.md 的阅读说明写明 development-tasks-completed.md 是档案，
+        不参与「现行条款以谁为准」。
+    - id: J41B-P6
+      check: auto
+      text: >-
+        确认前实际展示的白话正文做 sha256，写入冻结快照并计入 schemeSnapshotDigest。
+        缺这段的旧快照仍可校验。不新增顾问 Agent。右栏不设系统提示。
+        surface_log 仍在 .stagent/records/surface-log。
+    - id: J41B-P7
+      check: auto
+      text: >-
+        escalation_missed 非空时落一条记录，字段为合同、决策、发现时间、是否已停在 PENDING_RESUME。
+        不上 R19 的回滚、披露、追认。
+    - id: J41B-P8
+      check: auto
+      text: >-
+        docs/ledger/decision-class-crosswalk.md 对照现行五类与目标态八类。
+        technical-design-and-knowledge.md §3 的五类原文不改，八类不写入规格正文。
+    - id: J41B-P9
+      check: auto
+      text: >-
+        施工 diff 不改 scheme-patch-engine 的 user_said / user_confirmed 不降级规则，
+        不改 deadlock-resilience.ts 里 D-3 把 PENDING_RESUME 推回 PREPARING 的方向。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - docs/README.md
+      - docs/ledger/README.md
+      - docs/specs/README.md
+      - docs/glossary.md
+      - docs/specs/development-tasks-index.md
+      - docs/ledger/decision-class-crosswalk.md
+      - daemon/pipeline/scheme-snapshot-store.ts
+      - daemon/server.ts
+      - src/lib/daemon-api.ts
+      - src/routes/index.tsx
+      - src/components/studio/SchemeReviewPane.tsx
+      - src/components/studio/ScopeAcceptanceBlock.tsx
+      - daemon/supervisor/design/design-step.ts
+      - tests/unit/scheme-snapshot-frozen-quotes.test.ts
+      - tests/unit/design-note.test.ts
+      - tests/unit/shown-text-digest.test.ts
+      - tests/unit/docs-check.test.ts
+    readonly_paths:
+      - docs/user-journey.md
+      - docs/specs/technical-design-and-knowledge.md
+      - docs/ledger/target-doc-system-spec.md
+      - docs/ledger/target-vs-current-gap-brief.md
+      - docs/specs/scheme-patch-engine.md
+      - daemon/state/deadlock-resilience.ts
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/scheme-snapshot-frozen-quotes.test.ts, tests/unit/shown-text-digest.test.ts, tests/unit/design-note.test.ts, tests/unit/docs-check.test.ts] }
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    文档五条只改口径，不改 ADR。白话哈希接在 schemeSnapshotDigest 与 handleSchemeSnapshot：
+    确认请求带上已展示正文的 sha256，缺省的旧快照不参与 digest。
+    escalation_missed 由 runDesignStep 在现有检测之后写记录，不新增回滚流程。
+    对照表新建 decision-class-crosswalk.md。
+    daemon/server.ts 与 src/routes/index.tsx 只许改冻结入参这一处，不许拆路由或拆 Console。
+    路径不够时停工，按修卡上报，不自行扩面。
+  touches:
+    - { path: docs/README.md, change: modify, why: 样板与工厂分开, symbols: [] }
+    - { path: docs/ledger/README.md, change: modify, why: 正文只留开放项，历史流水不从 changelog 删除, symbols: [] }
+    - { path: docs/specs/README.md, change: modify, why: 第 18 行改成任务卡与总装图指针, symbols: [] }
+    - { path: docs/glossary.md, change: modify, why: 合同条写明方案与合同的差别, symbols: [] }
+    - { path: docs/specs/development-tasks-index.md, change: modify, why: 阅读说明标已完成卡为档案, symbols: [] }
+    - { path: docs/ledger/decision-class-crosswalk.md, change: create, why: 五类与八类对照，不改现行五类, symbols: [] }
+    - { path: daemon/pipeline/scheme-snapshot-store.ts, change: modify, why: schemeSnapshotDigest 计入已展示白话正文哈希, symbols: [schemeSnapshotDigest] }
+    - { path: daemon/server.ts, change: modify, why: handleSchemeSnapshot 接收并封存该哈希，不拆路由, symbols: [handleSchemeSnapshot] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: freezeSchemeSnapshot 增加已展示正文哈希字段, symbols: [freezeSchemeSnapshot] }
+    - { path: src/routes/index.tsx, change: modify, why: 确认调用传入已展示正文，不拆 Console, symbols: [] }
+    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 确认前决议区白话正文可被哈希, symbols: [SCHEME_DECISIONS_PLAIN_TEXT_VERSION] }
+    - { path: src/components/studio/ScopeAcceptanceBlock.tsx, change: modify, why: 确认前范围白话正文可被哈希, symbols: [SCOPE_ACCEPTANCE_PLAIN_TEXT_VERSION] }
+    - { path: daemon/supervisor/design/design-step.ts, change: modify, why: escalation_missed 落记录, symbols: [runDesignStep] }
+    - { path: tests/unit/scheme-snapshot-frozen-quotes.test.ts, change: modify, why: 旧快照无白话哈希段仍可校验, symbols: [] }
+    - { path: tests/unit/shown-text-digest.test.ts, change: create, why: 白话正文哈希计入 digest, symbols: [] }
+    - { path: tests/unit/design-note.test.ts, change: modify, why: 漏标记录含合同、决策、时间、是否停在 PENDING_RESUME, symbols: [] }
+    - { path: tests/unit/docs-check.test.ts, change: modify, why: 文档五条与对照表的门禁, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J41B-P1, test_path: tests/unit/docs-check.test.ts, level: unit, case: "样板与工厂分开" }
+    - { acceptance_id: J41B-P2, test_path: tests/unit/docs-check.test.ts, level: unit, case: "ledger 只留开放项" }
+    - { acceptance_id: J41B-P3, test_path: tests/unit/docs-check.test.ts, level: unit, case: "规格索引不再写待施工" }
+    - { acceptance_id: J41B-P4, test_path: tests/unit/docs-check.test.ts, level: unit, case: "术语与档案说明在" }
+    - { acceptance_id: J41B-P5, test_path: tests/unit/docs-check.test.ts, level: unit, case: "术语与档案说明在" }
+    - { acceptance_id: J41B-P6, test_path: tests/unit/shown-text-digest.test.ts, level: unit, case: "字段缺省时 digest" }
+    - { acceptance_id: J41B-P6, test_path: tests/unit/scheme-snapshot-frozen-quotes.test.ts, level: unit, debt: "旧快照缺省由 shown-text-digest 断言；本文件保持既有旧快照用例" }
+    - { acceptance_id: J41B-P7, test_path: tests/unit/design-note.test.ts, level: unit, case: "J41B-P7" }
+    - { acceptance_id: J41B-P8, test_path: tests/unit/docs-check.test.ts, level: unit, case: "对照表不改五类正文" }
+    - { acceptance_id: J41B-P9, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "以 #318 施工 diff 核对不改引擎与 D-3；无单独用例标题" }
+governance:
+  spec_refs:
+    - docs/ledger/target-doc-system-spec.md
+    - docs/ledger/target-vs-current-gap-brief.md
+    - docs/specs/technical-design-and-knowledge.md
+    - docs/specs/delivery-lifecycle.md
+  depends_on:
+    - { id: TASK-J.41a, kind: hard }
+    - { id: TASK-J.32a, kind: soft }
+  code_facts:
+    - { ref: "docs/README.md:5-5", note: "样板只有 scheme.md、user-journey.md、glossary.md；adr/specs/任务卡是工厂" }
+    - { ref: "docs/ledger/README.md:47-49", note: "正文只留开放项；历史流水留在 changelog，不删原文" }
+    - { ref: "docs/specs/README.md:18-18", note: "能力以任务卡状态和证据为准，总装图以 delivery-lifecycle.md 为准" }
+    - { ref: "docs/glossary.md:20-20", note: "方案是用户看见的整件事，合同是系统里单独验收的一段" }
+    - { ref: "docs/specs/development-tasks-index.md:3-3", note: "阅读说明已把 development-tasks-completed.md 标成档案" }
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:450-452", note: "shown_plain_text_sha256 存在才计入 digest；schema_version 仍为 1.2" }
+    - { ref: "src/routes/index.tsx:1585-1587", note: "freezeSchemeSnapshot 入参带确认前已展示正文哈希" }
+    - { ref: "daemon/server.ts:2461-2504", note: "handleSchemeSnapshot 合法才写入；省略则不写该段" }
+    - { ref: "daemon/supervisor/design/design-step.ts:257-273", note: "escalation-missed.json 含 contract_id、decisions、discovered_at、pending_resume" }
+    - { ref: "src/lib/design/design-note.ts::detectEscalations", note: "仍只负责发现漏标，不负责落记录" }
+  non_goals:
+    - 不拆 daemon/server.ts 的路由，不拆 src/routes/index.tsx 的 Console；这两项单列，不进本卡施工
+    - 不改 ADR-0015，不把合入改成方案级自动合入，不落 brief.md 那棵文件树
+    - 不补 GAP-R22 与 GAP-STRESS 的原文
+    - R23（带 rl 的批量确认无效则回落 ai_inferred）标「需引擎规则变更，单独评估」。本卡不改 user_said / user_confirmed 不降级
+    - R18（parked 停放）与 D-3 看门狗推回 PREPARING 方向相反。反哺前拍板，本卡不改看门狗
+    - 不新增顾问 Agent，不给右栏加系统提示
+    - 不上 R19 的回滚、披露、追认
+    - 不把八类决策写进 technical-design-and-knowledge.md
+  fail:
+    - 拆分 server.ts 路由或 index.tsx 的 Console
+    - 修改 ADR-0015，或把每份合同的合入点击改成方案级自动合入
+    - 在用户项目根目录新增 brief.md、dialogue.md、gate.md 或 final.md
+    - 把 GAP-R22 或 T-1～T-7 情节写进本卡 diff
+    - 改写 scheme-patch-engine 的不降级规则，或改写 D-3 的自愈方向
+    - 给右栏注入系统提示，或新增一种顾问 Agent
+    - 修改 technical-design-and-knowledge.md §3 的五类清单
+    - 从 development-tasks-changelog.md 删除历史流水
+  adr_revisions: []
+  defaults: []
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 318, commit: 6f2ec657101983d0f263f0a80f8d0225244fa4c6 }
+```
+
+* **背景**：J.41a 已把目标态蓝图存档为未激活；本卡吸收第一批可反哺项。
+* **取舍**：可反哺项第一批已交付（文档口径五条 + 白话哈希存证 + escalation_missed 记录 + 五类↔八类对照表），R23/R18 拍板项未施工。
