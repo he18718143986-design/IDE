@@ -2221,6 +2221,8 @@ export async function freezeSchemeSnapshot(
     source_turns: readonly SchemeSourceTurn[];
     /** TASK-J.32a：信任档；省略时 Daemon 默认 standard */
     trust_tier?: "light" | "standard" | "reconfirm";
+    /** TASK-J.41b：确认前已展示白话正文的 sha256(utf8)。省略则不写入快照。 */
+    shown_plain_text_sha256?: string;
   },
 ): Promise<SchemeSnapshotView> {
   return request<SchemeSnapshotView>(conn, "/api/supervisor/scheme/freeze", {

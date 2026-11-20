@@ -139,7 +139,10 @@ import {
 import { ProtectionConfirmCard } from "@/components/ProtectionConfirmCard";
 import { SupervisorStudioPane } from "@/components/SupervisorStudioPane";
 import { StudioViewportShell } from "@/components/studio/StudioViewportShell";
-import { SchemeReviewPane } from "@/components/studio/SchemeReviewPane";
+import {
+  SchemeReviewPane,
+  shownPlainTextSha256,
+} from "@/components/studio/SchemeReviewPane";
 import { DemoPreviewPane } from "@/components/studio/DemoPreviewPane";
 import { PlainContractAuthorizeCard } from "@/components/supervisor/PlainContractAuthorizeCard";
 import { ScopePausedDialog } from "@/components/supervisor/ScopePausedDialog";
@@ -504,6 +507,7 @@ function Console() {
    */
   const [scopePlan, setScopePlan] = useState<ScopePlan | null>(null);
   const scopePreflightSeqRef = useRef(0);
+  const shownPlainTextRef = useRef("");
   /** J.6：确认点击时展开敏感项查看 */
   const [forceExpandSensitive, setForceExpandSensitive] = useState(false);
   const [scopeDecisionBusy, setScopeDecisionBusy] = useState(false);
@@ -1578,6 +1582,9 @@ function Console() {
               scope_plan: planForConfirm,
               source_turns: sourceTurnsForConfirm,
               trust_tier: schemeTrustTier,
+              shown_plain_text_sha256: shownPlainTextSha256(
+                shownPlainTextRef.current,
+              ),
             });
             return {
               snapshot_id: view.snapshot_id,
@@ -3949,6 +3956,9 @@ function Console() {
                     acceptanceSettled={schemeAcceptanceSettled}
                     surfaceConfirmationId={schemeSurfaceConfirmId}
                     onSurfacePresented={handleSchemeSurfacePresented}
+                    onShownPlainText={(text) => {
+                      shownPlainTextRef.current = text;
+                    }}
                     onConfirmDecision={handleSchemeConfirmDecision}
                     onResolveConflict={handleSchemeResolveConflict}
                     onNotesChange={handleSchemeNotesChange}

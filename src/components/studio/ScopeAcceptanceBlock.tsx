@@ -66,6 +66,99 @@ export function presentableAcceptanceItems(
  * 呈现上报（J.16 / GAP-P8）。`confirmationId` 由父级在方案修订期间铸造并保持稳定；
  * `onReport` 失败不阻塞渲染，只留痕（console.warn + data-surface-log="failed"）。
  */
+/** 与当前渲染分支一致的白话正文，供确认前做 sha256。折叠着的建议列表不计入。 */
+export function scopeAcceptancePlainText(input: {
+  plan: ScopePlan | null;
+  mode: ScopeAcceptanceMode;
+  policyMessage?: string | null | undefined;
+  acceptanceItems?: readonly ScopeAcceptanceItemView[] | undefined;
+  acceptanceSettled?: boolean | undefined;
+  suggestions?: readonly TestTargetSuggestion[] | undefined;
+  suggestOpen?: boolean | undefined;
+  sensitiveExpanded?: boolean | undefined;
+}): string {
+  const lines: string[] = ["改动范围与验收方式"];
+  if (input.policyMessage) lines.push(input.policyMessage);
+  const rows = presentableAcceptanceItems(input.acceptanceItems ?? []);
+  if (rows.length > 0) {
+    lines.push("验收条目");
+    for (const item of rows) {
+      lines.push(`${item.id} ${item.text}`);
+      if (item.status) lines.push(`状态 ${item.status}`);
+      if (item.scope) lines.push(`范围 ${item.scope}`);
+      if (item.provenance) lines.push(`来源 ${item.provenance}`);
+      if (item.links && item.links.length > 0) {
+        lines.push(`关联 ${item.links.join(" · ")}`);
+      }
+      if (item.confidence) lines.push(`置信 ${item.confidence}`);
+    }
+  } else if (input.acceptanceSettled === true) {
+    lines.push(NO_ACCEPTANCE_SURFACE_RECORD_LABEL);
+  }
+  const suggestions = input.suggestions ?? [];
+  if (suggestions.length > 0) {
+    lines.push(
+      `AI 建议·非验收 （${suggestions.length} 条，不进合并门禁） ${input.suggestOpen ? "收起" : "展开"}`,
+    );
+    if (input.suggestOpen) {
+      for (const s of suggestions) lines.push(`AI 建议·非验收 ${s.text}`);
+    }
+  }
+  const plan = input.plan;
+  const readOnly = input.mode === "frozen" || input.mode === "acceptance";
+  if (!plan) {
+    lines.push("正在核对要改哪些地方…");
+    return lines.join("\n");
+  }
+  if (readOnly) {
+    const areas = plan.areas.filter((a) => !a.excluded_by_user);
+    lines.push("会改动的地方");
+    lines.push(
+      areas.length === 0
+        ? "这一轮没有要改的地方"
+        : areas
+            .map((a) => (a.why ? `${a.label} —— ${a.why}` : a.label))
+            .join("\n"),
+    );
+    lines.push("这次不会碰");
+    lines.push(
+      plan.never_touch.length === 0
+        ? "没有额外排除项"
+        : plan.never_touch.map((g) => g.label).join("\n"),
+    );
+    lines.push("怎么算做完");
+    if (plan.verification.manual_only) {
+      lines.push("没有自动检查，完成后需要你试玩确认");
+    }
+    for (const line of plan.verification.plain) lines.push(line);
+    lines.push(`预计规模：${plan.budget.plain}`);
+    return lines.join("\n");
+  }
+  lines.push(
+    `这次大概改 ${activeAreaCount(plan)} 处、不碰 ${neverTouchCount(plan)} 处`,
+  );
+  const done = plan.verification.manual_only
+    ? "没有自动检查，完成后需要你试玩确认"
+    : plan.verification.plain.length > 0
+      ? plan.verification.plain.join("；")
+      : "按方案试玩确认";
+  lines.push(`怎么算做完：${done}`);
+  lines.push(`预计多大：${plan.budget.plain}`);
+  const pending = pendingSensitive(plan);
+  if (pending.length > 0) {
+    const mark = input.sensitiveExpanded ? " ▾" : " ▸";
+    const labels = pending.map((i) => i.label).join("、");
+    lines.push(`含 ${pending.length} 处敏感改动${mark}：${labels}`);
+    if (input.sensitiveExpanded) {
+      for (const item of pending) {
+        lines.push(item.why ? `${item.label} —— ${item.why}` : item.label);
+      }
+    }
+    lines.push("不碰这些，其余照做");
+  }
+  return lines.join("\n");
+}
+
 export interface ScopeAcceptanceSurfaceProps {
   confirmationId: string;
   onReport: (report: SurfacePresentationReport) => Promise<unknown>;
@@ -98,6 +191,8 @@ export interface ScopeAcceptanceBlockProps {
    * 不写入台账 / 不进 can_merge；空或未传则不渲染建议块。
    */
   testTargetSuggestions?: readonly TestTargetSuggestion[] | undefined;
+  /** 当前已展示的范围白话正文。确认前用来做 sha256。 */
+  onShownPlainText?: ((text: string) => void) | undefined;
 }
 
 /**
@@ -286,6 +381,23 @@ export function ScopeAcceptanceBlock(props: ScopeAcceptanceBlockProps) {
   const acceptanceRows = presentableAcceptanceItems(
     props.acceptanceItems ?? [],
   );
+  const shownPlain = scopeAcceptancePlainText({
+    plan,
+    mode,
+    policyMessage: props.policyMessage,
+    acceptanceItems: props.acceptanceItems,
+    acceptanceSettled: props.acceptanceSettled,
+    suggestions,
+    suggestOpen,
+    sensitiveExpanded: expanded,
+  });
+  const onShownPlainTextRef = useRef(props.onShownPlainText ?? null);
+  useEffect(() => {
+    onShownPlainTextRef.current = props.onShownPlainText ?? null;
+  });
+  useEffect(() => {
+    onShownPlainTextRef.current?.(shownPlain);
+  }, [shownPlain]);
 
   return (
     <section

@@ -63,6 +63,7 @@ import {
   parseSourceTurnRefs,
   sealFrozenQuotes,
   parseTrustTier,
+  parseShownPlainTextSha256,
   collectItemQuoteBacklinks,
   evaluateSchemeItemBacklinks,
   FROZEN_QUOTE_MAX_CHARS,
@@ -2351,6 +2352,7 @@ export class StagentDaemon {
       scope_plan?: unknown;
       source_turns?: unknown;
       trust_tier?: unknown;
+      shown_plain_text_sha256?: unknown;
     };
     try {
       body = (await this.readJsonBody(req)) as typeof body;
@@ -2456,6 +2458,17 @@ export class StagentDaemon {
       }
       // 请求省略时默认标准档，新冻结一定落档；旧快照无此段仍视为未选档。
       const trustTier: TrustTier = parsedTier.value ?? "standard";
+      const parsedShown = parseShownPlainTextSha256(
+        body.shown_plain_text_sha256,
+      );
+      if (!parsedShown.ok) {
+        this.sendJson(res, 400, {
+          error: "invalid_scheme_snapshot",
+          code: "E_SCHEME_SNAPSHOT_INVALID",
+          message: "shown_plain_text_sha256 不是 sha256 十六进制",
+        });
+        return;
+      }
       // TASK-J.18b / GAP-W2：冻结时从账本拷贝完整墓地（含 revived）进快照 1.2
       const ledgerState = loadOrInitLedgerState(this.repoRoot);
       const ledgerGraveyard = ledgerState.graveyard;
@@ -2486,6 +2499,9 @@ export class StagentDaemon {
         frozen_quotes: sealed.value,
         trust_tier: trustTier,
         item_quote_backlinks: backlinks,
+        ...(parsedShown.value === undefined
+          ? {}
+          : { shown_plain_text_sha256: parsedShown.value }),
       });
       this.sendJson(res, written.idempotent ? 200 : 201, {
         snapshot_id: written.snapshot.snapshot_id,

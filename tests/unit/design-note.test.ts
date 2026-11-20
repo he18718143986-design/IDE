@@ -1,7 +1,11 @@
 /**
  * TASK-L.11 / technical-design TD-01～TD-05：DesignNote 校验与二次升级判定。
  */
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { runDesignStep } from "../../daemon/supervisor/design/design-step";
 import {
   createContractDraft,
   softwareContractSchema,
@@ -188,5 +192,38 @@ describe("TASK-L.11 DesignNote TD-01～TD-05", () => {
         (e) => e.class === "costs_money" && e.source === "second_pass",
       ),
     ).toBe(true);
+  });
+
+  it("J41B-P7: 漏标时写下 escalation-missed.json，不写回滚", async () => {
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), "j41b-miss-"));
+    const contract = makeContract({ dependencyChangesAllowed: true });
+    const note = baseNote(contract, {
+      dependencies: [{ name: "stripe", version: "14.0.0", why: "收款" }],
+      decisions: [],
+    });
+    const result = await runDesignStep({
+      repoRoot: repo,
+      contract,
+      generator: () => ({ note, stillNeedsDependencies: false }),
+    });
+    expect(result.status).toBe("suspended");
+    const file = path.join(
+      repo,
+      ".stagent",
+      "records",
+      contract.contract_id,
+      "escalation-missed.json",
+    );
+    const record = JSON.parse(fs.readFileSync(file, "utf8")) as {
+      contract_id: string;
+      decisions: { class: string; detail: string }[];
+      discovered_at: string;
+      pending_resume: boolean;
+    };
+    expect(record.contract_id).toBe(contract.contract_id);
+    expect(record.pending_resume).toBe(true);
+    expect(record.decisions.some((d) => d.class === "costs_money")).toBe(true);
+    expect(record.discovered_at.length).toBeGreaterThan(0);
+    expect(JSON.stringify(record)).not.toContain("回滚");
   });
 });

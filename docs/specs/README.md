@@ -15,7 +15,7 @@
 | **代码即权威** | 运行时事实 | `src/lib/state/delivery-state.ts`、`src/lib/journey/confirm-scheme-atomic.ts`、`daemon/supervisor/demo/signing-gate.ts`、`daemon/guard/audit-manifest.ts`、`daemon/supervisor/rules-l0.ts`、`src/lib/error-codes.ts` | 代码现状 ≠ 目标规格；差距登记在 supervisor §19 与 [`scheme.md`](../scheme.md) §11 |
 | **实施口径（附属）· 证据判定** | 验收材料三态与必填字段 | [`evidence-and-acceptance-criteria.md`](./evidence-and-acceptance-criteria.md) | 从属 ADR-0005 / verification-strategy；〔待补〕项不得假完成 |
 
-> 交付全链路实施口径处于「设计定稿 · 待施工」；能力状态以任务卡和验证证据为准。
+> 交付全链路的能力以任务卡状态和证据为准；总装图以 [`delivery-lifecycle.md`](./delivery-lifecycle.md) 为准。
 
 ## 三个 Agent 在规格里的位置
 

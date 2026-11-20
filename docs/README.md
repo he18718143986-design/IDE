@@ -2,11 +2,11 @@
 
 Stagent 是一个本地优先的软件开发工作台：用户用日常语言提出需求，系统把需求整理成方案、拆成可执行的任务卡，再由 Agent 在隔离环境里施工，并用可检查的证据判断能不能合入。文档按这条链分层，从用户原话一直追到规格、任务卡和证据。
 
-本仓库的文档既是 Stagent 自己的施工依据，也是「Supervisor 读完模糊意图后应当交出什么」的样板。下面的地图说明先读哪一份、哪一层说了算。
+样板只有三份：[`scheme.md`](./scheme.md)、[`user-journey.md`](./user-journey.md)、[`glossary.md`](./glossary.md)。这是 Supervisor 读完模糊意图后交给用户看的东西。`adr/`、`specs/` 和任务卡是造这个产品的工厂，不是用户合同。下面的地图说明先读哪一份、哪一层说了算。
 
 > **更新**：2026-11-14（TASK-J.26）：删去原 §3 / §8 / §9「已迁走」空壳，文首补项目简介，阅读顺序与决策节去掉硬编码篇数；§3 此前已迁至 [`specs/README.md`](./specs/README.md)，怎么改文档见 [`CONTRIBUTING.md`](./CONTRIBUTING.md)，已删除或已移动的路径见 [`ledger/removed-and-moved.md`](./ledger/removed-and-moved.md)。命名、死引用与硬编码计数由 `check:docs` 校验。
 > **上次内容更新**：2026-10-30（Asia/Hong_Kong）· 第三轮：补全交付全链路（项目分解、技术方案、测试义务、发布运维、卡就绪标准）。第二轮（2026-10-29）按 Supervisor 产物的形态重排。
-> **一句话**：这套文档就是 Stagent 的 Supervisor 读完用户模糊意图后**应该交出的东西**。从用户原话出发，逐层推到决策、规格、给 Worker 的[任务卡](./glossary.md#任务卡)、证据和台账。每层都能往上追到原话，往下追到代码。
+> **一句话**：样板是方案、用户旅程和术语表。工厂是 `adr/`、`specs/` 和任务卡。从用户原话出发，逐层推到决策、规格、给 Worker 的[任务卡](./glossary.md#任务卡)、证据和台账。每层都能往上追到原话，往下追到代码。
 > **命名约定**：文件名英文 kebab-case（小写 ASCII、数字与连字符；`v0.2` 这类版本号可用 `.`）；`reports/` 下的时点快照允许 `-YYYY-MM-DD` 日期后缀；`README.md`、`CONTRIBUTING.md` 为惯例大写名；版本流转交给 Git Tag 与 commit 历史；规格文件头标注定稿基线。
 
 ---
