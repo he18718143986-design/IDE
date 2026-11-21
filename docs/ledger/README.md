@@ -60,6 +60,7 @@
 | [`ci2-sample-assessment-brief.md`](./ci2-sample-assessment-brief.md) | CI.2 维持 Hold，不开工 | P-245 |
 | [`route-split-assessment-brief.md`](./route-split-assessment-brief.md) | 整拆仍不做。第一批 [`TASK-J.42`](../specs/development-tasks-completed.md#task-j.42) 已抽出合同内联段（#324/`b331cd4`）。Console 与第二批未立卡 | P-258 |
 | [`adr0015-mainline-breakpoint.md`](./adr0015-mainline-breakpoint.md) | 已修，J.45。[#334](https://github.com/he18718143986-design/IDE/pull/334)/`92e5a63` 有钥匙时注入意图编译器模型客户端（常驻客户端 + 显式 hasModelKey + generate 内重读钥匙）。无钥匙保持离线不产方案。端到端浏览器验证未做 | P-264 |
+| 编译器有钥匙时模型调用失败 | 已立 [`TASK-J.46`](../specs/development-tasks-active.md#task-j.46)（P-265），未开工。现象：436ms，`detail=network`，无 `active.json`。日志只有原因码 | P-265 |
 | Windows 路径分隔符导致 spawn/cli-host 白名单匹配失效 | 已修，J.43。[#329](https://github.com/he18718143986-design/IDE/pull/329)/`32bdab9` 在 cli-host 静态禁令比较前把 `path.relative` 收成正斜杠。19 条反斜杠红消除。其余 Windows 存量未动 | P-260 |
 | `TASK-D.1e`、`TASK-S.3` | 维持 DEFERRED | 另案，不在本轮 |
 | 上方 GAP-R22、GAP-STRESS | 已补。重建版补入，原文未逐字核对 | P-253；找回原文后可再替换 |
