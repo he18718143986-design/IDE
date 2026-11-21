@@ -1516,3 +1516,93 @@ governance:
 #### 【Task J.42】daemon 路由拆分第一批：合同内联段抽出 `[COMPLETED · 正文已迁]`
 
 > 本卡已 **COMPLETED**（施工 [#324](https://github.com/he18718143986-design/IDE/pull/324) squash `b331cd42efc7332b482ee57b692cfb47f9c40f85`；修卡 P-257；完工回写 P-258）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.42) §3.4bd。诚实口径：**合同内联段已抽出至 `daemon/http/contract-routes.ts`，行为不变（状态码/错误码/正则顺序/字段读写时机保持），Console/第二批/front-door 未动**。
+
+### 3.4o Windows 白名单路径分隔符归一化（2026-11-21 · 立卡 P-259）
+
+> **立卡说明（2026-11-21 · P-259）**：Tina 点名立卡。`docs/ledger/README.md` 第 60 行挂账：白名单写正斜杠，Windows 的 `path.relative` 返回反斜杠。匹配逻辑在测试里，不在产品代码。`spawn-whitelist.test.ts` 的 `relOf`（第 293–294 行）已经把分隔符收成正斜杠。19 条红来自 `cli-host-claude-code.test.ts` 第 743 行未归一化的 `path.relative`，再和第 749 行的正斜杠白名单比较。本条只立 `TASK-J.43` 为 `[NEW_TASK]`，估算 S。**立卡 ≠ 开工**。不改产品代码。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。R23 暂缓。Console 拆分与第二批未立卡。
+
+<a id="task-j.43"></a>
+
+#### 【Task J.43】Windows 白名单路径分隔符归一化 `[NEW_TASK]`
+
+```yaml task-card
+id: TASK-J.43
+status: NEW_TASK
+contract:
+  intent:
+    title: Windows 白名单路径分隔符归一化
+    description: >-
+      白名单匹配处把 path.relative 的结果收成正斜杠，
+      使 Windows 上的反斜杠路径能对上既有白名单。
+      只动匹配，不改白名单条目，不改产品行为。
+    risk_level: LOW
+  acceptance:
+    - id: J43-P1
+      check: auto
+      text: >-
+        cli-host 静态禁令在比较前把路径分隔符收成正斜杠。
+        Windows 上那 19 条反斜杠路径不再因为分隔符对不上而报红。
+        以 #324 的 Windows Unit 17 文件 30 项为对照，这条断言转绿。
+    - id: J43-P2
+      check: auto
+      text: >-
+        ubuntu 与 macOS 上 spawn-whitelist 和 cli-host-claude-code 这两份测试保持绿。
+    - id: J43-P3
+      check: auto
+      text: >-
+        不改白名单条目内容，不改「未登记即红」的断言口径，不改产品代码行为。
+        spawn EINVAL、EFTYPE、CRLF、性能门禁超时不在本卡范围。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - tests/unit/cli-host-claude-code.test.ts
+      - tests/unit/spawn-whitelist.test.ts
+    readonly_paths:
+      - docs/ledger/README.md
+      - daemon/http/contract-routes.ts
+  verification:
+    commands:
+      - { alias: whitelist-sep, executable: npx, args: [vitest, run, tests/unit/cli-host-claude-code.test.ts, tests/unit/spawn-whitelist.test.ts] }
+design:
+  approach: >-
+    匹配在测试里。cli-host-claude-code.test.ts 第 743 行把 path.relative 的结果直接拿去和第 749 行的正斜杠集合比较。
+    在这一处把反斜杠收成正斜杠，再用同一字符串做 has 和 startsWith。
+    spawn-whitelist.test.ts 第 294 行的 relOf 已经 split(path.sep).join("/")。
+    该行已归一化则不改它。无必要不制造 diff。
+    若发现必须改产品代码才能归一化，停工按修卡上报，不写进本卡 diff。
+  touches:
+    - { path: tests/unit/cli-host-claude-code.test.ts, change: modify, why: 静态禁令的 path.relative 结果收成正斜杠, symbols: [] }
+    - { path: tests/unit/spawn-whitelist.test.ts, change: modify, why: 仅当 relOf 的既有归一化不够时才改, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J43-P1, test_path: tests/unit/cli-host-claude-code.test.ts, level: unit, debt: 既有静态禁令；本卡只归一化路径再比较 }
+    - { acceptance_id: J43-P2, test_path: tests/unit/spawn-whitelist.test.ts, level: unit, debt: 既有白名单扫描；ubuntu 与 macOS 保持绿 }
+    - { acceptance_id: J43-P3, test_path: tests/unit/cli-host-claude-code.test.ts, level: unit, debt: 不改白名单条目与断言口径；产品代码不在 writable_paths }
+governance:
+  spec_refs:
+    - docs/ledger/README.md
+  depends_on: []
+  code_facts:
+    - { ref: "tests/unit/cli-host-claude-code.test.ts:743-749", note: path.relative 未归一化，再与正斜杠白名单和 cli-host 前缀比较 }
+    - { ref: "tests/unit/spawn-whitelist.test.ts:293-294", note: relOf 已把 path.sep 收成正斜杠 }
+    - { ref: "docs/ledger/README.md:60-60", note: 挂账写明存量 18 条，J.42 后为 19 条，同一根因 }
+  non_goals:
+    - 不修 spawn EINVAL、EFTYPE、CRLF、性能门禁超时
+    - 不改白名单条目内容
+    - 不改「未登记即红」的断言口径
+    - 不改产品代码行为
+  fail:
+    - 改动产品代码行为
+    - 增删白名单条目来消掉这 19 条红
+    - 放宽断言，让未登记路径也能通过
+    - 把 EINVAL、EFTYPE、CRLF 或性能超时写进本卡 diff
+  adr_revisions: []
+  defaults: []
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
