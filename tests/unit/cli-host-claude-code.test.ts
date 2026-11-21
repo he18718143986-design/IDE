@@ -740,7 +740,7 @@ describe("TASK-W.5a spawn 静态禁令", () => {
             fs.readFileSync(p, "utf8"),
           )
         )
-          hits.push(path.relative(process.cwd(), p));
+          hits.push(path.relative(process.cwd(), p).split(path.sep).join("/"));
       }
     };
     walk(path.join(process.cwd(), "daemon"));
