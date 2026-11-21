@@ -9236,6 +9236,8 @@ governance:
 
 > **立卡说明（2026-11-20 · P-251）**：Tina 审过卡面后授权立卡。范围八条：文档口径五条、白话正文哈希计入冻结快照 digest、`escalation_missed` 记录、五类↔八类对照表。R23 / R18 写入卡面不施工。
 
+> **拍板注记（2026-11-21 · P-254）**：R18 已拍板：不反哺。超时 `parked` 停放归「仅目标态保留」；现行 D-3 看门狗推回 `PREPARING` 的方向维持不变。R23 仍未施工，单独评估。
+
 > **归档注记（2026-11-21 · P-252）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266/#288/#291/#298/#301/#304/#307/#312）。[#318](https://github.com/he18718143986-design/IDE/pull/318) squash `6f2ec657101983d0f263f0a80f8d0225244fa4c6` 于 2026-11-21 00:11:28 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `390429e34f3c9a62cf47b3dd06d60eba144a6858`；父提交 `fc44b98cf65ee75f27fd21f3eec8aaf14db4622d`）。合入前必需面全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit；macOS Unit SUCCESS，本卡改过的冻结 / digest / `design-note` 路径在 macOS 与 ubuntu 均通过），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非阻断存量失败，`continue-on-error`；`spawn EINVAL` / `EFTYPE` 落在 `app-preview-runner` / `cli-host-claude-code` / `deps-reuse` / `diff-files` / `merger` / `worktree-manager` / `golden-slice` / `ipc-stream` / `playtest-gate-execution`；本卡 `shown-text-digest` / `design-note` / `docs-check` / `scheme-snapshot-frozen-quotes` 不在失败名单）；Bugbot NEUTRAL 不挡合入。估算仍为 M。修卡未触发：未扩 `writable_paths`。诚实口径：**可反哺项第一批已交付（文档口径五条 + 白话哈希存证 + escalation_missed 记录 + 五类↔八类对照表），R23/R18 拍板项未施工**。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。GAP-R22 与 GAP-STRESS 仍待原文。不宣称端到端闭环。
 
 ```yaml task-card
@@ -9393,7 +9395,7 @@ governance:
     - 不改 ADR-0015，不把合入改成方案级自动合入，不落 brief.md 那棵文件树
     - 不补 GAP-R22 与 GAP-STRESS 的原文
     - R23（带 rl 的批量确认无效则回落 ai_inferred）标「需引擎规则变更，单独评估」。本卡不改 user_said / user_confirmed 不降级
-    - R18（parked 停放）与 D-3 看门狗推回 PREPARING 方向相反。反哺前拍板，本卡不改看门狗
+    - R18（parked 停放）与 D-3 看门狗推回 PREPARING 方向相反。已拍板：不反哺（P-254）；本卡不改看门狗
     - 不新增顾问 Agent，不给右栏加系统提示
     - 不上 R19 的回滚、披露、追认
     - 不把八类决策写进 technical-design-and-knowledge.md
@@ -9419,4 +9421,4 @@ governance:
 ```
 
 * **背景**：J.41a 已把目标态蓝图存档为未激活；本卡吸收第一批可反哺项。
-* **取舍**：可反哺项第一批已交付（文档口径五条 + 白话哈希存证 + escalation_missed 记录 + 五类↔八类对照表），R23/R18 拍板项未施工。
+* **取舍**：可反哺项第一批已交付（文档口径五条 + 白话哈希存证 + escalation_missed 记录 + 五类↔八类对照表）。R18 已拍板：不反哺（P-254）。R23 仍未施工，单独评估。
