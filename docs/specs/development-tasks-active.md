@@ -1507,4 +1507,4 @@ governance:
 
 #### 【Task J.41b】目标态可反哺项第一批（文档口径 + 两条存证）`[COMPLETED · 正文已迁]`
 
-> 本卡已 **COMPLETED**（施工 [#318](https://github.com/he18718143986-design/IDE/pull/318) squash `6f2ec657101983d0f263f0a80f8d0225244fa4c6`；完工回写 P-252）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.41b) §3.4bc。诚实口径：**可反哺项第一批已交付（文档口径五条 + 白话哈希存证 + escalation_missed 记录 + 五类↔八类对照表），R23/R18 拍板项未施工**。
+> 本卡已 **COMPLETED**（施工 [#318](https://github.com/he18718143986-design/IDE/pull/318) squash `6f2ec657101983d0f263f0a80f8d0225244fa4c6`；完工回写 P-252）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.41b) §3.4bc。诚实口径：**可反哺项第一批已交付（文档口径五条 + 白话哈希存证 + escalation_missed 记录 + 五类↔八类对照表）**。R18 已拍板：不反哺（P-254）。R23 仍未施工，单独评估。
