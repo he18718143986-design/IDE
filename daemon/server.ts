@@ -145,6 +145,7 @@ import {
   type IntentCompilerModelClient,
   type CompilerLoopStats,
 } from "./supervisor/intent-compiler/host";
+import { createOpenAiCompilerClient } from "./supervisor/intent-compiler/openai-compiler-client";
 
 import {
   recoverDaemonState,
@@ -249,7 +250,11 @@ import { EvidenceInvalidationEngine } from "./watcher/invalidation-engine";
 import { buildDependencyGraph, getOrCreateRepoGraph } from "./arch/graph";
 import { readDiffFiles } from "./diff/diff-files";
 import { launchEditor } from "./editor/launcher";
-import { getModelSettings, setRuntimeKey } from "./worker/key-store";
+import {
+  getModelSettings,
+  getRuntimeKey,
+  setRuntimeKey,
+} from "./worker/key-store";
 // TASK-W.6：daemon 启动 / 项目打开时装配默认受控 Worker 注册表
 import { createDefaultWorkerRegistry } from "./worker/default-worker-registry";
 import type { AdapterRegistry } from "./worker/adapter-registry";
@@ -384,8 +389,11 @@ export interface DaemonServerOptions extends PortFinderOptions {
    */
   consolePublicDir?: string | null;
   /**
-   * TASK-J.10：意图编译器模型客户端（可替换）。
-   * 缺省 / null → 离线兜底（V-06），不调用模型、不回流右栏。
+   * TASK-J.10 / TASK-J.45：意图编译器模型客户端（可替换）。
+   * 缺省：常驻生产客户端，有钥匙才调用模型。
+   * 显式 null：离线兜底，不调用模型。
+   * 显式桩：测试用，不读进程钥匙。
+   * 编译器输出不回流右栏。
    */
   intentCompilerModelClient?: IntentCompilerModelClient | null;
   /** TASK-J.10 测试注入：覆盖编译循环 setTimeout（跳过 1.2s 防抖） */
@@ -568,6 +576,8 @@ export class StagentDaemon {
   /** TASK-J.10：意图编译器宿主（用户消息 → 方案补丁 CAS） */
   private intentCompilerHost: IntentCompilerHost | null = null;
   private readonly intentCompilerModelClient: IntentCompilerModelClient | null;
+  /** TASK-J.45：缺省才用生产客户端；显式传入（含 null）不替换 */
+  private readonly intentCompilerUsesProductionClient: boolean;
   private readonly intentCompilerSetTimeout:
     ((fn: () => void, ms: number) => unknown) | undefined;
   private readonly intentCompilerClearTimeout:
@@ -638,10 +648,13 @@ export class StagentDaemon {
       },
     });
     this.supervisorEnrich = options.supervisorEnrich;
+    const explicitCompilerClient = options.intentCompilerModelClient;
+    this.intentCompilerUsesProductionClient =
+      explicitCompilerClient === undefined;
     this.intentCompilerModelClient =
-      options.intentCompilerModelClient === undefined
-        ? null
-        : options.intentCompilerModelClient;
+      explicitCompilerClient === undefined
+        ? createOpenAiCompilerClient()
+        : explicitCompilerClient;
     this.intentCompilerSetTimeout = options.intentCompilerSetTimeout;
     this.intentCompilerClearTimeout = options.intentCompilerClearTimeout;
 
@@ -972,6 +985,11 @@ export class StagentDaemon {
     this.intentCompilerHost = createIntentCompilerHost({
       repoRoot: this.repoRoot,
       modelClient: this.intentCompilerModelClient,
+      // 生产路径显式看钥匙。测试桩固定为有钥匙，避免被进程钥匙挡掉；
+      // 显式 null 客户端仍因 modelClient === null 走离线。
+      hasModelKey: this.intentCompilerUsesProductionClient
+        ? () => getRuntimeKey() != null
+        : () => true,
       ...(this.intentCompilerSetTimeout === undefined
         ? {}
         : { setTimeoutFn: this.intentCompilerSetTimeout }),
