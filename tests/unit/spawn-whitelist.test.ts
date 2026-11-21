@@ -58,6 +58,11 @@ const LEGACY_ALLOWLIST: LegacyAllowance[] = [
     reason: "Diff API 的 git diff（execFileSync）",
   },
   {
+    file: "daemon/http/contract-routes.ts",
+    module: "daemon/http",
+    reason: "Diff API 的 git diff（execFileSync）",
+  },
+  {
     file: "daemon/runner/process-tree.ts",
     module: "daemon/runner",
     reason: "Windows 进程树回收（taskkill/tasklist）",
