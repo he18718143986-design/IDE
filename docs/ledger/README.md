@@ -20,7 +20,7 @@
 | [`blueprint-fine-layer-impl-split-brief.md`](./blueprint-fine-layer-impl-split-brief.md) | 细模型加层 + 视图投影实现拆分（R-11）：A–E COMPLETED（D=#312/`7efb1f7`；P-248）；母卡 P-249 选 B 已 SPLIT→COMPLETED 闭合 | planning brief；**J.9b/V-07 债清**（已由 J.38d 吸收） |
 | [`prompt-builder-live-send-path-brief.md`](./prompt-builder-live-send-path-brief.md) | prompt-builder 活发送路径只读定位（P-233）：J.35 已对齐但生产零调用；四缝事实 + 接线前置 | planning brief；**不立**接线卡；不施工 |
 | [`ci2-sample-assessment-brief.md`](./ci2-sample-assessment-brief.md) | CI.2 只读样本量评估（P-245）：三门禁样本表 + 中位数 + 排除口径；结论「不够整卡放宽开工」 | evidence brief；**Hold 不开工**；下次评估触发见简报 §2 |
-| [`route-split-assessment-brief.md`](./route-split-assessment-brief.md) | 路由拆分只读评估（P-255）：合同内联段与 Console 集中度；结论「暂缓整拆」 | planning brief；**未立卡**；建议均为 `ai_inferred` |
+| [`route-split-assessment-brief.md`](./route-split-assessment-brief.md) | 路由拆分只读评估（P-255）：合同内联段与 Console 集中度；结论「暂缓整拆」 | planning brief；第一批已立 [`TASK-J.42`](../specs/development-tasks-active.md#task-j.42)（P-256，未开工） |
 | [`decision-class-crosswalk.md`](./decision-class-crosswalk.md) | 现行五类与目标态八类的对照。不改五类，不把八类写进规格正文 | 对照；不是施工权威 |
 
 ## 蓝图存档（目标态未激活 · TASK-J.41a）
@@ -56,6 +56,6 @@
 | [`w3-known-gaps.md`](./w3-known-gaps.md) §4.1、§4.3 | `tmpRoot` GC 与 `splitShellSegments` 引号边界仍未修 | 见该文件的 PASS/FAIL |
 | [`consistency-audit.md`](./consistency-audit.md) OP-39 | `daemon/server.ts` 与 `src/routes/index.tsx` 的大文件结构债。清算时机在 v0.3 方向拍板之后 | 待指定 |
 | [`ci2-sample-assessment-brief.md`](./ci2-sample-assessment-brief.md) | CI.2 维持 Hold，不开工 | P-245 |
-| [`route-split-assessment-brief.md`](./route-split-assessment-brief.md) | 结构拆分评估已落，未立卡。整拆暂缓 | 待业主点名 |
+| [`route-split-assessment-brief.md`](./route-split-assessment-brief.md) | 整拆仍不做。第一批 [`TASK-J.42`](../specs/development-tasks-active.md#task-j.42) 已立，未开工 | P-256 |
 | `TASK-D.1e`、`TASK-S.3` | 维持 DEFERRED | 另案，不在本轮 |
 | 上方 GAP-R22、GAP-STRESS | 已补。重建版补入，原文未逐字核对 | P-253；找回原文后可再替换 |
