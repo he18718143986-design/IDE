@@ -1512,6 +1512,8 @@ governance:
 ### 3.4n daemon 路由拆分第一批（2026-11-21 · 立卡 P-256）
 
 > **立卡说明（2026-11-21 · P-256）**：Tina 审过 [`../ledger/route-split-assessment-brief.md`](../ledger/route-split-assessment-brief.md) 后授权立第一批，不整拆。本条只立 `TASK-J.42` 为 `[NEW_TASK]`，估算 M。**立卡 ≠ 开工**。不改产品代码。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。R23 暂缓。Console 拆分与第二批未立卡。
+>
+> **修卡说明（2026-11-21 · P-257）**：施工 [#324](https://github.com/he18718143986-design/IDE/pull/324) 停工上报后，Tina 授权修卡。`code_facts` 行号改到搬家后的 `daemon/http/contract-routes.ts`（正则段与 404）。`writable_paths` 增加三份静态对齐测试。`daemon/http/contract-routes.ts` 的 `touches` 由 create 改为 modify（文件已在施工分支）。卡状态仍 `[NEW_TASK]`。**修卡 ≠ 完工**。本条不改产品代码，不改三份测试。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。R23 暂缓。Console 拆分与第二批未立卡。
 
 <a id="task-j.42"></a>
 
@@ -1576,6 +1578,9 @@ contract:
       - tests/daemon/scope-revision-api.test.ts
       - tests/daemon/diff-endpoint-security.test.ts
       - tests/e2e/golden-slice.test.ts
+      - tests/unit/audited-return-to-pending-wiring.test.ts
+      - tests/unit/cli-host-claude-code.test.ts
+      - tests/unit/spawn-whitelist.test.ts
     readonly_paths:
       - src/routes/index.tsx
       - docs/ledger/route-split-assessment-brief.md
@@ -1587,9 +1592,11 @@ design:
     只搬合同内联段。前门在 /api/contracts 鉴权之后调用新文件的一个函数。
     优先传窄上下文。若参数太多，暂传 server，并在 contract-routes.ts 文件头写明过渡。
     测试文件只在导入路径不得不改时才改，不改断言。
+    P-257：三份静态对齐测试允许改读取目标与白名单登记，不放宽 return-to-pending 必须走 orchestrator，不改产品行为。
+    execFileSync 留在搬家段内，把新文件登记进既有白名单，登记理由沿用「Diff API 的 git diff」。
     要抽 front-door、要搬已有 handle*、或要动 Console，先停工按修卡上报。
   touches:
-    - { path: daemon/http/contract-routes.ts, change: create, why: 承接合同生命周期内联分支, symbols: [handleContractRoutes] }
+    - { path: daemon/http/contract-routes.ts, change: modify, why: 已存在（施工分支已引入），承接合同生命周期内联分支, symbols: [handleContractRoutes] }
     - { path: daemon/server.ts, change: modify, why: handleHttpRequest 对 /api/contracts 改为一行转交, symbols: [handleHttpRequest] }
     - { path: tests/integration/merge-decision-d4.test.ts, change: modify, why: 仅当导入路径不得不改, symbols: [] }
     - { path: tests/integration/resume-abort.test.ts, change: modify, why: 仅当导入路径不得不改, symbols: [] }
@@ -1598,6 +1605,9 @@ design:
     - { path: tests/daemon/scope-revision-api.test.ts, change: modify, why: 仅当导入路径不得不改, symbols: [] }
     - { path: tests/daemon/diff-endpoint-security.test.ts, change: modify, why: 仅当导入路径不得不改, symbols: [] }
     - { path: tests/e2e/golden-slice.test.ts, change: modify, why: 仅当导入路径不得不改, symbols: [] }
+    - { path: tests/unit/audited-return-to-pending-wiring.test.ts, change: modify, why: P-257 读取目标改到 contract-routes.ts，断言仍要求 return-to-pending 走 orchestrator, symbols: [] }
+    - { path: tests/unit/cli-host-claude-code.test.ts, change: modify, why: P-257 白名单登记 contract-routes.ts，理由沿用 Diff API 的 git diff, symbols: [] }
+    - { path: tests/unit/spawn-whitelist.test.ts, change: modify, why: P-257 白名单登记 contract-routes.ts，理由沿用 Diff API 的 git diff, symbols: [] }
   interfaces: []
   test_plan:
     - { acceptance_id: J42-P1, test_path: tests/e2e/golden-slice.test.ts, level: e2e, debt: 既有 HTTP 路径；本卡未新增用例 }
@@ -1611,9 +1621,10 @@ governance:
     - docs/ledger/route-split-assessment-brief.md
   depends_on: []
   code_facts:
-    - { ref: "daemon/server.ts::handleHttpRequest", note: 合同创建、执行、合入仍写在这个分发函数里 }
-    - { ref: "daemon/server.ts:6115-7048", note: /api/contracts 前缀内的内联分支，本卡只搬这一段 }
-    - { ref: "daemon/server.ts:6520-6521", note: 通用动作正则在 scope-revision、gateway-violation、rework 之后 }
+    - { ref: "daemon/server.ts::handleHttpRequest", note: 前门在 /api/contracts 鉴权之后转交 handleContractRoutes }
+    - { ref: "daemon/http/contract-routes.ts:63-991", note: 搬家后的合同路由整段，含未命中路径的 404 }
+    - { ref: "daemon/http/contract-routes.ts:234-466", note: 正则顺序仍是 scope-revision（235）、gateway-violation（304）、rework（340）、通用动作正则（465-466） }
+    - { ref: "daemon/http/contract-routes.ts:990-991", note: 未命中合同路径的 404 在本文件末尾 }
     - { ref: "docs/ledger/route-split-assessment-brief.md:163-177", note: 正则顺序与实例字段清单是只读约束 }
   non_goals:
     - 不拆 src/routes/index.tsx 的 Console

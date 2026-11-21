@@ -31,12 +31,12 @@ describe("TASK-AUDITED.2 production wiring self-proof", () => {
   });
 
   it("server contracts 正则与 POST 处理器挂 return-to-pending", () => {
-    const src = read("daemon/server.ts");
+    const src = read("daemon/http/contract-routes.ts");
     expect(src).toMatch(
       /admit\|approve\|execute\|run-worker\|open-editor\|diff-files\|diff\|merge-decision\|merge\|evidence\|resume\|abort\|return-to-pending/,
     );
     expect(src).toContain('action === "return-to-pending"');
-    expect(src).toContain("this.orchestrator.returnToPending(");
+    expect(src).toContain("server.orchestrator.returnToPending(");
     expect(src).toContain("sendActionError");
   });
 

@@ -708,6 +708,8 @@ describe("TASK-W.5a spawn 静态禁令", () => {
       "daemon/runner/command-runner.ts",
       "daemon/runner/process-tree.ts",
       "daemon/server.ts",
+      // TASK-J.42：Diff API 的 git diff 随合同路由整段搬家
+      "daemon/http/contract-routes.ts",
       "daemon/editor/launcher.ts",
       // TASK-C.10h：废纸篓 trash/osascript
       "daemon/editor/repo-delete.ts",
