@@ -57,6 +57,6 @@
 | [`consistency-audit.md`](./consistency-audit.md) OP-39 | `daemon/server.ts` 与 `src/routes/index.tsx` 的大文件结构债。清算时机在 v0.3 方向拍板之后 | 待指定 |
 | [`ci2-sample-assessment-brief.md`](./ci2-sample-assessment-brief.md) | CI.2 维持 Hold，不开工 | P-245 |
 | [`route-split-assessment-brief.md`](./route-split-assessment-brief.md) | 整拆仍不做。第一批 [`TASK-J.42`](../specs/development-tasks-completed.md#task-j.42) 已抽出合同内联段（#324/`b331cd4`）。Console 与第二批未立卡 | P-258 |
-| Windows 路径分隔符导致 spawn/cli-host 白名单匹配失效 | 存量。白名单写正斜杠，Windows `path.relative` 出反斜杠。#318 基线 18 条；#324 后 19 条，多出 `daemon\http\contract-routes.ts`，同因。已立 [`TASK-J.43`](../specs/development-tasks-active.md#task-j.43)（P-259），未开工，不销账 | P-259 |
+| Windows 路径分隔符导致 spawn/cli-host 白名单匹配失效 | 已修，J.43。[#329](https://github.com/he18718143986-design/IDE/pull/329)/`32bdab9` 在 cli-host 静态禁令比较前把 `path.relative` 收成正斜杠。19 条反斜杠红消除。其余 Windows 存量未动 | P-260 |
 | `TASK-D.1e`、`TASK-S.3` | 维持 DEFERRED | 另案，不在本轮 |
 | 上方 GAP-R22、GAP-STRESS | 已补。重建版补入，原文未逐字核对 | P-253；找回原文后可再替换 |
