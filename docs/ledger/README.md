@@ -22,6 +22,7 @@
 | [`ci2-sample-assessment-brief.md`](./ci2-sample-assessment-brief.md) | CI.2 只读样本量评估（P-245）：三门禁样本表 + 中位数 + 排除口径；结论「不够整卡放宽开工」 | evidence brief；**Hold 不开工**；下次评估触发见简报 §2 |
 | [`route-split-assessment-brief.md`](./route-split-assessment-brief.md) | 路由拆分只读评估（P-255）：合同内联段与 Console 集中度；结论「暂缓整拆」 | planning brief；第一批 [`TASK-J.42`](../specs/development-tasks-completed.md#task-j.42) 已 COMPLETED（#324/`b331cd4`，P-258）。Console 与第二批未立卡 |
 | [`adr0015-mainline-breakpoint.md`](./adr0015-mainline-breakpoint.md) | ADR-0015 主链只读走查（P-261）：一句需求之后得不到可审阅的 `SchemeDraftV2` | 断点记录；不立卡、不施工 |
+| [`adr0015-breakpoint-fix-assessment.md`](./adr0015-breakpoint-fix-assessment.md) | 断点修复评估（P-262）：建议生产注入意图编译器模型客户端，不把离线语料写入台账 | 评估；`ai_inferred`；不立卡、不施工 |
 | [`decision-class-crosswalk.md`](./decision-class-crosswalk.md) | 现行五类与目标态八类的对照。不改五类，不把八类写进规格正文 | 对照；不是施工权威 |
 
 ## 蓝图存档（目标态未激活 · TASK-J.41a）
@@ -58,7 +59,7 @@
 | [`consistency-audit.md`](./consistency-audit.md) OP-39 | `daemon/server.ts` 与 `src/routes/index.tsx` 的大文件结构债。清算时机在 v0.3 方向拍板之后 | 待指定 |
 | [`ci2-sample-assessment-brief.md`](./ci2-sample-assessment-brief.md) | CI.2 维持 Hold，不开工 | P-245 |
 | [`route-split-assessment-brief.md`](./route-split-assessment-brief.md) | 整拆仍不做。第一批 [`TASK-J.42`](../specs/development-tasks-completed.md#task-j.42) 已抽出合同内联段（#324/`b331cd4`）。Console 与第二批未立卡 | P-258 |
-| [`adr0015-mainline-breakpoint.md`](./adr0015-mainline-breakpoint.md) | 一句需求发出后，得不到可审阅的 `SchemeDraftV2`。未立卡 | P-261 |
+| [`adr0015-mainline-breakpoint.md`](./adr0015-mainline-breakpoint.md) | 一句需求发出后，得不到可审阅的 `SchemeDraftV2`。修复评估见 [`adr0015-breakpoint-fix-assessment.md`](./adr0015-breakpoint-fix-assessment.md)（P-262）。未立卡 | P-262 |
 | Windows 路径分隔符导致 spawn/cli-host 白名单匹配失效 | 已修，J.43。[#329](https://github.com/he18718143986-design/IDE/pull/329)/`32bdab9` 在 cli-host 静态禁令比较前把 `path.relative` 收成正斜杠。19 条反斜杠红消除。其余 Windows 存量未动 | P-260 |
 | `TASK-D.1e`、`TASK-S.3` | 维持 DEFERRED | 另案，不在本轮 |
 | 上方 GAP-R22、GAP-STRESS | 已补。重建版补入，原文未逐字核对 | P-253；找回原文后可再替换 |
