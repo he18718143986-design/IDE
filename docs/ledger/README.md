@@ -31,18 +31,18 @@
 | 文件 | 内容 |
 | :--- | :--- |
 | [`target-doc-system-spec.md`](./target-doc-system-spec.md) | v3 终稿。合同单位 = 方案（Q-14）；AI 技术顾问（Q-15）；单方案串行；§8 多需求并行默认关闭 |
-| [`target-doc-system-stress-test.md`](./target-doc-system-stress-test.md) | R17–R23 落点索引。T-1～T-7 与 DEF-1～7 的情节未随终稿粘贴，存档不补写 |
+| [`target-doc-system-stress-test.md`](./target-doc-system-stress-test.md) | R17–R23 落点索引仍在。T-1～T-7 与 DEF-1～7 已按 P-253 重建版补入，原文未逐字核对 |
 | [`target-vs-current-gap-brief.md`](./target-vs-current-gap-brief.md) | 合同单位差异、四态标记差异、六件可反哺机制三栏表 |
 | [`target-vs-current-analysis.md`](./target-vs-current-analysis.md) | 区别分析：同源但平行；`.stagent/` 运行时层对照；编号撞车 |
 
-### 存档待补（不挡 #315 合入）
+### 存档待补（P-253 已补，重建版）
 
-两条都是终稿粘贴时的原文缺口，不是仓库侧读错。补写从 Claude 会话取回，或由业主直接补；补完另开 docs PR 更新存档文件，不改已合入的 v3 正文编号。
+两条都是终稿粘贴时的原文缺口，不是仓库侧读错。P-253 已补入，重建版补入，原文未逐字核对。不改已合入的 v3 正文编号。
 
 | 编号 | 记录 | 补法 |
 | :--- | :--- | :--- |
-| GAP-R22 | spec v3 缺 R22 正文，待补。Q-11 接受 R17–R23，终稿没有 R22 单独条款。待补内容为：验收后翻案（accepted 永不重开）、新 REQ 带 `amends:`、事因三分类。 | 回 Claude 会话或业主直接补，再走 docs PR |
-| GAP-STRESS | `target-doc-system-stress-test.md` 只有 R17–R23 落点索引。T-1～T-7 情节与 DEF-1～7 推演过程未随终稿粘贴。 | 从 Claude 会话取回原文后补入该存档文件 |
+| GAP-R22 | 已补。重建版补入，原文未逐字核对。补入位置为 `target-doc-system-spec.md` §4：验收后翻案（`accepted` 永不重开）、新 REQ 带 `amends:`、事因三分类「漏检 / 翻译错 / 需求变」。 | P-253 已落入。原句仍可在找回 Claude 原文后另开 docs PR 替换 |
+| GAP-STRESS | 已补。重建版补入，原文未逐字核对。`target-doc-system-stress-test.md` 保留 R17–R23 落点索引，并在其后补入 T-1～T-7 与 DEF-1～7。 | P-253 已落入。编号按 R17–R23 顺序对齐，不是原文编号 |
 
 ## 开放项
 
@@ -54,4 +54,4 @@
 | [`consistency-audit.md`](./consistency-audit.md) OP-39 | `daemon/server.ts` 与 `src/routes/index.tsx` 的大文件结构债。清算时机在 v0.3 方向拍板之后 | 待指定 |
 | [`ci2-sample-assessment-brief.md`](./ci2-sample-assessment-brief.md) | CI.2 维持 Hold，不开工 | P-245 |
 | `TASK-D.1e`、`TASK-S.3` | 维持 DEFERRED | 另案，不在本轮 |
-| 上方 GAP-R22、GAP-STRESS | 终稿粘贴缺 R22 正文，压力测试缺场景情节 | 业主整理原文后另开 docs PR |
+| 上方 GAP-R22、GAP-STRESS | 已补。重建版补入，原文未逐字核对 | P-253；找回原文后可再替换 |
