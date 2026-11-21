@@ -1508,3 +1508,133 @@ governance:
 #### 【Task J.41b】目标态可反哺项第一批（文档口径 + 两条存证）`[COMPLETED · 正文已迁]`
 
 > 本卡已 **COMPLETED**（施工 [#318](https://github.com/he18718143986-design/IDE/pull/318) squash `6f2ec657101983d0f263f0a80f8d0225244fa4c6`；完工回写 P-252）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.41b) §3.4bc。诚实口径：**可反哺项第一批已交付（文档口径五条 + 白话哈希存证 + escalation_missed 记录 + 五类↔八类对照表）**。R18 已拍板：不反哺（P-254）。R23 仍未施工，单独评估。
+
+### 3.4n daemon 路由拆分第一批（2026-11-21 · 立卡 P-256）
+
+> **立卡说明（2026-11-21 · P-256）**：Tina 审过 [`../ledger/route-split-assessment-brief.md`](../ledger/route-split-assessment-brief.md) 后授权立第一批，不整拆。本条只立 `TASK-J.42` 为 `[NEW_TASK]`，估算 M。**立卡 ≠ 开工**。不改产品代码。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。R23 暂缓。Console 拆分与第二批未立卡。
+
+<a id="task-j.42"></a>
+
+#### 【Task J.42】daemon 路由拆分第一批：合同内联段抽出 `[NEW_TASK]`
+
+```yaml task-card
+id: TASK-J.42
+status: NEW_TASK
+contract:
+  intent:
+    title: daemon 路由拆分第一批：合同内联段抽出
+    description: >-
+      把 handleHttpRequest 里仍内联的合同生命周期分支抽到
+      daemon/http/contract-routes.ts，前门留一行转交。
+      纯移动：不改状态码、错误码、正则顺序，不改实例字段的读写时机。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J42-P1
+      check: auto
+      text: >-
+        创建、scope-revision、gateway-violation、rework、admit、approve、
+        run-worker、merge、merge-decision、diff、diff-files、open-editor、
+        resume、return-to-pending、abort、execute 从 handleHttpRequest 抽到
+        daemon/http/contract-routes.ts。前门对该前缀只留一行转交。
+    - id: J42-P2
+      check: auto
+      text: >-
+        正则顺序不变：scope-revision，然后 gateway-violation，然后 rework，
+        然后通用 admit|approve|execute|run-worker|open-editor|diff-files|diff|merge-decision|merge|evidence|resume|abort|return-to-pending。
+        改了顺序即失败。
+    - id: J42-P3
+      check: auto
+      text: >-
+        状态码与错误码不变。判断条件不顺手改写。改了任一即失败。
+    - id: J42-P4
+      check: auto
+      text: >-
+        activeContracts、targetAdvancedContracts、证据监听、真预览进程、
+        deadlock、stoppingContracts、vault、orchestrator 的读写时机不变。
+        改了任一即失败。
+    - id: J42-P5
+      check: auto
+      text: >-
+        新文件接收窄上下文：repoRoot、orchestrator、sendJson、readJsonBody、
+        sendActionError，以及合同更新与证据监听的开关。
+        接口太宽时可以暂传 server，文件头必须注明这是过渡。
+    - id: J42-P6
+      check: auto
+      text: >-
+        合入前跑过 merge-decision-d4、resume-abort、scheme-confirm-http-injection、
+        scheme-confirm-scope-drift、scope-revision-api、diff-endpoint-security、
+        golden-slice。这些测试仍打在 Daemon 的 HTTP 上。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/http/contract-routes.ts
+      - daemon/server.ts
+      - tests/integration/merge-decision-d4.test.ts
+      - tests/integration/resume-abort.test.ts
+      - tests/integration/scheme-confirm-http-injection.test.ts
+      - tests/integration/scheme-confirm-scope-drift.test.ts
+      - tests/daemon/scope-revision-api.test.ts
+      - tests/daemon/diff-endpoint-security.test.ts
+      - tests/e2e/golden-slice.test.ts
+    readonly_paths:
+      - src/routes/index.tsx
+      - docs/ledger/route-split-assessment-brief.md
+  verification:
+    commands:
+      - { alias: contract-http, executable: npx, args: [vitest, run, tests/integration/merge-decision-d4.test.ts, tests/integration/resume-abort.test.ts, tests/integration/scheme-confirm-http-injection.test.ts, tests/integration/scheme-confirm-scope-drift.test.ts, tests/daemon/scope-revision-api.test.ts, tests/daemon/diff-endpoint-security.test.ts, tests/e2e/golden-slice.test.ts] }
+design:
+  approach: >-
+    只搬合同内联段。前门在 /api/contracts 鉴权之后调用新文件的一个函数。
+    优先传窄上下文。若参数太多，暂传 server，并在 contract-routes.ts 文件头写明过渡。
+    测试文件只在导入路径不得不改时才改，不改断言。
+    要抽 front-door、要搬已有 handle*、或要动 Console，先停工按修卡上报。
+  touches:
+    - { path: daemon/http/contract-routes.ts, change: create, why: 承接合同生命周期内联分支, symbols: [handleContractRoutes] }
+    - { path: daemon/server.ts, change: modify, why: handleHttpRequest 对 /api/contracts 改为一行转交, symbols: [handleHttpRequest] }
+    - { path: tests/integration/merge-decision-d4.test.ts, change: modify, why: 仅当导入路径不得不改, symbols: [] }
+    - { path: tests/integration/resume-abort.test.ts, change: modify, why: 仅当导入路径不得不改, symbols: [] }
+    - { path: tests/integration/scheme-confirm-http-injection.test.ts, change: modify, why: 仅当导入路径不得不改, symbols: [] }
+    - { path: tests/integration/scheme-confirm-scope-drift.test.ts, change: modify, why: 仅当导入路径不得不改, symbols: [] }
+    - { path: tests/daemon/scope-revision-api.test.ts, change: modify, why: 仅当导入路径不得不改, symbols: [] }
+    - { path: tests/daemon/diff-endpoint-security.test.ts, change: modify, why: 仅当导入路径不得不改, symbols: [] }
+    - { path: tests/e2e/golden-slice.test.ts, change: modify, why: 仅当导入路径不得不改, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J42-P1, test_path: tests/e2e/golden-slice.test.ts, level: e2e, debt: 既有 HTTP 路径；本卡未新增用例 }
+    - { acceptance_id: J42-P2, test_path: tests/daemon/scope-revision-api.test.ts, level: unit, debt: 既有范围修订路径；顺序约束靠 diff 核对 }
+    - { acceptance_id: J42-P3, test_path: tests/integration/merge-decision-d4.test.ts, level: integration, debt: 既有合入与 409 路径 }
+    - { acceptance_id: J42-P4, test_path: tests/integration/resume-abort.test.ts, level: integration, debt: 既有恢复与中止路径 }
+    - { acceptance_id: J42-P5, test_path: tests/integration/scheme-confirm-http-injection.test.ts, level: integration, debt: 既有确认后建合同路径 }
+    - { acceptance_id: J42-P6, test_path: tests/daemon/diff-endpoint-security.test.ts, level: unit, debt: 既有 diff 路径；施工跑卡面列出的七个文件 }
+governance:
+  spec_refs:
+    - docs/ledger/route-split-assessment-brief.md
+  depends_on: []
+  code_facts:
+    - { ref: "daemon/server.ts::handleHttpRequest", note: 合同创建、执行、合入仍写在这个分发函数里 }
+    - { ref: "daemon/server.ts:6115-7048", note: /api/contracts 前缀内的内联分支，本卡只搬这一段 }
+    - { ref: "daemon/server.ts:6520-6521", note: 通用动作正则在 scope-revision、gateway-violation、rework 之后 }
+    - { ref: "docs/ledger/route-split-assessment-brief.md:163-177", note: 正则顺序与实例字段清单是只读约束 }
+  non_goals:
+    - 不拆 src/routes/index.tsx 的 Console
+    - 不把已经独立的 handle* 前缀再搬文件
+    - 不拆 /api/repo、/api/knowledge、/api/arch/graph、/api/client-events
+    - 不抽 front-door；若施工发现必须抽，停工上报，不写进本卡 diff
+    - 不改状态码、错误码、正则顺序、实例字段读写时机
+    - 不改产品行为，不评估功能改动
+  fail:
+    - 改状态码、错误码或判断条件
+    - 调换 scope-revision、gateway-violation、rework 与通用动作正则的顺序
+    - 改变 activeContracts、targetAdvancedContracts、证据监听、真预览进程、deadlock、stoppingContracts、vault、orchestrator 的读写时机
+    - 修改 Console 或把第二批前缀写进本卡 diff
+    - 未跑卡面列出的七个测试就声称可合入
+  adr_revisions: []
+  defaults: []
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```

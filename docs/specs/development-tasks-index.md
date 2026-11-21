@@ -207,6 +207,7 @@
 | `TASK-J.38e` | `COMPLETED` | 测试目标建议层（ai_inferred；立卡 P-243；施工 #307 `6d7faca`；完工回写 P-244；估算 S） | [正文](./development-tasks-completed.md#task-j.38e) |
 | `TASK-J.41a` | `COMPLETED` | 目标态文档治理蓝图入库（未激活存档；纯 docs；估算 S；P-250）。蓝图 Q-n 与引擎测试锚点 Q-n 编号分家，不改蓝图正文编号 | [规格](../ledger/target-doc-system-spec.md) · [压力测试索引](../ledger/target-doc-system-stress-test.md) · [对照](../ledger/target-vs-current-gap-brief.md) · [区别](../ledger/target-vs-current-analysis.md) |
 | `TASK-J.41b` | `COMPLETED` | 目标态可反哺项第一批（文档口径 + 两条存证；立卡 P-251；施工 #318 `6f2ec65`；完工回写 P-252；估算 M；R18 已拍板：不反哺（P-254）；R23 未施工） | [正文](./development-tasks-completed.md#task-j.41b) |
+| `TASK-J.42` | `NEW_TASK` | daemon 路由拆分第一批：合同内联段抽出（立卡 P-256；估算 M；未开工；不含 Console） | [正文](./development-tasks-active.md#task-j.42) |
 
 ---
 
