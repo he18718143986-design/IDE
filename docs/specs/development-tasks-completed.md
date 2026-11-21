@@ -9661,3 +9661,134 @@ governance:
 
 * **背景**：白名单写正斜杠，Windows 的 `path.relative` 返回反斜杠。
 * **取舍**：只在 cli-host 静态禁令比较前把路径收成正斜杠。19 条反斜杠红消除。其余 Windows 存量失败未动。
+
+### 3.4bf 有钥匙就注入意图编译器模型客户端（J.45 · 完工回写 P-264）
+
+<a id="task-j.45"></a>
+
+### 【Task J.45】有钥匙就注入意图编译器模型客户端 `[COMPLETED · 立卡 P-263 · 施工 #334 · 完工回写 P-264]`
+
+> **归档注记（2026-11-21 · P-264）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266/#288/#291/#298/#301/#304/#307/#312/#318/#324/#329；Bugbot 未跑成不挡）。[#334](https://github.com/he18718143986-design/IDE/pull/334) squash `92e5a63c43ed4d174a65efc4b12264c974aef258` 于 2026-11-21 22:14 香港时间合入（由我执行；pre-merge head `0de1131f5006d938003879736ae2e74077da3050`；父提交 `4bcc9965bc795deae1b1282af1c8b38a03c36de8`）。合入前必需面 12 项全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit 实跑通过，无本卡相关红），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit，16 文件 28 项，`continue-on-error`）。Windows 上 `intent-compiler-openai-client` 4 项与 `intent-compiler-journey-wiring` 2 项为绿。Bugbot 合入时仍 `IN_PROGRESS`（用量上限，request `644552fa-7c8c-4eb5-9e6c-f708d7c6ef71`）。没有 `TASK-J.44`。估算仍为 M。诚实口径：**有钥匙时注入意图编译器模型客户端已交付（常驻客户端 + 显式 hasModelKey + generate 内重读钥匙），无钥匙保持离线不产方案；端到端浏览器验证未做**。ledger 第 62 行挂账已销，注明已修 J.45。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。R23 暂缓。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.45
+status: COMPLETED
+contract:
+  intent:
+    title: 有钥匙就注入意图编译器模型客户端
+    description: >-
+      生产 Daemon 常驻一个 IntentCompilerModelClient。
+      有钥匙时一句需求写成可审阅的 SchemeDraftV2；
+      无钥匙仍走离线，不写台账。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J45-P1
+      check: auto
+      text: >-
+        有钥匙时，右栏一句需求经编译循环把 SchemeDraftV2 写入台账，
+        条目带 user_said 证据。中栏可审阅，确认方案出现。
+    - id: J45-P2
+      check: auto
+      text: >-
+        无钥匙时仍走 runOffline，只打横幅，不写台账，不产方案。
+    - id: J45-P3
+      check: auto
+      text: >-
+        客户端对象常驻。ensureIntentCompilerHost 显式传
+        hasModelKey: () => getRuntimeKey() != null。
+        generate 内再读一次 getRuntimeKey()。
+        启动之后用 setRuntimeKey 写入的钥匙，不重启进程也能被编译循环用到。
+        不得用「客户端非空」代替有钥匙。
+    - id: J45-P4
+      check: auto
+      text: >-
+        不接 onOfflineFallback 把 buildOfflineSchemeDraft 写入台账。
+        不改右栏逐字节相同，不把编译结果写进右栏。
+        不接 buildSupervisorPrompt。不改 ADR-0015。不激活蓝图。
+        不做重试、超时、降级策略增强。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/supervisor/intent-compiler/openai-compiler-client.ts
+      - daemon/server.ts
+      - bin/stagent.ts
+      - tests/unit/intent-compiler-openai-client.test.ts
+      - tests/integration/intent-compiler-journey-wiring.test.ts
+    readonly_paths:
+      - daemon/supervisor/intent-compiler/compile-loop.ts
+      - src/lib/journey/compiler-output-schema.ts
+      - daemon/worker/key-store.ts
+      - daemon/worker/openai-client.ts
+      - src/routes/index.tsx
+      - docs/ledger/adr0015-breakpoint-fix-assessment.md
+  verification:
+    commands:
+      - { alias: compiler-client, executable: npx, args: [vitest, run, tests/unit/intent-compiler-openai-client.test.ts, tests/integration/intent-compiler-journey-wiring.test.ts] }
+design:
+  approach: >-
+    新建 daemon/supervisor/intent-compiler/openai-compiler-client.ts。
+    generate 收到 system、prompt、enums、signal、temperature 0。
+    用 buildCompilerOutputSchema(enums) 作 schema，走 generateObject，
+    把 object 放进 IntentCompilerModelResult.ok=true 的 raw。
+    用量映射为 input_tokens / output_tokens，model_id 用 getRuntimeModel()。
+    调用前再读 getRuntimeKey()；没有钥匙返回 ok:false reason invalid，不发请求。
+    不复用 OpenAiWorkerClient。不加重试。循环里已有的超时中止保持不动。
+    ensureIntentCompilerHost 在没有显式测试客户端时，传入这个常驻客户端，
+    并传 hasModelKey: () => getRuntimeKey() != null。
+    测试若传入 intentCompilerModelClient，仍用该桩，并传 hasModelKey: () => true，
+    以免桩被钥匙判断挡掉。
+    bin/stagent.ts 在 writable_paths 里。客户端改在 Daemon 内构造时，这个文件不改。
+    评估报告第 24 行的启动时一次性构造，以本卡为准，不照做。
+  touches:
+    - { path: daemon/supervisor/intent-compiler/openai-compiler-client.ts, change: create, why: 生产用 IntentCompilerModelClient, symbols: [] }
+    - { path: daemon/server.ts, change: modify, why: ensureIntentCompilerHost 接常驻客户端与 hasModelKey, symbols: [ensureIntentCompilerHost] }
+    - { path: bin/stagent.ts, change: modify, why: 仅当必须从进程入口传入客户端, symbols: [] }
+    - { path: tests/unit/intent-compiler-openai-client.test.ts, change: create, why: 无钥匙不请求；setRuntimeKey 之后 generate 读到新钥匙, symbols: [] }
+    - { path: tests/integration/intent-compiler-journey-wiring.test.ts, change: modify, why: 仅当现有桩或离线用例必须跟着接线调整, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J45-P1, test_path: tests/unit/intent-compiler-openai-client.test.ts, level: unit, case: 写出可审阅方案 }
+    - { acceptance_id: J45-P2, test_path: tests/integration/intent-compiler-journey-wiring.test.ts, level: integration, case: 无模型钥匙时走离线兜底 }
+    - { acceptance_id: J45-P3, test_path: tests/unit/intent-compiler-openai-client.test.ts, level: unit, case: 无钥匙不发请求 }
+    - { acceptance_id: J45-P4, test_path: tests/unit/intent-compiler-openai-client.test.ts, level: unit, case: 此前无钥匙不写台账 }
+governance:
+  spec_refs:
+    - docs/ledger/adr0015-mainline-breakpoint.md
+    - docs/ledger/adr0015-breakpoint-fix-assessment.md
+  depends_on: []
+  code_facts:
+    - { ref: "daemon/supervisor/intent-compiler/openai-compiler-client.ts:25-28", note: generate 内 getRuntimeKey() == null 则 ok false、reason invalid，不发请求 }
+    - { ref: "daemon/supervisor/intent-compiler/openai-compiler-client.ts:44-60", note: generateObject 用 buildCompilerOutputSchema，maxRetries 0，raw 为 object，model_id 为 getRuntimeModel() }
+    - { ref: "daemon/server.ts:651-657", note: 选项缺省时构造常驻生产客户端，不看启动时有没有钥匙 }
+    - { ref: "daemon/server.ts:990-992", note: 生产路径 hasModelKey 为 getRuntimeKey() != null；显式桩为 () => true }
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:318-321", note: hasModelKey 为假或 modelClient 为 null 都走 runOffline }
+    - { ref: "daemon/worker/key-store.ts:68-69", note: getRuntimeKey 读进程内钥匙，否则 OPENAI_API_KEY }
+    - { ref: "tests/unit/intent-compiler-openai-client.test.ts:196-269", note: 无钥匙不写台账；setRuntimeKey 后写出 user_said，中栏 available 为真 }
+    - { ref: "bin/stagent.ts:344-351", note: createDaemon 仍不传 intentCompilerModelClient }
+  non_goals:
+    - 不接 onOfflineFallback，不把 buildOfflineSchemeDraft 写入台账
+    - 不改右栏逐字节相同，不把编译结果写进右栏
+    - 不接 buildSupervisorPrompt
+    - 不改 ADR-0015，不激活蓝图
+    - 不做重试、超时、降级策略增强
+  fail:
+    - 用「客户端非空」代替 hasModelKey
+    - 无钥匙时调用模型或写入台账
+    - 复用 OpenAiWorkerClient 的文件补丁协议
+    - 把离线启发式写入台账
+    - 修改右栏发送正文或 ADR-0015
+  adr_revisions: []
+  defaults: []
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 334, commit: 92e5a63c43ed4d174a65efc4b12264c974aef258 }
+```
+
+* **背景**：官方 Daemon 不注入意图编译器模型客户端，一句需求写不出可审阅方案。
+* **取舍**：客户端常驻，显式 `hasModelKey`，`generate` 内再读钥匙。无钥匙仍离线、不写台账。端到端浏览器验证未做。
+
