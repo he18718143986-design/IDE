@@ -1524,3 +1524,128 @@ governance:
 #### 【Task J.43】Windows 白名单路径分隔符归一化 `[COMPLETED · 正文已迁]`
 
 > 本卡已 **COMPLETED**（施工 [#329](https://github.com/he18718143986-design/IDE/pull/329) squash `32bdab937c24d0420fd0487d802aab328a9f3eef`；立卡 P-259；完工回写 P-260）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.43) §3.4be。诚实口径：**Windows 白名单路径分隔符已归一化（`split(path.sep).join("/")`），cli-host 静态禁令 19 条反斜杠红消除（Windows Unit 17 文件 30 项 → 16 文件 28 项），其余 Windows 存量失败未动**。
+
+### 3.4p 有钥匙就注入意图编译器模型客户端（2026-11-21 · 立卡 P-263）
+
+> **立卡说明（2026-11-21 · P-263）**：Tina 点名立卡。编号用 `TASK-J.45`，没有 `TASK-J.44`。P-261 断点是官方 Daemon 不注入 `intentCompilerModelClient`，编译循环离线、不写 `SchemeDraftV2`。P-262 建议注入生产客户端。钥匙判定以本卡为准，覆盖评估报告第 24 行「启动时有钥匙才构造」的写法。本条只立 `[NEW_TASK]`，估算 M。**立卡 ≠ 开工**。不改产品代码。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。R23 暂缓。Console 拆分与第二批未立卡。
+
+<a id="task-j.45"></a>
+
+#### 【Task J.45】有钥匙就注入意图编译器模型客户端 `[NEW_TASK]`
+
+```yaml task-card
+id: TASK-J.45
+status: NEW_TASK
+contract:
+  intent:
+    title: 有钥匙就注入意图编译器模型客户端
+    description: >-
+      生产 Daemon 常驻一个 IntentCompilerModelClient。
+      有钥匙时一句需求写成可审阅的 SchemeDraftV2；
+      无钥匙仍走离线，不写台账。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J45-P1
+      check: auto
+      text: >-
+        有钥匙时，右栏一句需求经编译循环把 SchemeDraftV2 写入台账，
+        条目带 user_said 证据。中栏可审阅，确认方案出现。
+    - id: J45-P2
+      check: auto
+      text: >-
+        无钥匙时仍走 runOffline，只打横幅，不写台账，不产方案。
+    - id: J45-P3
+      check: auto
+      text: >-
+        客户端对象常驻。ensureIntentCompilerHost 显式传
+        hasModelKey: () => getRuntimeKey() != null。
+        generate 内再读一次 getRuntimeKey()。
+        启动之后用 setRuntimeKey 写入的钥匙，不重启进程也能被编译循环用到。
+        不得用「客户端非空」代替有钥匙。
+    - id: J45-P4
+      check: auto
+      text: >-
+        不接 onOfflineFallback 把 buildOfflineSchemeDraft 写入台账。
+        不改右栏逐字节相同，不把编译结果写进右栏。
+        不接 buildSupervisorPrompt。不改 ADR-0015。不激活蓝图。
+        不做重试、超时、降级策略增强。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/supervisor/intent-compiler/openai-compiler-client.ts
+      - daemon/server.ts
+      - bin/stagent.ts
+      - tests/unit/intent-compiler-openai-client.test.ts
+      - tests/integration/intent-compiler-journey-wiring.test.ts
+    readonly_paths:
+      - daemon/supervisor/intent-compiler/compile-loop.ts
+      - src/lib/journey/compiler-output-schema.ts
+      - daemon/worker/key-store.ts
+      - daemon/worker/openai-client.ts
+      - src/routes/index.tsx
+      - docs/ledger/adr0015-breakpoint-fix-assessment.md
+  verification:
+    commands:
+      - { alias: compiler-client, executable: npx, args: [vitest, run, tests/unit/intent-compiler-openai-client.test.ts, tests/integration/intent-compiler-journey-wiring.test.ts] }
+design:
+  approach: >-
+    新建 daemon/supervisor/intent-compiler/openai-compiler-client.ts。
+    generate 收到 system、prompt、enums、signal、temperature 0。
+    用 buildCompilerOutputSchema(enums) 作 schema，走 generateObject，
+    把 object 放进 IntentCompilerModelResult.ok=true 的 raw。
+    用量映射为 input_tokens / output_tokens，model_id 用 getRuntimeModel()。
+    调用前再读 getRuntimeKey()；没有钥匙返回 ok:false reason invalid，不发请求。
+    不复用 OpenAiWorkerClient。不加重试。循环里已有的超时中止保持不动。
+    ensureIntentCompilerHost 在没有显式测试客户端时，传入这个常驻客户端，
+    并传 hasModelKey: () => getRuntimeKey() != null。
+    测试若传入 intentCompilerModelClient，仍用该桩，并传 hasModelKey: () => true，
+    以免桩被钥匙判断挡掉。
+    bin/stagent.ts 在 writable_paths 里。客户端改在 Daemon 内构造时，这个文件不改。
+    评估报告第 24 行的启动时一次性构造，以本卡为准，不照做。
+  touches:
+    - { path: daemon/supervisor/intent-compiler/openai-compiler-client.ts, change: create, why: 生产用 IntentCompilerModelClient, symbols: [] }
+    - { path: daemon/server.ts, change: modify, why: ensureIntentCompilerHost 接常驻客户端与 hasModelKey, symbols: [ensureIntentCompilerHost] }
+    - { path: bin/stagent.ts, change: modify, why: 仅当必须从进程入口传入客户端, symbols: [] }
+    - { path: tests/unit/intent-compiler-openai-client.test.ts, change: create, why: 无钥匙不请求；setRuntimeKey 之后 generate 读到新钥匙, symbols: [] }
+    - { path: tests/integration/intent-compiler-journey-wiring.test.ts, change: modify, why: 仅当现有桩或离线用例必须跟着接线调整, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J45-P1, test_path: tests/integration/intent-compiler-journey-wiring.test.ts, level: integration, debt: 既有桩已证明一句需求可落 user_said；生产客户端用单测锁钥匙与请求，不打真实网络 }
+    - { acceptance_id: J45-P2, test_path: tests/integration/intent-compiler-journey-wiring.test.ts, level: integration, debt: 既有 null 客户端用例保持 offline、modelCalls 为 0 }
+    - { acceptance_id: J45-P3, test_path: tests/unit/intent-compiler-openai-client.test.ts, level: unit, debt: 本卡新建；覆盖常驻客户端与启动后写入钥匙 }
+    - { acceptance_id: J45-P4, test_path: tests/unit/intent-compiler-openai-client.test.ts, level: unit, debt: 不写离线启发式；右栏与 ADR 不在本卡 diff }
+governance:
+  spec_refs:
+    - docs/ledger/adr0015-mainline-breakpoint.md
+    - docs/ledger/adr0015-breakpoint-fix-assessment.md
+  depends_on: []
+  code_facts:
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:95-98", note: IntentCompilerModelClient.generate；注释写生产注入 generateObject }
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:318-321", note: hasModelKey 为假或 modelClient 为 null 都走 runOffline }
+    - { ref: "daemon/server.ts:641-644", note: intentCompilerModelClient 缺省为 null }
+    - { ref: "daemon/server.ts:972-974", note: ensureIntentCompilerHost 只传 modelClient，未传 hasModelKey }
+    - { ref: "daemon/worker/key-store.ts:68-69", note: getRuntimeKey 读进程内钥匙，否则 OPENAI_API_KEY }
+    - { ref: "src/lib/journey/compiler-output-schema.ts:232-232", note: buildCompilerOutputSchema 按 enums 构造生成端 schema }
+    - { ref: "bin/stagent.ts:344-351", note: createDaemon 不传 intentCompilerModelClient }
+  non_goals:
+    - 不接 onOfflineFallback，不把 buildOfflineSchemeDraft 写入台账
+    - 不改右栏逐字节相同，不把编译结果写进右栏
+    - 不接 buildSupervisorPrompt
+    - 不改 ADR-0015，不激活蓝图
+    - 不做重试、超时、降级策略增强
+  fail:
+    - 用「客户端非空」代替 hasModelKey
+    - 无钥匙时调用模型或写入台账
+    - 复用 OpenAiWorkerClient 的文件补丁协议
+    - 把离线启发式写入台账
+    - 修改右栏发送正文或 ADR-0015
+  adr_revisions: []
+  defaults: []
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```

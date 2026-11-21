@@ -209,6 +209,7 @@
 | `TASK-J.41b` | `COMPLETED` | 目标态可反哺项第一批（文档口径 + 两条存证；立卡 P-251；施工 #318 `6f2ec65`；完工回写 P-252；估算 M；R18 已拍板：不反哺（P-254）；R23 未施工） | [正文](./development-tasks-completed.md#task-j.41b) |
 | `TASK-J.42` | `COMPLETED` | daemon 路由拆分第一批：合同内联段抽出（立卡 P-256；修卡 P-257；施工 #324 `b331cd4`；完工回写 P-258；估算 M；不含 Console） | [正文](./development-tasks-completed.md#task-j.42) |
 | `TASK-J.43` | `COMPLETED` | Windows 白名单路径分隔符归一化（立卡 P-259；施工 #329 `32bdab9`；完工回写 P-260；估算 S；只动测试侧匹配） | [正文](./development-tasks-completed.md#task-j.43) |
+| `TASK-J.45` | `NEW_TASK` | 有钥匙就注入意图编译器模型客户端（立卡 P-263；估算 M；未开工；无 J.44） | [正文](./development-tasks-active.md#task-j.45) |
 
 ---
 
