@@ -212,6 +212,7 @@
 | `TASK-J.45` | `COMPLETED` | 有钥匙就注入意图编译器模型客户端（立卡 P-263；施工 #334 `92e5a63`；完工回写 P-264；估算 M；无 J.44；端到端浏览器验证未做） | [正文](./development-tasks-completed.md#task-j.45) |
 | `TASK-J.46` | `COMPLETED` | 编译器模型失败留下原因原文（立卡 P-265；施工 #337 `0ff3419`；完工回写 P-266；估算 S） | [正文](./development-tasks-completed.md#task-j.46) |
 | `TASK-J.47` | `COMPLETED` | 确认门禁标题不足：诊断与修复（立卡 P-268；施工 #342 `1dfac26`；完工回写 P-269；估算 S；J47-P4 手工 debt 未销） | [正文](./development-tasks-completed.md#task-j.47) · [诊断简报](../ledger/j47-title-gate-diagnosis-brief.md) |
+| `TASK-J.48` | `NEW_TASK` | 第二轮生成 schema 嵌套 anyOf 缺 type 修复（立卡 P-270；估算 S；未开工；不含 J47-P4 销账） | [正文](./development-tasks-active.md#task-j.48) |
 
 ---
 
