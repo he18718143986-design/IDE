@@ -1548,3 +1548,110 @@ governance:
 #### 【Task J.47】确认门禁标题不足：诊断与修复 `[COMPLETED · 正文已迁]`
 
 > 本卡已 **COMPLETED**（施工 [#342](https://github.com/he18718143986-design/IDE/pull/342) squash `1dfac26986eb13c9a48817d9818788fbc0f13ab5`；立卡 P-268；完工回写 P-269）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.47) §3.4bh。诚实口径：**组装兜底注入 `set_title` 已交付（模块名优先、quotes 兜底、已有不重复），门禁阈值未动；J47-P4 为手工 debt——真钥匙实测 `scheme-confirm` 的 `disabled` 为 false 待销账，未点按钮未冻结**。
+
+### 3.4s 第二轮生成 schema 嵌套 anyOf 缺 type（2026-11-23 · 立卡 P-270）
+
+<a id="task-j.48"></a>
+
+#### 【Task J.48】第二轮生成 schema 嵌套 anyOf 缺 type 修复 `[NEW_TASK]`
+
+```yaml task-card
+id: TASK-J.48
+status: NEW_TASK
+contract:
+  intent:
+    title: 第二轮生成 schema 嵌套 anyOf 缺 type 修复
+    description: >-
+      台账已有条目 id 时，生成 schema 里每个 anyOf 分支都带 type。
+      接受的值仍是现有 id、new: id 或空。真钥匙复测不在本卡验收内。
+    risk_level: LOW
+  acceptance:
+    - id: J48-P1
+      check: auto
+      text: >-
+        ids 含 ITEM-1 时，asSchema(buildCompilerOutputSchema).jsonSchema
+        不存在缺 type 的嵌套 anyOf。转换路径与 generateObject 相同。
+    - id: J48-P2
+      check: auto
+      text: >-
+        流程步骤 module_id 在 ids 非空时仍接受现有 id、new: 前缀 id 与空，
+        拒绝无关系字符串。只改 JSON Schema 形态，不改接受集。
+    - id: J48-P3
+      check: auto
+      text: >-
+        assembleCompilerOutput 仍是原六参；第 743-772 行标题兜底顺序仍在
+        （已有 set_title 不重复，其次模块名，再次 quotes）。单测读源码证明。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/lib/journey/compiler-output-schema.ts
+      - tests/unit/compiler-output-schema.test.ts
+    readonly_paths:
+      - src/lib/journey/scheme-draft.ts
+      - docs/specs/intent-compiler-prompt.md
+      - daemon/supervisor/intent-compiler/compile-loop.ts
+      - src/components/studio/SchemeReviewPane.tsx
+  verification:
+    commands:
+      - { alias: schema-anyof, executable: npx, args: [vitest, run, tests/unit/compiler-output-schema.test.ts] }
+design:
+  approach: >-
+    真钥匙复测（main 50ba47c，试玩目录已有 ITEM-1，T4）：
+    compiler_failure、stage=model、detail=network、elapsed_ms=261。
+    client_detail 为 Invalid json schema: field anyOf: field anyOf: missing field type。
+    空台账首轮没有这一层，P-267 能 compiler_applied。
+    立卡时全文件只有第 127 行是 z.union(...).nullable()，
+    落在流程步骤 module_id。其余 z.union 不是「联合再可空」。
+    施工再搜一遍同模式；仍只有这一处就只修这一处；若还有，同一修法一并改。
+    修法是让每个 anyOf 分支自带 type，接受值不变。
+    若必须改 enumOrNever 接受的字符串集合，停工上报。
+    不改门禁阈值，不改组装六参，不改标题兜底顺序。
+    J47-P4 真钥匙看按钮不在本卡验收内。
+  touches:
+    - { path: src/lib/journey/compiler-output-schema.ts, change: modify, why: 去掉缺 type 的嵌套 anyOf，接受值不变, symbols: [buildCompilerOutputSchema] }
+    - { path: tests/unit/compiler-output-schema.test.ts, change: modify, why: 用 asSchema 断言嵌套 anyOf 分支都有 type，并锁住接受集与组装签名, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J48-P1, test_path: tests/unit/compiler-output-schema.test.ts, level: unit, case: 现有 id 时嵌套 anyOf 分支都有 type }
+    - { acceptance_id: J48-P2, test_path: tests/unit/compiler-output-schema.test.ts, level: unit, case: "module_id 仍接受现有 id、new: 与空" }
+    - { acceptance_id: J48-P3, test_path: tests/unit/compiler-output-schema.test.ts, level: unit, case: 组装签名与标题兜底未改 }
+governance:
+  spec_refs:
+    - docs/specs/intent-compiler-prompt.md
+  depends_on:
+    - { id: TASK-J.47, kind: soft }
+  code_facts:
+    - { ref: "src/lib/journey/compiler-output-schema.ts:126-128", note: ids 非空时 module_id 为 z.union 再 nullable，这是唯一的联合再可空 }
+    - { ref: "src/lib/journey/compiler-output-schema.ts:743-772", note: 标题兜底已在；本卡不改这段顺序 }
+    - { ref: "tests/unit/compiler-output-schema.test.ts:14-18", note: 既有夹具 ids 已非空，但只断言 required 覆盖 properties }
+    - { ref: "tests/unit/compiler-output-schema.test.ts:165-168", note: asSchema().jsonSchema 与 generateObject 同一条转换路径 }
+  non_goals:
+    - 不改 isReviewableScheme / evaluateSchemeConfirmation 阈值与挡句
+    - 不改 assembleCompilerOutput 的六参签名
+    - 不改第 743-772 行标题兜底顺序
+    - 不把 J47-P4 真钥匙看按钮写进本卡验收
+    - 不点「确认方案」，不冻结
+    - 不改右栏逐字节
+    - 不改 ADR-0015
+    - 不改 enumOrNever 接受的字符串集合
+  fail:
+    - 放宽或收紧 module_id 的接受集来躲过 schema 报错
+    - 改组装签名或标题兜底顺序
+    - 改门禁阈值
+    - 未搜同模式就宣称只有一处，或发现多处却只改一处
+    - 必须改 enumOrNever 接受集时未停工
+  adr_revisions: []
+  defaults:
+    - "嵌套 anyOf 展平为同一层、每个分支自带 type；空、现有 id、new: id 都仍可过"
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：J47-P4 复测时第二轮 schema 被 DeepSeek 拒绝，组装兜底没跑到。标题仍空，按钮仍禁用。未点按钮，未冻结。
+* **取舍**：本卡只修 schema 形态，验收用单测。真钥匙看按钮仍是 J47-P4 的手工 debt，合入并重启 Daemon 后再测。
+* **立卡说明（2026-11-23 · P-270）**：Tina 授权立卡。**立卡 ≠ 开工**。先审施工方案再动代码。
