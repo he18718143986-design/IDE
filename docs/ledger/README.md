@@ -21,7 +21,7 @@
 | [`prompt-builder-live-send-path-brief.md`](./prompt-builder-live-send-path-brief.md) | prompt-builder 活发送路径只读定位（P-233）：J.35 已对齐但生产零调用；四缝事实 + 接线前置 | planning brief；**不立**接线卡；不施工 |
 | [`ci2-sample-assessment-brief.md`](./ci2-sample-assessment-brief.md) | CI.2 只读样本量评估（P-245）：三门禁样本表 + 中位数 + 排除口径；结论「不够整卡放宽开工」 | evidence brief；**Hold 不开工**；下次评估触发见简报 §2 |
 | [`route-split-assessment-brief.md`](./route-split-assessment-brief.md) | 路由拆分只读评估（P-255）：合同内联段与 Console 集中度；结论「暂缓整拆」 | planning brief；第一批 [`TASK-J.42`](../specs/development-tasks-completed.md#task-j.42) 已 COMPLETED（#324/`b331cd4`，P-258）。Console 与第二批未立卡 |
-| [`adr0015-mainline-breakpoint.md`](./adr0015-mainline-breakpoint.md) | ADR-0015 主链只读走查（P-261）：一句需求之后得不到可审阅的 `SchemeDraftV2` | 已修，J.45（[#334](https://github.com/he18718143986-design/IDE/pull/334)/`92e5a63`，P-264）。端到端浏览器验证未做 |
+| [`adr0015-mainline-breakpoint.md`](./adr0015-mainline-breakpoint.md) | ADR-0015 主链只读走查（P-261）：一句需求之后得不到可审阅的 `SchemeDraftV2` | 已修。真钥匙复测（P-267，main `59f9798`）已落 `user_said` 台账，中栏投影 `available=true`。报告写「确认方案」应可出，未记录浏览器里点到按钮 |
 | [`adr0015-breakpoint-fix-assessment.md`](./adr0015-breakpoint-fix-assessment.md) | 断点修复评估（P-262）：建议生产注入意图编译器模型客户端，不把离线语料写入台账 | 建议已由 J.45 交付。评估正文仍是当时的只读记录 |
 | [`decision-class-crosswalk.md`](./decision-class-crosswalk.md) | 现行五类与目标态八类的对照。不改五类，不把八类写进规格正文 | 对照；不是施工权威 |
 
@@ -59,8 +59,8 @@
 | [`consistency-audit.md`](./consistency-audit.md) OP-39 | `daemon/server.ts` 与 `src/routes/index.tsx` 的大文件结构债。清算时机在 v0.3 方向拍板之后 | 待指定 |
 | [`ci2-sample-assessment-brief.md`](./ci2-sample-assessment-brief.md) | CI.2 维持 Hold，不开工 | P-245 |
 | [`route-split-assessment-brief.md`](./route-split-assessment-brief.md) | 整拆仍不做。第一批 [`TASK-J.42`](../specs/development-tasks-completed.md#task-j.42) 已抽出合同内联段（#324/`b331cd4`）。Console 与第二批未立卡 | P-258 |
-| [`adr0015-mainline-breakpoint.md`](./adr0015-mainline-breakpoint.md) | 已修，J.45。[#334](https://github.com/he18718143986-design/IDE/pull/334)/`92e5a63` 有钥匙时注入意图编译器模型客户端（常驻客户端 + 显式 hasModelKey + generate 内重读钥匙）。无钥匙保持离线不产方案。端到端浏览器验证未做 | P-264 |
-| 编译器有钥匙时模型调用失败 | J.46 已交付诊断透出（[#337](https://github.com/he18718143986-design/IDE/pull/337)/`0ff3419`，P-266）。失败日志有 `client_detail`，钥匙抹为 `[REDACTED]`，原因码仍在 `detail`。端点选择未动。端到端浏览器验证仍未做；`network` 根因待 `client_detail` 透出后复测定位 | P-266 |
+| [`adr0015-mainline-breakpoint.md`](./adr0015-mainline-breakpoint.md) | 已修。J.45 注入客户端（[#334](https://github.com/he18718143986-design/IDE/pull/334)/`92e5a63`）。真钥匙复测（P-267，main `59f9798`）：「我要一个登录页」`compiler_applied`，`active.json` 有 1 处 `user_said`，`offline=false`，中栏 `available=true`。报告写「确认方案」应可出，未见禁用挡因；未记录浏览器里点到按钮 | P-267 |
+| 编译器有钥匙时模型调用失败 | 根因是 DeepSeek 拒绝 schema（`required` 未覆盖全部 properties）。[#339](https://github.com/he18718143986-design/IDE/pull/339)/`59f9798` 已改成 nullable 必填。复测（P-267）`compiler_applied`，`elapsed_ms=1163`，无 `client_detail`。未再记端到端按钮点击 | P-267 |
 | 跨工作区串扰测试间歇性失败 | 存量，疑似时序相关。`multi-worktree-cross-talk` 期望 `STALE`、实际 `PASSED`（第 190 行）。#324 出现、#329 未复现、#337 复现。不在 J.46 修。待 Windows 存量清理专项或单独立卡 | P-266 |
 | Windows 路径分隔符导致 spawn/cli-host 白名单匹配失效 | 已修，J.43。[#329](https://github.com/he18718143986-design/IDE/pull/329)/`32bdab9` 在 cli-host 静态禁令比较前把 `path.relative` 收成正斜杠。19 条反斜杠红消除。其余 Windows 存量未动 | P-260 |
 | `TASK-D.1e`、`TASK-S.3` | 维持 DEFERRED | 另案，不在本轮 |
