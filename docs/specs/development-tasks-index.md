@@ -210,7 +210,7 @@
 | `TASK-J.42` | `COMPLETED` | daemon 路由拆分第一批：合同内联段抽出（立卡 P-256；修卡 P-257；施工 #324 `b331cd4`；完工回写 P-258；估算 M；不含 Console） | [正文](./development-tasks-completed.md#task-j.42) |
 | `TASK-J.43` | `COMPLETED` | Windows 白名单路径分隔符归一化（立卡 P-259；施工 #329 `32bdab9`；完工回写 P-260；估算 S；只动测试侧匹配） | [正文](./development-tasks-completed.md#task-j.43) |
 | `TASK-J.45` | `COMPLETED` | 有钥匙就注入意图编译器模型客户端（立卡 P-263；施工 #334 `92e5a63`；完工回写 P-264；估算 M；无 J.44；端到端浏览器验证未做） | [正文](./development-tasks-completed.md#task-j.45) |
-| `TASK-J.46` | `NEW_TASK` | 编译器模型失败留下原因原文（立卡 P-265；估算 S；未开工） | [正文](./development-tasks-active.md#task-j.46) |
+| `TASK-J.46` | `COMPLETED` | 编译器模型失败留下原因原文（立卡 P-265；施工 #337 `0ff3419`；完工回写 P-266；估算 S） | [正文](./development-tasks-completed.md#task-j.46) |
 
 ---
 
