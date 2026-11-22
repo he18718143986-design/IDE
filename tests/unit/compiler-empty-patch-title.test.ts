@@ -22,13 +22,17 @@ function emptyPatch(): SchemePatch {
 describe("J.49 空补丁补标题", () => {
   it("空补丁且标题不足 2 字时补上已有模块名", () => {
     const tr = makeTranscript([{ role: "user", text: "我要一个登录页" }]);
-    const login = userModule(tr, "ITEM-1", "登录页", "用户登录入口", "T1", "我要一个登录页");
+    const login = userModule(
+      tr,
+      "ITEM-1",
+      "登录页",
+      "用户登录入口",
+      "T1",
+      "我要一个登录页",
+    );
     const draft = emptyDraft({
       title: "",
-      modules: [
-        aiModule("ITEM-0", "x", "太短且无证据"),
-        login,
-      ],
+      modules: [aiModule("ITEM-0", "x", "太短且无证据"), login],
     });
     const next = maybeFillEmptyPatchTitle(emptyPatch(), draft);
     const titles = next.ops.filter((op) => op.op === "set_title");
@@ -38,9 +42,7 @@ describe("J.49 空补丁补标题", () => {
     if (title?.op !== "set_title") return;
     expect(title.value).toBe("登录页");
     expect(title.evidence).toEqual(
-      login.evidence
-        .filter((e) => e.kind === "turn")
-        .map((e) => e.ref),
+      login.evidence.filter((e) => e.kind === "turn").map((e) => e.ref),
     );
     expect(title.evidence.length).toBeGreaterThan(0);
   });
@@ -49,7 +51,16 @@ describe("J.49 空补丁补标题", () => {
     const tr = makeTranscript([{ role: "user", text: "我要一个登录页" }]);
     const draft = emptyDraft({
       title: "已有标题",
-      modules: [userModule(tr, "ITEM-1", "登录页", "用户登录入口", "T1", "我要一个登录页")],
+      modules: [
+        userModule(
+          tr,
+          "ITEM-1",
+          "登录页",
+          "用户登录入口",
+          "T1",
+          "我要一个登录页",
+        ),
+      ],
     });
     const next = maybeFillEmptyPatchTitle(emptyPatch(), draft);
     expect(next.ops).toEqual([]);

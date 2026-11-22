@@ -207,7 +207,6 @@ export function createItemIdAllocator(
   };
 }
 
-
 /**
  * TASK-J.49：组装成功且本批 ops 为空、标题不足 2 字时，用台账里已有合格模块名补一条 set_title。
  * 全部被 DROP 才变成 noop 的批次（组装后 ops 非空）不补。
