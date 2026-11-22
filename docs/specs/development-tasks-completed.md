@@ -9792,3 +9792,107 @@ governance:
 * **背景**：官方 Daemon 不注入意图编译器模型客户端，一句需求写不出可审阅方案。
 * **取舍**：客户端常驻，显式 `hasModelKey`，`generate` 内再读钥匙。无钥匙仍离线、不写台账。端到端浏览器验证未做。
 
+### 3.4bg 编译器模型失败留下原因原文（J.46 · 完工回写 P-266）
+
+<a id="task-j.46"></a>
+
+### 【Task J.46】编译器模型失败留下原因原文 `[COMPLETED · 立卡 P-265 · 施工 #337 · 完工回写 P-266]`
+
+> **归档注记（2026-11-22 · P-266）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266–#334）。[#337](https://github.com/he18718143986-design/IDE/pull/337) squash `0ff3419aa4729e183c0cfb9ce070fb4daa97c77c` 于 2026-11-22 13:29 香港时间合入（由我执行；pre-merge head `fcce8eafc14337c85c8eb92d03a1f704ccca5d71`；父提交 `664ba71fff95461a4bb4ffb227ab5264386b393a`）。合入前必需面 12 项全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit 实跑通过，无本卡相关红），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit，17 文件 30 项，`continue-on-error`）。Windows 上 `intent-compiler-model-failure-log.test.ts` 1 项为绿。多出的 `multi-worktree-cross-talk` 2 项期望 `STALE`、实际 `PASSED`（第 190 行），#324 出现、#329 未复现、#337 复现，与本卡无关、未修。Bugbot NEUTRAL 不挡。估算仍为 S。诚实口径：**编译器模型失败已透出原因原文（`client_detail`，钥匙抹为 `[REDACTED]`），原因码保留在 `detail`；失败仍不写台账；端点选择/重试/baseURL 未动；`multi-worktree-cross-talk` 间歇性失败（STALE/PASSED）与本卡无关、未修**。端到端浏览器验证仍未做。`network` 根因待 `client_detail` 透出后复测定位。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。R23 暂缓。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.46
+status: COMPLETED
+contract:
+  intent:
+    title: 编译器模型失败留下原因原文
+    description: >-
+      有钥匙时模型调用失败，intent_compiler 日志要同时留下原因码和客户端 detail。
+      detail 里的钥匙必须抹掉。失败仍然不写台账。
+    risk_level: LOW
+  acceptance:
+    - id: J46-P1
+      check: auto
+      text: >-
+        模型结果 ok 为 false 时，intent_compiler 的 compiler_failure 仍写原因码
+        （例如 network），并另写 client_detail，内容来自客户端的 detail。
+        不再只有一个 network。
+    - id: J46-P2
+      check: auto
+      text: >-
+        client_detail 若含当前 getRuntimeKey() 或 sk- 开头的长钥匙样式，日志里换成
+        [REDACTED]。日志不得出现钥匙原文。
+    - id: J46-P3
+      check: auto
+      text: >-
+        失败仍不写 SchemeDraftV2。不加重试，不加超时，不改 baseURL 选择。
+        不把编译结果写进右栏。不改 ADR-0015。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/supervisor/intent-compiler/compile-loop.ts
+      - tests/unit/intent-compiler-model-failure-log.test.ts
+    readonly_paths:
+      - daemon/supervisor/intent-compiler/openai-compiler-client.ts
+      - daemon/worker/key-store.ts
+      - src/routes/index.tsx
+      - docs/ledger/README.md
+  verification:
+    commands:
+      - { alias: compiler-failure-log, executable: npx, args: [vitest, run, tests/unit/intent-compiler-model-failure-log.test.ts] }
+design:
+  approach: >-
+    真钥匙核对（main 61fc529，试玩目录 stagent-j45-key-playtest）：
+    POST /api/supervisor/turns「我要一个登录页」返回 201。
+    约 1.6s 后日志为 compiler_failure、stage=model、detail=network、elapsed_ms=436。
+    没有 active.json。436ms 不是 30s 超时。
+    客户端已把异常原文放进 result.detail，循环在 compile-loop.ts 第 392 行只把
+    modelResult.reason 交给 noteFailure，原文被丢掉。
+    施工只改这一处记录：原因码仍放 detail，另加 client_detail。
+    写入前去掉 getRuntimeKey() 和 sk- 长串。
+    不改 openai-compiler-client 的端点选择。调用时的 provider / baseURL 没有记在那次现象里，
+    本卡不把它当成已证实的原因。若施工发现客户端丢掉了已经保存的 baseURL，停工修卡。
+    不重试。失败仍不写台账，不改右栏。
+  touches:
+    - { path: daemon/supervisor/intent-compiler/compile-loop.ts, change: modify, why: 模型失败日志补上抹掉钥匙后的 client_detail, symbols: [noteFailure] }
+    - { path: tests/unit/intent-compiler-model-failure-log.test.ts, change: create, why: 桩客户端返回 network 与含钥匙的 detail，断言日志, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J46-P1, test_path: tests/unit/intent-compiler-model-failure-log.test.ts, level: unit, case: 原因码仍是 network }
+    - { acceptance_id: J46-P2, test_path: tests/unit/intent-compiler-model-failure-log.test.ts, level: unit, case: 钥匙已抹掉 }
+    - { acceptance_id: J46-P3, test_path: tests/unit/intent-compiler-model-failure-log.test.ts, level: unit, case: 不写台账 }
+governance:
+  spec_refs:
+    - docs/ledger/adr0015-mainline-breakpoint.md
+  depends_on: []
+  code_facts:
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:392-396", note: 原因码仍传 noteFailure 第二参；client_detail 放进 extra }
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:615-615", note: extra 展开进 compiler_failure }
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:655-665", note: "getRuntimeKey 非空整段替换；sk- 后 8 位以上替换为 [REDACTED]" }
+    - { ref: "tests/unit/intent-compiler-model-failure-log.test.ts:106-115", note: detail 仍为 network；client_detail 为抹钥匙后的原文；casWrite 为 0 }
+  non_goals:
+    - 不重试，不加第二套超时，不做降级
+    - 不改 baseURL 或供应商选择
+    - 失败时不写 SchemeDraftV2
+    - 不把编译结果写进右栏
+    - 不改 ADR-0015
+    - 不把端到端浏览器验证算进本卡
+  fail:
+    - 日志里出现钥匙原文
+    - 失败时写入台账
+    - client_detail 仍然只有 network，没有客户端原文
+    - 改动右栏或 ADR-0015
+  adr_revisions: []
+  defaults: []
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 337, commit: 0ff3419aa4729e183c0cfb9ce070fb4daa97c77c }
+```
+
+* **背景**：有钥匙时模型调用失败，日志只有原因码 `network`，客户端原文被丢掉。
+* **取舍**：原因码留在 `detail`，另写抹掉钥匙后的 `client_detail`。失败仍不写台账。端点选择、重试、baseURL 未动。
