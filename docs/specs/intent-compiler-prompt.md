@@ -574,6 +574,8 @@ GAP-1 关闭后，编译器可以在用户明确否决方案中既有条目时�
 | `propose_decision` | `id`、`question`、`recommended`、`alternatives[]`、`rationale`、`risk` | 生成端**没有** `status` / `chosen` 字段：模型不能把推荐写成已采纳（消灭 TM-C-14 类升级） |
 | `raise_conflict` | `id`、`question`、`options[]{id, label, qids[]}` | 选项证据用 qid |
 
+首轮写出 `upsert_module` 时须同时给出 `set_title`，`value` 用模块名。
+
 **生成端与引擎 op 的差异**（由 `assembleCompilerOutput` 抹平）：
 
 | 生成端 | 引擎 `SchemeOp` | 原因 |

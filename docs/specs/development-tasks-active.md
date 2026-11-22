@@ -1600,8 +1600,9 @@ design:
     试玩台账 title/summary 均为空字符串；last_journal 仅 upsert_module 一条；
     midpane title 亦空——模型未输出 set_title，非组装/投影丢字段。
     门禁 isReviewableScheme 读 draft.title 正确；模块=1 已过摘要/模块支路，卡在标题≥2。
-    施工：assembleCompilerOutput 在无 set_title 时用首个模块 name（或本批用户首句）
-    注入 set_title 并带证据；可选 prompt 一句提醒。不改门禁阈值与文案。
+    施工：assembleCompilerOutput 在无 set_title 时优先用首个模块 name 注入 set_title 并带证据。
+    模块名不够时只用 raw.quotes 里已有的文字。不把 transcript 传进函数，不改签名。
+    可选 prompt 一句提醒。不改门禁阈值与文案。
     不改右栏、不改 ADR-0015。真钥匙浏览器只验按钮可点，不强制冻结。
   touches:
     - { path: src/lib/journey/compiler-output-schema.ts, change: modify, why: 组装收口注入缺失的 set_title 兜底, symbols: [assembleCompilerOutput] }
@@ -1613,7 +1614,7 @@ design:
     - { acceptance_id: J47-P1, test_path: tests/unit/compiler-title-fallback.test.ts, level: unit, case: 无 set_title 时注入 }
     - { acceptance_id: J47-P2, test_path: tests/unit/compiler-title-fallback.test.ts, level: unit, case: 已有 set_title 不重复 }
     - { acceptance_id: J47-P3, test_path: tests/unit/compiler-title-fallback.test.ts, level: unit, case: 门禁阈值未改 }
-    - { acceptance_id: J47-P4, test_path: tests/unit/compiler-title-fallback.test.ts, level: e2e, case: 真钥匙浏览器可点确认方案 }
+    - { acceptance_id: J47-P4, test_path: tests/unit/compiler-title-fallback.test.ts, level: e2e, debt: "真钥匙手工看 scheme-confirm 的 disabled 为 false；不点按钮、不冻结。完工以实测记录销账，不写成 CI 的 it()" }
 governance:
   spec_refs:
     - docs/specs/intent-compiler-prompt.md
