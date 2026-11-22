@@ -1,6 +1,8 @@
 /**
  * TASK-J.10：生成 Schema / 组装期 S 类码封杀与字段代填。
+ * TASK-J.47：DeepSeek 要求 JSON Schema 每个 object 的 required 覆盖全部 properties。
  */
+import { asSchema } from "ai";
 import { describe, expect, it } from "vitest";
 import {
   S_CLASS_CODES_KILLED_BY_SCHEMA,
@@ -159,6 +161,75 @@ describe("S 类码：组装后不可能合法出现", () => {
   });
 });
 
+describe("JSON Schema：required 覆盖全部 properties（DeepSeek）", () => {
+  it("asSchema(buildCompilerOutputSchema) 每个 object 的 required ≡ properties 键集", async () => {
+    const zodSchema = buildCompilerOutputSchema(enums);
+    // 与 generateObject 相同转换路径（ai asSchema → jsonSchema）
+    const jsonSchema = await asSchema(zodSchema).jsonSchema;
+
+    type JsonSchemaNode = {
+      type?: string | string[];
+      properties?: Record<string, JsonSchemaNode>;
+      required?: string[];
+      items?: JsonSchemaNode | JsonSchemaNode[];
+      anyOf?: JsonSchemaNode[];
+      oneOf?: JsonSchemaNode[];
+      allOf?: JsonSchemaNode[];
+      $defs?: Record<string, JsonSchemaNode>;
+      definitions?: Record<string, JsonSchemaNode>;
+    };
+
+    const mismatches: {
+      path: string;
+      missing: string[];
+      extra: string[];
+    }[] = [];
+
+    const walk = (node: JsonSchemaNode | undefined, path: string) => {
+      if (!node || typeof node !== "object") return;
+      const props = node.properties;
+      if (props) {
+        const propKeys = Object.keys(props).sort();
+        const reqKeys = [...(node.required ?? [])].sort();
+        const propSet = new Set(propKeys);
+        const reqSet = new Set(reqKeys);
+        const missing = propKeys.filter((k) => !reqSet.has(k));
+        const extra = reqKeys.filter((k) => !propSet.has(k));
+        if (missing.length > 0 || extra.length > 0) {
+          mismatches.push({ path, missing, extra });
+        }
+        for (const [k, child] of Object.entries(props)) {
+          walk(child, `${path}.${k}`);
+        }
+      }
+      if (node.items) {
+        if (Array.isArray(node.items)) {
+          node.items.forEach((c, i) => walk(c, `${path}.items[${i}]`));
+        } else {
+          walk(node.items, `${path}.items`);
+        }
+      }
+      for (const key of ["anyOf", "oneOf", "allOf"] as const) {
+        const arr = node[key];
+        if (Array.isArray(arr)) {
+          arr.forEach((c, i) => walk(c, `${path}.${key}[${i}]`));
+        }
+      }
+      for (const defsKey of ["$defs", "definitions"] as const) {
+        const defs = node[defsKey];
+        if (defs) {
+          for (const [k, child] of Object.entries(defs)) {
+            walk(child, `${path}.${defsKey}.${k}`);
+          }
+        }
+      }
+    };
+
+    walk(jsonSchema as JsonSchemaNode, "$");
+    expect(mismatches).toEqual([]);
+  });
+});
+
 describe("组装：qid 展开、new: 替换、代填字段", () => {
   it("成功组装：代填 base_revision 与 compiled_from_turns；new: → ITEM-*", () => {
     const r = assembleCompilerOutput(
@@ -214,6 +285,29 @@ describe("组装：qid 展开、new: 替换、代填字段", () => {
     expect(r).toMatchObject({
       ok: false,
       subreason: "assemble.unknown_qid",
+    });
+  });
+
+  it("reject_item.reason 为 null → 默认「用户在聊天中否决」，不写 null", () => {
+    const raw = {
+      quotes: [{ qid: "q1", from: "U5", text: "不要这个模块" }],
+      ops: [
+        {
+          op: "reject_item" as const,
+          id: "M1",
+          reason: null,
+          evidence: [{ qid: "q1" }],
+        },
+      ],
+    };
+    const r = assembleCompilerOutput(raw, aliasMap, 5, batch, enums);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.patch.ops[0]).toEqual({
+      op: "reject_item",
+      id: "M1",
+      reason: "用户在聊天中否决",
+      evidence: [{ turn_id: "T5", quote: "不要这个模块" }],
     });
   });
 });

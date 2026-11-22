@@ -236,7 +236,8 @@ export function buildCompilerOutputSchema(enums: CompilerSchemaEnums) {
   const idEnum = ids;
   const rejEnum = rej;
 
-  const revival = revivalSchema(rejEnum).optional();
+  // DeepSeek：每个 property 必须进 required；可空用 nullable，禁止 .optional() 省略键。
+  const revival = revivalSchema(rejEnum);
   // confirm / reject / remove / revival 证据必须能引用本批摘录（组装期再验 from∈UB）
   const idRef =
     idEnum.length > 0
@@ -325,7 +326,7 @@ export function buildCompilerOutputSchema(enums: CompilerSchemaEnums) {
     .object({
       op: z.literal("reject_item"),
       id: idRef,
-      reason: z.string().max(80).optional(),
+      reason: z.string().max(80).nullable(),
       evidence: evSchema(),
     })
     .strict();
@@ -644,12 +645,11 @@ export function assembleCompilerOutput(
           "assemble.reject_not_in_batch",
         );
         if (!Array.isArray(evidence)) return evidence;
+        // reason null / 缺省同义「没有」→ 默认文案，不把 null 写进补丁
         ops.push({
           op: "reject_item",
           id: op.id,
-          ...(op.reason !== undefined
-            ? { reason: op.reason }
-            : { reason: "用户在聊天中否决" }),
+          reason: op.reason == null ? "用户在聊天中否决" : op.reason,
           evidence,
         });
         break;
