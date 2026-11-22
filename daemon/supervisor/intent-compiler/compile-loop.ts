@@ -15,11 +15,14 @@ import {
 } from "../../../src/lib/journey/compiler-output-schema";
 import { mergeSchemePatch } from "../../../src/lib/journey/scheme-patch-engine";
 import type {
+  EvidenceItem,
   LedgerState,
   MergeJournal,
   MergeResult,
+  SchemeDraftV2,
   SchemePatch,
   TranscriptView,
+  TurnRef,
 } from "../../../src/lib/journey/scheme-patch-types";
 import {
   rebuildSchemeFromCorpus,
@@ -202,6 +205,46 @@ export function createItemIdAllocator(
     if (injected) return injected(prefix);
     return `${prefix}-${next++}`;
   };
+}
+
+/**
+ * TASK-J.49：组装成功且本批 ops 为空、标题不足 2 字时，用台账里已有合格模块名补一条 set_title。
+ * 全部被 DROP 才变成 noop 的批次（组装后 ops 非空）不补。
+ */
+export function maybeFillEmptyPatchTitle(
+  patch: SchemePatch,
+  draft: SchemeDraftV2,
+): SchemePatch {
+  if (patch.ops.length !== 0) return patch;
+  if (draft.title.trim().length >= 2) return patch;
+
+  for (const module of draft.modules) {
+    const name = module.name.trim();
+    if (name.length < 2 || module.evidence.length === 0) continue;
+    const evidence = turnRefsFromModuleEvidence(module.evidence);
+    if (evidence.length === 0) continue;
+    return {
+      ...patch,
+      ops: [
+        {
+          op: "set_title",
+          value: name.slice(0, 200),
+          evidence,
+        },
+      ],
+    };
+  }
+  return patch;
+}
+
+function turnRefsFromModuleEvidence(evidence: EvidenceItem[]): TurnRef[] {
+  const refs: TurnRef[] = [];
+  for (const item of evidence) {
+    if (item.kind === "turn") {
+      refs.push({ ...item.ref });
+    }
+  }
+  return refs;
 }
 
 /**
@@ -417,9 +460,11 @@ export class IntentCompileLoop {
       return;
     }
 
+    const patch = maybeFillEmptyPatchTitle(assembled.patch, state.draft);
+
     const merge = mergeSchemePatch({
       state,
-      patch: assembled.patch,
+      patch,
       transcript: this.deps.getTranscriptView(),
       ctx: {
         attempt,
