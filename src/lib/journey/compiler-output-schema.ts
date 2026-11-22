@@ -740,6 +740,37 @@ export function assembleCompilerOutput(
     if (!v) return fail("assemble.dangling_new_id", k);
   }
 
+  // 模型常漏 set_title。优先用模块名；否则只用本批 quotes 里已有的文字。
+  // 不从函数外再要用户原句。
+  if (!ops.some((op) => op.op === "set_title")) {
+    const titled = ops.find((op) => {
+      if (op.op !== "upsert_module") return false;
+      const name = op.item["name"];
+      return (
+        typeof name === "string" &&
+        name.trim().length >= 2 &&
+        op.evidence.length > 0
+      );
+    });
+    if (titled && titled.op === "upsert_module") {
+      const name = String(titled.item["name"]).trim().slice(0, 200);
+      ops.push({ op: "set_title", value: name, evidence: titled.evidence });
+    } else {
+      for (const q of data.quotes) {
+        const text = q.text.trim();
+        if (text.length < 2) continue;
+        const known = quoteByQid.get(q.qid);
+        if (!known) continue;
+        ops.push({
+          op: "set_title",
+          value: text.slice(0, 200),
+          evidence: [{ turn_id: known.turn_id, quote: known.text }],
+        });
+        break;
+      }
+    }
+  }
+
   const compiled =
     batch.batchTurnIds.length > 0
       ? [...batch.batchTurnIds]
