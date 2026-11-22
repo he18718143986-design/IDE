@@ -124,7 +124,7 @@ function flowItemSchema(ids: readonly string[]) {
       : z.string().regex(NEW_ID_RE);
   const modId =
     ids.length > 0
-      ? z.union([enumOrNever(ids), z.string().regex(NEW_ID_RE)]).nullable()
+      ? z.union([enumOrNever(ids), z.string().regex(NEW_ID_RE), z.null()])
       : z.string().regex(NEW_ID_RE).nullable();
   return z
     .object({
