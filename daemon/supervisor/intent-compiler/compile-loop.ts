@@ -31,6 +31,7 @@ import {
   E_VAULT_SECRET_IN_CONTEXT,
   VaultSecretInContextError,
 } from "../../vault/active";
+import { getRuntimeKey } from "../../worker/key-store";
 import {
   COMPILER_PROMPT_VERSION,
   renderCompilerSystemPrompt,
@@ -389,7 +390,10 @@ export class IntentCompileLoop {
 
     const elapsed = (this.deps.now ?? Date.now)() - started;
     if (!modelResult.ok) {
-      this.noteFailure("model", modelResult.reason, elapsed, rendered);
+      const clientDetail = redactCompilerClientDetail(modelResult.detail);
+      this.noteFailure("model", modelResult.reason, elapsed, rendered, {
+        ...(clientDetail === undefined ? {} : { client_detail: clientDetail }),
+      });
       return;
     }
 
@@ -646,6 +650,19 @@ export class IntentCompileLoop {
       }
     }
   }
+}
+
+const SK_KEY_RE = /sk-[A-Za-z0-9_-]{8,}/g;
+
+/** 失败日志可留原因原文，钥匙本身不落盘。 */
+function redactCompilerClientDetail(
+  detail: string | undefined,
+): string | undefined {
+  if (detail == null || detail.length === 0) return undefined;
+  let out = detail;
+  const key = getRuntimeKey();
+  if (key) out = out.split(key).join("[REDACTED]");
+  return out.replace(SK_KEY_RE, "[REDACTED]");
 }
 
 /** 离线兜底：现行 scheme-draft 启发式（无证据、不可溯源）。 */
