@@ -1,6 +1,6 @@
 # TASK-J.48 · 第二轮生成 schema 嵌套 anyOf 缺 type：诊断与施工方案
 
-> **地位**：planning brief；施工权威在 [`../specs/development-tasks-active.md`](../specs/development-tasks-active.md#task-j.48)。  
+> **地位**：planning brief（诊断记录）。施工已由 [`TASK-J.48`](../specs/development-tasks-completed.md#task-j.48) COMPLETED（#346/`3a68a81`，P-271）交付。真钥匙复测不在本卡。J47-P4 手工 debt 未销。  
 > **基线**：main `50ba47cab8d1a593b4dbae626086644c8c8479f4`（P-269）。  
 > **现象来源**：J47-P4 真钥匙复测（试玩目录已有 `ITEM-1`）。  
 > **不改产品代码**（本文件仅诊断与方案）。
