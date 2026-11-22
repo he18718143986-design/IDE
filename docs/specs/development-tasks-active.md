@@ -1548,3 +1548,103 @@ governance:
 #### 【Task J.47】确认门禁标题不足：诊断与修复 `[COMPLETED · 正文已迁]`
 
 > 本卡已 **COMPLETED**（施工 [#342](https://github.com/he18718143986-design/IDE/pull/342) squash `1dfac26986eb13c9a48817d9818788fbc0f13ab5`；立卡 P-268；完工回写 P-269）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.47) §3.4bh。诚实口径：**组装兜底注入 `set_title` 已交付（模块名优先、quotes 兜底、已有不重复），门禁阈值未动；J47-P4 为手工 debt——真钥匙实测 `scheme-confirm` 的 `disabled` 为 false 待销账，未点按钮未冻结**。
+
+### 3.4s 第二轮生成 schema 嵌套 anyOf 缺 type（2026-11-23 · 立卡 P-270）
+
+<a id="task-j.48"></a>
+
+#### 【Task J.48】第二轮生成 schema 嵌套 anyOf 缺 type 修复 `[NEW_TASK]`
+
+```yaml task-card
+id: TASK-J.48
+status: NEW_TASK
+contract:
+  intent:
+    title: 第二轮生成 schema 嵌套 anyOf 缺 type 修复
+    description: >-
+      ids 非空时生成端 JSON Schema 不再出现「anyOf 套 anyOf 且内层包装缺 type」，
+      DeepSeek 可接受该 schema（由 asSchema 单测锁住；真钥匙复测不在本卡）。
+    risk_level: LOW
+  acceptance:
+    - id: J48-P1
+      check: auto
+      text: >-
+        enums.ids 含 ITEM-1 时，asSchema(buildCompilerOutputSchema(...)).jsonSchema
+        （与 generateObject 同一转换路径）中，不存在「节点仅有 anyOf/oneOf 且无 type」
+        的嵌套包装（module_id 路径不得再复现 J47-P4 的 nested anyOf）。
+    - id: J48-P2
+      check: auto
+      text: >-
+        接受值不变：ids 非空时 module_id 仍接受现有 id、new: id、null（zod safeParse
+        正例覆盖三者）。
+    - id: J48-P3
+      check: auto
+      text: >-
+        未改 assembleCompilerOutput 形参个数；未改标题兜底顺序；未改
+        isReviewableScheme / evaluateSchemeConfirmation 阈值。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/lib/journey/compiler-output-schema.ts
+      - tests/unit/compiler-nested-anyof-type.test.ts
+      - docs/ledger/j48-nested-anyof-diagnosis-brief.md
+    readonly_paths:
+      - tests/unit/compiler-output-schema.test.ts
+      - tests/unit/compiler-title-fallback.test.ts
+      - src/lib/journey/scheme-draft.ts
+  verification:
+    commands:
+      - { alias: nested-anyof, executable: npx, args: [vitest, run, tests/unit/compiler-nested-anyof-type.test.ts] }
+      - { alias: compiler-schema, executable: npx, args: [vitest, run, tests/unit/compiler-output-schema.test.ts] }
+design:
+  approach: >-
+    诊断见 docs/ledger/j48-nested-anyof-diagnosis-brief.md：
+    flowItemSchema L126-128 在 ids 非空时 z.union([...]).nullable() 转 JSON Schema
+    为 anyOf[{anyOf:[...]}, {type:null}]，内层包装缺 type；DeepSeek 拒。
+    全量排查：本文件仅此一处 union+nullable 同根因；其它 nullable 为 string/object。
+    修法：改为每分支带 type 的联合（例如 union 含 z.null()），接受值不变。
+    若须改 enumOrNever 对外契约 → 停工上报。真钥匙不在本卡验收。
+  touches:
+    - { path: src/lib/journey/compiler-output-schema.ts, change: modify, why: 去掉 module_id 嵌套 anyOf 缺 type, symbols: [flowItemSchema] }
+    - { path: tests/unit/compiler-nested-anyof-type.test.ts, change: create, why: asSchema 路径断言无 nested missing type, symbols: [] }
+    - { path: docs/ledger/j48-nested-anyof-diagnosis-brief.md, change: modify, why: 诊断与方案简报（立卡已建）, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J48-P1, test_path: tests/unit/compiler-nested-anyof-type.test.ts, level: unit, case: ids 含 ITEM-1 无 nested missing type }
+    - { acceptance_id: J48-P2, test_path: tests/unit/compiler-nested-anyof-type.test.ts, level: unit, case: module_id 接受 id/new/null }
+    - { acceptance_id: J48-P3, test_path: tests/unit/compiler-nested-anyof-type.test.ts, level: unit, case: 组装签名与门禁/标题兜底未改 }
+governance:
+  spec_refs:
+    - docs/specs/intent-compiler-prompt.md
+  depends_on:
+    - { id: TASK-J.47, kind: soft }
+  code_facts:
+    - { ref: "src/lib/journey/compiler-output-schema.ts:125-128", note: ids 非空时 module_id=union(...).nullable() → nested anyOf 缺 type }
+    - { ref: "docs/ledger/j48-nested-anyof-diagnosis-brief.md:12-40", note: J47-P4 client_detail 与 asSchema 复现；排查清单 }
+  non_goals:
+    - 不改门禁阈值
+    - 不动 assembleCompilerOutput 六参签名
+    - 不动标题兜底顺序（约 L743-772）
+    - 不点「确认方案」、不做真钥匙验收
+    - 不改右栏逐字节
+    - 不改 ADR-0015
+  fail:
+    - ids 含 ITEM-1 时 schema 仍有 nested anyOf 缺 type
+    - "module_id 不再接受 null 或 new: id"
+    - 改动 enumOrNever 对外契约却未停工上报
+    - 改门禁 / 标题兜底 / 右栏 / ADR-0015
+  adr_revisions: []
+  defaults:
+    - 优先用 z.union([..., z.null()]) 替代 union.nullable()；不改 enumOrNever 签名
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：有台账第二轮时 DeepSeek 拒 schema（嵌套 anyOf 缺 type）。空台账首轮无此层。
+* **取舍**：修 JSON Schema 形态，不放宽接受值；真钥匙复测另案，不进本卡 PASS。
+* **立卡说明（2026-11-23 · P-270）**：Tina 授权立卡。诊断与排查清单已入简报。**立卡 ≠ 开工**；先审方案再授权动代码。
