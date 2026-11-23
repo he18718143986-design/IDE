@@ -1547,7 +1547,7 @@ governance:
 
 #### 【Task J.47】确认门禁标题不足：诊断与修复 `[COMPLETED · 正文已迁]`
 
-> 本卡已 **COMPLETED**（施工 [#342](https://github.com/he18718143986-design/IDE/pull/342) squash `1dfac26986eb13c9a48817d9818788fbc0f13ab5`；立卡 P-268；完工回写 P-269）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.47) §3.4bh。诚实口径：**组装兜底注入 `set_title` 已交付（模块名优先、quotes 兜底、已有不重复），门禁阈值未动；J47-P4 为手工 debt——真钥匙实测 `scheme-confirm` 的 `disabled` 为 false 待销账，未点按钮未冻结**。
+> 本卡已 **COMPLETED**（施工 [#342](https://github.com/he18718143986-design/IDE/pull/342) squash `1dfac26986eb13c9a48817d9818788fbc0f13ab5`；立卡 P-268；完工回写 P-269）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.47) §3.4bh。诚实口径：**组装兜底注入 `set_title` 已交付（模块名优先、quotes 兜底、已有不重复），门禁阈值未动；J47-P4 已销（P-274）：真钥匙实测 HEAD `bcf8b08`，`scheme-confirm` 的 `disabled` 为 `false`；判定用生产同一套逻辑（无同源静态页，非 DOM 点击）；未点按钮、未冻结**。
 
 ### 3.4s 第二轮生成 schema 嵌套 anyOf 缺 type（2026-11-23 · 立卡 P-270 · 完工 P-271）
 
@@ -1555,7 +1555,7 @@ governance:
 
 #### 【Task J.48】第二轮生成 schema 嵌套 anyOf 缺 type 修复 `[COMPLETED · 正文已迁]`
 
-> 本卡已 **COMPLETED**（施工 [#346](https://github.com/he18718143986-design/IDE/pull/346) squash `3a68a813b8a0e703a1687db51b125abe9139b6e4`；立卡 P-270；完工回写 P-271）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.48) §3.4bi。诚实口径：**嵌套 `anyOf` 缺 `type` 已修（一层联合三支带 `type`，接受值不变：现有 id/`new:` id/`null`），`enumOrNever` 对外契约未动；真钥匙复测不在本卡，J47-P4 手工 debt 仍挂账**。
+> 本卡已 **COMPLETED**（施工 [#346](https://github.com/he18718143986-design/IDE/pull/346) squash `3a68a813b8a0e703a1687db51b125abe9139b6e4`；立卡 P-270；完工回写 P-271）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.48) §3.4bi。诚实口径：**嵌套 `anyOf` 缺 `type` 已修（一层联合三支带 `type`，接受值不变：现有 id/`new:` id/`null`），`enumOrNever` 对外契约未动；真钥匙复测不在本卡，J47-P4 已销（P-274）**。
 
 
 ### 3.4t 空补丁时用台账里已有模块名补 set_title（2026-11-23 · 立卡 P-272 · 完工 P-273）
@@ -1564,4 +1564,4 @@ governance:
 
 #### 【Task J.49】空补丁时用台账里已有模块名补 set_title `[COMPLETED · 正文已迁]`
 
-> 本卡已 **COMPLETED**（施工 [#349](https://github.com/he18718143986-design/IDE/pull/349) squash `b4fecdc09396c1b3654a0fcb8e9d7354d51b8a11`；立卡 P-272；完工回写 P-273）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.49) §3.4bj。诚实口径：**空补丁时台账已有合格模块但标题空则补 `set_title` 已交付（编译循环层读 `state.draft`，六参签名未动）；真钥匙复测不在本卡，J47-P4 手工 debt 仍挂账**。
+> 本卡已 **COMPLETED**（施工 [#349](https://github.com/he18718143986-design/IDE/pull/349) squash `b4fecdc09396c1b3654a0fcb8e9d7354d51b8a11`；立卡 P-272；完工回写 P-273）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.49) §3.4bj。诚实口径：**空补丁时台账已有合格模块但标题空则补 `set_title` 已交付（编译循环层读 `state.draft`，六参签名未动）；真钥匙复测不在本卡，J47-P4 已销（P-274）**。
