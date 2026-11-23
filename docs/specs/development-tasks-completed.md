@@ -10114,3 +10114,121 @@ governance:
 * **背景**：有台账第二轮时 DeepSeek 拒 schema（嵌套 anyOf 缺 type）。空台账首轮无此层。
 * **取舍**：修 JSON Schema 形态，不放宽接受值。`enumOrNever` 对外契约未动。
 * **完工说明（2026-11-23 · P-271）**：施工 [#346](https://github.com/he18718143986-design/IDE/pull/346) squash `3a68a813b8a0e703a1687db51b125abe9139b6e4`。真钥匙复测不在本卡。J47-P4 手工 debt 仍挂账。
+
+### 3.4bj 空补丁时用台账里已有模块名补 set_title（J.49 · 完工回写 P-273）
+
+<a id="task-j.49"></a>
+
+### 【Task J.49】空补丁时用台账里已有模块名补 set_title `[COMPLETED · 立卡 P-272 · 施工 #349 · 完工回写 P-273]`
+
+> **归档注记（2026-11-23 · P-273）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266–#346）。[#349](https://github.com/he18718143986-design/IDE/pull/349) squash `b4fecdc09396c1b3654a0fcb8e9d7354d51b8a11` 于 2026-11-23 02:56:27 香港时间合入（由我执行；pre-merge head `60767b9ce2746a6a08436cfa7f3814248b4c201e`；父提交 `1522c38995d9cec230c9c2c68a940fcba8096d63`）。诚实口径：**空补丁时台账已有合格模块但标题空则补 `set_title` 已交付（编译循环层读 `state.draft`，六参签名未动）；真钥匙复测不在本卡，J47-P4 手工 debt 仍挂账**。
+
+```yaml task-card
+id: TASK-J.49
+status: COMPLETED
+contract:
+  intent:
+    title: 空补丁时用台账里已有模块名补 set_title
+    description: >-
+      assembleCompilerOutput 成功之后若本批 patch.ops.length === 0，且当前
+      draft.title 的 trim 长度 < 2，且台账里已有合格模块，则只补一条 set_title，
+      value 取台账里第一条合格模块名（截到 200 字），evidence 原样抄该模块已有的
+      TurnRef。全部被 DROP 才变成 noop 的批次不补。真钥匙复测不在本卡验收。
+    risk_level: LOW
+  acceptance:
+    - id: J49-P1
+      check: auto
+      text: >-
+        空补丁且标题不足 2 字时补上已有模块名。组装成功且 patch.ops.length === 0，
+        当前 draft.title trim 长度 < 2，台账有合格模块时，恰好补一条 set_title；
+        value 为按 modules 现有顺序第一条 name.trim() >= 2 且 evidence.length > 0
+        的模块名，截到 200 字；evidence 原样抄该模块已有 TurnRef，不新造摘录，
+        不写空 evidence。全部被 DROP 才变成 noop 的批次不补。
+    - id: J49-P2
+      check: auto
+      text: 标题已够 2 字则不补。
+    - id: J49-P3
+      check: auto
+      text: 没有合格模块则不补。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/supervisor/intent-compiler/compile-loop.ts
+      - tests/unit/compiler-empty-patch-title.test.ts
+    readonly_paths:
+      - src/lib/journey/compiler-output-schema.ts
+      - src/lib/journey/scheme-draft.ts
+      - src/lib/journey/scheme-patch-engine.ts
+  verification:
+    commands:
+      - { alias: empty-patch-title, executable: npx, args: [vitest, run, tests/unit/compiler-empty-patch-title.test.ts] }
+design:
+  approach: >-
+    落点用 compile-loop.ts 第 334 行已经读到的 state.draft。在 assembleCompilerOutput
+    成功之后、mergeSchemePatch（约第 420 行）之前插入：仅当 assembled.patch.ops.length
+    === 0，且 state.draft.title.trim().length < 2，且台账 modules 按现有顺序存在第一条
+    name.trim().length >= 2 且 evidence.length > 0 的模块时，向该空补丁追加恰好一条
+    set_title（value 用该名字截到 200 字，evidence 原样抄这条模块上已有的 TurnRef）。
+    不新造摘录，不写空 evidence。title 已够 2 字、没有合格模块、或本批并非「组装后
+    ops 为空」（包括全部被 DROP 才变成 noop）则不补。assembleCompilerOutput 六参签名
+    保持封口；要改签名就停工上报，施工里不许直接改。不改 compiler-output-schema.ts
+    第 743–772 行对本批 upsert_module / data.quotes 的取词顺序，不改
+    scheme-patch-engine.ts 第 1658–1666 行的 noop 定义。要动 writable_paths 以外的
+    文件，停工修卡，不扩面。单测三条 it 标题必须逐字为：「空补丁且标题不足 2 字时补上已有模块名」
+    「标题已够 2 字则不补」「没有合格模块则不补」。真钥匙复测不进本卡验收，不写成 it()，
+    也不写成会让 check:docs 要求出现在 it() 里的 case。先审施工方案再动代码。
+  touches:
+    - { path: daemon/supervisor/intent-compiler/compile-loop.ts, change: modify, why: 组装成功且空补丁时按台账合格模块补一条 set_title, symbols: [] }
+    - { path: tests/unit/compiler-empty-patch-title.test.ts, change: create, why: 三条 CI 单测锁住补与不补, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J49-P1, test_path: tests/unit/compiler-empty-patch-title.test.ts, level: unit, case: 空补丁且标题不足 2 字时补上已有模块名 }
+    - { acceptance_id: J49-P2, test_path: tests/unit/compiler-empty-patch-title.test.ts, level: unit, case: 标题已够 2 字则不补 }
+    - { acceptance_id: J49-P3, test_path: tests/unit/compiler-empty-patch-title.test.ts, level: unit, case: 没有合格模块则不补 }
+governance:
+  spec_refs:
+    - docs/specs/intent-compiler-prompt.md
+  depends_on:
+    - { id: TASK-J.48, kind: soft }
+    - { id: TASK-J.47, kind: soft }
+  code_facts:
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:377", note: runOnce 已读 state（含 draft），本卡复用、不另读 }
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:448-465", note: 组装成功之后、mergeSchemePatch 之前调用 maybeFillEmptyPatchTitle }
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:214-238", note: maybeFillEmptyPatchTitle：ops 非空/标题已够/无合格模块不补；value 截 200 字，evidence 抄已有 TurnRef }
+    - { ref: "src/lib/journey/compiler-output-schema.ts:743-772", note: 本批 upsert_module / data.quotes 取词顺序，本卡未改 }
+    - { ref: "src/lib/journey/scheme-patch-engine.ts:1658-1666", note: ops 全无 APPLY 时 noop，本卡未改 }
+  non_goals:
+    - 不改门禁阈值
+    - 不改 J.47 对本批材料的取词顺序（compiler-output-schema.ts 第 743–772 行）
+    - 不强制模型交出非空补丁
+    - 不改右栏逐字节
+    - 不改 ADR-0015
+    - 不点「确认方案」
+    - 不动 assembleCompilerOutput 六参签名
+    - 不改 scheme-patch-engine.ts 第 1658–1666 行的 noop 定义
+    - 真钥匙复测不进本卡验收
+  fail:
+    - 空补丁且标题不足 2 字且有合格模块时未补上一条 set_title
+    - title.trim() 已够 2 字或没有合格模块时仍补
+    - 全部被 DROP 才变成 noop 的批次被补了
+    - 改动 assembleCompilerOutput 六参签名却未停工上报
+    - 改门禁阈值 / J.47 取词顺序 / noop 定义 / 右栏 / ADR-0015
+    - 把真钥匙复测写成 it() 或写成会让 check:docs 要求出现在 it() 里的 case
+    - 改动 writable_paths 以外的文件却未停工修卡
+  adr_revisions: []
+  defaults:
+    - 插在组装成功之后、merge 之前；只补一条 set_title；要改 assembleCompilerOutput 六参签名则停工上报
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 349, commit: b4fecdc09396c1b3654a0fcb8e9d7354d51b8a11 }
+```
+
+* **背景**：J.48 之后 DeepSeek 已收下 schema。真钥匙复测 HEAD `301aec2`：发句前台账已有 `ITEM-1`、`frozen=false`、`title=""`。再发「我要一个登录页」得到 `compiler_applied` / `status=noop` / `ops=0` / `elapsed_ms=1001`，无 `client_detail`。发句后 `title` 仍是 `""`，`last_journal.verdicts` 为 `[]`，没有 `set_title`。`scheme-confirm` 存在且 `disabled=true`，挡句「方案摘要不足，至少需要可读标题与摘要/模块」。未点按钮，未冻结。
+* **取舍**：只补空补丁上的一条 `set_title`，不改门禁、不改本批取词顺序、不改 noop 定义、不强制模型交出非空补丁。真钥匙复测另案，不进本卡 PASS。
+* **立卡说明（2026-11-23 · P-272）**：Tina 授权立卡（t1321u）。基线 `301aec2fa347225fd8fdaf7abe91965b9451afbd`（[#347](https://github.com/he18718143986-design/IDE/pull/347) P-271）；其上产品提交 [#346](https://github.com/he18718143986-design/IDE/pull/346)/`3a68a813b8a0e703a1687db51b125abe9139b6e4`。**立卡 ≠ 开工**；先审施工方案再授权动代码。
+* **完工说明（2026-11-23 · P-273）**：施工 [#349](https://github.com/he18718143986-design/IDE/pull/349) squash `b4fecdc09396c1b3654a0fcb8e9d7354d51b8a11`。真钥匙复测不在本卡。J47-P4 手工 debt 仍挂账。
