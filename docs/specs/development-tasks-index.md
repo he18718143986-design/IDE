@@ -218,7 +218,7 @@
 | `TASK-J.50a` | `SPLIT` | PAB 最小生产路径（母卡；立卡 P-277；P-278 按 R-11 拆为 a-1 / a-2；不再作为施工依据） | [正文](./development-tasks-active.md#task-j.50a) |
 | `TASK-J.50a-1` | `COMPLETED` | PAB 落盘与读取（立卡 P-278；施工 #356 `21237298`；完工回写 P-279；估算 S） | [正文](./development-tasks-completed.md#task-j.50a-1) |
 | `TASK-J.50a-2` | `COMPLETED` | 资格判定 + 生成 + 投影 + 接线（立卡 P-278；修卡 P-280；施工 #359 `13c29a97`；完工回写 P-281；估算 M） | [正文](./development-tasks-completed.md#task-j.50a-2) |
-| `TASK-J.50b` | `NEW_TASK` | 确认方案只冻结并开始规划，再按合同确认开工（立卡 P-277；估算 M；硬依赖 J.50a-2；未开工；立卡 ≠ 开工） | [打开](./development-tasks-active.md#task-j.50b) |
+| `TASK-J.50b` | `COMPLETED` | 确认方案只冻结并开始规划，再按合同确认开工（立卡 P-277；施工 #361 `f69d026`；完工回写 P-282；估算 M） | [正文](./development-tasks-completed.md#task-j.50b) |
 
 ---
 
@@ -231,7 +231,7 @@
 | **S1 需求摄取** | 只读已实现；纯净化 → **L.1** |
 | **S2 方案编译** | **J.9 COMPLETED**（#12）；**J.10 COMPLETED**（#17）；**L.6 COMPLETED**（#21 / `93589bf`）；**L.8 COMPLETED**（#33 / `fb27504`）；**L.9 COMPLETED**（#35 / `e1cf1bb`）；**L.10 COMPLETED**（#38 / `e4351b0`）；**L.11 COMPLETED**（#43 / `78ec236`）；**L.12 COMPLETED**（#47 / `39f426a`）；**L.13 COMPLETED**（#51 / `51ea872`）；L 系下一张 → **L.15** |
 | **S2→Seal 意图[密封](../glossary.md#密封)** | **J.2～J.5 COMPLETED**（#4～#7）；编译生成端 **J.10 COMPLETED**（#17）；Seal 消费链齐 |
-| **S3 项目架构基线** | 完整 PAB Schema 仍待后续；L.7/L.8 已用最小 `ReadyPabView` 先行完成。**J.50a-1** 已 `[COMPLETED]`（落盘与读取；施工 #356 `21237298`；完工回写 P-279）。**J.50a-2** 已 `[COMPLETED]`（资格判定 + 生成 + 投影 + 接线；施工 #359 `13c29a97`；修卡 P-280；完工回写 P-281）。下一张施工卡为 **J.50b** `[NEW_TASK]`（确认方案只冻结并开始规划，再按合同确认开工；估算 M；硬依赖已完工的 J.50a-2；立卡 ≠ 开工）。**J.50a** 已 `[SPLIT]`，不再作为施工依据 |
+| **S3 项目架构基线** | 完整 PAB Schema 仍待后续；L.7/L.8 已用最小 `ReadyPabView` 先行完成。**J.50a-1** 已 `[COMPLETED]`（落盘与读取；施工 #356 `21237298`；完工回写 P-279）。**J.50a-2** 已 `[COMPLETED]`（资格判定 + 生成 + 投影 + 接线；施工 #359 `13c29a97`；修卡 P-280；完工回写 P-281）。**J.50b** 已 `[COMPLETED]`（确认方案只冻结并开始规划，再按合同确认开工；施工 #361 `f69d026`；完工回写 P-282）。本线无其他 active 施工卡。**J.50a** 已 `[SPLIT]`，不再作为施工依据 |
 | **S3 项目分解** | **L.7 COMPLETED**（#23 / `607d742`：类型/校验/落盘）；**L.8 COMPLETED**（#33 / `fb27504`：PlanPatch/分解器/API）；**L.9 COMPLETED**（#35 / `e1cf1bb`：nextStub/桩视图/互斥/回填）；**L.10 COMPLETED**（#38 / `e4351b0`：同页嵌地图 + GET plan 权威下一份） |
 | **S3→合同** | **J.2～J.6 COMPLETED**（#4～#7、#11）；**J.10 COMPLETED**（#17）；**L.7 COMPLETED**（#23）；**L.8 COMPLETED**（#33 / `fb27504`）；**L.9 COMPLETED**（#35 / `e1cf1bb`：合同序列/下一份交接）；**L.10 COMPLETED**（#38 / `e4351b0`：画布同页嵌入口）；**L.11 COMPLETED**（#43 / `78ec236`）；**L.12 COMPLETED**（#47 / `39f426a`：知识库门禁）；**L.13 COMPLETED**（#51 / `51ea872`：Trailer/反查）；发布 **L.15 COMPLETED**（#52/`9829385`）；回流 **L.16 COMPLETED**（#62/`e4dfe1c`） |
 | **S4 技术方案** | **L.11 COMPLETED**（#43 / `78ec236`）；**L.12 COMPLETED**（#47 / `39f426a`）；**J.19 COMPLETED**（#55 / `4bae423`：DN-2 HTTP/画布入口；DLV-6 RESOLVED）；**L.18 COMPLETED**（#54 / `c8e6a81`：系统地图 + impactClosure；DLV-5 RESOLVED） |
