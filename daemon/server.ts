@@ -297,6 +297,10 @@ import { applyPlanPatch, type PlanPatch } from "../src/lib/project/plan-patch";
 import type { RepoFacts } from "../src/lib/project/project-plan";
 import { decompose, type ReadyPabView } from "./supervisor/decomposer";
 import {
+  ensureMinimalReadyPab,
+  resolvePabForDecompose,
+} from "./supervisor/pab/minimal-ready-pab";
+import {
   httpStatusForErrorCode,
   plainMessageForErrorCode,
 } from "../src/lib/error-codes";
@@ -5528,6 +5532,45 @@ export class StagentDaemon {
       return;
     }
 
+    if (
+      method === "POST" &&
+      pathname === "/api/project/architecture-baseline/ensure-minimal"
+    ) {
+      if (!this.isAuthorized(req)) {
+        this.sendJson(res, 401, { error: "Unauthorized" });
+        return;
+      }
+      try {
+        const body = (await this.readJsonBody(req)) as {
+          scheme?: Parameters<typeof decompose>[0]["scheme"];
+        };
+        if (!body.scheme || typeof body.scheme !== "object") {
+          this.sendJson(res, 400, { error: "scheme required" });
+          return;
+        }
+        const ensured = ensureMinimalReadyPab({
+          projectRoot: this.repoRoot,
+          scheme: body.scheme,
+        });
+        if (!ensured.ok) {
+          this.sendJson(res, 422, {
+            ok: false,
+            code: ensured.code,
+            error: ensured.plain_message,
+          });
+          return;
+        }
+        this.sendJson(res, 200, {
+          ok: true,
+          pab: ensured.pab,
+          created: ensured.created,
+        });
+      } catch (err) {
+        this.sendJson(res, 500, { error: (err as Error).message });
+      }
+      return;
+    }
+
     if (method === "POST" && pathname === "/api/project/plan/decompose") {
       if (!this.isAuthorized(req)) {
         this.sendJson(res, 401, { error: "Unauthorized" });
@@ -5550,10 +5593,25 @@ export class StagentDaemon {
           existing_dirs: ["src"],
         };
         const existing = readPlan(this.repoRoot);
+        const resolved = resolvePabForDecompose({
+          projectRoot: this.repoRoot,
+          scheme: body.scheme,
+          pab: body.pab ?? null,
+        });
+        if (resolved.failure && resolved.pab === null) {
+          this.sendJson(res, 422, {
+            ok: false,
+            code: resolved.failure.code,
+            error: resolved.failure.plain_message,
+            violations: [],
+            model_calls: 0,
+          });
+          return;
+        }
         const result = await decompose({
           scheme: body.scheme,
           repoFacts,
-          pab: body.pab ?? null,
+          pab: resolved.pab,
           existingPlan: existing,
           ...(body.project_id !== undefined
             ? { project_id: body.project_id }
