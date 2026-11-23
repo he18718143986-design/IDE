@@ -16,9 +16,7 @@ export const ARCHITECTURE_BASELINE_REVISIONS_DIR =
   "architecture-baseline.revisions" as const;
 
 export type ArchitectureBaselineStoreErrorCode =
-  | "E_PAB_INVALID"
-  | "E_PAB_REVISION_EXISTS"
-  | "E_PAB_UNREADABLE";
+  "E_PAB_INVALID" | "E_PAB_REVISION_EXISTS" | "E_PAB_UNREADABLE";
 
 export class ArchitectureBaselineStoreError extends Error {
   readonly code: ArchitectureBaselineStoreErrorCode;
@@ -31,11 +29,7 @@ export class ArchitectureBaselineStoreError extends Error {
 }
 
 export function architectureBaselinePath(projectRoot: string): string {
-  return path.resolve(
-    projectRoot,
-    PROJECT_DIR,
-    ARCHITECTURE_BASELINE_FILENAME,
-  );
+  return path.resolve(projectRoot, PROJECT_DIR, ARCHITECTURE_BASELINE_FILENAME);
 }
 
 export function architectureBaselineRevisionPath(
@@ -119,6 +113,14 @@ export function writeCurrentArchitectureBaseline(
   writeJsonAtomic(currentPath, next);
 }
 
+interface PabRecord {
+  baseline_id?: unknown;
+  baseline_revision?: unknown;
+  baseline_digest?: unknown;
+  status?: unknown;
+  open_decisions?: unknown;
+}
+
 function readPabFile(target: string): ReadyPabView | null {
   if (!fs.existsSync(target)) return null;
   let raw: unknown;
@@ -141,7 +143,7 @@ function normalizeReadyPabView(value: unknown, source: string): ReadyPabView {
       `PAB 必须是对象（来源：${source}）`,
     );
   }
-  const rec = value as Record<string, unknown>;
+  const rec = value as PabRecord;
   if (typeof rec.baseline_id !== "string" || rec.baseline_id.length === 0) {
     throw new ArchitectureBaselineStoreError(
       "E_PAB_INVALID",
@@ -185,9 +187,7 @@ function normalizeReadyPabView(value: unknown, source: string): ReadyPabView {
   return view;
 }
 
-function isPabStatus(
-  value: unknown,
-): value is ReadyPabView["status"] {
+function isPabStatus(value: unknown): value is ReadyPabView["status"] {
   return value === "draft" || value === "ready" || value === "stale";
 }
 
@@ -208,13 +208,13 @@ function normalizeOpenDecisions(
         `open_decisions[${index}] 必须是对象（来源：${source}）`,
       );
     }
-    const rec = item as Record<string, unknown>;
+    const rec = item as { blocking?: unknown };
     if (typeof rec.blocking !== "boolean") {
       throw new ArchitectureBaselineStoreError(
         "E_PAB_INVALID",
         `open_decisions[${index}].blocking 必须是 boolean（来源：${source}）`,
       );
     }
-    return rec as { blocking: boolean };
+    return item as { blocking: boolean };
   });
 }

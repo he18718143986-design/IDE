@@ -94,8 +94,14 @@ describe("daemon/project/architecture-baseline-store", () => {
   });
 
   it("J50a1-P2: 归档目标已存在时失败关闭，不覆盖归档也不改写当前文件", () => {
-    const v1 = samplePab({ baseline_revision: 1, baseline_digest: "digest-v1" });
-    const v2 = samplePab({ baseline_revision: 2, baseline_digest: "digest-v2" });
+    const v1 = samplePab({
+      baseline_revision: 1,
+      baseline_digest: "digest-v1",
+    });
+    const v2 = samplePab({
+      baseline_revision: 2,
+      baseline_digest: "digest-v2",
+    });
     writeCurrentArchitectureBaseline(tempDir, v1);
 
     const archive = architectureBaselineRevisionPath(tempDir, 1);
@@ -187,10 +193,7 @@ describe("daemon/project/architecture-baseline-store", () => {
       ),
     ).toThrow(/E_PAB_INVALID/);
     expect(() =>
-      writeCurrentArchitectureBaseline(
-        tempDir,
-        samplePab({ baseline_id: "" }),
-      ),
+      writeCurrentArchitectureBaseline(tempDir, samplePab({ baseline_id: "" })),
     ).toThrow(/E_PAB_INVALID/);
     expect(readCurrentArchitectureBaseline(tempDir)).toBeNull();
   });
