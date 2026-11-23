@@ -1567,9 +1567,9 @@ governance:
 > 本卡已 **COMPLETED**（施工 [#349](https://github.com/he18718143986-design/IDE/pull/349) squash `b4fecdc09396c1b3654a0fcb8e9d7354d51b8a11`；立卡 P-272；完工回写 P-273）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.49) §3.4bj。诚实口径：**空补丁时台账已有合格模块但标题空则补 `set_title` 已交付（编译循环层读 `state.draft`，六参签名未动）；真钥匙复测不在本卡，J47-P4 已销（P-274）**。
 
 
-### 3.4u 按评估 i 修复计划环节（2026-11-23 · 立卡 P-277 · P-278 再拆 J.50a · P-280 修卡 J.50a-2 · P-281 完工回写 J.50a-2）
+### 3.4u 按评估 i 修复计划环节（2026-11-23 · 立卡 P-277 · P-278 再拆 J.50a · P-280 修卡 J.50a-2 · P-281 完工回写 J.50a-2 · P-282 完工回写 J.50b）
 
-> **拆卡说明（2026-11-23 · P-277 / P-278）**：Tina 授权按评估 i 立施工卡（t1349u）。范围必须含 PAB 处理，并写清 `ReadyPabView` 怎么来，不能只接线分解。评估正文未给估算；整包含 PAB 最小生产路径与「确认方案」拆开，估算 L，按 R-11 先拆再开工。母卡 **`TASK-J.50`** 标 `[SPLIT]`，只追溯，**不再作为施工依据**。P-278（t1359u）再按 R-11 把 **`TASK-J.50a`** 拆为 **`TASK-J.50a-1`**（PAB 落盘与读取，估算 S）与 **`TASK-J.50a-2`**（资格判定 + 生成 + 投影 + 接线，估算 M，硬依赖 J.50a-1）；**`TASK-J.50a`** 改 `[SPLIT]`，只追溯，**不再作为施工依据**。施工链：[`TASK-J.50a-1`](./development-tasks-completed.md#task-j.50a-1)（已 `[COMPLETED]`，完工回写 P-279）→ [`TASK-J.50a-2`](./development-tasks-completed.md#task-j.50a-2)（已 `[COMPLETED]`，施工 #359 `13c29a97`，完工回写 P-281）→ [`TASK-J.50b`](#task-j.50b)（确认方案只冻结并开始规划，再按合同确认开工，估算 M，硬依赖已完工的 J.50a-2）。依据 [`../ledger/adr0015-plan-step-fix-assessment.md`](../ledger/adr0015-plan-step-fix-assessment.md) 与 [`../ledger/adr0015-plan-step-breakpoint.md`](../ledger/adr0015-plan-step-breakpoint.md)。P-280（t1368u）修订 J.50a-2：完整 PAB 文档落盘、digest 可对落盘内容复算。P-281：J.50a-2 已 `[COMPLETED]`。**立卡 ≠ 开工**（J.50b）。先前对 J.50a 的施工授权已被本拆分取代。
+> **拆卡说明（2026-11-23 · P-277 / P-278）**：Tina 授权按评估 i 立施工卡（t1349u）。范围必须含 PAB 处理，并写清 `ReadyPabView` 怎么来，不能只接线分解。评估正文未给估算；整包含 PAB 最小生产路径与「确认方案」拆开，估算 L，按 R-11 先拆再开工。母卡 **`TASK-J.50`** 标 `[SPLIT]`，只追溯，**不再作为施工依据**。P-278（t1359u）再按 R-11 把 **`TASK-J.50a`** 拆为 **`TASK-J.50a-1`**（PAB 落盘与读取，估算 S）与 **`TASK-J.50a-2`**（资格判定 + 生成 + 投影 + 接线，估算 M，硬依赖 J.50a-1）；**`TASK-J.50a`** 改 `[SPLIT]`，只追溯，**不再作为施工依据**。施工链：[`TASK-J.50a-1`](./development-tasks-completed.md#task-j.50a-1)（已 `[COMPLETED]`，完工回写 P-279）→ [`TASK-J.50a-2`](./development-tasks-completed.md#task-j.50a-2)（已 `[COMPLETED]`，施工 #359 `13c29a97`，完工回写 P-281）→ [`TASK-J.50b`](./development-tasks-completed.md#task-j.50b)（已 `[COMPLETED]`，施工 #361 `f69d026`，完工回写 P-282）。依据 [`../ledger/adr0015-plan-step-fix-assessment.md`](../ledger/adr0015-plan-step-fix-assessment.md) 与 [`../ledger/adr0015-plan-step-breakpoint.md`](../ledger/adr0015-plan-step-breakpoint.md)。P-280（t1368u）修订 J.50a-2：完整 PAB 文档落盘、digest 可对落盘内容复算。P-281：J.50a-2 已 `[COMPLETED]`。P-282：J.50b 已 `[COMPLETED]`。先前对 J.50a 的施工授权已被本拆分取代。
 
 <a id="task-j.50"></a>
 
@@ -1738,141 +1738,6 @@ governance:
 
 <a id="task-j.50b"></a>
 
-#### 【Task J.50b】确认方案只冻结并开始规划，再按合同确认开工 `[NEW_TASK]`
+#### 【Task J.50b】确认方案只冻结并开始规划，再按合同确认开工 `[COMPLETED · 正文已迁]`
 
-```yaml task-card
-id: TASK-J.50b
-status: NEW_TASK
-contract:
-  intent:
-    title: 确认方案只冻结并开始规划，再按合同确认开工
-    description: >-
-      按 P-276 评估候选 i，把底部「确认方案」改成只冻结并开始规划：走 C.22
-      到 FREEZE_SNAPSHOT，再调用 J.50a-2 的 PAB 路径与分解，刷新项目地图；
-      此路径不签署合同、不 runWorker。地图「确认开工」再按合同桩走签署与
-      施工准备，成功后才 runWorker。按钮与说明改为与 ADR-0019 一致的
-      「确认方案，开始规划」。必须有覆盖生产用户路径的集成测试。硬依赖
-      J.50a-2，不再挂 J.50a。立卡 ≠ 开工。
-    risk_level: MEDIUM
-  acceptance:
-    - id: J50b-P1
-      check: auto
-      text: >-
-        确认方案只冻结并开始规划。底部「确认方案」走 C.22 的
-        CLAIM_AND_QUIESCE、VALIDATE_CONFIRMATION、FREEZE_SNAPSHOT，随后
-        走 J.50a-2 的 PAB 路径并调用 decompose 与 refreshProjectPlan；不签署
-        合同，不 runWorker。按钮与说明改为「确认方案，开始规划」，不再写
-        「确认后冻结 Spec 并直接开工写代码」。
-    - id: J50b-P2
-      check: auto
-      text: >-
-        地图确认开工仍按合同桩签署并开工。项目地图「确认开工」预检该合同
-        桩后，走 SIGN_AND_PREPARE，成功后 runWorker。C.22 五阶段不删除。
-    - id: J50b-P3
-      check: auto
-      text: >-
-        规划提交与开工提交可区分。confirmation_id 能区分「规划提交」和
-        「开工提交」；原先把「确认方案」写成「冻结并开工中」「正在准备开工」
-        的交接文案与测试改为与拆开后语义一致。
-    - id: J50b-P4
-      check: auto
-      text: >-
-        生产用户路径集成测试。覆盖正常用户路径，而不是只证明模块存在：
-        确认方案之后能看到项目计划/地图，且此时尚未签署、尚未 runWorker。
-    - id: J50b-P5
-      check: auto
-      text: >-
-        不把当前登录页按 tiny 绕过。本卡按 standard 处理该需求，不得用
-        tiny Fast Path 跳过计划环节；large 的模型分解不在本卡。
-  scheme_item_ids: []
-  scope:
-    writable_paths:
-      - src/routes/index.tsx
-      - src/components/studio/SchemeReviewPane.tsx
-      - src/lib/journey/confirm-scheme-atomic.ts
-      - src/lib/daemon-api.ts
-      - tests/ui/task-c22-confirm-wiring.test.tsx
-      - tests/ui/confirm-scheme-starts-planning.test.tsx
-    readonly_paths:
-      - src/components/project/ProjectMapPane.tsx
-      - daemon/supervisor/decomposer/decompose.ts
-      - docs/adr/0015-contract-as-unit-of-delivery.md
-      - docs/adr/0019-project-architecture-baseline.md
-      - docs/ledger/adr0015-plan-step-fix-assessment.md
-  verification:
-    commands:
-      - { alias: confirm-wiring-regression, executable: npx, args: [vitest, run, tests/ui/task-c22-confirm-wiring.test.tsx] }
-      - { alias: starts-planning, executable: npx, args: [vitest, run, tests/ui/confirm-scheme-starts-planning.test.tsx] }
-design:
-  approach: >-
-    硬依赖 J.50a-2：本卡不得在没有 ready PAB 生产路径的情况下只把 UI 接到
-    decompose。底部按钮不再一次跑完「冻结 + 签署 + 开工」；C.22 五阶段
-    保留，签署与施工准备改到地图「确认开工」。handleConfirmScheme（或拆出
-    的开始规划路径）在 FREEZE_SNAPSHOT 成功后进入 PROJECT_MAPPING，中栏
-    写「正在整理项目地图…」，右栏不锁，然后调用 J.50a-2 入口与
-    decomposeProjectPlan，再 refreshProjectPlan。成功后不 runWorker。
-    handleProjectMapConfirmStart 继续预检 stub_id，再走签署并在成功后
-    runWorker。按钮与 SchemeReviewPane 说明改为「确认方案，开始规划」。
-    confirmation_id 区分规划提交与开工提交。更新既有把确认方案绑定为
-    「冻结并开工」的文案与测试。要动 writable_paths 以外的文件，停工修卡。
-    先审施工方案再动代码。
-  touches:
-    - { path: src/routes/index.tsx, change: modify, why: 拆开确认方案与确认开工两条路径, symbols: [handleConfirmScheme, handleProjectMapConfirmStart] }
-    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 按钮与说明改为开始规划, symbols: [] }
-    - { path: src/lib/journey/confirm-scheme-atomic.ts, change: modify, why: 规划路径只跑到冻结，签署留在确认开工, symbols: [] }
-    - { path: src/lib/daemon-api.ts, change: modify, why: 如需补 PAB/规划客户端调用，不改分解器语义, symbols: [] }
-    - { path: tests/ui/task-c22-confirm-wiring.test.tsx, change: modify, why: 回归不再把确认方案等同于开工, symbols: [] }
-    - { path: tests/ui/confirm-scheme-starts-planning.test.tsx, change: create, why: 生产路径：确认方案后可见计划且尚未开工, symbols: [] }
-  interfaces: []
-  test_plan:
-    - { acceptance_id: J50b-P1, test_path: tests/ui/confirm-scheme-starts-planning.test.tsx, level: integration, case: 确认方案只冻结并开始规划 }
-    - { acceptance_id: J50b-P2, test_path: tests/ui/confirm-scheme-starts-planning.test.tsx, level: integration, case: 地图确认开工仍按合同桩签署并开工 }
-    - { acceptance_id: J50b-P3, test_path: tests/ui/task-c22-confirm-wiring.test.tsx, level: unit, case: 规划提交与开工提交可区分 }
-    - { acceptance_id: J50b-P4, test_path: tests/ui/confirm-scheme-starts-planning.test.tsx, level: integration, case: 生产用户路径集成测试 }
-    - { acceptance_id: J50b-P5, test_path: tests/ui/confirm-scheme-starts-planning.test.tsx, level: integration, case: 不把当前登录页按 tiny 绕过 }
-governance:
-  spec_refs:
-    - docs/adr/0015-contract-as-unit-of-delivery.md
-    - docs/adr/0018-intent-to-executable-seal.md
-    - docs/adr/0019-project-architecture-baseline.md
-    - docs/ledger/adr0015-plan-step-fix-assessment.md
-    - docs/specs/supervisor.md
-  depends_on:
-    - { id: TASK-J.50a-2, kind: hard }
-  code_facts:
-    - { ref: "src/routes/index.tsx:1457-1733", note: "现行底部确认方案按 C.22 一次冻结、签署并 runWorker" }
-    - { ref: "src/routes/index.tsx:1855-1867", note: "地图确认开工仍走同一套 handleConfirmScheme" }
-    - { ref: "src/components/studio/SchemeReviewPane.tsx:846-847", note: "现行说明「确认后冻结 Spec 并直接开工写代码」" }
-    - { ref: "src/lib/daemon-api.ts:1321-1345", note: "decomposeProjectPlan 已在，生产 UI 零调用" }
-    - { ref: "docs/adr/0019-project-architecture-baseline.md:18-36", note: "开始规划不等于确认开工，这一下不授权 Worker" }
-  non_goals:
-    - 不删 C.22 五阶段，不改成「确认即开工后再补计划」（评估候选 ii）
-    - 不在确认方案之前分解（与 ADR-0019 冲突）
-    - 不把当前「登录页」按 tiny 绕过
-    - 不实现 large 的模型分解
-    - 不改 ADR 正文
-    - 不在本卡重做 J.50a-2 的 PAB 生成器或 J.50a-1 的落盘
-    - 不把试玩或合入写入本卡验收
-  fail:
-    - 确认方案后仍直接签署或 runWorker
-    - 只接线分解却未走 J.50a-2 的 ReadyPabView 生产路径
-    - 地图确认开工不再签署或不拉 Worker
-    - 没有覆盖「确认后可见计划且尚未开工」的生产路径集成测试
-    - 把当前「登录页」按 tiny 绕过计划环节
-    - 改动 writable_paths 以外的文件却未停工修卡
-  adr_revisions: []
-  defaults:
-    - 底部按钮只冻结并开始规划；签署与开工留在地图确认开工；必须先有 J.50a-2
-  open_questions: []
-  estimate: M
-  invariants:
-    auth: unchanged
-    demo_origin: unchanged
-    illumination: unchanged
-    gateway_write_scope: unchanged
-```
-
-* **背景**：P-275 定性是主链顺序与 ADR-0015 不符：现行「确认方案 = 冻结 + 直接开工」，计划/里程碑被绕过。P-276 建议候选 i，并写明落地必须同时面对 PAB。
-* **取舍**：采用评估 i，不默认走 ii。`tiny` 分流不是本卡主修法；当前「登录页」按 `standard` 处理。
-* **立卡说明（2026-11-23 · P-277）**：Tina 授权立卡（t1349u）。基线 `86128d241e1c5dab616a1a37871f0ba126ec0e3e`（[#353](https://github.com/he18718143986-design/IDE/pull/353) P-276）。当时硬依赖 J.50a。**立卡 ≠ 开工**；先审施工方案再授权动代码。
-* **依赖改挂（2026-11-23 · P-278）**：硬依赖改挂 `TASK-J.50a-2`，不再挂 J.50a。J.50a 已 `[SPLIT]`，不再作为施工依据。
+> 本卡已 **COMPLETED**（施工 [#361](https://github.com/he18718143986-design/IDE/pull/361) squash `f69d026427792db3376da77dd089db09aa072947`；立卡 P-277；完工回写 P-282）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.50b) §3.4bm。诚实口径：**『确认方案』已拆分为冻结+规划（C.22 到 `FREEZE_SNAPSHOT` 后接 PAB 生产与分解刷新地图，不签署不 `runWorker`），地图『确认开工』按合同桩签署开工；不具备资格白话失败关闭；端到端闭环未宣称，试玩与合入不在本卡**。
