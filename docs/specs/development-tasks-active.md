@@ -1569,7 +1569,7 @@ governance:
 
 ### 3.4u 按评估 i 修复计划环节（2026-11-23 · 立卡 P-277 · P-278 再拆 J.50a）
 
-> **拆卡说明（2026-11-23 · P-277 / P-278）**：Tina 授权按评估 i 立施工卡（t1349u）。范围必须含 PAB 处理，并写清 `ReadyPabView` 怎么来，不能只接线分解。评估正文未给估算；整包含 PAB 最小生产路径与「确认方案」拆开，估算 L，按 R-11 先拆再开工。母卡 **`TASK-J.50`** 标 `[SPLIT]`，只追溯，**不再作为施工依据**。P-278（t1359u）再按 R-11 把 **`TASK-J.50a`** 拆为 **`TASK-J.50a-1`**（PAB 落盘与读取，估算 S）与 **`TASK-J.50a-2`**（资格判定 + 生成 + 投影 + 接线，估算 M，硬依赖 J.50a-1）；**`TASK-J.50a`** 改 `[SPLIT]`，只追溯，**不再作为施工依据**。施工链：[`TASK-J.50a-1`](#task-j.50a-1) → [`TASK-J.50a-2`](#task-j.50a-2) → [`TASK-J.50b`](#task-j.50b)（确认方案只冻结并开始规划，再按合同确认开工，估算 M，硬依赖 J.50a-2）。依据 [`../ledger/adr0015-plan-step-fix-assessment.md`](../ledger/adr0015-plan-step-fix-assessment.md) 与 [`../ledger/adr0015-plan-step-breakpoint.md`](../ledger/adr0015-plan-step-breakpoint.md)。**立卡 ≠ 开工**。先前对 J.50a 的施工授权已被本拆分取代。
+> **拆卡说明（2026-11-23 · P-277 / P-278）**：Tina 授权按评估 i 立施工卡（t1349u）。范围必须含 PAB 处理，并写清 `ReadyPabView` 怎么来，不能只接线分解。评估正文未给估算；整包含 PAB 最小生产路径与「确认方案」拆开，估算 L，按 R-11 先拆再开工。母卡 **`TASK-J.50`** 标 `[SPLIT]`，只追溯，**不再作为施工依据**。P-278（t1359u）再按 R-11 把 **`TASK-J.50a`** 拆为 **`TASK-J.50a-1`**（PAB 落盘与读取，估算 S）与 **`TASK-J.50a-2`**（资格判定 + 生成 + 投影 + 接线，估算 M，硬依赖 J.50a-1）；**`TASK-J.50a`** 改 `[SPLIT]`，只追溯，**不再作为施工依据**。施工链：[`TASK-J.50a-1`](./development-tasks-completed.md#task-j.50a-1)（已 `[COMPLETED]`，完工回写 P-279）→ [`TASK-J.50a-2`](#task-j.50a-2) → [`TASK-J.50b`](#task-j.50b)（确认方案只冻结并开始规划，再按合同确认开工，估算 M，硬依赖 J.50a-2）。依据 [`../ledger/adr0015-plan-step-fix-assessment.md`](../ledger/adr0015-plan-step-fix-assessment.md) 与 [`../ledger/adr0015-plan-step-breakpoint.md`](../ledger/adr0015-plan-step-breakpoint.md)。**立卡 ≠ 开工**（J.50a-2 / J.50b）。先前对 J.50a 的施工授权已被本拆分取代。
 
 <a id="task-j.50"></a>
 
@@ -1724,117 +1724,10 @@ governance:
 
 <a id="task-j.50a-1"></a>
 
-#### 【Task J.50a-1】PAB 落盘与读取 `[NEW_TASK]`
+#### 【Task J.50a-1】PAB 落盘与读取 `[COMPLETED · 正文已迁]`
 
-```yaml task-card
-id: TASK-J.50a-1
-status: NEW_TASK
-contract:
-  intent:
-    title: PAB 落盘与读取
-    description: >-
-      新建 architecture-baseline-store.ts：把当前 PAB 写入
-      .stagent/project/architecture-baseline.json，旧修订归档到
-      architecture-baseline.revisions/<revision>.json，不得改写已落盘
-      文件；提供读取接口供 decompose / J.50a-2 在 body.pab 为空时加载。
-      落盘格式必须按现有 PAB 规格（ReadyPabView 所需字段、status、digest
-      语义），不得自造格式。本卡不含资格判定、生成逻辑或 decompose / HTTP
-      接线。立卡 ≠ 开工。
-    risk_level: LOW
-  acceptance:
-    - id: J50a1-P1
-      check: auto
-      text: >-
-        当前 PAB 写入与读取。store 把当前 PAB 写入
-        .stagent/project/architecture-baseline.json，并提供读取接口，
-        供 J.50a-2 / decompose 在请求未传入 pab 时加载。本卡本身不接线
-        HTTP，也不改 decompose 入口。
-    - id: J50a1-P2
-      check: auto
-      text: >-
-        修订归档且不可改写。写入新的当前 PAB 时，先把上一份当前文件归档到
-        .stagent/project/architecture-baseline.revisions/<revision>.json，
-        再写新的当前文件；不得直接改写已落盘文件。归档完成后，这些修订文件
-        保持不可变，不得再被改写。
-    - id: J50a1-P3
-      check: auto
-      text: >-
-        落盘格式可被现有 PAB 类型 / ReadyPabView 投影消费。持久化格式必须
-        按现有 PAB 规格，至少包含 ReadyPabView 所需字段（baseline_id、
-        baseline_revision、baseline_digest、status 为 draft 或 ready 或
-        stale、可选 open_decisions）及 status / digest 语义，不得自造平行
-        类型或新 Schema。验收须断言：读出的落盘文件能被 decompose.ts 里现有
-        ReadyPabView 类型消费，而不是测试里另写的假类型。完整 PAB Schema
-        仍属后续，本卡不一次做完。
-  scheme_item_ids: []
-  scope:
-    writable_paths:
-      - daemon/project/architecture-baseline-store.ts
-      - tests/daemon/architecture-baseline-store.test.ts
-    readonly_paths:
-      - daemon/supervisor/decomposer/decompose.ts
-      - docs/specs/project-architecture-baseline.md
-      - docs/adr/0019-project-architecture-baseline.md
-  verification:
-    commands:
-      - { alias: pab-store, executable: npx, args: [vitest, run, tests/daemon/architecture-baseline-store.test.ts] }
-design:
-  approach: >-
-    只做持久化与读取，不判定资格，不生成 PAB，不接线 HTTP。写入新的当前
-    PAB 时先归档上一份当前文件，再写新文件；已归档的修订文件不可变。读取
-    接口给 J.50a-2 / decompose 在未传入 pab 时用，但本卡不改 server.ts
-    或 decompose.ts。落盘必须能被现有 ReadyPabView（decompose.ts 导出的
-    类型）消费：字段与 status / digest 语义跟现有 PAB 规格走，不另起一套
-    平行 Schema。digest 由调用方按既有语义写入，本卡负责原样落盘与读出，
-    不发明新的哈希算法。要动 writable_paths 以外的文件，停工修卡，不扩面。
-    先审施工方案再动代码。
-  touches:
-    - { path: daemon/project/architecture-baseline-store.ts, change: create, why: 当前 PAB 落盘、修订归档与读取, symbols: [] }
-    - { path: tests/daemon/architecture-baseline-store.test.ts, change: create, why: 锁住落盘、归档不可变、读取，以及落盘可被 ReadyPabView 消费, symbols: [] }
-  interfaces: []
-  test_plan:
-    - { acceptance_id: J50a1-P1, test_path: tests/daemon/architecture-baseline-store.test.ts, level: unit, case: 当前 PAB 写入与读取 }
-    - { acceptance_id: J50a1-P2, test_path: tests/daemon/architecture-baseline-store.test.ts, level: unit, case: 修订归档且不可改写 }
-    - { acceptance_id: J50a1-P3, test_path: tests/daemon/architecture-baseline-store.test.ts, level: unit, case: 落盘格式可被现有 ReadyPabView 消费 }
-governance:
-  spec_refs:
-    - docs/specs/project-architecture-baseline.md
-    - docs/adr/0019-project-architecture-baseline.md
-  depends_on:
-    - { id: TASK-L.8, kind: soft }
-  code_facts:
-    - { ref: "docs/specs/project-architecture-baseline.md:45-45", note: "当前文件路径与 revisions/<revision>.json 归档目录；旧版不可覆盖" }
-    - { ref: "docs/specs/project-architecture-baseline.md:86-86", note: "必需语义可不一次照搬同名类型，但不得建立平行架构 SSOT" }
-    - { ref: "daemon/supervisor/decomposer/decompose.ts:26-32", note: "现有 ReadyPabView 类型；落盘必须能被该类型消费，本卡不改此文件" }
-  non_goals:
-    - 不做资格判定，不实现 minimal / full / large 生成器
-    - 不投影生产路径上的 ReadyPabView（属 J.50a-2），也不接线 decompose 或 HTTP
-    - 不改 decompose.ts，不改 ReadyPabView 字段集合或 assertPabReady 判定形状
-    - 不改 /api/baseline 参考基线语义
-    - 不接线「确认方案」按钮，不拆 C.22（属 J.50b）
-    - 不改 ADR-0015 / ADR-0019 正文
-    - 不宣称完整 PAB Schema 或规格 §7 十条验收矩阵已全部落地
-  fail:
-    - 自造平行 PAB / ReadyPabView 类型，或落盘文件不能被现有 ReadyPabView 消费
-    - 直接覆盖已落盘的当前文件或已归档修订，而不先归档上一份当前文件
-    - 在本卡做资格判定、生成逻辑或 decompose / HTTP 接线
-    - 改动 decompose.ts 或 ReadyPabView / assertPabReady 的形状
-    - 改动 writable_paths 以外的文件却未停工修卡
-  adr_revisions: []
-  defaults:
-    - 先归档再写当前文件；已落盘文件不可改写；读取接口只给后续卡用，本卡不接线
-  open_questions: []
-  estimate: S
-  invariants:
-    auth: unchanged
-    demo_origin: unchanged
-    illumination: unchanged
-    gateway_write_scope: unchanged
-```
+> 本卡已 **COMPLETED**（施工 [#356](https://github.com/he18718143986-design/IDE/pull/356) squash `21237298c48d4327d396d8b36b999b656f5e76c1`；立卡 P-278；完工回写 P-279）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.50a-1) §3.4bk。诚实口径：**PAB 落盘/归档/读取 store 已交付（格式锚定现有 PAB 规格，digest 由调用方写入本卡原样落盘）；资格判定/生成/`decompose` 接线在 J.50a-2**。
 
-* **背景**：从原 J.50a 拆出的低风险持久化卡。落盘路径与归档目录已在 PAB 规格写明；完整 Schema 仍属后续，但本卡不能另造格式。
-* **取舍**：只做 store 的写、归档、读；资格判定与生产接线留给 J.50a-2。
-* **立卡说明（2026-11-23 · P-278）**：Tina 授权按 R-11 拆立（t1359u）。基线 `546bf80df82190a0a538157ec6d74baa93e2f4db`（[#354](https://github.com/he18718143986-design/IDE/pull/354) P-277）。**立卡 ≠ 开工**；先审施工方案再授权动代码。
 
 <a id="task-j.50a-2"></a>
 
