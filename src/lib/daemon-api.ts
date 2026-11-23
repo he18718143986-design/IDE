@@ -1323,7 +1323,8 @@ export async function decomposeProjectPlan(
   conn: DaemonConnection,
   input: {
     scheme: unknown;
-    pab: unknown;
+    /** J.50a-2 服务端可在 null 时走 resolvePabForDecompose 回退。 */
+    pab: unknown | null;
     repo_facts?: {
       has_test_script: boolean;
       has_modules_yaml: boolean;

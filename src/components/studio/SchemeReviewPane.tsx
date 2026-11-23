@@ -4,8 +4,9 @@
  * - 图表优先（mermaid 源码卡片；浏览器未接渲染器时仍可读）
  * - 冲突抉择 / AI 推荐决策确认
  * - 方案够完整才出现「生成 Demo」
- * - 最底只有「确认方案」（冻结 Spec → 开工）；无「继续澄清」按钮
- * - J.7：确认中三步人话进度；COMMIT 后中栏交接卡（不进右栏）
+ * - 最底「确认方案，开始规划」（冻结并开始规划，不直接开工）；无「继续澄清」按钮
+ * - J.7：开工交接中三步人话进度；COMMIT 后中栏交接卡（不进右栏）
+ * - J.50b：规划中显示「正在整理项目地图…」；「正在准备开工」仅用于地图确认开工
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -95,8 +96,14 @@ export interface SchemeReviewPaneProps {
   onConfirmScheme?: (() => void) | undefined;
   /**
    * J.7：交接进行中的当前人话步骤；有值时按钮区改为三步进度。
+   * 仅用于地图「确认开工」签署过程，规划路径不得设置该值。
    */
   handoffStep?: HandoffUiStepId | null | undefined;
+  /**
+   * TASK-J.50b：规划路径已冻结、正在 decompose / 刷新地图。
+   * 有值时中栏显示「正在整理项目地图…」，不得写「正在准备开工」。
+   */
+  planningMapBusy?: boolean | undefined;
   /**
    * J.7：COMMIT 成功后的中栏交接卡文案（含节点数）；不进右栏。
    */
@@ -824,6 +831,15 @@ export function SchemeReviewPane(props: SchemeReviewPaneProps) {
               {HANDOFF_LOCK_HINT}
             </p>
           </div>
+        ) : props.planningMapBusy ? (
+          <div
+            data-testid="scheme-planning-map-progress"
+            className="rounded border border-border bg-card p-3"
+          >
+            <p className="text-xs font-semibold text-foreground">
+              正在整理项目地图…
+            </p>
+          </div>
         ) : (
           <button
             type="button"
@@ -833,17 +849,17 @@ export function SchemeReviewPane(props: SchemeReviewPaneProps) {
             className="w-full rounded border border-emerald-800 bg-emerald-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-40"
           >
             {props.confirmBusy
-              ? "冻结并开工中…"
+              ? "开始规划中…"
               : frozen
                 ? "方案已确认"
                 : pendingSensitiveCount > 0
-                  ? `确认方案（含 ${pendingSensitiveCount} 处敏感改动）`
-                  : "确认方案"}
+                  ? `确认方案，开始规划（含 ${pendingSensitiveCount} 处敏感改动）`
+                  : "确认方案，开始规划"}
           </button>
         )}
-        {!props.handoffStep ? (
+        {!props.handoffStep && !props.planningMapBusy ? (
           <p className="mt-1.5 text-[10px] text-muted-foreground">
-            确认后冻结 Spec 并直接开工写代码。Demo
+            确认方案，开始规划。Demo
             是可选增强项；已生成则须先确认或显式接受降级。
           </p>
         ) : null}

@@ -6,6 +6,10 @@
  * - `confirmation_id` 是幂等键；同一 id + 同一 revision 的重放不重复签署；
  * - 快照成功后签署失败，必须调用 compensate（吊销/清理/回退），不得半签半开；
  * - 只有成功签署并完成施工准备后才 COMMIT；失败一律回到可重试审阅态。
+ *
+ * TASK-J.50b：规划路径 `stopAfter: "FREEZE_SNAPSHOT"` 在冻结后成功返回，不签署；
+ * 开工路径 `startFrom: "SIGN_AND_PREPARE"` 在已冻结快照上继续签署与 COMMIT。
+ * 五阶段定义保留，默认仍跑完全程（兼容既有 C.22 用例）。
  */
 
 import type {
@@ -93,6 +97,18 @@ export interface ConfirmSchemeAtomicInput {
    * 失败路径也会在已进入的阶段上报；调用方不得据此旁路事务。
    */
   onStage?: (stage: ConfirmSchemeStepId) => void;
+  /**
+   * TASK-J.50b 规划路径：跑完该阶段即成功返回。
+   * 仅支持 `FREEZE_SNAPSHOT`：不调用 signAndPrepare，不进入 COMMIT。
+   */
+  stopAfter?: ConfirmSchemeStepId;
+  /**
+   * TASK-J.50b 开工路径：从已冻结快照继续。
+   * 仅支持 `SIGN_AND_PREPARE`：不再冻结，不重跑 VALIDATE。
+   */
+  startFrom?: ConfirmSchemeStepId;
+  /** `startFrom: "SIGN_AND_PREPARE"` 时必填，指向规划阶段已落盘的快照。 */
+  existingSnapshot?: PersistedSchemeSnapshot;
 }
 
 export interface ConfirmSchemeAtomicResult {
@@ -154,6 +170,20 @@ function validConfirmationId(value: string): boolean {
 
 export function newSchemeConfirmationId(): string {
   return `scheme-confirm-${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 10)}`;
+}
+
+/** TASK-J.50b：规划提交幂等键（与开工提交可区分）。 */
+export function newSchemePlanConfirmationId(): string {
+  return `scheme-plan-${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 10)}`;
+}
+
+/** TASK-J.50b：开工提交幂等键（与规划提交可区分）。 */
+export function newSchemeStartConfirmationId(): string {
+  return `scheme-start-${Date.now().toString(36)}-${Math.random()
     .toString(36)
     .slice(2, 10)}`;
 }
@@ -226,6 +256,38 @@ export async function runConfirmSchemeAtomic(
       "confirmation_id 已用于另一版方案；请生成新的确认 id",
       steps,
     );
+  }
+
+  if (input.startFrom && input.startFrom !== "SIGN_AND_PREPARE") {
+    return failed(
+      input.confirmationId,
+      "SIGN_AND_PREPARE",
+      "E_CONFIRM_START_FROM_INVALID",
+      "开工路径只允许从 SIGN_AND_PREPARE 继续",
+      steps,
+    );
+  }
+  if (input.stopAfter && input.stopAfter !== "FREEZE_SNAPSHOT") {
+    return failed(
+      input.confirmationId,
+      "FREEZE_SNAPSHOT",
+      "E_CONFIRM_STOP_AFTER_INVALID",
+      "规划路径只允许在 FREEZE_SNAPSHOT 停止",
+      steps,
+    );
+  }
+  if (input.startFrom && input.stopAfter) {
+    return failed(
+      input.confirmationId,
+      "CLAIM_AND_QUIESCE",
+      "E_CONFIRM_PATH_CONFLICT",
+      "规划路径与开工路径不能同时指定",
+      steps,
+    );
+  }
+
+  if (input.startFrom === "SIGN_AND_PREPARE") {
+    return runConfirmSchemeFromSign(input, steps);
   }
 
   // 1. 先冻结输入：停流式 + 禁右栏，之后不再接受 Supervisor Patch。
@@ -316,6 +378,26 @@ export async function runConfirmSchemeAtomic(
     );
   }
 
+  if (input.stopAfter === "FREEZE_SNAPSHOT") {
+    // 规划路径：冻结成功即解锁右栏并返回，不签署、不 COMMIT。
+    input.restoreRightChat?.();
+    const planned: ConfirmSchemeAtomicResult = {
+      ok: true,
+      idempotent: false,
+      steps,
+      frozen,
+      confirmation_id: input.confirmationId,
+      snapshot,
+    };
+    completedConfirmations.set(input.confirmationId, {
+      confirmation_id: input.confirmationId,
+      scheme_id: input.scheme.scheme_id,
+      scheme_revision: input.expectedRevision,
+      result: planned,
+    });
+    return planned;
+  }
+
   // 4. 签署 + 施工准备。失败必须走补偿，补偿未成功则保持右栏锁定。
   let contractId: string;
   /**
@@ -383,6 +465,137 @@ export async function runConfirmSchemeAtomic(
 
   // 5. 提交事务并记住幂等结果。
   // J.7 / D9：右栏解锁由调用方在 COMMIT 成功后执行；本函数不再假定永久锁定。
+  input.onStage?.("COMMIT");
+  steps.push({ step: "COMMIT", ok: true });
+  const result: ConfirmSchemeAtomicResult = {
+    ok: true,
+    idempotent: false,
+    steps,
+    frozen,
+    confirmation_id: input.confirmationId,
+    contract_id: contractId,
+    snapshot,
+  };
+  completedConfirmations.set(input.confirmationId, {
+    confirmation_id: input.confirmationId,
+    scheme_id: input.scheme.scheme_id,
+    scheme_revision: input.expectedRevision,
+    result,
+  });
+  return result;
+}
+
+async function runConfirmSchemeFromSign(
+  input: ConfirmSchemeAtomicInput,
+  steps: ConfirmSchemeStepResult[],
+): Promise<ConfirmSchemeAtomicResult> {
+  if (!input.scheme.frozen) {
+    return failed(
+      input.confirmationId,
+      "SIGN_AND_PREPARE",
+      "E_SCHEME_NOT_FROZEN",
+      "开工前方案必须已冻结",
+      steps,
+    );
+  }
+  const snapshot = input.existingSnapshot;
+  if (!snapshot?.snapshot_id || !snapshot.digest) {
+    return failed(
+      input.confirmationId,
+      "SIGN_AND_PREPARE",
+      "E_SCHEME_SNAPSHOT_MISSING",
+      "缺少已冻结的方案快照，无法确认开工",
+      steps,
+    );
+  }
+  if (input.expectedRevision !== input.scheme.scheme_revision) {
+    input.restoreRightChat?.();
+    steps.push({
+      step: "SIGN_AND_PREPARE",
+      ok: false,
+      reason: "方案修订号已变化",
+    });
+    return failed(
+      input.confirmationId,
+      "SIGN_AND_PREPARE",
+      "E_SCHEME_REVISION_MISMATCH",
+      `期望修订 ${input.expectedRevision}，实际 ${input.scheme.scheme_revision}`,
+      steps,
+    );
+  }
+
+  // 开工时右栏可能已解锁；签署前再次静默，但不重跑冻结与求值。
+  try {
+    await input.quiesceRightChat();
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : "阻断右栏失败";
+    return failed(
+      input.confirmationId,
+      "SIGN_AND_PREPARE",
+      "E_QUIESCE_FAILED",
+      reason,
+      steps,
+    );
+  }
+
+  const frozen = input.scheme;
+  let contractId: string;
+  const staging: { contractId: string | undefined } = { contractId: undefined };
+  try {
+    input.onStage?.("SIGN_AND_PREPARE");
+    const signed = await input.signAndPrepare({
+      confirmation_id: input.confirmationId,
+      frozen,
+      demo: input.demo,
+      snapshot,
+      ...(input.acknowledgeDirty === undefined
+        ? {}
+        : { acknowledgeDirty: input.acknowledgeDirty }),
+      onContractCreated: (id) => {
+        staging.contractId = id;
+      },
+    });
+    contractId = signed.contract_id;
+    steps.push({ step: "SIGN_AND_PREPARE", ok: true });
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : "签署或施工准备失败";
+    const dirty = readErrorCode(err) === "E_WORKTREE_DIRTY";
+    const dirtyFiles = dirty ? readDirtyFiles(err) : undefined;
+    const staged = staging.contractId;
+    let compensated = false;
+    try {
+      await input.compensate?.({
+        confirmation_id: input.confirmationId,
+        failed_at: "SIGN_AND_PREPARE",
+        ...(staged === undefined ? {} : { contract_id: staged }),
+        snapshot,
+        cause: reason,
+      });
+      compensated = true;
+    } catch {
+      compensated = false;
+    }
+    if (compensated) input.restoreRightChat?.();
+    steps.push({ step: "SIGN_AND_PREPARE", ok: false, reason });
+    return failed(
+      input.confirmationId,
+      "SIGN_AND_PREPARE",
+      dirty
+        ? "E_WORKTREE_DIRTY"
+        : compensated
+          ? "E_SIGN_AND_PREPARE_FAILED"
+          : "E_COMPENSATION_FAILED",
+      compensated ? reason : `${reason}；补偿未完成，已保持锁定并需人工处理`,
+      steps,
+      frozen,
+      {
+        snapshot,
+        ...(staged === undefined ? {} : { contract_id: staged }),
+        ...(dirtyFiles ? { dirty_files: dirtyFiles } : {}),
+      },
+    );
+  }
+
   input.onStage?.("COMMIT");
   steps.push({ step: "COMMIT", ok: true });
   const result: ConfirmSchemeAtomicResult = {
