@@ -9903,7 +9903,7 @@ governance:
 
 ### 【Task J.47】确认门禁标题不足：诊断与修复 `[COMPLETED · 立卡 P-268 · 施工 #342 · 完工回写 P-269]`
 
-> **归档注记（2026-11-22 · P-269）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266–#339）。[#342](https://github.com/he18718143986-design/IDE/pull/342) squash `1dfac26986eb13c9a48817d9818788fbc0f13ab5` 于 2026-11-22 18:58 香港时间合入（由我执行；pre-merge head `ea4f9da596f53cc455a525a19f431c5571751795`；父提交 `8ac0bcaa02eab92a86d36d96c085d72ba32fda27`）。合入前必需面 12 项全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit 实跑通过，本卡用例通过），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit，16 文件 28 项，`continue-on-error`）。`compiler-title-fallback.test.ts` 不在失败名单。`multi-worktree-cross-talk` 本轮未复现。Bugbot NEUTRAL 不挡。估算仍为 S。诚实口径：**组装兜底注入 `set_title` 已交付（模块名优先、quotes 兜底、已有不重复），门禁阈值未动；J47-P4 为手工 debt——真钥匙实测 `scheme-confirm` 的 `disabled` 为 false 待销账，未点按钮未冻结**。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。R23 暂缓。Console 拆分与第二批未立卡。不宣称端到端闭环。
+> **归档注记（2026-11-22 · P-269）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266–#339）。[#342](https://github.com/he18718143986-design/IDE/pull/342) squash `1dfac26986eb13c9a48817d9818788fbc0f13ab5` 于 2026-11-22 18:58 香港时间合入（由我执行；pre-merge head `ea4f9da596f53cc455a525a19f431c5571751795`；父提交 `8ac0bcaa02eab92a86d36d96c085d72ba32fda27`）。合入前必需面 12 项全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit 实跑通过，本卡用例通过），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit，16 文件 28 项，`continue-on-error`）。`compiler-title-fallback.test.ts` 不在失败名单。`multi-worktree-cross-talk` 本轮未复现。Bugbot NEUTRAL 不挡。估算仍为 S。诚实口径：**组装兜底注入 `set_title` 已交付（模块名优先、quotes 兜底、已有不重复），门禁阈值未动；J47-P4 已销（P-274）：真钥匙实测 HEAD `bcf8b08`，`scheme-confirm` 的 `disabled` 为 `false`；判定用生产同一套逻辑（无同源静态页，非 DOM 点击）；未点按钮、未冻结**。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。R23 暂缓。Console 拆分与第二批未立卡。不宣称端到端闭环。
 
 ```yaml task-card
 id: TASK-J.47
@@ -10010,7 +10010,7 @@ governance:
 
 * **背景**：数据链已通（`available=true`、有 `user_said` 模块），但确认按钮因标题空被禁用。浏览器补验挡句与门禁一致。
 * **取舍**：组装兜底为主。优先模块名；模块名不够时只用 `raw.quotes` 里已有文字。不改函数签名，不传入 transcript。门禁阈值未动。
-* **完工说明（2026-11-22 · P-269）**：施工 [#342](https://github.com/he18718143986-design/IDE/pull/342) squash `1dfac26986eb13c9a48817d9818788fbc0f13ab5`。J47-P4 仍是手工 debt，真钥匙实测未做，未点按钮，未冻结。
+* **完工说明（2026-11-22 · P-269）**：施工 [#342](https://github.com/he18718143986-design/IDE/pull/342) squash `1dfac26986eb13c9a48817d9818788fbc0f13ab5`。J47-P4 已销（P-274）：真钥匙实测（HEAD `bcf8b08`）`scheme-confirm` 的 `disabled` 为 `false`；判定用生产同一套逻辑（无同源静态页，非 DOM 点击）；未点按钮、未冻结。
 
 ### 3.4bi 第二轮生成 schema 嵌套 anyOf 缺 type（J.48 · 完工回写 P-271）
 
@@ -10018,7 +10018,7 @@ governance:
 
 ### 【Task J.48】第二轮生成 schema 嵌套 anyOf 缺 type 修复 `[COMPLETED · 立卡 P-270 · 施工 #346 · 完工回写 P-271]`
 
-> **归档注记（2026-11-23 · P-271）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266–#342）。[#346](https://github.com/he18718143986-design/IDE/pull/346) squash `3a68a813b8a0e703a1687db51b125abe9139b6e4` 于 2026-11-23 01:20 香港时间合入（由我执行；pre-merge head `d4a1d6b288be625848d53c82983a9e899a51459f`；父提交 `6c90d927bab85a69340b5ef6ac25279b9c7d67f3`）。合入前必需面 12 项全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit 实跑通过，本卡三条 `it()` 通过），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit，16 文件 28 项，`continue-on-error`）。`compiler-nested-anyof-type.test.ts` 不在失败名单。`multi-worktree-cross-talk` 本轮未复现。Bugbot NEUTRAL 不挡。估算仍为 S。诚实口径：**嵌套 `anyOf` 缺 `type` 已修（一层联合三支带 `type`，接受值不变：现有 id/`new:` id/`null`），`enumOrNever` 对外契约未动；真钥匙复测不在本卡，J47-P4 手工 debt 仍挂账**。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。R23 暂缓。Console 拆分与第二批未立卡。不宣称端到端闭环。
+> **归档注记（2026-11-23 · P-271）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266–#342）。[#346](https://github.com/he18718143986-design/IDE/pull/346) squash `3a68a813b8a0e703a1687db51b125abe9139b6e4` 于 2026-11-23 01:20 香港时间合入（由我执行；pre-merge head `d4a1d6b288be625848d53c82983a9e899a51459f`；父提交 `6c90d927bab85a69340b5ef6ac25279b9c7d67f3`）。合入前必需面 12 项全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit 实跑通过，本卡三条 `it()` 通过），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit，16 文件 28 项，`continue-on-error`）。`compiler-nested-anyof-type.test.ts` 不在失败名单。`multi-worktree-cross-talk` 本轮未复现。Bugbot NEUTRAL 不挡。估算仍为 S。诚实口径：**嵌套 `anyOf` 缺 `type` 已修（一层联合三支带 `type`，接受值不变：现有 id/`new:` id/`null`），`enumOrNever` 对外契约未动；真钥匙复测不在本卡，J47-P4 已销（P-274）**。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。R23 暂缓。Console 拆分与第二批未立卡。不宣称端到端闭环。
 
 ```yaml task-card
 id: TASK-J.48
@@ -10113,7 +10113,7 @@ governance:
 
 * **背景**：有台账第二轮时 DeepSeek 拒 schema（嵌套 anyOf 缺 type）。空台账首轮无此层。
 * **取舍**：修 JSON Schema 形态，不放宽接受值。`enumOrNever` 对外契约未动。
-* **完工说明（2026-11-23 · P-271）**：施工 [#346](https://github.com/he18718143986-design/IDE/pull/346) squash `3a68a813b8a0e703a1687db51b125abe9139b6e4`。真钥匙复测不在本卡。J47-P4 手工 debt 仍挂账。
+* **完工说明（2026-11-23 · P-271）**：施工 [#346](https://github.com/he18718143986-design/IDE/pull/346) squash `3a68a813b8a0e703a1687db51b125abe9139b6e4`。真钥匙复测不在本卡。J47-P4 已销（P-274）。
 
 ### 3.4bj 空补丁时用台账里已有模块名补 set_title（J.49 · 完工回写 P-273）
 
@@ -10121,7 +10121,7 @@ governance:
 
 ### 【Task J.49】空补丁时用台账里已有模块名补 set_title `[COMPLETED · 立卡 P-272 · 施工 #349 · 完工回写 P-273]`
 
-> **归档注记（2026-11-23 · P-273）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266–#346）。[#349](https://github.com/he18718143986-design/IDE/pull/349) squash `b4fecdc09396c1b3654a0fcb8e9d7354d51b8a11` 于 2026-11-23 02:56:27 香港时间合入（由我执行；pre-merge head `60767b9ce2746a6a08436cfa7f3814248b4c201e`；父提交 `1522c38995d9cec230c9c2c68a940fcba8096d63`）。诚实口径：**空补丁时台账已有合格模块但标题空则补 `set_title` 已交付（编译循环层读 `state.draft`，六参签名未动）；真钥匙复测不在本卡，J47-P4 手工 debt 仍挂账**。
+> **归档注记（2026-11-23 · P-273）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266–#346）。[#349](https://github.com/he18718143986-design/IDE/pull/349) squash `b4fecdc09396c1b3654a0fcb8e9d7354d51b8a11` 于 2026-11-23 02:56:27 香港时间合入（由我执行；pre-merge head `60767b9ce2746a6a08436cfa7f3814248b4c201e`；父提交 `1522c38995d9cec230c9c2c68a940fcba8096d63`）。诚实口径：**空补丁时台账已有合格模块但标题空则补 `set_title` 已交付（编译循环层读 `state.draft`，六参签名未动）；真钥匙复测不在本卡，J47-P4 已销（P-274）**。
 
 ```yaml task-card
 id: TASK-J.49
@@ -10231,4 +10231,4 @@ governance:
 * **背景**：J.48 之后 DeepSeek 已收下 schema。真钥匙复测 HEAD `301aec2`：发句前台账已有 `ITEM-1`、`frozen=false`、`title=""`。再发「我要一个登录页」得到 `compiler_applied` / `status=noop` / `ops=0` / `elapsed_ms=1001`，无 `client_detail`。发句后 `title` 仍是 `""`，`last_journal.verdicts` 为 `[]`，没有 `set_title`。`scheme-confirm` 存在且 `disabled=true`，挡句「方案摘要不足，至少需要可读标题与摘要/模块」。未点按钮，未冻结。
 * **取舍**：只补空补丁上的一条 `set_title`，不改门禁、不改本批取词顺序、不改 noop 定义、不强制模型交出非空补丁。真钥匙复测另案，不进本卡 PASS。
 * **立卡说明（2026-11-23 · P-272）**：Tina 授权立卡（t1321u）。基线 `301aec2fa347225fd8fdaf7abe91965b9451afbd`（[#347](https://github.com/he18718143986-design/IDE/pull/347) P-271）；其上产品提交 [#346](https://github.com/he18718143986-design/IDE/pull/346)/`3a68a813b8a0e703a1687db51b125abe9139b6e4`。**立卡 ≠ 开工**；先审施工方案再授权动代码。
-* **完工说明（2026-11-23 · P-273）**：施工 [#349](https://github.com/he18718143986-design/IDE/pull/349) squash `b4fecdc09396c1b3654a0fcb8e9d7354d51b8a11`。真钥匙复测不在本卡。J47-P4 手工 debt 仍挂账。
+* **完工说明（2026-11-23 · P-273）**：施工 [#349](https://github.com/he18718143986-design/IDE/pull/349) squash `b4fecdc09396c1b3654a0fcb8e9d7354d51b8a11`。真钥匙复测不在本卡。J47-P4 已销（P-274）。

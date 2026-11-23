@@ -1,6 +1,6 @@
 # TASK-J.47 · 确认门禁标题不足：诊断与施工方案
 
-> **地位**：planning brief（诊断记录）。施工已由 [`TASK-J.47`](../specs/development-tasks-completed.md#task-j.47) COMPLETED（#342/`1dfac26`，P-269）交付。J47-P4 手工 debt 未销：真钥匙看按钮可点待实测，未点未冻结。  
+> **地位**：planning brief（诊断记录）。施工已由 [`TASK-J.47`](../specs/development-tasks-completed.md#task-j.47) COMPLETED（#342/`1dfac26`，P-269）交付。J47-P4 已销（P-274）：真钥匙实测（HEAD `bcf8b08`）台账标题『登录页』、`scheme_revision` 2、`scheme-confirm` 的 `disabled` 为 `false`；判定用生产同一套逻辑（无同源静态页，非 DOM 点击）；未点按钮、未冻结。  
 > **基线**：main `2166adc1652692402bd174abf71e08a202484180`（P-267）。  
 > **试玩目录**：`/Users/tina/Downloads/stagent-j45-key-playtest`。  
 > **不改产品代码**（本文件仅诊断与方案）。

@@ -211,9 +211,9 @@
 | `TASK-J.43` | `COMPLETED` | Windows 白名单路径分隔符归一化（立卡 P-259；施工 #329 `32bdab9`；完工回写 P-260；估算 S；只动测试侧匹配） | [正文](./development-tasks-completed.md#task-j.43) |
 | `TASK-J.45` | `COMPLETED` | 有钥匙就注入意图编译器模型客户端（立卡 P-263；施工 #334 `92e5a63`；完工回写 P-264；估算 M；无 J.44；端到端浏览器验证未做） | [正文](./development-tasks-completed.md#task-j.45) |
 | `TASK-J.46` | `COMPLETED` | 编译器模型失败留下原因原文（立卡 P-265；施工 #337 `0ff3419`；完工回写 P-266；估算 S） | [正文](./development-tasks-completed.md#task-j.46) |
-| `TASK-J.47` | `COMPLETED` | 确认门禁标题不足：诊断与修复（立卡 P-268；施工 #342 `1dfac26`；完工回写 P-269；估算 S；J47-P4 手工 debt 未销） | [正文](./development-tasks-completed.md#task-j.47) · [诊断简报](../ledger/j47-title-gate-diagnosis-brief.md) |
-| `TASK-J.48` | `COMPLETED` | 第二轮生成 schema 嵌套 anyOf 缺 type 修复（立卡 P-270；施工 #346 `3a68a81`；完工回写 P-271；估算 S；真钥匙不在本卡；J47-P4 手工 debt 未销） | [正文](./development-tasks-completed.md#task-j.48) · [诊断简报](../ledger/j48-nested-anyof-diagnosis-brief.md) |
-| `TASK-J.49` | `COMPLETED` | 空补丁时用台账里已有模块名补 set_title（立卡 P-272；施工 #349 `b4fecdc`；完工回写 P-273；估算 S；真钥匙复测不在本卡；J47-P4 手工 debt 未销） | [正文](./development-tasks-completed.md#task-j.49) |
+| `TASK-J.47` | `COMPLETED` | 确认门禁标题不足：诊断与修复（立卡 P-268；施工 #342 `1dfac26`；完工回写 P-269；估算 S；J47-P4 已销（P-274）） | [正文](./development-tasks-completed.md#task-j.47) · [诊断简报](../ledger/j47-title-gate-diagnosis-brief.md) |
+| `TASK-J.48` | `COMPLETED` | 第二轮生成 schema 嵌套 anyOf 缺 type 修复（立卡 P-270；施工 #346 `3a68a81`；完工回写 P-271；估算 S；真钥匙不在本卡；J47-P4 已销（P-274）） | [正文](./development-tasks-completed.md#task-j.48) · [诊断简报](../ledger/j48-nested-anyof-diagnosis-brief.md) |
+| `TASK-J.49` | `COMPLETED` | 空补丁时用台账里已有模块名补 set_title（立卡 P-272；施工 #349 `b4fecdc`；完工回写 P-273；估算 S；真钥匙复测不在本卡；J47-P4 已销（P-274）） | [正文](./development-tasks-completed.md#task-j.49) |
 
 ---
 
