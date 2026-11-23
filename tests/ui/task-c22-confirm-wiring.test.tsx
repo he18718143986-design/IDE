@@ -12,24 +12,28 @@ import {
   EMPTY_DEMO_GATE,
   emptySchemeDraft,
   evaluateSchemeConfirmation,
+  freezeScheme,
   type DemoGate,
   type SchemeDraft,
 } from "../../src/lib/journey/scheme-draft";
 import {
+  newSchemePlanConfirmationId,
+  newSchemeStartConfirmationId,
+  resetConfirmSchemeTransactionsForTest,
+  runConfirmSchemeAtomic,
+} from "../../src/lib/journey/confirm-scheme-atomic";
+import {
   formatBudgetPlain,
   scopePlanDigest,
-  scopePlanToContractScope,
   type ScopePlan,
 } from "../../src/lib/journey/scope-plan";
-import { buildConfirmContractFromScopePlan } from "../../src/lib/journey/confirm-scheme-contract";
-import { softwareContractSchema } from "../../src/lib/contract.schema";
 
 /**
  * SSOT v2.0.2 §3 验收：前端接线。
  *
  * 这里只断言「组件确实按谓词渲染、按钮确实连到回调」——
  * 谓词本身的正确性由 tests/unit/scheme-confirmation-gate.test.ts 负责。
- * J.5：夹具补合规 ScopePlan；T-UI-011～013 覆盖预检与签署投影。
+ * J.5：夹具补合规 ScopePlan；T-UI-011～013 覆盖预检；J.50b 确认不再等同开工。
  */
 
 function makeScheme(partial: Partial<SchemeDraft> = {}): SchemeDraft {
@@ -340,49 +344,98 @@ describe("T-UI-4 J.5 范围预检与确认接线", () => {
     expect(screen.queryByTestId("scheme-confirm-blocked")).toBeNull();
   });
 
-  it("T-UI-013 点击确认：createContractWithAdmission 的 writable_paths 与 plan 一致，且未走 submitJourneyMessage", async () => {
+  it("T-UI-013 点击确认：不签署、不调用 createContractWithAdmission，且未走 submitJourneyMessage", async () => {
     const scheme = makeScheme();
     const plan = compliantScopePlan({
       scheme_revision: scheme.scheme_revision,
     });
-    const expectedWritable = scopePlanToContractScope(plan).writable_paths;
-    const createContractWithAdmission = vi.fn(
-      async (_conn: unknown, contract: unknown) => ({
-        contract,
-        admission: null,
-      }),
-    );
+    const createContractWithAdmission = vi.fn();
     const submitJourneyMessage = vi.fn();
 
     const onConfirmScheme = vi.fn(async () => {
-      // 与 index.tsx::handleConfirmScheme 的 signAndPrepare 同源：按 plan 投影建合同。
-      const fromPlan = buildConfirmContractFromScopePlan(scheme, plan);
-      await createContractWithAdmission(
-        { baseUrl: "http://test" },
-        softwareContractSchema.parse({
-          ...fromPlan,
-          lifecycle_state: "PENDING_APPROVAL",
-          approval: { status: "PENDING_REVIEW" },
-        }),
-        { confirmationId: "scheme-confirm-ui-013" },
-      );
-      // 确认链不得再走意图文本推断
+      // J.50b：确认方案只开始规划，不再在点击回调里签署/建合同。
+      expect(createContractWithAdmission).not.toHaveBeenCalled();
       expect(submitJourneyMessage).not.toHaveBeenCalled();
     });
 
     renderPane(scheme, EMPTY_DEMO_GATE, { onConfirmScheme }, plan);
+    expect(screen.getByTestId("scheme-confirm")).toHaveTextContent(
+      "确认方案，开始规划",
+    );
+    expect(screen.queryByText("确认后冻结 Spec 并直接开工写代码。")).toBeNull();
+    expect(screen.queryByText("冻结并开工中…")).toBeNull();
     fireEvent.click(screen.getByTestId("scheme-confirm"));
     expect(onConfirmScheme).toHaveBeenCalledTimes(1);
     await onConfirmScheme.mock.results[0]!.value;
 
-    expect(createContractWithAdmission).toHaveBeenCalledTimes(1);
+    expect(createContractWithAdmission).not.toHaveBeenCalled();
     expect(submitJourneyMessage).not.toHaveBeenCalled();
-    const passed = createContractWithAdmission.mock.calls[0]![1] as {
-      authorization: { file_system_scope: { writable_paths: string[] } };
-    };
-    expect(passed.authorization.file_system_scope.writable_paths).toEqual(
-      expectedWritable,
+  });
+});
+
+describe("J50b-P3 规划提交与开工提交可区分", () => {
+  beforeEach(() => {
+    resetConfirmSchemeTransactionsForTest();
+  });
+
+  it("规划提交与开工提交可区分", async () => {
+    const planId = newSchemePlanConfirmationId();
+    const startId = newSchemeStartConfirmationId();
+    expect(planId.startsWith("scheme-plan-")).toBe(true);
+    expect(startId.startsWith("scheme-start-")).toBe(true);
+    expect(planId).not.toEqual(startId);
+    expect(planId.length).toBeGreaterThanOrEqual(8);
+    expect(startId.length).toBeLessThanOrEqual(96);
+
+    const scheme = makeScheme();
+    const plan = compliantScopePlan({
+      scheme_revision: scheme.scheme_revision,
+    });
+    const sign = vi.fn(async () => ({ contract_id: "ctr-start" }));
+    const persist = vi.fn(
+      async ({ confirmation_id }: { confirmation_id: string }) => ({
+        snapshot_id: `snap-${confirmation_id}`,
+        digest: "digest-plan",
+      }),
     );
-    expect(expectedWritable).toContain("src/pages/**");
+
+    const planned = await runConfirmSchemeAtomic({
+      confirmationId: planId,
+      scheme,
+      demo: EMPTY_DEMO_GATE,
+      expectedRevision: scheme.scheme_revision,
+      scopePlan: plan,
+      stopAfter: "FREEZE_SNAPSHOT",
+      quiesceRightChat: async () => {},
+      persistSnapshot: persist,
+      signAndPrepare: sign,
+    });
+    expect(planned.ok).toBe(true);
+    expect(planned.confirmation_id).toBe(planId);
+    expect(planned.contract_id).toBeUndefined();
+    expect(sign).not.toHaveBeenCalled();
+    expect(persist).toHaveBeenCalledTimes(1);
+    expect(persist.mock.calls[0]![0].confirmation_id).toBe(planId);
+
+    const frozen = planned.frozen ?? freezeScheme(scheme);
+    const started = await runConfirmSchemeAtomic({
+      confirmationId: startId,
+      scheme: frozen,
+      demo: EMPTY_DEMO_GATE,
+      expectedRevision: frozen.scheme_revision,
+      scopePlan: plan,
+      startFrom: "SIGN_AND_PREPARE",
+      existingSnapshot: planned.snapshot,
+      quiesceRightChat: async () => {},
+      persistSnapshot: persist,
+      signAndPrepare: sign,
+    });
+    expect(started.ok).toBe(true);
+    expect(started.confirmation_id).toBe(startId);
+    expect(started.contract_id).toBe("ctr-start");
+    expect(sign).toHaveBeenCalledTimes(1);
+    expect(sign.mock.calls[0]![0].confirmation_id).toBe(startId);
+    // 开工不得再次冻结
+    expect(persist).toHaveBeenCalledTimes(1);
   });
 });
