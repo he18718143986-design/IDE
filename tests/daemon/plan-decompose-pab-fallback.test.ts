@@ -234,8 +234,8 @@ describe("TASK-J.50a-2 plan decompose PAB fallback", () => {
 
     daemon = createDaemon({
       repoRoot: repo,
-      startPort: 4840,
-      endPort: 4849,
+      startPort: 4930,
+      endPort: 4939,
       consolePublicDir: null,
     });
     const info = await daemon.start();
@@ -276,8 +276,8 @@ describe("TASK-J.50a-2 plan decompose PAB fallback", () => {
 
     daemon = createDaemon({
       repoRoot: repo,
-      startPort: 4850,
-      endPort: 4859,
+      startPort: 4940,
+      endPort: 4949,
       consolePublicDir: null,
     });
     const info = await daemon.start();
@@ -317,8 +317,8 @@ describe("TASK-J.50a-2 plan decompose PAB fallback", () => {
 
     daemon = createDaemon({
       repoRoot: repo,
-      startPort: 4860,
-      endPort: 4869,
+      startPort: 4950,
+      endPort: 4959,
       consolePublicDir: null,
     });
     const info = await daemon.start();
@@ -572,8 +572,8 @@ describe("TASK-J.50a-2 plan decompose PAB fallback", () => {
     initGitRepo(repo);
     daemon = createDaemon({
       repoRoot: repo,
-      startPort: 4870,
-      endPort: 4879,
+      startPort: 4960,
+      endPort: 4969,
       consolePublicDir: null,
     });
     const info = await daemon.start();
