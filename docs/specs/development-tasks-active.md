@@ -1567,9 +1567,9 @@ governance:
 > 本卡已 **COMPLETED**（施工 [#349](https://github.com/he18718143986-design/IDE/pull/349) squash `b4fecdc09396c1b3654a0fcb8e9d7354d51b8a11`；立卡 P-272；完工回写 P-273）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.49) §3.4bj。诚实口径：**空补丁时台账已有合格模块但标题空则补 `set_title` 已交付（编译循环层读 `state.draft`，六参签名未动）；真钥匙复测不在本卡，J47-P4 已销（P-274）**。
 
 
-### 3.4u 按评估 i 修复计划环节（2026-11-23 · 立卡 P-277 · R-11 拆分）
+### 3.4u 按评估 i 修复计划环节（2026-11-23 · 立卡 P-277 · P-278 再拆 J.50a）
 
-> **拆卡说明（2026-11-23 · P-277）**：Tina 授权按评估 i 立施工卡（t1349u）。范围必须含 PAB 处理，并写清 `ReadyPabView` 怎么来，不能只接线分解。评估正文未给估算；整包含 PAB 最小生产路径与「确认方案」拆开，估算 L，按 R-11 先拆再开工。母卡 **`TASK-J.50`** 标 `[SPLIT]`，只追溯，**不再作为施工依据**。施工以子卡为准：[`TASK-J.50a`](#task-j.50a)（PAB 最小生产路径，估算 M）→ [`TASK-J.50b`](#task-j.50b)（确认方案只冻结并开始规划，再按合同确认开工，估算 M，硬依赖 J.50a）。依据 [`../ledger/adr0015-plan-step-fix-assessment.md`](../ledger/adr0015-plan-step-fix-assessment.md) 与 [`../ledger/adr0015-plan-step-breakpoint.md`](../ledger/adr0015-plan-step-breakpoint.md)。**立卡 ≠ 开工**。
+> **拆卡说明（2026-11-23 · P-277 / P-278）**：Tina 授权按评估 i 立施工卡（t1349u）。范围必须含 PAB 处理，并写清 `ReadyPabView` 怎么来，不能只接线分解。评估正文未给估算；整包含 PAB 最小生产路径与「确认方案」拆开，估算 L，按 R-11 先拆再开工。母卡 **`TASK-J.50`** 标 `[SPLIT]`，只追溯，**不再作为施工依据**。P-278（t1359u）再按 R-11 把 **`TASK-J.50a`** 拆为 **`TASK-J.50a-1`**（PAB 落盘与读取，估算 S）与 **`TASK-J.50a-2`**（资格判定 + 生成 + 投影 + 接线，估算 M，硬依赖 J.50a-1）；**`TASK-J.50a`** 改 `[SPLIT]`，只追溯，**不再作为施工依据**。施工链：[`TASK-J.50a-1`](#task-j.50a-1) → [`TASK-J.50a-2`](#task-j.50a-2) → [`TASK-J.50b`](#task-j.50b)（确认方案只冻结并开始规划，再按合同确认开工，估算 M，硬依赖 J.50a-2）。依据 [`../ledger/adr0015-plan-step-fix-assessment.md`](../ledger/adr0015-plan-step-fix-assessment.md) 与 [`../ledger/adr0015-plan-step-breakpoint.md`](../ledger/adr0015-plan-step-breakpoint.md)。**立卡 ≠ 开工**。先前对 J.50a 的施工授权已被本拆分取代。
 
 <a id="task-j.50"></a>
 
@@ -1584,13 +1584,15 @@ contract:
     description: >-
       按 P-276 评估候选 i，让「确认方案」只冻结并开始规划，先出计划/地图，
       再按合同桩确认开工。落地必须同时处理 PAB，不能只接线分解。
-      整包估算 L，已按 R-11 拆为 J.50a / J.50b。本母卡不再作为施工依据。
+      整包估算 L，已按 R-11 拆为 J.50a / J.50b；P-278 再把 J.50a
+      拆为 J.50a-1 / J.50a-2。本母卡不再作为施工依据。
     risk_level: MEDIUM
   acceptance:
     - id: J50-P1
       check: auto
       text: >-
-        母卡已拆为 J.50a / J.50b，不再作为施工依据；不得按本母卡开工。
+        母卡已拆为 J.50a / J.50b，且 J.50a 已再拆为 J.50a-1 / J.50a-2；
+        本母卡不再作为施工依据；不得按本母卡开工。
   scheme_item_ids: []
   scope:
     writable_paths:
@@ -1602,9 +1604,10 @@ contract:
       - { alias: docs, executable: npm, args: [run, check:docs] }
 design:
   approach: >-
-    本母卡不施工。J.50a 先提供 minimal 生产路径，把 ReadyPabView 从密封后的
-    方案与仓库事实里做出来并交给分解器；J.50b 再把底部「确认方案」拆成
-    「冻结并开始规划」，地图「确认开工」继续签署并拉 Worker。
+    本母卡不施工。施工链为 J.50a-1 → J.50a-2 → J.50b：J.50a-1 先做
+    PAB 落盘与读取；J.50a-2 再做资格判定、零模型生成、ReadyPabView
+    投影与分解接线；J.50b 把底部「确认方案」拆成「冻结并开始规划」，
+    地图「确认开工」继续签署并拉 Worker。
   touches:
     - { path: docs/specs/development-tasks-active.md, change: modify, why: 母卡拆分与子卡登记, symbols: [] }
   interfaces: []
@@ -1619,7 +1622,7 @@ governance:
     - docs/specs/project-architecture-baseline.md
   depends_on: []
   code_facts:
-    - { ref: "docs/ledger/adr0015-plan-step-fix-assessment.md:13-57", note: "评估建议候选 i，落地必须同时面对 PAB；本母卡按 R-11 拆为 J.50a / J.50b" }
+    - { ref: "docs/ledger/adr0015-plan-step-fix-assessment.md:13-57", note: "评估建议候选 i，落地必须同时面对 PAB；施工链为 J.50a-1 → J.50a-2 → J.50b" }
   non_goals:
     - 本母卡不改任何产品代码
     - 不改 ADR
@@ -1637,144 +1640,71 @@ governance:
 ```
 
 * **立卡说明（2026-11-23 · P-277）**：Tina 授权立卡（t1349u）。基线 `86128d241e1c5dab616a1a37871f0ba126ec0e3e`（[#353](https://github.com/he18718143986-design/IDE/pull/353) P-276）。**立卡 ≠ 开工**；先审施工方案再授权动代码。
+* **拆分说明（2026-11-23 · P-278）**：Tina 授权按 R-11 再拆 J.50a（t1359u）。施工链改为 J.50a-1 → J.50a-2 → J.50b。本母卡仍只追溯，不作为施工依据。
 
 <a id="task-j.50a"></a>
 
-#### 【Task J.50a】PAB 最小生产路径：产出并可向分解器提供 ReadyPabView `[NEW_TASK]`
+#### 【Task J.50a】PAB 最小生产路径：产出并可向分解器提供 ReadyPabView（母卡）`[SPLIT]`
 
 ```yaml task-card
 id: TASK-J.50a
-status: NEW_TASK
+status: SPLIT
 contract:
   intent:
-    title: PAB 最小生产路径：产出并可向分解器提供 ReadyPabView
+    title: PAB 最小生产路径：产出并可向分解器提供 ReadyPabView（母卡）
     description: >-
-      在已密封方案之后、生成可签署合同桩之前，为具备资格的 standard
-      单模块需求提供生产路径：生成 mode=minimal 且 status=ready 的 PAB，
-      落在 .stagent/project/architecture-baseline.json，投影为分解器要的
-      ReadyPabView，并在分解接口未传入 pab 时从该仓库读取。必须写清
-      ReadyPabView 怎么来，不能只接线分解，也不能把现有 /api/baseline
-      参考基线当作这份视图。不具备 minimal 资格则失败关闭。本卡不实现
-      full/large 生成器。立卡 ≠ 开工。
+      原卡范围是密封之后为具备资格的 standard 单模块提供 minimal ready
+      PAB 生产路径，投影 ReadyPabView 并在分解接口未传入 pab 时从仓库
+      读取。P-278 已按 R-11 拆为 J.50a-1（落盘与读取）与 J.50a-2（资格
+      判定、生成、投影与接线）。本母卡只作追溯，不再作为施工依据。
+      先前对 J.50a 的施工授权已被本拆分取代。立卡 ≠ 开工。
     risk_level: MEDIUM
   acceptance:
-    - id: J50a-P1
+    - id: J50a-P0
       check: auto
       text: >-
-        具备资格的 standard 单模块能生成 minimal ready PAB。方案已密封，
-        size_hint 为 standard，仅一个用户可见模块，且无跨模块接口或数据
-        边界变化时，生产入口生成 mode=minimal、status=ready 的 PAB，写入
-        .stagent/project/architecture-baseline.json，并能投影为 ReadyPabView（baseline_id、baseline_revision、baseline_digest、status=ready，且 open_decisions 无 blocking）。
-    - id: J50a-P2
-      check: auto
-      text: >-
-        分解器能用上这份 ReadyPabView。把该视图交给 decompose，或在
-        POST /api/project/plan/decompose 的 body.pab 为空时从仓库读取，
-        具备资格的标准单模块不再因缺 PAB 而返回 E_PAB_NOT_READY。
-    - id: J50a-P3
-      check: auto
-      text: >-
-        现有 /api/baseline 仍是参考基线。GET/POST /api/baseline 语义不变，
-        grants_construction=false，不得把该参考基线当作 ReadyPabView，
-        也不得改写其契约来冒充架构基线。
-    - id: J50a-P4
-      check: auto
-      text: >-
-        不具备 minimal 资格则失败关闭。出现跨模块接口、数据边界变化，
-        或 size_hint 为 large 时，不生成可签署合同桩，返回白话失败，
-        不在本卡实现 full 或 large 的 PAB 生成器。
-    - id: J50a-P5
-      check: auto
-      text: >-
-        旧版不覆盖。写入新修订时归档到
-        .stagent/project/architecture-baseline.revisions/<revision>.json，
-        不得直接改写上一份已落盘文件。
+        母卡已拆为 J.50a-1 / J.50a-2，不再作为施工依据；不得按本母卡开工。
+        原 J50a-P1～P5 已改挂到子卡（落盘/归档/读取与格式消费为 J50a1-P*，
+        资格判定、生成、投影与接线为 J50a2-P*）。
   scheme_item_ids: []
   scope:
     writable_paths:
-      - daemon/project/architecture-baseline-store.ts
-      - daemon/supervisor/pab/minimal-ready-pab.ts
-      - daemon/server.ts
-      - tests/daemon/architecture-baseline-store.test.ts
-      - tests/daemon/plan-decompose-pab-fallback.test.ts
+      - docs/specs/development-tasks-active.md
     readonly_paths:
-      - daemon/supervisor/decomposer/decompose.ts
-      - daemon/supervisor/decomposer/index.ts
       - docs/specs/project-architecture-baseline.md
-      - docs/adr/0019-project-architecture-baseline.md
       - docs/ledger/adr0015-plan-step-fix-assessment.md
   verification:
     commands:
-      - { alias: pab-store, executable: npx, args: [vitest, run, tests/daemon/architecture-baseline-store.test.ts] }
-      - { alias: pab-decompose-fallback, executable: npx, args: [vitest, run, tests/daemon/plan-decompose-pab-fallback.test.ts] }
+      - { alias: docs, executable: npm, args: [run, check:docs] }
 design:
   approach: >-
-    ReadyPabView 必须从本卡的生产路径来，不得由 UI 或测试临时拼一个
-    status=ready 的对象了事，也不得复用 GET/POST /api/baseline（那是扫描/
-    认可参考基线，grants_construction=false，不是分解器要的 ReadyPabView）。
-    密封之后，对本卡认定的「具备资格」情形（size_hint=standard、仅一个用户
-    可见模块、无跨模块接口、无数据边界变化）用零模型生成规格允许的
-    minimal PAB：绑定 scheme_ref 与 repository_ref，覆盖目标与用户可见模块，
-    来源诚实标注，open_decisions 无阻断项，status=ready，digest 对规范化
-    内容确定性哈希。落盘路径固定为 .stagent/project/architecture-baseline.json，
-    旧修订归档到 .stagent/project/architecture-baseline.revisions/。提供可从
-    该文件投影 ReadyPabView 的函数，并改 decompose HTTP 入口：body.pab 为空
-    时从仓库读取，仍没有 ready PAB 则继续 E_PAB_NOT_READY。assertPabReady
-    与 ReadyPabView 字段集合保持原样，本卡不改 decompose.ts 的门禁形状。
-    不具备 minimal 资格（跨模块接口、数据边界变化、或 size_hint=large）
-    失败关闭，只给白话原因，不在本卡做 full/large 生成器。新文件放在已列
-    目录；daemon/server.ts 只允许加 PAB 相关薄接线，以及 decompose 入口在
-    pab 为空时读仓库。要动 writable_paths 以外的文件，停工修卡，不扩面。
-    须有 Daemon/集成级测试覆盖生产入口，不能只证明模块存在。先审施工方案
-    再动代码。
+    本母卡不施工。J.50a-1 只做 architecture-baseline-store 的落盘、修订
+    归档与读取，格式必须按现有 PAB 规格并可被 ReadyPabView 消费。
+    J.50a-2 再做资格判定、零模型生成、从落盘结果投影 ReadyPabView，
+    以及 server.ts 薄接线（含 decompose 在 body.pab 为空时经 J.50a-1
+    读仓库）。J.50b 硬依赖 J.50a-2，不再挂本母卡。
   touches:
-    - { path: daemon/project/architecture-baseline-store.ts, change: create, why: 落盘、修订归档、读出当前 PAB, symbols: [] }
-    - { path: daemon/supervisor/pab/minimal-ready-pab.ts, change: create, why: 零模型生成 minimal ready PAB 并投影 ReadyPabView, symbols: [] }
-    - { path: daemon/server.ts, change: modify, why: 增加 PAB 生产入口，并在 decompose 未传 pab 时从仓库读取, symbols: [] }
-    - { path: tests/daemon/architecture-baseline-store.test.ts, change: create, why: 锁住生成、落盘、归档与资格门, symbols: [] }
-    - { path: tests/daemon/plan-decompose-pab-fallback.test.ts, change: create, why: 锁住 decompose 从仓库读取且不误用 /api/baseline, symbols: [] }
+    - { path: docs/specs/development-tasks-active.md, change: modify, why: 母卡改 SPLIT 并登记子卡, symbols: [] }
   interfaces: []
   test_plan:
-    - { acceptance_id: J50a-P1, test_path: tests/daemon/architecture-baseline-store.test.ts, level: unit, case: 具备资格的 standard 单模块能生成 minimal ready PAB }
-    - { acceptance_id: J50a-P2, test_path: tests/daemon/plan-decompose-pab-fallback.test.ts, level: integration, case: 分解器能用上这份 ReadyPabView }
-    - { acceptance_id: J50a-P3, test_path: tests/daemon/plan-decompose-pab-fallback.test.ts, level: integration, case: 现有 /api/baseline 仍是参考基线 }
-    - { acceptance_id: J50a-P4, test_path: tests/daemon/architecture-baseline-store.test.ts, level: unit, case: 不具备 minimal 资格则失败关闭 }
-    - { acceptance_id: J50a-P5, test_path: tests/daemon/architecture-baseline-store.test.ts, level: unit, case: 旧版不覆盖 }
+    - { acceptance_id: J50a-P0, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "母卡已拆分；门禁 npm run check:docs" }
 governance:
   spec_refs:
     - docs/specs/project-architecture-baseline.md
     - docs/adr/0019-project-architecture-baseline.md
     - docs/ledger/adr0015-plan-step-fix-assessment.md
     - docs/specs/project-decomposition.md
-  depends_on:
-    - { id: TASK-L.8, kind: soft }
-    - { id: TASK-J.49, kind: soft }
+  depends_on: []
   code_facts:
-    - { ref: "daemon/supervisor/decomposer/decompose.ts:25-32", note: "ReadyPabView 最小字段；完整 PAB Schema 本卡也不一次做完" }
-    - { ref: "daemon/supervisor/decomposer/decompose.ts:165-188", note: "assertPabReady；缺/非 ready/有阻断 open_decisions 即 E_PAB_NOT_READY" }
-    - { ref: "daemon/server.ts:5556-5556", note: "现行 decompose 入口把未传入的 pab 置为 null，未读仓库" }
-    - { ref: "daemon/server.ts:6318-6367", note: "现有 /api/baseline 是扫描/认可参考基线，grants_construction=false，不得冒充 ReadyPabView" }
-    - { ref: "docs/specs/project-architecture-baseline.md:26-27", note: "standard 单模块且无跨模块接口/数据边界时可用 minimal，仍须结构与来源校验" }
-    - { ref: "docs/specs/project-architecture-baseline.md:45-45", note: "落盘路径与修订归档目录" }
+    - { ref: "daemon/supervisor/decomposer/decompose.ts:26-32", note: "ReadyPabView 最小字段；完整 PAB Schema 不在本母卡一次做完" }
+    - { ref: "docs/specs/project-architecture-baseline.md:45-45", note: "落盘路径与修订归档目录；由 J.50a-1 承接" }
   non_goals:
-    - 不实现 full 或 large 的 PAB 生成器，也不接模型做架构分析
-    - 不改 ReadyPabView 字段集合，不改 assertPabReady 的判定形状
-    - 不改 /api/baseline 参考基线语义
-    - 不接线「确认方案」按钮，不拆 C.22（属 J.50b）
-    - 不把当前「登录页」按 tiny 绕过 PAB
-    - 不改 ADR-0015 / ADR-0019 正文
-    - 不宣称完整 PAB Schema 或 §7 十条验收矩阵已全部落地
+    - 本母卡不改任何产品代码
+    - 不改 ADR
   fail:
-    - 只接线分解却没有生产路径产出 ReadyPabView
-    - 把 /api/baseline 参考基线当作 ReadyPabView 或改写其契约来冒充
-    - 具备资格的 standard 单模块仍因缺 PAB 返回 E_PAB_NOT_READY
-    - 不具备 minimal 资格时仍生成可签署合同桩，或在本卡实现 full/large 生成器
-    - 直接覆盖旧版 PAB 而不归档修订
-    - 改动 ReadyPabView 字段集合或 assertPabReady 判定形状
-    - 改动 writable_paths 以外的文件却未停工修卡
+    - 把本母卡当作施工依据并直接改产品代码
   adr_revisions: []
-  defaults:
-    - ReadyPabView 只能来自本卡落盘的 ready PAB，不能临时拼对象，也不能借用 /api/baseline
+  defaults: []
   open_questions: []
   estimate: M
   invariants:
@@ -1784,9 +1714,278 @@ governance:
     gateway_write_scope: unchanged
 ```
 
-* **背景**：P-276 评估写明，只接线 `decompose`、不处理 ready 架构基线，会立刻遇到 `E_PAB_NOT_READY`。分解器要的是 `ReadyPabView`；现有 `/api/baseline` 只是参考基线。L.8 只留下最小视图，完整 PAB Schema 仍属后续。本卡先做规格允许的 `minimal` 生产路径，供 J.50b 接线。
+* **背景**：P-276 评估写明，只接线 `decompose`、不处理 ready 架构基线，会立刻遇到 `E_PAB_NOT_READY`。分解器要的是 `ReadyPabView`；现有 `/api/baseline` 只是参考基线。L.8 只留下最小视图，完整 PAB Schema 仍属后续。
 * **取舍**：只做 `minimal` 资格内的零模型路径与落盘/投影；full/large 与完整 Schema 另案。不把参考基线改造成架构基线。
-* **立卡说明（2026-11-23 · P-277）**：Tina 授权立卡（t1349u），并要求写清 PAB 怎么来。基线 `86128d241e1c5dab616a1a37871f0ba126ec0e3e`（[#353](https://github.com/he18718143986-design/IDE/pull/353) P-276）。**立卡 ≠ 开工**；先审施工方案再授权动代码。
+* **立卡说明（2026-11-23 · P-277）**：Tina 授权立卡（t1349u），并要求写清 PAB 怎么来。基线 `86128d241e1c5dab616a1a37871f0ba126ec0e3e`（[#353](https://github.com/he18718143986-design/IDE/pull/353) P-276）。**立卡 ≠ 开工**。
+* **拆分说明（2026-11-23 · P-278）**：Tina 授权按 R-11 再拆（t1359u）。本母卡改 `[SPLIT]`，只作追溯，不再作为施工依据；先前施工授权已被取代。原卡面门禁改挂如下，不删除历史范围：
+  - 原 J50a-P5（旧版不覆盖 / 修订归档）以及落盘、读取 → [`TASK-J.50a-1`](#task-j.50a-1) 的 J50a1-P1～P3
+  - 原 J50a-P1（生成并投影）、J50a-P2（decompose 读取）、J50a-P3（`/api/baseline` 不得充当）、J50a-P4（不具备资格则失败关闭）→ [`TASK-J.50a-2`](#task-j.50a-2) 的 J50a2-P1～P5
+  - 原 writable_paths：`daemon/project/architecture-baseline-store.ts` 与 `tests/daemon/architecture-baseline-store.test.ts` 归 a-1；`daemon/supervisor/pab/minimal-ready-pab.ts`、`daemon/server.ts` 与 `tests/daemon/plan-decompose-pab-fallback.test.ts` 归 a-2
+
+<a id="task-j.50a-1"></a>
+
+#### 【Task J.50a-1】PAB 落盘与读取 `[NEW_TASK]`
+
+```yaml task-card
+id: TASK-J.50a-1
+status: NEW_TASK
+contract:
+  intent:
+    title: PAB 落盘与读取
+    description: >-
+      新建 architecture-baseline-store.ts：把当前 PAB 写入
+      .stagent/project/architecture-baseline.json，旧修订归档到
+      architecture-baseline.revisions/<revision>.json，不得改写已落盘
+      文件；提供读取接口供 decompose / J.50a-2 在 body.pab 为空时加载。
+      落盘格式必须按现有 PAB 规格（ReadyPabView 所需字段、status、digest
+      语义），不得自造格式。本卡不含资格判定、生成逻辑或 decompose / HTTP
+      接线。立卡 ≠ 开工。
+    risk_level: LOW
+  acceptance:
+    - id: J50a1-P1
+      check: auto
+      text: >-
+        当前 PAB 写入与读取。store 把当前 PAB 写入
+        .stagent/project/architecture-baseline.json，并提供读取接口，
+        供 J.50a-2 / decompose 在请求未传入 pab 时加载。本卡本身不接线
+        HTTP，也不改 decompose 入口。
+    - id: J50a1-P2
+      check: auto
+      text: >-
+        修订归档且不可改写。写入新的当前 PAB 时，先把上一份当前文件归档到
+        .stagent/project/architecture-baseline.revisions/<revision>.json，
+        再写新的当前文件；不得直接改写已落盘文件。归档完成后，这些修订文件
+        保持不可变，不得再被改写。
+    - id: J50a1-P3
+      check: auto
+      text: >-
+        落盘格式可被现有 PAB 类型 / ReadyPabView 投影消费。持久化格式必须
+        按现有 PAB 规格，至少包含 ReadyPabView 所需字段（baseline_id、
+        baseline_revision、baseline_digest、status 为 draft 或 ready 或
+        stale、可选 open_decisions）及 status / digest 语义，不得自造平行
+        类型或新 Schema。验收须断言：读出的落盘文件能被 decompose.ts 里现有
+        ReadyPabView 类型消费，而不是测试里另写的假类型。完整 PAB Schema
+        仍属后续，本卡不一次做完。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/project/architecture-baseline-store.ts
+      - tests/daemon/architecture-baseline-store.test.ts
+    readonly_paths:
+      - daemon/supervisor/decomposer/decompose.ts
+      - docs/specs/project-architecture-baseline.md
+      - docs/adr/0019-project-architecture-baseline.md
+  verification:
+    commands:
+      - { alias: pab-store, executable: npx, args: [vitest, run, tests/daemon/architecture-baseline-store.test.ts] }
+design:
+  approach: >-
+    只做持久化与读取，不判定资格，不生成 PAB，不接线 HTTP。写入新的当前
+    PAB 时先归档上一份当前文件，再写新文件；已归档的修订文件不可变。读取
+    接口给 J.50a-2 / decompose 在未传入 pab 时用，但本卡不改 server.ts
+    或 decompose.ts。落盘必须能被现有 ReadyPabView（decompose.ts 导出的
+    类型）消费：字段与 status / digest 语义跟现有 PAB 规格走，不另起一套
+    平行 Schema。digest 由调用方按既有语义写入，本卡负责原样落盘与读出，
+    不发明新的哈希算法。要动 writable_paths 以外的文件，停工修卡，不扩面。
+    先审施工方案再动代码。
+  touches:
+    - { path: daemon/project/architecture-baseline-store.ts, change: create, why: 当前 PAB 落盘、修订归档与读取, symbols: [] }
+    - { path: tests/daemon/architecture-baseline-store.test.ts, change: create, why: 锁住落盘、归档不可变、读取，以及落盘可被 ReadyPabView 消费, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J50a1-P1, test_path: tests/daemon/architecture-baseline-store.test.ts, level: unit, case: 当前 PAB 写入与读取 }
+    - { acceptance_id: J50a1-P2, test_path: tests/daemon/architecture-baseline-store.test.ts, level: unit, case: 修订归档且不可改写 }
+    - { acceptance_id: J50a1-P3, test_path: tests/daemon/architecture-baseline-store.test.ts, level: unit, case: 落盘格式可被现有 ReadyPabView 消费 }
+governance:
+  spec_refs:
+    - docs/specs/project-architecture-baseline.md
+    - docs/adr/0019-project-architecture-baseline.md
+  depends_on:
+    - { id: TASK-L.8, kind: soft }
+  code_facts:
+    - { ref: "docs/specs/project-architecture-baseline.md:45-45", note: "当前文件路径与 revisions/<revision>.json 归档目录；旧版不可覆盖" }
+    - { ref: "docs/specs/project-architecture-baseline.md:86-86", note: "必需语义可不一次照搬同名类型，但不得建立平行架构 SSOT" }
+    - { ref: "daemon/supervisor/decomposer/decompose.ts:26-32", note: "现有 ReadyPabView 类型；落盘必须能被该类型消费，本卡不改此文件" }
+  non_goals:
+    - 不做资格判定，不实现 minimal / full / large 生成器
+    - 不投影生产路径上的 ReadyPabView（属 J.50a-2），也不接线 decompose 或 HTTP
+    - 不改 decompose.ts，不改 ReadyPabView 字段集合或 assertPabReady 判定形状
+    - 不改 /api/baseline 参考基线语义
+    - 不接线「确认方案」按钮，不拆 C.22（属 J.50b）
+    - 不改 ADR-0015 / ADR-0019 正文
+    - 不宣称完整 PAB Schema 或规格 §7 十条验收矩阵已全部落地
+  fail:
+    - 自造平行 PAB / ReadyPabView 类型，或落盘文件不能被现有 ReadyPabView 消费
+    - 直接覆盖已落盘的当前文件或已归档修订，而不先归档上一份当前文件
+    - 在本卡做资格判定、生成逻辑或 decompose / HTTP 接线
+    - 改动 decompose.ts 或 ReadyPabView / assertPabReady 的形状
+    - 改动 writable_paths 以外的文件却未停工修卡
+  adr_revisions: []
+  defaults:
+    - 先归档再写当前文件；已落盘文件不可改写；读取接口只给后续卡用，本卡不接线
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：从原 J.50a 拆出的低风险持久化卡。落盘路径与归档目录已在 PAB 规格写明；完整 Schema 仍属后续，但本卡不能另造格式。
+* **取舍**：只做 store 的写、归档、读；资格判定与生产接线留给 J.50a-2。
+* **立卡说明（2026-11-23 · P-278）**：Tina 授权按 R-11 拆立（t1359u）。基线 `546bf80df82190a0a538157ec6d74baa93e2f4db`（[#354](https://github.com/he18718143986-design/IDE/pull/354) P-277）。**立卡 ≠ 开工**；先审施工方案再授权动代码。
+
+<a id="task-j.50a-2"></a>
+
+#### 【Task J.50a-2】资格判定 + 生成 + 投影 + 接线 `[NEW_TASK]`
+
+```yaml task-card
+id: TASK-J.50a-2
+status: NEW_TASK
+contract:
+  intent:
+    title: 资格判定 + 生成 + 投影 + 接线
+    description: >-
+      新建 minimal-ready-pab.ts：密封之后判定资格（size_hint 为 standard、
+      恰好一个用户可见模块、无跨模块接口变化、无数据边界变化），对具备资格
+      的需求用零模型生成 mode=minimal 且 status=ready 的 PAB，并经 J.50a-1
+      落盘后投影为 ReadyPabView。server.ts 只加薄接线：密封后的 PAB 生产
+      入口，以及 decompose 在未传入 pab 时经 J.50a-1 读取仓库。ReadyPabView
+      只能来自落盘结果；不得让 /api/baseline 充当，也不得改其契约。不具备
+      资格则白话失败关闭。本卡不实现 full / large 生成器，不接「确认方案」
+      按钮。硬依赖 J.50a-1。立卡 ≠ 开工。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J50a2-P1
+      check: auto
+      text: >-
+        具备资格则零模型生成 minimal ready PAB。方案已密封，且同时满足
+        size_hint 为 standard、恰好一个用户可见模块、无跨模块接口变化、
+        无数据边界变化时，生产入口生成 mode=minimal、status=ready 的 PAB，
+        经 J.50a-1 写入仓库。须绑定 scheme_ref 与 repository_ref，来源诚实
+        标注，open_decisions 无阻断项，digest 对规范化内容做确定性哈希。
+        当前「登录页」按 standard 处理，不得按 tiny 绕过。
+    - id: J50a2-P2
+      check: auto
+      text: >-
+        ReadyPabView 只能来自落盘结果。投影函数从 J.50a-1 读出的落盘文件
+        得到 ReadyPabView（baseline_id、baseline_revision、baseline_digest、
+        status=ready，且 open_decisions 无 blocking），不得由 UI 或测试临时
+        拼一个 status=ready 的对象充当生产路径，也不得借用 /api/baseline。
+    - id: J50a2-P3
+      check: auto
+      text: >-
+        分解器能用上这份 ReadyPabView。把该视图交给 decompose，或在
+        POST /api/project/plan/decompose 未传入 pab 时经 J.50a-1 从仓库
+        读取，具备资格的 standard 单模块不再因缺 PAB 而返回 E_PAB_NOT_READY。
+    - id: J50a2-P4
+      check: auto
+      text: >-
+        现有 /api/baseline 仍是参考基线。GET/POST /api/baseline 语义不变，
+        grants_construction 仍为 false，不得把该参考基线当作 ReadyPabView，
+        也不得改写其契约来冒充架构基线。
+    - id: J50a2-P5
+      check: auto
+      text: >-
+        不具备 minimal 资格则失败关闭。出现跨模块接口、数据边界变化，
+        或 size_hint 为 large 时，不生成可签署合同桩，返回白话失败，
+        不在本卡实现 full 或 large 的 PAB 生成器。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/supervisor/pab/minimal-ready-pab.ts
+      - daemon/server.ts
+      - tests/daemon/plan-decompose-pab-fallback.test.ts
+    readonly_paths:
+      - daemon/supervisor/decomposer/decompose.ts
+      - daemon/supervisor/decomposer/index.ts
+      - docs/specs/project-architecture-baseline.md
+      - docs/adr/0019-project-architecture-baseline.md
+      - docs/ledger/adr0015-plan-step-fix-assessment.md
+  verification:
+    commands:
+      - { alias: pab-decompose-fallback, executable: npx, args: [vitest, run, tests/daemon/plan-decompose-pab-fallback.test.ts] }
+design:
+  approach: >-
+    硬依赖 J.50a-1：本卡经其 store 落盘与读取，不重写 store 文件。
+    ReadyPabView 必须从落盘结果来，不得由 UI 或测试临时拼一个
+    status=ready 的对象了事，也不得复用 GET/POST /api/baseline（那是扫描/
+    认可参考基线，grants_construction 为 false，不是分解器要的 ReadyPabView）。
+    密封之后，对本卡认定的「具备资格」情形（size_hint 为 standard、恰好一个
+    用户可见模块、无跨模块接口、无数据边界变化）用零模型生成规格允许的
+    minimal PAB：绑定 scheme_ref 与 repository_ref，覆盖目标与用户可见模块，
+    来源诚实标注，open_decisions 无阻断项，status=ready，digest 对规范化
+    内容确定性哈希。然后经 J.50a-1 落盘，再从落盘结果投影 ReadyPabView。
+    daemon/server.ts 只允许加 PAB 生产入口薄接线，以及 decompose 入口在
+    未传入 pab 时经 J.50a-1 读仓库；仍没有 ready PAB 则继续 E_PAB_NOT_READY。
+    assertPabReady 与 ReadyPabView 字段集合保持原样，本卡不改 decompose.ts
+    的门禁形状。不具备 minimal 资格（跨模块接口、数据边界变化、或 size_hint
+    为 large）失败关闭，只给白话原因，不在本卡做 full/large 生成器。不接线
+    「确认方案」按钮，不拆 C.22（属 J.50b）。当前「登录页」按 standard 处理。
+    要动 writable_paths 以外的文件（含 J.50a-1 的 store），停工修卡，不扩面。
+    须有 Daemon/集成级测试覆盖生产入口，不能只证明模块存在。资格判定与生成
+    的测试放在本卡已列的 plan-decompose-pab-fallback 测试文件，不另开产品
+    文件。先审施工方案再动代码。
+  touches:
+    - { path: daemon/supervisor/pab/minimal-ready-pab.ts, change: create, why: 资格判定、零模型生成 minimal ready PAB，并从落盘结果投影 ReadyPabView, symbols: [] }
+    - { path: daemon/server.ts, change: modify, why: 增加密封后 PAB 生产入口，并在 decompose 未传 pab 时经 J.50a-1 读仓库, symbols: [] }
+    - { path: tests/daemon/plan-decompose-pab-fallback.test.ts, change: create, why: 锁住资格判定、生成、从落盘投影、decompose 回退读取，且不误用 /api/baseline, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J50a2-P1, test_path: tests/daemon/plan-decompose-pab-fallback.test.ts, level: integration, case: 具备资格则零模型生成 minimal ready PAB }
+    - { acceptance_id: J50a2-P2, test_path: tests/daemon/plan-decompose-pab-fallback.test.ts, level: integration, case: ReadyPabView 只能来自落盘结果 }
+    - { acceptance_id: J50a2-P3, test_path: tests/daemon/plan-decompose-pab-fallback.test.ts, level: integration, case: 分解器能用上这份 ReadyPabView }
+    - { acceptance_id: J50a2-P4, test_path: tests/daemon/plan-decompose-pab-fallback.test.ts, level: integration, case: 现有 /api/baseline 仍是参考基线 }
+    - { acceptance_id: J50a2-P5, test_path: tests/daemon/plan-decompose-pab-fallback.test.ts, level: integration, case: 不具备 minimal 资格则失败关闭 }
+governance:
+  spec_refs:
+    - docs/specs/project-architecture-baseline.md
+    - docs/adr/0019-project-architecture-baseline.md
+    - docs/ledger/adr0015-plan-step-fix-assessment.md
+    - docs/specs/project-decomposition.md
+  depends_on:
+    - { id: TASK-J.50a-1, kind: hard }
+    - { id: TASK-L.8, kind: soft }
+    - { id: TASK-J.49, kind: soft }
+  code_facts:
+    - { ref: "daemon/supervisor/decomposer/decompose.ts:26-32", note: "ReadyPabView 最小字段；完整 PAB Schema 本卡也不一次做完" }
+    - { ref: "daemon/supervisor/decomposer/decompose.ts:165-192", note: "assertPabReady；缺、非 ready、或有阻断 open_decisions 即 E_PAB_NOT_READY" }
+    - { ref: "daemon/server.ts:5556-5556", note: "现行 decompose 入口把未传入的 pab 置为 null，未读仓库" }
+    - { ref: "daemon/server.ts:6318-6367", note: "现有 /api/baseline 是扫描/认可参考基线，grants_construction 为 false，不得冒充 ReadyPabView" }
+    - { ref: "docs/specs/project-architecture-baseline.md:26-27", note: "standard 单模块且无跨模块接口/数据边界时可用 minimal，仍须结构与来源校验" }
+  non_goals:
+    - 不实现 full 或 large 的 PAB 生成器，也不接模型做架构分析
+    - 不改写 J.50a-1 的 store 实现，不另起一套落盘格式
+    - 不改 ReadyPabView 字段集合，不改 assertPabReady 的判定形状
+    - 不改 /api/baseline 参考基线语义
+    - 不接线「确认方案」按钮，不拆 C.22（属 J.50b）
+    - 不把当前「登录页」按 tiny 绕过 PAB
+    - 不改 ADR-0015 / ADR-0019 正文
+    - 不宣称完整 PAB Schema 或规格 §7 十条验收矩阵已全部落地
+  fail:
+    - 只接线分解却没有经 J.50a-1 落盘的生产路径产出 ReadyPabView
+    - 把 /api/baseline 参考基线当作 ReadyPabView，或改写其契约来冒充
+    - ReadyPabView 不是来自落盘结果，而是临时拼出来的对象
+    - 具备资格的 standard 单模块仍因缺 PAB 返回 E_PAB_NOT_READY
+    - 不具备 minimal 资格时仍生成可签署合同桩，或在本卡实现 full/large 生成器
+    - 改动 ReadyPabView 字段集合或 assertPabReady 判定形状
+    - 改写 J.50a-1 的 store 文件，或改动 writable_paths 以外的文件却未停工修卡
+  adr_revisions: []
+  defaults:
+    - ReadyPabView 只能来自经 J.50a-1 落盘的 ready PAB，不能临时拼对象，也不能借用 /api/baseline
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：从原 J.50a 拆出的判定、生成、投影与接线卡。必须先有 J.50a-1 的落盘与读取。
+* **取舍**：只做 `minimal` 资格内的零模型路径与投影/接线；full/large 与完整 Schema 另案。不把参考基线改造成架构基线。不接「确认方案」按钮。
+* **立卡说明（2026-11-23 · P-278）**：Tina 授权按 R-11 拆立（t1359u）。基线 `546bf80df82190a0a538157ec6d74baa93e2f4db`（[#354](https://github.com/he18718143986-design/IDE/pull/354) P-277）。硬依赖 J.50a-1。**立卡 ≠ 开工**；先审施工方案再授权动代码。
 
 <a id="task-j.50b"></a>
 
@@ -1800,11 +1999,11 @@ contract:
     title: 确认方案只冻结并开始规划，再按合同确认开工
     description: >-
       按 P-276 评估候选 i，把底部「确认方案」改成只冻结并开始规划：走 C.22
-      到 FREEZE_SNAPSHOT，再调用 J.50a 的 PAB 路径与分解，刷新项目地图；
+      到 FREEZE_SNAPSHOT，再调用 J.50a-2 的 PAB 路径与分解，刷新项目地图；
       此路径不签署合同、不 runWorker。地图「确认开工」再按合同桩走签署与
       施工准备，成功后才 runWorker。按钮与说明改为与 ADR-0019 一致的
       「确认方案，开始规划」。必须有覆盖生产用户路径的集成测试。硬依赖
-      J.50a。立卡 ≠ 开工。
+      J.50a-2，不再挂 J.50a。立卡 ≠ 开工。
     risk_level: MEDIUM
   acceptance:
     - id: J50b-P1
@@ -1812,7 +2011,7 @@ contract:
       text: >-
         确认方案只冻结并开始规划。底部「确认方案」走 C.22 的
         CLAIM_AND_QUIESCE、VALIDATE_CONFIRMATION、FREEZE_SNAPSHOT，随后
-        走 J.50a 的 PAB 路径并调用 decompose 与 refreshProjectPlan；不签署
+        走 J.50a-2 的 PAB 路径并调用 decompose 与 refreshProjectPlan；不签署
         合同，不 runWorker。按钮与说明改为「确认方案，开始规划」，不再写
         「确认后冻结 Spec 并直接开工写代码」。
     - id: J50b-P2
@@ -1857,11 +2056,11 @@ contract:
       - { alias: starts-planning, executable: npx, args: [vitest, run, tests/ui/confirm-scheme-starts-planning.test.tsx] }
 design:
   approach: >-
-    硬依赖 J.50a：本卡不得在没有 ready PAB 生产路径的情况下只把 UI 接到
+    硬依赖 J.50a-2：本卡不得在没有 ready PAB 生产路径的情况下只把 UI 接到
     decompose。底部按钮不再一次跑完「冻结 + 签署 + 开工」；C.22 五阶段
     保留，签署与施工准备改到地图「确认开工」。handleConfirmScheme（或拆出
     的开始规划路径）在 FREEZE_SNAPSHOT 成功后进入 PROJECT_MAPPING，中栏
-    写「正在整理项目地图…」，右栏不锁，然后调用 J.50a 入口与
+    写「正在整理项目地图…」，右栏不锁，然后调用 J.50a-2 入口与
     decomposeProjectPlan，再 refreshProjectPlan。成功后不 runWorker。
     handleProjectMapConfirmStart 继续预检 stub_id，再走签署并在成功后
     runWorker。按钮与 SchemeReviewPane 说明改为「确认方案，开始规划」。
@@ -1890,7 +2089,7 @@ governance:
     - docs/ledger/adr0015-plan-step-fix-assessment.md
     - docs/specs/supervisor.md
   depends_on:
-    - { id: TASK-J.50a, kind: hard }
+    - { id: TASK-J.50a-2, kind: hard }
   code_facts:
     - { ref: "src/routes/index.tsx:1457-1733", note: "现行底部确认方案按 C.22 一次冻结、签署并 runWorker" }
     - { ref: "src/routes/index.tsx:1855-1867", note: "地图确认开工仍走同一套 handleConfirmScheme" }
@@ -1903,18 +2102,18 @@ governance:
     - 不把当前「登录页」按 tiny 绕过
     - 不实现 large 的模型分解
     - 不改 ADR 正文
-    - 不在本卡重做 J.50a 的 PAB 生成器
+    - 不在本卡重做 J.50a-2 的 PAB 生成器或 J.50a-1 的落盘
     - 不把试玩或合入写入本卡验收
   fail:
     - 确认方案后仍直接签署或 runWorker
-    - 只接线分解却未走 J.50a 的 ReadyPabView 生产路径
+    - 只接线分解却未走 J.50a-2 的 ReadyPabView 生产路径
     - 地图确认开工不再签署或不拉 Worker
     - 没有覆盖「确认后可见计划且尚未开工」的生产路径集成测试
     - 把当前「登录页」按 tiny 绕过计划环节
     - 改动 writable_paths 以外的文件却未停工修卡
   adr_revisions: []
   defaults:
-    - 底部按钮只冻结并开始规划；签署与开工留在地图确认开工；必须先有 J.50a
+    - 底部按钮只冻结并开始规划；签署与开工留在地图确认开工；必须先有 J.50a-2
   open_questions: []
   estimate: M
   invariants:
@@ -1926,4 +2125,5 @@ governance:
 
 * **背景**：P-275 定性是主链顺序与 ADR-0015 不符：现行「确认方案 = 冻结 + 直接开工」，计划/里程碑被绕过。P-276 建议候选 i，并写明落地必须同时面对 PAB。
 * **取舍**：采用评估 i，不默认走 ii。`tiny` 分流不是本卡主修法；当前「登录页」按 `standard` 处理。
-* **立卡说明（2026-11-23 · P-277）**：Tina 授权立卡（t1349u）。基线 `86128d241e1c5dab616a1a37871f0ba126ec0e3e`（[#353](https://github.com/he18718143986-design/IDE/pull/353) P-276）。硬依赖 J.50a。**立卡 ≠ 开工**；先审施工方案再授权动代码。
+* **立卡说明（2026-11-23 · P-277）**：Tina 授权立卡（t1349u）。基线 `86128d241e1c5dab616a1a37871f0ba126ec0e3e`（[#353](https://github.com/he18718143986-design/IDE/pull/353) P-276）。当时硬依赖 J.50a。**立卡 ≠ 开工**；先审施工方案再授权动代码。
+* **依赖改挂（2026-11-23 · P-278）**：硬依赖改挂 `TASK-J.50a-2`，不再挂 J.50a。J.50a 已 `[SPLIT]`，不再作为施工依据。
