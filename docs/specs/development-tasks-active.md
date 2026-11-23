@@ -1726,7 +1726,7 @@ governance:
 
 #### 【Task J.50a-1】PAB 落盘与读取 `[COMPLETED · 正文已迁]`
 
-> 本卡已 **COMPLETED**（施工 [#356](https://github.com/he18718143986-design/IDE/pull/356) squash `21237298c48d4327d396d8b36b999b656f5e76c1`；立卡 P-278；完工回写 P-279）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.50a-1) §3.4bk。诚实口径：**PAB 落盘/归档/读取 store 已交付（格式锚定现有 PAB 规格，digest 由调用方写入本卡原样落盘）；资格判定/生成/`decompose` 接线在 J.50a-2**。
+> 本卡已 **COMPLETED**（施工 [#356](https://github.com/he18718143986-design/IDE/pull/356) squash `21237298c48d4327d396d8b36b999b656f5e76c1`；立卡 P-278；完工回写 P-279）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.50a-1) §3.4bk。诚实口径：**PAB 落盘/归档/读取 store 已交付（格式锚定现有 PAB 规格，`ReadyPabView` 类型直接复用 `decompose.ts`，digest 由调用方写入本卡原样落盘不发明哈希，`E_PAB_REVISION_EXISTS` 失败关闭不覆盖）；资格判定/生成/`decompose` 接线在 J.50a-2**。
 
 
 <a id="task-j.50a-2"></a>

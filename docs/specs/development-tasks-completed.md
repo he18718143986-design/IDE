@@ -10239,7 +10239,7 @@ governance:
 
 ### 【Task J.50a-1】PAB 落盘与读取 `[COMPLETED · 立卡 P-278 · 施工 #356 · 完工回写 P-279]`
 
-> **归档注记（2026-11-23 · P-279）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266–#349）。[#356](https://github.com/he18718143986-design/IDE/pull/356) squash `21237298c48d4327d396d8b36b999b656f5e76c1` 于 2026-11-23 19:56:34 香港时间合入（由我执行；pre-merge head `587c92fba87a1ad1e246c3e12b5bf9b76d072836`；父提交 `d5e68c561087ead4c213a94e2f8edafd0eb0715d`）。诚实口径：**PAB 落盘/归档/读取 store 已交付（格式锚定现有 PAB 规格，digest 由调用方写入本卡原样落盘）；资格判定/生成/`decompose` 接线在 J.50a-2**。
+> **归档注记（2026-11-23 · P-279）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266–#349）。[#356](https://github.com/he18718143986-design/IDE/pull/356) squash `21237298c48d4327d396d8b36b999b656f5e76c1` 于 2026-11-23 19:56:34 香港时间合入（由我执行；pre-merge head `587c92fba87a1ad1e246c3e12b5bf9b76d072836`；父提交 `d5e68c561087ead4c213a94e2f8edafd0eb0715d`）。诚实口径：**PAB 落盘/归档/读取 store 已交付（格式锚定现有 PAB 规格，`ReadyPabView` 类型直接复用 `decompose.ts`，digest 由调用方写入本卡原样落盘不发明哈希，`E_PAB_REVISION_EXISTS` 失败关闭不覆盖）；资格判定/生成/`decompose` 接线在 J.50a-2**。
 
 ```yaml task-card
 id: TASK-J.50a-1
@@ -10358,4 +10358,4 @@ governance:
 * **背景**：从原 J.50a 拆出的低风险持久化卡。落盘路径与归档目录已在 PAB 规格写明；完整 Schema 仍属后续，但本卡不能另造格式。
 * **取舍**：只做 store 的写、归档、读；资格判定与生产接线留给 J.50a-2。
 * **立卡说明（2026-11-23 · P-278）**：Tina 授权按 R-11 拆立（t1359u）。基线 `546bf80df82190a0a538157ec6d74baa93e2f4db`（[#354](https://github.com/he18718143986-design/IDE/pull/354) P-277）。**立卡 ≠ 开工**；先审施工方案再授权动代码。
-* **完工说明（2026-11-23 · P-279）**：施工 [#356](https://github.com/he18718143986-design/IDE/pull/356) squash `21237298c48d4327d396d8b36b999b656f5e76c1`。PAB 落盘/归档/读取 store 已交付（格式锚定现有 PAB 规格，digest 由调用方写入本卡原样落盘）；资格判定/生成/`decompose` 接线在 J.50a-2。
+* **完工说明（2026-11-23 · P-279）**：施工 [#356](https://github.com/he18718143986-design/IDE/pull/356) squash `21237298c48d4327d396d8b36b999b656f5e76c1`。PAB 落盘/归档/读取 store 已交付（格式锚定现有 PAB 规格，`ReadyPabView` 类型直接复用 `decompose.ts`，digest 由调用方写入本卡原样落盘不发明哈希，`E_PAB_REVISION_EXISTS` 失败关闭不覆盖）；资格判定/生成/`decompose` 接线在 J.50a-2。
