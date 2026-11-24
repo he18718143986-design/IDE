@@ -1741,3 +1741,138 @@ governance:
 #### 【Task J.50b】确认方案只冻结并开始规划，再按合同确认开工 `[COMPLETED · 正文已迁]`
 
 > 本卡已 **COMPLETED**（施工 [#361](https://github.com/he18718143986-design/IDE/pull/361) squash `f69d026427792db3376da77dd089db09aa072947`；立卡 P-277；完工回写 P-282）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.50b) §3.4bm。诚实口径：**『确认方案』已拆分为冻结+规划（C.22 到 `FREEZE_SNAPSHOT` 后接 PAB 生产与分解刷新地图，不签署不 `runWorker`），地图『确认开工』按合同桩签署开工；不具备资格白话失败关闭；端到端闭环未宣称，试玩与合入不在本卡**。
+
+
+### 3.4v 资格判定读错方案来源（2026-11-24 · 立卡 P-283）
+
+<a id="task-j.51"></a>
+
+#### 【Task J.51】资格判定读错方案来源 `[NEW_TASK]`
+
+```yaml task-card
+id: TASK-J.51
+status: NEW_TASK
+contract:
+  intent:
+    title: 资格判定读错方案来源
+    description: >-
+      资格判定与 ensureMinimalReadyPab 的输入改为冻结后的台账方案（state.draft /
+      已密封证明），不读请求体投影。新增共用加载函数，供 ensureMinimalReadyPab、
+      decompose 回退 resolvePabForDecompose、以及 POST
+      /api/project/architecture-baseline/ensure-minimal 三处共用：内容读台账
+      state.draft，密封证明用同一 scheme_id + 修订号、状态已冻结的快照；台账自身
+      frozen=true 也承认。请求体投影忽略，不再作为资格来源。判定表一行不改。
+      真钥匙复测不在本卡验收。
+    risk_level: LOW
+  acceptance:
+    - id: J51-P1
+      check: auto
+      text: >-
+        投影缺 size_hint 但台账 size_hint=standard 且有匹配快照时具备资格并落盘。
+        请求体（或传入的 scheme 参数）为中栏投影形态：模块只剩名称、无 size_hint；
+        台账 state.draft 为 size_hint=standard、单用户可见新模块，且存在同一
+        scheme_id + 修订号、状态已冻结的快照。此时应判定具备资格并写入 minimal
+        ready PAB，不得因投影缺 size_hint 失败关闭。
+    - id: J51-P2
+      check: auto
+      text: >-
+        台账 size_hint=large 时白话失败且不写盘，即使请求体写成 standard。
+        失败须走现有白话，不得落盘。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/supervisor/pab/minimal-ready-pab.ts
+      - daemon/server.ts
+      - tests/daemon/plan-decompose-pab-fallback.test.ts
+    readonly_paths:
+      - daemon/supervisor/intent-compiler/scheme-ledger-store.ts
+      - daemon/pipeline/scheme-snapshot-store.ts
+      - daemon/supervisor/intent-compiler/scheme-midpane-projection.ts
+      - src/lib/journey/scheme-patch-types.ts
+      - src/routes/index.tsx
+  verification:
+    commands:
+      - { alias: pab-fallback, executable: npx, args: [vitest, run, tests/daemon/plan-decompose-pab-fallback.test.ts] }
+design:
+  approach: >-
+    J.50b 规划冻结之后，账本内容是完整的（size_hint=standard、模块结构还在），
+    但 frozen 仍是 false；密封快照已标冻结，里面却只有中栏投影。所以资格判定必须
+    「内容读台账 state.draft，密封证明读匹配的已冻结快照」，单读任一边都会错。
+    在 daemon/supervisor/pab/minimal-ready-pab.ts 新增同一套加载函数（建议名
+    loadSealedLedgerSchemeForMinimalPab），给 ensureMinimalReadyPab、
+    resolvePabForDecompose 与 POST /api/project/architecture-baseline/ensure-minimal
+    三处共用。先读 readSchemeLedger(projectRoot)?.state.draft；若存在同一
+    scheme_id + 修订号、且 readSchemeSnapshot 能读出的已冻结快照，则按已密封做判定，
+    内容仍用台账，不用快照里的投影。查找快照可在本文件内遍历
+    SCHEME_SNAPSHOT_DIR 再调用现有 readSchemeSnapshot，不改
+    scheme-snapshot-store.ts（该文件不在 writable_paths）。台账自身
+    draft.frozen===true（现有 J.50a-2 单测夹具）也承认。两样都没有，仍用现成白话
+    「方案还没密封，还不能生成架构基线。」请求体里的投影忽略，不再作为资格来源；
+    ensure-minimal 不再强求请求体带 scheme。判定表
+    assessMinimalReadyPabEligibility 一行不改（standard、单模块、无跨模块接口、
+    无数据边界变化、kind 合格）。因为判定表仍读 scheme.frozen === true，加载函数
+    在确认密封证明之后，把台账内容交给判定时须带上已密封标记（例如展开台账草稿并设
+    frozen: true），不得把 frozen=false 的台账原文直接丢进未改的判定表，否则会误报
+    「方案还没密封」。ensureMinimalReadyPab / resolvePabForDecompose 即使保留
+    scheme 参数，也不得再用它做资格判定。原有 J.50a-2 用例改为先写入台账（及按需
+    写入匹配快照），判定逻辑保持原样。要动 writable_paths 以外的文件，停工修卡，
+    不扩面。先审施工方案再动代码。本卡验收只含 CI 单测；真钥匙复测不进本卡验收，
+    不写成 it()，也不写成会让 check:docs 要求出现在 it() 里的 case。
+  touches:
+    - { path: daemon/supervisor/pab/minimal-ready-pab.ts, change: modify, why: 新增共用加载函数并让 ensureMinimalReadyPab / resolvePabForDecompose 用台账内容加密封证明做资格判定, symbols: [loadSealedLedgerSchemeForMinimalPab] }
+    - { path: daemon/server.ts, change: modify, why: ensure-minimal 与 decompose 回退改走共用加载函数，不再把请求体投影当作资格来源，ensure-minimal 不再强求请求体带 scheme, symbols: [] }
+    - { path: tests/daemon/plan-decompose-pab-fallback.test.ts, change: modify, why: 新增 J51-P1 / J51-P2，并把原有 J.50a-2 用例改为先写台账, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J51-P1, test_path: tests/daemon/plan-decompose-pab-fallback.test.ts, level: unit, case: "J51-P1: 投影缺 size_hint 但台账 size_hint=standard 且有匹配快照时具备资格并落盘" }
+    - { acceptance_id: J51-P2, test_path: tests/daemon/plan-decompose-pab-fallback.test.ts, level: unit, case: "J51-P2: 台账 size_hint=large 时白话失败且不写盘，即使请求体写 standard" }
+governance:
+  spec_refs:
+    - docs/specs/project-architecture-baseline.md
+    - docs/adr/0019-project-architecture-baseline.md
+    - docs/specs/project-decomposition.md
+  depends_on:
+    - { id: TASK-J.50b, kind: hard }
+  code_facts:
+    - { ref: "daemon/supervisor/pab/minimal-ready-pab.ts:44", note: assessMinimalReadyPabEligibility 入口；判定表本卡一行不改 }
+    - { ref: "daemon/supervisor/pab/minimal-ready-pab.ts:47-60", note: "先查 frozen，再查 size_hint；缺 size_hint 会落到「这个需求的规模档不适合用精简架构基线。」" }
+    - { ref: "daemon/supervisor/pab/minimal-ready-pab.ts:94-99", note: ensureMinimalReadyPab 目前把 input.scheme 直接送进判定 }
+    - { ref: "daemon/supervisor/pab/minimal-ready-pab.ts:153-168", note: resolvePabForDecompose 回退同样把 input.scheme 交给 ensureMinimalReadyPab }
+    - { ref: "daemon/server.ts:5547-5553", note: ensure-minimal 强求请求体 scheme 并把它当作资格来源 }
+    - { ref: "daemon/server.ts:5586-5599", note: decompose 回退把 body.scheme 传给 resolvePabForDecompose }
+    - { ref: "daemon/supervisor/intent-compiler/scheme-ledger-store.ts:72", note: 本卡内容来源 readSchemeLedger(repoRoot).state.draft }
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:761-776", note: readSchemeSnapshot 只返回 status 为 FROZEN 的快照，用作密封证明 }
+    - { ref: "daemon/supervisor/intent-compiler/scheme-midpane-projection.ts:64-76", note: 中栏投影无 size_hint，模块只剩名称；本卡不改投影结构 }
+  non_goals:
+    - 不改判定表阈值（standard、单模块、无跨模块、无数据边界变化、kind 合格）
+    - 不改 J.50b 已交付的冻结+规划拆分
+    - 不改中栏投影结构（投影瘦身是另一回事）
+    - 不点「确认开工」、不走确认开工路径
+    - 不改右栏逐字节
+    - 不动 ADR-0015 / ADR-0019
+    - 真钥匙复测不进本卡验收
+  fail:
+    - 仍用请求体投影做资格判定，导致缺 size_hint 的投影被判不合格、而台账 standard 且已有匹配快照时本应具备资格
+    - 只读密封快照里的投影当内容，或只看台账 frozen 标记当密封证明
+    - 把 frozen=false 的台账原文直接送进未改的判定表，误报「方案还没密封」
+    - 改了 assessMinimalReadyPabEligibility 的判定表或阈值
+    - 台账 size_hint=large 时因请求体写成 standard 而落盘或判为具备资格
+    - 两样密封证明都没有时，没有沿用现成白话「方案还没密封，还不能生成架构基线。」
+    - 改动 writable_paths 以外的文件却未停工修卡
+    - 把真钥匙复测写成 it() 或写成会让 check:docs 要求出现在 it() 里的 case
+  adr_revisions: []
+  defaults:
+    - 内容读台账，密封证明读匹配快照；判定表一行不改；请求体投影忽略
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：J.50b 之后，真钥匙「确认方案，开始规划」已写冻结快照 `scheme-plan-mwujofon-p66842ot`，合同 0、未开工——J.50b 拆分本身工作正常。随后 decompose 返回 422「这个需求的规模档不适合用精简架构基线。」根因：控制台送出中栏投影（模块只剩名称，无 `size_hint`），`assessMinimalReadyPabEligibility` 对投影判定 `size_hint` 缺失 → 不合格。账本 `state.draft` 仍是 `size_hint=standard`、单用户可见新模块「登录页」，按台账原样具备资格。
+* **取舍**：J.50b 冻结后账本内容完整但 `frozen=false`，密封快照已冻结但只有投影，所以「内容读台账、密封证明读快照」是唯一正确的组合。判定表一行不改；请求体投影忽略。真钥匙复测另案，不进本卡 PASS。
+* **立卡说明（2026-11-24 · P-283）**：Tina 授权立卡（t1388u）。基线 `baf23834add1ee2512d25daa359b91537886c225`（[#362](https://github.com/he18718143986-design/IDE/pull/362) P-282）；其上产品提交 [#361](https://github.com/he18718143986-design/IDE/pull/361)/`f69d026427792db3376da77dd089db09aa072947`。**立卡 ≠ 开工**；先合入本 docs PR，再开独立代码 PR。代码 PR 必需检查全绿后报授权；Windows 存量失败按先例报 UNSTABLE（#266–#361 选 A）。
+* **真钥匙复测路径（锁定，不在本卡验收）**：J.51 施工合入并重启 Daemon 后，同一试玩目录再点「确认方案，开始规划」→ 看分解是否出计划/地图 → 再测「确认开工」。实测记录落 ledger。
