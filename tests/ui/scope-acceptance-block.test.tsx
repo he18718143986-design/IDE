@@ -309,6 +309,16 @@ describe("TASK-J.6 ScopeAcceptanceBlock（S2-08）", () => {
     for (const d of scheme.decisions) {
       scheme = confirmSchemeDecision(scheme, d.id);
     }
+    scheme = {
+      ...scheme,
+      acceptance: [
+        {
+          id: "ac-1",
+          text: "页面能打开并看到进度数字",
+          check: "playtest",
+        },
+      ],
+    };
     const plan = makePlan({
       scheme_revision: scheme.scheme_revision,
       needs_approval: [

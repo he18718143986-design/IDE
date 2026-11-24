@@ -7,6 +7,7 @@ import {
   emptySchemeDraft,
   evaluateSchemeConfirmation,
   freezeScheme,
+  SCHEME_ACCEPTANCE_EMPTY_MESSAGE,
   type DemoGate,
   type SchemeConflict,
   type SchemeDraft,
@@ -37,6 +38,13 @@ function makeDraft(partial: Partial<SchemeDraft> = {}): SchemeDraft {
     modules: ["工程进度管控", "财务数据与预算"],
     mermaidFlow: "flowchart LR\n  A[录入进度] --> B[汇总]",
     business_input_rounds: 1,
+    acceptance: [
+      {
+        id: "ac-1",
+        text: "页面能打开并看到进度数字",
+        check: "playtest",
+      },
+    ],
     ...partial,
   });
 }
@@ -460,6 +468,114 @@ describe("T-GATE J.3/J.5 范围纳入唯一确认谓词（恒开启）", () => {
     expect(decision.ok).toBe(true);
     expect(decision.code).toBe("OK");
     expect(decision.demo_mode).toBe("none");
+  });
+});
+
+
+describe("T-GATE J.54 验收非空门禁", () => {
+  it("J54-P1: 缺少合格验收时 evaluateSchemeConfirmation 为 ok=false，白话为「方案还没有验收标准，先补一条再冻结」，不复用「这个需求我还没拆好」", () => {
+    const decision = evaluateSchemeConfirmation(
+      makeDraft({ acceptance: [] }),
+      EMPTY_DEMO_GATE,
+      compliantScopePlan(),
+    );
+    expect(decision.ok).toBe(false);
+    expect(decision.code).toBe("E_SCHEME_ACCEPTANCE_EMPTY");
+    expect(decision.message).toBe(SCHEME_ACCEPTANCE_EMPTY_MESSAGE);
+    expect(decision.message).toBe("方案还没有验收标准，先补一条再冻结");
+    expect(decision.message).not.toContain("这个需求我还没拆好");
+  });
+
+  it("J54-P3: 至少一条合格验收可通过本门禁；空白 id/text 或仅测试目标建议不算", () => {
+    const onlyBlanks = evaluateSchemeConfirmation(
+      makeDraft({
+        acceptance: [
+          { id: "  ", text: "有文案但 id 空白", check: "auto" },
+          { id: "blank-text", text: "   ", check: "auto" },
+        ],
+      }),
+      EMPTY_DEMO_GATE,
+      compliantScopePlan(),
+    );
+    expect(onlyBlanks.ok).toBe(false);
+    expect(onlyBlanks.code).toBe("E_SCHEME_ACCEPTANCE_EMPTY");
+
+    const onlyGoals = evaluateSchemeConfirmation(
+      makeDraft({
+        acceptance: [],
+        goals: [{ id: "g1", text: "只是测试目标建议" }],
+      }),
+      EMPTY_DEMO_GATE,
+      compliantScopePlan(),
+    );
+    expect(onlyGoals.ok).toBe(false);
+    expect(onlyGoals.code).toBe("E_SCHEME_ACCEPTANCE_EMPTY");
+
+    const qualifiedAmongBlanks = evaluateSchemeConfirmation(
+      makeDraft({
+        acceptance: [
+          { id: "  ", text: "丢弃", check: "auto" },
+          { id: "ac-ok", text: "页面能打开并看到进度数字", check: "playtest" },
+        ],
+        goals: [{ id: "g1", text: "只是测试目标建议" }],
+      }),
+      EMPTY_DEMO_GATE,
+      compliantScopePlan(),
+    );
+    expect(qualifiedAmongBlanks.ok).toBe(true);
+    expect(qualifiedAmongBlanks.code).toBe("OK");
+  });
+
+  it("goals=[] 不单独拦住；已冻结且验收仍空时仍是 E_SCHEME_ALREADY_FROZEN，不被空验收文案误伤；已有空验收草案（标题/模块「登录页」、acceptance=[]）先被门禁拦住，补一条合格验收后，本门禁不再单独阻止", () => {
+    const emptyGoalsOk = evaluateSchemeConfirmation(
+      makeDraft({ goals: [] }),
+      EMPTY_DEMO_GATE,
+      compliantScopePlan(),
+    );
+    expect(emptyGoalsOk.ok).toBe(true);
+    expect(emptyGoalsOk.code).toBe("OK");
+
+    const frozenEmpty = evaluateSchemeConfirmation(
+      freezeScheme(makeDraft({ acceptance: [] })),
+      EMPTY_DEMO_GATE,
+      compliantScopePlan(),
+    );
+    expect(frozenEmpty.ok).toBe(false);
+    expect(frozenEmpty.code).toBe("E_SCHEME_ALREADY_FROZEN");
+    expect(frozenEmpty.message).toBe("方案已冻结，不能重复确认");
+    expect(frozenEmpty.message).not.toContain("方案还没有验收标准");
+
+    const loginEmpty = makeDraft({
+      title: "登录页",
+      modules: ["登录页"],
+      acceptance: [],
+    });
+    const blocked = evaluateSchemeConfirmation(
+      loginEmpty,
+      EMPTY_DEMO_GATE,
+      compliantScopePlan(),
+    );
+    expect(blocked.ok).toBe(false);
+    expect(blocked.code).toBe("E_SCHEME_ACCEPTANCE_EMPTY");
+    expect(blocked.message).toBe("方案还没有验收标准，先补一条再冻结");
+
+    const loginFilled = {
+      ...loginEmpty,
+      acceptance: [
+        {
+          id: "ac-login",
+          text: "打开登录页后可以用手机号登录",
+          check: "playtest" as const,
+        },
+      ],
+    };
+    const afterFill = evaluateSchemeConfirmation(
+      loginFilled,
+      EMPTY_DEMO_GATE,
+      compliantScopePlan(),
+    );
+    expect(afterFill.ok).toBe(true);
+    expect(afterFill.code).toBe("OK");
   });
 });
 

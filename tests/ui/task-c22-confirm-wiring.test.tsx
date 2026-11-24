@@ -44,6 +44,13 @@ function makeScheme(partial: Partial<SchemeDraft> = {}): SchemeDraft {
     mermaidFlow: "flowchart LR\n  A[录入进度] --> B[汇总]",
     business_input_rounds: 1,
     scheme_revision: 2,
+    acceptance: [
+      {
+        id: "ac-1",
+        text: "页面能打开并看到进度数字",
+        check: "playtest",
+      },
+    ],
     ...partial,
   });
 }
@@ -370,6 +377,37 @@ describe("T-UI-4 J.5 范围预检与确认接线", () => {
 
     expect(createContractWithAdmission).not.toHaveBeenCalled();
     expect(submitJourneyMessage).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("T-UI J.54 空验收拦截", () => {
+  it("空验收时 scheme-confirm 禁用，scheme-confirm-blocked 展示「方案还没有验收标准，先补一条再冻结」", () => {
+    renderPane(makeScheme({ acceptance: [] }), EMPTY_DEMO_GATE);
+    expect(screen.getByTestId("scheme-confirm")).toBeDisabled();
+    expect(
+      screen.getByTestId("scheme-confirm-blocked").textContent ?? "",
+    ).toContain("方案还没有验收标准，先补一条再冻结");
+    expect(
+      screen.getByTestId("scheme-confirm-blocked").textContent ?? "",
+    ).not.toContain("这个需求我还没拆好");
+  });
+
+  it("补录合格验收后，在其他门禁满足时按钮可点、不再展示该拦截文案", () => {
+    renderPane(
+      makeScheme({
+        acceptance: [
+          {
+            id: "ac-1",
+            text: "页面能打开并看到进度数字",
+            check: "playtest",
+          },
+        ],
+      }),
+      EMPTY_DEMO_GATE,
+    );
+    expect(screen.getByTestId("scheme-confirm")).not.toBeDisabled();
+    expect(screen.queryByTestId("scheme-confirm-blocked")).toBeNull();
   });
 });
 

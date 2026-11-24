@@ -93,13 +93,18 @@ export const NO_SCHEME_YET_LABEL = "方案尚未生成" as const;
  * TASK-J.22b：从中栏 SchemeDraft 抽出验收条目（id+文案），供 ScopeAcceptanceBlock 呈现。
  * 空白 id/文案丢弃；不伪造条目。
  */
-export function acceptanceItemsFromSchemeDraft(
-  draft: SchemeDraft | null | undefined,
+export type SchemeAcceptanceRow = {
+  id?: unknown;
+  text?: unknown;
+};
+
+/** 与 acceptanceItemsFromSchemeDraft 同一口径：去空白后 id 与 text 都非空，且 id 不重复。 */
+export function qualifiedAcceptanceItems(
+  rows: ReadonlyArray<SchemeAcceptanceRow> | null | undefined,
 ): Array<{ id: string; text: string }> {
-  const rows = draft?.acceptance ?? [];
   const seen = new Set<string>();
   const out: Array<{ id: string; text: string }> = [];
-  for (const row of rows) {
+  for (const row of rows ?? []) {
     const id = typeof row.id === "string" ? row.id.trim() : "";
     const text = typeof row.text === "string" ? row.text.trim() : "";
     if (id === "" || text === "" || seen.has(id)) continue;
@@ -108,6 +113,25 @@ export function acceptanceItemsFromSchemeDraft(
   }
   return out;
 }
+
+export function acceptanceItemsFromSchemeDraft(
+  draft: SchemeDraft | null | undefined,
+): Array<{ id: string; text: string }> {
+  return qualifiedAcceptanceItems(draft?.acceptance);
+}
+
+/** TASK-J.54：至少一条合格验收（「AI 建议·非验收」与 goals 不在 acceptance 里，不算）。 */
+export function hasQualifiedSchemeAcceptance(
+  source:
+    | { acceptance?: ReadonlyArray<SchemeAcceptanceRow> | null }
+    | null
+    | undefined,
+): boolean {
+  return qualifiedAcceptanceItems(source?.acceptance).length > 0;
+}
+
+export const SCHEME_ACCEPTANCE_EMPTY_MESSAGE =
+  "方案还没有验收标准，先补一条再冻结" as const;
 
 /** Daemon 中栏只读投影的前端视图（与 scheme-midpane-projection 同形）。 */
 export interface SchemeMidpaneView {
@@ -273,6 +297,7 @@ export const EMPTY_DEMO_GATE: DemoGate = {
 export type SchemeConfirmationCode =
   | "OK"
   | "E_SCHEME_ALREADY_FROZEN"
+  | "E_SCHEME_ACCEPTANCE_EMPTY"
   | "E_SCHEME_REVISION_MISMATCH"
   | "E_SCHEME_CONFLICTS_OPEN"
   | "E_SCHEME_NOT_REVIEWABLE"
@@ -610,7 +635,7 @@ function evaluateScopeGate(
  * - building / failed 尚未处置；
  * - E_SCOPE_NOT_READY / E_SCOPE_POLICY / E_SCOPE_APPROVAL_REQUIRED。
  *
- * 判定顺序：冻结 → 冲突 → 可审 → Demo 四码 → 三条范围码。
+ * 判定顺序：冻结 → 冲突 → 可审 → Demo 四码 → 三条范围码 → 验收非空。
  */
 export function evaluateSchemeConfirmation(
   draft: SchemeDraft,
@@ -704,6 +729,18 @@ export function evaluateSchemeConfirmation(
 
   const scopeDecision = evaluateScopeGate(draft, scopePlan, demoMode);
   if (scopeDecision) return scopeDecision;
+
+  // TASK-J.54：其他既有门禁都通过后，再校验至少一条合格验收。
+  // 已冻结走上方先行返回，避免空验收文案误伤。不对 goals 单独拦截。
+  if (!hasQualifiedSchemeAcceptance(draft)) {
+    return {
+      ok: false,
+      code: "E_SCHEME_ACCEPTANCE_EMPTY",
+      message: SCHEME_ACCEPTANCE_EMPTY_MESSAGE,
+      reasons: ["方案还没有验收标准"],
+      demo_mode: demoMode,
+    };
+  }
 
   return {
     ok: true,

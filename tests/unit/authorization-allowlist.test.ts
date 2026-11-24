@@ -182,6 +182,13 @@ describe("TASK-J.20 authorization allowlist", () => {
         summary: "继续改登录相关页面与文案",
         modules: ["登录"],
         business_input_rounds: 1,
+        acceptance: [
+          {
+            id: "ac-1",
+            text: "打开登录页后可以用手机号登录",
+            check: "playtest",
+          },
+        ],
       }),
       EMPTY_DEMO_GATE,
       auto,

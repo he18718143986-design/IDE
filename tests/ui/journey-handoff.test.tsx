@@ -51,6 +51,13 @@ function makeScheme(partial: Partial<SchemeDraft> = {}): SchemeDraft {
     mermaidFlow: "flowchart LR\n  A[录入进度] --> B[汇总]",
     business_input_rounds: 1,
     scheme_revision: 2,
+    acceptance: [
+      {
+        id: "ac-1",
+        text: "页面能打开并看到进度数字",
+        check: "playtest",
+      },
+    ],
     ...partial,
   });
 }
