@@ -11,7 +11,10 @@ import {
   writeSchemeSnapshot,
   SCHEME_SNAPSHOT_DIR,
 } from "../../daemon/pipeline/scheme-snapshot-store";
-import { emptySchemeDraft, type DemoGate } from "../../src/lib/journey/scheme-draft";
+import {
+  emptySchemeDraft,
+  type DemoGate,
+} from "../../src/lib/journey/scheme-draft";
 import type { ScopePlan } from "../../src/lib/journey/scope-plan";
 
 const SCHEME_ID = "scheme-j55-unit";
@@ -28,7 +31,9 @@ const decision = {
   demo_mode: "none" as const,
 };
 
-function scheme(over: { title?: string; scheme_id?: string; scheme_revision?: number } = {}) {
+function scheme(
+  over: { title?: string; scheme_id?: string; scheme_revision?: number } = {},
+) {
   return emptySchemeDraft({
     scheme_id: over.scheme_id ?? SCHEME_ID,
     scheme_revision: over.scheme_revision ?? REVISION,
@@ -69,11 +74,15 @@ afterEach(() => {
 
 describe("findFrozenSnapshotBySchemeRevision", () => {
   it("目录不存在或零份匹配时找不到", () => {
-    expect(findFrozenSnapshotBySchemeRevision(repo, SCHEME_ID, REVISION)).toEqual({
+    expect(
+      findFrozenSnapshotBySchemeRevision(repo, SCHEME_ID, REVISION),
+    ).toEqual({
       ok: false,
     });
     fs.mkdirSync(path.join(repo, SCHEME_SNAPSHOT_DIR), { recursive: true });
-    expect(findFrozenSnapshotBySchemeRevision(repo, SCHEME_ID, REVISION)).toEqual({
+    expect(
+      findFrozenSnapshotBySchemeRevision(repo, SCHEME_ID, REVISION),
+    ).toEqual({
       ok: false,
     });
   });
@@ -119,10 +128,16 @@ describe("findFrozenSnapshotBySchemeRevision", () => {
   });
 
   it("J55-P4: 同一 scheme_id+修订号多份内容不同的冻结快照 → 视为定位不到", () => {
-    const first = writeFrozen(repo, "scheme-plan-j55-alpha", { title: "方案甲" });
-    const second = writeFrozen(repo, "scheme-plan-j55-beta", { title: "方案乙" });
+    const first = writeFrozen(repo, "scheme-plan-j55-alpha", {
+      title: "方案甲",
+    });
+    const second = writeFrozen(repo, "scheme-plan-j55-beta", {
+      title: "方案乙",
+    });
     expect(first.digest).not.toBe(second.digest);
-    expect(findFrozenSnapshotBySchemeRevision(repo, SCHEME_ID, REVISION)).toEqual({
+    expect(
+      findFrozenSnapshotBySchemeRevision(repo, SCHEME_ID, REVISION),
+    ).toEqual({
       ok: false,
     });
     // 查找不得改写或删除已有快照
@@ -141,7 +156,11 @@ describe("findFrozenSnapshotBySchemeRevision", () => {
     writeFrozen(repo, "scheme-plan-j55-keep", {
       now: new Date("2026-11-25T00:00:00.000Z"),
     });
-    const file = path.join(repo, SCHEME_SNAPSHOT_DIR, "scheme-plan-j55-keep.json");
+    const file = path.join(
+      repo,
+      SCHEME_SNAPSHOT_DIR,
+      "scheme-plan-j55-keep.json",
+    );
     const before = fs.readFileSync(file);
     const found = findFrozenSnapshotBySchemeRevision(repo, SCHEME_ID, REVISION);
     expect(found.ok).toBe(true);

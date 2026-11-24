@@ -822,10 +822,8 @@ export function readSchemeSnapshot(
   }
 }
 
-
 export type FrozenSnapshotLookupResult =
-  | { ok: true; snapshot: SchemeSnapshot }
-  | { ok: false };
+  { ok: true; snapshot: SchemeSnapshot } | { ok: false };
 
 /**
  * 按 scheme_id + 修订号在快照目录找出已冻结快照。只读，不写盘，不改已有文件。

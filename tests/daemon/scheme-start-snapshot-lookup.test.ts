@@ -22,7 +22,10 @@ import {
   softwareContractSchema,
   type SoftwareContract,
 } from "../../src/lib/contract.schema";
-import { emptySchemeDraft, type DemoGate } from "../../src/lib/journey/scheme-draft";
+import {
+  emptySchemeDraft,
+  type DemoGate,
+} from "../../src/lib/journey/scheme-draft";
 import { scopePlanToContractScope } from "../../src/lib/journey/scope-plan";
 import { emptyDraft } from "../helpers/scheme-patch-fixtures";
 import { git } from "../helpers/git";
@@ -91,12 +94,12 @@ function seedPlanSnapshot(repoRoot: string) {
   return { scheme, scopePlan, snapshot };
 }
 
-function makeContract(scopePlan: ReturnType<typeof buildScopePlan>): SoftwareContract {
+function makeContract(
+  scopePlan: ReturnType<typeof buildScopePlan>,
+): SoftwareContract {
   const projected = scopePlanToContractScope(scopePlan);
   const writable =
-    projected.writable_paths.length > 0
-      ? projected.writable_paths
-      : ["src/**"];
+    projected.writable_paths.length > 0 ? projected.writable_paths : ["src/**"];
   const useManual =
     projected.verification_spec.commands.length === 0 ||
     Boolean(projected.verification_spec.manual_confirmation);
@@ -238,7 +241,9 @@ describe("TASK-J.55 开工确认按 scheme_id+修订号定位冻结快照", () =
     };
     expect(res.status).toBe(201);
     expect(body.contract?.scheme_binding?.confirmation_id).toBe(PLAN_ID);
-    expect(body.contract?.scheme_binding?.snapshot_digest).toBe(snapshot.digest);
+    expect(body.contract?.scheme_binding?.snapshot_digest).toBe(
+      snapshot.digest,
+    );
     expect(body.contract?.scheme_binding?.confirmation_id).not.toBe(START_ID);
   });
 
@@ -262,9 +267,7 @@ describe("TASK-J.55 开工确认按 scheme_id+修订号定位冻结快照", () =
     };
     expect(res.status).toBe(409);
     expect(body.code).toBe("E_SCHEME_SNAPSHOT_NOT_FOUND");
-    expect(body.message).toBe(
-      "确认快照不存在或已损坏，拒绝创建可签署合同",
-    );
+    expect(body.message).toBe("确认快照不存在或已损坏，拒绝创建可签署合同");
   });
 
   it("J55-P3: 批准路径同键：按开工编号读不到时改按 scheme_id+修订号定位，找到可继续，找不到 409「确认快照不存在或已损坏，拒绝签署」", async () => {
@@ -316,7 +319,9 @@ describe("TASK-J.55 开工确认按 scheme_id+修订号定位冻结快照", () =
       code?: string;
     };
     expect(approved.status).toBe(200);
-    expect(approvedBody.contract?.scheme_binding?.confirmation_id).toBe(PLAN_ID);
+    expect(approvedBody.contract?.scheme_binding?.confirmation_id).toBe(
+      PLAN_ID,
+    );
     expect(approvedBody.contract?.scheme_binding?.snapshot_digest).toBe(
       snapshot.digest,
     );
@@ -370,8 +375,6 @@ describe("TASK-J.55 开工确认按 scheme_id+修订号定位冻结快照", () =
     };
     expect(rejected.status).toBe(409);
     expect(rejectedBody.code).toBe("E_SCHEME_SNAPSHOT_NOT_FOUND");
-    expect(rejectedBody.message).toBe(
-      "确认快照不存在或已损坏，拒绝签署",
-    );
+    expect(rejectedBody.message).toBe("确认快照不存在或已损坏，拒绝签署");
   });
 });
