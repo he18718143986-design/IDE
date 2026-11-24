@@ -1758,3 +1758,312 @@ governance:
 #### 【Task J.52】decompose 方案来源未统一 `[COMPLETED · 正文已迁]`
 
 > 本卡已 **COMPLETED**（施工 [#367](https://github.com/he18718143986-design/IDE/pull/367) squash `1d022acaca5e653650b0968074dd0a5266800be7`；立卡 P-286；修卡 P-287；完工回写 P-288）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.52) §3.4bo。诚实口径：**decompose 入口改读密封台账方案已交付（与资格判定同一 `loadSealedLedgerSchemeForMinimalPab` 来源、请求体投影忽略、`decompose()` 内部分支与判定表未改）；真钥匙复测不在本卡，端到端闭环未宣称**。
+
+
+### 3.4x 生成器补写验收（2026-11-25 · 立卡 P-290）
+
+<a id="task-j.53"></a>
+
+#### 【Task J.53】生成器补写验收（few-shot + 编译循环窄兜底 + 人工补录） `[NEW_TASK]`
+
+```yaml task-card
+id: TASK-J.53
+status: NEW_TASK
+contract:
+  intent:
+    title: 生成器补写验收（few-shot + 编译循环窄兜底 + 人工补录）
+    description: >-
+      让最小需求也会在方案里留下至少一条可检查验收：官方 few-shot
+      「登陆页」示例同时写出 upsert_acceptance；编译循环在「已有可见模块
+      或目标、但 acceptance 仍空」时，以 source:"ai_inferred" 窄兜底补一条；
+      已有空验收台账可在未冻草案上经右栏自然语言 + 已有 upsert_acceptance
+      补录并升修订，再冻出带真实验收 id 的新快照。不改 buildStandardPlanPatch
+      的 acc-missing 占位，不放宽 D-2。真钥匙复测不在本卡验收。
+    risk_level: LOW
+  acceptance:
+    - id: J53-P1
+      check: auto
+      text: >-
+        官方 few-shot 例 1（U3「就搞个登陆页吧，手机号就行」）在写出
+        upsert_module 的同时，至少写出一条 upsert_acceptance，其 item.id 与
+        item.text 去空白后均非空，且可检查（含 check）。
+        docs/specs/intent-compiler-prompt.md 对应示例同步，不得只改代码提示词。
+    - id: J53-P2
+      check: auto
+      text: >-
+        草案未冻结、已有可见模块（或目标）但 acceptance 仍空时，编译循环
+        在 assemble 成功之后、merge 之前注入一条 source 为 ai_inferred 的
+        upsert_acceptance；合并后方案 acceptance[] 至少有一条 id 与 text
+        去空白后均非空的条目。不得在已有合格验收时再发明一条，也不得在
+        既无可见模块也无目标时凭空补。
+    - id: J53-P3
+      check: auto
+      text: >-
+        草案已冻结（deps.isFrozen()===true 或 draft.frozen）时不注入验收兜底，
+        也不经补丁改写已密封快照。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/supervisor/intent-compiler/system-prompt.ts
+      - docs/specs/intent-compiler-prompt.md
+      - daemon/supervisor/intent-compiler/compile-loop.ts
+      - tests/unit/compiler-empty-acceptance-fallback.test.ts
+    readonly_paths:
+      - src/lib/journey/compiler-output-schema.ts
+      - src/lib/journey/scheme-patch-engine.ts
+      - daemon/supervisor/decomposer/decompose.ts
+      - src/lib/project/project-plan.ts
+      - docs/specs/project-decomposition.md
+      - tests/unit/compiler-empty-patch-title.test.ts
+  verification:
+    commands:
+      - { alias: acceptance-fallback, executable: npx, args: [vitest, run, tests/unit/compiler-empty-acceptance-fallback.test.ts] }
+design:
+  approach: >-
+    根因是生成器与门禁的常径：官方 few-shot 例 1 对「登陆页」只发
+    upsert_module，不写验收；空草案默认 acceptance=[]；确认/冻结不查验收
+    非空。本卡先补「验收从哪来」，不拦冻结（拦冻结是 J.54，硬依赖本卡）。
+    1) 改 daemon/supervisor/intent-compiler/system-prompt.ts 例 1，使最小需求
+    也写出至少一条可检查验收；docs/specs/intent-compiler-prompt.md 对应示例
+    必须同步（该文件是提示词实施口径）。摘录规则不变：条目名可写「登录页」，
+    摘录必须是用户原样「登陆页」。2) 编译循环加与 J.49 maybeFillEmptyPatchTitle
+    同类的窄兜底：在 assemble 成功之后、merge 之前注入；source 固定
+    "ai_inferred"；只覆盖「已有可见模块或目标，但 acceptance 仍空」；id 用
+    new: 前缀，text 从已有模块名或目标生成一条可观察、可检查的最小验收
+    （check 用 playtest 或 both），证据抄已有模块/目标的 TurnRef（与 J.49
+    同类）；不得凭空编造模块里没有的能力，不得在已有合格验收时再补。
+    编译循环已对 isFrozen / draft.frozen 短路，冻结草案不得进入补丁。
+    3) 人工补录走右栏自然语言 + 已有 upsert_acceptance，不把全新中栏验收
+    编辑器当作本卡必做。4) 已有空验收台账怎么补（必须执行，不可削弱）：
+    第一个实例是试玩目录 /Users/tina/Downloads/stagent-j45-key-playtest，
+    台账 scheme-active 修订号 2、goals=[]、acceptance=[]、size_hint=standard、
+    标题/模块「登录页」。已写出的冻结快照不得改写（含 P-289 冻出的
+    scheme-plan-mwuuzd92-2pmvzk8v）。在未冻草案上补验收并升修订，再冻出
+    带真实验收 id 的新快照后才能分解。P-289 / J.51 观测：写冻结快照后台账
+    draft 仍可能 frozen=false，补录默认走这条未冻草案路径。若施工时磁盘
+    frozen=true 挡住编译补丁（E_PATCH_FROZEN 或编译循环短路），必须在施工
+    方案里写明显式解冻或「另开未冻修订再补录」的写路径，先报审再动代码；
+    禁止静默改已密封快照，也不把完整解冻产品当作本卡默认必做。补录完成后，
+    方案 acceptance[] 必须有至少一条 id 与 text 去空白后均非空的条目（空白
+    / 空 id 不算）。不改 buildStandardPlanPatch 的 acc-missing 占位，不放宽
+    D-2。要动 writable_paths 以外的文件，停工修卡，不扩面。先审施工方案再
+    动代码。本卡验收只含 CI 单测；真钥匙复测不进本卡验收，不写成 it()，
+    也不写成会让 check:docs 要求出现在 it() 里的 case。
+  touches:
+    - { path: daemon/supervisor/intent-compiler/system-prompt.ts, change: modify, why: 官方 few-shot 例 1 为最小需求同时写出至少一条可检查 upsert_acceptance, symbols: [] }
+    - { path: docs/specs/intent-compiler-prompt.md, change: modify, why: 与 system-prompt.ts 例 1 同步，避免规格与实施口径分叉, symbols: [] }
+    - { path: daemon/supervisor/intent-compiler/compile-loop.ts, change: modify, why: 增加与 J.49 同类的空验收窄兜底，并在 assemble 之后、merge 之前调用, symbols: [] }
+    - { path: tests/unit/compiler-empty-acceptance-fallback.test.ts, change: create, why: 覆盖 J53-P1～P3（few-shot 例 1、未冻空验收兜底、已有验收/无模块不补、冻结不注入）, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J53-P1, test_path: tests/unit/compiler-empty-acceptance-fallback.test.ts, level: unit, case: "J53-P1: 官方 few-shot 例 1 在 upsert_module 同时写出至少一条 id 与 text 非空的可检查 upsert_acceptance，且 intent-compiler-prompt.md 对应示例同步" }
+    - { acceptance_id: J53-P2, test_path: tests/unit/compiler-empty-acceptance-fallback.test.ts, level: unit, case: "J53-P2: 未冻草案已有可见模块但 acceptance 为空时注入 source=ai_inferred 的 upsert_acceptance；已有合格验收或无模块无目标时不补" }
+    - { acceptance_id: J53-P3, test_path: tests/unit/compiler-empty-acceptance-fallback.test.ts, level: unit, case: "J53-P3: 草案已冻结时不注入验收兜底，也不改写已密封快照" }
+governance:
+  spec_refs:
+    - docs/ledger/j52-retest-acceptance-source.md
+    - docs/specs/intent-compiler-prompt.md
+    - docs/specs/scheme-patch-engine.md
+  depends_on:
+    - { id: TASK-J.52, kind: hard }
+  code_facts:
+    - { ref: "daemon/supervisor/intent-compiler/system-prompt.ts:41-47", note: 官方 few-shot 例 1 对「登陆页」只发 upsert_module，不写 upsert_acceptance }
+    - { ref: "docs/specs/intent-compiler-prompt.md:602-607", note: 规格侧同一示例，目前同样只发模块 }
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:214-238", note: J.49 maybeFillEmptyPatchTitle 是本卡窄兜底的对标实现 }
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:356-360", note: isFrozen 或 draft.frozen 时编译循环直接短路，不写补丁 }
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:463", note: 标题兜底在 assemble 成功之后、merge 之前调用；本卡验收兜底应落在同一位置 }
+    - { ref: "src/lib/journey/compiler-output-schema.ts:306-313", note: upsert_acceptance 已支持 source 为 user_said 或 ai_inferred；本卡不改该 schema }
+    - { ref: "src/lib/journey/scheme-patch-engine.ts:1707", note: draft.frozen 时合并返回 E_PATCH_FROZEN；已密封快照不得静默改写 }
+  non_goals:
+    - 不改 buildStandardPlanPatch 的 acc-missing 占位，不放宽 D-2
+    - 不把全新中栏验收编辑器当作本卡必做
+    - 不改确认/冻结门禁（那是 J.54；J.54 在本卡施工合入前不开工）
+    - 不改写已写出的冻结快照
+    - 不把完整解冻产品当作本卡默认必做（仅当施工时 frozen=true 挡住补录时，才在施工方案里写明显式解冻或另开未冻修订的写路径并先报审）
+    - 不改 J.49 已交付的标题兜底语义，不改 tests/unit/compiler-empty-patch-title.test.ts
+    - 不点「确认开工」、不走确认开工路径
+    - 真钥匙复测不进本卡验收
+  fail:
+    - few-shot 例 1 或对应规格示例仍只发 upsert_module、不写可检查验收
+    - 只改了 system-prompt.ts、未同步 intent-compiler-prompt.md，或只改了规格未改提示词
+    - 未冻且已有可见模块（或目标）但验收仍空时，编译循环不补，或 source 不是 ai_inferred
+    - 在已有合格验收时仍再发明一条，或既无可见模块也无目标时凭空补
+    - 冻结草案仍被注入验收补丁，或已密封快照被静默改写
+    - 改了 acc-missing 占位或放宽了 D-2
+    - 改动 writable_paths 以外的文件却未停工修卡
+    - 把真钥匙复测写成 it() 或写成会让 check:docs 要求出现在 it() 里的 case
+  adr_revisions: []
+  defaults:
+    - 窄兜底只覆盖「已有可见模块或目标但验收仍空」；source 固定 ai_inferred；人工补录走右栏 + 已有 upsert_acceptance
+    - 已冻结快照不改写；未冻草案上补验收并升修订，再冻新快照
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：P-289 真钥匙复测（2026-11-24 23:37 香港时间）证实 J.52 入口修复已生效，分解走台账 `standard` 零模型路径后得到 422 `E_PLAN_INVALID`，违规 D-2 / `cs-1:acc-missing`。根因不是分解器坏了，是密封台账 `acceptance=[]`（且 `goals=[]`）。只读评估（`ai_inferred`）认定空验收是当前生成器与门禁的常径：官方 few-shot 对「登陆页」只发模块、空草案默认空验收、冻结与确认都不查验收非空。Tina t1417u 拍板采用「冻结前校验非空 + 生成器补写验收」：本卡先补写与补录路径，避免只上 J.54 把已有空验收台账卡死。
+* **取舍**：不把「只在分解里造验收」当作修法——D-2 要求方案来源的验收 id 必须真实存在于方案 `acceptance[]`，`acc-missing` 占位过不了。不把全新中栏编辑器当必做。J.54 的冻结门禁必须等本卡施工合入后才能开工。
+* **已有空验收台账怎么补（卡面锁定）**：第一个实例是 `/Users/tina/Downloads/stagent-j45-key-playtest` 的 `scheme-active` 修订号 2（`goals=[]`、`acceptance=[]`、`size_hint=standard`、标题/模块「登录页」）。已写出的冻结快照不得改写。在未冻草案上补验收并升修订，再冻出带真实验收 id 的新快照后才能分解。若磁盘 `frozen=true` 挡住编译补丁，施工方案须写明显式解冻或另开未冻修订的补录写路径，先报审；禁止静默改已密封快照。
+* **立卡说明（2026-11-25 · P-290）**：Tina 授权立卡（t1417u）。基线 `6baf812d1ad2294b2038c7e0d2f3c2492e3d19a7`（[#370](https://github.com/he18718143986-design/IDE/pull/370) P-289）；产品代码仍为 [#367](https://github.com/he18718143986-design/IDE/pull/367)/`1d022acaca5e653650b0968074dd0a5266800be7`。编号按授权使用 P-290；P-285 号未占用，不擅自改号。**立卡 ≠ 开工**；先合入本 docs PR，再先报 J.53 施工方案，授权后再开独立代码 PR。J.54 在本卡施工合入前不开工。
+* **施工顺序（锁定）**：本立卡 PR 合入后，先报 J.53 施工方案（先审再动代码）→ J.53 施工 → 再报 J.54 施工方案 → J.54 施工。
+* **真钥匙复测路径（锁定，不在本卡验收）**：J.53+J.54 施工均合入并重启 Daemon 后，同一试玩目录先补验收并升修订 → 再点「确认方案，开始规划」→ 看分解是否出计划/地图 → 再测「确认开工」。实测记录落 ledger。未测「确认开工」，未宣称端到端闭环。
+
+### 3.4y 冻结前校验验收非空（2026-11-25 · 立卡 P-290）
+
+<a id="task-j.54"></a>
+
+#### 【Task J.54】冻结前校验验收非空（确认谓词 + 冻结入口再拦） `[NEW_TASK]`
+
+```yaml task-card
+id: TASK-J.54
+status: NEW_TASK
+contract:
+  intent:
+    title: 冻结前校验验收非空（确认谓词 + 冻结入口再拦）
+    description: >-
+      确认/冻结门禁要求方案至少有一条合格验收（id 与 text 去空白后均非空），
+      缺了用白话「方案还没有验收标准，先补一条再冻结」拦住，不复用
+      「这个需求我还没拆好」。POST /api/supervisor/scheme/freeze 的
+      handleSchemeSnapshot 必须再拦一次：空验收返回 4xx，不写快照，不给
+      201。中栏只读验收块、确认按钮禁用态与错误提示与谓词保持同步。
+      不改 acc-missing 占位，不放宽 D-2。必须等 J.53 施工合入后才开工。
+      真钥匙复测不在本卡验收。
+    risk_level: LOW
+  acceptance:
+    - id: J54-P1
+      check: auto
+      text: >-
+        evaluateSchemeConfirmation（及确认路径上同一谓词）在缺少合格验收时
+        ok=false，白话为「方案还没有验收标准，先补一条再冻结」（可略作润色，
+        但不得改成别的意思），不得复用「这个需求我还没拆好」。合格验收指
+        至少一条 id 与 text 去空白后均非空的条目；goals 为空不挡；「AI 建议·
+        非验收」测试目标建议块不算。
+    - id: J54-P2
+      check: auto
+      text: >-
+        POST /api/supervisor/scheme/freeze 在即将写入快照的方案缺少合格验收时
+        返回 4xx，不写新快照，不返回 201。已存在的冻结快照不得被本卡改写。
+    - id: J54-P3
+      check: auto
+      text: >-
+        至少一条合格验收时，本门禁不单独阻止确认/冻结（其他既有门禁仍生效）。
+        仅空白 id、仅空白 text、或只有测试目标建议的，不得当作合格验收通过。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/lib/journey/scheme-draft.ts
+      - daemon/server.ts
+      - tests/unit/scheme-confirmation-gate.test.ts
+      - tests/unit/confirm-scheme-atomic.test.ts
+      - tests/integration/scheme-confirm-http-injection.test.ts
+      - tests/integration/scheme-confirm-scope-drift.test.ts
+      - tests/ui/task-c22-confirm-wiring.test.tsx
+    readonly_paths:
+      - src/lib/journey/confirm-scheme-atomic.ts
+      - src/components/studio/SchemeReviewPane.tsx
+      - src/components/studio/ScopeAcceptanceBlock.tsx
+      - daemon/supervisor/decomposer/decompose.ts
+      - src/lib/project/project-plan.ts
+      - docs/specs/project-decomposition.md
+  verification:
+    commands:
+      - { alias: confirm-gate, executable: npx, args: [vitest, run, tests/unit/scheme-confirmation-gate.test.ts] }
+      - { alias: freeze-http, executable: npx, args: [vitest, run, tests/integration/scheme-confirm-http-injection.test.ts] }
+      - { alias: midpane-wiring, executable: npx, args: [vitest, run, tests/ui/task-c22-confirm-wiring.test.tsx] }
+design:
+  approach: >-
+    空验收的方案本来就不该密封。J.53 先提供补写与补录路径；本卡再在门禁
+    处拦住，避免分解在下游撞 D-2。硬依赖 J.53：只上本卡会把本试玩这类已有
+    空验收台账卡死，且没有补录路径。1) 在 evaluateSchemeConfirmation 或
+    其调用的确认谓词里查验收非空（建议复用或对齐
+    acceptanceItemsFromSchemeDraft 已有的「空白 id/文案丢弃」口径）。缺了
+    用白话「方案还没有验收标准，先补一条再冻结」拦住；可略作润色，但意图
+    锁定；不得复用「这个需求我还没拆好」。goals 不必非空。「AI 建议·非验收」
+    测试目标建议块不算验收。2) handleSchemeSnapshot（POST
+    /api/supervisor/scheme/freeze）必须再拦一次：校验即将写入快照的
+    scheme.acceptance，空则 4xx，不写快照，不给 201。中栏投影已含
+    acceptance 字段；再拦对象是即将密封的那份方案正文，避免再出现只信错误
+    来源。已存在的冻结快照不得改写；既有幂等 200（同一 confirmation_id
+    重放已有快照）由施工方案写清，不得借机改快照正文。3) 中栏
+    SchemeReviewPane 已展示 confirmation.message，按钮随 canConfirm 禁用；
+    confirm-scheme-atomic 已调用 evaluateSchemeConfirmation。生产代码默认
+    不改这两处，只要禁用态与错误提示自动跟上。本卡把
+    tests/ui/task-c22-confirm-wiring.test.tsx 列入可写，用以锁同步并改编因
+    空验收门禁而失败的夹具/断言。若必须改 SchemeReviewPane.tsx 或
+    confirm-scheme-atomic.ts 才能让文案/禁用态同步，停工修卡，不扩面。
+    既有「空验收仍可确认/冻结」测试夹具，只允许在本卡已列测试文件里补一条
+    合格验收，或改写成空验收应被拦住的负例。不改 acc-missing，不放宽 D-2。
+    要动 writable_paths 以外的文件，停工修卡。先审施工方案再动代码。本卡
+    验收只含 CI 测试；真钥匙复测不进本卡验收，不写成 it()，也不写成会让
+    check:docs 要求出现在 it() 里的 case。J.53 施工合入前本卡不开工。
+  touches:
+    - { path: src/lib/journey/scheme-draft.ts, change: modify, why: evaluateSchemeConfirmation / 确认谓词增加验收非空校验与锁定白话, symbols: [evaluateSchemeConfirmation] }
+    - { path: daemon/server.ts, change: modify, why: handleSchemeSnapshot 对空验收返回 4xx，不写快照，不给 201, symbols: [handleSchemeSnapshot] }
+    - { path: tests/unit/scheme-confirmation-gate.test.ts, change: modify, why: 新增空验收拦截与合格验收可通过的断言，并适配既有夹具, symbols: [] }
+    - { path: tests/unit/confirm-scheme-atomic.test.ts, change: modify, why: 仅适配因验收非空门禁而失败的夹具/断言，不改生产编排, symbols: [] }
+    - { path: tests/integration/scheme-confirm-http-injection.test.ts, change: modify, why: 断言空验收 freeze 返回 4xx 且不落新快照，并适配既有夹具, symbols: [] }
+    - { path: tests/integration/scheme-confirm-scope-drift.test.ts, change: modify, why: 仅适配因验收非空门禁而失败的冻结夹具/断言, symbols: [] }
+    - { path: tests/ui/task-c22-confirm-wiring.test.tsx, change: modify, why: 锁中栏按钮禁用态与错误提示跟谓词白话同步，并适配既有夹具, symbols: [] }
+  interfaces:
+    - { kind: http, name: "POST /api/supervisor/scheme/freeze", signature: "空验收 → 4xx（不写快照、不返回 201）；有合格验收时既有成功语义不变", consumers: [] }
+  test_plan:
+    - { acceptance_id: J54-P1, test_path: tests/unit/scheme-confirmation-gate.test.ts, level: unit, case: "J54-P1: 缺少合格验收时 evaluateSchemeConfirmation 为 ok=false，白话为「方案还没有验收标准，先补一条再冻结」，不复用「这个需求我还没拆好」" }
+    - { acceptance_id: J54-P2, test_path: tests/integration/scheme-confirm-http-injection.test.ts, level: integration, case: "J54-P2: POST /api/supervisor/scheme/freeze 在空验收时返回 4xx，不写新快照，不返回 201" }
+    - { acceptance_id: J54-P3, test_path: tests/unit/scheme-confirmation-gate.test.ts, level: unit, case: "J54-P3: 至少一条合格验收可通过本门禁；空白 id/text 或仅测试目标建议不算" }
+    - { acceptance_id: J54-P1, test_path: tests/ui/task-c22-confirm-wiring.test.tsx, level: unit, case: "空验收时 scheme-confirm 禁用，scheme-confirm-blocked 展示「方案还没有验收标准，先补一条再冻结」" }
+governance:
+  spec_refs:
+    - docs/ledger/j52-retest-acceptance-source.md
+    - docs/specs/project-decomposition.md
+  depends_on:
+    - { id: TASK-J.53, kind: hard }
+  code_facts:
+    - { ref: "src/lib/journey/scheme-draft.ts:524-529", note: isReviewableScheme 只查标题与摘要/模块，不查验收 }
+    - { ref: "src/lib/journey/scheme-draft.ts:615-715", note: evaluateSchemeConfirmation 目前不查 acceptance 非空 }
+    - { ref: "src/lib/journey/scheme-draft.ts:96-109", note: acceptanceItemsFromSchemeDraft 已丢弃空白 id/文案，可作非空口径对齐 }
+    - { ref: "daemon/server.ts:2342-2534", note: handleSchemeSnapshot 写快照前不查验收非空，空验收可返回 201 }
+    - { ref: "src/components/studio/SchemeReviewPane.tsx:779-847", note: 中栏已展示 confirmation.message，按钮随 canConfirm 禁用；默认指望自动跟上，不改生产代码，除非修卡 }
+    - { ref: "src/lib/journey/confirm-scheme-atomic.ts:328-346", note: 确认路径已调用 evaluateSchemeConfirmation；默认不改此文件 }
+    - { ref: "src/components/studio/ScopeAcceptanceBlock.tsx:531", note: 「AI 建议·非验收」是测试目标建议，本卡不算验收 }
+  non_goals:
+    - 不改 buildStandardPlanPatch 的 acc-missing 占位，不放宽 D-2
+    - 不在本卡做生成器补写或人工补录路径（那是 J.53）
+    - 不复用「这个需求我还没拆好」
+    - 不改写已写出的冻结快照
+    - 默认不改 SchemeReviewPane.tsx / confirm-scheme-atomic.ts 生产代码；若必须改才能同步文案或禁用态，停工修卡
+    - J.53 施工合入前不开工
+    - 不点「确认开工」、不走确认开工路径
+    - 真钥匙复测不进本卡验收
+  fail:
+    - 空验收仍能确认，或 freeze 仍返回 201 并写出新快照
+    - 拦截白话复用「这个需求我还没拆好」，或偏离「方案还没有验收标准，先补一条再冻结」的意图
+    - 空白 id、空白 text、或仅「AI 建议·非验收」被当作合格验收通过
+    - goals 为空却被本门禁单独拦住
+    - 中栏按钮禁用态或错误提示与谓词白话不同步
+    - 改了 acc-missing 占位或放宽了 D-2
+    - 改写了已存在的冻结快照
+    - J.53 施工合入前即开工本卡
+    - 改动 writable_paths 以外的文件却未停工修卡
+    - 把真钥匙复测写成 it() 或写成会让 check:docs 要求出现在 it() 里的 case
+  adr_revisions: []
+  defaults:
+    - 非空口径：至少一条 id 与 text 去空白后均非空；goals 不必非空；测试目标建议不算
+    - 冻结入口再拦即将写入快照的方案正文；空验收 4xx、不写快照、不给 201
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：若只改冻结门禁、不先补生成器与补录路径，本试玩 `scheme-active` 修订号 2 这类空验收台账会被卡死。Tina t1417u 拍板先 J.53、后本卡；本卡硬依赖 J.53。服务端必须再拦一次，不能只信前端谓词。
+* **取舍**：不选「只在分解里造验收」。不复用「这个需求我还没拆好」。中栏生产代码默认不改，靠已有 `confirmation.message` / `canConfirm` 同步；要把 `SchemeReviewPane.tsx` 或 `confirm-scheme-atomic.ts` 列入施工，须先修卡。
+* **立卡说明（2026-11-25 · P-290）**：Tina 授权立卡（t1417u）。基线 `6baf812d1ad2294b2038c7e0d2f3c2492e3d19a7`（[#370](https://github.com/he18718143986-design/IDE/pull/370) P-289）。编号按授权使用 P-290；P-285 号未占用，不擅自改号。**立卡 ≠ 开工**。J.54 在 J.53 施工 PR 合入前不开工。
+* **施工顺序（锁定）**：本立卡 PR 合入后，先 J.53 施工方案与施工；J.53 合入后再报 J.54 施工方案，授权后再动代码。
+* **真钥匙复测路径（锁定，不在本卡验收）**：J.53+J.54 施工均合入并重启 Daemon 后，同一试玩目录先补验收并升修订 → 再点「确认方案，开始规划」→ 看分解是否出计划/地图 → 再测「确认开工」。实测记录落 ledger。未测「确认开工」，未宣称端到端闭环。
