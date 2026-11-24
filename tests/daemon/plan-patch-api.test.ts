@@ -12,6 +12,17 @@ import { writePlan, readPlan } from "../../daemon/project/plan-store";
 import type { ProjectPlan } from "../../src/lib/project/project-plan";
 import { emptyDraft } from "../helpers/scheme-patch-fixtures";
 import type { SchemeDraftV2 } from "../../src/lib/journey/scheme-patch-types";
+import {
+  casWriteSchemeLedger,
+  emptyLedgerState,
+  readSchemeLedger,
+} from "../../daemon/supervisor/intent-compiler/scheme-ledger-store";
+import { writeSchemeSnapshot } from "../../daemon/pipeline/scheme-snapshot-store";
+import { buildScopePlan } from "../../daemon/supervisor/scope-plan-builder";
+import {
+  EMPTY_DEMO_GATE,
+  emptySchemeDraft,
+} from "../../src/lib/journey/scheme-draft";
 
 function requestJson<T>(
   url: string,
@@ -75,6 +86,45 @@ function sampleScheme(): SchemeDraftV2 {
       },
     ],
     acceptance: [{ ...meta("acc-1"), text: "能登录" }],
+  });
+}
+
+function writeLedgerDraft(repoRoot: string, draft: SchemeDraftV2): void {
+  const current = readSchemeLedger(repoRoot);
+  const expectedPrevRevision = current?.state.draft.scheme_revision ?? 0;
+  const written = casWriteSchemeLedger(repoRoot, {
+    expectedPrevRevision,
+    next: emptyLedgerState({ draft }),
+    journal: null,
+    modelId: "j52-test",
+    promptVersion: "j52-test",
+    offline: false,
+  });
+  if (!written.ok) {
+    throw new Error(`casWriteSchemeLedger failed: ${written.reason}`);
+  }
+}
+
+function writeMatchingFrozenSnapshot(
+  repoRoot: string,
+  draft: SchemeDraftV2,
+  confirmationId = "scheme-plan-j52test01",
+): void {
+  const scheme = emptySchemeDraft({
+    scheme_id: draft.scheme_id,
+    scheme_revision: draft.scheme_revision,
+    title: draft.title,
+    summary: draft.summary,
+    modules: draft.modules.map((item) => item.name),
+    frozen: true,
+  });
+  writeSchemeSnapshot(repoRoot, {
+    confirmation_id: confirmationId,
+    scheme,
+    demo: EMPTY_DEMO_GATE,
+    decision: { code: "OK", message: "ok", demo_mode: "none" },
+    scope_plan: buildScopePlan({ repoRoot, scheme }),
+    graveyard: [],
   });
 }
 
@@ -163,6 +213,8 @@ describe("TASK-L.8 plan patch / decompose HTTP", () => {
       "content-type": "application/json",
     };
     const scheme = sampleScheme();
+    writeLedgerDraft(repo, scheme);
+    writeMatchingFrozenSnapshot(repo, scheme);
     const pab = {
       baseline_id: "pab-1",
       baseline_revision: 1,
@@ -279,6 +331,9 @@ describe("TASK-L.8 plan patch / decompose HTTP", () => {
     });
     expect(unauth.status).toBe(401);
 
+    const sealed = sampleScheme();
+    writeLedgerDraft(repo, sealed);
+    writeMatchingFrozenSnapshot(repo, sealed);
     const stale = await requestJson<{
       ok: boolean;
       code: string;
@@ -287,7 +342,7 @@ describe("TASK-L.8 plan patch / decompose HTTP", () => {
       method: "POST",
       headers: auth,
       body: JSON.stringify({
-        scheme: sampleScheme(),
+        scheme: sealed,
         pab: {
           baseline_id: "pab-1",
           baseline_revision: 1,
