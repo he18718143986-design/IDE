@@ -1769,7 +1769,7 @@ governance:
 > 本卡已 **COMPLETED**（施工 [#372](https://github.com/he18718143986-design/IDE/pull/372) squash `6c0a2fbc22bd3b7bfde62c27ce702cc75bddd820`；立卡 P-290；完工回写 P-291）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.53) §3.4bp。诚实口径：**few-shot 与编译循环补写验收已交付（例 1 补可检查验收、空验收窄兜底 `ai_inferred`、已冻结不注入）；冻结前校验非空在 J.54；端到端闭环未宣称**。
 
 
-### 3.4y 冻结前校验验收非空（2026-11-25 · 立卡 P-290 · 修卡 P-292）
+### 3.4y 冻结前校验验收非空（2026-11-25 · 立卡 P-290 · 修卡 P-292 · 修卡 P-293）
 
 <a id="task-j.54"></a>
 
@@ -1825,6 +1825,7 @@ contract:
       - tests/ui/scope-acceptance-block.test.tsx
       - tests/ui/journey-handoff.test.tsx
       - tests/integration/dispute-anchor-real-session.test.ts
+      - tests/ui/task-c18-scheme-single-pane.test.tsx
     readonly_paths:
       - src/lib/journey/confirm-scheme-atomic.ts
       - src/components/studio/SchemeReviewPane.tsx
@@ -1866,6 +1867,7 @@ design:
     P-292 修卡：writable_paths 由七条扩为十三条，追加六个因空验收正例夹具
     必红的测试文件；这些测试正例夹具无合格验收却断言确认通过或冻结 201，J.54 门禁生效后需同步适配；属行为变化的预期适配，非范围蔓延。适配口径：正例夹具补一条去空白后 id 与 text 都非空的验收，或改写成空验收应被拦住的负例；不得借机改其他断言、不得扩到别的文件、不扩生产文件。
     只读复核 tests/e2e/golden-slice.test.ts：该切片编译桩发出 upsert_acceptance（L209–217，id 为 new:ac、text 为「页面源码含问候语」，去空白后均非空），flush 后由 ledgerToFreezeScheme（L327–331）把账本 draft.acceptance 拷进冻结请求；L385 已用 scheme.acceptance![0]!.id 取第一条验收 id——若验收为空，本测试在现行 main 上也会在 L385 失败。结论：切片编译后已有合格验收，J.54 门禁生效后预期仍绿，不列入 writable_paths。若施工时该文件意外变红，停工再修卡追加。
+    P-293 第二次修卡：writable_paths 由十三条扩为十四条，追加 tests/ui/task-c18-scheme-single-pane.test.tsx（用例「方案够完整才出现生成 Demo；最底只有确认方案」，L110–138：rebuildSchemeFromCorpus 无合格验收却点 scheme-confirm 并断言 onConfirm）。扩面原因与适配口径沿用 P-292：这些测试正例夹具无合格验收却断言确认通过或冻结 201，J.54 门禁生效后需同步适配；属行为变化的预期适配，非范围蔓延。适配口径：正例夹具补一条去空白后 id 与 text 都非空的验收，或改写成空验收应被拦住的负例；不得借机改其他断言、不得扩到别的文件、不扩生产文件。收敛要求：施工前先把名单内外的相关测试夹具整体扫一遍，确认没有下一批同类必红文件再动手。全量排查（当前 main 6ea5329e60bc0e206a488a2f10a56ead00612652，不依赖未合入的 #375 代码）：在 tests/ 与 src/tests/ 共 367 个测试文件中检索 evaluateSchemeConfirmation、scheme-confirm、runConfirmSchemeAtomic、handleConfirmScheme、POST /api/supervisor/scheme/freeze、emptySchemeDraft、makeScheme()、makeDraft()、rebuildSchemeFromCorpus、acceptance: [] 等，得 59 个候选后再按断言实读。结论：除本文件外无其他同类必红夹具。P-292 已列入的六个追加测试不算新发现。golden-slice 复核仍为编译后已有合格验收、预期仍绿，不列入。system-map-pane.test.tsx（L132–148）与 project-map-pane.test.tsx（L155–171）会调谓词并挂载 SchemeReviewPane，但只断言地图嵌套、不断言 confirmation.ok / 按钮可点 / onConfirm / freeze 201，排除。confirm-scheme-starts-planning.test.tsx 夹具 L132 已有合格验收，L314 可点断言预期仍绿，排除。其余候选或只直接调用 writeSchemeSnapshot（不经 handleSchemeSnapshot）、或只渲染中栏/表面上报/试玩按钮、或为负例/已冻结，不构成「无合格验收却断言确认通过或冻结 201」。施工 PR #375 已开，因本范围外文件停工，等待本修卡；修卡 ≠ 开工，状态仍为 NEW_TASK。
   touches:
     - { path: src/lib/journey/scheme-draft.ts, change: modify, why: evaluateSchemeConfirmation / 确认谓词增加验收非空校验与锁定白话, symbols: [evaluateSchemeConfirmation] }
     - { path: daemon/server.ts, change: modify, why: handleSchemeSnapshot 对空验收返回 4xx，不写快照，不给 201, symbols: [handleSchemeSnapshot] }
@@ -1880,6 +1882,7 @@ design:
     - { path: tests/ui/scope-acceptance-block.test.tsx, change: modify, why: 仅适配因验收非空门禁而失败的正例夹具/断言，不改其他断言, symbols: [] }
     - { path: tests/ui/journey-handoff.test.tsx, change: modify, why: 仅适配因验收非空门禁而失败的正例夹具/断言，不改其他断言, symbols: [] }
     - { path: tests/integration/dispute-anchor-real-session.test.ts, change: modify, why: 仅适配因验收非空门禁而失败的冻结夹具/断言，不改其他断言, symbols: [] }
+    - { path: tests/ui/task-c18-scheme-single-pane.test.tsx, change: modify, why: 仅适配因验收非空门禁而失败的正例夹具/断言，不改其他断言, symbols: [] }
   interfaces:
     - { kind: http, name: "POST /api/supervisor/scheme/freeze", signature: "空验收 → 4xx（不写快照、不返回 201）；有合格验收时既有成功语义不变", consumers: [] }
   test_plan:
@@ -1939,4 +1942,5 @@ governance:
 * **立卡说明（2026-11-25 · P-290）**：Tina 授权立卡（t1417u）。基线 `6baf812d1ad2294b2038c7e0d2f3c2492e3d19a7`（[#370](https://github.com/he18718143986-design/IDE/pull/370) P-289）。编号按授权使用 P-290；P-285 号未占用，不擅自改号。**立卡 ≠ 开工**。J.54 在 J.53 施工 PR 合入前不开工。
 * **施工顺序（锁定）**：本立卡 PR 合入后，先 J.53 施工方案与施工；J.53 合入后再报 J.54 施工方案，授权后再动代码。
 * **修卡说明（2026-11-25 · P-292）**：Tina 授权修卡（t1424u）。J.54 按已审方案开工前，因范围外六个测试文件正例夹具无合格验收却断言确认通过或冻结 201 而停工——按流程正确，不擅自扩面。这些测试正例夹具无合格验收却断言确认通过或冻结 201，J.54 门禁生效后需同步适配；属行为变化的预期适配，非范围蔓延。修订 `TASK-J.54`：`writable_paths` 由七条扩为十三条，新增 `tests/unit/authorization-allowlist.test.ts`、`tests/unit/dispute-seal-turn-register.test.ts`、`tests/ui/scheme-quote-backlink.test.tsx`、`tests/ui/scope-acceptance-block.test.tsx`、`tests/ui/journey-handoff.test.tsx`、`tests/integration/dispute-anchor-real-session.test.ts`。更新口径限定：正例夹具补一条去空白后 id 与 text 都非空的验收，或改写成空验收应被拦住的负例；不得借机改其他断言、不得扩到别的文件、不扩生产文件。只读复核 tests/e2e/golden-slice.test.ts：该切片编译桩发出 upsert_acceptance（L209–217，id 为 new:ac、text 为「页面源码含问候语」，去空白后均非空），flush 后由 ledgerToFreezeScheme（L327–331）把账本 draft.acceptance 拷进冻结请求；L385 已用 scheme.acceptance![0]!.id 取第一条验收 id——若验收为空，本测试在现行 main 上也会在 L385 失败。结论：切片编译后已有合格验收，J.54 门禁生效后预期仍绿，不列入 writable_paths。若施工时该文件意外变红，停工再修卡追加。 其余卡面（验收 J54-P1～P3、白话锁定「方案还没有验收标准，先补一条再冻结」、空验收 4xx 不写快照不给 201、不对 freeze 请求调完整确认谓词、不改分解器 / `acc-missing` / D-2 / 中栏生产代码、已有快照仍幂等 200/409、真钥匙复测不写成自动测试）不变。卡状态仍为 `[NEW_TASK]`，估算仍为 S，硬依赖仍为已完成的 J.53；**修卡 ≠ 开工**。本修卡合入后再按十三条路径重新开工，分支名仍用 `feat/j54-acceptance-nonempty-gate`，基线为当时 `origin/main`。
+* **修卡说明（2026-11-25 · P-293）**：Tina 授权第二次修卡（t1427u）。纯 docs，不改产品代码，不继续改 #375。基线 `main` `6ea5329e60bc0e206a488a2f10a56ead00612652`（[#374](https://github.com/he18718143986-design/IDE/pull/374) P-292）。编号按流水使用 **P-293**（版本头第 277 条）；**P-285 号未占用，不擅自改号**。施工 PR [#375](https://github.com/he18718143986-design/IDE/pull/375) 已开，因范围外 `tests/ui/task-c18-scheme-single-pane.test.tsx` 正例夹具无合格验收却断言确认可过而停工——按流程正确，不擅自扩面、未改该文件、未自行合入。这些测试正例夹具无合格验收却断言确认通过或冻结 201，J.54 门禁生效后需同步适配；属行为变化的预期适配，非范围蔓延。适配口径：正例夹具补一条去空白后 id 与 text 都非空的验收，或改写成空验收应被拦住的负例；不得借机改其他断言、不得扩到别的文件、不扩生产文件。这是第二次扩面（P-292 七→十三、本次十三→十四）。修订 `TASK-J.54`：`writable_paths` 由十三条扩为十四条，追加 `tests/ui/task-c18-scheme-single-pane.test.tsx`。收敛要求：施工前先把名单内外的相关测试夹具整体扫一遍，确认没有下一批同类必红文件再动手。全量排查结论：除本文件外无其他同类必红夹具（检索 tests/ 与 src/tests/ 367 个文件、59 个候选后再按断言实读；P-292 已列入的六个追加测试不算新发现；golden-slice 复核仍绿不列入；system-map-pane / project-map-pane 只调谓词不断言成功路径，排除；confirm-scheme-starts-planning 夹具已有合格验收，排除）。其余卡面（验收 J54-P1～P3、白话锁定「方案还没有验收标准，先补一条再冻结」、空验收 4xx 不写快照不给 201、不对 freeze 请求调完整确认谓词、不改分解器 / `acc-missing` / D-2 / 中栏生产代码、已有快照仍幂等 200/409、真钥匙复测不写成自动测试）不变。卡状态仍为 `[NEW_TASK]`，估算仍为 S，硬依赖仍为已完成的 J.53；**修卡 ≠ 开工**。本修卡合入后，按十四条路径继续 #375 施工（适配该测试文件，不改产品代码范围），必需检查全绿后报授权，不自行合入。
 * **真钥匙复测路径（锁定，不在本卡验收）**：J.53+J.54 施工均合入并重启 Daemon 后，同一试玩目录先补验收并升修订 → 再点「确认方案，开始规划」→ 看分解是否出计划/地图 → 再测「确认开工」。实测记录落 ledger。未测「确认开工」，未宣称端到端闭环。
