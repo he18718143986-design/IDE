@@ -1769,7 +1769,7 @@ governance:
 > 本卡已 **COMPLETED**（施工 [#372](https://github.com/he18718143986-design/IDE/pull/372) squash `6c0a2fbc22bd3b7bfde62c27ce702cc75bddd820`；立卡 P-290；完工回写 P-291）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.53) §3.4bp。诚实口径：**few-shot 与编译循环补写验收已交付（例 1 补可检查验收、空验收窄兜底 `ai_inferred`、已冻结不注入）；冻结前校验非空在 J.54；端到端闭环未宣称**。
 
 
-### 3.4y 冻结前校验验收非空（2026-11-25 · 立卡 P-290）
+### 3.4y 冻结前校验验收非空（2026-11-25 · 立卡 P-290 · 修卡 P-292）
 
 <a id="task-j.54"></a>
 
@@ -1819,6 +1819,12 @@ contract:
       - tests/integration/scheme-confirm-http-injection.test.ts
       - tests/integration/scheme-confirm-scope-drift.test.ts
       - tests/ui/task-c22-confirm-wiring.test.tsx
+      - tests/unit/authorization-allowlist.test.ts
+      - tests/unit/dispute-seal-turn-register.test.ts
+      - tests/ui/scheme-quote-backlink.test.tsx
+      - tests/ui/scope-acceptance-block.test.tsx
+      - tests/ui/journey-handoff.test.tsx
+      - tests/integration/dispute-anchor-real-session.test.ts
     readonly_paths:
       - src/lib/journey/confirm-scheme-atomic.ts
       - src/components/studio/SchemeReviewPane.tsx
@@ -1857,6 +1863,9 @@ design:
     要动 writable_paths 以外的文件，停工修卡。先审施工方案再动代码。本卡
     验收只含 CI 测试；真钥匙复测不进本卡验收，不写成 it()，也不写成会让
     check:docs 要求出现在 it() 里的 case。J.53 施工合入前本卡不开工。
+    P-292 修卡：writable_paths 由七条扩为十三条，追加六个因空验收正例夹具
+    必红的测试文件；这些测试正例夹具无合格验收却断言确认通过或冻结 201，J.54 门禁生效后需同步适配；属行为变化的预期适配，非范围蔓延。适配口径：正例夹具补一条去空白后 id 与 text 都非空的验收，或改写成空验收应被拦住的负例；不得借机改其他断言、不得扩到别的文件、不扩生产文件。
+    只读复核 tests/e2e/golden-slice.test.ts：该切片编译桩发出 upsert_acceptance（L209–217，id 为 new:ac、text 为「页面源码含问候语」，去空白后均非空），flush 后由 ledgerToFreezeScheme（L327–331）把账本 draft.acceptance 拷进冻结请求；L385 已用 scheme.acceptance![0]!.id 取第一条验收 id——若验收为空，本测试在现行 main 上也会在 L385 失败。结论：切片编译后已有合格验收，J.54 门禁生效后预期仍绿，不列入 writable_paths。若施工时该文件意外变红，停工再修卡追加。
   touches:
     - { path: src/lib/journey/scheme-draft.ts, change: modify, why: evaluateSchemeConfirmation / 确认谓词增加验收非空校验与锁定白话, symbols: [evaluateSchemeConfirmation] }
     - { path: daemon/server.ts, change: modify, why: handleSchemeSnapshot 对空验收返回 4xx，不写快照，不给 201, symbols: [handleSchemeSnapshot] }
@@ -1865,6 +1874,12 @@ design:
     - { path: tests/integration/scheme-confirm-http-injection.test.ts, change: modify, why: 断言空验收 freeze 返回 4xx 且不落新快照，并适配既有夹具, symbols: [] }
     - { path: tests/integration/scheme-confirm-scope-drift.test.ts, change: modify, why: 仅适配因验收非空门禁而失败的冻结夹具/断言, symbols: [] }
     - { path: tests/ui/task-c22-confirm-wiring.test.tsx, change: modify, why: 锁中栏按钮禁用态与错误提示跟谓词白话同步，并适配既有夹具, symbols: [] }
+    - { path: tests/unit/authorization-allowlist.test.ts, change: modify, why: 仅适配因验收非空门禁而失败的正例夹具/断言，不改其他断言, symbols: [] }
+    - { path: tests/unit/dispute-seal-turn-register.test.ts, change: modify, why: 仅适配因验收非空门禁而失败的冻结夹具/断言，不改其他断言, symbols: [] }
+    - { path: tests/ui/scheme-quote-backlink.test.tsx, change: modify, why: 仅适配因验收非空门禁而失败的正例夹具/断言，不改其他断言, symbols: [] }
+    - { path: tests/ui/scope-acceptance-block.test.tsx, change: modify, why: 仅适配因验收非空门禁而失败的正例夹具/断言，不改其他断言, symbols: [] }
+    - { path: tests/ui/journey-handoff.test.tsx, change: modify, why: 仅适配因验收非空门禁而失败的正例夹具/断言，不改其他断言, symbols: [] }
+    - { path: tests/integration/dispute-anchor-real-session.test.ts, change: modify, why: 仅适配因验收非空门禁而失败的冻结夹具/断言，不改其他断言, symbols: [] }
   interfaces:
     - { kind: http, name: "POST /api/supervisor/scheme/freeze", signature: "空验收 → 4xx（不写快照、不返回 201）；有合格验收时既有成功语义不变", consumers: [] }
   test_plan:
@@ -1923,4 +1938,5 @@ governance:
 * **取舍**：不选「只在分解里造验收」。不复用「这个需求我还没拆好」。中栏生产代码默认不改，靠已有 `confirmation.message` / `canConfirm` 同步；要把 `SchemeReviewPane.tsx` 或 `confirm-scheme-atomic.ts` 列入施工，须先修卡。
 * **立卡说明（2026-11-25 · P-290）**：Tina 授权立卡（t1417u）。基线 `6baf812d1ad2294b2038c7e0d2f3c2492e3d19a7`（[#370](https://github.com/he18718143986-design/IDE/pull/370) P-289）。编号按授权使用 P-290；P-285 号未占用，不擅自改号。**立卡 ≠ 开工**。J.54 在 J.53 施工 PR 合入前不开工。
 * **施工顺序（锁定）**：本立卡 PR 合入后，先 J.53 施工方案与施工；J.53 合入后再报 J.54 施工方案，授权后再动代码。
+* **修卡说明（2026-11-25 · P-292）**：Tina 授权修卡（t1424u）。J.54 按已审方案开工前，因范围外六个测试文件正例夹具无合格验收却断言确认通过或冻结 201 而停工——按流程正确，不擅自扩面。这些测试正例夹具无合格验收却断言确认通过或冻结 201，J.54 门禁生效后需同步适配；属行为变化的预期适配，非范围蔓延。修订 `TASK-J.54`：`writable_paths` 由七条扩为十三条，新增 `tests/unit/authorization-allowlist.test.ts`、`tests/unit/dispute-seal-turn-register.test.ts`、`tests/ui/scheme-quote-backlink.test.tsx`、`tests/ui/scope-acceptance-block.test.tsx`、`tests/ui/journey-handoff.test.tsx`、`tests/integration/dispute-anchor-real-session.test.ts`。更新口径限定：正例夹具补一条去空白后 id 与 text 都非空的验收，或改写成空验收应被拦住的负例；不得借机改其他断言、不得扩到别的文件、不扩生产文件。只读复核 tests/e2e/golden-slice.test.ts：该切片编译桩发出 upsert_acceptance（L209–217，id 为 new:ac、text 为「页面源码含问候语」，去空白后均非空），flush 后由 ledgerToFreezeScheme（L327–331）把账本 draft.acceptance 拷进冻结请求；L385 已用 scheme.acceptance![0]!.id 取第一条验收 id——若验收为空，本测试在现行 main 上也会在 L385 失败。结论：切片编译后已有合格验收，J.54 门禁生效后预期仍绿，不列入 writable_paths。若施工时该文件意外变红，停工再修卡追加。 其余卡面（验收 J54-P1～P3、白话锁定「方案还没有验收标准，先补一条再冻结」、空验收 4xx 不写快照不给 201、不对 freeze 请求调完整确认谓词、不改分解器 / `acc-missing` / D-2 / 中栏生产代码、已有快照仍幂等 200/409、真钥匙复测不写成自动测试）不变。卡状态仍为 `[NEW_TASK]`，估算仍为 S，硬依赖仍为已完成的 J.53；**修卡 ≠ 开工**。本修卡合入后再按十三条路径重新开工，分支名仍用 `feat/j54-acceptance-nonempty-gate`，基线为当时 `origin/main`。
 * **真钥匙复测路径（锁定，不在本卡验收）**：J.53+J.54 施工均合入并重启 Daemon 后，同一试玩目录先补验收并升修订 → 再点「确认方案，开始规划」→ 看分解是否出计划/地图 → 再测「确认开工」。实测记录落 ledger。未测「确认开工」，未宣称端到端闭环。
