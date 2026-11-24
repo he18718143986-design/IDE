@@ -43,6 +43,7 @@ import { decompose } from "../../daemon/supervisor/decomposer";
 import type { ReadyPabView } from "../../daemon/supervisor/decomposer/decompose";
 import type { SchemeDraftV2 } from "../../src/lib/journey/scheme-patch-types";
 import type { ProjectPlan } from "../../src/lib/project/project-plan";
+import { readPlan } from "../../daemon/project/plan-store";
 
 function requestJson<T>(
   url: string,
@@ -874,5 +875,59 @@ describe("TASK-J.50a-2 plan decompose PAB fallback", () => {
     expect(httpStandard.body.code).toBe("E_PAB_NOT_READY");
     expect(httpStandard.body.error).toMatch(/规模较大|完整架构/);
     expect(fs.existsSync(pabPath)).toBe(false);
+  });
+
+  it("J52-P1: 请求体投影无 size_hint 但台账 size_hint=standard 且有匹配快照时，分解走 standard 路径成功且 model_calls=0 并写出计划", async () => {
+    initGitRepo(repo);
+    const ledger = eligibleScheme({ frozen: false, size_hint: "standard" });
+    writeLedgerDraft(repo, ledger);
+    writeMatchingFrozenSnapshot(repo, ledger);
+    expect(readPlan(repo)).toBeNull();
+
+    const projection = midpaneProjection(ledger);
+    expect(projection).not.toHaveProperty("size_hint");
+    expect((projection["modules"] as Array<{ name?: string }>)[0]).toEqual({
+      id: "m-1",
+      name: "登录页",
+    });
+
+    daemon = createDaemon({
+      repoRoot: repo,
+      startPort: 4990,
+      endPort: 4999,
+      consolePublicDir: null,
+    });
+    const info = await daemon.start();
+    const token = daemon.getSessionToken();
+    const auth = {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    };
+    const dec = await requestJson<{
+      ok: boolean;
+      plan?: ProjectPlan;
+      model_calls?: number;
+      code?: string;
+      error?: string;
+    }>(`http://127.0.0.1:${info.port}/api/project/plan/decompose`, {
+      method: "POST",
+      headers: auth,
+      body: JSON.stringify({
+        scheme: projection,
+        pab: null,
+        repo_facts: repoFacts,
+        project_id: "proj-j52",
+      }),
+    });
+    expect(dec.status).toBe(200);
+    expect(dec.body.ok).toBe(true);
+    expect(dec.body.code).toBeUndefined();
+    expect(dec.body.model_calls).toBe(0);
+    expect(dec.body.plan).toBeDefined();
+    expect(dec.body.plan!.milestones).toHaveLength(1);
+    expect(dec.body.plan!.contracts).toHaveLength(1);
+    const stored = readPlan(repo);
+    expect(stored).not.toBeNull();
+    expect(stored).toEqual(dec.body.plan);
   });
 });

@@ -298,6 +298,7 @@ import type { RepoFacts } from "../src/lib/project/project-plan";
 import { decompose, type ReadyPabView } from "./supervisor/decomposer";
 import {
   ensureMinimalReadyPab,
+  loadSealedLedgerSchemeForMinimalPab,
   resolvePabForDecompose,
 } from "./supervisor/pab/minimal-ready-pab";
 import {
@@ -5577,8 +5578,16 @@ export class StagentDaemon {
           pab?: ReadyPabView | null;
           project_id?: string;
         };
-        if (!body.scheme || typeof body.scheme !== "object") {
-          this.sendJson(res, 400, { error: "scheme required" });
+        // 分解输入读台账与密封证明；请求体 scheme（中栏投影）忽略，也不再强求。
+        const loaded = loadSealedLedgerSchemeForMinimalPab(this.repoRoot);
+        if (!loaded.ok) {
+          this.sendJson(res, 422, {
+            ok: false,
+            code: loaded.code,
+            error: loaded.plain_message,
+            violations: [],
+            model_calls: 0,
+          });
           return;
         }
         const repoFacts: RepoFacts = body.repo_facts ?? {
@@ -5602,7 +5611,7 @@ export class StagentDaemon {
           return;
         }
         const result = await decompose({
-          scheme: body.scheme,
+          scheme: loaded.scheme,
           repoFacts,
           pab: resolved.pab,
           existingPlan: existing,
