@@ -471,7 +471,6 @@ describe("T-GATE J.3/J.5 范围纳入唯一确认谓词（恒开启）", () => {
   });
 });
 
-
 describe("T-GATE J.54 验收非空门禁", () => {
   it("J54-P1: 缺少合格验收时 evaluateSchemeConfirmation 为 ok=false，白话为「方案还没有验收标准，先补一条再冻结」，不复用「这个需求我还没拆好」", () => {
     const decision = evaluateSchemeConfirmation(

@@ -380,7 +380,6 @@ describe("T-UI-4 J.5 范围预检与确认接线", () => {
   });
 });
 
-
 describe("T-UI J.54 空验收拦截", () => {
   it("空验收时 scheme-confirm 禁用，scheme-confirm-blocked 展示「方案还没有验收标准，先补一条再冻结」", () => {
     renderPane(makeScheme({ acceptance: [] }), EMPTY_DEMO_GATE);

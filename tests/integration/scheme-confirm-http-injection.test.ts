@@ -405,7 +405,6 @@ describe("T-HTTP R-10 / F-07 确认快照与建图补偿（真 Daemon）", () =>
     expect(changed.body.code).toBe("E_SCHEME_CONFIRMATION_CONFLICT");
   });
 
-
   it("J54-P2: POST /api/supervisor/scheme/freeze 在空验收时返回 4xx，不写新快照，不返回 201", async () => {
     const confirmationId = "scheme-confirm-j54-empty-0001";
     const scheme = { ...makeScheme(), acceptance: [] };
@@ -440,7 +439,11 @@ describe("T-HTTP R-10 / F-07 确认快照与建图补偿（真 Daemon）", () =>
         },
       ],
     };
-    const first = await call<{ snapshot_id: string; digest: string; idempotent?: boolean }>(
+    const first = await call<{
+      snapshot_id: string;
+      digest: string;
+      idempotent?: boolean;
+    }>(
       "POST",
       "/api/supervisor/scheme/freeze",
       freezePayload(confirmationId, filled),
