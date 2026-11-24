@@ -25,8 +25,20 @@ import {
   assessMinimalReadyPabEligibility,
   computeArchitectureBaselineDigest,
   ensureMinimalReadyPab,
+  resolvePabForDecompose,
   verifyPersistedArchitectureBaselineDigest,
 } from "../../daemon/supervisor/pab/minimal-ready-pab";
+import {
+  casWriteSchemeLedger,
+  emptyLedgerState,
+  readSchemeLedger,
+} from "../../daemon/supervisor/intent-compiler/scheme-ledger-store";
+import { writeSchemeSnapshot } from "../../daemon/pipeline/scheme-snapshot-store";
+import { buildScopePlan } from "../../daemon/supervisor/scope-plan-builder";
+import {
+  EMPTY_DEMO_GATE,
+  emptySchemeDraft,
+} from "../../src/lib/journey/scheme-draft";
 import { decompose } from "../../daemon/supervisor/decomposer";
 import type { ReadyPabView } from "../../daemon/supervisor/decomposer/decompose";
 import type { SchemeDraftV2 } from "../../src/lib/journey/scheme-patch-types";
@@ -114,6 +126,64 @@ function initGitRepo(root: string): string {
   return git(root, ["rev-parse", "HEAD"]).trim();
 }
 
+function writeLedgerDraft(repoRoot: string, draft: SchemeDraftV2): void {
+  const current = readSchemeLedger(repoRoot);
+  const expectedPrevRevision = current?.state.draft.scheme_revision ?? 0;
+  const written = casWriteSchemeLedger(repoRoot, {
+    expectedPrevRevision,
+    next: emptyLedgerState({ draft }),
+    journal: null,
+    modelId: "j51-test",
+    promptVersion: "j51-test",
+    offline: false,
+  });
+  if (!written.ok) {
+    throw new Error(`casWriteSchemeLedger failed: ${written.reason}`);
+  }
+}
+
+function writeMatchingFrozenSnapshot(
+  repoRoot: string,
+  draft: SchemeDraftV2,
+  confirmationId = "scheme-plan-j51test01",
+): void {
+  const scheme = emptySchemeDraft({
+    scheme_id: draft.scheme_id,
+    scheme_revision: draft.scheme_revision,
+    title: draft.title,
+    summary: draft.summary,
+    modules: draft.modules.map((item) => item.name),
+    frozen: true,
+  });
+  writeSchemeSnapshot(repoRoot, {
+    confirmation_id: confirmationId,
+    scheme,
+    demo: EMPTY_DEMO_GATE,
+    decision: { code: "OK", message: "ok", demo_mode: "none" },
+    scope_plan: buildScopePlan({ repoRoot, scheme }),
+    graveyard: [],
+  });
+}
+
+/** 中栏投影形态：模块只剩名称，无 size_hint。 */
+function midpaneProjection(draft: SchemeDraftV2): Record<string, unknown> {
+  return {
+    scheme_id: draft.scheme_id,
+    scheme_revision: draft.scheme_revision,
+    frozen: false,
+    title: draft.title,
+    summary: draft.summary,
+    goals: draft.goals.map((item) => ({ id: item.id, text: item.text })),
+    modules: draft.modules.map((item) => ({ id: item.id, name: item.name })),
+    decisions: [],
+    conflicts: [],
+    acceptance: draft.acceptance.map((item) => ({
+      id: item.id,
+      text: item.text,
+    })),
+  };
+}
+
 const repoFacts = {
   has_test_script: true,
   has_modules_yaml: true,
@@ -137,6 +207,7 @@ describe("TASK-J.50a-2 plan decompose PAB fallback", () => {
   it("J50a2-P1: 具备资格则零模型生成 minimal ready PAB", () => {
     const head = initGitRepo(repo);
     const scheme = eligibleScheme();
+    writeLedgerDraft(repo, scheme);
     const result = ensureMinimalReadyPab({ projectRoot: repo, scheme });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -179,6 +250,7 @@ describe("TASK-J.50a-2 plan decompose PAB fallback", () => {
 
   it("J50a2-P2: ReadyPabView 只能来自落盘结果", () => {
     initGitRepo(repo);
+    writeLedgerDraft(repo, eligibleScheme());
     const result = ensureMinimalReadyPab({
       projectRoot: repo,
       scheme: eligibleScheme(),
@@ -212,6 +284,7 @@ describe("TASK-J.50a-2 plan decompose PAB fallback", () => {
   it("J50a2-P3: decompose HTTP 未传 pab 时能用上这份 ReadyPabView", async () => {
     initGitRepo(repo);
     const scheme = eligibleScheme();
+    writeLedgerDraft(repo, scheme);
     const ensured = ensureMinimalReadyPab({ projectRoot: repo, scheme });
     expect(ensured.ok).toBe(true);
     if (!ensured.ok) return;
@@ -272,6 +345,7 @@ describe("TASK-J.50a-2 plan decompose PAB fallback", () => {
   it("J50a2-P3: decompose 未传 pab 且仓库为空时，具备资格则先生产再分解", async () => {
     initGitRepo(repo);
     const scheme = eligibleScheme();
+    writeLedgerDraft(repo, scheme);
     expect(readCurrentArchitectureBaseline(repo)).toBeNull();
 
     daemon = createDaemon({
@@ -312,6 +386,7 @@ describe("TASK-J.50a-2 plan decompose PAB fallback", () => {
   it("J50a2-P4: 现有 /api/baseline 仍是参考基线，不得充当 ReadyPabView", async () => {
     initGitRepo(repo);
     const scheme = eligibleScheme();
+    writeLedgerDraft(repo, scheme);
     const ensured = ensureMinimalReadyPab({ projectRoot: repo, scheme });
     expect(ensured.ok).toBe(true);
 
@@ -386,6 +461,7 @@ describe("TASK-J.50a-2 plan decompose PAB fallback", () => {
       expect(large.code).toBe("E_PAB_NOT_READY");
       expect(large.plain_message).toMatch(/规模较大|完整架构/);
     }
+    writeLedgerDraft(repo, eligibleScheme({ size_hint: "large" }));
     expect(
       ensureMinimalReadyPab({
         projectRoot: repo,
@@ -394,6 +470,10 @@ describe("TASK-J.50a-2 plan decompose PAB fallback", () => {
     ).toBe(false);
     expect(fs.existsSync(pabPath)).toBe(false);
 
+    writeLedgerDraft(
+      repo,
+      eligibleScheme({ size_hint: "tiny", title: "登录页" }),
+    );
     const tiny = ensureMinimalReadyPab({
       projectRoot: repo,
       scheme: eligibleScheme({ size_hint: "tiny", title: "登录页" }),
@@ -404,26 +484,28 @@ describe("TASK-J.50a-2 plan decompose PAB fallback", () => {
     }
     expect(fs.existsSync(pabPath)).toBe(false);
 
+    const crossModuleScheme = eligibleScheme({
+      modules: [
+        {
+          ...meta("m-1"),
+          name: "登录页",
+          purpose: "用户登录",
+          user_visible: true,
+          kind: "new",
+        },
+        {
+          ...meta("m-2"),
+          name: "账户服务",
+          purpose: "账户",
+          user_visible: false,
+          kind: "new",
+        },
+      ],
+    });
+    writeLedgerDraft(repo, crossModuleScheme);
     const crossModule = ensureMinimalReadyPab({
       projectRoot: repo,
-      scheme: eligibleScheme({
-        modules: [
-          {
-            ...meta("m-1"),
-            name: "登录页",
-            purpose: "用户登录",
-            user_visible: true,
-            kind: "new",
-          },
-          {
-            ...meta("m-2"),
-            name: "账户服务",
-            purpose: "账户",
-            user_visible: false,
-            kind: "new",
-          },
-        ],
-      }),
+      scheme: crossModuleScheme,
     });
     expect(crossModule.ok).toBe(false);
     if (!crossModule.ok) {
@@ -431,20 +513,22 @@ describe("TASK-J.50a-2 plan decompose PAB fallback", () => {
     }
     expect(fs.existsSync(pabPath)).toBe(false);
 
+    const foreignFlowScheme = eligibleScheme({
+      flows: [
+        {
+          ...meta("f-1"),
+          name: "登录并记账",
+          steps: [
+            { actor: "用户", action: "登录", module_id: "m-1" },
+            { actor: "系统", action: "记账", module_id: "m-other" },
+          ],
+        },
+      ],
+    });
+    writeLedgerDraft(repo, foreignFlowScheme);
     const foreignFlow = ensureMinimalReadyPab({
       projectRoot: repo,
-      scheme: eligibleScheme({
-        flows: [
-          {
-            ...meta("f-1"),
-            name: "登录并记账",
-            steps: [
-              { actor: "用户", action: "登录", module_id: "m-1" },
-              { actor: "系统", action: "记账", module_id: "m-other" },
-            ],
-          },
-        ],
-      }),
+      scheme: foreignFlowScheme,
     });
     expect(foreignFlow.ok).toBe(false);
     if (!foreignFlow.ok) {
@@ -452,19 +536,21 @@ describe("TASK-J.50a-2 plan decompose PAB fallback", () => {
     }
     expect(fs.existsSync(pabPath)).toBe(false);
 
+    const changeExistingScheme = eligibleScheme({
+      modules: [
+        {
+          ...meta("m-1"),
+          name: "登录页",
+          purpose: "用户登录",
+          user_visible: true,
+          kind: "change_existing",
+        },
+      ],
+    });
+    writeLedgerDraft(repo, changeExistingScheme);
     const changeExisting = ensureMinimalReadyPab({
       projectRoot: repo,
-      scheme: eligibleScheme({
-        modules: [
-          {
-            ...meta("m-1"),
-            name: "登录页",
-            purpose: "用户登录",
-            user_visible: true,
-            kind: "change_existing",
-          },
-        ],
-      }),
+      scheme: changeExistingScheme,
     });
     expect(changeExisting.ok).toBe(false);
     if (!changeExisting.ok) {
@@ -472,6 +558,7 @@ describe("TASK-J.50a-2 plan decompose PAB fallback", () => {
     }
     expect(fs.existsSync(pabPath)).toBe(false);
 
+    writeLedgerDraft(repo, eligibleScheme({ frozen: false }));
     const unsealed = ensureMinimalReadyPab({
       projectRoot: repo,
       scheme: eligibleScheme({ frozen: false }),
@@ -482,6 +569,7 @@ describe("TASK-J.50a-2 plan decompose PAB fallback", () => {
 
   it("J50a2-P6: 落盘文件含完整 PAB 文档字段且 digest 可对落盘内容复算", () => {
     initGitRepo(repo);
+    writeLedgerDraft(repo, eligibleScheme());
     const result = ensureMinimalReadyPab({
       projectRoot: repo,
       scheme: eligibleScheme(),
@@ -570,6 +658,8 @@ describe("TASK-J.50a-2 plan decompose PAB fallback", () => {
 
   it("新入口 POST /api/project/architecture-baseline/ensure-minimal 需鉴权", async () => {
     initGitRepo(repo);
+    const scheme = eligibleScheme();
+    writeLedgerDraft(repo, scheme);
     daemon = createDaemon({
       repoRoot: repo,
       startPort: 4960,
@@ -580,7 +670,6 @@ describe("TASK-J.50a-2 plan decompose PAB fallback", () => {
     const token = daemon.getSessionToken();
     const base = `http://127.0.0.1:${info.port}`;
     const url = `${base}/api/project/architecture-baseline/ensure-minimal`;
-    const scheme = eligibleScheme();
 
     const unauth = await requestJson<{ error?: string }>(url, {
       method: "POST",
@@ -609,6 +698,7 @@ describe("TASK-J.50a-2 plan decompose PAB fallback", () => {
     expect(created.body.created).toBe(true);
     expect(created.body.pab).toEqual(readCurrentArchitectureBaseline(repo));
 
+    writeLedgerDraft(repo, eligibleScheme({ size_hint: "large" }));
     const ineligible = await requestJson<{
       ok: boolean;
       code?: string;
@@ -616,11 +706,173 @@ describe("TASK-J.50a-2 plan decompose PAB fallback", () => {
     }>(url, {
       method: "POST",
       headers: auth,
-      body: JSON.stringify({ scheme: eligibleScheme({ size_hint: "large" }) }),
+      body: JSON.stringify({
+        scheme: eligibleScheme({ size_hint: "standard" }),
+      }),
     });
     expect(ineligible.status).toBe(422);
     expect(ineligible.body.ok).toBe(false);
     expect(ineligible.body.code).toBe("E_PAB_NOT_READY");
     expect(ineligible.body.error).toMatch(/规模较大|完整架构/);
+  });
+
+  it("J51-P1: 投影缺 size_hint 但台账 size_hint=standard 且有匹配快照时具备资格并落盘", async () => {
+    initGitRepo(repo);
+    const pabPath = architectureBaselinePath(repo);
+
+    const passedEligible = ensureMinimalReadyPab({
+      projectRoot: repo,
+      scheme: eligibleScheme(),
+    });
+    expect(passedEligible.ok).toBe(false);
+    if (!passedEligible.ok) {
+      expect(passedEligible.code).toBe("E_PAB_NOT_READY");
+      expect(passedEligible.plain_message).toBe(
+        "方案还没密封，还不能生成架构基线。",
+      );
+    }
+    expect(fs.existsSync(pabPath)).toBe(false);
+
+    const ledger = eligibleScheme({ frozen: false, size_hint: "standard" });
+    writeLedgerDraft(repo, ledger);
+    writeMatchingFrozenSnapshot(repo, ledger);
+    const projection = midpaneProjection(ledger);
+    expect(projection).not.toHaveProperty("size_hint");
+    expect((projection["modules"] as Array<{ name?: string }>)[0]).toEqual({
+      id: "m-1",
+      name: "登录页",
+    });
+
+    const result = ensureMinimalReadyPab({
+      projectRoot: repo,
+      scheme: projection as unknown as SchemeDraftV2,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.created).toBe(true);
+    expect(result.pab.status).toBe("ready");
+    const stored = readCurrentArchitectureBaselineDocument(repo);
+    expect(stored).not.toBeNull();
+    expect(isProjectArchitectureBaseline(stored!)).toBe(true);
+    if (!stored || !isProjectArchitectureBaseline(stored)) return;
+    expect(stored.mode).toBe("minimal");
+    expect(stored.components[0]?.name).toBe("登录页");
+    expect(stored.scheme_ref).toEqual({
+      scheme_id: ledger.scheme_id,
+      scheme_revision: ledger.scheme_revision,
+    });
+
+    const resolved = resolvePabForDecompose({
+      projectRoot: repo,
+      scheme: projection as unknown as SchemeDraftV2,
+    });
+    expect(resolved.failure).toBeUndefined();
+    expect(resolved.pab).toEqual(result.pab);
+
+    fs.rmSync(pabPath, { force: true });
+    expect(readCurrentArchitectureBaseline(repo)).toBeNull();
+
+    daemon = createDaemon({
+      repoRoot: repo,
+      startPort: 4970,
+      endPort: 4979,
+      consolePublicDir: null,
+    });
+    const info = await daemon.start();
+    const token = daemon.getSessionToken();
+    const url = `http://127.0.0.1:${info.port}/api/project/architecture-baseline/ensure-minimal`;
+    const auth = {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    };
+
+    const omitted = await requestJson<{
+      ok: boolean;
+      pab: ReadyPabView;
+      created: boolean;
+      code?: string;
+      error?: string;
+    }>(url, {
+      method: "POST",
+      headers: auth,
+      body: JSON.stringify({}),
+    });
+    expect(omitted.status).toBe(200);
+    expect(omitted.body.ok).toBe(true);
+    expect(omitted.body.created).toBe(true);
+    expect(omitted.body.pab.status).toBe("ready");
+    expect(readCurrentArchitectureBaseline(repo)).toEqual(omitted.body.pab);
+
+    const again = await requestJson<{
+      ok: boolean;
+      created: boolean;
+    }>(url, {
+      method: "POST",
+      headers: auth,
+      body: JSON.stringify({ scheme: projection }),
+    });
+    expect(again.status).toBe(200);
+    expect(again.body.ok).toBe(true);
+    expect(again.body.created).toBe(false);
+  });
+
+  it("J51-P2: 台账 size_hint=large 时白话失败且不写盘，即使请求体写 standard", async () => {
+    initGitRepo(repo);
+    const pabPath = architectureBaselinePath(repo);
+    const ledger = eligibleScheme({ frozen: false, size_hint: "large" });
+    writeLedgerDraft(repo, ledger);
+    writeMatchingFrozenSnapshot(repo, ledger);
+    const bodyStandard = eligibleScheme({
+      frozen: true,
+      size_hint: "standard",
+    });
+
+    const result = ensureMinimalReadyPab({
+      projectRoot: repo,
+      scheme: bodyStandard,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("E_PAB_NOT_READY");
+      expect(result.plain_message).toMatch(/规模较大|完整架构/);
+    }
+    expect(fs.existsSync(pabPath)).toBe(false);
+
+    const resolved = resolvePabForDecompose({
+      projectRoot: repo,
+      scheme: bodyStandard,
+    });
+    expect(resolved.pab).toBeNull();
+    expect(resolved.failure?.code).toBe("E_PAB_NOT_READY");
+    expect(resolved.failure?.plain_message).toMatch(/规模较大|完整架构/);
+    expect(fs.existsSync(pabPath)).toBe(false);
+
+    daemon = createDaemon({
+      repoRoot: repo,
+      startPort: 4980,
+      endPort: 4989,
+      consolePublicDir: null,
+    });
+    const info = await daemon.start();
+    const token = daemon.getSessionToken();
+    const url = `http://127.0.0.1:${info.port}/api/project/architecture-baseline/ensure-minimal`;
+    const auth = {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    };
+    const httpStandard = await requestJson<{
+      ok: boolean;
+      code?: string;
+      error?: string;
+    }>(url, {
+      method: "POST",
+      headers: auth,
+      body: JSON.stringify({ scheme: bodyStandard }),
+    });
+    expect(httpStandard.status).toBe(422);
+    expect(httpStandard.body.ok).toBe(false);
+    expect(httpStandard.body.code).toBe("E_PAB_NOT_READY");
+    expect(httpStandard.body.error).toMatch(/规模较大|完整架构/);
+    expect(fs.existsSync(pabPath)).toBe(false);
   });
 });
