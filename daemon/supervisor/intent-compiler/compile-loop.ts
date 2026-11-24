@@ -15,11 +15,13 @@ import {
 } from "../../../src/lib/journey/compiler-output-schema";
 import { mergeSchemePatch } from "../../../src/lib/journey/scheme-patch-engine";
 import type {
+  CompilerEvidence,
   EvidenceItem,
   LedgerState,
   MergeJournal,
   MergeResult,
   SchemeDraftV2,
+  SchemeOp,
   SchemePatch,
   TranscriptView,
   TurnRef,
@@ -247,6 +249,137 @@ function turnRefsFromModuleEvidence(evidence: EvidenceItem[]): TurnRef[] {
   return refs;
 }
 
+function turnRefsFromCompilerEvidence(evidence: CompilerEvidence[]): TurnRef[] {
+  const refs: TurnRef[] = [];
+  for (const item of evidence) {
+    if ("kind" in item && item.kind === "edit") continue;
+    if ("turn_id" in item && typeof item.turn_id === "string") {
+      refs.push({ ...item });
+    }
+  }
+  return refs;
+}
+
+function isQualifiedAcceptance(id: unknown, text: unknown): boolean {
+  return (
+    typeof id === "string" &&
+    typeof text === "string" &&
+    id.trim().length > 0 &&
+    text.trim().length > 0
+  );
+}
+
+function hasQualifiedAcceptanceAfterOps(
+  draft: SchemeDraftV2,
+  patch: SchemePatch,
+): boolean {
+  const qualified = new Set<string>();
+  for (const item of draft.acceptance) {
+    if (isQualifiedAcceptance(item.id, item.text)) qualified.add(item.id);
+  }
+  for (const op of patch.ops) {
+    if (op.op === "remove_item" || op.op === "reject_item") {
+      qualified.delete(op.id);
+      continue;
+    }
+    if (op.op !== "upsert_acceptance") continue;
+    const id = op.item.id;
+    const text = op.item["text"];
+    if (isQualifiedAcceptance(id, text)) qualified.add(id);
+    else qualified.delete(id);
+  }
+  return qualified.size > 0;
+}
+
+function minimalAcceptanceFromModule(name: string, purpose: string): string {
+  const n = name.trim();
+  const p = purpose.trim();
+  const raw = p ? `打开「${n}」后，${p}` : `可以打开并使用「${n}」`;
+  return raw.slice(0, 200);
+}
+
+function minimalAcceptanceFromGoal(text: string): string {
+  return `可以确认已达成：${text.trim()}`.slice(0, 200);
+}
+
+function pickAcceptanceSeed(
+  draft: SchemeDraftV2,
+  patch: SchemePatch,
+): { text: string; evidence: TurnRef[] } | null {
+  const namedModules = draft.modules.filter((m) => m.name.trim().length > 0);
+  namedModules.sort((a, b) => Number(b.user_visible) - Number(a.user_visible));
+  for (const module of namedModules) {
+    const evidence = turnRefsFromModuleEvidence(module.evidence);
+    if (evidence.length === 0) continue;
+    const text = minimalAcceptanceFromModule(module.name, module.purpose);
+    if (text.trim().length === 0) continue;
+    return { text, evidence };
+  }
+  for (const goal of draft.goals) {
+    if (goal.text.trim().length === 0) continue;
+    const evidence = turnRefsFromModuleEvidence(goal.evidence);
+    if (evidence.length === 0) continue;
+    const text = minimalAcceptanceFromGoal(goal.text);
+    if (text.trim().length === 0) continue;
+    return { text, evidence };
+  }
+  for (const op of patch.ops) {
+    if (op.op === "upsert_module") {
+      const name = typeof op.item["name"] === "string" ? op.item["name"] : "";
+      const purpose =
+        typeof op.item["purpose"] === "string" ? op.item["purpose"] : "";
+      if (name.trim().length === 0) continue;
+      const evidence = turnRefsFromCompilerEvidence(op.evidence);
+      if (evidence.length === 0) continue;
+      const text = minimalAcceptanceFromModule(name, purpose);
+      if (text.trim().length === 0) continue;
+      return { text, evidence };
+    }
+    if (op.op === "upsert_goal") {
+      const raw = typeof op.item["text"] === "string" ? op.item["text"] : "";
+      if (raw.trim().length === 0) continue;
+      const evidence = turnRefsFromCompilerEvidence(op.evidence);
+      if (evidence.length === 0) continue;
+      const text = minimalAcceptanceFromGoal(raw);
+      if (text.trim().length === 0) continue;
+      return { text, evidence };
+    }
+  }
+  return null;
+}
+
+/**
+ * TASK-J.53：草案未冻结、已有可见模块或目标、合并后验收仍空时，注入一条
+ * source 为 ai_inferred 的 upsert_acceptance。
+ * 已有合格验收、既无模块也无目标、或草案已冻结时不补。
+ * 不要求本批 ops 为空（与 J.49 标题兜底不同）。
+ * 注入的 id 带 new: 前缀；若传入 newId（生产编译循环的 ITEM 分配器），
+ * 则在返回前解析为 ITEM-N，以免 assemble 之后的 new: 进入台账。
+ */
+export function maybeFillEmptyAcceptance(
+  patch: SchemePatch,
+  draft: SchemeDraftV2,
+  newId?: (prefix: "ITEM") => string,
+): SchemePatch {
+  if (draft.frozen) return patch;
+  if (hasQualifiedAcceptanceAfterOps(draft, patch)) return patch;
+  const seed = pickAcceptanceSeed(draft, patch);
+  if (seed === null) return patch;
+
+  const id = newId ? newId("ITEM") : "new:acceptance";
+  const injected: SchemeOp = {
+    op: "upsert_acceptance",
+    item: {
+      id,
+      text: seed.text,
+      check: "playtest",
+      source: "ai_inferred",
+    },
+    evidence: seed.evidence,
+  };
+  return { ...patch, ops: [...patch.ops, injected] };
+}
+
 /**
  * 编译循环控制器。宿主在用户消息落盘后调用 {@link notifyUserTurnCommitted}。
  */
@@ -460,7 +593,15 @@ export class IntentCompileLoop {
       return;
     }
 
-    const patch = maybeFillEmptyPatchTitle(assembled.patch, state.draft);
+    const patchWithTitle = maybeFillEmptyPatchTitle(
+      assembled.patch,
+      state.draft,
+    );
+    const patch = maybeFillEmptyAcceptance(
+      patchWithTitle,
+      state.draft,
+      allocItem,
+    );
 
     const merge = mergeSchemePatch({
       state,

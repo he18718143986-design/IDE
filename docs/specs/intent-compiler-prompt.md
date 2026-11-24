@@ -603,8 +603,11 @@ U3：那个嗯 就搞个登陆页吧，手机号就行
 → quotes: [{ "qid":"q1", "from":"U3", "text":"就搞个登陆页吧" }, { "qid":"q2", "from":"U3", "text":"手机号就行" }]
   ops: [{ "op":"upsert_module", "source":"user_said",
           "item":{ "id":"new:login", "name":"登录页", "purpose":"用手机号登录", "user_visible":true, "kind":"new", "project_anchor":null },
+          "evidence":[{"qid":"q1"},{"qid":"q2"}], "revival":null },
+        { "op":"upsert_acceptance", "source":"user_said",
+          "item":{ "id":"new:login-acc", "text":"打开登录页后可以用手机号登录", "check":"playtest" },
           "evidence":[{"qid":"q1"},{"qid":"q2"}], "revival":null }]
-说明：条目名可以写规范的「登录页」，但摘录必须是用户的原样「登陆页」。
+说明：条目名可以写规范的「登录页」，但摘录必须是用户的原样「登陆页」。最小需求也要同时写一条可检查的验收。
 ```
 
 **例 2 · ✗ 释义 → ✓ 剪原句（防 F-1、F-3）**
