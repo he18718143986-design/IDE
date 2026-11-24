@@ -118,6 +118,16 @@ describe("TASK-C.18 单页方案审阅", () => {
     for (const d of scheme.decisions) {
       scheme = confirmSchemeDecision(scheme, d.id);
     }
+    scheme = {
+      ...scheme,
+      acceptance: [
+        {
+          id: "ac-1",
+          text: "页面能打开并看到进度数字",
+          check: "playtest",
+        },
+      ],
+    };
     const onGenerate = vi.fn();
     const onConfirm = vi.fn();
     const plan = compliantScopePlan(scheme.scheme_revision);
