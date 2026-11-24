@@ -1751,7 +1751,7 @@ governance:
 
 > 本卡已 **COMPLETED**（施工 [#364](https://github.com/he18718143986-design/IDE/pull/364) squash `fa1ee4578ba1d50b788a33d3baad7d016202e4e6`；立卡 P-283；完工回写 P-284）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.51) §3.4bn。诚实口径：**资格判定改读台账与密封快照已交付（内容读 `state.draft`、密封证明用匹配已冻结快照或台账 `frozen=true`、请求体投影忽略、判定表一行未改）；真钥匙复测不在本卡，端到端闭环未宣称**。
 
-### 3.4w decompose 方案来源未统一（2026-11-24 · 立卡 P-286）
+### 3.4w decompose 方案来源未统一（2026-11-24 · 立卡 P-286 · 修卡 P-287）
 
 <a id="task-j.52"></a>
 
@@ -1784,6 +1784,7 @@ contract:
     writable_paths:
       - daemon/server.ts
       - tests/daemon/plan-decompose-pab-fallback.test.ts
+      - tests/daemon/plan-patch-api.test.ts
     readonly_paths:
       - daemon/supervisor/decomposer/decompose.ts
       - daemon/supervisor/pab/minimal-ready-pab.ts
@@ -1794,6 +1795,7 @@ contract:
   verification:
     commands:
       - { alias: pab-fallback, executable: npx, args: [vitest, run, tests/daemon/plan-decompose-pab-fallback.test.ts] }
+      - { alias: plan-patch-api, executable: npx, args: [vitest, run, tests/daemon/plan-patch-api.test.ts] }
 design:
   approach: >-
     J.51 之后资格判定已改读台账与密封快照，PAB 可以落盘 minimal/ready；但
@@ -1813,13 +1815,18 @@ design:
     模块对象（user_visible、id）；改读台账后，standard 路径才能按设计工作。
     控制台可以继续发送投影，服务端不再用它做分解输入；不改 index.tsx 请求
     形态，不改中栏投影结构。单测可复用 plan-decompose-pab-fallback.test.ts
-    里已有的写台账、写快照和中栏投影助手。要动 writable_paths 以外的文件，
+    里已有的写台账、写快照和中栏投影助手。P-287 修卡把 writable_paths 扩为三条，
+    新增 tests/daemon/plan-patch-api.test.ts：该测试断言 decompose 入口旧的请求体
+    方案来源，J.52 改读台账后需同步更新断言；属行为变化的预期适配，非范围蔓延。
+    更新口径限定：只改该测试中与方案来源相关的断言/夹具（改为先写台账与匹配快照），
+    不得借机改其他断言或扩到别的文件。要动 writable_paths 以外的文件，
     停工修卡，不扩面。先审施工方案再动代码。本卡验收只含 CI 单测；真钥匙复测
     不进本卡验收，不写成 it()，也不写成会让 check:docs 要求出现在 it() 里的
     case。
   touches:
     - { path: daemon/server.ts, change: modify, why: decompose 入口改用 loadSealedLedgerSchemeForMinimalPab 加载方案并交给 decompose()，忽略请求体投影，不再强求请求体带 scheme, symbols: [] }
     - { path: tests/daemon/plan-decompose-pab-fallback.test.ts, change: modify, why: 新增 J52-P1：请求体投影无 size_hint 但台账 standard 且有匹配快照时，分解走 standard 路径成功且 model_calls=0 并写出计划, symbols: [] }
+    - { path: tests/daemon/plan-patch-api.test.ts, change: modify, why: 同步更新与方案来源相关的断言/夹具（改为先写台账与匹配快照）；不得借机改其他断言, symbols: [] }
   interfaces: []
   test_plan:
     - { acceptance_id: J52-P1, test_path: tests/daemon/plan-decompose-pab-fallback.test.ts, level: unit, case: "J52-P1: 请求体投影无 size_hint 但台账 size_hint=standard 且有匹配快照时，分解走 standard 路径成功且 model_calls=0 并写出计划" }
@@ -1873,4 +1880,5 @@ governance:
 * **背景**：J.51 之后，真钥匙下「确认方案，开始规划」可使 PAB 落盘 minimal/ready，但 `POST /api/project/plan/decompose` 返回 422 `E_DECOMPOSE_FAILED`「这个需求我还没拆好」，`model_calls=0`。根因：分解入口读请求体中栏投影（无 `size_hint`）→ 非 standard/tiny 走模型路径 → 服务端未传模型即失败。台账 `state.draft` 的 `size_hint=standard` 本可走零模型 `buildStandardPlanPatch`；`buildStandardPlanPatch` 还需要台账模块对象（`user_visible`、`id`），中栏投影没有这些字段。
 * **取舍**：`standard` / `tiny` 分解本身是零模型确定性路径，不需要模型，本卡不改这条语义。只改分解入口的方案来源，与资格判定共用 `loadSealedLedgerSchemeForMinimalPab`。不改 `decompose()` 内部分支，不给 HTTP 入口接模型。台账 `large` 仍走需模型路径，现有失败语义不变。真钥匙复测另案，不进本卡 PASS。
 * **立卡说明（2026-11-24 · P-286）**：Tina 授权立卡（t1398u）。基线 `0980ff7bec04991a77b97319518833c5811d024a`（[#365](https://github.com/he18718143986-design/IDE/pull/365) P-284）；其上产品提交 [#364](https://github.com/he18718143986-design/IDE/pull/364)/`fa1ee4578ba1d50b788a33d3baad7d016202e4e6`。编号按授权使用 P-286；P-285 号未占用，不擅自改号。**立卡 ≠ 开工**；先合入本 docs PR，再开独立代码 PR。代码 PR 必需检查全绿后报授权；Windows 存量失败按先例报 UNSTABLE（#266–#361 选 A）。
+* **修卡说明（2026-11-24 · P-287）**：Tina 授权修卡（t1404u）。#367 因范围外 `tests/daemon/plan-patch-api.test.ts` 受行为变化影响而停工——按流程正确，不擅自扩面。该测试断言 decompose 入口旧的请求体方案来源，J.52 改读台账后需同步更新断言；属行为变化的预期适配，非范围蔓延。`writable_paths` 由两条扩为三条，新增 `tests/daemon/plan-patch-api.test.ts`。更新口径限定：只改该测试中与方案来源相关的断言/夹具（改为先写台账与匹配快照），不得借机改其他断言或扩到别的文件。其余卡面（验收 J52-P1、排除项、判定表不动、`decompose()` 内部分支不改）不变。卡状态仍为 `[NEW_TASK]`，估算仍为 S；**修卡 ≠ 开工**。本修卡合入后再按三条路径继续 #367 施工。
 * **真钥匙复测路径（锁定，不在本卡验收）**：J.52 施工合入并重启 Daemon 后（不是仅立卡或仅 #364 / P-284 合入后），同一试玩目录再点「确认方案，开始规划」→ 看分解是否出计划/地图 → 再测「确认开工」。实测记录落 ledger。
