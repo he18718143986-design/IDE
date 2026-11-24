@@ -136,9 +136,18 @@ describe("J16-P5 原话封存全链路（真 Daemon）", () => {
 
   /** 与前端同一口径：语料折出启发式方案，冻结的是冻结态方案，范围按冻结态预检。 */
   function confirmInputs() {
-    const scheme = rebuildSchemeFromCorpus(null, REQUIREMENT, {
-      titleHint: REQUIREMENT.slice(0, 48),
-    });
+    const scheme = {
+      ...rebuildSchemeFromCorpus(null, REQUIREMENT, {
+        titleHint: REQUIREMENT.slice(0, 48),
+      }),
+      acceptance: [
+        {
+          id: "ac-1",
+          text: "页面能打开并看到进度数字",
+          check: "playtest" as const,
+        },
+      ],
+    };
     const frozen = freezeScheme(scheme);
     const plan = buildScopePlan({ repoRoot: repo, scheme: frozen });
     return { scheme, frozen, plan };

@@ -56,6 +56,10 @@ import {
   type DemoSignGateDecision,
 } from "./supervisor/demo/signing-gate";
 import {
+  hasQualifiedSchemeAcceptance,
+  SCHEME_ACCEPTANCE_EMPTY_MESSAGE,
+} from "../src/lib/journey/scheme-draft";
+import {
   readSchemeSnapshot,
   writeSchemeSnapshot,
   schemeBindingFromSnapshot,
@@ -2504,6 +2508,21 @@ export class StagentDaemon {
       }
       const coveredCount = evaluated.verdicts.filter((v) => v.covered).length;
       const uncoveredCount = evaluated.verdicts.length - coveredCount;
+      // TASK-J.54：仅对新写快照校验即将写入的 scheme.acceptance 非空。
+      // 已有 confirmation_id 快照仍走 writeSchemeSnapshot 的幂等 200 / 冲突 409，
+      // 不以新门禁把历史空验收快照打成 4xx。
+      // 禁止对 freeze 请求调用完整 evaluateSchemeConfirmation
+      // （入口草案可能已是 frozen=true，整谓词会误判已冻结）。
+      if (!readSchemeSnapshot(this.repoRoot, confirmationId)) {
+        if (!hasQualifiedSchemeAcceptance(schemeDraft)) {
+          this.sendJson(res, 422, {
+            error: "scheme_acceptance_empty",
+            code: "E_SCHEME_ACCEPTANCE_EMPTY",
+            message: SCHEME_ACCEPTANCE_EMPTY_MESSAGE,
+          });
+          return;
+        }
+      }
       const written = writeSchemeSnapshot(this.repoRoot, {
         confirmation_id: confirmationId,
         scheme: schemeDraft,

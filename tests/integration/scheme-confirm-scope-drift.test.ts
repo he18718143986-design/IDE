@@ -124,6 +124,13 @@ describe("T-HTTP S205–S207 范围预检与快照漂移（真 Daemon）", () =>
       mermaidFlow: "flowchart LR\n  A[录入] --> B[汇总]",
       business_input_rounds: 1,
       scheme_revision: revision,
+      acceptance: [
+        {
+          id: "ac-1",
+          text: "页面能打开并看到进度数字",
+          check: "playtest",
+        },
+      ],
     });
   }
 

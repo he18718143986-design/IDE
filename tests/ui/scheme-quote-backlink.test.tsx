@@ -157,6 +157,13 @@ function renderPaneWithBacklink(
     modules: ["工程进度管控"],
     business_input_rounds: 1,
     scheme_revision: 2,
+    acceptance: [
+      {
+        id: "ac-1",
+        text: "页面能打开并看到进度数字",
+        check: "playtest",
+      },
+    ],
   });
   const scopePlan = compliantScopePlan(2);
   const demo = EMPTY_DEMO_GATE;
@@ -276,6 +283,13 @@ describe("TASK-J.32b · 挂载在确认按钮前，并按档位约束确认", ()
       modules: ["工程进度管控"],
       business_input_rounds: 1,
       scheme_revision: 2,
+      acceptance: [
+        {
+          id: "ac-1",
+          text: "页面能打开并看到进度数字",
+          check: "playtest",
+        },
+      ],
     });
     const scopePlan = compliantScopePlan(2);
     const demo = EMPTY_DEMO_GATE;
@@ -329,6 +343,13 @@ describe("TASK-J.32b · 挂载在确认按钮前，并按档位约束确认", ()
       modules: ["工程进度管控"],
       business_input_rounds: 1,
       scheme_revision: 2,
+      acceptance: [
+        {
+          id: "ac-1",
+          text: "页面能打开并看到进度数字",
+          check: "playtest",
+        },
+      ],
     });
     const scopePlan = compliantScopePlan(2);
     const demo = EMPTY_DEMO_GATE;

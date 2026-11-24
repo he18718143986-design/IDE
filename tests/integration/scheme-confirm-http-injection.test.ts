@@ -12,6 +12,7 @@ import {
 import {
   EMPTY_DEMO_GATE,
   emptySchemeDraft,
+  SCHEME_ACCEPTANCE_EMPTY_MESSAGE,
   type DemoGate,
   type SchemeDraft,
 } from "../../src/lib/journey/scheme-draft";
@@ -141,6 +142,13 @@ describe("T-HTTP R-10 / F-07 确认快照与建图补偿（真 Daemon）", () =>
       mermaidFlow: "flowchart LR\n  A[录入进度] --> B[汇总]",
       business_input_rounds: 1,
       scheme_revision: revision,
+      acceptance: [
+        {
+          id: "ac-1",
+          text: "页面能打开并看到进度数字",
+          check: "playtest",
+        },
+      ],
     });
   }
 
@@ -395,6 +403,65 @@ describe("T-HTTP R-10 / F-07 确认快照与建图补偿（真 Daemon）", () =>
     });
     expect(changed.status).toBe(409);
     expect(changed.body.code).toBe("E_SCHEME_CONFIRMATION_CONFLICT");
+  });
+
+  it("J54-P2: POST /api/supervisor/scheme/freeze 在空验收时返回 4xx，不写新快照，不返回 201", async () => {
+    const confirmationId = "scheme-confirm-j54-empty-0001";
+    const scheme = { ...makeScheme(), acceptance: [] };
+    const res = await call("POST", "/api/supervisor/scheme/freeze", {
+      ...freezePayload(confirmationId, scheme),
+    });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).toBeLessThan(500);
+    expect(res.status).not.toBe(201);
+    expect(res.body.code).toBe("E_SCHEME_ACCEPTANCE_EMPTY");
+    expect(res.body.message).toBe(SCHEME_ACCEPTANCE_EMPTY_MESSAGE);
+    expect(res.body.message).toBe("方案还没有验收标准，先补一条再冻结");
+    expect(fs.existsSync(snapshotPath(confirmationId))).toBe(false);
+  });
+
+  it("补录合格验收后同一入口可 201 并写出新快照；已有快照同 id 同 digest 重放仍 200、正文不变", async () => {
+    const confirmationId = "scheme-confirm-j54-fill-0001";
+    const empty = { ...makeScheme(), acceptance: [] };
+    const blocked = await call("POST", "/api/supervisor/scheme/freeze", {
+      ...freezePayload(confirmationId, empty),
+    });
+    expect(blocked.status).not.toBe(201);
+    expect(fs.existsSync(snapshotPath(confirmationId))).toBe(false);
+
+    const filled = {
+      ...empty,
+      acceptance: [
+        {
+          id: "ac-1",
+          text: "页面能打开并看到进度数字",
+          check: "playtest" as const,
+        },
+      ],
+    };
+    const first = await call<{
+      snapshot_id: string;
+      digest: string;
+      idempotent?: boolean;
+    }>(
+      "POST",
+      "/api/supervisor/scheme/freeze",
+      freezePayload(confirmationId, filled),
+    );
+    expect(first.status).toBe(201);
+    expect(first.body.snapshot_id).toBe(confirmationId);
+    expect(fs.existsSync(snapshotPath(confirmationId))).toBe(true);
+    const before = fs.readFileSync(snapshotPath(confirmationId), "utf8");
+
+    const replay = await call<{ digest: string; idempotent: boolean }>(
+      "POST",
+      "/api/supervisor/scheme/freeze",
+      freezePayload(confirmationId, filled),
+    );
+    expect(replay.status).toBe(200);
+    expect(replay.body.idempotent).toBe(true);
+    expect(replay.body.digest).toBe(first.body.digest);
+    expect(fs.readFileSync(snapshotPath(confirmationId), "utf8")).toBe(before);
   });
 
   // -------------------------------------------------------------------------

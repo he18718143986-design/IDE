@@ -112,6 +112,13 @@ describe("P-201 原话登记与冻结校验（真 Daemon）", () => {
       mermaidFlow: "flowchart LR\n  A[录入进度] --> B[汇总]",
       business_input_rounds: 1,
       scheme_revision: 2,
+      acceptance: [
+        {
+          id: "ac-1",
+          text: "页面能打开并看到进度数字",
+          check: "playtest",
+        },
+      ],
     });
   }
 
