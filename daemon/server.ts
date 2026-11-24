@@ -5541,16 +5541,10 @@ export class StagentDaemon {
         return;
       }
       try {
-        const body = (await this.readJsonBody(req)) as {
-          scheme?: Parameters<typeof decompose>[0]["scheme"];
-        };
-        if (!body.scheme || typeof body.scheme !== "object") {
-          this.sendJson(res, 400, { error: "scheme required" });
-          return;
-        }
+        // 资格判定读台账与密封证明；请求体 scheme（中栏投影）忽略，也不再强求。
+        await this.readJsonBody(req);
         const ensured = ensureMinimalReadyPab({
           projectRoot: this.repoRoot,
-          scheme: body.scheme,
         });
         if (!ensured.ok) {
           this.sendJson(res, 422, {
@@ -5595,7 +5589,6 @@ export class StagentDaemon {
         const existing = readPlan(this.repoRoot);
         const resolved = resolvePabForDecompose({
           projectRoot: this.repoRoot,
-          scheme: body.scheme,
           pab: body.pab ?? null,
         });
         if (resolved.failure && resolved.pab === null) {

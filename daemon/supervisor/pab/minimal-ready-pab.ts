@@ -24,6 +24,11 @@ import {
   writeCurrentArchitectureBaseline,
   type ProjectArchitectureBaseline,
 } from "../../project/architecture-baseline-store";
+import { readSchemeLedger } from "../intent-compiler/scheme-ledger-store";
+import {
+  SCHEME_SNAPSHOT_DIR,
+  readSchemeSnapshot,
+} from "../../pipeline/scheme-snapshot-store";
 
 export type MinimalPabFailure = {
   ok: false;
@@ -87,15 +92,60 @@ export function assessMinimalReadyPabEligibility(
 }
 
 /**
+ * 从台账加载资格判定用的已密封方案。内容读 state.draft；密封证明为
+ * 同一 scheme_id + 修订号的已冻结快照，或台账自身 frozen===true。
+ * 确认密封后交给判定表时带上 frozen: true。不用请求体或快照里的投影当内容。
+ */
+export function loadSealedLedgerSchemeForMinimalPab(
+  projectRoot: string,
+): { ok: true; scheme: SchemeDraftV2 } | MinimalPabFailure {
+  const draft = readSchemeLedger(projectRoot)?.state.draft;
+  if (!draft) {
+    return fail("方案还没密封，还不能生成架构基线。");
+  }
+  const snapshotSealed = hasMatchingFrozenSnapshot(projectRoot, draft);
+  if (!snapshotSealed && draft.frozen !== true) {
+    return fail("方案还没密封，还不能生成架构基线。");
+  }
+  return { ok: true, scheme: { ...draft, frozen: true } };
+}
+
+function hasMatchingFrozenSnapshot(
+  projectRoot: string,
+  draft: SchemeDraftV2,
+): boolean {
+  const dir = path.join(projectRoot, SCHEME_SNAPSHOT_DIR);
+  if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
+    return false;
+  }
+  for (const name of fs.readdirSync(dir)) {
+    if (!name.endsWith(".json")) continue;
+    const confirmationId = name.slice(0, -".json".length);
+    const snapshot = readSchemeSnapshot(projectRoot, confirmationId);
+    if (!snapshot) continue;
+    if (
+      snapshot.scheme.scheme_id === draft.scheme_id &&
+      snapshot.scheme_revision === draft.scheme_revision
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * 密封后生产入口：具备资格则零模型生成 mode=minimal、status=ready 的完整
  * PAB 文档并落盘，再从落盘结果投影 ReadyPabView。已有 ready 当前文件时
  * 不改写，直接返回其投影。不具备资格或无法读取仓库 HEAD 时失败关闭、不写盘。
+ * 资格判定只读台账内容与密封证明，忽略传入的 scheme 参数。
  */
 export function ensureMinimalReadyPab(input: {
   projectRoot: string;
-  scheme: SchemeDraftV2;
+  scheme?: SchemeDraftV2;
 }): EnsureMinimalReadyPabResult {
-  const eligibility = assessMinimalReadyPabEligibility(input.scheme);
+  const loaded = loadSealedLedgerSchemeForMinimalPab(input.projectRoot);
+  if (!loaded.ok) return loaded;
+  const eligibility = assessMinimalReadyPabEligibility(loaded.scheme);
   if (!eligibility.ok) return eligibility;
 
   const existing = readCurrentArchitectureBaselineDocument(input.projectRoot);
@@ -114,7 +164,7 @@ export function ensureMinimalReadyPab(input: {
 
   const knowledgeDigest = readKnowledgeDigest(input.projectRoot);
   const drafted = buildMinimalReadyDocument({
-    scheme: input.scheme,
+    scheme: loaded.scheme,
     baseSha,
     knowledgeDigest,
   });
@@ -152,7 +202,7 @@ export function ensureMinimalReadyPab(input: {
  */
 export function resolvePabForDecompose(input: {
   projectRoot: string;
-  scheme: SchemeDraftV2;
+  scheme?: SchemeDraftV2;
   pab?: ReadyPabView | null;
 }): { pab: ReadyPabView | null; failure?: MinimalPabFailure } {
   if (input.pab !== undefined && input.pab !== null) {
@@ -164,7 +214,6 @@ export function resolvePabForDecompose(input: {
   }
   const ensured = ensureMinimalReadyPab({
     projectRoot: input.projectRoot,
-    scheme: input.scheme,
   });
   if (!ensured.ok) {
     return { pab: null, failure: ensured };
