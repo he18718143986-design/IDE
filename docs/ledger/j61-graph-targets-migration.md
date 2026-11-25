@@ -2,7 +2,7 @@
 
 > **地位**：施工记录。施工权威在 [`../specs/development-tasks-active.md`](../specs/development-tasks-active.md#task-j.61)；方案与拍板见 [`j61-graph-targets-migration-plan.md`](./j61-graph-targets-migration-plan.md)。
 > **基线**：`main` `94a53eabb9760401888247d41e97df41fcc4c5c7`（[#406](https://github.com/he18718143986-design/IDE/pull/406) P-317 立卡）。
-> **状态**：代码已施工、本地全绿；**真机迁移尚未执行**（需本 PR 合入并重启 Daemon 后调新接口），执行结果另行追加，不在本文件先写。
+> **状态**：代码已施工并合入 [#407](https://github.com/he18718143986-design/IDE/pull/407)（`cd28cc0`）；**真机迁移已执行**（见第五节）：`dry_run` retired 8 / kept 4 → 实跑 `revision` 13→14、节点 12→4 → `n10` 官方核销 `ILLUMINATED`、`n11` 转 `PENDING`，图 `revision=16`。端到端闭环未宣称。
 
 ## 一、交付内容
 
@@ -55,13 +55,51 @@ body: { contract_id?: string, dry_run?: boolean, graph_id?: string }
 
 用例覆盖：旧图 12→4（`n1`/`n2` 状态与 `commit_sha` 原样，`revision` +1，8 条 `E_TARGET_SUPERSEDED`，`n10`→`PENDING`、`n11` 仍 `BLOCKED`）；幂等；`dry_run` 不落盘；`npm run typecheck` 保留 `tsconfig*`、`npm test` 保留 `vitest/vite` 与测试 glob；`ILLUMINATED` / `RUNNING` 退役候选被拒且图零改动；`graph_id` 不符；多目标部分剔除。
 
-## 五、待执行（本 PR 合入后，不在本文件先写结果）
+## 五、真机迁移实测（2026-11-26 · P-318）
 
-1. 以新 main 重启 Daemon（旧 Daemon pid 77517 @ `5173e8e` 必须停）。
-2. `POST /api/graph/targets/migrate` 先 `dry_run: true` 核对 `retired=8` / `kept=4`，再实跑。
-3. 迁移后对首个 `PENDING` 节点（预期 `n10`）官方 `start` / `verify`，实测落本文件第五节。
-4. `n12` 扩展名不匹配、`markStale` / `nodeTouchesPaths` glob 化、设计层挂账、自动钩子仍不在本卡。
+> 执行时间 2026-11-26 02:32–02:33 香港时间（操作者由我执行）；main `cd28cc078e3f78381907039b853ca5c22f4b28c4`（[#407](https://github.com/he18718143986-design/IDE/pull/407) J.61 施工）。
+
+### 5.1 Daemon
+
+- 旧 Daemon（pid 77517 @ `5173e8e`）已停；新 Daemon 以 `cd28cc0` 启动：`npm run stagent -- open /Users/tina/Downloads/stagent-j45-key-playtest`，监听进程 **51894**、端口 `127.0.0.1:3001`。
+- `GET /health` **200**：`status=ok`、`pid=51894`、`port=3001`、`repoRoot=/Users/tina/Downloads/stagent-j45-key-playtest`。源码 SHA `cd28cc078e3f78381907039b853ca5c22f4b28c4`。
+
+### 5.2 dry_run（`{"dry_run":true}`）
+
+- `POST /api/graph/targets/migrate` **200**（`requestId=ba69dddafc30`，1ms，ts `2026-11-25T18:32:51.167Z`）。
+- `migrated=true`、`dry_run=true`、`revision_before=13`、**`revision_after=13`**（未递增）。
+- **`retired=8`**：`n3`、`n4`、`n5`、`n6`、`n7`、`n8`、`n9`、`n12`。
+- **`kept=4`**：`n1`（`ILLUMINATED`，`["src/**"]`）、`n2`（`ILLUMINATED`，`["package.json"]`）、`n10`（`BLOCKED`，`["index.html"]`）、`n11`（`BLOCKED`，`["tests/**"]`）。
+- 与拍板预期完全一致，故继续实跑。
+
+### 5.3 实跑迁移（`{"dry_run":false}`）
+
+- `POST /api/graph/targets/migrate` **200**（`requestId=bbf6f9f35ae6`，10ms，ts `2026-11-25T18:32:56.382Z`）。
+- `migrated=true`、`dry_run=false`、`revision` **13→14**（恰好 +1）。
+- 节点由 **12 → 4**，`depends_on` 重接为 `n1: []`、`n2: ["n1"]`、`n10: ["n2"]`、`n11: ["n10"]`（原 `n10↔n9`、`n11↔n10` 链上 8 个退役节点被递归跳过）。
+- 状态：`n1=ILLUMINATED`、`n2=ILLUMINATED`（`executed_at=2026-11-25T14:39:43.878Z`、`commit_sha=ae03e3c` 原样保留）；`n10` 由 `BLOCKED`→**`PENDING`**（前置全亮）；`n11` 仍 `BLOCKED`（`n10` 未亮）。
+- `issues`：原 `n3` 的 `E_FILES_NOT_WRITTEN`（`ERROR`，历史记录未删）+ 8 条新增 `E_TARGET_SUPERSEDED`（`WARNING`，退役留痕）。
+- `fingerprints` 8 条保留（`src/*.js` 7 + `package.json`）；无退役节点名下指纹。
+
+### 5.4 迁移后 n10 官方 start / verify
+
+- `POST /api/graph/nodes/start` `{node_id:"n10"}` **200**（`requestId=cbe882f80f35`，17ms，ts `18:33:01.614Z`）；`n10` `PENDING`→`RUNNING`，`revision` **14→15**。
+- `POST /api/graph/verify` `{node_id:"n10"}` **200**（`requestId=935869b0c1c6`，4458ms，ts `18:33:06.098Z`）；**`illuminated=true`**，无错误码。
+- 九条 baseline 全部 `exit 0`、`stderr_length=0`（`18:33:02.225Z`–`18:33:06.067Z`，stdout 94–105）。
+- `n10` `RUNNING`→**`ILLUMINATED`**；`n11` `BLOCKED`→**`PENDING`**；`revision` **15→16**。
+- 指纹增至 9 条（新增 `index.html`）。
+
+### 5.5 迁移后图状态
+
+| 节点 | 目标 | 状态 |
+| :--- | :--- | :--- |
+| `n1` | `src/**` | `ILLUMINATED`（迁移前既有状态，未重新核销） |
+| `n2` | `package.json` | `ILLUMINATED`（同上） |
+| `n10` | `index.html` | `ILLUMINATED`（本轮核销） |
+| `n11` | `tests/**` | `PENDING`（未点，按授权只推进首个 PENDING） |
+
+图 `revision=16`，进度 `ILLUMINATED=3` / `PENDING=1` / `total=4`（75%）。**端到端闭环未宣称**（`n11` 未点亮，合同未合入）。
 
 ## 六、密钥与纪律
 
-HTTP 只用试玩目录 `.stagent/session-token`（0600）作 `Authorization: Bearer`。本文件不含 token、密钥或 `.tmp/deepseek.env` 内容。未手工改 `.stagent/specs/task_graph.json`，未重新提案，未伪造证据。
+HTTP 只用试玩目录 `.stagent/session-token`（0600）作 `Authorization: Bearer`。本文件不含 token、密钥或 `.tmp/deepseek.env` 内容。未手工改 `.stagent/specs/task_graph.json`，未重新提案，未伪造证据。本轮只推进首个 `PENDING`（`n10`），未对 `n11` 发 start/verify，未发 `run-worker`，未点「确认方案 / 确认开工」。
