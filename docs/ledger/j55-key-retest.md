@@ -53,3 +53,21 @@
 ## 五、结论（不引申为施工授权）
 
 锁定路径已走完。J.55 要验证的那一环已在同一试玩目录上实测通过：用新的 `scheme-start-…` 编号创建合同得到 201，`scheme_binding` 写的是规划编号与已冻结快照 digest，而不是开工编号。合同随后在官方脏工作区确认后签署成功（`APPROVED` / `EXECUTING`），任务图已建立（12 节点），`runWorker` 已启动，随后以 `E_WORKER_PARSE`（模型响应无法解析）失败。**未宣称端到端闭环。** 本次只验证开工确认读快照这一环。
+
+## 附：E_WORKER_PARSE 只读排查（P-299 · 标 `ai_inferred`）
+
+> **地位**：排查结论落账，不改产品代码，不立施工卡，不重开 J.55。不改写上文复测事实段。
+> **依据**：2026-11-25 合入 #382 后的只读排查；Tina t1441u 授权排查、t1442u 确认结论并拍板落账与先补可观测性。操作者由我执行。
+> **诚实口径**：标 `ai_inferred`。不把「解析器有 bug」当已证实结论。未宣称端到端闭环。
+
+Worker 使用 `deepseek-flash`（DeepSeek OpenAI 兼容口）。系统提示来自 `buildWorkerTaskInstruction`，输出契约要求返回 `changes` 数组；结构化 schema 为 `{ changes:[{path,content}], log:string[] }`。
+
+`POST /api/contracts/contract_1795588309763_cy8zx/run-worker` 于 2026-11-25 14:33:05 香港时间返回 **400**，耗时 22642ms，错误为：`[E_WORKER_PARSE] No object generated: could not parse the response.` 该句是 AI SDK 在 JSON 解析失败（不是 schema 校验失败）时的固定文案。
+
+试玩目录日志与记录中无模型原始回复；`NoObjectGeneratedError.text` 未被读取或落盘。`daemon.jsonl` 只有 HTTP 400 索引（`ts=2026-11-25T06:33:05.204Z`，`requestId=068965233fe9`，`duration_ms=22642`）。失败发生在写 Worker 终端日志之前（无 `logs/worker-contract_1795588309763_cy8zx.jsonl`）。本地 `stripMarkdownFence` 未进入这条失败路径（生产主路径走 `generateObject`）。
+
+因成功解析会写入 Worktree、扩大施工，未重试 run-worker。单次失败不能证明必现。
+
+标 `ai_inferred`：约 22.6 秒更像含一次本地重试；在缺原文的前提下，不能判定是纯模型跑偏还是围栏/前后文导致 SDK 拒解析。不把「解析器有 bug」当已证实结论。
+
+拍板已定为：先立卡补可观测性（TASK-J.56，本落账不立卡），`generateObject` 失败时把 SDK 错误对象里的 `text` 结构特征写入 daemon 日志（长度、是否以 markdown 围栏开头、解析失败原因、前后几十个字符片段；不落密钥、不落完整原文），再定修不修；不重试这次已签成合同的 run-worker。拿到原文特征后再定：模型真跑偏 → 修提示词/约束；合法 JSON 被包住 → 失败后回退已有的 `parseWorkerPatch`（含剥围栏）或给 `generateObject` 配同等修复。**未宣称端到端闭环。**
