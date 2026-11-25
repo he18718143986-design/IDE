@@ -65,6 +65,7 @@
 
 | 项 | 还欠什么 | 谁来定 |
 | :--- | :--- | :--- |
+| 官方核销把计划生成的 `src/**` 等 glob 当字面路径，匹配文件已在施工树仍报 `E_FILES_NOT_WRITTEN` | Tina 审过施工方案并授权立卡 [`TASK-J.58`](../specs/development-tasks-active.md#task-j.58)（P-307；`[NEW_TASK]`；估算 S；**立卡 ≠ 开工**）。走查见 [`j57-graph-n1-walk.md`](./j57-graph-n1-walk.md)（P-306）。不重开 J.57。自动钩子仍 backlog 候选，不立卡。未宣称端到端闭环。 | P-307 |
 | [`w3-known-gaps.md`](./w3-known-gaps.md) §4.1、§4.3 | `tmpRoot` GC 与 `splitShellSegments` 引号边界仍未修 | 见该文件的 PASS/FAIL |
 | [`consistency-audit.md`](./consistency-audit.md) OP-39 | `daemon/server.ts` 与 `src/routes/index.tsx` 的大文件结构债。清算时机在 v0.3 方向拍板之后 | 待指定 |
 | [`ci2-sample-assessment-brief.md`](./ci2-sample-assessment-brief.md) | CI.2 维持 Hold，不开工 | P-245 |

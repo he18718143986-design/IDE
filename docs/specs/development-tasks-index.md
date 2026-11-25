@@ -226,6 +226,7 @@
 | `TASK-J.55` | `COMPLETED` | 开工确认按 scheme_id+修订号定位已冻结快照（立卡 P-296；施工 #380 `05e6f4e7`；完工回写 P-297；估算 S；端到端闭环未宣称） | [正文](./development-tasks-completed.md#task-j.55) |
 | `TASK-J.56` | `COMPLETED` | Worker 解析失败落盘原文特征已交付（立卡 P-300；施工 #385 `3529009b`；完工回写 P-301；估算 S；只做可观测性未修解析；端到端闭环未宣称） | [正文](./development-tasks-completed.md#task-j.56) |
 | `TASK-J.57` | `COMPLETED` | Worker 提示词约束只输出 JSON、禁止工具调用标记已交付（立卡 P-303；施工 #389 `fed205a5`；完工回写 P-304；估算 S；输出契约与首轮/重试提示锁 JSON-only、角色与边界/可用工具/known_limitations 改写、generateObject 形状与模型 id 未改；真钥匙复测不在本卡，端到端闭环未宣称） | [正文](./development-tasks-completed.md#task-j.57) |
+| `TASK-J.58` | `NEW_TASK` | 核销展开 target_files 通配符，匹配文件存在时不得因字面 glob 报尚未写入（立卡 P-307；估算 S；立卡 ≠ 开工；端到端闭环未宣称） | [正文](./development-tasks-active.md#task-j.58) |
 
 ---
 
