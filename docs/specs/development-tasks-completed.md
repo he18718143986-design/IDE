@@ -12460,3 +12460,150 @@ governance:
 * **取舍**：Tina 拍板「重新派生 + 空目标节点删除 + 依赖重接」；不选「允许空 `target_files`」（等于给核销器开无证据点亮的口子）、不选「保留旧目标」（等于不迁移）、不选「重定向目标」（造假证据）、不选「新增 `SUPERSEDED` 状态」（升 M）。已点亮节点保护写进 J61-P4。
 * **立卡说明（2026-11-26 · P-317）**：Tina 审过方案（P-316 / #405）后拍板走本方案并授权立卡。**立卡 ≠ 开工**；方案简报与拍板理由见 [`../ledger/j61-graph-targets-migration-plan.md`](../ledger/j61-graph-targets-migration-plan.md)
 * **完工说明（2026-11-26 · P-318）**：Tina 授权开工并合并 [#407](https://github.com/he18718143986-design/IDE/pull/407)（由我执行）。施工 squash `cd28cc078e3f78381907039b853ca5c22f4b28c4`。**既有图节点目标按 J.60 规则迁移已交付**：显式 `POST /api/graph/targets/migrate`（`dry_run` 预览 + `graph_id` 乐观并发 + `contract_id` 缺省取图所属合同），复用 J.60 同一判定 `isDeliverableTarget(pattern, verificationCapabilities(commands))`（从 `proposal-from-contract.ts` 导出，禁止第二套规则）；派生为空的节点退役、下游 `depends_on` 递归跳过它指向其上游（去重 + 环保护）；保留节点 `node_id`/`state`/`executed_at`/`commit_sha` 原样；一次 `commit()` → `revision` 恰好 +1；`dry_run` 不落盘；退役逐条写 `issues`（`WARNING` / `E_TARGET_SUPERSEDED`）。已点亮保护：退役候选 `ILLUMINATED` → 409 `E_GRAPH_ILLUMINATED_TARGET_NOT_DELIVERABLE`、`RUNNING`/`REPAIRING` → 409 `E_GRAPH_TARGETS_IN_FLIGHT`，均图零改动。迁移错误码收在引擎侧 `TargetMigrationError`，不扩 readonly 的 `GraphInvariantCode`。相对父提交 5 文件 +758/−7；`readonly_paths` 四文件零 diff。CI 必需面全绿，Windows Unit 为存量 17 文件 / 28 例（`continue-on-error`，本卡用例在 Windows 上 8/8 与 5/5 全绿），`mergeStateStatus=UNSTABLE` 按先例不挡；Bugbot skipping。**真机迁移结果另记**（[`../ledger/j61-graph-targets-migration.md`](../ledger/j61-graph-targets-migration.md) §5）：`dry_run` retired 8 / kept 4 → 实跑 `revision` 13→14、节点 12→4、`n1`/`n2` 已点亮状态与 `commit_sha` 原样、`n10`→`PENDING`；随后 `n10`、`n11` 先后官方 start/verify 均 **`illuminated=true`**（两组九条 baseline 全 `exit 0`、`stderr_length=0`），`revision` 14→16→18，**图 4/4 全亮（100%）**。任务图首次全亮；**端到端闭环仍未宣称**（合同仍 `EXECUTING`/`APPROVED`，未合入、未试玩、未点确认开工）。
+
+---
+
+### 3.4ca execute 路径解析产品 CLI（J.62 · 完工回写 P-322）
+
+<a id="task-j.62"></a>
+
+#### 【Task J.62】`execute` 命令路径解析产品 CLI `[COMPLETED]`
+
+```yaml task-card
+id: TASK-J.62
+status: COMPLETED
+contract:
+  intent:
+    title: execute 命令路径解析产品 CLI
+    description: >-
+      合同 execute 的验收命令若声明 executable=stagent，网关在威胁守卫之后、
+      runCommand 之前把它解析为当前 Daemon 入口（process.execPath + 包内 tsx +
+      bin/stagent.ts + 原 args），并把已解析命令串加入本轮白名单；非 stagent
+      命令逐字透传。检查体非零仍报 E_VERIFICATION_FAILED，白名单外仍
+      E_UNAUTHORIZED_COMMAND，语义零漂移。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J62-P1
+      check: auto
+      text: >-
+        executable=stagent 且合同白名单含原始串时，runCommand 收到的
+        argv.executable 为 process.execPath、argv.args 以包内 tsx 与
+        bin/stagent.ts 开头并原样接合同 args；已解析命令串在白名单内
+        （否则会被精确匹配拒成 E_UNAUTHORIZED_COMMAND）。
+    - id: J62-P2
+      check: auto
+      text: >-
+        executable 非 stagent（npm / node / 其它）时 argv 与白名单逐字不变，
+        零改写。
+    - id: J62-P3
+      check: auto
+      text: >-
+        missing_exec_path / missing_tsx / missing_bin 时返回
+        E_COMMAND_NOT_RESOLVED 且 details.reason 为对应短码，不产生子进程
+        （onSpawn 未触发）。
+    - id: J62-P4
+      check: auto
+      text: >-
+        解析成功但 spawn 抛 ENOENT / EACCES 时返回 E_COMMAND_SPAWN_FAILED
+        且 details.spawn_code 为原始系统码，不再归为 EXEC_ERROR。
+    - id: J62-P5
+      check: auto
+      text: >-
+        检查体返回非零仍是 E_VERIFICATION_FAILED、data.exitCode 原样；
+        白名单外命令仍是 E_UNAUTHORIZED_COMMAND（既有语义零漂移）。
+    - id: J62-P6
+      check: auto
+      text: >-
+        readonly 五个文件（command-runner.ts / illumination-verifier.ts /
+        orchestrator.ts / contract.schema.ts / target-file-match.ts）相对父提交
+        零 diff；威胁守卫仍在解析之前（越界绝对路径样本仍被拒）。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/mcp/gateway.ts
+      - daemon/cli-host/resolve-stagent-cli.ts
+      - tests/unit/j62-execute-stagent-resolve.test.ts
+      - docs/ledger/j62-execute-resolve.md
+    readonly_paths:
+      - daemon/runner/command-runner.ts
+      - daemon/graph/illumination-verifier.ts
+      - daemon/pipeline/orchestrator.ts
+      - src/lib/contract.schema.ts
+      - daemon/graph/target-file-match.ts
+  verification:
+    commands:
+      - { alias: j62-execute-resolve, executable: npx, args: [vitest, run, tests/unit/j62-execute-stagent-resolve.test.ts] }
+      - { alias: gateway-suites, executable: npx, args: [vitest, run, tests/unit/worker-mcp-tools.test.ts, tests/unit/command-runner.test.ts] }
+      - { alias: j59-resolve, executable: npx, args: [vitest, run, tests/unit/j59-verify-command-resolve-observe.test.ts] }
+design:
+  approach: >-
+    方案见 docs/ledger/j62-execute-resolve-plan.md（P-320，Tina 已审）。
+    根因：execute 走 orchestrator → gateway.callTool("stagent_exec_command")
+    → runCommand(command, {argv}) → spawn(executable)（gateway.ts:1911、
+    command-runner.ts:454），无任何 CLI 解析；J.59 的 resolveStagentCli 只接在
+    图核销路径（daemon/server.ts:3663-3664），本机无全局 stagent，故九条验收
+    命令必然失败。落点 A：gateway.handleExecCommand 内、威胁守卫之后、
+    runCommand 之前解析（解析结果含 Worktree 外绝对路径，先解析会被守卫拒），
+    已解析串用 ensureAllowedCommand 追加本轮 allowedCommands。不推荐改
+    runCommand（通用执行器被多处复用，静默改写+自动放行等于全局削弱白名单）；
+    不改已签发合同。错误码复用 J.59 的 E_COMMAND_NOT_RESOLVED /
+    E_COMMAND_SPAWN_FAILED，常量从 resolve-stagent-cli.ts 导出；
+    illumination-verifier.ts 的同名字面量保持不动。不新增
+    verificationResults.error_code（需改 orchestrator 与 evidence schema，
+    超 S 估算）。非 stagent 命令由 resolveStagentCli 原样返回。
+  touches:
+    - { path: daemon/mcp/gateway.ts, change: modify, why: handleExecCommand 内解析 + 追加白名单 + argv 用解析值 + catch 区分两码, symbols: [ScopedWorktreeGateway] }
+    - { path: daemon/cli-host/resolve-stagent-cli.ts, change: modify, why: 导出 E_COMMAND_NOT_RESOLVED / E_COMMAND_SPAWN_FAILED 常量（解析逻辑不动）, symbols: [resolveStagentCli] }
+    - { path: tests/unit/j62-execute-stagent-resolve.test.ts, change: modify, why: "本卡新建；落库后按 modify 记录（J62-P1～P6 断言）", symbols: [] }
+    - { path: docs/ledger/j62-execute-resolve.md, change: modify, why: "本卡新建；落库后按 modify 记录（施工与实测记录）", symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J62-P1, test_path: tests/unit/j62-execute-stagent-resolve.test.ts, level: unit, case: "stagent 解析为 process.execPath 与包内 tsx/bin，白名单含已解析串" }
+    - { acceptance_id: J62-P2, test_path: tests/unit/j62-execute-stagent-resolve.test.ts, level: unit, case: "非 stagent 命令 argv 与白名单逐字不变" }
+    - { acceptance_id: J62-P3, test_path: tests/unit/j62-execute-stagent-resolve.test.ts, level: unit, case: "解析失败返回 E_COMMAND_NOT_RESOLVED 且不产生子进程" }
+    - { acceptance_id: J62-P4, test_path: tests/unit/j62-execute-stagent-resolve.test.ts, level: unit, case: "spawn ENOENT 返回 E_COMMAND_SPAWN_FAILED 并带 spawn_code" }
+    - { acceptance_id: J62-P5, test_path: tests/unit/j62-execute-stagent-resolve.test.ts, level: unit, case: "检查体非零仍是 E_VERIFICATION_FAILED、白名单外仍是 E_UNAUTHORIZED_COMMAND" }
+    - { acceptance_id: J62-P6, test_path: tests/unit/j59-verify-command-resolve-observe.test.ts, level: unit, debt: "readonly 五文件零改动与威胁守卫顺序以施工 diff + 既有 J.59 用例自证，不另写 it()" }
+governance:
+  spec_refs:
+    - docs/specs/intent-compiler-prompt.md
+    - docs/ledger/j62-execute-resolve-plan.md
+  depends_on:
+    - { id: TASK-J.59, kind: soft }
+  code_facts:
+    - { ref: "daemon/mcp/gateway.ts:1908-1912", note: "handleExecCommand 在威胁守卫与环境装配之后直接 runCommand(command, {argv: structured})" }
+    - { ref: "daemon/runner/command-runner.ts:452-462", note: "spawn(executable, args, {shell:false})；ENOENT 走 error 事件 reject" }
+    - { ref: "daemon/cli-host/resolve-stagent-cli.ts:68-100", note: "J.59 解析器：非 stagent 原样返回，stagent 解析为 execPath + tsx + bin" }
+    - { ref: "daemon/server.ts:3633-3665", note: "J.59 仅在 /api/graph/verify 路径接线，execute 路径没有" }
+  non_goals:
+    - 不改已签发合同内容
+    - 不在 runCommand 内做全局改写或自动放行
+    - 不放宽威胁守卫或白名单精确匹配语义
+    - 不改图核销路径与 evidence schema
+    - 不新增第四个命令错误码
+    - 不改门禁阈值、标题兜底、右栏、ADR-0015
+    - 不做本卡的 resume / execute / merge 收尾调用
+  fail:
+    - 在 runCommand 内全局改写可执行文件或自动放行白名单
+    - 解析放在威胁守卫之前，导致守卫按 Worktree 外绝对路径拒掉内部验证命令
+    - 把解析失败 / spawn 失败仍归为 EXEC_ERROR 或 E_VERIFICATION_FAILED
+    - 非 stagent 命令被改写，或新增 verificationResults.error_code
+    - 改 readonly 五文件、门禁、标题兜底、右栏、ADR-0015
+  adr_revisions: []
+  defaults:
+    - 复用 resolveStagentCli 与 ensureAllowedCommand，不新造解析器或白名单逻辑
+    - 解析顺序固定：威胁守卫（原始 argv）→ 解析 → 追加白名单 → runCommand
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 412, commit: a05b5bf6b96b53e77325ea07e8cd9b17cb967881 }
+```
+
+* **背景**：P-319 收尾排查发现 `execute` 路径无 CLI 解析。合同九条命令均为 `executable: "stagent"`，本机无全局 `stagent`，J.59 只接在图核销路径——九条必 spawn 失败 → `verdict=FAILED` → `can_merge=false` → 合同回 `EXECUTING`，合入不可达。
+* **取舍**：在网关层解析并追加白名单（方案 A），不动通用执行器 `runCommand`，不改已签发合同。错误码复用 J.59 两个，语义零漂移。
+* **立卡说明（2026-11-26 · P-321）**：Tina 审过方案（P-320 / #410）后授权立卡。**立卡 ≠ 开工**；施工顺序：立卡 PR 合入 → 代码 PR → 全绿报授权 → 重启 Daemon → `resume`→`execute`→`merge` 三步收尾。
+* **完工说明（2026-11-26 · P-322）**：Tina 选 A 按先例授权合并 [#412](https://github.com/he18718143986-design/IDE/pull/412)（由我执行）。施工 squash `a05b5bf6b96b53e77325ea07e8cd9b17cb967881`。**execute 命令路径解析产品 CLI 已交付**：`gateway.handleExecCommand` 内「2. Whitelist compilation」之后新增 2.5 段（`gateway.ts:1873-1927`），位置**晚于**威胁守卫、**早于** `runCommand`；解析结果含 Worktree 外绝对路径，先解析会被守卫按越界拒。**白名单前置**（Tina 拍板采纳的加固）：仅当原始命令串已在合同 `allowedCommands` 内才解析（`gateway.ts:1891`），否则 `stagent <任意参数>` 会借「已解析串自动入白名单」绕过合同授权；未授权命令原样交给 `runCommand` 精确匹配拒成 `E_UNAUTHORIZED_COMMAND`。改写仅限 `executable === "stagent"` 且已授权：`{executable: process.execPath, args: [包内 tsx, bin/stagent.ts, ...原 args]}`，`command`（审计/超时查表）保持原始串；已解析串 `ensureAllowedCommand` 入白名单（`:1926`）。解析失败 `E_COMMAND_NOT_RESOLVED` + `details.reason` 并在 `runCommand` 之前 return（不产生子进程）；`catch` 里 `ENOENT`/`EACCES` → `E_COMMAND_SPAWN_FAILED` + `details.spawn_code`（`:2072-2106`），不再埋进 `EXEC_ERROR`；常量从 `resolve-stagent-cli.ts:20-21` 导出。零漂移：`CommandSecurityError` → `E_UNAUTHORIZED_COMMAND`、检查体非零 → `E_VERIFICATION_FAILED` + `data.exitCode` 原样、非 `stagent` 逐字透传、未新增 `verificationResults.error_code`。相对父提交 4 文件 +418/−3（`gateway.ts` +86/−3、`resolve-stagent-cli.ts` +9 仅导出常量、新建测试 270 行/6 例、新建 ledger 56 行）；**readonly 五文件零 diff**（`command-runner.ts` / `illumination-verifier.ts` / `orchestrator.ts` / `contract.schema.ts` / `target-file-match.ts`）。本地：J.62 用例 6/6、相关三文件 50/50、`tests/unit` + `tests/daemon` 271 文件 2809 例全绿、`tsc` 0、eslint 0。CI 必需面全绿，Windows Unit 为存量 15 文件 / 24 例（`continue-on-error`，本卡用例在 Windows 上 6/6、`worker-mcp-tools` 29/29 全绿），`mergeStateStatus=UNSTABLE` 按先例不挡；Bugbot skipping。**真钥匙复测不在本卡验收**（`resume`→`execute`→`merge` 收尾待 Tina 点名）；端到端闭环未宣称。
