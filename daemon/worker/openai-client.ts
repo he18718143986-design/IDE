@@ -1,15 +1,21 @@
 import { z } from "zod";
 import { getRuntimeBaseUrl, getRuntimeKey, getRuntimeModel } from "./key-store";
-import { appendLlmMeta } from "../core/debug-log";
+import {
+  appendDaemonLog,
+  appendLlmMeta,
+  redactSecrets,
+} from "../core/debug-log";
 import type {
   WorkerGenerationInput,
   WorkerGenerationResult,
   WorkerModelClient,
 } from "./ai-worker";
 import {
+  extractWorkerParseFailureFeatures,
   parseWorkerPatch,
   withParseRetry,
   type ParseRetryHooks,
+  type WorkerParseFailureFeatures,
 } from "./parse-worker-output";
 
 const workerOutputSchema = z.object({
@@ -23,6 +29,29 @@ const workerOutputSchema = z.object({
     .describe("需要在授权范围内创建或覆盖的文件完整内容"),
   log: z.array(z.string()).describe("按步骤描述的中文改动说明"),
 });
+
+function redactedParseFailureDetail(
+  features: WorkerParseFailureFeatures,
+): Record<string, unknown> {
+  const detail: Record<string, unknown> = {
+    text_present: features.text_present,
+    text_length: features.text_length,
+    starts_with_fence: features.starts_with_fence,
+    starts_with_brace: features.starts_with_brace,
+    ends_with_fence: features.ends_with_fence,
+    ends_with_brace: features.ends_with_brace,
+    reason: features.reason,
+    attempt: features.attempt,
+    model_id: features.model_id,
+  };
+  if (features.head !== undefined) {
+    detail.head = redactSecrets(features.head);
+  }
+  if (features.tail !== undefined) {
+    detail.tail = redactSecrets(features.tail);
+  }
+  return detail;
+}
 
 /**
  * OpenAI 兼容模型客户端（Daemon 侧）。
@@ -99,13 +128,21 @@ export class OpenAiWorkerClient implements WorkerModelClient {
     const { value } = await withParseRetry(
       async (attempt) => {
         const prompt = attempt === 0 ? basePrompt : basePrompt + strictSuffix;
-        const result = await generateObject({
-          model: provider(this.modelId),
-          schema: workerOutputSchema,
-          system,
-          prompt,
-          ...(input.signal === undefined ? {} : { abortSignal: input.signal }),
-        });
+        let result;
+        try {
+          result = await generateObject({
+            model: provider(this.modelId),
+            schema: workerOutputSchema,
+            system,
+            prompt,
+            ...(input.signal === undefined
+              ? {}
+              : { abortSignal: input.signal }),
+          });
+        } catch (err) {
+          this.logParseFailureFeatures(err, attempt, contract.contract_id);
+          throw err;
+        }
         const usage = result.usage as
           { inputTokens?: number; outputTokens?: number } | undefined;
         return {
@@ -147,5 +184,27 @@ export class OpenAiWorkerClient implements WorkerModelClient {
       }
     }
     return value;
+  }
+
+  private logParseFailureFeatures(
+    err: unknown,
+    attempt: number,
+    contractId: string,
+  ): void {
+    if (!this.repoRoot) return;
+    try {
+      const features = extractWorkerParseFailureFeatures({
+        err,
+        attempt,
+        modelId: this.modelId,
+      });
+      appendDaemonLog(this.repoRoot, {
+        kind: "worker_parse_failure",
+        contractId,
+        detail: redactedParseFailureDetail(features),
+      });
+    } catch {
+      /* 可观测性失败不得改变原错误 */
+    }
   }
 }
