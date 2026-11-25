@@ -140,14 +140,13 @@ describe("TASK-J.57 Worker 提示词 JSON-only 与禁工具标记", () => {
     expect(WORKER_PARSE_RETRY_STRICT_SUFFIX).toContain("<tool_call>");
 
     const source = fs.readFileSync(
-      path.resolve(
-        import.meta.dirname,
-        "../../daemon/worker/openai-client.ts",
-      ),
+      path.resolve(import.meta.dirname, "../../daemon/worker/openai-client.ts"),
       "utf8",
     );
     expect(source).toContain("WORKER_JSON_ONLY_USER_RULE");
-    expect(source).toContain("const strictSuffix = WORKER_PARSE_RETRY_STRICT_SUFFIX");
+    expect(source).toContain(
+      "const strictSuffix = WORKER_PARSE_RETRY_STRICT_SUFFIX",
+    );
     expect(source).toMatch(
       /attempt === 0 \? basePrompt : basePrompt \+ strictSuffix/,
     );
