@@ -224,7 +224,7 @@
 | `TASK-J.53` | `COMPLETED` | 生成器补写验收（few-shot + 编译循环窄兜底 + 人工补录；立卡 P-290；施工 #372 `6c0a2fbc`；完工回写 P-291；估算 M；冻结前校验非空在 J.54；端到端闭环未宣称） | [正文](./development-tasks-completed.md#task-j.53) |
 | `TASK-J.54` | `COMPLETED` | 冻结前校验验收非空（确认谓词 + 冻结入口再拦；立卡 P-290；修卡 P-292（writable_paths 由七条扩为十三条）；第二次修卡 P-293（由十三条扩为十四条）；施工 #375 `6ea454c6`；完工回写 P-294；估算 S；端到端闭环未宣称） | [正文](./development-tasks-completed.md#task-j.54) |
 | `TASK-J.55` | `COMPLETED` | 开工确认按 scheme_id+修订号定位已冻结快照（立卡 P-296；施工 #380 `05e6f4e7`；完工回写 P-297；估算 S；端到端闭环未宣称） | [正文](./development-tasks-completed.md#task-j.55) |
-| `TASK-J.56` | `NEW_TASK` | Worker 解析失败落盘原文特征（立卡 P-300；估算 S；硬依赖已完成的 J.55 复测/排查；只做可观测性，不修解析；**立卡 ≠ 开工**；不重开 J.55） | [正文](./development-tasks-active.md#task-j.56) |
+| `TASK-J.56` | `COMPLETED` | Worker 解析失败落盘原文特征已交付（立卡 P-300；施工 #385 `3529009b`；完工回写 P-301；估算 S；只做可观测性未修解析；端到端闭环未宣称） | [正文](./development-tasks-completed.md#task-j.56) |
 
 ---
 
