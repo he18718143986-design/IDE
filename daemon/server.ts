@@ -164,7 +164,20 @@ import { ContractOrchestrator } from "./pipeline/orchestrator";
 import { IllegalContractTransitionError } from "./pipeline/contract-store";
 import { TaskGraphEngine } from "./graph/graph-engine";
 import { collectWorktreeEvidence } from "./graph/evidence-collector";
-import type { IlluminationInput } from "./graph/illumination-verifier";
+import type {
+  IlluminationInput,
+  VerificationCommandResult,
+} from "./graph/illumination-verifier";
+import {
+  E_COMMAND_NOT_RESOLVED,
+  E_COMMAND_SPAWN_FAILED,
+} from "./graph/illumination-verifier";
+import {
+  ensureAllowedCommand,
+  resolveStagentCli,
+  resolvedCommandString,
+} from "./cli-host/resolve-stagent-cli";
+import { buildVerifyCommandLogDetail } from "./graph/verify-command-snippet";
 import type { SupervisorProposalV1 } from "../src/lib/graph/task-graph";
 import { RequirementsStore } from "./supervisor/specs/requirements-store";
 import { orchestrateJourney } from "./supervisor/journey/orchestrate";
@@ -3531,10 +3544,7 @@ export class StagentDaemon {
         }
 
         // 实采命令退出码：对 COMMAND 模式节点运行其声明命令（或指定别名命令）
-        const collectedCommandResults: Array<{
-          alias: string;
-          exit_code: number;
-        }> = [];
+        const collectedCommandResults: VerificationCommandResult[] = [];
 
         if (node.verification_mode === "COMMAND") {
           const targetAliases = requestedAlias
@@ -3552,17 +3562,49 @@ export class StagentDaemon {
               return;
             }
 
-            const commandStr = [spec.executable, ...spec.args].join(" ").trim();
             const cmdCwd = spec.working_directory
               ? path.resolve(worktreePath, spec.working_directory)
               : worktreePath;
+
+            const resolved = resolveStagentCli({
+              executable: spec.executable,
+              args: spec.args,
+            });
+            if (!resolved.ok) {
+              collectedCommandResults.push({
+                alias,
+                error: E_COMMAND_NOT_RESOLVED,
+                reason: resolved.reason,
+              });
+              try {
+                appendDaemonLog(this.repoRoot, {
+                  level: "error",
+                  kind: "graph_verify_command",
+                  code: E_COMMAND_NOT_RESOLVED,
+                  detail: buildVerifyCommandLogDetail({
+                    alias,
+                    stdout: "",
+                    stderr: "",
+                    includeSnippets: true,
+                    error: E_COMMAND_NOT_RESOLVED,
+                    reason: resolved.reason,
+                  }),
+                });
+              } catch {
+                /* 日志失败不改核销判定 */
+              }
+              continue;
+            }
+
+            const commandStr = resolvedCommandString(resolved);
+            ensureAllowedCommand(allowedCommands, commandStr);
 
             try {
               const runRes = await runCommand(commandStr, {
                 cwd: cmdCwd,
                 argv: {
-                  executable: spec.executable,
-                  args: spec.args,
+                  executable: resolved.executable,
+                  args: resolved.args,
                 },
                 allowedCommands,
                 timeoutMs: 30_000,
@@ -3574,20 +3616,90 @@ export class StagentDaemon {
                 alias,
                 exit_code: runRes.exitCode,
               });
+              try {
+                appendDaemonLog(this.repoRoot, {
+                  level: runRes.exitCode === 0 ? "info" : "error",
+                  kind: "graph_verify_command",
+                  ...(runRes.exitCode === 0
+                    ? {}
+                    : { code: "E_COMMAND_FAILED" }),
+                  detail: buildVerifyCommandLogDetail({
+                    alias,
+                    stdout: runRes.stdout,
+                    stderr: runRes.stderr,
+                    includeSnippets: runRes.exitCode !== 0,
+                    exit_code: runRes.exitCode,
+                  }),
+                });
+              } catch {
+                /* 日志失败不改核销判定 */
+              }
             } catch (err: unknown) {
-              const exitCode =
-                typeof (err as { exitCode?: number })?.exitCode === "number"
-                  ? (err as { exitCode: number }).exitCode
-                  : (err as { code?: string })?.code === "E_COMMAND_TIMEOUT"
-                    ? 124
-                    : (err as { code?: string })?.code ===
-                        E_UNAUTHORIZED_COMMAND
-                      ? 126
-                      : 1;
+              const errCode = (err as { code?: string })?.code;
+              const hasExit =
+                typeof (err as { exitCode?: number })?.exitCode === "number";
+              const isTimeout = errCode === "E_COMMAND_TIMEOUT";
+              const isUnauthorized = errCode === E_UNAUTHORIZED_COMMAND;
+              if (!hasExit && !isTimeout && !isUnauthorized) {
+                const spawn_code =
+                  typeof errCode === "string" && errCode.length > 0
+                    ? errCode
+                    : "spawn_error";
+                collectedCommandResults.push({
+                  alias,
+                  error: E_COMMAND_SPAWN_FAILED,
+                  spawn_code,
+                });
+                try {
+                  appendDaemonLog(this.repoRoot, {
+                    level: "error",
+                    kind: "graph_verify_command",
+                    code: E_COMMAND_SPAWN_FAILED,
+                    detail: buildVerifyCommandLogDetail({
+                      alias,
+                      stdout: "",
+                      stderr: "",
+                      includeSnippets: true,
+                      error: E_COMMAND_SPAWN_FAILED,
+                      spawn_code,
+                    }),
+                  });
+                } catch {
+                  /* 日志失败不改核销判定 */
+                }
+                continue;
+              }
+              const exitCode = hasExit
+                ? (err as { exitCode: number }).exitCode
+                : isTimeout
+                  ? 124
+                  : isUnauthorized
+                    ? 126
+                    : 1;
               collectedCommandResults.push({
                 alias,
                 exit_code: exitCode,
               });
+              try {
+                appendDaemonLog(this.repoRoot, {
+                  level: "error",
+                  kind: "graph_verify_command",
+                  code: isTimeout
+                    ? "E_COMMAND_TIMEOUT"
+                    : isUnauthorized
+                      ? E_UNAUTHORIZED_COMMAND
+                      : "E_COMMAND_FAILED",
+                  detail: buildVerifyCommandLogDetail({
+                    alias,
+                    stdout: "",
+                    stderr: "",
+                    includeSnippets: true,
+                    exit_code: exitCode,
+                  }),
+                });
+              } catch {
+                /* 日志失败不改核销判定 */
+              }
             }
           }
         }

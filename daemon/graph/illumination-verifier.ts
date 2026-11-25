@@ -33,6 +33,8 @@ export const E_FILES_NOT_WRITTEN = "E_FILES_NOT_WRITTEN";
 export const E_FINGERPRINT_MISSING = "E_FINGERPRINT_MISSING";
 export const E_SCOPE_VIOLATION = "E_SCOPE_VIOLATION";
 export const E_COMMAND_FAILED = "E_COMMAND_FAILED";
+export const E_COMMAND_NOT_RESOLVED = "E_COMMAND_NOT_RESOLVED";
+export const E_COMMAND_SPAWN_FAILED = "E_COMMAND_SPAWN_FAILED";
 export const E_COMMIT_SHA_MISSING = "E_COMMIT_SHA_MISSING";
 export const E_SIDE_EFFECT_UNVERIFIED = "E_SIDE_EFFECT_UNVERIFIED";
 export const E_MANUAL_APPROVAL_MISSING = "E_MANUAL_APPROVAL_MISSING";
@@ -43,7 +45,14 @@ export const E_TARGET_FILES_MISSING = "E_TARGET_FILES_MISSING";
 /** 单条验证命令的执行结果（alias 与节点声明的命令一一对应） */
 export interface VerificationCommandResult {
   alias: string;
-  exit_code: number;
+  /** 进程已启动时的退出码；解析失败或 spawn 未启动时不记假的 exit_code 1 */
+  exit_code?: number;
+  /** 解析失败或 spawn 启动失败时的独立错误码 */
+  error?: "E_COMMAND_NOT_RESOLVED" | "E_COMMAND_SPAWN_FAILED";
+  /** E_COMMAND_NOT_RESOLVED 的短原因码，如 missing_exec_path / missing_tsx / missing_bin */
+  reason?: string;
+  /** E_COMMAND_SPAWN_FAILED 的系统错误码，如 ENOENT / EACCES */
+  spawn_code?: string;
 }
 
 /** 隐式副作用检查：执行前后同一文件的 SHA-256 是否变化 */
@@ -280,6 +289,30 @@ export function evaluateIllumination(
   const expected = input.expected_exit_code ?? 0;
   switch (node.verification_mode) {
     case "COMMAND": {
+      const unresolved = input.command_results.filter(
+        (result) => result.error === E_COMMAND_NOT_RESOLVED,
+      );
+      if (unresolved.length > 0) {
+        return blocked(
+          E_COMMAND_NOT_RESOLVED,
+          `节点 ${node.node_id} 的验证命令无法解析到当前 Daemon 入口: ` +
+            unresolved
+              .map((result) => `${result.alias}（${result.reason}）`)
+              .join(", "),
+        );
+      }
+      const spawnFailed = input.command_results.filter(
+        (result) => result.error === E_COMMAND_SPAWN_FAILED,
+      );
+      if (spawnFailed.length > 0) {
+        return blocked(
+          E_COMMAND_SPAWN_FAILED,
+          `节点 ${node.node_id} 的验证命令无法启动: ` +
+            spawnFailed
+              .map((result) => `${result.alias}(${result.spawn_code})`)
+              .join(", "),
+        );
+      }
       const failed = input.command_results.filter(
         (result) => result.exit_code !== expected,
       );
