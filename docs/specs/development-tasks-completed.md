@@ -12196,3 +12196,126 @@ governance:
 * **立卡说明（2026-11-25 · P-310）**：Tina 授权立卡（t1465u）。操作者由我执行。基线 `main` `1caaf52839f43499edbfb2377172050ad65eb20b`（[#396](https://github.com/he18718143986-design/IDE/pull/396) P-309）；产品代码尖仍为 [#394](https://github.com/he18718143986-design/IDE/pull/394) squash `025cdb01e62f81e7ef86e46595c49f5873f383f7`。现场核对 changelog 最新原为 P-309、版本头最新原为第 293 条，按流水取下一号 **P-310**（版本头第 294 条）。**P-285 号未占用，不擅自改号**。**立卡 ≠ 开工**；先合入本 docs PR，再开独立代码 PR。代码 PR 必需检查全绿后报授权；Windows 存量失败按先例报 UNSTABLE（#266–#394 选 A）。范围外文件要动就停工修卡。
 * **后续路径（锁定，不在本卡验收）**：立卡 PR 合入后开代码 PR；全绿报授权；Windows 存量失败按先例报 UNSTABLE；范围外文件要动就停工修卡。本卡施工不重试 `n1`，不对 `n2`–`n12` 发 start/verify。代码合入并重启 Daemon 后再对 `n1` 官方重试 start/verify，由 Tina 点名，实测记录落 ledger。设计层挂账、n12 扩展名不匹配与 `markStale` glob 化是否另立卡，届时再定。
 * **完工说明（2026-11-25 · P-311）**：施工 [#398](https://github.com/he18718143986-design/IDE/pull/398) squash `e7e5ca673b2fdf98eceed8c40c09dfe0e68b4787`。**官方核销把产品 CLI `stagent` 解析到当前 Daemon 入口已交付（`E_COMMAND_NOT_RESOLVED`/`E_COMMAND_SPAWN_FAILED` 独立错误码、片段按 J.56 口径落 `daemon.jsonl`、注入三文件零 diff）；真钥匙复测不在本卡，端到端闭环未宣称**。相对父提交只改五条 `writable_paths`、+780/−18，无 docs、无范围外文件。注入三文件 / `command-runner.ts` / 图 schema 两文件 / J.56 三文件相对父提交零 diff。后续路径已锁定、待 Tina 点名。本回写未启动实测，未重试 n1，未重启 Daemon。
+
+---
+
+### 3.4bx 计划节点目标与 Worker 实际产出对齐（J.60 · 完工回写 P-315）
+
+<a id="task-j.60"></a>
+
+#### 【Task J.60】计划节点目标与 Worker 实际产出对齐 `[COMPLETED]`
+
+```yaml task-card
+id: TASK-J.60
+status: COMPLETED
+contract:
+  intent:
+    title: 计划节点目标与 Worker 实际产出对齐
+    description: >-
+      提案不再把 writable_paths（权限上界）1:1 变成核销节点：纯脚手架/配置类目标
+      在验收命令不要求时不出节点；真实产物节点（src/**、tests/**、package.json、
+      index.html）全部保留。核销 fail-closed 语义零改动。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J60-P1
+      check: auto
+      text: >-
+        验收命令为九条 baseline-*（无 npm typecheck / npm test）时，
+        buildProposalFromContract 生成的节点不含 tsconfig.json、tsconfig.*.json、
+        vite.config.*、vitest.config.*、*.config.ts、*.config.mjs、*.config.js、
+        **/*.test.ts、**/*.test.tsx、**/*.spec.ts 这些目标；且 src/**、tests/**、
+        package.json、index.html 仍各成节点。
+    - id: J60-P2
+      check: auto
+      text: >-
+        验收命令含 npm run typecheck 时 tsconfig.json 仍成节点；含 npm test 时
+        vitest.config.* 与 vite.config.* 仍成节点（不误删能力）。
+    - id: J60-P3
+      check: auto
+      text: >-
+        核销侧零改动：目标文件未写入仍报 E_FILES_NOT_WRITTEN，判定顺序
+        （命令 → 存在性 → 指纹）与 patternIsSatisfied 语义未改；未放宽 fail-closed。
+    - id: J60-P4
+      check: auto
+      text: >-
+        未改 J.58 glob 展开、J.59 命令解析、门禁阈值、标题兜底、右栏；未宣称端到端闭环。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/lib/journey/proposal-from-contract.ts
+      - tests/unit/proposal-scope-align.test.ts
+      - docs/ledger/j60-plan-output-mismatch-brief.md
+    readonly_paths:
+      - daemon/graph/illumination-verifier.ts
+      - daemon/graph/target-file-match.ts
+      - daemon/supervisor/rules-l0.ts
+      - daemon/cli-host/resolve-stagent-cli.ts
+  verification:
+    commands:
+      - { alias: proposal-scope-align, executable: npx, args: [vitest, run, tests/unit/proposal-scope-align.test.ts] }
+      - { alias: proposal-from-contract, executable: npx, args: [vitest, run, tests/unit/journey-proposal-from-contract.test.ts] }
+      - { alias: graph-verify, executable: npx, args: [vitest, run, tests/daemon/server-task-graph-verify.test.ts] }
+design:
+  approach: >-
+    诊断见 docs/ledger/j60-plan-output-mismatch-brief.md：writable_paths 同时承担
+    「允许写」与「必须写」两种语义；proposal-from-contract.ts:56-66 把可写路径
+    slice(0,12) 一对一派生节点，模板里的 tsconfig* / *.config.* / **/*.test.ts
+    变成必失败节点（n3 起 E_FILES_NOT_WRITTEN，九条命令仍全 exit 0）。
+    修法（方案 A，ai_inferred）：提案侧过滤「纯脚手架/配置类」目标，仅当验收命令
+    不要求相应能力时（复用 commandsNeedNpmVerification 语义）——有 typecheck 保留
+    tsconfig*，有 npm test 保留 vitest/vite config；这些路径仍留在 writable_paths
+    作写权限。核销侧与 fail-closed 一字不改。备选 B（合同新增 deliverables 字段）
+    属 M 级 schema 变更，另案；C（Worker 补齐配置）会为过核销造无意义文件，不采用。
+  touches:
+    - { path: src/lib/journey/proposal-from-contract.ts, change: modify, why: 过滤脚手架目标节点（守卫：验收命令能力）, symbols: [buildProposalFromContract] }
+    - { path: tests/unit/proposal-scope-align.test.ts, change: modify, why: "本卡新建；落库后按 modify 记录（J60-P1/P2 断言）", symbols: [] }
+    - { path: docs/ledger/j60-plan-output-mismatch-brief.md, change: modify, why: 诊断与方案简报（立卡已建）, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J60-P1, test_path: tests/unit/proposal-scope-align.test.ts, level: unit, case: "baseline 验收命令下不产出脚手架节点" }
+    - { acceptance_id: J60-P2, test_path: tests/unit/proposal-scope-align.test.ts, level: unit, case: "npm test 要求测试能力，vitest/vite 配置仍成节点" }
+    - { acceptance_id: J60-P3, test_path: tests/daemon/server-task-graph-verify.test.ts, level: unit, debt: "核销侧零改动以施工 diff 自证：四文件相对父提交零 diff，fail-closed 与判定顺序未改；既有用例保持绿，不另写 it()" }
+    - { acceptance_id: J60-P4, test_path: tests/unit/proposal-scope-align.test.ts, level: unit, debt: "施工 diff 自证未触碰 J.58/J.59/门禁面与右栏，不写成产品行为 it()" }
+governance:
+  spec_refs:
+    - docs/specs/intent-compiler-prompt.md
+    - docs/specs/supervisor.md
+  depends_on:
+    - { id: TASK-J.58, kind: soft }
+    - { id: TASK-J.59, kind: soft }
+  code_facts:
+    - { ref: "src/lib/journey/proposal-from-contract.ts:56-66", note: "writable.slice(0,12) 每条可写路径 1:1 生成一个节点" }
+    - { ref: "daemon/supervisor/rules-l0.ts:84-98", note: "GREENFIELD_NPM_WRITABLE_DEFAULTS 14 条，与合同 writable_paths 同序同值" }
+    - { ref: "daemon/graph/illumination-verifier.ts:276-287", note: "target_files 逐条要求被 files_written 满足，否则 E_FILES_NOT_WRITTEN" }
+  non_goals:
+    - 不改门禁阈值
+    - 不放宽 E_FILES_NOT_WRITTEN 或判定顺序
+    - 不改 J.58 glob 展开与 J.59 命令解析
+    - 不改合同 schema 版本（方案 B 另案）
+    - 不伪造施工树文件、不点「确认开工」、不做真钥匙验收
+    - 不改右栏逐字节、不改 ADR-0015
+    - 不改 markStale / nodeTouchesPaths glob 化
+  fail:
+    - 为过核销删掉真实产物节点（src/**、tests/**、package.json、index.html）或改成不检查
+    - 放宽 E_FILES_NOT_WRITTEN、改写判定顺序或 patternIsSatisfied 语义
+    - 改合同 schema 版本或把 writable_paths 的写入权限语义缩掉
+    - 在施工树伪造文件让节点点亮
+    - 改门禁 / 标题兜底 / 右栏 / ADR-0015，或宣称端到端闭环
+  adr_revisions: []
+  defaults:
+    - 复用 rules-l0 的 commandsNeedNpmVerification 语义判断能力，不改其对外契约
+    - 优先在提案构建侧解决，不改核销侧
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 403, commit: 5173e8ece9e0391c0b893ba61284094ae04ed0b5 }
+```
+
+* **背景**：P-312/P-313 实测——`n1`、`n2` 已点亮；`n3` 起九条命令全 `exit 0` 但停在目标文件存在性检查（`E_FILES_NOT_WRITTEN`「节点 n3 的目标文件尚未写入: tsconfig.json」），`n12` 另预埋 `**/*.test.ts` 与 `tests/*.test.js` 扩展名不匹配。
+* **取舍**：修「权限上界被当成必须产物」这一层，不碰核销 fail-closed，不为过核销造文件。
+* **立卡说明（2026-11-25 · P-314）**：Tina 拍板立卡、先出方案、不动代码。方案 A 为默认（`ai_inferred`），备选 B 另案、C 不采用；**立卡 ≠ 开工**。
+* **完工说明（2026-11-25 · P-315）**：Tina 本轮授权开工（按卡面方案 A，只动三条 `writable_paths`，范围外停工修卡）；施工 PR [#403](https://github.com/he18718143986-design/IDE/pull/403) squash `5173e8ece9e0391c0b893ba61284094ae04ed0b5` 于 2026-11-26 01:09 香港时间合入（由我执行）。**提案按验收命令能力过滤纯脚手架/配置类目标已交付**：14 条绿野模板 + 九条 `baseline-*` → 节点目标恰为 `["src/**","package.json","index.html","tests/**"]`；`npm run typecheck` 保留 `tsconfig*`、`npm test` 保留 `vitest.config.*` / `vite.config.*` / 配置与测试 glob（`*.config.ts|mjs|js`、`**/*.test.ts|tsx`、`**/*.spec.ts`），互不误删；过滤在 `slice(0, 12)` 之前，空结果回退原列表不产零节点图。实现用本地纯函数复刻 `commandsNeedNpmVerification` 语义，**不 import `daemon/`**（保持 `src/lib` 共享契约层）。相对父提交 3 文件 +272/−7（产品 1 文件 +77/−3、新增测试 1 文件 181 行、简报 +21/−4）；`readonly_paths` 四文件零 diff，核销侧 fail-closed / 判定顺序 / `patternIsSatisfied` 一字未改。本地：新用例 5/5、相关 41/41、`tests/unit` + `tests/daemon` 269 文件 2795 例全绿、`tsc` 0、eslint 0。CI 必需面全绿，Windows Unit 为存量 16 文件 / 28 例（`continue-on-error`，本卡用例在 Windows 上 5/5 绿），`mergeStateStatus=UNSTABLE` 按先例不挡；Bugbot `skipping`。**真钥匙复测不在本卡验收口径内**；合入后按锁定路径对 `n3` 复测，但既有图在 J.60 之前生成、节点目标仍为旧形态，重启 Daemon 不会重建图，结果仍是 `E_FILES_NOT_WRITTEN`（详见 [`../ledger/j60-n3-retest-after-merge.md`](../ledger/j60-n3-retest-after-merge.md)）。J.60 只对新提案生效，旧图需重新提案才体现。端到端闭环未宣称。
