@@ -11,6 +11,15 @@ import { fileURLToPath } from "node:url";
 export type StagentResolveReason =
   "missing_exec_path" | "missing_tsx" | "missing_bin";
 
+/**
+ * TASK-J.62：合同 `execute` 路径的解析/启动失败码。
+ *
+ * 与图核销路径（J.59）同名同义，排障口径一致；常量收在本模块，
+ * `daemon/graph/illumination-verifier.ts` 里的同名字面量保持不动。
+ */
+export const E_COMMAND_NOT_RESOLVED = "E_COMMAND_NOT_RESOLVED";
+export const E_COMMAND_SPAWN_FAILED = "E_COMMAND_SPAWN_FAILED";
+
 export type ResolveStagentCliInput = {
   executable: string;
   args: readonly string[];

@@ -43,6 +43,13 @@ import { buildCommandEnvironment } from "../worker/policy-guard";
 import type { RuntimeInterceptor } from "../worker/runtime-interceptor";
 import { assessCommandThreat, isRepoTrusted } from "../worker/threat-guard";
 import {
+  E_COMMAND_NOT_RESOLVED,
+  E_COMMAND_SPAWN_FAILED,
+  ensureAllowedCommand,
+  resolveStagentCli,
+  resolvedCommandString,
+} from "../cli-host/resolve-stagent-cli";
+import {
   CostMonitor,
   E_COST_CAP_EXCEEDED,
   E_BUDGET_EXCEEDED,
@@ -1863,6 +1870,62 @@ export class ScopedWorktreeGateway {
       allowedCommands.push(authorizedAliasCommand);
     }
 
+    // 2.5 TASK-J.62：把产品 CLI 裸名 `stagent` 解析到当前 Daemon 入口。
+    //
+    // 合同 `execute` 的验收命令就是 `executable: "stagent"`，而本机 PATH 上没有
+    // 该可执行文件；不解析就必然 spawn ENOENT，execute 永远拿不到 PASSED 证据。
+    // 顺序硬约束：本块必须在威胁守卫之后——解析结果含 Worktree 之外的绝对路径
+    // （node_modules/tsx、bin/stagent.ts），先解析会被守卫按越界拒掉。
+    //
+    // 白名单前置：**只有原始命令串已在合同白名单里才解析**。否则
+    // `stagent <任意参数>` 会借「已解析串自动入白名单」绕过合同授权——
+    // 未授权的 stagent 命令必须原样交给 runCommand 精确匹配拒掉。
+    let execArgv = structured;
+    const originalCommandString =
+      structured === undefined
+        ? ""
+        : [structured.executable, ...structured.args].join(" ").trim();
+    if (
+      structured !== undefined &&
+      structured.executable === "stagent" &&
+      allowedCommands.includes(originalCommandString)
+    ) {
+      const resolved = resolveStagentCli({
+        executable: structured.executable,
+        args: structured.args,
+      });
+      if (!resolved.ok) {
+        const msg =
+          `无法把产品 CLI 'stagent' 解析到当前 Daemon 入口（${resolved.reason}）：` +
+          "检查 package 内 tsx 与 bin/stagent.ts 是否存在";
+        this.logAudit({
+          tool: "stagent_exec_command",
+          input: { command },
+          outcome: "BLOCKED",
+          violationCode: E_COMMAND_NOT_RESOLVED,
+          details: msg,
+        });
+        return {
+          isError: true,
+          content: [
+            { type: "text", text: `[${E_COMMAND_NOT_RESOLVED}] ${msg}` },
+          ],
+          error: {
+            code: E_COMMAND_NOT_RESOLVED,
+            message: msg,
+            details: { reason: resolved.reason },
+          },
+        };
+      }
+      execArgv = {
+        executable: resolved.executable,
+        args: resolved.args,
+      };
+      // 已解析命令串必须进白名单：runCommand 只做精确匹配，否则会被拒成
+      // E_UNAUTHORIZED_COMMAND（与图核销路径 J.59 同一处理）。
+      ensureAllowedCommand(allowedCommands, resolvedCommandString(resolved));
+    }
+
     // 3. Execution
     const taskBudgetMs =
       (this.contract.authorization.budget_limits.max_duration_seconds ?? 1800) *
@@ -1923,7 +1986,7 @@ export class ScopedWorktreeGateway {
           ...(commandEnv.secretValues.length === 0
             ? {}
             : { secretValues: commandEnv.secretValues }),
-          ...(structured === undefined ? {} : { argv: structured }),
+          ...(execArgv === undefined ? {} : { argv: execArgv }),
           ...(this.signal === undefined ? {} : { signal: this.signal }),
           ...(this.onTerminalLine === undefined
             ? {}
@@ -2006,10 +2069,21 @@ export class ScopedWorktreeGateway {
     } catch (err) {
       // 命令安全校验（注入符号 / 空命令 / 非法 argv）统一归到目录码
       // E_UNAUTHORIZED_COMMAND（§9.3），避免回传内部实现码 E_COMMAND_REJECTED
+      //
+      // TASK-J.62：解析成功但子进程起不来（ENOENT / EACCES，典型是入口被删或
+      // 权限位丢失）单独记 E_COMMAND_SPAWN_FAILED，并带上原始系统码；不再和
+      // 其它内部异常一起埋进 EXEC_ERROR，否则排障时分不清「没找到 CLI」与
+      // 「检查体返回 1」。
+      const spawnCode = (err as { code?: unknown })?.code;
+      const isSpawnFailure =
+        !(err instanceof CommandSecurityError) &&
+        (spawnCode === "ENOENT" || spawnCode === "EACCES");
       const code =
         err instanceof CommandSecurityError
           ? E_UNAUTHORIZED_COMMAND
-          : "EXEC_ERROR";
+          : isSpawnFailure
+            ? E_COMMAND_SPAWN_FAILED
+            : "EXEC_ERROR";
       this.logAudit({
         tool: "stagent_exec_command",
         input: { command },
@@ -2022,7 +2096,13 @@ export class ScopedWorktreeGateway {
         content: [
           { type: "text", text: `[${code}] ${(err as Error).message}` },
         ],
-        error: { code, message: (err as Error).message },
+        error: {
+          code,
+          message: (err as Error).message,
+          ...(isSpawnFailure
+            ? { details: { spawn_code: String(spawnCode) } }
+            : {}),
+        },
       };
     }
   }
