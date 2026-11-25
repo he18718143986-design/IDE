@@ -2,7 +2,7 @@
 
 > **地位**：施工记录。施工权威在 [`../specs/development-tasks-active.md`](../specs/development-tasks-active.md#task-j.61)；方案与拍板见 [`j61-graph-targets-migration-plan.md`](./j61-graph-targets-migration-plan.md)。
 > **基线**：`main` `94a53eabb9760401888247d41e97df41fcc4c5c7`（[#406](https://github.com/he18718143986-design/IDE/pull/406) P-317 立卡）。
-> **状态**：代码已施工并合入 [#407](https://github.com/he18718143986-design/IDE/pull/407)（`cd28cc0`）；**真机迁移已执行**（见第五节）：`dry_run` retired 8 / kept 4 → 实跑 `revision` 13→14、节点 12→4 → `n10` 官方核销 `ILLUMINATED`、`n11` 转 `PENDING`，图 `revision=16`。端到端闭环未宣称。
+> **状态**：代码已施工并合入 [#407](https://github.com/he18718143986-design/IDE/pull/407)（`cd28cc0`）；**真机迁移已执行**（见第五节）：`dry_run` retired 8 / kept 4 → 实跑 `revision` 13→14、节点 12→4 → `n10`、`n11` 先后官方核销 `ILLUMINATED`，图 `revision=18`、**4/4 全亮**。任务图首次全亮，但**端到端闭环未宣称**（合同仍 `EXECUTING`，未合入、未试玩）。
 
 ## 一、交付内容
 
@@ -89,17 +89,28 @@ body: { contract_id?: string, dry_run?: boolean, graph_id?: string }
 - `n10` `RUNNING`→**`ILLUMINATED`**；`n11` `BLOCKED`→**`PENDING`**；`revision` **15→16**。
 - 指纹增至 9 条（新增 `index.html`）。
 
-### 5.5 迁移后图状态
+### 5.5 迁移后 n11 官方 start / verify
+
+- `POST /api/graph/nodes/start` `{node_id:"n11"}` **200**（`requestId=994dc2b27711`，16ms，ts `18:53:24.215Z`）；`n11` `PENDING`→`RUNNING`，`revision` **16→17**。
+- `POST /api/graph/verify` `{node_id:"n11"}` **200**（`requestId=698884b60e73`，4422ms，ts `18:53:28.661Z`）；**`illuminated=true`**，无错误码。
+- 九条 baseline 全部 `exit 0`、`stderr_length=0`（`18:53:24.783Z`–`18:53:28.631Z`，stdout 94–105）。
+- `n11` `RUNNING`→**`ILLUMINATED`**；`revision` **17→18**。
+- 指纹增至 11 条（新增 `tests/auth.test.js`、`tests/phone.test.js`）。
+- `tests/**` 通配符按 J.58 展开匹配到 2 个 `.test.js`，未触发扩展名问题（本图已无 `n12`）。
+
+### 5.6 迁移后图状态（终态）
 
 | 节点 | 目标 | 状态 |
 | :--- | :--- | :--- |
-| `n1` | `src/**` | `ILLUMINATED`（迁移前既有状态，未重新核销） |
+| `n1` | `src/**` | `ILLUMINATED`（迁移前既有，未重新核销） |
 | `n2` | `package.json` | `ILLUMINATED`（同上） |
 | `n10` | `index.html` | `ILLUMINATED`（本轮核销） |
-| `n11` | `tests/**` | `PENDING`（未点，按授权只推进首个 PENDING） |
+| `n11` | `tests/**` | `ILLUMINATED`（本轮核销） |
 
-图 `revision=16`，进度 `ILLUMINATED=3` / `PENDING=1` / `total=4`（75%）。**端到端闭环未宣称**（`n11` 未点亮，合同未合入）。
+图 `revision=18`，进度 **`ILLUMINATED=4` / `total=4`（100%）**，`FAILED=0`、`BLOCKED=0`、`PENDING=0`。
+
+**诚实口径**：这是**任务图首次全亮**（4/4），但**端到端闭环仍未宣称**——合同仍是 `EXECUTING` / `APPROVED`（`state.json` `updated_at` 仍为 `2026-11-25T11:30:48.057Z`），未走合入、未做试玩认可、未点「确认开工」。`issues` 中 `n3` 的历史 `E_FILES_NOT_WRITTEN`（ERROR）为迁移前记录，未清；8 条 `E_TARGET_SUPERSEDED`（WARNING）为退役留痕。
 
 ## 六、密钥与纪律
 
-HTTP 只用试玩目录 `.stagent/session-token`（0600）作 `Authorization: Bearer`。本文件不含 token、密钥或 `.tmp/deepseek.env` 内容。未手工改 `.stagent/specs/task_graph.json`，未重新提案，未伪造证据。本轮只推进首个 `PENDING`（`n10`），未对 `n11` 发 start/verify，未发 `run-worker`，未点「确认方案 / 确认开工」。
+HTTP 只用试玩目录 `.stagent/session-token`（0600）作 `Authorization: Bearer`。本文件不含 token、密钥或 `.tmp/deepseek.env` 内容。未手工改 `.stagent/specs/task_graph.json`，未重新提案，未伪造证据。按 Tina 后续授权对 `n10`、`n11` 依次官方 start/verify；未发 `run-worker`，未点「确认方案 / 确认开工」，未手工改图文件。
