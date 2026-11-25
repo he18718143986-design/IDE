@@ -150,3 +150,93 @@ export async function withParseRetry<T>(
     WORKER_PARSE_MAX_RETRIES,
   );
 }
+
+/** J.56：失败原文特征片段上限；仅 text_length > 80 时写入 */
+export const WORKER_PARSE_FAILURE_SNIPPET_MAX = 40 as const;
+/** J.56：超过该长度才写 head/tail，避免短回复被整段拼回 */
+export const WORKER_PARSE_FAILURE_SNIPPET_MIN_LENGTH = 80 as const;
+
+export type WorkerParseFailureReason = "json_parse" | "schema" | "other";
+
+export interface WorkerParseFailureFeatures {
+  text_present: boolean;
+  text_length: number;
+  starts_with_fence: boolean;
+  starts_with_brace: boolean;
+  ends_with_fence: boolean;
+  ends_with_brace: boolean;
+  reason: WorkerParseFailureReason;
+  attempt: number;
+  model_id: string;
+  head?: string;
+  tail?: string;
+}
+
+function readGeneratedObjectText(err: unknown): string | undefined {
+  const seen = new Set<unknown>();
+  let current: unknown = err;
+  for (
+    let depth = 0;
+    depth < 3 && current !== null && typeof current === "object";
+    depth += 1
+  ) {
+    if (seen.has(current)) break;
+    seen.add(current);
+    const text = (current as { text?: unknown }).text;
+    if (typeof text === "string") return text;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return undefined;
+}
+
+function classifyWorkerParseFailureReason(
+  err: unknown,
+): WorkerParseFailureReason {
+  const message = err instanceof Error ? err.message : String(err ?? "");
+  const lower = message.toLowerCase();
+  if (lower.includes("did not match schema")) return "schema";
+  if (
+    lower.includes("could not parse the response") ||
+    lower.includes("invalid json") ||
+    lower.includes("json parse") ||
+    lower.includes("failed to parse")
+  ) {
+    return "json_parse";
+  }
+  return "other";
+}
+
+/**
+ * 从 SDK 错误对象抽取可落盘的结构特征。纯函数：不写盘、不改错误、不回退解析。
+ * 禁止产出名为 text / raw / full 的字段；片段只在原文长度大于 80 时给出。
+ */
+export function extractWorkerParseFailureFeatures(input: {
+  err: unknown;
+  attempt: number;
+  modelId: string;
+}): WorkerParseFailureFeatures {
+  const raw = readGeneratedObjectText(input.err);
+  const text_present = typeof raw === "string" && raw.length > 0;
+  const text_length = typeof raw === "string" ? raw.length : 0;
+  const trimmed = text_present && raw !== undefined ? raw.trim() : "";
+  const features: WorkerParseFailureFeatures = {
+    text_present,
+    text_length,
+    starts_with_fence: trimmed.startsWith("```"),
+    starts_with_brace: trimmed.startsWith("{"),
+    ends_with_fence: trimmed.endsWith("```"),
+    ends_with_brace: trimmed.endsWith("}"),
+    reason: classifyWorkerParseFailureReason(input.err),
+    attempt: input.attempt,
+    model_id: input.modelId,
+  };
+  if (
+    text_present &&
+    raw !== undefined &&
+    text_length > WORKER_PARSE_FAILURE_SNIPPET_MIN_LENGTH
+  ) {
+    features.head = raw.slice(0, WORKER_PARSE_FAILURE_SNIPPET_MAX);
+    features.tail = raw.slice(-WORKER_PARSE_FAILURE_SNIPPET_MAX);
+  }
+  return features;
+}
