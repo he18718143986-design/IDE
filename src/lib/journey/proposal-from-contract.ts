@@ -10,9 +10,15 @@
  * - 每个可写路径（或验收标准）对应一个 CODE_MODIFICATION 节点
  * - 验证命令优先用合同里已声明的 alias；否则挂一条占位 `verify`
  *   （空验证集会被 illumination 挡住，不会假绿）
+ *
+ * TASK-J.60：`writable_paths` 是**写入权限上界**，不等于**必须产物**。
+ * 绿野 npm 模板（`GREENFIELD_NPM_WRITABLE_DEFAULTS`）里的纯脚手架/配置类
+ * 路径只在验收命令真的要求相应能力时才建成核销节点；否则会把
+ * `tsconfig.json` 这类 Worker 不会写的路径变成必失败节点
+ * （核销报 `E_FILES_NOT_WRITTEN`）。这些路径仍留在可写范围里。
  */
 
-import type { SoftwareContract } from "../contract.schema";
+import type { SoftwareContract, VerificationCommand } from "../contract.schema";
 import type {
   SupervisorProposalNode,
   SupervisorProposalV1,
@@ -36,6 +42,62 @@ function slugify(raw: string, fallback: string): string {
 }
 
 /**
+ * 纯脚手架 / 配置类目标：属于写入权限，但通常不是本轮的真实产物。
+ * 与 `daemon/supervisor/rules-l0.ts` 的 `GREENFIELD_NPM_WRITABLE_DEFAULTS`
+ * 同源；只在这里按验收命令能力决定是否剔除（TASK-J.60 方案 A）。
+ */
+const SCAFFOLDING_TARGETS: ReadonlySet<string> = new Set([
+  "tsconfig.json",
+  "tsconfig.*.json",
+  "vitest.config.*",
+  "vite.config.*",
+  "*.config.ts",
+  "*.config.mjs",
+  "*.config.js",
+  "**/*.test.ts",
+  "**/*.test.tsx",
+  "**/*.spec.ts",
+]);
+
+function commandArgumentIncludes(
+  command: VerificationCommand,
+  needle: string,
+): boolean {
+  const args = command.args.map((arg) => arg.toLowerCase());
+  if (args.includes(needle)) return true;
+  const runIdx = args.indexOf("run");
+  return runIdx >= 0 && args[runIdx + 1] === needle;
+}
+
+/**
+ * 与 `rules-l0.ts::commandsNeedNpmVerification` 同一判定语义
+ * （不 import `daemon/`，保持 `src/lib` 共享契约层的分层）。
+ */
+function verificationCapabilities(commands: readonly VerificationCommand[]): {
+  typescript: boolean;
+  tests: boolean;
+} {
+  let typescript = false;
+  let tests = false;
+  for (const command of commands) {
+    if (command.executable !== "npm") continue;
+    if (commandArgumentIncludes(command, "typecheck")) typescript = true;
+    if (commandArgumentIncludes(command, "test")) tests = true;
+  }
+  return { typescript, tests };
+}
+
+/** 该脚手架目标是否被验收命令「要求」；未被要求则不作为核销节点。 */
+function isUnneededScaffoldingTarget(
+  pattern: string,
+  capabilities: { typescript: boolean; tests: boolean },
+): boolean {
+  if (!SCAFFOLDING_TARGETS.has(pattern)) return false;
+  if (pattern.startsWith("tsconfig")) return !capabilities.typescript;
+  return !capabilities.tests;
+}
+
+/**
  * 把合同编成可提交给 Graph 引擎的提案。
  * 调用方负责再调 `createTaskGraph`；本函数不做 IO。
  */
@@ -53,9 +115,18 @@ export function buildProposalFromContract(
     .filter((a): a is string => typeof a === "string" && a.length > 0);
   const isManualOnly = declaredCommands.length === 0;
 
+  // TASK-J.60：只把验收命令真正要求的脚手架/配置类路径建成节点；
+  // 若过滤后为空（可写范围全是脚手架），回退原列表，不产出零节点图。
+  const capabilities = verificationCapabilities(declaredCommands);
+  const deliverableWritable = writable.filter(
+    (pattern) => !isUnneededScaffoldingTarget(pattern, capabilities),
+  );
+  const effectiveWritable =
+    deliverableWritable.length > 0 ? deliverableWritable : writable;
+
   const targets: Array<{ title: string; files: string[] }> = [];
-  if (writable.length > 0) {
-    for (const file of writable.slice(0, 12)) {
+  if (effectiveWritable.length > 0) {
+    for (const file of effectiveWritable.slice(0, 12)) {
       targets.push({
         title: `落实：${file}`,
         files: [file],
