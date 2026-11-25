@@ -644,6 +644,52 @@ describe("证据采集：路径解析与 Worktree 缺失", () => {
   });
 });
 
+describe("TASK-J.58：target_files glob 展开后的点亮与指纹", () => {
+  function globProposal(): SupervisorProposalV1 {
+    const proposal = baseProposal();
+    proposal.nodes[0] = {
+      ...proposal.nodes[0]!,
+      target_files: ["src/**"],
+    };
+    return proposal;
+  }
+
+  it("J58-P4: 范围越界仍走现有 scope_valid / E_SCOPE_VIOLATION，不按节点目标展开集合改判", () => {
+    const engine = new TaskGraphEngine({ repoRoot });
+    engine.createFromProposal(globProposal());
+    engine.startNode("n1");
+
+    const outOfScope = engine.verifyNode(
+      "n1",
+      passingEvidence(["src/auth.js"], { scope_valid: false }),
+    );
+    expect(outOfScope.result.illuminated).toBe(false);
+    if (!outOfScope.result.illuminated) {
+      expect(outOfScope.result.code).toBe("E_SCOPE_VIOLATION");
+    }
+  });
+
+  it("J58-P5: glob 点亮时 fingerprints 按真实文件路径记录", () => {
+    const engine = new TaskGraphEngine({ repoRoot });
+    engine.createFromProposal(globProposal());
+    engine.startNode("n1");
+
+    const { result, graph } = engine.verifyNode(
+      "n1",
+      passingEvidence(["src/auth.js"]),
+    );
+    expect(result.illuminated).toBe(true);
+    expect(graph.fingerprints).toEqual([
+      expect.objectContaining({
+        node_id: "n1",
+        path: "src/auth.js",
+        sha256: "sha256-src/auth.js",
+      }),
+    ]);
+    expect(graph.fingerprints.some((fp) => fp.path === "src/**")).toBe(false);
+  });
+});
+
 describe("TASK_GRAPH_UPDATED 帧", () => {
   it("每次变更递增 revision 并携带变更节点与进度", () => {
     const frames: Array<{

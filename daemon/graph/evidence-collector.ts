@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { execGit } from "../git/worktree-manager";
 import { checkWriteAccess, type FileSystemScope } from "../../src/lib/scope";
 import { unquoteGitPath } from "../pipeline/untracked-scope-guard";
+import { expandTargetFilesOnDisk } from "./target-file-match";
 
 /**
  * 点亮证据采集器（架构 §3.2.2，TASK-C.7）。
@@ -11,7 +12,7 @@ import { unquoteGitPath } from "../pipeline/untracked-scope-guard";
  * 这里解决的是一条红线：**证据必须来自真实文件与真实命令，前端不得自造**。
  *
  * 因此以下三项一律由 Daemon 在 Worktree 上现算，HTTP 调用方无法声明：
- * - `files_written` / `file_hashes`：逐个目标文件真实读取并算 SHA-256；
+ * - `files_written` / `file_hashes`：对 target_files 展开（字面路径直接读、glob 磁盘展开成真实相对路径）后真实读取并算 SHA-256；
  * - `commit_sha`：`git rev-parse HEAD` 的真实结果；
  * - `scope_valid`：`git status --porcelain -uall` 联合比对合同 Scope。
  *
@@ -113,9 +114,11 @@ export async function collectWorktreeEvidence(params: {
 
   const filesWritten: string[] = [];
   const fileHashes: Record<string, string> = {};
-  for (const raw of params.targetFiles) {
-    const relative = normalizeRelative(raw);
-    if (relative === null) continue;
+  // 字面路径仍按相对路径直接读盘哈希；glob 先在施工树磁盘展开成真实文件。
+  for (const relative of expandTargetFilesOnDisk(
+    worktreePath,
+    params.targetFiles,
+  )) {
     const digest = sha256File(path.join(worktreePath, relative));
     if (digest === null) continue;
     filesWritten.push(relative);
