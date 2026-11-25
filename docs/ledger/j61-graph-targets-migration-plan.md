@@ -7,7 +7,7 @@
 
 ---
 
-## 1. 必须先讲清的一个冲突（请重点审这一节）
+## 1. 冲突与拍板结论（2026-11-26 · Tina 已拍板）
 
 Tina 的约束是「保留节点 id、`depends_on`、状态与 `revision` 递增语义」。但按 J.60 规则，本图 12 个节点里有 **8 个目标会被判定为非交付物**：
 
@@ -15,24 +15,37 @@ Tina 的约束是「保留节点 id、`depends_on`、状态与 `revision` 递增
 | :--- | :--- | :--- |
 | `n1` | `src/**` | 保留 |
 | `n2` | `package.json` | 保留 |
-| `n3` | `tsconfig.json` | **不保留** |
-| `n4` | `tsconfig.*.json` | **不保留** |
-| `n5` | `vitest.config.*` | **不保留** |
-| `n6` | `vite.config.*` | **不保留** |
-| `n7` | `*.config.ts` | **不保留** |
-| `n8` | `*.config.mjs` | **不保留** |
-| `n9` | `*.config.js` | **不保留** |
+| `n3` | `tsconfig.json` | **退役** |
+| `n4` | `tsconfig.*.json` | **退役** |
+| `n5` | `vitest.config.*` | **退役** |
+| `n6` | `vite.config.*` | **退役** |
+| `n7` | `*.config.ts` | **退役** |
+| `n8` | `*.config.mjs` | **退役** |
+| `n9` | `*.config.js` | **退役** |
 | `n10` | `index.html` | 保留 |
 | `n11` | `tests/**` | 保留 |
-| `n12` | `**/*.test.ts` | **不保留** |
+| `n12` | `**/*.test.ts` | **退役** |
 
-节点 `target_files` 被清空不行——核销侧 `E_TARGET_FILES_MISSING` 会拦（`illumination-verifier.ts:255-265`：`CODE_MODIFICATION` 必须声明目标）。所以「目标被剔除」的节点只有三种处置，逐一说明代价：
+节点 `target_files` 被清空不行——核销侧 `E_TARGET_FILES_MISSING` 会拦（`illumination-verifier.ts:255-265`：`CODE_MODIFICATION` 必须声明目标）。三种处置的代价：
 
-- **(a) 退役（从图里移除）**：保留存活节点的 id / 状态 / `executed_at` / `commit_sha`，把被移除节点记录进图的 `issues`（`WARNING`，码 `E_TARGET_SUPERSEDED`）+ 迁移报告。**代价**：节点数 12→4；`n3` 的 `FAILED` 消失（它本来就是 J.60 缺陷造成的误报，需在 issues 与 ledger 留痕）。
-- **(b) 保留节点 + 重定向目标**：把脚手架节点指向真实产物（如都指向 `package.json`）。**不推荐**：标题写「落实：tsconfig.json」而核销的是 `package.json`，等于为了变绿造假证据。
-- **(c) 新增节点状态 `SUPERSEDED`**：语义最诚实、节点数不变，但要改 `src/lib/graph/task-graph.ts` 状态机、前端 `TaskGraphPanel`、多处切换与测试，估算升到 **M/L**，且改动面远大于本卡。
+- **(a) 重新派生 + 空目标节点删除 + 依赖重接** —— **Tina 拍板采纳**。
+- (b) 保留节点 + 重定向目标 —— 等于为了变绿造假证据，**不采用**。
+- (c) 新增 `SUPERSEDED` 状态 —— 语义最诚实但改状态机与前端，升 **M**，**不采用**。
 
-**我的建议：走 (a) 退役**，这是唯一「S 级 + 不伪造证据」的路。若你坚持节点数不变，就得接受 (c) 升卡到 M——请拍板。
+### 1.1 拍板理由（原话要点）
+
+1. 「保留全部节点」与「目标重新派生」不可兼得——8 个节点的目标按 J.60 属非交付物，说明这些节点本身就是旧拆解规则的产物（把不该由 Worker 交付的东西当成了节点目标）。
+2. 「允许空 `target_files`」不可选——等于给核销器开「无文件证据也能点亮」的口子，违背「目标文件未写入不得点亮」的门禁语义，比删节点危害大。
+3. 「保留旧目标不派生」等于迁移不做，`n3` 永久 `FAILED`，已否过。
+
+### 1.2 拍板后的迁移规则（施工必须逐条守住）
+
+1. 按 J.60 新规则**重新派生每个节点的 `target_files`**。
+2. **派生结果为空的节点从图中删除**；其下游节点的 `depends_on` **改指向被删节点的上游**（跳过被删节点），保持拓扑一致、无悬空依赖、无环。
+3. 保留的节点维持 `node_id`、`state`（`ILLUMINATED` / `FAILED` / `BLOCKED` 等）与 `executed_at` / `commit_sha`。
+4. 图 `revision` 仍按「一次迁移 = 一次提交 = +1」递增。
+5. **`n1` / `n2` 的已点亮状态必须保住**。若某个 `ILLUMINATED` 节点本身落入「空目标」名单，**不得擅自删除**——`ILLUMINATED` 节点退役候选即**停工上报**（`E_GRAPH_ILLUMINATED_TARGET_NOT_DELIVERABLE`），由 Tina 另议。本图中 `n1`（`src/**`）、`n2`（`package.json`）都属交付物，不触发该分支。
+6. `FAILED` 节点允许退役（本图 `n3` 即此情形，其失败系 J.60 缺陷造成的误报），但必须逐条写 `issues` 留痕。
 
 ## 2. 迁移触发点：显式接口（推荐），不做启动静默迁移
 
@@ -50,7 +63,8 @@ body: { contract_id: string, dry_run?: boolean, graph_id?: string }
 200: { migrated: boolean, dry_run: boolean, retired: [{node_id, target_files, previous_state}],
        kept: [{node_id, state, target_files}], revision_before, revision_after }
 404: E_GRAPH_NOT_FOUND / E_CONTRACT_NOT_FOUND
-409: E_GRAPH_TARGETS_IN_FLIGHT（有节点处于 RUNNING / REPAIRING，拒绝迁移）
+409: E_GRAPH_TARGETS_IN_FLIGHT（有退役候选处于 RUNNING / REPAIRING，拒绝迁移）
+409: E_GRAPH_ILLUMINATED_TARGET_NOT_DELIVERABLE（退役候选已 ILLUMINATED，按拍板规则停工上报）
 409: E_GRAPH_STALE_SNAPSHOT（body.graph_id 与当前图不符）
 ```
 
@@ -63,6 +77,9 @@ body: { contract_id: string, dry_run?: boolean, graph_id?: string }
 - 能力来源：图所属合同的 `verification_spec.commands`（`orchestrator.getStore().get(contract_id)`）。合同缺失 → 404，不猜。
 - 本图合同是九条 `baseline-*`（`executable: stagent`），不要求 typecheck/test → 8 个脚手架节点全部退役。
 - 依赖图重连：按原拓扑序保留存活节点的相对顺序，`depends_on` 指向**前一个存活节点**；存活节点 id 不变。
+  - 多目标节点：只把非交付物模式从 `target_files` 里剔除；若剔除后仍非空，节点保留、状态不变（不因目标缩减而重置）。
+  - 剔除后为空 → 节点退役，下游 `depends_on` 跳过它指向其上游（递归跳过连续退役节点），保证无悬空 / 无环。
+  - **已点亮节点保护**：退役候选 `state === "ILLUMINATED"` → 整个迁移拒绝（409 `E_GRAPH_ILLUMINATED_TARGET_NOT_DELIVERABLE`），图零改动，报 Tina 另议。
 
 ## 4. 状态与 `revision` 的保留语义
 
@@ -91,8 +108,9 @@ body: { contract_id: string, dry_run?: boolean, graph_id?: string }
 - **J61-P1**：旧形态图 + 九条 `baseline-*` 合同 → dry-run 返回 `retired` 8 条、`kept` 4 条且不落盘；实跑后 `nodes.length=4`，`n1`/`n2` 的 `state`/`executed_at`/`commit_sha` 与迁移前逐字相同，`revision` 恰好 +1，`issues` 含 8 条 `E_TARGET_SUPERSEDED`。
 - **J61-P2**：幂等——已迁移图再次调用返回 `migrated:false`，`revision` 不变、无新 issue。
 - **J61-P3**：合同含 `npm run typecheck` / `npm test` 时，`tsconfig*` 与 `vitest/vite config` 节点**不被退役**（与 J.60 同一判定）。
-- **J61-P4**：退役节点处于 `RUNNING` / `REPAIRING` → 409 `E_GRAPH_TARGETS_IN_FLIGHT`，图零改动；合同不存在 → 404；`graph_id` 不符 → 409。
-- **J61-P5**：四个 readonly 文件相对父提交零 diff；核销侧 `E_FILES_NOT_WRITTEN` / 判定顺序未改。
+- **J61-P4**：退役候选处于 `RUNNING` / `REPAIRING` → 409 `E_GRAPH_TARGETS_IN_FLIGHT`，图零改动；退役候选处于 `ILLUMINATED` → 409 `E_GRAPH_ILLUMINATED_TARGET_NOT_DELIVERABLE`，图零改动（已点亮节点不得擅自删除）；合同不存在 → 404；`graph_id` 不符 → 409。
+- **J61-P5**：多目标节点只剔除脚手架模式、保留其余目标且状态不变；连续多个退役节点时下游 `depends_on` 递归跳过、无悬空 / 无环（拓扑序可重算）。
+- **J61-P6**：四个 readonly 文件相对父提交零 diff；核销侧 `E_FILES_NOT_WRITTEN` / 判定顺序未改。
 
 ## 7. 执行后（不在本卡验收）
 
