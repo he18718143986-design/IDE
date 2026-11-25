@@ -229,6 +229,7 @@
 | `TASK-J.58` | `COMPLETED` | 核销展开 target_files 通配符已交付（立卡 P-307；施工 #394 `025cdb01`；完工回写 P-308；估算 S；判定侧纯函数 + 采证侧磁盘遍历展开、字面路径行为不变、E_FILES_NOT_WRITTEN 白话不变、范围检查未改；真钥匙复测不在本卡，端到端闭环未宣称） | [正文](./development-tasks-completed.md#task-j.58) |
 | `TASK-J.59` | `COMPLETED` | 官方核销把产品 CLI stagent 解析到当前 Daemon 入口已交付（立卡 P-310；施工 #398 `e7e5ca67`；完工回写 P-311；估算 M；E_COMMAND_NOT_RESOLVED/E_COMMAND_SPAWN_FAILED 独立错误码、片段按 J.56 口径落 daemon.jsonl、注入三文件零 diff；真钥匙复测不在本卡，端到端闭环未宣称） | [正文](./development-tasks-completed.md#task-j.59) |
 | `TASK-J.60` | `COMPLETED` | 计划节点目标与 Worker 实际产出对齐（立卡 P-314；施工 #403 `5173e8e`；完工回写 P-315；估算 S；提案按验收命令能力过滤脚手架目标；核销侧零改动；既有图不回溯） | [正文](./development-tasks-completed.md#task-j.60) · [诊断简报](../ledger/j60-plan-output-mismatch-brief.md) · [n3 复测](../ledger/j60-n3-retest-after-merge.md) |
+| `TASK-J.61` | `NEW_TASK` | 既有任务图目标迁移：重新派生 + 空目标节点退役 + 依赖重接（立卡 P-317；估算 S；未开工） | [正文](./development-tasks-active.md#task-j.61) · [施工方案](../ledger/j61-graph-targets-migration-plan.md) |
 
 ---
 
