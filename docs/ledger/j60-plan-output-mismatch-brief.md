@@ -45,11 +45,11 @@ tests/**, **/*.test.ts, **/*.test.tsx, **/*.spec.ts
 
 ## 4. 候选方案
 
-### 方案 A（推荐 · 本卡默认）：提案侧按验收命令决定脚手架目标
+### 方案 A（推荐 · 本卡默认 · 已施工）：提案侧按验收命令决定脚手架目标
 
 - 在提案构建时过滤「纯脚手架 / 配置类」目标模式**不进节点**：
   - `tsconfig.json`、`tsconfig.*.json`、`*.config.ts`、`*.config.mjs`、`*.config.js`、`vitest.config.*`、`vite.config.*`、`**/*.test.ts`、`**/*.test.tsx`、`**/*.spec.ts`
-- **守卫条件**：仅当验收命令**不要求**相应能力时才过滤——复用既有 `commandsNeedNpmVerification()` 语义（`daemon/supervisor/rules-l0.ts:213-227`）：命令里有 `npm typecheck` → 保留 `tsconfig*`；有 `npm test` → 保留 `vitest.config.*` / `vite.config.*`。避免「把真需要 TS 配置的项目削成过不了 typecheck」。
+- **守卫条件**：仅当验收命令**不要求**相应能力时才过滤——复用既有 `commandsNeedNpmVerification()` 语义（`daemon/supervisor/rules-l0.ts:213-227`）：命令里有 `npm typecheck` → 保留 `tsconfig*`；有 `npm test` → 保留 `vitest.config.*` / `vite.config.*` / 配置与测试 glob。避免「把真需要 TS 配置的项目削成过不了 typecheck」。
 - 这些路径**仍留在 `writable_paths`**（写入权限不缩），只是不再作为核销目标。真实产物 `src/**`、`tests/**`、`package.json`、`index.html` 全部保留为节点。
 - 代价：`E_FILES_NOT_WRITTEN` 对「脚手架」不再兜底；收益：核销目标与产物语义一致。
 - 估算：**S**。
@@ -66,13 +66,26 @@ tests/**, **/*.test.ts, **/*.test.tsx, **/*.spec.ts
 
 **推荐 A**（本卡默认，标 `ai_inferred`）；B 作为后续口径升级另案；C 不采用。方向最终由 Tina 拍板，卡未开工。
 
-## 5. 验收口径（CI 可验证）
+## 5. 施工落地（2026-11-26，P-315）
+
+- **改动面**：只动 `src/lib/journey/proposal-from-contract.ts` 一个产品文件（+76/−3），新增 `tests/unit/proposal-scope-align.test.ts`（5 例）。`readonly_paths` 四个文件（`illumination-verifier.ts`、`target-file-match.ts`、`rules-l0.ts`、`resolve-stagent-cli.ts`）零改动 —— 核销侧 fail-closed、判定顺序与 `patternIsSatisfied` 语义未动。
+- **实现要点**：
+  - `SCAFFOLDING_TARGETS` 十个模式与 `GREENFIELD_NPM_WRITABLE_DEFAULTS` 中的脚手架子集一一对应。
+  - `verificationCapabilities()` 与 `rules-l0.ts::commandsNeedNpmVerification` **同一判定语义**（`executable === "npm"` + `args` 含 `typecheck` / `test`，或 `run <script>`），但**不 import `daemon/`**——本地纯函数，保持 `src/lib` 共享契约层不反向依赖 daemon。
+  - 过滤后若为空（可写范围全是脚手架），回退原列表，避免零节点图。
+- **验收对应**：
+  - `J60-P1`：14 条绿野模板 + 九条 `baseline-*` 命令 → 节点目标恰为 `["src/**","package.json","index.html","tests/**"]`，十个脚手架模式全部不出节点。
+  - `J60-P2`：`npm run typecheck` → `tsconfig.json` / `tsconfig.*.json` 保留；`npm test`（`run test` 与简写 `test`）→ `vitest.config.*` / `vite.config.*` / `**/*.test.ts` / `**/*.spec.ts` 保留；互不误删。
+- **回归**：`proposal-scope-align` 5/5、`journey-proposal-from-contract` + `server-task-graph-verify` + `target-file-match` + `graph-engine-invariants` 41/41 全绿；`tsc --noEmit` 零错误；eslint 零问题。
+- **未做**：真钥匙复测（`n3` 官方 start/verify）不在本卡验收口径内，由 J.60 合入并重启 Daemon 后另轮执行；`n12` 扩展名不匹配、过期标记 glob 化、设计层挂账、自动钩子均不在本卡。
+
+## 6. 验收口径（CI 可验证）
 
 - 纯 JS 交付（验收命令为九条 `baseline-*`、无 `npm typecheck` / `npm test`）时，提案节点**不含**上述脚手架目标；`src/**`、`tests/**`、`package.json`、`index.html` 仍各成节点。
 - 有 `npm run typecheck` 时 `tsconfig.json` 仍成节点；有 `npm test` 时 `vitest.config.*` / `vite.config.*` 仍成节点。
 - 核销侧零改动：`E_FILES_NOT_WRITTEN`、判定顺序、`patternIsSatisfied` 语义全部不变（只读核验 + 既有用例保持绿）。
 - 真钥匙复测不在本卡验收口径内。
 
-## 6. 排除
+## 7. 排除
 
 不放宽 fail-closed、不改 J.58 glob 展开、不改 J.59 命令解析、不改门禁阈值、不改 `markStale` / `nodeTouchesPaths`、不改 ADR-0015、不伪造施工树文件、不点「确认开工」、不宣称端到端闭环。
