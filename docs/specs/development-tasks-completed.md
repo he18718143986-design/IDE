@@ -11816,3 +11816,177 @@ governance:
 * **后续路径（锁定，待 Tina 点名）**：本回写合入并重启 Daemon 后，再重试 `run-worker` 验证提示词约束是否生效（仍出工具标记则按卡面风险另议换模型或更大改法）→ 实测记录落 ledger。本回写未启动实测，未重试 run-worker，未宣称端到端闭环。
 
 * **完工说明（2026-11-25 · P-304）**：施工 [#389](https://github.com/he18718143986-design/IDE/pull/389) squash `fed205a5805f41bc3516249be16d12bbfefaeb08`。**Worker 提示词约束只输出 JSON、禁止工具调用标记已交付（输出契约与首轮/重试提示锁 JSON-only、角色与边界/可用工具/known_limitations 改写、generateObject 形状与模型 id 未改）；真钥匙复测不在本卡，端到端闭环未宣称**。相对父提交只改四条 `writable_paths`、+176/−8，无 docs、无范围外文件。`generateObject` 调用形状与模型 id 未改。后续路径已锁定、待 Tina 点名。本回写未启动实测。
+
+### 3.4bu 核销展开 target_files 通配符（J.58 · 完工回写 P-308）
+
+<a id="task-j.58"></a>
+
+### 【Task J.58】核销展开 target_files 通配符，匹配文件存在时不得因字面 glob 报尚未写入 `[COMPLETED · 立卡 P-307 · 施工 #394 · 完工回写 P-308]`
+
+> **归档注记（2026-11-25 · P-308）**：本卡已 **COMPLETED**。Tina 选 A，按先例授权合并 #394（t1460u；Windows Unit 非阻断存量，同 #266–#389）。[#394](https://github.com/he18718143986-design/IDE/pull/394) squash `025cdb01e62f81e7ef86e46595c49f5873f383f7` 于 2026-11-25 19:16:17 香港时间合入（由我执行；pre-merge head `ea2ef152ee780597db0f151162cdcb150a7a40e2`；父提交 `776e95db6341a3244ee732f6da26ba2819aa7996`；squash 提交日期 2026-11-25 19:16:16 香港时间）。合入前必需面全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit 实跑通过，含 macOS Lint；CI run 45600382396 workflow conclusion=success，cancelled=0），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非必需存量失败：16 个既有文件 / 28 例，CRLF / 路径分隔 / EPERM fsync / golden-slice 等存量名单，`tests/unit/target-file-match.test.ts` 与 `tests/unit/graph-engine-invariants.test.ts` 不在失败名单；同 #266～#389 先例）。无 CANCELLED。Bugbot NEUTRAL 不挡。基线 `main` 原为 `776e95db6341a3244ee732f6da26ba2819aa7996`（[#393](https://github.com/he18718143986-design/IDE/pull/393) P-307）。编号按流水使用 **P-308**（版本头第 292 条）；**P-285 号未占用，不擅自改号**（changelog 号 P-285 与版本头顺序第 285 条不是同一个「285」）。诚实口径：**核销展开 `target_files` 通配符已交付（判定侧纯函数 + 采证侧磁盘遍历展开、字面路径行为不变、`E_FILES_NOT_WRITTEN` 白话不变、范围检查未改）；真钥匙复测不在本卡，端到端闭环未宣称**。相对父提交只改五条 `writable_paths`、+399/−12，无 docs、无范围外文件。`daemon/server.ts`、`src/lib/journey/proposal-from-contract.ts`、`src/lib/scope.ts`、`daemon/graph/graph-engine.ts`（含 `markStale`）、`daemon/worker/openai-client.ts`、`daemon/worker/parse-worker-output.ts` 相对父提交零 diff；`nodeTouchesPaths` 函数体未改。后续路径已锁定、待 Tina 点名：本回写合入并重启 Daemon 后，再对 n1 官方重试 start/verify 验证通配符采证，实测记录落 ledger；n12 扩展名不匹配与 `markStale` / `nodeTouchesPaths` 是否另立卡，届时再定。本回写未启动实测，未重试 n1，未宣称端到端闭环。
+```yaml task-card
+id: TASK-J.58
+status: COMPLETED
+contract:
+  intent:
+    title: 核销展开 target_files 通配符，匹配文件存在时不得因字面 glob 报尚未写入
+    description: >-
+      Worker/任务图官方核销必须把 target_files 里的 glob（如 src/**）在隔离施工树里
+      展开成真实匹配文件，再判定点亮；不得把 src/** 当字面相对路径，在匹配文件
+      已存在时仍报 E_FILES_NOT_WRITTEN「节点 n1 的目标文件尚未写入: src/**」。
+      根因：collectWorktreeEvidence（daemon/graph/evidence-collector.ts）对
+      target_files 逐条当相对路径读盘算哈希、不展开通配符；evaluateIllumination
+      （daemon/graph/illumination-verifier.ts）把 files_written 与 target_files
+      做集合精确包含，同样不展开。src/** 来自计划生成的确定性拆解
+      （proposal-from-contract 把合同 writable_paths 前 12 项各做成一个节点），
+      不是意外。修法：匹配规则只放一处，新增小模块两类能力——判定侧纯函数不读盘
+      （看已采集路径是否满足模式）、采证侧在施工树根目录把 glob 展开成真实文件
+      再算哈希（键用真实相对路径）。展开走磁盘遍历（跳过 .git / .stagent /
+      node_modules 等），不改成只看 git ls-files，不加「先提交才能被看见」门槛；
+      复用仓内已有 picomatch 与合同范围的 matchesAnyPattern，不新引入依赖。
+      同一次修一起改指纹取径（buildFingerprints）；只改采证会在指纹步再报
+      E_FINGERPRINT_MISSING。字面路径行为不变。一个都匹配不到仍报同一句
+      「节点 n1 的目标文件尚未写入: src/**」，缺项处仍写原模式，错误码与白话
+      不变。合同范围 / scope_violations 不改（已认识通配符，核的是变更路径是否
+      在合同 writable_paths，与节点目标展开是两条线）。不改 start/verify 请求
+      处理。立卡不等于开工。
+    risk_level: LOW
+  acceptance:
+    - id: J58-P1
+      check: auto
+      text: >-
+        glob 在施工树能匹配到实文件（含未跟踪文件）时，该模式不报
+        E_FILES_NOT_WRITTEN；files_written 与 file_hashes 列出真实相对路径
+        （如 src/auth.js），不含字面 src/**。
+    - id: J58-P2
+      check: auto
+      text: >-
+        glob 一个都匹配不到时，仍报 E_FILES_NOT_WRITTEN，白话仍为
+        「节点 <id> 的目标文件尚未写入: <原始模式>」（例如含 src/**），
+        错误码与用词不变，缺项列表仍写原模式。
+    - id: J58-P3
+      check: auto
+      text: >-
+        无通配符的字面路径：文件在或不在，行为与现在相同。
+    - id: J58-P4
+      check: auto
+      text: >-
+        范围越界仍走现有 scope_valid / E_SCOPE_VIOLATION，失败点在范围步；
+        不因本次展开而改成按节点目标展开集合来判。
+    - id: J58-P5
+      check: auto
+      text: >-
+        glob 点亮时，fingerprints 按真实文件路径记录，而不是字面 src/**
+        这种键。
+    - id: J58-P6
+      check: auto
+      text: >-
+        现有字面路径单测（含 tests/unit/graph-engine-invariants.test.ts
+        「目标文件未写入 / Scope 越界均不得点亮」）继续通过。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/graph/target-file-match.ts
+      - daemon/graph/evidence-collector.ts
+      - daemon/graph/illumination-verifier.ts
+      - tests/unit/graph-engine-invariants.test.ts
+      - tests/unit/target-file-match.test.ts
+    readonly_paths:
+      - daemon/server.ts
+      - src/lib/journey/proposal-from-contract.ts
+      - src/lib/scope.ts
+      - daemon/editor/worktree-files.ts
+      - docs/ledger/j57-graph-n1-walk.md
+  verification:
+    commands:
+      - { alias: target-file-match, executable: npx, args: [vitest, run, tests/unit/target-file-match.test.ts] }
+      - { alias: graph-engine-invariants, executable: npx, args: [vitest, run, tests/unit/graph-engine-invariants.test.ts] }
+design:
+  approach: >-
+    官方走查（P-306 / #392）对 n1 先 POST /api/graph/nodes/start 得 200
+    （PENDING→RUNNING，revision 1→2），再 POST /api/graph/verify 得 200
+    但 illuminated=false，E_FILES_NOT_WRITTEN「节点 n1 的目标文件尚未写入:
+    src/**」，n1→FAILED，n2–n12 级联 BLOCKED（revision 2→3）。施工树 src/*
+    文件物理存在且为未跟踪，HEAD 仍为 init。Tina 审过施工方案（t1458u）并
+    授权立卡：这是真缺口，不是请求体写错、不是权限挡住、与自动钩子无关，
+    也不是「先提交再核销」能绕过的。匹配规则只放一处（新建
+    daemon/graph/target-file-match.ts）：判定侧纯函数不读盘；采证侧磁盘展开
+    后算哈希。复用 picomatch 与 src/lib/scope.ts 的 matchesAnyPattern，不新
+    引入依赖；展开可对标 daemon/editor/worktree-files.ts 的磁盘遍历与忽略
+    目录，但本卡不改该文件与 daemon/server.ts 请求处理。同一次改
+    buildFingerprints 的取径。要动 writable_paths 以外的文件，停工修卡。
+    本卡验收只含 CI 单测；合入并重启 Daemon 后再对 n1 重试 start/verify、
+    以及 n12 扩展名不匹配与 markStale / nodeTouchesPaths 是否另立卡，不进
+    本卡 PASS，不写成 it()。观察项（ai_inferred）：修好存在性后本试玩仍可能
+    在命令退出码等后续步骤失败；n12 目标是 **/*.test.ts，Worker 写出的是
+    tests/*.test.js，即便通配符展开修好仍可能因扩展名不匹配报尚未写入。
+  touches:
+    - { path: daemon/graph/target-file-match.ts, change: create, why: 匹配规则只放一处：判定侧纯函数（已采集路径是否满足模式）与采证侧磁盘展开, symbols: [] }
+    - { path: daemon/graph/evidence-collector.ts, change: modify, why: 采证侧用共享匹配模块把 glob 展开成真实文件再算哈希，键用真实相对路径；字面路径行为不变；仍走磁盘而不是 git ls-files, symbols: [collectWorktreeEvidence] }
+    - { path: daemon/graph/illumination-verifier.ts, change: modify, why: 判定侧用同一匹配规则判断模式是否被 files_written 满足；零匹配缺项仍写原模式、错误码与白话不变；同一次改 buildFingerprints 取真实路径, symbols: [evaluateIllumination, buildFingerprints] }
+    - { path: tests/unit/target-file-match.test.ts, change: create, why: 新建匹配/展开单测，覆盖 glob 命中含未跟踪文件、零匹配白话、字面路径, symbols: [] }
+    - { path: tests/unit/graph-engine-invariants.test.ts, change: modify, why: 补充 glob 点亮指纹按真实路径记录、范围越界仍走现有范围步等门禁，并保住现有字面路径 invariant, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J58-P1, test_path: tests/unit/target-file-match.test.ts, level: unit, case: "J58-P1: glob 匹配到施工树实文件（含未跟踪）不报 E_FILES_NOT_WRITTEN，files_written 与哈希是真实路径而非字面 src/**" }
+    - { acceptance_id: J58-P2, test_path: tests/unit/target-file-match.test.ts, level: unit, case: "J58-P2: glob 零匹配仍 E_FILES_NOT_WRITTEN，白话含原始模式且错误码与用词不变" }
+    - { acceptance_id: J58-P3, test_path: tests/unit/graph-engine-invariants.test.ts, level: unit, case: "目标文件未写入 / Scope 越界均不得点亮" }
+    - { acceptance_id: J58-P4, test_path: tests/unit/graph-engine-invariants.test.ts, level: unit, case: "J58-P4: 范围越界仍走现有 scope_valid / E_SCOPE_VIOLATION，不按节点目标展开集合改判" }
+    - { acceptance_id: J58-P5, test_path: tests/unit/graph-engine-invariants.test.ts, level: unit, case: "J58-P5: glob 点亮时 fingerprints 按真实文件路径记录" }
+    - { acceptance_id: J58-P6, test_path: tests/unit/graph-engine-invariants.test.ts, level: unit, case: "目标文件未写入 / Scope 越界均不得点亮" }
+governance:
+  spec_refs:
+    - docs/ledger/j57-graph-n1-walk.md
+  depends_on:
+    - { id: TASK-J.57, kind: hard }
+  code_facts:
+    - { ref: "daemon/graph/evidence-collector.ts:116-123", note: collectWorktreeEvidence 对 targetFiles 逐条当相对路径 path.join 后 sha256File，不展开 glob }
+    - { ref: "daemon/graph/illumination-verifier.ts:241-250", note: evaluateIllumination 第 4 步对 files_written 与 target_files 做集合精确包含，缺项进白话「节点 … 尚未写入:」 }
+    - { ref: "daemon/graph/illumination-verifier.ts:158-175", note: buildFingerprints 按 target_files 字面路径取 file_hashes；只改采证不改此步会 E_FINGERPRINT_MISSING }
+    - { ref: "daemon/graph/illumination-verifier.ts:334-339", note: 指纹取不到时返回 E_FINGERPRINT_MISSING }
+    - { ref: "daemon/server.ts:3595-3600", note: POST /api/graph/verify 把 node.target_files 交给 collectWorktreeEvidence；本卡不改该请求处理 }
+    - { ref: "src/lib/journey/proposal-from-contract.ts:57-62", note: 计划生成把合同 writable_paths 前 12 项各做成一个节点的 target_files，故出现 src/** 等 glob }
+    - { ref: "src/lib/scope.ts:40-62", note: matchesAnyPattern 已用 picomatch 识别合同范围 glob；本卡复用，不新引入依赖 }
+    - { ref: "src/lib/scope.ts:113-140", note: checkWriteAccess 已按合同 writable_paths glob 判定；scope_violations 走这条线，本卡不改 }
+    - { ref: "daemon/graph/evidence-collector.ts:133-156", note: 范围检查用 git status --porcelain -uall（含未跟踪）再 checkWriteAccess，不按节点 target_files 展开集合来判 }
+    - { ref: "daemon/editor/worktree-files.ts:126-138", note: TREE_IGNORED_DIRS 已列出 .git / .stagent / node_modules 等；展开可对标，本卡不改此文件 }
+  non_goals:
+    - 自动钩子（Worker 完成 → 自动 start/verify）仍只作 backlog 候选，不立卡、不在本卡施工
+    - 本卡施工不重试 FAILED 的 n1，不对 n2–n12 发 start/verify
+    - 不改 start/verify 的 HTTP 请求体或 daemon/server.ts 的请求处理
+    - 不改 generateObject、解析器或计划拆解策略（proposal-from-contract）
+    - 不把「先提交才能被看见」写成修法，不把展开改成只看 git ls-files
+    - 不把合同范围 / scope_violations 改成按节点目标展开集合来判
+    - 不改 markStale / nodeTouchesPaths（前缀/相等比对留本卡外，是否另立卡由 Tina 定）
+    - 施工 PR 不改 docs/
+    - 立卡不等于开工
+    - J.58 代码合入并重启 Daemon 后对 n1 重试 start/verify，以及 n12 扩展名不匹配与过期标记 glob 化是否另立卡，不进本卡验收
+  fail:
+    - glob 已匹配到施工树实文件（含未跟踪）仍因字面 src/** 报 E_FILES_NOT_WRITTEN
+    - files_written / file_hashes / fingerprints 仍用字面 glob 当路径键，而不是真实相对路径
+    - 零匹配时改了错误码，或白话不再是「节点 … 尚未写入:」加原始模式
+    - 字面路径在或不在的行为被改掉，或现有字面路径 invariant 单测不再通过
+    - 范围检查被改成按节点目标展开集合来判，或范围越界不再走现有 scope 步
+    - 展开改成只看 git ls-files，或加了「先提交才能被看见」门槛
+    - 新引入了依赖，或未复用仓内 picomatch / matchesAnyPattern
+    - 只改了采证、未改 buildFingerprints 取径
+    - 改了 start/verify 请求处理、解析器、计划拆解，或改动 writable_paths 以外的文件却未停工修卡
+    - 把 n1 重试、n2–n12 start/verify、自动钩子、n12 扩展名或 markStale glob 化写成 it()，或写成会让 check:docs 要求出现在 it() 里的 case
+  adr_revisions: []
+  defaults:
+    - 本卡只修核销路径对 target_files glob 的展开与判定/指纹取径，不改范围检查、请求格式与计划拆解
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 394, commit: 025cdb01e62f81e7ef86e46595c49f5873f383f7 }
+```
+
+* **背景**：J.57 提示词约束已交付并完成官方 `run-worker` 复测（P-305，HTTP 200，施工树写出 11 个文件）。随后官方控制面走查（P-306）：`n1` start 200（`PENDING`→`RUNNING`），verify 200 但因 `E_FILES_NOT_WRITTEN`「节点 n1 的目标文件尚未写入: src/**」转为 `FAILED`，`n2`–`n12` 级联 `BLOCKED`。采证与点亮判定把 `src/**` 当字面路径、不展开通配符；文件已在施工树且为未跟踪。Tina 定性为真缺口：计划生成的 glob 目标若核销器不展开，这类节点会一直 `FAILED`，不是「先提交再核销」能绕过的。
+* **取舍**：Tina t1458u 审过施工方案并授权立卡。匹配规则只放一处；展开走磁盘；同一次改指纹取径；字面路径与错误白话不变；合同范围检查不改。不重开 J.53 / J.54 / J.55 / J.56 / J.57。自动钩子仍 backlog 候选，不立卡。观察项标 `ai_inferred`：修好存在性后本试玩仍可能在命令退出码等后续步骤失败；`n12` 目标 `**/*.test.ts` 而 Worker 写出 `tests/*.test.js`，即便展开修好仍可能因扩展名不匹配报尚未写入。
+* **立卡说明（2026-11-25 · P-307）**：Tina 授权立卡（t1458u）。基线 `main` `5ba3eae6f6adeafc4abc990850adc486f97d85b9`（[#392](https://github.com/he18718143986-design/IDE/pull/392) P-306）；产品代码尖仍为 [#389](https://github.com/he18718143986-design/IDE/pull/389) squash `fed205a5805f41bc3516249be16d12bbfefaeb08`。现场核对 changelog 最新原为 P-306、版本头最新原为第 290 条，按流水取下一号 **P-307**（版本头第 291 条）。**P-285 号未占用，不擅自改号**。**立卡 ≠ 开工**；先合入本 docs PR，再开独立代码 PR。代码 PR 必需检查全绿后报授权；Windows 存量失败按先例报 UNSTABLE（#266–#389 选 A）。范围外文件要动就停工修卡。
+* **后续路径（锁定，不在本卡验收）**：J.58 代码合入并重启 Daemon 后，再对 `n1` 官方重试 start/verify，验证通配符采证 → 实测记录落 ledger。`n12` 扩展名不匹配与 `markStale` / `nodeTouchesPaths` 是否另立卡，届时由 Tina 定。本卡施工不重试 `n1`，不对 `n2`–`n12` 发 start/verify。
+* **完工说明（2026-11-25 · P-308）**：施工 [#394](https://github.com/he18718143986-design/IDE/pull/394) squash `025cdb01e62f81e7ef86e46595c49f5873f383f7`。**核销展开 `target_files` 通配符已交付（判定侧纯函数 + 采证侧磁盘遍历展开、字面路径行为不变、`E_FILES_NOT_WRITTEN` 白话不变、范围检查未改）；真钥匙复测不在本卡，端到端闭环未宣称**。相对父提交只改五条 `writable_paths`、+399/−12，无 docs、无范围外文件。请求格式 / 解析器 / 计划拆解 / 范围检查 / 过期标记相对父提交零 diff。后续路径已锁定、待 Tina 点名。本回写未启动实测。
