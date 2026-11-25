@@ -30,6 +30,14 @@ const workerOutputSchema = z.object({
   log: z.array(z.string()).describe("按步骤描述的中文改动说明"),
 });
 
+/** 首轮用户提示中的 JSON-only / 禁工具标记约束（TASK-J.57）。 */
+export const WORKER_JSON_ONLY_USER_RULE =
+  "本轮只返回合法 JSON 对象，字段必须含 changes:[{path,content}] 与 log:string[]。禁止自然语言开场，禁止 markdown 围栏，禁止 DSML、<tool_call> 以及任何工具调用标记。写入由 Daemon 落地，不要在回复里发出工具调用。";
+
+/** 解析失败后的本地重试后缀；在首轮约束上再点名禁止 DSML / <tool_call>。 */
+export const WORKER_PARSE_RETRY_STRICT_SUFFIX =
+  "\n\n【重试】上次输出格式无效。" + WORKER_JSON_ONLY_USER_RULE;
+
 function redactedParseFailureDetail(
   features: WorkerParseFailureFeatures,
 ): Record<string, unknown> {
@@ -120,10 +128,10 @@ export class OpenAiWorkerClient implements WorkerModelClient {
         .map((f) => `=== ${f.path} ===\n${f.content}`)
         .join("\n\n")}`,
       "请按输出契约返回 changes 数组（完整文件内容）；若无需改动返回空数组。",
+      WORKER_JSON_ONLY_USER_RULE,
     ].join("\n\n");
 
-    const strictSuffix =
-      "\n\n【重试】上次输出格式无效。请只返回合法 JSON 对象，字段必须含 changes:[{path,content}] 与 log:string[]，不要 markdown 围栏。";
+    const strictSuffix = WORKER_PARSE_RETRY_STRICT_SUFFIX;
 
     const { value } = await withParseRetry(
       async (attempt) => {

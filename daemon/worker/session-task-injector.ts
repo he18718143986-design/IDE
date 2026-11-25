@@ -436,7 +436,7 @@ export function buildWorkerTaskInstruction(
       body: [
         "你是 Stagent 的 Coding Worker，只在一个隔离的 Git Worktree 中工作。",
         `工作目录（Worktree 根）：${worktreeRoot}`,
-        "你必须通过受管工具读写文件与执行命令；严禁直接调用 Shell、严禁访问 Worktree 之外的任何路径。",
+        "本轮你只返回一个 JSON 对象；读写文件与执行命令由 Daemon 在模型之外经 stagent_* 受管工具落地。严禁直接调用 Shell、严禁访问 Worktree 之外的任何路径。不要在回复里发出工具调用标记。",
         "宿主项目根对你是不可见的；任何试图跳出 Worktree 的路径都会被网关拒绝。",
       ].join("\n"),
     },
@@ -496,10 +496,13 @@ export function buildWorkerTaskInstruction(
     },
     {
       title: "可用工具",
-      body: bulletList(
-        exposedTools.map((tool) => `${tool}：${TOOL_DESCRIPTIONS[tool]}`),
-        "（当前合同未暴露任何工具）",
-      ),
+      body: [
+        "下列名称是合同授权与范围说明，不是要你在本轮回复里发出工具调用。写入由 Daemon 根据你返回的 JSON 落地。",
+        bulletList(
+          exposedTools.map((tool) => `${tool}：${TOOL_DESCRIPTIONS[tool]}`),
+          "（当前合同未暴露任何工具）",
+        ),
+      ].join("\n"),
     },
     {
       title: "已知限制（known_limitations）",
@@ -516,6 +519,9 @@ export function buildWorkerTaskInstruction(
     {
       title: "输出契约",
       body: [
+        "本轮回复必须是合法 JSON 对象，字段仅为 changes:[{path,content}] 与 log:string[]。",
+        "禁止自然语言开场，禁止 markdown 围栏，禁止 DSML、<tool_call> 以及任何工具调用标记。",
+        "写入由 Daemon 根据该 JSON 经受管工具落地，不要在回复里发出工具调用。",
         "返回完整文件内容（changes 数组），不要输出 diff。",
         "不得引入未授权依赖，不得修改验收标准或测试断言来规避验证。",
         "若无需改动，返回空 changes 数组。",
