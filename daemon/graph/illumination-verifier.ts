@@ -3,6 +3,12 @@ import type {
   TaskGraphFingerprint,
   TaskNode,
 } from "../../src/lib/graph/task-graph";
+import {
+  isGlobPattern,
+  normalizeTargetPath,
+  pathSatisfiesTargetPattern,
+  patternIsSatisfied,
+} from "./target-file-match";
 
 /**
  * 物理点亮验证器（架构规范 §3.2.2 / §3.4，TASK-C.7）。
@@ -100,7 +106,7 @@ export interface IlluminationBlocked {
 export type IlluminationResult = IlluminationSuccess | IlluminationBlocked;
 
 function normalizePath(input: string): string {
-  return input.replace(/\\/g, "/").replace(/^\.\//, "");
+  return normalizeTargetPath(input);
 }
 
 function blocked(
@@ -160,17 +166,36 @@ function buildFingerprints(
   input: IlluminationInput,
 ): TaskGraphFingerprint[] | null {
   const fingerprints: TaskGraphFingerprint[] = [];
-  for (const rawPath of node.target_files) {
-    const path = normalizePath(rawPath);
-    const sha256 = input.file_hashes[path];
-    if (typeof sha256 !== "string" || sha256.length === 0) return null;
+  const seen = new Set<string>();
+  const add = (filePath: string): boolean => {
+    if (seen.has(filePath)) return true;
+    const sha256 = input.file_hashes[filePath];
+    if (typeof sha256 !== "string" || sha256.length === 0) return false;
+    seen.add(filePath);
     fingerprints.push({
       node_id: node.node_id,
-      path,
+      path: filePath,
       sha256,
       recorded_at: input.now,
       commit_sha: input.commit_sha as string,
     });
+    return true;
+  };
+
+  for (const rawPath of node.target_files) {
+    const pattern = normalizePath(rawPath);
+    if (!isGlobPattern(pattern)) {
+      if (!add(pattern)) return null;
+      continue;
+    }
+    const matched = Object.keys(input.file_hashes)
+      .map(normalizePath)
+      .filter((filePath) => pathSatisfiesTargetPattern(filePath, pattern))
+      .sort((a, b) => a.localeCompare(b));
+    if (matched.length === 0) return null;
+    for (const filePath of matched) {
+      if (!add(filePath)) return null;
+    }
   }
   return fingerprints;
 }
@@ -239,10 +264,11 @@ export function evaluateIllumination(
   }
 
   // ---- 4. 目标文件确实写入 ----
-  const written = new Set(input.files_written.map(normalizePath));
+  // 字面路径仍精确包含；glob 在已采集路径上判定是否被满足。缺项仍列原始模式。
+  const written = input.files_written.map(normalizePath);
   const missingFiles = node.target_files
     .map(normalizePath)
-    .filter((path) => !written.has(path));
+    .filter((pattern) => !patternIsSatisfied(written, pattern));
   if (missingFiles.length > 0) {
     return blocked(
       E_FILES_NOT_WRITTEN,
