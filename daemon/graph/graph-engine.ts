@@ -20,6 +20,11 @@ import {
   type VerificationMode,
 } from "../../src/lib/graph/task-graph";
 import { writeJsonAtomic } from "../../src/lib/state-machine";
+import type { VerificationCommand } from "../../src/lib/contract.schema";
+import {
+  isDeliverableTarget,
+  verificationCapabilities,
+} from "../../src/lib/journey/proposal-from-contract";
 import {
   evaluateIllumination,
   nodeTouchesPaths,
@@ -47,6 +52,61 @@ export interface TaskGraphEngineOptions {
   repoRoot: string;
   /** 注入时钟：测试可固定时间，生产默认系统时间 */
   now?: () => Date;
+}
+
+/** `migrateTargets` 的入参：能力来源由图所属合同的验收命令决定。 */
+export interface MigrateTargetsInput {
+  /** 合同 `verification_spec.commands`；与 J.60 提案构建同一判定来源 */
+  commands: readonly VerificationCommand[];
+  /** 只预览不落盘（不递增 revision） */
+  dryRun?: boolean;
+  /** 乐观并发：与当前图不一致则拒绝 */
+  expectedGraphId?: string;
+}
+
+export interface TargetMigrationRetiredNode {
+  node_id: string;
+  target_files: string[];
+  title: string;
+  previous_state: TaskNodeState;
+}
+
+export interface TargetMigrationKeptNode {
+  node_id: string;
+  state: TaskNodeState;
+  target_files: string[];
+}
+
+export interface TargetMigrationResult {
+  /** 是否有任何节点/目标发生变化并已落盘（dry_run 时表示"将会变化"） */
+  migrated: boolean;
+  dry_run: boolean;
+  retired: TargetMigrationRetiredNode[];
+  kept: TargetMigrationKeptNode[];
+  revision_before: number;
+  revision_after: number;
+  graph: TaskGraph;
+}
+
+/**
+ * 迁移专用错误码。
+ *
+ * 刻意不进 `GraphInvariantCode`：那个联合类型在 `src/lib/graph/task-graph.ts`
+ * （本卡 readonly），加码就要改只读文件。迁移是新增动作，错误码收在引擎侧。
+ */
+export type TargetMigrationErrorCode =
+  | "E_GRAPH_STALE_SNAPSHOT"
+  | "E_GRAPH_ILLUMINATED_TARGET_NOT_DELIVERABLE"
+  | "E_GRAPH_TARGETS_IN_FLIGHT";
+
+export class TargetMigrationError extends Error {
+  readonly code: TargetMigrationErrorCode;
+
+  constructor(code: TargetMigrationErrorCode, message: string) {
+    super(message);
+    this.name = "TargetMigrationError";
+    this.code = code;
+  }
 }
 
 /**
@@ -509,6 +569,190 @@ export class TaskGraphEngine {
     }
     this.commit(affected.map((node) => node.node_id));
     return affected.map((node) => node.node_id);
+  }
+
+  /**
+   * TASK-J.61：把 J.60 之前生成的既有图目标迁移到新规则。
+   *
+   * 规则（Tina P-317 拍板，逐条对应卡面验收）：
+   * 1. 按 J.60 同一判定（`isDeliverableTarget`）逐个过滤节点 `target_files`；
+   * 2. 过滤后为空的节点退役，下游 `depends_on` 递归跳过它指向其上游；
+   * 3. 保留节点维持 `node_id` / `state` / `executed_at` / `commit_sha`；
+   * 4. 一次迁移只 `commit()` 一次 → `revision` 恰好 +1；`dry_run` 不落盘；
+   * 5. 退役候选为 `ILLUMINATED` → 拒绝迁移（已点亮节点不得擅自删除）；
+   *    `RUNNING` / `REPAIRING` → 拒绝迁移（有节点在飞）。
+   */
+  migrateTargets(input: MigrateTargetsInput): TargetMigrationResult {
+    const graph = this.requireGraph();
+    if (
+      input.expectedGraphId !== undefined &&
+      graph.graph_id !== input.expectedGraphId
+    ) {
+      throw new TargetMigrationError(
+        "E_GRAPH_STALE_SNAPSHOT",
+        `图快照已变化（当前 ${graph.graph_id}，请求 ${input.expectedGraphId}），请刷新后重试`,
+      );
+    }
+
+    const capabilities = verificationCapabilities(input.commands);
+    const revisionBefore = graph.revision;
+
+    const retired: TargetMigrationRetiredNode[] = [];
+    const retiredIds = new Set<string>();
+    const nextTargets = new Map<string, string[]>();
+    const changedIds: string[] = [];
+
+    for (const node of graph.nodes) {
+      const filtered = node.target_files.filter((pattern) =>
+        isDeliverableTarget(pattern, capabilities),
+      );
+      nextTargets.set(node.node_id, filtered);
+      if (filtered.length === 0 && node.target_files.length > 0) {
+        retiredIds.add(node.node_id);
+        retired.push({
+          node_id: node.node_id,
+          target_files: [...node.target_files],
+          title: node.title,
+          previous_state: node.state,
+        });
+        continue;
+      }
+      if (filtered.length !== node.target_files.length) {
+        changedIds.push(node.node_id);
+      }
+    }
+
+    const illuminatedRetired = retired.filter(
+      (item) => item.previous_state === "ILLUMINATED",
+    );
+    if (illuminatedRetired.length > 0) {
+      throw new TargetMigrationError(
+        "E_GRAPH_ILLUMINATED_TARGET_NOT_DELIVERABLE",
+        `节点 ${illuminatedRetired
+          .map((item) => item.node_id)
+          .join(", ")} 已点亮但目标按 J.60 属非交付物：拒绝迁移，需人工另议`,
+      );
+    }
+    const inFlightRetired = retired.filter(
+      (item) =>
+        item.previous_state === "RUNNING" ||
+        item.previous_state === "REPAIRING",
+    );
+    if (inFlightRetired.length > 0) {
+      throw new TargetMigrationError(
+        "E_GRAPH_TARGETS_IN_FLIGHT",
+        `节点 ${inFlightRetired
+          .map((item) => `${item.node_id}（${item.previous_state}）`)
+          .join(", ")} 正在执行中，拒绝迁移`,
+      );
+    }
+
+    const migrated = retired.length > 0 || changedIds.length > 0;
+    const dryRun = input.dryRun === true;
+    const buildKept = (nodes: readonly TaskNode[]): TargetMigrationKeptNode[] =>
+      nodes
+        .filter((node) => !retiredIds.has(node.node_id))
+        .map((node) => ({
+          node_id: node.node_id,
+          state: node.state,
+          target_files: [...node.target_files],
+        }));
+
+    if (!migrated || dryRun) {
+      return {
+        migrated,
+        dry_run: dryRun,
+        retired,
+        kept: buildKept(graph.nodes),
+        revision_before: revisionBefore,
+        revision_after: revisionBefore,
+        graph: cloneGraph(graph),
+      };
+    }
+
+    const retiredById = new Map(
+      graph.nodes
+        .filter((node) => retiredIds.has(node.node_id))
+        .map((node) => [node.node_id, node]),
+    );
+    /** 依赖若指向已退役节点，跳过它继续找上游；环形保护避免无限递归。 */
+    const resolveUpstream = (
+      dependencyId: string,
+      seen: Set<string> = new Set(),
+    ): string[] => {
+      const retiredNode = retiredById.get(dependencyId);
+      if (!retiredNode) return [dependencyId];
+      if (seen.has(dependencyId)) return [];
+      seen.add(dependencyId);
+      return retiredNode.depends_on.flatMap((upstream) =>
+        resolveUpstream(upstream, seen),
+      );
+    };
+
+    const nodes: TaskNode[] = [];
+    for (const node of graph.nodes) {
+      if (retiredIds.has(node.node_id)) continue;
+      const dependsOn: string[] = [];
+      for (const dependencyId of node.depends_on) {
+        for (const resolved of resolveUpstream(dependencyId)) {
+          if (!retiredIds.has(resolved) && !dependsOn.includes(resolved)) {
+            dependsOn.push(resolved);
+          }
+        }
+      }
+      nodes.push({
+        ...node,
+        target_files: nextTargets.get(node.node_id) ?? [...node.target_files],
+        depends_on: dependsOn,
+      });
+    }
+
+    // 退役会把链路缩短：前置已全部点亮的 BLOCKED 节点应放回 PENDING
+    let progressed = true;
+    while (progressed) {
+      progressed = false;
+      for (const node of nodes) {
+        if (node.state !== "BLOCKED") continue;
+        const ready = node.depends_on.every(
+          (dependencyId) =>
+            nodes.find((item) => item.node_id === dependencyId)?.state ===
+            "ILLUMINATED",
+        );
+        if (!ready) continue;
+        this.transition(node, "PENDING");
+        changedIds.push(node.node_id);
+        progressed = true;
+      }
+    }
+
+    const timestamp = this.now().toISOString();
+    const retiredIssues: TaskGraphIssue[] = retired.map((item) => ({
+      node_id: item.node_id,
+      code: "E_TARGET_SUPERSEDED",
+      message:
+        `节点 ${item.node_id} 的目标 ${item.target_files.join(", ")} ` +
+        `按 J.60 判定属非交付物，已退役（原状态 ${item.previous_state}）；` +
+        `下游依赖已重接`,
+      severity: "WARNING",
+      recorded_at: timestamp,
+    }));
+
+    graph.nodes = nodes;
+    graph.issues = [...graph.issues, ...retiredIssues];
+    graph.fingerprints = graph.fingerprints.filter(
+      (fingerprint) => !retiredIds.has(fingerprint.node_id),
+    );
+
+    const committed = this.commit([...new Set([...retiredIds, ...changedIds])]);
+    return {
+      migrated: true,
+      dry_run: false,
+      retired,
+      kept: buildKept(committed.nodes),
+      revision_before: revisionBefore,
+      revision_after: committed.revision,
+      graph: committed,
+    };
   }
 
   /** 供崩溃恢复 / 诊断使用：清空内存态并重新读盘（不删文件） */

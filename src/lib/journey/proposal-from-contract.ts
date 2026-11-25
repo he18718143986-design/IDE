@@ -45,8 +45,10 @@ function slugify(raw: string, fallback: string): string {
  * 纯脚手架 / 配置类目标：属于写入权限，但通常不是本轮的真实产物。
  * 与 `daemon/supervisor/rules-l0.ts` 的 `GREENFIELD_NPM_WRITABLE_DEFAULTS`
  * 同源；只在这里按验收命令能力决定是否剔除（TASK-J.60 方案 A）。
+ *
+ * TASK-J.61：旧图目标迁移复用同一份判定，禁止另写第二套规则。
  */
-const SCAFFOLDING_TARGETS: ReadonlySet<string> = new Set([
+export const SCAFFOLDING_TARGETS: ReadonlySet<string> = new Set([
   "tsconfig.json",
   "tsconfig.*.json",
   "vitest.config.*",
@@ -58,6 +60,11 @@ const SCAFFOLDING_TARGETS: ReadonlySet<string> = new Set([
   "**/*.test.tsx",
   "**/*.spec.ts",
 ]);
+
+export interface VerificationCapabilities {
+  typescript: boolean;
+  tests: boolean;
+}
 
 function commandArgumentIncludes(
   command: VerificationCommand,
@@ -72,11 +79,11 @@ function commandArgumentIncludes(
 /**
  * 与 `rules-l0.ts::commandsNeedNpmVerification` 同一判定语义
  * （不 import `daemon/`，保持 `src/lib` 共享契约层的分层）。
+ * 导出供 TASK-J.61 旧图目标迁移复用——迁移与提案必须同一套判定。
  */
-function verificationCapabilities(commands: readonly VerificationCommand[]): {
-  typescript: boolean;
-  tests: boolean;
-} {
+export function verificationCapabilities(
+  commands: readonly VerificationCommand[],
+): VerificationCapabilities {
   let typescript = false;
   let tests = false;
   for (const command of commands) {
@@ -90,11 +97,22 @@ function verificationCapabilities(commands: readonly VerificationCommand[]): {
 /** 该脚手架目标是否被验收命令「要求」；未被要求则不作为核销节点。 */
 function isUnneededScaffoldingTarget(
   pattern: string,
-  capabilities: { typescript: boolean; tests: boolean },
+  capabilities: VerificationCapabilities,
 ): boolean {
   if (!SCAFFOLDING_TARGETS.has(pattern)) return false;
   if (pattern.startsWith("tsconfig")) return !capabilities.typescript;
   return !capabilities.tests;
+}
+
+/**
+ * 该目标模式是否仍应作为「必须产物」核销目标。
+ * TASK-J.61：迁移按节点逐个过滤 `target_files` 时复用这个函数。
+ */
+export function isDeliverableTarget(
+  pattern: string,
+  capabilities: VerificationCapabilities,
+): boolean {
+  return !isUnneededScaffoldingTarget(pattern, capabilities);
 }
 
 /**

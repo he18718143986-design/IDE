@@ -162,7 +162,7 @@ import {
 import { projectDeliveryState } from "../src/lib/state/delivery-state";
 import { ContractOrchestrator } from "./pipeline/orchestrator";
 import { IllegalContractTransitionError } from "./pipeline/contract-store";
-import { TaskGraphEngine } from "./graph/graph-engine";
+import { TaskGraphEngine, TargetMigrationError } from "./graph/graph-engine";
 import { collectWorktreeEvidence } from "./graph/evidence-collector";
 import type {
   IlluminationInput,
@@ -3441,6 +3441,70 @@ export class StagentDaemon {
         }
         const graph = this.graphEngine.startNode(body.node_id);
         this.sendJson(res, 200, { graph });
+        return;
+      }
+
+      if (method === "POST" && url.pathname === "/api/graph/targets/migrate") {
+        // TASK-J.61：把 J.60 之前生成的既有图目标迁移到新判定。
+        // 显式接口 + dry_run，不做启动静默迁移；图仍只经 TaskGraphEngine 写。
+        const body = (await this.readJsonBody(req)) as Record<string, unknown>;
+        const contractIdFromBody =
+          typeof body["contract_id"] === "string" ? body["contract_id"] : "";
+        const snapshot = this.graphEngine.getGraph();
+        if (!snapshot) {
+          this.sendJson(res, 404, {
+            error: "TASK_GRAPH_NOT_FOUND",
+            code: "E_GRAPH_NOT_FOUND",
+            message: this.graphEngine.lastLoadError ?? "尚未生成任务图谱",
+          });
+          return;
+        }
+        const contractId = contractIdFromBody || snapshot.contract_id;
+        const contract = this.orchestrator.getStore().get(contractId);
+        if (!contract) {
+          this.sendJson(res, 404, {
+            error: "contract_not_found",
+            code: "E_CONTRACT_NOT_FOUND",
+            message: `合同 ${contractId} 不存在`,
+          });
+          return;
+        }
+        if (contract.contract_id !== snapshot.contract_id) {
+          this.sendJson(res, 409, {
+            error: "contract_graph_mismatch",
+            code: "E_GRAPH_STALE_SNAPSHOT",
+            message: `合同 ${contract.contract_id} 与当前图所属合同 ${snapshot.contract_id} 不一致`,
+          });
+          return;
+        }
+        try {
+          const result = this.graphEngine.migrateTargets({
+            commands: contract.verification_spec?.commands ?? [],
+            dryRun: body["dry_run"] === true,
+            ...(typeof body["graph_id"] === "string"
+              ? { expectedGraphId: body["graph_id"] }
+              : {}),
+          });
+          this.sendJson(res, 200, {
+            migrated: result.migrated,
+            dry_run: result.dry_run,
+            retired: result.retired,
+            kept: result.kept,
+            revision_before: result.revision_before,
+            revision_after: result.revision_after,
+            graph: result.graph,
+          });
+        } catch (err) {
+          if (err instanceof TargetMigrationError) {
+            this.sendJson(res, 409, {
+              error: "target_migration_rejected",
+              code: err.code,
+              message: err.message,
+            });
+            return;
+          }
+          throw err;
+        }
         return;
       }
 
