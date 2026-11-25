@@ -14,6 +14,7 @@ import {
   withParseRetry,
   WORKER_PARSE_FAILURE_SNIPPET_MAX,
   WORKER_PARSE_FAILURE_SNIPPET_MIN_LENGTH,
+  type WorkerParseFailureFeatures,
 } from "../../daemon/worker/parse-worker-output";
 import { OpenAiWorkerClient } from "../../daemon/worker/openai-client";
 import type { WorkerGenerationInput } from "../../daemon/worker/ai-worker";
@@ -255,16 +256,16 @@ describe("OpenAiWorkerClient 挂钩：日志有特征、无完整原文、无密
     return fs.readFileSync(file, "utf8");
   }
 
-  function failureDetails(): Array<Record<string, unknown>> {
+  function failureDetails(): WorkerParseFailureFeatures[] {
     return readLog()
       .split("\n")
       .filter((line) => line.trim())
       .map((line) => JSON.parse(line) as Record<string, unknown>)
-      .filter((row) => row.kind === "worker_parse_failure")
+      .filter((row) => row["kind"] === "worker_parse_failure")
       .map((row) => {
         expect(row).not.toHaveProperty("message");
         expect(forbiddenKeys(row)).toEqual([]);
-        return row.detail as Record<string, unknown>;
+        return row["detail"] as WorkerParseFailureFeatures;
       });
   }
 

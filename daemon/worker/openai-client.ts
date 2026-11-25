@@ -45,10 +45,10 @@ function redactedParseFailureDetail(
     model_id: features.model_id,
   };
   if (features.head !== undefined) {
-    detail.head = redactSecrets(features.head);
+    detail["head"] = redactSecrets(features.head);
   }
   if (features.tail !== undefined) {
-    detail.tail = redactSecrets(features.tail);
+    detail["tail"] = redactSecrets(features.tail);
   }
   return detail;
 }
