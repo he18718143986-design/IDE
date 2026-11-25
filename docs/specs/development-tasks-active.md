@@ -1814,3 +1814,140 @@ governance:
 <a id="task-j.60"></a>
 
 > 本卡已 **COMPLETED**（施工 [#403](https://github.com/he18718143986-design/IDE/pull/403) squash `5173e8ece9e0391c0b893ba61284094ae04ed0b5`；立卡 P-314；完工回写 P-315）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.60) §3.4bx。诚实口径：**提案侧按验收命令能力过滤纯脚手架/配置类目标已交付（九条 `baseline-*` 下 14 条绿野模板只剩 4 个真实产物节点；有 `npm typecheck` 保留 `tsconfig*`、有 `npm test` 保留 vitest/vite config）；核销侧四个只读文件零 diff，`E_FILES_NOT_WRITTEN` 与判定顺序未改；真钥匙复测不在本卡验收，端到端闭环未宣称**。补充事实：既有图在 J.60 之前生成，节点目标仍是旧形态，重启 Daemon 不会重建图——见 [`../ledger/j60-n3-retest-after-merge.md`](../ledger/j60-n3-retest-after-merge.md)。
+
+### 3.4by 既有任务图目标迁移：重新派生 + 空目标节点退役 + 依赖重接（2026-11-26 · 立卡 P-317）
+
+<a id="task-j.61"></a>
+
+#### 【Task J.61】既有任务图目标迁移 `[NEW_TASK]`
+
+```yaml task-card
+id: TASK-J.61
+status: NEW_TASK
+contract:
+  intent:
+    title: 既有任务图目标迁移：重新派生 + 空目标节点退役 + 依赖重接
+    description: >-
+      对 J.60 之前生成的既有图，按 J.60 同一判定重新派生每个节点的
+      target_files；派生为空的节点退役，下游 depends_on 跳过它指向其上游；
+      保留节点维持 id、状态与 executed_at/commit_sha；一次迁移 revision 只 +1。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J61-P1
+      check: auto
+      text: >-
+        旧形态图（12 节点、合同为九条 baseline-*）dry_run 返回 retired 8 / kept 4
+        且不落盘；实跑后 nodes.length=4，n1/n2 的 state/executed_at/commit_sha
+        与迁移前逐字相同，revision 恰好 +1，issues 含 8 条 E_TARGET_SUPERSEDED。
+    - id: J61-P2
+      check: auto
+      text: >-
+        幂等：已迁移图再次调用返回 migrated=false，revision 不变且不新增 issue。
+    - id: J61-P3
+      check: auto
+      text: >-
+        合同含 npm run typecheck 时 tsconfig.json / tsconfig.*.json 不被退役；
+        含 npm test 时 vitest.config.* / vite.config.* / *.config.* / **/*.test.*
+        不被退役（与 J.60 同一判定，不另写第二套规则）。
+    - id: J61-P4
+      check: auto
+      text: >-
+        退役候选处于 RUNNING/REPAIRING 返回 E_GRAPH_TARGETS_IN_FLIGHT；
+        退役候选处于 ILLUMINATED 返回 E_GRAPH_ILLUMINATED_TARGET_NOT_DELIVERABLE
+        且图零改动（已点亮节点不得擅自删除）；合同不存在 404；graph_id 不符 409。
+    - id: J61-P5
+      check: auto
+      text: >-
+        多目标节点只剔除脚手架模式并保留其余目标、状态不变；连续退役节点时
+        下游 depends_on 递归跳过，迁移后无悬空依赖与环（拓扑序可重算）。
+    - id: J61-P6
+      check: auto
+      text: >-
+        readonly_paths 四个文件相对父提交零 diff；核销侧 E_FILES_NOT_WRITTEN、
+        判定顺序与 patternIsSatisfied 语义未改；未改 J.60 判定口径。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/lib/journey/proposal-from-contract.ts
+      - daemon/graph/graph-engine.ts
+      - daemon/server.ts
+      - tests/unit/graph-targets-migration.test.ts
+      - docs/ledger/j61-graph-targets-migration.md
+    readonly_paths:
+      - daemon/graph/illumination-verifier.ts
+      - daemon/graph/target-file-match.ts
+      - src/lib/graph/task-graph.ts
+      - daemon/supervisor/rules-l0.ts
+  verification:
+    commands:
+      - { alias: targets-migration, executable: npx, args: [vitest, run, tests/unit/graph-targets-migration.test.ts] }
+      - { alias: proposal-scope-align, executable: npx, args: [vitest, run, tests/unit/proposal-scope-align.test.ts] }
+      - { alias: graph-verify, executable: npx, args: [vitest, run, tests/daemon/server-task-graph-verify.test.ts] }
+design:
+  approach: >-
+    方案见 docs/ledger/j61-graph-targets-migration-plan.md（P-316，Tina 已拍板）。
+    触发点：显式 POST /api/graph/targets/migrate（dry_run 幂等），不做启动静默迁移、
+    不做绕过 TaskGraphEngine 的独立脚本。派生规则：从 proposal-from-contract.ts
+    导出 verificationCapabilities / isDeliverableTarget 供迁移复用，禁止第二套判定；
+    能力来源为图所属合同的 verification_spec.commands。退役与重接：派生为空的节点
+    移出 nodes，下游 depends_on 递归跳过它指向其上游；保留节点 id/state/executed_at/
+    commit_sha 原样；一次迁移 commit() 一次 → revision +1；退役逐条写 issues
+    （WARNING / E_TARGET_SUPERSEDED）。保护：退役候选为 ILLUMINATED → 409 停工上报；
+    RUNNING/REPAIRING → 409；dry_run 不落盘不递增。
+  touches:
+    - { path: src/lib/journey/proposal-from-contract.ts, change: modify, why: 导出两个纯函数供迁移复用（J.60 行为不变）, symbols: [verificationCapabilities, isDeliverableTarget, buildProposalFromContract] }
+    - { path: daemon/graph/graph-engine.ts, change: modify, why: 新增 migrateTargets（校验→派生→退役→重接→commit）, symbols: [TaskGraphEngine] }
+    - { path: daemon/server.ts, change: modify, why: 新增 /api/graph/targets/migrate 路由与 404/409 映射, symbols: [handleTaskGraph] }
+    - { path: tests/unit/graph-targets-migration.test.ts, change: create, why: J61-P1～P5 断言, symbols: [] }
+    - { path: docs/ledger/j61-graph-targets-migration.md, change: create, why: 迁移实测记录, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J61-P1, test_path: tests/unit/graph-targets-migration.test.ts, level: unit, case: "旧形态图迁移后节点数 4、存活节点状态与 commit_sha 原样、revision +1" }
+    - { acceptance_id: J61-P2, test_path: tests/unit/graph-targets-migration.test.ts, level: unit, case: "迁移幂等，再次调用不递增 revision" }
+    - { acceptance_id: J61-P3, test_path: tests/unit/graph-targets-migration.test.ts, level: unit, case: "typecheck 保留 tsconfig、npm test 保留 vitest/vite config" }
+    - { acceptance_id: J61-P4, test_path: tests/unit/graph-targets-migration.test.ts, level: unit, case: "运行中与已点亮退役候选被拒绝且图零改动" }
+    - { acceptance_id: J61-P5, test_path: tests/unit/graph-targets-migration.test.ts, level: unit, case: "多目标节点部分剔除、连续退役依赖递归重接" }
+    - { acceptance_id: J61-P6, test_path: tests/daemon/server-task-graph-verify.test.ts, level: unit, debt: "核销侧零改动以施工 diff 自证：四个 readonly 文件相对父提交零 diff；既有用例保持绿，不另写 it()" }
+governance:
+  spec_refs:
+    - docs/specs/intent-compiler-prompt.md
+    - docs/specs/supervisor.md
+    - docs/ledger/j61-graph-targets-migration-plan.md
+  depends_on:
+    - { id: TASK-J.60, kind: hard }
+  code_facts:
+    - { ref: "daemon/graph/graph-engine.ts:639-655", note: "commit() 是唯一写入口：revision += 1、updated_at 刷新、progress 重算、publish" }
+    - { ref: "daemon/graph/illumination-verifier.ts:255-265", note: "CODE_MODIFICATION 必须声明 target_files，空目标直接 E_TARGET_FILES_MISSING" }
+    - { ref: "src/lib/journey/proposal-from-contract.ts:45-100", note: "J.60 的 SCAFFOLDING_TARGETS 与 verificationCapabilities 私有实现，迁移须复用" }
+  non_goals:
+    - 不允许空 target_files 通关（不给核销器开无证据点亮的口子）
+    - 不重定向目标伪造证据
+    - 不重建图、不重置已点亮节点
+    - 不改 J.60 判定口径、不改核销 error code 与判定顺序
+    - 不改门禁阈值、标题兜底、右栏、ADR-0015
+    - 不改 markStale / nodeTouchesPaths glob 化
+    - 不做启动静默迁移、不做绕开引擎的独立写盘脚本
+  fail:
+    - 删除或重置 ILLUMINATED 节点，或让其目标被清空后仍点亮
+    - 允许空 target_files 通过核销，或放宽 E_FILES_NOT_WRITTEN
+    - 重定向目标与标题不符（造假证据）
+    - 另写第二套 target_files 判定与 J.60 漂移
+    - 迁移后出现悬空依赖或环
+    - 一次迁移 revision 递增多次，或 dry_run 落盘
+    - 改 readonly 四文件、门禁、标题兜底、右栏、ADR-0015
+  adr_revisions: []
+  defaults:
+    - 复用 rules-l0 / proposal-from-contract 的既有判定语义，不新造模式表
+    - 迁移在同一 commit() 内一次落盘
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：P-315 复测证明 J.60 只对新提案生效——既有图 `graph_1795588362553_e4fbb0f1` 的 `n3.target_files` 持久化为 `["tsconfig.json"]`，重启 Daemon 只重读不重建，仍报 `E_FILES_NOT_WRITTEN`（图 `revision=13`，12 节点点亮 2 个）。
+* **取舍**：Tina 拍板「重新派生 + 空目标节点删除 + 依赖重接」；不选「允许空 `target_files`」（等于给核销器开无证据点亮的口子）、不选「保留旧目标」（等于不迁移）、不选「重定向目标」（造假证据）、不选「新增 `SUPERSEDED` 状态」（升 M）。已点亮节点保护写进 J61-P4。
+* **立卡说明（2026-11-26 · P-317）**：Tina 审过方案（P-316 / #405）后拍板走本方案并授权立卡。**立卡 ≠ 开工**；方案简报与拍板理由见 [`../ledger/j61-graph-targets-migration-plan.md`](../ledger/j61-graph-targets-migration-plan.md)
