@@ -1802,3 +1802,203 @@ governance:
 <a id="task-j.58"></a>
 
 > 本卡已 **COMPLETED**（施工 [#394](https://github.com/he18718143986-design/IDE/pull/394) squash `025cdb01e62f81e7ef86e46595c49f5873f383f7`；立卡 P-307；完工回写 P-308）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.58) §3.4bu。诚实口径：**核销展开 `target_files` 通配符已交付（判定侧纯函数 + 采证侧磁盘遍历展开、字面路径行为不变、`E_FILES_NOT_WRITTEN` 白话不变、范围检查未改）；真钥匙复测不在本卡，端到端闭环未宣称**。
+
+### 3.4bv 官方核销解析产品 CLI 并按 J.56 口径记录命令片段（J.59 · 立卡 P-310）
+
+<a id="task-j.59"></a>
+
+#### 【Task J.59】官方核销把产品 CLI `stagent` 解析到当前 Daemon 入口，并按 J.56 口径记录命令片段与独立启动错误 `[NEW_TASK]`
+
+```yaml task-card
+id: TASK-J.59
+status: NEW_TASK
+contract:
+  intent:
+    title: 官方核销把产品 CLI stagent 解析到当前 Daemon 入口，并按 J.56 口径记录命令片段与独立启动错误
+    description: >-
+      官方 POST /api/graph/verify 不得再对产品 CLI 裸名 stagent 走 PATH spawn。
+      仅当 executable === "stagent" 时，改写为 process.execPath + 包内 tsx +
+      bin/stagent.ts + 原 args；其他可执行文件仍原样交给 runCommand。包根用
+      import.meta.url 自算，与 baseline-gates.ts 未导出的 stagentPackageRoot()
+      同源，但不改 baseline-gates.ts。已解析命令串必须同步加入该别名的
+      allowedCommands 白名单，否则 runCommand 会报 E_UNAUTHORIZED_COMMAND。
+      合同仍存储 executable: "stagent"，注入逻辑不变。解析不到时不 spawn、
+      不记假的 exit_code 1，错误码 E_COMMAND_NOT_RESOLVED，白话为「节点
+      ${node_id} 的验证命令无法解析到当前 Daemon 入口: ${alias}（${reason}）」，
+      reason 为 missing_exec_path / missing_tsx / missing_bin 等短码。已尝试
+      spawn 但进程未启动（ENOENT、EACCES 等）用 E_COMMAND_SPAWN_FAILED，
+      白话为「节点 ${node_id} 的验证命令无法启动: ${alias}(${spawn_code})」。
+      检查体已启动且退出码非 0 仍用现有 E_COMMAND_FAILED，illumination-verifier.ts
+      L288–292 白话「节点 … 的验证命令未通过: …」逐字不动。判定顺序：先未解析，
+      再启动失败，最后才是检查体非零；三类原因必须能在 graph.issues[].code
+      上区分。可观测性：按 J.56 口径（长度大于 80 才写各最多 40 字符的
+      head/tail，长度小于等于 80 不写片段；复用 redactSecrets；禁止 text / raw
+      / full 字段；不把原文写入 message）。不改已关闭的 J.56 三文件。片段只落
+      .stagent/logs/daemon.jsonl（appendDaemonLog，kind 如 graph_verify_command）；
+      失败与启动/解析失败必写片段（在长度规则允许时）；成功路径只写长度和退出码、
+      不写片段。不扩展 task-graph.ts 或 graph-engine.ts，不把片段写入
+      issue.detail；HTTP 体形状保持 { illuminated, code, message, graph }。
+      立卡不等于开工。
+    risk_level: LOW
+  acceptance:
+    - id: J59-P1
+      check: auto
+      text: >-
+        官方 verify 对 executable === "stagent" 的命令使用已解析的 Daemon
+        入口（process.execPath + 包内 tsx + bin/stagent.ts + 原 args），
+        不再 PATH 裸 spawn stagent。
+    - id: J59-P2
+      check: auto
+      text: >-
+        已解析命令串已加入该别名的 allowedCommands 白名单，改写本身不得触发
+        E_UNAUTHORIZED_COMMAND。
+    - id: J59-P3
+      check: auto
+      text: >-
+        入口无法解析时记录 E_COMMAND_NOT_RESOLVED，白话为「节点 … 的验证命令无法解析到当前 Daemon 入口: …」，
+        不记 exit_code 1，也不走「验证命令未通过」白话。
+    - id: J59-P4
+      check: auto
+      text: >-
+        spawn 启动失败（如 ENOENT、EACCES）记录 E_COMMAND_SPAWN_FAILED，白话为「节点 … 的验证命令无法启动: …」，
+        与检查体非零的 E_COMMAND_FAILED 在 graph.issues[].code 上可区分。
+    - id: J59-P5
+      check: auto
+      text: >-
+        命令片段遵循 J.56 口径（常量与 J.56 的 40/80 相等；先 redactSecrets；
+        长度大于 80 才写各最多 40 字符的 head/tail，小于等于 80 不写片段；
+        无 text/raw/full 字段；不把原文写入 message）；只落 daemon.jsonl；
+        成功路径只写长度和退出码、不写片段。
+    - id: J59-P6
+      check: auto
+      text: >-
+        注入三文件（baseline-gates.ts、scope-plan-builder.ts、proposal-from-contract.ts）
+        相对父提交零 diff；E_COMMAND_FAILED 检查体路径白话逐字未改；官方 verify
+        timeoutMs 30_000 未改。本条用施工时 diff/grep 自证，不写成 it()。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/cli-host/resolve-stagent-cli.ts
+      - daemon/graph/verify-command-snippet.ts
+      - tests/unit/j59-verify-command-resolve-observe.test.ts
+      - daemon/server.ts
+      - daemon/graph/illumination-verifier.ts
+    readonly_paths:
+      - daemon/guard/baseline-gates.ts
+      - daemon/supervisor/scope-plan-builder.ts
+      - src/lib/journey/proposal-from-contract.ts
+      - daemon/runner/command-runner.ts
+      - daemon/graph/graph-engine.ts
+      - src/lib/graph/task-graph.ts
+      - daemon/worker/parse-worker-output.ts
+      - daemon/worker/openai-client.ts
+      - daemon/core/debug-log.ts
+      - tests/daemon/server-task-graph-verify.test.ts
+      - tests/unit/graph-engine-invariants.test.ts
+      - docs/ledger/j58-glob-n1-retry.md
+  verification:
+    commands:
+      - { alias: j59-resolve-observe, executable: npx, args: [vitest, run, tests/unit/j59-verify-command-resolve-observe.test.ts] }
+design:
+  approach: >-
+    官方 n1 重试（P-309 / #396）在 J.58 通配符采证生效后，verify 200 但
+    illuminated=false，错误码从 E_FILES_NOT_WRITTEN 变为 E_COMMAND_FAILED，
+    九条 baseline 全部 exit 1。排查确认直接原因是 spawn("stagent") 找不到
+    可执行文件：stagent 不在 Daemon PATH、不在施工树、不在试玩根，
+    node_modules/.bin/stagent 也缺失；官方 catch 把无 exitCode 的 spawn
+    失败记成 exit 1；43ms 跑完九条与「进程没启动就失败」相容。用
+    tsx bin/stagent.ts check baseline-gate 对照跑九条全部 exit 0，说明
+    不是检查体对施工树判红。Tina t1465u 审过施工方案并授权立卡：命令解析
+    与可观测性是同一断点的两面，一张卡一起做（估算 M）。新模块
+    daemon/cli-host/resolve-stagent-cli.ts 只在官方 verify 命令循环
+    （daemon/server.ts 约 L3533–3590）调用；仅 executable === "stagent"
+    时改写；已解析 argv 必须进白名单。新模块
+    daemon/graph/verify-command-snippet.ts 复用 J.56 的 80/40 与
+    redactSecrets（只读，不改 parse-worker-output.ts / openai-client.ts /
+    debug-log.ts）。片段只落 daemon.jsonl；成功路径只写长度和退出码。
+    illumination-verifier.ts 扩展结果类型并增加独立错误码分支，
+    E_COMMAND_FAILED 检查体白话逐字不动。判定顺序：未解析 → 启动失败 →
+    检查体非零。不改注入三文件、command-runner.ts、图 schema 两文件、
+    既有 verify/invariants 测试；要动就停工修卡。不改官方 verify
+    timeoutMs 30_000。设计层「产品固定底线自检该不该挂到试玩节点核销」
+    挂账并标 ai_inferred，等 n1 能跑通后再看是否另立卡，不进本卡验收。
+    本卡验收以 CI 单测为主；J59-P6 用施工时 diff/grep 自证，不写成 it()。
+    立卡不等于开工。
+  touches:
+    - { path: daemon/cli-host/resolve-stagent-cli.ts, change: create, why: "把产品 CLI 裸名 stagent 解析为当前 Daemon 入口（process.execPath + 包内 tsx + bin/stagent.ts）；解析失败返回明确原因、不给出可 spawn 的 argv", symbols: [] }
+    - { path: daemon/graph/verify-command-snippet.ts, change: create, why: "按 J.56 的 80/40 与 redactSecrets 生成可落盘片段；禁止 text/raw/full；成功路径不写片段", symbols: [] }
+    - { path: daemon/server.ts, change: modify, why: "仅官方 verify 采证循环：解析 stagent、把已解析命令串加入白名单、启动失败不记假 exit 1、按条 appendDaemonLog", symbols: [] }
+    - { path: daemon/graph/illumination-verifier.ts, change: modify, why: "扩展 command_results 类型；先未解析、再启动失败、最后检查体非零；E_COMMAND_FAILED 检查体白话逐字不动", symbols: [evaluateIllumination] }
+    - { path: tests/unit/j59-verify-command-resolve-observe.test.ts, change: create, why: "锁死解析成功/失败、非 stagent 不改写、白名单、独立错误码、J.56 片段口径与脱敏", symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J59-P1, test_path: tests/unit/j59-verify-command-resolve-observe.test.ts, level: unit, case: "J59-R1: executable 为 stagent 时解析为 process.execPath + tsx + 包内 bin/stagent.ts，args 保持 check baseline-gate --id …" }
+    - { acceptance_id: J59-P2, test_path: tests/unit/j59-verify-command-resolve-observe.test.ts, level: unit, case: "J59-P2: 已解析命令串加入该别名白名单，改写本身不触发 E_UNAUTHORIZED_COMMAND" }
+    - { acceptance_id: J59-P3, test_path: tests/unit/j59-verify-command-resolve-observe.test.ts, level: unit, case: "J59-R2: 解析失败（缺 bin/stagent.ts 或缺 tsx 或缺 execPath）时不给出可 spawn 的 argv，返回明确失败原因" }
+    - { acceptance_id: J59-P4, test_path: tests/unit/j59-verify-command-resolve-observe.test.ts, level: unit, case: "J59-O4: 解析失败或 spawn ENOENT 记为独立错误码，不记成 exit 1，且与检查体 exit 1 的 E_COMMAND_FAILED（白话不变）可区分" }
+    - { acceptance_id: J59-P5, test_path: tests/unit/j59-verify-command-resolve-observe.test.ts, level: unit, case: "J59-O1: 长度大于 80 的 stdout/stderr 各写最多 40 字符的 head/tail，中段不出现，无 text/raw/full，不把原文写入 message" }
+    - { acceptance_id: J59-P5, test_path: tests/unit/j59-verify-command-resolve-observe.test.ts, level: unit, case: "J59-O2: 片段中的 sk- / Bearer / api_key= 被脱敏" }
+    - { acceptance_id: J59-P5, test_path: tests/unit/j59-verify-command-resolve-observe.test.ts, level: unit, case: "J59-O3: 原文长度等于 80 时不写 head/tail；81 才写各最多 40 字符" }
+    - { acceptance_id: J59-P1, test_path: tests/unit/j59-verify-command-resolve-observe.test.ts, level: unit, case: "J59-R3: executable 不是 stagent 时原样返回，不改写" }
+    - { acceptance_id: J59-P6, test_path: tests/unit/j59-verify-command-resolve-observe.test.ts, level: unit, case: "J59-P6: 注入三文件相对父提交零 diff，E_COMMAND_FAILED 检查体白话逐字未改，timeoutMs 30_000 未改（施工时 diff/grep 自证，不写成产品行为 it()）" }
+governance:
+  spec_refs:
+    - docs/ledger/j58-glob-n1-retry.md
+  depends_on:
+    - { id: TASK-J.58, kind: hard }
+  code_facts:
+    - { ref: "daemon/server.ts:3533-3590", note: "官方 POST /api/graph/verify 按节点 verification_commands 在合同白名单取 spec 后 runCommand；成功只留 alias+exit_code；catch 把无 exitCode 的 spawn 失败记成 exit 1 "}
+    - { ref: "daemon/server.ts:3508-3510", note: "allowedCommands 按合同原文 executable+args 精确拼接；改写 argv 后若不把已解析命令串加入白名单，会变成 E_UNAUTHORIZED_COMMAND "}
+    - { ref: "daemon/server.ts:3568", note: "官方 verify 写死 timeoutMs 30_000；本卡不改 "}
+    - { ref: "daemon/runner/command-runner.ts:393-404", note: "runCommand 白名单要求 trimmedCmd 全等；本卡不改此文件，在 server 侧加入已解析命令串 "}
+    - { ref: "daemon/runner/command-runner.ts:454-458", note: "spawn(executable, args) 使用 cwd 与 shell: false，裸名 stagent 走 PATH" }
+    - { ref: "daemon/runner/command-runner.ts:568-575", note: "spawn 失败（ENOENT 等）reject(err)，本身不把错误写成 exit 1 "}
+    - { ref: "daemon/graph/illumination-verifier.ts:43-47", note: "VerificationCommandResult 目前只有 alias 与 exit_code "}
+    - { ref: "daemon/graph/illumination-verifier.ts:288-292", note: "检查体非零路径 E_COMMAND_FAILED 白话「节点 … 的验证命令未通过: …」；本卡此句逐字不动 "}
+    - { ref: "daemon/guard/baseline-gates.ts:111-118", note: "baselineGateCommand 的 executable 为 stagent，args 为 check baseline-gate --id alias；本卡不改注入 "}
+    - { ref: "daemon/guard/baseline-gates.ts:335-337", note: "stagentPackageRoot 用 import.meta.url 算包根且未 export；新模块自算同源公式，不改此文件 "}
+    - { ref: "daemon/supervisor/scope-plan-builder.ts:886-889", note: "固定底线清单始终注入；本卡不改 "}
+    - { ref: "src/lib/journey/proposal-from-contract.ts:50-106", note: "把合同命令别名复制到每个生成节点；本卡不改 "}
+    - { ref: "daemon/worker/parse-worker-output.ts:154-157", note: "J.56 片段常量 SNIPPET_MAX=40、SNIPPET_MIN_LENGTH=80；本卡只读复用数字，不改此文件 "}
+    - { ref: "daemon/core/debug-log.ts:156-177", note: "redactSecrets 与 appendDaemonLog；本卡只读复用，不改此文件 "}
+    - { ref: "src/lib/graph/task-graph.ts:164-170", note: "TaskGraphIssue 只有 node_id/code/message/severity/recorded_at；本卡不扩展，片段不进 issue.detail "}
+  non_goals:
+    - 不改九条 baseline 的注入逻辑（ScopePlan 始终注入 + 复制到每个生成节点）
+    - 不改 E_COMMAND_FAILED 在检查体已启动且退出码非 0 路径上的白话
+    - 不改官方 verify timeoutMs 30_000 与合同 timeout_seconds 60 的差异
+    - 不扩展 task-graph.ts / graph-engine.ts，不把片段写入 issue.detail
+    - 不改 HTTP 体形状（保持 illuminated / code / message / graph）
+    - 不改已关闭的 J.56 三文件（parse-worker-output.ts、openai-client.ts、debug-log.ts）
+    - 不改 command-runner.ts
+    - 不预先改 tests/daemon/server-task-graph-verify.test.ts 与 tests/unit/graph-engine-invariants.test.ts；要动就停工修卡
+    - 施工 PR 不改 docs/
+    - 立卡不等于开工
+    - 本卡施工不重试 n1，不对 n2–n12 发 start/verify
+    - 「产品固定底线自检该不该挂到试玩节点核销」挂账并标 ai_inferred，等 n1 能跑通后再看是否另立卡，不进本卡验收
+    - n12 扩展名不匹配与 markStale / nodeTouchesPaths glob 化不在本卡；自动钩子仍 backlog 候选，不立卡
+  fail:
+    - 官方 verify 对 executable === "stagent" 仍 PATH 裸 spawn stagent
+    - 已解析 argv 未加入白名单，改写本身触发 E_UNAUTHORIZED_COMMAND
+    - 解析失败或 spawn 启动失败仍被记成 exit_code 1，或误走「验证命令未通过」白话
+    - 三类失败在 graph.issues[].code 上不可区分
+    - 片段未遵循 J.56 的 80/40，或出现未脱敏的 sk- / Bearer / api_key=，或出现 text/raw/full 字段，或把原文写入 message
+    - 成功路径写了 head/tail 片段，或片段写进了 issue.detail / 改了 HTTP 体形状
+    - 改了注入三文件、E_COMMAND_FAILED 检查体白话、timeoutMs 30_000，或改动 writable_paths 以外的文件却未停工修卡
+    - 把 n1 重试、n2–n12 start/verify、自动钩子、设计层挂账、n12 扩展名、markStale glob 化或 J59-P6 的 diff/grep 自证写成 it()，或写成会让 check:docs 要求出现在 it() 里的 case
+  adr_revisions: []
+  defaults:
+    - 本卡只修官方 verify 对产品 CLI 的解析与命令输出可观测性；注入、检查体白话与 30s 超时不动
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：J.58 通配符采证已交付并完成官方 n1 重试（P-309 / #396）：`start` 200（`FAILED`→`RUNNING`），`verify` 200 但 `illuminated=false`，错误码从 `E_FILES_NOT_WRITTEN` 变为 `E_COMMAND_FAILED`，九条 baseline 全部 exit 1。排查确认直接原因是 `spawn("stagent")` 找不到可执行文件，官方 catch 把无 `exitCode` 的启动失败记成 exit 1；对照用 `tsx bin/stagent.ts check baseline-gate` 跑九条全部 exit 0。不是施工树缺依赖导致检查体判红。端到端闭环未宣称。
+* **取舍**：Tina t1465u 审过施工方案并四点拍板后授权立卡。独立错误码 `E_COMMAND_NOT_RESOLVED` 与 `E_COMMAND_SPAWN_FAILED` 都立；判定顺序为先未解析、再启动失败、最后检查体非零。片段只落 `daemon.jsonl`，不扩展图 schema；失败与启动/解析失败必写片段，成功路径只写长度和退出码。不改注入、不改检查体白话、不改 30s 超时。不重开 J.53–J.58。设计层「产品固定底线自检该不该挂到试玩节点核销」挂账并标 `ai_inferred`，本轮不写 ledger。自动钩子仍 backlog 候选，不立卡。n12 扩展名不匹配与过期标记 glob 化届时再定。
+* **立卡说明（2026-11-25 · P-310）**：Tina 授权立卡（t1465u）。操作者由我执行。基线 `main` `1caaf52839f43499edbfb2377172050ad65eb20b`（[#396](https://github.com/he18718143986-design/IDE/pull/396) P-309）；产品代码尖仍为 [#394](https://github.com/he18718143986-design/IDE/pull/394) squash `025cdb01e62f81e7ef86e46595c49f5873f383f7`。现场核对 changelog 最新原为 P-309、版本头最新原为第 293 条，按流水取下一号 **P-310**（版本头第 294 条）。**P-285 号未占用，不擅自改号**。**立卡 ≠ 开工**；先合入本 docs PR，再开独立代码 PR。代码 PR 必需检查全绿后报授权；Windows 存量失败按先例报 UNSTABLE（#266–#394 选 A）。范围外文件要动就停工修卡。
+* **后续路径（锁定，不在本卡验收）**：立卡 PR 合入后开代码 PR；全绿报授权；Windows 存量失败按先例报 UNSTABLE；范围外文件要动就停工修卡。本卡施工不重试 `n1`，不对 `n2`–`n12` 发 start/verify。代码合入并重启 Daemon 后再对 `n1` 官方重试 start/verify，由 Tina 点名，实测记录落 ledger。设计层挂账、n12 扩展名不匹配与 `markStale` glob 化是否另立卡，届时再定。
+
