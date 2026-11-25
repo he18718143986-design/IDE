@@ -5,6 +5,8 @@
 > **依据**：2026-11-25 22:48–22:49 香港时间（操作者由我执行）；授权 Tina 本轮：合并 #400 后，用同一 Daemon（pid 26569、端口 3001、J.59 在线）同一试玩目录继续对 `n2` 发官方 start / verify；可逐节点推进，每点亮一个记录一次；出现新断点即停、报她定是否立卡。
 > **诚实口径**：`n2` 已 **`ILLUMINATED`**（九条 baseline 全部 `exit 0`，图 `revision` 7→9）。`n3` **未点亮**：九条命令仍全部 `exit 0`，但停在目标文件存在性检查——`E_FILES_NOT_WRITTEN`「节点 n3 的目标文件尚未写入: tsconfig.json」，`n3=FAILED`，`revision` 9→11。这是**计划声明 12 个节点、Worker 只写出 11 个文件**导致的结构性断点，不是命令解析/执行问题。**按授权停下，未发 `run-worker`、未改施工树、未绕过检查**。端到端闭环未宣称（12 节点点亮 2 个）。
 
+> **落点注记（2026-11-26 00:34 香港时间）**：本文件实际落 main 的提交是 squash **`3782c45e5215212f289f82f302a66ce7a129adbd`**（树 `ccf3baee2832ee3a18ee4f981c8e20951dd3b17b`），不是 [#401](https://github.com/he18718143986-design/IDE/pull/401) 的 PR 合并事件——该 PR 在合入时遇 GitHub 两次 502，状态页未跟上仍显示 `OPEN`（`mergedAt=null`），已按关闭处理。日后查账请以 `3782c45` 为准，比对方式为 tree SHA 而非 PR 页面状态。
+
 ## 一、合入与 Daemon（事实）
 
 - [#400](https://github.com/he18718143986-design/IDE/pull/400)（P-312）squash 合入，main 由 `53682172` → **`5ff9759b0d7204d961b33089c60401156501d082`**，合入时间 2026-11-25 22:48:06 香港时间（操作者由我执行）。合入前必需面全绿（Docs check 48s、Knowledge 56s、Perf 44s、三平台 Lint/Typecheck/Unit 全 pass），`mergeable=MERGEABLE`、`mergeStateStatus=CLEAN`、Bugbot `skipping`；只改 4 个 docs 文件（新建 `docs/ledger/j59-n1-illumination-retest.md` + ledger README / changelog P-312 / 版本头第 296 条），无产品代码。
