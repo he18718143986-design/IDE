@@ -66,7 +66,7 @@
 
 | 项 | 还欠什么 | 谁来定 |
 | :--- | :--- | :--- |
-| 官方核销把计划生成的 `src/**` 等 glob 当字面路径，匹配文件已在施工树仍报 `E_FILES_NOT_WRITTEN` | [`TASK-J.58`](../specs/development-tasks-completed.md#task-j.58) 已交付（#394 / `025cdb01e62f81e7ef86e46595c49f5873f383f7`；回写 P-308）。官方重试见 [`j58-glob-n1-retry.md`](./j58-glob-n1-retry.md)（P-309）：Daemon 跑 `c3a25e29`，start **200**（`FAILED`→`RUNNING`），verify **200** 但 `E_COMMAND_FAILED`（九条 baseline 命令全部 exit 1），**不是** `E_FILES_NOT_WRITTEN`；通配符存在性已越过，停在命令步。`n1` 仍 `FAILED`，`n2`–`n12` 仍 `BLOCKED` 不可开工。命令退出码失败、n12 扩展名不匹配（`**/*.test.ts` vs `tests/*.test.js`）与 `markStale` / `nodeTouchesPaths` glob 化是否另立卡，届时由 Tina 定。走查前记录仍见 [`j57-graph-n1-walk.md`](./j57-graph-n1-walk.md)（P-306）。不重开 J.58。自动钩子仍 backlog 候选，不立卡。未宣称端到端闭环。 | P-309 |
+| 官方核销把计划生成的 `src/**` 等 glob 当字面路径，匹配文件已在施工树仍报 `E_FILES_NOT_WRITTEN` | [`TASK-J.58`](../specs/development-tasks-completed.md#task-j.58) 已交付（#394 / `025cdb01e62f81e7ef86e46595c49f5873f383f7`；回写 P-308）。官方重试见 [`j58-glob-n1-retry.md`](./j58-glob-n1-retry.md)（P-309）：通配符存在性已越过，停在命令步，`E_COMMAND_FAILED`（九条 baseline 全部 exit 1），定性为 `spawn("stagent")` 找不到可执行文件。Tina 审过施工方案并授权立卡 [`TASK-J.59`](../specs/development-tasks-active.md#task-j.59)（P-310；`[NEW_TASK]`；估算 M；**立卡 ≠ 开工**）：解析产品 CLI 到当前 Daemon 入口，并按 J.56 口径记录命令片段与独立启动错误。n12 扩展名不匹配（`**/*.test.ts` vs `tests/*.test.js`）与 `markStale` / `nodeTouchesPaths` glob 化是否另立卡，届时由 Tina 定。不重开 J.58。自动钩子仍 backlog 候选，不立卡。未宣称端到端闭环。 | P-310 |
 | [`w3-known-gaps.md`](./w3-known-gaps.md) §4.1、§4.3 | `tmpRoot` GC 与 `splitShellSegments` 引号边界仍未修 | 见该文件的 PASS/FAIL |
 | [`consistency-audit.md`](./consistency-audit.md) OP-39 | `daemon/server.ts` 与 `src/routes/index.tsx` 的大文件结构债。清算时机在 v0.3 方向拍板之后 | 待指定 |
 | [`ci2-sample-assessment-brief.md`](./ci2-sample-assessment-brief.md) | CI.2 维持 Hold，不开工 | P-245 |
