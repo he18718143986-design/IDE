@@ -11640,3 +11640,179 @@ governance:
 * **后续路径（锁定，待 Tina 点名）**：本回写合入并重启 Daemon 后，再考虑重试 `run-worker` 拿原文特征 → 按特征定「模型跑偏修提示词」还是「合法 JSON 被包住修容错」→ 那时再立卡。实测记录落 ledger。本回写未启动实测，未重试 run-worker，未宣称端到端闭环。
 
 * **完工说明（2026-11-25 · P-301）**：施工 [#385](https://github.com/he18718143986-design/IDE/pull/385) squash `3529009b1f51fdc6adf207762f9838698185e502`。**Worker 解析失败落盘原文特征已交付（纯函数特征抽取、失败先记日志再原样抛出、禁完整原文与密钥）；只做可观测性未修解析，端到端闭环未宣称**。相对父提交只改三条 writable_paths、+521/−8，无 docs、无范围外文件。后续路径已锁定、待 Tina 点名。本回写未启动实测。
+
+### 3.4bt Worker 提示词约束只输出 JSON、禁止工具调用标记（J.57 · 完工回写 P-304）
+
+<a id="task-j.57"></a>
+
+### 【Task J.57】Worker 提示词约束只输出 JSON、禁止工具调用标记 `[COMPLETED · 立卡 P-303 · 施工 #389 · 完工回写 P-304]`
+
+> **归档注记（2026-11-25 · P-304）**：本卡已 **COMPLETED**。Tina 选 A，按先例授权合并 #389（t1452u；Windows Unit 非阻断存量，同 #266–#385）。[#389](https://github.com/he18718143986-design/IDE/pull/389) squash `fed205a5805f41bc3516249be16d12bbfefaeb08` 于 2026-11-25 17:31:54 香港时间合入（由我执行；pre-merge head `d0ab5da745d835336a3e0e8aff9b92cce2335544`；父提交 `87647f836d171b80c51d1b775eba6296d5ca53ac`；squash 提交日期 2026-11-25 17:31:52 香港时间）。合入前必需面全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit 实跑通过，含 macOS Lint；CI run 45584178499 workflow conclusion=success，cancelled=0），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非必需存量失败：spawn EINVAL / playtest-gate / ipc-stream / golden-slice 生命周期 / worktree 路径分隔 / merger CRLF / diff-files 路径 / deps-reuse 等存量名单，无一落在本 PR 的 4 个文件；同 #266～#385 先例）。无 CANCELLED。Bugbot NEUTRAL 不挡。基线 `main` 原为 `87647f836d171b80c51d1b775eba6296d5ca53ac`（[#388](https://github.com/he18718143986-design/IDE/pull/388) P-303）。编号按流水使用 **P-304**（版本头第 288 条）；**P-285 号未占用，不擅自改号**（changelog 号 P-285 与版本头顺序第 285 条不是同一个「285」）。诚实口径：**Worker 提示词约束只输出 JSON、禁止工具调用标记已交付（输出契约与首轮/重试提示锁 JSON-only、角色与边界/可用工具/known_limitations 改写、generateObject 形状与模型 id 未改）；真钥匙复测不在本卡，端到端闭环未宣称**。相对父提交只改四条 `writable_paths`（三处产品提示词文件 + 新建 `tests/unit/worker-prompt-json-only.test.ts`）、+176/−8，无 docs、无范围外文件。`generateObject` 调用形状、schema、`withParseRetry` 控制流、`E_WORKER_PARSE` 包装、模型 id、`parse-worker-output.ts`、`ai-worker.ts`、`key-store.ts` 相对父提交零 diff（`openai-client.ts` 仅增加首轮/重试提示词常量并将它们拼进 `basePrompt` / `strictSuffix`，`generateObject` 调用语句本身未改）。后续路径已锁定、待 Tina 点名：本回写合入并重启 Daemon 后，再重试 `run-worker` 验证提示词约束是否生效（仍出工具标记则按卡面风险另议换模型或更大改法），实测记录落 ledger。本回写未启动实测，未重试 run-worker，未宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.57
+status: COMPLETED
+contract:
+  intent:
+    title: Worker 提示词约束只输出 JSON、禁止工具调用标记
+    description: >-
+      只改提示词，不修解析。根因：generateObject 未传 tools（openai-client.ts
+      L133-141），模型看见提示词里的工具清单后自己发明了 <tool_call>/DSML；
+      系统提示自相矛盾（「角色与边界」L434-441「你必须通过受管工具读写」+
+      「可用工具」L497-502 列 stagent_* + known_limitations L290「仅能调用
+      stagent_* 受管工具」，而「输出契约」L517-522 没说「只输出 JSON」也没禁
+      工具标记；首轮用户提示 L116-123 无禁令，只有 strictSuffix L125-130
+      才说「要 JSON」仍不点名工具标记）。本卡锁定：输出契约写明本轮必须是
+      {changes, log} JSON，禁止自然语言开场、围栏和任何工具调用标记，写入
+      由 Daemon 落地；改写「角色与边界」，不再写「你必须通过受管工具读写」；
+      「可用工具」段首标明这是授权范围说明、不是要模型在回复里发工具调用；
+      同卡必改 known_limitations 那条，能力事实可保留为「写入与执行只经
+      Daemon 侧 stagent_*，模型不得输出工具调用标记」；首轮用户提示写上
+      JSON-only 与禁工具标记，strictSuffix 同步点名禁止 DSML/<tool_call>。
+      不改 generateObject 调用形状、schema、重试次数、E_WORKER_PARSE 包装、
+      模型 id；不换 generateText、不回退 parseWorkerPatch、不修解析器。
+      模型保留现场 deepseek-flash（非产品默认 deepseek-chat），只用提示词
+      约束验证，不叠换模型变量。真钥匙复测不在本卡验收。不把「解析器有
+      bug」写成已证实结论。立卡不等于开工。
+    risk_level: LOW
+  acceptance:
+    - id: J57-P1
+      check: auto
+      text: >-
+        系统提示「输出契约」写明本轮必须是 {changes, log} JSON 对象，禁止
+        自然语言开场、markdown 围栏和任何工具调用标记（含 DSML、
+        <tool_call>），并写明写入由 Daemon 落地。
+    - id: J57-P2
+      check: auto
+      text: >-
+        「角色与边界」不再出现「你必须通过受管工具读写」，也不要求模型在
+        回复里发出工具调用。
+    - id: J57-P3
+      check: auto
+      text: >-
+        「可用工具」段首标明这是授权范围说明，不是要模型在回复里发工具调用。
+    - id: J57-P4
+      check: auto
+      text: >-
+        known_limitations 不再写「仅能调用 stagent_* 受管工具」；改为写入与
+        执行只经 Daemon 侧 stagent_*，模型不得输出工具调用标记。
+    - id: J57-P5
+      check: auto
+      text: >-
+        首轮用户提示含 JSON-only 与禁工具标记；strictSuffix 同步点名禁止
+        DSML / <tool_call>。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/worker/session-task-injector.ts
+      - daemon/worker/openai-client.ts
+      - daemon/worker/worker-adapter.interface.ts
+      - tests/unit/worker-instruction-checks.test.ts
+      - tests/unit/worker-prompt-json-only.test.ts
+    readonly_paths:
+      - daemon/worker/parse-worker-output.ts
+      - daemon/worker/ai-worker.ts
+      - daemon/worker/key-store.ts
+      - tests/unit/worker-parse-failure-features.test.ts
+      - tests/unit/task-h1-worker-parse-retry.test.ts
+      - docs/ledger/j56-worker-retry.md
+  verification:
+    commands:
+      - { alias: prompt-json-only, executable: npx, args: [vitest, run, tests/unit/worker-prompt-json-only.test.ts] }
+      - { alias: instruction-checks, executable: npx, args: [vitest, run, tests/unit/worker-instruction-checks.test.ts] }
+design:
+  approach: >-
+    J.56 落盘验证已通过（P-302）。对已签成合同 contract_1795588309763_cy8zx
+    官方重试一次 run-worker 仍 400 [E_WORKER_PARSE]（16:22:43–16:22:46
+    香港时间，duration_ms=2450，requestId=ca47f349cc29）。特征日志首次与
+    重试各一条：attempt 0 为中文开场加 DSML 工具标记（261 字符），attempt 1
+    为 <tool_call> 包裹的 stagent_list_dir（108 字符）；两轮 reason=json_parse，
+    围栏与大括号起止均为 false。Tina 确认断点为「模型跑偏修提示词」，不立
+    「解析器有 bug」。只读结论（main 55b3134 / 产品代码尖 3529009b）：
+    generateObject（openai-client.ts L133-141）未传 tools；工具清单只出现在
+    提示词里；模型自行发明协议。系统提示「角色与边界」（session-task-injector.ts
+    L434-441）要求「通过受管工具读写」，「可用工具」（L497-502）列出
+    stagent_*（含 stagent_list_dir），known_limitations（worker-adapter.interface.ts
+    L290）写「仅能调用 stagent_* 受管工具」，而「输出契约」（L517-522）没有
+    「只输出 JSON」也没禁工具标记；首轮用户提示（openai-client.ts L116-123）
+    无禁令，只有 strictSuffix（L125-130）才说「只返回合法 JSON 对象，不要
+    markdown 围栏」，仍不点名 DSML/<tool_call>。Tina t1450u 审过施工方案并
+    授权立卡：本卡只改提示词。不改 generateObject 调用形状、schema、重试
+    次数、E_WORKER_PARSE 包装、模型 id；不换 generateText、不回退
+    parseWorkerPatch、不修解析器。模型保留现场 deepseek-flash（仓库
+    deepseek 默认是 deepseek-chat，见 key-store.ts L72-77），只用提示词
+    约束验证，不叠换模型变量。风险：提示词约束对 deepseek-flash 不一定
+    一次够，复测仍出工具标记再另议换模型或更大改法，不预先塞进本卡必做项。
+    要动 writable_paths 以外的文件，停工修卡，不扩面。本卡验收只含 CI 单测；
+    真钥匙复测不在本卡。后续路径只作锁定说明：J.57 代码合入并重启 Daemon
+    后，再重试 run-worker 验证提示词约束，实测记录落 ledger，不进本卡 PASS，
+    不写成 it()。
+  touches:
+    - { path: daemon/worker/session-task-injector.ts, change: modify, why: 改写输出契约、角色与边界、可用工具段首，消除「去调用受管工具」的矛盾指令, symbols: [buildWorkerTaskInstruction] }
+    - { path: daemon/worker/openai-client.ts, change: modify, why: 首轮 basePrompt 写上 JSON-only 与禁工具标记；strictSuffix 同步点名禁止 DSML/<tool_call>；不改 generateObject 调用形状, symbols: [generateChanges] }
+    - { path: daemon/worker/worker-adapter.interface.ts, change: modify, why: 同卡改写 known_limitations 中「仅能调用 stagent_* 受管工具」那条, symbols: [MANAGED_AI_CAPABILITY] }
+    - { path: tests/unit/worker-instruction-checks.test.ts, change: modify, why: 扩展既有指令装配单测以锁新文句（若本文件能覆盖则用之）, symbols: [] }
+    - { path: tests/unit/worker-prompt-json-only.test.ts, change: create, why: 新建提示词单测，锁系统提示与首轮/重试用户提示的 JSON-only 与禁工具标记（若扩展既有文件已覆盖，可不再新建，但本路径仍在可写名单内）, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J57-P1, test_path: tests/unit/worker-prompt-json-only.test.ts, level: unit, case: "J57-P1: 系统提示输出契约要求本轮只输出 {changes, log} JSON，禁止自然语言开场、围栏和 DSML/<tool_call> 等工具调用标记，并写明写入由 Daemon 落地" }
+    - { acceptance_id: J57-P2, test_path: tests/unit/worker-prompt-json-only.test.ts, level: unit, case: "J57-P2: 角色与边界不再出现「你必须通过受管工具读写」，也不要求模型在回复里发出工具调用" }
+    - { acceptance_id: J57-P3, test_path: tests/unit/worker-prompt-json-only.test.ts, level: unit, case: "J57-P3: 可用工具段首标明这是授权范围说明，不是要模型在回复里发工具调用" }
+    - { acceptance_id: J57-P4, test_path: tests/unit/worker-prompt-json-only.test.ts, level: unit, case: "J57-P4: known_limitations 不再写「仅能调用 stagent_* 受管工具」，改为写入与执行只经 Daemon 侧 stagent_*、模型不得输出工具调用标记" }
+    - { acceptance_id: J57-P5, test_path: tests/unit/worker-prompt-json-only.test.ts, level: unit, case: "J57-P5: 首轮用户提示含 JSON-only 与禁工具标记，strictSuffix 同步点名禁止 DSML/<tool_call>" }
+governance:
+  spec_refs:
+    - docs/ledger/j56-worker-retry.md
+  depends_on:
+    - { id: TASK-J.56, kind: hard }
+  code_facts:
+    - { ref: "daemon/worker/openai-client.ts:133-141", note: generateObject 只传 model、schema、system、prompt 与可选 abortSignal，未传 tools }
+    - { ref: "daemon/worker/openai-client.ts:116-123", note: 首轮 basePrompt 只要求按输出契约返回 changes 数组，无 JSON-only、无禁工具标记 }
+    - { ref: "daemon/worker/openai-client.ts:125-130", note: strictSuffix 仅在重试时追加「只返回合法 JSON 对象，不要 markdown 围栏」，仍不点名 DSML/<tool_call> }
+    - { ref: "daemon/worker/session-task-injector.ts:434-441", note: 「角色与边界」现写「你必须通过受管工具读写文件与执行命令」；本卡改写，不再这样要求模型 }
+    - { ref: "daemon/worker/session-task-injector.ts:497-502", note: 「可用工具」列出 resolveExposedTools() 的 stagent_*（默认含 stagent_list_dir）；本卡在段首标明这是授权范围说明 }
+    - { ref: "daemon/worker/session-task-injector.ts:517-522", note: 「输出契约」现只要求返回 changes 数组、不要 diff；没有「只输出 JSON」、没有禁止工具标记 }
+    - { ref: "daemon/worker/worker-adapter.interface.ts:290", note: MANAGED_AI_CAPABILITY.known_limitations 现有「仅能调用 stagent_* 受管工具，无原生 Shell 与直接文件系统访问能力」；本卡同改此条 }
+    - { ref: "daemon/worker/ai-worker.ts:299-300", note: 模型返回 changes 后由 Daemon 经 toolset.writeFile 落地；本卡不改该执行路径 }
+    - { ref: "daemon/worker/parse-worker-output.ts:123-151", note: withParseRetry（WORKER_PARSE_MAX_RETRIES=1，见同文件 L9）最多额外重试 1 次并包装 E_WORKER_PARSE；本卡不改控制流与包装 }
+    - { ref: "daemon/worker/key-store.ts:72-77", note: deepseek 未设 STAGENT_MODEL 时产品默认 deepseek-chat；本卡不改模型 id，复测仍用现场 deepseek-flash }
+  non_goals:
+    - 不改解析成功路径
+    - 不换模型，不改模型 id；保留现场 deepseek-flash，不叠换模型变量
+    - 不给 generateObject 传 tools
+    - 不换 generateText 加自解析，不回退 parseWorkerPatch，不修解析器
+    - 不改 generateObject 调用形状、schema、重试次数、E_WORKER_PARSE 包装
+    - 不重试 run-worker（含已签成合同 contract_1795588309763_cy8zx）
+    - 施工 PR 不改 docs/
+    - 不把「解析器有 bug」写成已证实结论
+    - 立卡不等于开工
+    - 真钥匙复测与 J.57 合入并重启 Daemon 后再重试 run-worker 验证提示词约束，不进本卡验收
+  fail:
+    - 系统提示或首轮/重试用户提示仍未锁「只输出 JSON」与禁止工具调用标记
+    - 「角色与边界」仍出现「你必须通过受管工具读写」，或仍要求模型在回复里发工具调用
+    - 「可用工具」段首未标明这是授权范围说明
+    - known_limitations 仍写「仅能调用 stagent_* 受管工具」
+    - 改了 generateObject 调用形状、schema、重试次数、E_WORKER_PARSE 包装或模型 id
+    - 换了 generateText、回退了 parseWorkerPatch，或改了解析器 / 解析成功路径
+    - 给 generateObject 传了 tools
+    - 改动 writable_paths 以外的文件却未停工修卡
+    - 把真钥匙复测或重试 run-worker 写成 it()，或写成会让 check:docs 要求出现在 it() 里的 case
+  adr_revisions: []
+  defaults:
+    - 本卡只改提示词约束，不修解析、不换模型、不给 generateObject 传 tools
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 389, commit: fed205a5805f41bc3516249be16d12bbfefaeb08 }
+```
+
+* **背景**：J.56 已交付可观测性并在 P-302 真钥匙重试中验证落盘能力。`run-worker` 仍 400 `[E_WORKER_PARSE]`。特征为 attempt 0 中文开场 + DSML、attempt 1 `<tool_call>` 包裹 `stagent_list_dir`，两轮均非围栏或 `{...}` 包装的 Worker 对象。Tina 确认断点为「模型跑偏修提示词」，不立「解析器有 bug」。只读表明 `generateObject` 未传 tools，模型是看见提示词里的工具清单后自己发明了协议；系统提示自相矛盾。
+* **取舍**：Tina t1450u 审过施工方案并授权立卡。本卡只改提示词，不修解析，不换模型，不给 `generateObject` 传 tools。风险写进卡面：提示词约束对 `deepseek-flash` 不一定一次够，复测仍出工具标记再另议换模型或更大改法。不重开 J.53 / J.54 / J.55 / J.56。
+* **立卡说明（2026-11-25 · P-303）**：Tina 授权立卡（t1450u）。基线 `main` `55b3134d805e9e9299e2bb43bbff9f36ed4d4134`（[#387](https://github.com/he18718143986-design/IDE/pull/387) P-302）；产品代码尖仍为 [#385](https://github.com/he18718143986-design/IDE/pull/385) squash `3529009b1f51fdc6adf207762f9838698185e502`。现场核对 changelog 最新原为 P-302、版本头最新原为第 286 条，按流水取下一号 **P-303**（版本头第 287 条）。**P-285 号未占用，不擅自改号**。**立卡 ≠ 开工**；先合入本 docs PR，再开独立代码 PR。代码 PR 必需检查全绿后报授权；Windows 存量失败按先例报 UNSTABLE（#266–#385 选 A）。范围外文件要动就停工修卡。
+* **后续路径（锁定，待 Tina 点名）**：本回写合入并重启 Daemon 后，再重试 `run-worker` 验证提示词约束是否生效（仍出工具标记则按卡面风险另议换模型或更大改法）→ 实测记录落 ledger。本回写未启动实测，未重试 run-worker，未宣称端到端闭环。
+
+* **完工说明（2026-11-25 · P-304）**：施工 [#389](https://github.com/he18718143986-design/IDE/pull/389) squash `fed205a5805f41bc3516249be16d12bbfefaeb08`。**Worker 提示词约束只输出 JSON、禁止工具调用标记已交付（输出契约与首轮/重试提示锁 JSON-only、角色与边界/可用工具/known_limitations 改写、generateObject 形状与模型 id 未改）；真钥匙复测不在本卡，端到端闭环未宣称**。相对父提交只改四条 `writable_paths`、+176/−8，无 docs、无范围外文件。`generateObject` 调用形状与模型 id 未改。后续路径已锁定、待 Tina 点名。本回写未启动实测。
