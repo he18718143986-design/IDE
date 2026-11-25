@@ -65,7 +65,7 @@
 
 | 项 | 还欠什么 | 谁来定 |
 | :--- | :--- | :--- |
-| 官方核销把计划生成的 `src/**` 等 glob 当字面路径，匹配文件已在施工树仍报 `E_FILES_NOT_WRITTEN` | Tina 审过施工方案并授权立卡 [`TASK-J.58`](../specs/development-tasks-active.md#task-j.58)（P-307；`[NEW_TASK]`；估算 S；**立卡 ≠ 开工**）。走查见 [`j57-graph-n1-walk.md`](./j57-graph-n1-walk.md)（P-306）。不重开 J.57。自动钩子仍 backlog 候选，不立卡。未宣称端到端闭环。 | P-307 |
+| 官方核销把计划生成的 `src/**` 等 glob 当字面路径，匹配文件已在施工树仍报 `E_FILES_NOT_WRITTEN` | [`TASK-J.58`](../specs/development-tasks-completed.md#task-j.58) 已交付（施工 [#394](https://github.com/he18718143986-design/IDE/pull/394) squash `025cdb01e62f81e7ef86e46595c49f5873f383f7`；完工回写 P-308）。核销展开已合入，但官方 n1 start/verify 重试须待本回写合入并重启 Daemon 后，由 Tina 点名再做，以验证通配符采证，实测落 ledger。n12 扩展名不匹配（`**/*.test.ts` vs `tests/*.test.js`）与 `markStale` / `nodeTouchesPaths` glob 化是否另立卡，届时再定。走查见 [`j57-graph-n1-walk.md`](./j57-graph-n1-walk.md)（P-306）。不重开 J.57。自动钩子仍 backlog 候选，不立卡。未宣称端到端闭环。 | P-308 |
 | [`w3-known-gaps.md`](./w3-known-gaps.md) §4.1、§4.3 | `tmpRoot` GC 与 `splitShellSegments` 引号边界仍未修 | 见该文件的 PASS/FAIL |
 | [`consistency-audit.md`](./consistency-audit.md) OP-39 | `daemon/server.ts` 与 `src/routes/index.tsx` 的大文件结构债。清算时机在 v0.3 方向拍板之后 | 待指定 |
 | [`ci2-sample-assessment-brief.md`](./ci2-sample-assessment-brief.md) | CI.2 维持 Hold，不开工 | P-245 |
