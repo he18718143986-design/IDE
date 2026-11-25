@@ -822,6 +822,50 @@ export function readSchemeSnapshot(
   }
 }
 
+export type FrozenSnapshotLookupResult =
+  { ok: true; snapshot: SchemeSnapshot } | { ok: false };
+
+/**
+ * 按 scheme_id + 修订号在快照目录找出已冻结快照。只读，不写盘，不改已有文件。
+ * 零份 → 找不到；恰好一份 → 用之；多份且 digest 相同 → 取 created_at 最新
+ *（再相同按 confirmation_id 排序）；多份且 digest 不同 → 视为找不到。
+ */
+export function findFrozenSnapshotBySchemeRevision(
+  repoRoot: string,
+  schemeId: string,
+  schemeRevision: number,
+): FrozenSnapshotLookupResult {
+  const dir = path.join(path.resolve(repoRoot), SCHEME_SNAPSHOT_DIR);
+  if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
+    return { ok: false };
+  }
+  const matches: SchemeSnapshot[] = [];
+  for (const name of fs.readdirSync(dir)) {
+    if (!name.endsWith(".json")) continue;
+    const confirmationId = name.slice(0, -".json".length);
+    const snapshot = readSchemeSnapshot(repoRoot, confirmationId);
+    if (!snapshot) continue;
+    if (
+      snapshot.scheme.scheme_id === schemeId &&
+      snapshot.scheme_revision === schemeRevision
+    ) {
+      matches.push(snapshot);
+    }
+  }
+  if (matches.length === 0) return { ok: false };
+  if (matches.length === 1) {
+    return { ok: true, snapshot: matches[0]! };
+  }
+  const digests = new Set(matches.map((item) => item.digest));
+  if (digests.size > 1) return { ok: false };
+  const sorted = [...matches].sort((left, right) => {
+    const byTime = Date.parse(left.created_at) - Date.parse(right.created_at);
+    if (byTime !== 0) return byTime;
+    return left.confirmation_id.localeCompare(right.confirmation_id);
+  });
+  return { ok: true, snapshot: sorted[sorted.length - 1]! };
+}
+
 export function writeSchemeSnapshot(
   repoRoot: string,
   input: {

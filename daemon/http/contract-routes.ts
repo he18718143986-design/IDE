@@ -12,9 +12,12 @@ import {
   type DemoSignGateDecision,
 } from "../supervisor/demo/signing-gate";
 import {
+  findFrozenSnapshotBySchemeRevision,
   readSchemeSnapshot,
   schemeBindingFromSnapshot,
+  type SchemeSnapshot,
 } from "../pipeline/scheme-snapshot-store";
+import { readSchemeLedger } from "../supervisor/intent-compiler/scheme-ledger-store";
 import {
   assertContractScopeAllowed,
   WritableScopePolicyError,
@@ -60,6 +63,29 @@ import { DirtyWorktreeConfirmationRequiredError } from "../git/worktree-manager"
  * TASK-J.42 过渡：本文件直接拿 Daemon 实例。
  * 窄上下文还没抽。调用顺序与从 handleHttpRequest 搬出前一致。
  */
+
+/**
+ * 先按 confirmation_id 读快照；读不到时再按台账草案的 scheme_id+修订号
+ * 定位规划阶段已冻结快照。不写盘。找不到或内容冲突时返回 null。
+ */
+function resolveSchemeSnapshotForConfirmation(
+  repoRoot: string,
+  confirmationId: string,
+): SchemeSnapshot | null {
+  const byId = readSchemeSnapshot(repoRoot, confirmationId);
+  if (byId) return byId;
+  const draft = readSchemeLedger(repoRoot)?.state.draft;
+  if (!draft?.scheme_id || typeof draft.scheme_revision !== "number") {
+    return null;
+  }
+  const found = findFrozenSnapshotBySchemeRevision(
+    repoRoot,
+    draft.scheme_id,
+    draft.scheme_revision,
+  );
+  return found.ok ? found.snapshot : null;
+}
+
 export async function handleContractRoutes(
   server: StagentDaemon,
   req: http.IncomingMessage,
@@ -99,7 +125,7 @@ export async function handleContractRoutes(
       }
       let snapshotDemoGate: DemoSignGateDecision | undefined;
       if (body.confirmation_id) {
-        const snapshot = readSchemeSnapshot(
+        const snapshot = resolveSchemeSnapshotForConfirmation(
           server.repoRoot,
           body.confirmation_id,
         );
@@ -160,7 +186,7 @@ export async function handleContractRoutes(
         contract = softwareContractSchema.parse({
           ...contract,
           scheme_binding: schemeBindingFromSnapshot(
-            body.confirmation_id,
+            snapshot.confirmation_id,
             snapshot,
           ),
         });
@@ -187,7 +213,7 @@ export async function handleContractRoutes(
       const created = admission?.contract ?? saved;
       // TASK-J.20：确认开工成功 → 点名敏感项写入授权清单（跨合同自动放行；可失效）
       if (body.confirmation_id) {
-        const snapForAllow = readSchemeSnapshot(
+        const snapForAllow = resolveSchemeSnapshotForConfirmation(
           server.repoRoot,
           body.confirmation_id,
         );
@@ -195,7 +221,7 @@ export async function handleContractRoutes(
           recordConfirmAuthorizations(server.repoRoot, {
             scopePlan: snapForAllow.scope_plan,
             source_contract_id: created.contract_id,
-            source_confirmation_id: body.confirmation_id,
+            source_confirmation_id: snapForAllow.confirmation_id,
           });
         }
       }
@@ -535,7 +561,7 @@ export async function handleContractRoutes(
         }
         let demoGate: DemoSignGateDecision;
         if (body.confirmation_id) {
-          const snapshot = readSchemeSnapshot(
+          const snapshot = resolveSchemeSnapshotForConfirmation(
             server.repoRoot,
             body.confirmation_id,
           );
