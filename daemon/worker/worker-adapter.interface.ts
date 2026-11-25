@@ -287,7 +287,7 @@ export const MANAGED_AI_CAPABILITY: AdapterCapabilityDeclaration = {
   platform_support: ["darwin-arm64", "darwin-x64", "linux-x64", "win32-x64"],
   known_limitations: [
     "模型以整文件内容覆盖写入，不保证最小 diff；未改动的文件不会被重写",
-    "仅能调用 stagent_* 受管工具，无原生 Shell 与直接文件系统访问能力",
+    "写入与执行只经 Daemon 侧 stagent_* 受管工具，模型不得输出工具调用标记；无原生 Shell 与直接文件系统访问能力",
     "上下文仅包含 writable_paths 内已存在文件（上限 20 个文件 / 100,000 字符）",
     "依赖安装与网络访问默认不可用，需合同显式授权后方可执行",
     "会话级恢复未实现：中断后需由编排器以新会话重跑，不复用模型侧会话状态",
