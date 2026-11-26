@@ -267,6 +267,7 @@
 | `E_EVIDENCE_REVISION_MISMATCH`（TASK-P0.1） | merger 合并时重核 Evidence `contract_revision`：字段缺失（旧证据 / 版本不可确认）或与当前合同版本不符 | 失败关闭：不进合并；旧证据可读、可展示 | 「这份验收结论不是当前这版合同的，请重新验收」 | ✓ | `EVIDENCE_STALE` |
 | `E_TEST_BASELINE_REGRESSION`（TASK-P0.4） | POST_VERIFICATION / merger 基线隔离重跑失败（改码破坏既有基线测试） | 失败关闭：不进合并 | 「既有测试基线重跑失败，存在回归风险」 | 门禁码 | `TEST_WEAKENED` |
 | `E_TEST_BASELINE_UNAVAILABLE`（TASK-P0.4） | POST_VERIFICATION / merger 基线重跑环境故障（超时、依赖缺失等无法执行） | 失败关闭：不进合并 | 「基线测试重跑环境不可用」 | 门禁码 | `UNSAFE_EXECUTION` |
+| `MOUNT_SCOPE_INVALID`（TASK-P0.3b-1） | container-host.ts resolveScopedMounts 挂载规格生成与合法性校验（路径逃逸、越界、重复、嵌套冲突等） | 失败关闭：拒绝启动容器 | 「容器挂载作用域不合法」 | 门禁码 | `SCOPE_VIOLATION` |
 | `E_SCHEME_SNAPSHOT_NOT_FOUND` / `E_SCHEME_SNAPSHOT_MISMATCH` | 派工绑定（复用 L2 Daemon 专属码） | 不签发 `exec_token` | 「方案快照对不上，需要重新确认」 | L2 表 | （签署/派工归因，不写入执行期 evidence 主码） |
 | `E_DISPUTE_TIMEOUT` | 质询看门狗 | 熔断 | 见 playtest-self-check | ✓ | `BUDGET_EXHAUSTED` |
 
@@ -274,6 +275,9 @@
 - **`contract_revision` 字段缺失复用 `E_EVIDENCE_REVISION_MISMATCH`**（缺失即「无法确认与当前合同一致」，与版本不符同一处理）；不另立码。
 - **控制模式拒绝（`worker_control_mode` 缺失、`UNCONTROLLED_EXTERNAL` 或未知值）用 `E_CANNOT_MERGE`**——沿用 merger 既有「证据不可合并」字面量（与 `E_EVIDENCE_MISSING` / `E_EVIDENCE_MISMATCH` 同属 `MergeGateError` 字面量，不入 `ERROR_CODES`），不新增码。`GATEWAY_ENFORCED` / `SANDBOX_ENFORCED` 字符串只是证据记档，**不构成执行受控的真实性证明**；SandboxWitness 深层验证属 P0-3。
 - **候选提交绑定不一致（任务分支 tip ≠ 证据 `worktree_snapshot.head_sha` / `git_info.task_commit_sha`，或读不到分支 tip）用 `E_EVIDENCE_STALE`**（既有码）。
+
+**容器挂载作用域错误码（TASK-P0.3b-1，P-333 立卡写入）**：
+- **`MOUNT_SCOPE_INVALID`**：`daemon/worker/sandbox/container-host.ts` 中 `resolveScopedMounts` 纯函数在计算合同 `writable_paths` 细粒度挂载规格时，对输入路径进行严格合法性校验（禁止 `..` 路径遍历逃逸、禁止越出 Worktree 根、禁止非法字符、禁止重复挂载或嵌套读写冲突）；一旦校验失败即 fail-closed 抛出 `MOUNT_SCOPE_INVALID`，坚决拒绝生成挂载规格与启动容器。
 
 **测试完整性门禁用码（TASK-P0.4，防范 Worker 篡改/删除既有测试）**：
 - **`E_TEST_BASELINE_REGRESSION`**：Worker 修改或删除既有测试文件，在仅还原被改/删既有测试文件的基线隔离重跑中执行失败（退出码非 0 或断言失败），fail-closed 阻断合并。
