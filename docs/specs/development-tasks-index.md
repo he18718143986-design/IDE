@@ -233,7 +233,7 @@
 | `TASK-J.62` | `COMPLETED` | execute 命令路径解析产品 CLI（立卡 P-321；施工 #412 `a05b5bf`；完工回写 P-322；估算 S；白名单前置 + 威胁守卫后解析；复用 J.59 错误码；零漂移；真钥匙复测不在本卡） | [正文](./development-tasks-completed.md#task-j.62) · [施工方案](../ledger/j62-execute-resolve-plan.md) · [施工记录](../ledger/j62-execute-resolve.md) |
 | `TASK-P0.1` | `COMPLETED` | Evidence / Merge Fail-Closed：控制模式与合同版本双重封锁已交付（立卡 P-324；施工 #418 `dc225a0`；完工回写 P-325；估算 S；候选提交绑定重核；负向测试实跑含反证；独立审查验收已完成，P0 风险未宣称解除） | [正文](./development-tasks-completed.md#task-p0.1) · [施工记录](../ledger/p0-1-evidence-merge-fail-closed.md) |
 | `TASK-P0.2` | `COMPLETED` | Full Git Candidate Scope Audit：全量候选变更 Scope 审计（立卡 P-324；施工 P-326 · #420 `bf8d3b9`） | [正文](./development-tasks-completed.md#task-p0.2) |
-| `TASK-P0.3a` | `NEW_TASK` | 生产 Daemon 装配接线 + SandboxWitness 落盘与深层断言（立卡 P-327；writable_paths 修订 P-328；估算 M；未开工） | [正文](./development-tasks-active.md#task-p0.3a) |
+| `TASK-P0.3a` | `COMPLETED` | 生产 Daemon 装配接线 + SandboxWitness 落盘与深层断言（立卡 P-327；修订 P-328；施工 #424 `5de16ebe`；完工回写 P-329；估算 M；生产 Daemon 容器装配与 SandboxWitness 落盘/深层断言已交付，双重校验 fail-closed、逃生门如实记档；P0 风险未宣称解除） | [正文](./development-tasks-completed.md#task-p0.3a) |
 | `TASK-P0.4` | `NEW_TASK` | 独立验收与测试完整性防护（立卡 P-327；估算 M；未开工） | [正文](./development-tasks-active.md#task-p0.4) |
 
 ---

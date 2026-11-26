@@ -12982,3 +12982,160 @@ governance:
 - **P02-P4～P6**：rename 按选 A 同时审新旧路径，删除审原路径，识别 mode-only / symlink / submodule；`node_modules/`、`.stagent/` 白名单不变。
 - **P02-P7～P10**：执行前 / 验证后违规阻断并留证；未跟踪兼容守卫保持原接口；越界按既有码拒绝；分支已提交的越权 rename 在 PRE_MERGE 阻断。
 - **诚实口径**：**全量候选变更 Scope 审计已交付（统一审计函数、三检测点、PRE_MERGE 分支 diff 复核、rename 新旧路径均审）；P0 风险未宣称解除**。
+
+### 3.4ce 生产 Daemon 容器装配与 SandboxWitness 深层断言（P0.3a · 完工回写 P-329）
+
+> 两卡共用立卡说明与审批边界保留在 [`development-tasks-active.md`](./development-tasks-active.md#task-p0.3a) §3.4cc。
+
+<a id="task-p0.3a"></a>
+
+#### 【Task P0.3a】生产 Daemon 装配接线 + SandboxWitness 落盘与深层断言 `[COMPLETED]`
+
+```yaml task-card
+id: TASK-P0.3a
+status: COMPLETED
+contract:
+  intent:
+    title: 生产 Daemon 装配接线 + SandboxWitness 落盘与深层断言
+    description: >-
+      做完后，生产 Daemon 在 server.ts 构造 ContractOrchestrator 时显式注入 DockerContainerHost，
+      解开 SANDBOX_ENFORCED 派工被 E_ADAPTER_SANDBOX_LOCKED 拒绝的死结；提供 STAGENT_DISABLE_CONTAINER=1 显式运维逃生门，
+      设置时在 daemon.jsonl 记 WARNING 并在 Evidence 如实记档、不得冒认 SANDBOX_ENFORCED；
+      EvidenceBundle 新增可选 sandbox_witness 字段并原子落盘；verifySandboxWitness 严格断言 via === "exit"、
+      worktree_root 规范化后与合同工作树严格相等、host_kind 为有效已知类型，exit_code 只记录不断言；
+      SANDBOX_ENFORCED 证据在生成与合并阶段双重强制校验 witness，缺失或不合规一律 fail-closed 阻断合并。
+    risk_level: HIGH
+  acceptance:
+    - id: P03A-P1
+      check: auto
+      text: >-
+        DaemonServerOptions 与装配接线支持注入 containerHost；server.ts 构造 ContractOrchestrator 时
+        默认注入 DockerContainerHost（环境可用时）；支持 STAGENT_DISABLE_CONTAINER=1 显式运维逃生门，
+        启用时在 daemon.jsonl 记录 WARNING 级别日志（含来源）。
+    - id: P03A-P2
+      check: auto
+      text: >-
+        运维逃生门启用或容器宿主不可用时，SANDBOX_ENFORCED 派工 fail-closed 抛 E_ADAPTER_SANDBOX_LOCKED；
+        Evidence 的 worker_control_mode 如实记录（如 UNCONTROLLED_EXTERNAL），严禁冒认 SANDBOX_ENFORCED。
+    - id: P03A-P3
+      check: auto
+      text: >-
+        EvidenceBundle 新增可选 sandbox_witness 字段（向后兼容旧证据），记录 host_kind、via、exit_code、
+        duration_ms、worktree_root；orchestrator 在任务执行完毕后从 containerHost 采集并落盘进证据。
+    - id: P03A-P4
+      check: auto
+      text: >-
+        verifySandboxWitness 严格断言：via === "exit"（排除 rejected/timeout/SIGKILL 冒认受控）、
+        worktree_root 规范化后等于合同工作树、host_kind 非 unknown/unavailable；exit_code 只记录不断言
+        （见证证明确实在沙箱运行过，Worker 执行失败由 verdict 阻断，不否定见证真实性）。
+    - id: P03A-P5
+      check: auto
+      text: >-
+        worker_control_mode === "SANDBOX_ENFORCED" 时，deriveCanMerge（生成时）与
+        merger.assertEvidenceControlAndRevision（合并时）双重校验 sandbox_witness，缺失或断言失败一律 fail-closed 阻断合并。
+    - id: P03A-P6
+      check: auto
+      text: >-
+        负向测试覆盖：witness 缺失、via 非 "exit"（timeout/rejected/SIGKILL）、worktree_root 不匹配、
+        host_kind 非法等场景均被拦截并阻断合并；合规 witness 正常放行。
+    - id: P03A-P7
+      check: auto
+      text: >-
+        既有 GATEWAY_ENFORCED 合并与派工路径零回归，不受 sandbox_witness 校验影响。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/server.ts
+      - src/lib/evidence.schema.ts
+      - daemon/worker/sandbox/container-host.ts
+      - daemon/worker/worker-adapter.interface.ts
+      - daemon/pipeline/orchestrator.ts
+      - daemon/pipeline/merger.ts
+      - tests/unit/container-witness-verify.test.ts
+      - tests/daemon/p0-3a-container-wiring-and-witness.test.ts
+      - tests/unit/evidence-schema-v11.test.ts
+      - tests/daemon/p0-1-evidence-merge-fail-closed.test.ts
+    readonly_paths:
+      - src/lib/contract.schema.ts
+      - daemon/guard/evidence-integrity.ts
+      - daemon/worker/cli-host/docker-container-host.ts
+      - docs/specs/runtime-contract-and-safety.md
+      - daemon/mcp/gateway.ts
+  verification:
+    commands:
+      - { alias: p03a-unit, executable: npx, args: [vitest, run, tests/unit/container-witness-verify.test.ts, tests/daemon/p0-3a-container-wiring-and-witness.test.ts, tests/unit/container-host.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) DaemonServerOptions 增加 containerHost?: ContainerHostPort | null 可选配置；server.ts 在构造 ContractOrchestrator 时，
+    根据 STAGENT_DISABLE_CONTAINER 环境变量与 options.containerHost 决定是否注入 DockerContainerHost；
+    若设置 STAGENT_DISABLE_CONTAINER=1，在 daemon.jsonl 输出 WARNING 日志记录设置来源。
+    2) 扩展 EvidenceBundle schema，加入可选 sandbox_witness 字段；定义 verifySandboxWitness 纯函数，
+    断言 via === "exit"、worktree_root 与合同工作树一致、host_kind 非 unknown/unavailable，exit_code 只记录不断言。
+    3) orchestrator 在任务执行完毕写 Evidence 时，若执行模式为 SANDBOX_ENFORCED 则从 containerHost 获取见证写入证据，
+    并在 deriveCanMerge 中校验 witness 合规性。
+    4) merger 在 assertEvidenceControlAndRevision 阶段，若 worker_control_mode === "SANDBOX_ENFORCED"，
+    从磁盘快照读取 sandbox_witness 执行 verifySandboxWitness，缺失或非法抛出 E_CANNOT_MERGE。
+    5) 编写单元测试与集成负向测试，验证断言覆盖及 GATEWAY_ENFORCED 零回归。
+  touches:
+    - { path: daemon/server.ts, change: modify, why: DaemonServerOptions 扩充 containerHost 注入；支持 STAGENT_DISABLE_CONTAINER=1 逃生门与 WARNING 日志, symbols: [DaemonServerOptions] }
+    - { path: src/lib/evidence.schema.ts, change: modify, why: 扩展 EvidenceBundle 新增可选 sandbox_witness 字段；deriveCanMerge 接入沙箱见证校验, symbols: [deriveCanMerge] }
+    - { path: daemon/worker/sandbox/container-host.ts, change: modify, why: 导出 verifySandboxWitness 校验函数，实现深层见证判定, symbols: [] }
+    - { path: daemon/worker/worker-adapter.interface.ts, change: modify, why: resolveEvidenceControlMode 对接见证有效性判定, symbols: [resolveEvidenceControlMode] }
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: 证据写入采集 sandbox_witness 并调用深层校验, symbols: [] }
+    - { path: daemon/pipeline/merger.ts, change: modify, why: PRE_MERGE 阶段对 SANDBOX_ENFORCED 独立核验证据内的 sandbox_witness, symbols: [] }
+    - { path: tests/unit/container-witness-verify.test.ts, change: modify, why: verifySandboxWitness 纯函数断言与边界单元测试, symbols: [] }
+    - { path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, change: modify, why: 生产装配、逃生门日志、负向拦截与合并阻断端到端测试, symbols: [] }
+    - { path: tests/unit/evidence-schema-v11.test.ts, change: modify, why: 对齐 P0.3a fail-closed 见证强制校验，更新 SANDBOX_ENFORCED 验收逻辑测试夹具, symbols: [] }
+    - { path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, change: modify, why: 对齐 P0.3a fail-closed 见证强制校验，更新 SANDBOX_ENFORCED 见证校验与合并断言夹具, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: P03A-P1, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, case: "P03A-P1: server 构造注入 containerHost 与逃生门 WARNING 日志" }
+    - { acceptance_id: P03A-P2, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, case: "P03A-P2: 宿主不可用时派工被拒 (E_ADAPTER_SANDBOX_LOCKED)" }
+    - { acceptance_id: P03A-P3, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, case: "P03A-P3 & P03A-P5: 真实入箱执行见证落盘，有合法见证放行合并，缺见证阻断合并" }
+    - { acceptance_id: P03A-P4, test_path: tests/unit/container-witness-verify.test.ts, level: unit, case: "合法有效见证：校验通过返回原见证对象" }
+    - { acceptance_id: P03A-P5, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, case: "P03A-P3 & P03A-P5: 真实入箱执行见证落盘，有合法见证放行合并，缺见证阻断合并" }
+    - { acceptance_id: P03A-P6, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, case: "P03A-P5 & P03A-P6: 负向测试拦截异常/伪造见证 (fail-closed)" }
+    - { acceptance_id: P03A-P7, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, case: "P03A-P7: GATEWAY_ENFORCED 路径零回归" }
+governance:
+  delivered: { pr: 424, commit: 5de16ebe326f7e8614ceb3fefd3494cba35400a6 }
+  spec_refs:
+    - docs/specs/runtime-contract-and-safety.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+  depends_on: []
+  code_facts:
+    - { ref: "daemon/server.ts:639-665", note: "构造 ContractOrchestrator 时未注入 containerHost" }
+    - { ref: "daemon/pipeline/orchestrator.ts:335-344", note: "OrchestratorOptions 已支持接收 containerHost" }
+    - { ref: "daemon/worker/sandbox/container-host.ts:164-172", note: "SandboxWitness 仅包含 5 字段且仅在内存 Map 驻留未落盘" }
+    - { ref: "daemon/worker/worker-adapter.interface.ts:168-185", note: "resolveEvidenceControlMode 仅检查 witness 是否存在" }
+    - { ref: "daemon/pipeline/merger.ts:580-605", note: "assertEvidenceControlAndRevision 仅校验 worker_control_mode 枚举值" }
+    - { ref: "daemon/worker/cli-host/docker-container-host.ts:290-310", note: "DockerContainerHost 实现类与挂载参数" }
+  non_goals:
+    - 不做容器文件系统细粒度 Scope 强制挂载（P0-3b，保持挂账）
+    - 不改动既有 GATEWAY_ENFORCED 的网络与写范围校验
+    - 不改动旧证据 schema 的向后兼容性（sandbox_witness 仍为可选）
+    - 不在此卡实现独立验收与基线重跑（TASK-P0.4）
+  fail:
+    - STAGENT_DISABLE_CONTAINER=1 启用时在 Evidence 冒认 SANDBOX_ENFORCED 或未记录 WARNING 日志
+    - verifySandboxWitness 错误断言 exit_code === 0 导致有效但失败的 Worker 见证被判定为假见证
+    - 允许 via 为 timeout/rejected/SIGKILL 的见证通过 SANDBOX_ENFORCED 合并校验
+    - 缺少 sandbox_witness 的 SANDBOX_ENFORCED 证据成功合并
+    - 破坏既有 GATEWAY_ENFORCED 任务的派工与合并
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+#### 归档注记（P-329 · 2026-11-26）
+
+- **交付 PR**：[#424](https://github.com/he18718143986-design/IDE/pull/424)（head `96796fe435d8b1f4b5f262fe40ba69b459e14c1f`，squash `5de16ebe326f7e8614ceb3fefd3494cba35400a6`，操作者由我执行）。
+- **范围与检查**：仅 10 个授权 `writable_paths`（+1011/−34），5 个 `readonly_paths` 保持零 diff。相关单元与集成测试（10 tests in `container-witness-verify.test.ts`、5 tests in `p0-3a-container-wiring-and-witness.test.ts`、18 tests in `evidence-schema-v11.test.ts`、13 tests in `p0-1-evidence-merge-fail-closed.test.ts`）全部通过。必需 CI 全绿（三平台 Lint/Typecheck + ubuntu/macOS Unit + Docs/Knowledge/Perf/Detect；无 CANCELLED），Windows Unit 失败为既有环境存量且本卡用例在 Windows 上全绿，Cursor Bugbot neutral。
+- **P03A-P1～P2（生产 Daemon 装配与逃生门）**：`daemon/server.ts` 构造装配 `containerHost`（支持注入，缺省为 `DockerContainerHost` 并注入 `orchestrator`）；支持 `STAGENT_DISABLE_CONTAINER=1` 运维逃生门且如实记录 WARNING 日志（`code: "STAGENT_DISABLE_CONTAINER"`, `kind: "container_escape_hatch"`），开启逃生门或宿主不可用时派工被拒（`E_ADAPTER_SANDBOX_LOCKED`），Evidence 如实记档（`UNCONTROLLED_EXTERNAL`）不冒认。
+- **P03A-P3～P4（见证落盘与深层断言）**：`src/lib/evidence.schema.ts` 增加可选 `sandbox_witness`；`daemon/worker/sandbox/container-host.ts` 导出 `verifySandboxWitness` 与 `isSandboxWitnessValid`，严格校验 `via === "exit"`（排除 timeout/rejected/SIGKILL 冒认受控）、工作树规范化匹配、`host_kind` 非空且不为 unknown/unavailable；`exit_code` 只记不断言（Worker 执行失败由 verdict 阻断，不否定见证真实性）。
+- **P03A-P5～P6（双重封锁与负向拦截）**：第一道门（`src/lib/evidence.schema.ts:deriveCanMerge`）在 `SANDBOX_ENFORCED` 时校验见证合法性，缺失或非法 fail-closed 返回 false；第二道门（`daemon/pipeline/merger.ts:assertEvidenceControlAndRevision`）在合并时独立从磁盘快照核验 `sandbox_witness`，非法或缺失抛 `E_CANNOT_MERGE` 阻断合并。负向用例覆盖见证缺失、非法 via、非法 host_kind、工作树不匹配等场景均成功阻断。
+- **P03A-P7（零回归）**：既有 `GATEWAY_ENFORCED` 路径零回归（Evidence 不带 witness，正常放行合并）。
+- **旧测试对齐**：对齐 P0.3a fail-closed 规则更新了 P0.1 两处旧夹具（`evidence-schema-v11.test.ts` 与 `p0-1-evidence-merge-fail-closed.test.ts`），断言方向均对齐为「SANDBOX_ENFORCED 需合法见证才放行」，未削弱拦截断言。
+- **诚实口径**：**生产 Daemon 容器装配与 SandboxWitness 落盘/深层断言已交付（双重校验 fail-closed、逃生门如实记档）；P0 风险未宣称解除**。
