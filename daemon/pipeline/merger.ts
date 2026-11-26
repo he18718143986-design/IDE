@@ -18,7 +18,13 @@ import {
 } from "../git/worktree-manager";
 import { assertEvidenceIntegrity } from "../guard/evidence-integrity";
 import {
+  E_OUT_OF_SCOPE,
   E_OUT_OF_SCOPE_UNTRACKED,
+  describeCandidateViolations,
+  enforceCandidateScope,
+  type CandidateScopeReport,
+} from "./candidate-scope-audit";
+import {
   describeUntrackedViolations,
   enforceUntrackedScope,
 } from "./untracked-scope-guard";
@@ -461,16 +467,29 @@ export function assertTrailerBounds(message: string): TrailerBounds {
  * 与 `assertMainTreeClean` 的分工：后者检查**主工作树**，本函数检查
  * **任务 Worktree**；两者互补，不重叠。
  */
-export async function assertWorktreeUntrackedScope(options: {
+export async function assertWorktreeCandidateScope(options: {
   worktreePath: string;
   scope: FileSystemScope;
-}): Promise<void> {
-  const report = await enforceUntrackedScope({
+  baseBranch?: string | undefined;
+  baseCommitSha?: string | undefined;
+  repoRoot?: string | undefined;
+  branch?: string | undefined;
+}): Promise<CandidateScopeReport> {
+  const report = await enforceCandidateScope({
     worktreePath: options.worktreePath,
     scope: options.scope,
     phase: "PRE_MERGE",
+    baseBranch: options.baseBranch,
+    baseCommitSha: options.baseCommitSha,
+    repoRoot: options.repoRoot,
+    branch: options.branch,
   });
-  if (report.passed) return;
+  if (report.passed) return report;
+
+  const isOnlyUntracked =
+    report.violations.length > 0 &&
+    report.violations.every((v) => v.changeType === "UNTRACKED");
+  const code = isOnlyUntracked ? E_OUT_OF_SCOPE_UNTRACKED : E_OUT_OF_SCOPE;
 
   const list = report.violations
     .slice(0, 5)
@@ -479,9 +498,16 @@ export async function assertWorktreeUntrackedScope(options: {
   const more =
     report.violations.length > 5 ? ` 等 ${report.violations.length} 处` : "";
   throw new MergeGateError(
-    E_OUT_OF_SCOPE_UNTRACKED,
-    `${describeUntrackedViolations(report)}（违规清单：${list}${more}）`,
+    code,
+    `${describeCandidateViolations(report)}（违规清单：${list}${more}）`,
   );
+}
+
+export async function assertWorktreeUntrackedScope(options: {
+  worktreePath: string;
+  scope: FileSystemScope;
+}): Promise<void> {
+  await assertWorktreeCandidateScope(options);
 }
 
 export async function squashMerge(options: MergeOptions): Promise<MergeResult> {
@@ -618,12 +644,16 @@ async function mergeInternal(
   }
   const branch = contract.authorization.git.task_branch;
 
-  // 3.5 TASK-D.2b：合并前复核完整工作树（含未跟踪文件）。
+  // 3.5 TASK-P0.2：合并前复核全量候选变更（Worktree 状态 + 分支 diff vs base）。
   // 放在证据完整性之前：越界文件是更具体、更可操作的结论，
   // 不该被指纹失配（E_EVIDENCE_STALE）抢先掩盖。
-  await assertWorktreeUntrackedScope({
+  await assertWorktreeCandidateScope({
     worktreePath,
     scope: contract.authorization.file_system_scope,
+    baseBranch: contract.authorization.git.base_branch,
+    baseCommitSha: snapshot.git_info.base_commit_sha,
+    repoRoot,
+    branch,
   });
 
   // 3.55 TASK-J.18d：PRE_MERGE 墓地全量扫描（纵深：绕过 hook 仍拦）
