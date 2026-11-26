@@ -30,6 +30,7 @@ export const ERROR_CODES = [
   "E_RETRY_LIMIT_EXCEEDED",
   "E_WORKSPACE_LOCKED",
   "E_EVIDENCE_STALE",
+  "E_EVIDENCE_REVISION_MISMATCH",
   "E_PREPARATION_FAILED",
   "E_WORKTREE_LOST",
   "E_PORT_CONFLICT",
@@ -202,6 +203,16 @@ export const ERROR_CODE_CATALOG: Readonly<Record<ErrorCode, ErrorCodeSpec>> = {
     component: "FS Watcher",
     task: "TASK-B.2",
     condition: "验证通过后工作树内文件被外部编辑器或进程二次修改",
+  },
+  E_EVIDENCE_REVISION_MISMATCH: {
+    code: "E_EVIDENCE_REVISION_MISMATCH",
+    reason_code: "EVIDENCE_STALE",
+    component: "Merger",
+    task: "TASK-P0.1",
+    condition:
+      "合并时重核 Evidence 的 contract_revision：字段缺失（旧证据 / 版本不可确认）或与当前合同版本不符，拒绝合并",
+    plain_message:
+      "这份验收结论对应的不是当前这版合同（或没记下是哪一版），不能用来合并。请按当前合同重新验收。",
   },
   E_PREPARATION_FAILED: {
     code: "E_PREPARATION_FAILED",

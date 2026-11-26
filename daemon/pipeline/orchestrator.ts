@@ -2389,18 +2389,23 @@ export class ContractOrchestrator {
       ? this.syncGit(worktreePath, ["diff", "--stat", "HEAD"]) || ""
       : "";
 
+    // TASK-W.5c-ii：如实记三值档位。
+    // TASK-W.5c-iii：**记实不记名**——声明 `SANDBOX_ENFORCED` 只是「声称」，
+    // 证据只认执行面实况：本轮派工没带 `SandboxWitness`（即没走 runInSandbox）
+    // 就降记为 `UNCONTROLLED_EXTERNAL`，不允许「标了沙箱档」本身充当受控证据。
+    // TASK-P0.1：同一个值既写入证据、也传给 deriveCanMerge（失败关闭）。
+    const evidenceControlMode = resolveEvidenceControlMode(
+      input.workerControlMode ?? contract.worker_spec.control_mode,
+      this.sandboxWitnesses.get(contract.contract_id),
+    );
+
     const bundle: EvidenceBundle = {
       evidence_id: evidenceId,
       contract_id: contract.contract_id,
+      // TASK-P0.1：新证据必填合同版本；merger 合并时按当前合同版本重新比对
+      contract_revision: contract.contract_revision,
       generated_at: new Date().toISOString(),
-      // TASK-W.5c-ii：如实记三值档位。
-      // TASK-W.5c-iii：**记实不记名**——声明 `SANDBOX_ENFORCED` 只是「声称」，
-      // 证据只认执行面实况：本轮派工没带 `SandboxWitness`（即没走 runInSandbox）
-      // 就降记为 `UNCONTROLLED_EXTERNAL`，不允许「标了沙箱档」本身充当受控证据。
-      worker_control_mode: resolveEvidenceControlMode(
-        input.workerControlMode ?? contract.worker_spec.control_mode,
-        this.sandboxWitnesses.get(contract.contract_id),
-      ),
+      worker_control_mode: evidenceControlMode,
       usage:
         totals && totals.totalTokens > 0
           ? {
@@ -2437,6 +2442,9 @@ export class ContractOrchestrator {
           manualConfirmationDeclared:
             contract.verification_spec.manual_confirmation !== undefined,
           manualConfirmationRecord: input.manualConfirmationRecord,
+          // TASK-P0.1：控制模式与合同版本进入派生门（缺失 / 不受控即 false）
+          workerControlMode: evidenceControlMode,
+          contractRevision: contract.contract_revision,
         }),
         summary: input.summary,
         ...(input.reasonCode === undefined

@@ -247,12 +247,18 @@ describe("can_merge 派生不变式（§9.2）", () => {
   });
 
   it("deriveCanMerge 与 Schema 判定完全一致", () => {
+    // TASK-P0.1：控制模式与合同版本齐全时，原有门禁语义不变
+    const CONTROLLED = {
+      workerControlMode: "GATEWAY_ENFORCED",
+      contractRevision: 1,
+    } as const;
     const cases: Array<{
       input: Parameters<typeof deriveCanMerge>[0];
       expected: boolean;
     }> = [
       {
         input: {
+          ...CONTROLLED,
           status: "PASSED",
           scopePassed: true,
           budgetExhausted: false,
@@ -262,6 +268,7 @@ describe("can_merge 派生不变式（§9.2）", () => {
       },
       {
         input: {
+          ...CONTROLLED,
           status: "PASSED",
           scopePassed: true,
           budgetExhausted: false,
@@ -271,6 +278,7 @@ describe("can_merge 派生不变式（§9.2）", () => {
       },
       {
         input: {
+          ...CONTROLLED,
           status: "PASSED",
           scopePassed: false,
           budgetExhausted: false,
@@ -280,6 +288,7 @@ describe("can_merge 派生不变式（§9.2）", () => {
       },
       {
         input: {
+          ...CONTROLLED,
           status: "PASSED",
           scopePassed: true,
           budgetExhausted: true,
@@ -289,6 +298,7 @@ describe("can_merge 派生不变式（§9.2）", () => {
       },
       {
         input: {
+          ...CONTROLLED,
           status: "PASSED",
           scopePassed: true,
           budgetExhausted: false,
@@ -300,6 +310,7 @@ describe("can_merge 派生不变式（§9.2）", () => {
       },
       {
         input: {
+          ...CONTROLLED,
           status: "PASSED",
           scopePassed: true,
           budgetExhausted: false,
@@ -315,6 +326,7 @@ describe("can_merge 派生不变式（§9.2）", () => {
       },
       {
         input: {
+          ...CONTROLLED,
           status: "PASSED",
           scopePassed: true,
           budgetExhausted: false,
@@ -330,6 +342,7 @@ describe("can_merge 派生不变式（§9.2）", () => {
       },
       {
         input: {
+          ...CONTROLLED,
           status: "STALE",
           scopePassed: true,
           budgetExhausted: false,
@@ -342,6 +355,92 @@ describe("can_merge 派生不变式（§9.2）", () => {
     for (const { input, expected } of cases) {
       expect(deriveCanMerge(input)).toBe(expected);
     }
+  });
+});
+
+describe("TASK-P0.1 控制模式与合同版本失败关闭", () => {
+  const gatesPass = {
+    status: "PASSED",
+    scopePassed: true,
+    budgetExhausted: false,
+    forbiddenViolationCount: 0,
+  } as const;
+
+  it("P01-P1：UNCONTROLLED_EXTERNAL 一律 can_merge=false", () => {
+    expect(
+      deriveCanMerge({
+        ...gatesPass,
+        workerControlMode: "UNCONTROLLED_EXTERNAL",
+        contractRevision: 3,
+      }),
+    ).toBe(false);
+  });
+
+  it("P01-P1：控制模式缺失同样 can_merge=false（缺失不视为受控）", () => {
+    expect(deriveCanMerge({ ...gatesPass, contractRevision: 3 })).toBe(false);
+    expect(
+      deriveCanMerge({
+        ...gatesPass,
+        workerControlMode: undefined,
+        contractRevision: 3,
+      }),
+    ).toBe(false);
+  });
+
+  it("P01-P1：GATEWAY_ENFORCED / SANDBOX_ENFORCED 进入正常验收逻辑", () => {
+    for (const mode of ["GATEWAY_ENFORCED", "SANDBOX_ENFORCED"] as const) {
+      expect(
+        deriveCanMerge({
+          ...gatesPass,
+          workerControlMode: mode,
+          contractRevision: 2,
+        }),
+      ).toBe(true);
+      // 受控档位也不能越过原有门禁
+      expect(
+        deriveCanMerge({
+          ...gatesPass,
+          scopePassed: false,
+          workerControlMode: mode,
+          contractRevision: 2,
+        }),
+      ).toBe(false);
+    }
+  });
+
+  it("合同版本缺失或不可确认 → can_merge=false", () => {
+    for (const contractRevision of [undefined, 0, -1, 1.5, Number.NaN]) {
+      expect(
+        deriveCanMerge({
+          ...gatesPass,
+          workerControlMode: "GATEWAY_ENFORCED",
+          contractRevision,
+        }),
+      ).toBe(false);
+    }
+  });
+
+  it("P01-P9：Schema 兼容面不变——缺 contract_revision / worker_control_mode 的旧证据仍可读", () => {
+    const legacy = asRaw(evidence());
+    delete legacy["contract_revision"];
+    delete legacy["worker_control_mode"];
+    const parsed = evidenceBundleSchema.safeParse(legacy);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.contract_revision).toBeUndefined();
+      expect(parsed.data.worker_control_mode).toBeUndefined();
+    }
+    // 两字段仍为可选，提供时同样合法
+    expect(
+      evidenceBundleSchema.safeParse(
+        asRaw(
+          evidence({
+            contract_revision: 4,
+            worker_control_mode: "UNCONTROLLED_EXTERNAL",
+          }),
+        ),
+      ).success,
+    ).toBe(true);
   });
 });
 

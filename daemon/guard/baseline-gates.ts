@@ -324,11 +324,16 @@ function evaluateExitCodesCanMerge(allZero: boolean): boolean {
   }));
   const evaluated = evaluateBaselineGateResults(results);
   const status = evaluated.ok ? "PASSED" : "FAILED";
+  // TASK-P0.1：deriveCanMerge 对控制模式 / 合同版本失败关闭。本函数只评估
+  // 「底线命令退出码」这一个维度，其余维度按受控、版本已确认的合成输入固定，
+  // 以便隔离出退出码对 can_merge 的影响；不代表任何真实证据的控制模式。
   return deriveCanMerge({
     status,
     scopePassed: true,
     budgetExhausted: false,
     forbiddenViolationCount: 0,
+    workerControlMode: "GATEWAY_ENFORCED",
+    contractRevision: 1,
   });
 }
 
