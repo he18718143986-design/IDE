@@ -229,7 +229,9 @@ describe("TASK-P0.2 / 全量候选变更门禁集成测试", () => {
       expect(result.commitSha).toBeTruthy();
       expect(git(repo, ["rev-parse", "HEAD"]).trim()).not.toBe(headBefore);
       expect(
-        fs.readFileSync(path.join(repo, "src", "feature.ts"), "utf-8").replace(/\r\n/g, "\n"),
+        fs
+          .readFileSync(path.join(repo, "src", "feature.ts"), "utf-8")
+          .replace(/\r\n/g, "\n"),
       ).toBe("export const feature = 1;\n");
       expect(store.get(contract.contract_id)?.lifecycle_state).toBe("MERGED");
     });
