@@ -399,6 +399,9 @@ describe("TASK-J.29 八项检查体", () => {
         scopePassed: true,
         budgetExhausted: false,
         forbiddenViolationCount: 0,
+        // TASK-P0.1：受控档位 + 合同版本齐全时才可能为真
+        workerControlMode: "GATEWAY_ENFORCED",
+        contractRevision: 1,
       }),
     ).toBe(true);
 
@@ -415,6 +418,8 @@ describe("TASK-J.29 八项检查体", () => {
         scopePassed: true,
         budgetExhausted: false,
         forbiddenViolationCount: 0,
+        workerControlMode: "GATEWAY_ENFORCED",
+        contractRevision: 1,
       }),
     ).toBe(false);
     expect(deriveCanMerge.length).toBe(1);

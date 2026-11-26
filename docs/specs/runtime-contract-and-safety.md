@@ -264,8 +264,14 @@
 | `E_WORKSPACE_LOCKED` | 工作区互斥 | 拒绝 | 「等一下」 | ✓ | `WORKSPACE_LOCKED` |
 | `E_PROPOSAL_PREVIOUSLY_REJECTED` | 派工门禁 / 全量扫描 / CLI hook | §5.2 | 墓地卡（§5.1） | ✓（DEC-1） | `SCOPE_VIOLATION` |
 | `E_GATE_SCAN_FAILED` | 全量扫描无法读取完整 diff | 失败关闭：不进合并 | 「自动检查没跑完」 | ✓ | `PREPARATION_INTERRUPTED` |
+| `E_EVIDENCE_REVISION_MISMATCH`（TASK-P0.1） | merger 合并时重核 Evidence `contract_revision`：字段缺失（旧证据 / 版本不可确认）或与当前合同版本不符 | 失败关闭：不进合并；旧证据可读、可展示 | 「这份验收结论不是当前这版合同的，请重新验收」 | ✓ | `EVIDENCE_STALE` |
 | `E_SCHEME_SNAPSHOT_NOT_FOUND` / `E_SCHEME_SNAPSHOT_MISMATCH` | 派工绑定（复用 L2 Daemon 专属码） | 不签发 `exec_token` | 「方案快照对不上，需要重新确认」 | L2 表 | （签署/派工归因，不写入执行期 evidence 主码） |
 | `E_DISPUTE_TIMEOUT` | 质询看门狗 | 熔断 | 见 playtest-self-check | ✓ | `BUDGET_EXHAUSTED` |
+
+**合并前证据门禁用码（TASK-P0.1，P-324 立卡要求在此写明）**：merger 读磁盘 Evidence Snapshot 独立重核，不信任快照里的 `can_merge`。
+- **`contract_revision` 字段缺失复用 `E_EVIDENCE_REVISION_MISMATCH`**（缺失即「无法确认与当前合同一致」，与版本不符同一处理）；不另立码。
+- **控制模式拒绝（`worker_control_mode` 缺失、`UNCONTROLLED_EXTERNAL` 或未知值）用 `E_CANNOT_MERGE`**——沿用 merger 既有「证据不可合并」字面量（与 `E_EVIDENCE_MISSING` / `E_EVIDENCE_MISMATCH` 同属 `MergeGateError` 字面量，不入 `ERROR_CODES`），不新增码。`GATEWAY_ENFORCED` / `SANDBOX_ENFORCED` 字符串只是证据记档，**不构成执行受控的真实性证明**；SandboxWitness 深层验证属 P0-3。
+- **候选提交绑定不一致（任务分支 tip ≠ 证据 `worktree_snapshot.head_sha` / `git_info.task_commit_sha`，或读不到分支 tip）用 `E_EVIDENCE_STALE`**（既有码）。
 
 **移出 L3**：`E_CHECKPOINT_FAILED`（开一轮前打检查点失败）——不是执行期码。
 

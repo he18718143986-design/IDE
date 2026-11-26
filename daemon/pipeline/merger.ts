@@ -85,6 +85,78 @@ export class MergeGateError extends Error {
   }
 }
 
+/**
+ * TASK-P0.1：证据合同版本缺失或与当前合同版本不符（runtime-contract-and-safety.md §8.1）。
+ * 字段缺失（旧证据 / 版本不可确认）同样使用本码：缺失即「无法确认与当前合同一致」。
+ */
+export const E_EVIDENCE_REVISION_MISMATCH = "E_EVIDENCE_REVISION_MISMATCH";
+
+/** TASK-P0.1：合并时承认的受控档位（字符串不构成执行受控的真实性证明，见 P0-3） */
+const MERGEABLE_CONTROL_MODES: ReadonlySet<string> = new Set([
+  "GATEWAY_ENFORCED",
+  "SANDBOX_ENFORCED",
+]);
+
+/**
+ * TASK-P0.1 第二道封锁：合并时独立重核 Evidence 的控制模式与合同版本。
+ * - 控制模式缺失 / `UNCONTROLLED_EXTERNAL` / 未知值 → `E_CANNOT_MERGE`
+ * - `contract_revision` 缺失 / 与当前合同版本不符 → `E_EVIDENCE_REVISION_MISMATCH`
+ * 旧证据仍可被 Schema 读取与展示，只是在这里不可合并。
+ */
+export function assertEvidenceControlAndRevision(
+  snapshot: Pick<EvidenceBundle, "worker_control_mode" | "contract_revision">,
+  currentContractRevision: number,
+): void {
+  const mode = snapshot.worker_control_mode;
+  if (mode === undefined || !MERGEABLE_CONTROL_MODES.has(mode)) {
+    throw new MergeGateError(
+      "E_CANNOT_MERGE",
+      mode === undefined
+        ? "这份验收证据没有记录施工时的控制模式，无法确认施工受控，不能合并（缺失按不受控处理）"
+        : `这份验收证据记录的控制模式是 ${mode}，不是受控施工，不能合并`,
+    );
+  }
+  const revision = snapshot.contract_revision;
+  if (revision === undefined) {
+    throw new MergeGateError(
+      E_EVIDENCE_REVISION_MISMATCH,
+      `这份验收证据没有记录对应的合同版本，无法确认它验的是当前合同（当前版本 ${currentContractRevision}），请重新验收后再合并`,
+    );
+  }
+  if (revision !== currentContractRevision) {
+    throw new MergeGateError(
+      E_EVIDENCE_REVISION_MISMATCH,
+      `这份验收证据对应合同版本 ${revision}，当前合同已是版本 ${currentContractRevision}，请按当前合同重新验收后再合并`,
+    );
+  }
+}
+
+/**
+ * TASK-P0.1 候选提交绑定：任务分支 tip 必须等于证据绑定的提交。
+ * 读不到分支 tip 也失败关闭（不默认放行）。
+ */
+async function assertCandidateCommitBound(input: {
+  repoRoot: string;
+  branch: string;
+  snapshot: EvidenceBundle;
+}): Promise<void> {
+  const tip = await execGit(
+    ["rev-parse", "--verify", `refs/heads/${input.branch}^{commit}`],
+    input.repoRoot,
+  );
+  const tipSha = tip.exitCode === 0 ? tip.stdout.trim() : "";
+  const bound = input.snapshot.worktree_snapshot.head_sha;
+  const taskCommit = input.snapshot.git_info.task_commit_sha;
+  if (tipSha === "" || tipSha !== bound || tipSha !== taskCommit) {
+    throw new MergeGateError(
+      "E_EVIDENCE_STALE",
+      tipSha === ""
+        ? `读不到任务分支 ${input.branch} 的当前提交，无法确认合并对象就是验收过的提交，已停止合并`
+        : `任务分支当前提交 ${tipSha.slice(0, 12)} 与验收证据绑定的提交 ${bound.slice(0, 12)} 不一致，验收结论不再适用，请重新验收`,
+    );
+  }
+}
+
 /** TASK-D.3 / D-4：目标分支在施工期间前进 */
 export const E_TARGET_BRANCH_ADVANCED = "E_TARGET_BRANCH_ADVANCED";
 
@@ -513,6 +585,10 @@ async function mergeInternal(
     );
   }
 
+  // 2b. TASK-P0.1 第二道封锁（合并时）：不信任快照里的 can_merge，
+  // 直接读真实 Evidence Snapshot 独立重核控制模式与合同版本，任一缺失即拒。
+  assertEvidenceControlAndRevision(snapshot, contract.contract_revision);
+
   // G2 / G3 守卫条款：若合同声明了 manual_confirmation，追加「确认记录齐全否则拒绝合并」闸门
   if (contract.verification_spec.manual_confirmation !== undefined) {
     const mc = snapshot.manual_confirmation;
@@ -579,6 +655,16 @@ async function mergeInternal(
   await assertEvidenceIntegrity({
     worktreePath,
     evidencePath,
+    snapshot,
+  });
+
+  // 3.65 TASK-P0.1 候选提交绑定：真正被 squash 的是任务分支 tip，
+  // 它必须等于证据绑定的提交（worktree_snapshot.head_sha / git_info.task_commit_sha）。
+  // 指纹只覆盖 Worktree HEAD；若 Worktree 被 detach 后分支 ref 被另行移动，
+  // 指纹仍一致而合并对象已变——此处补重核，失败关闭。
+  await assertCandidateCommitBound({
+    repoRoot,
+    branch,
     snapshot,
   });
 

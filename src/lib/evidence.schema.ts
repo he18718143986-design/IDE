@@ -261,6 +261,11 @@ export type EvidenceBundle = EvidenceBundleV11;
  * 合并门禁的唯一派生函数（§9.2：`can_merge` 必须等于完整合并门禁的派生结果）。
  * 任何写入 Evidence 的路径都必须调用它，不得手写布尔表达式。
  */
+/** TASK-P0.1：`deriveCanMerge` 接受的控制模式取值（与 Evidence 三值枚举同源） */
+export type WorkerControlModeForMerge = NonNullable<
+  EvidenceBundleV11["worker_control_mode"]
+>;
+
 export function deriveCanMerge(input: {
   status: EvidenceVerdictStatus;
   scopePassed: boolean;
@@ -277,7 +282,37 @@ export function deriveCanMerge(input: {
       }
     | null
     | undefined;
+  /**
+   * TASK-P0.1：证据记录的 Worker 控制模式（`worker_control_mode`）。
+   * 失败关闭：`UNCONTROLLED_EXTERNAL` 或缺失（undefined）一律 `false`；
+   * 只有 `GATEWAY_ENFORCED` / `SANDBOX_ENFORCED` 进入下方正常验收逻辑。
+   * 注意：该字符串只是证据记档，**不构成执行受控的真实性证明**；
+   * SandboxWitness 深层验证属 P0-3，不在本函数职责内。
+   */
+  workerControlMode?: WorkerControlModeForMerge | undefined;
+  /**
+   * TASK-P0.1：证据对应的合同版本（`contract_revision`）。
+   * 失败关闭：缺失或非正整数一律 `false`。与当前合同版本的比对由 merger
+   * 在合并时独立重做（第二道封锁），本处只拒绝「版本不可确认」。
+   */
+  contractRevision?: number | undefined;
 }): boolean {
+  // TASK-P0.1 第一道封锁（生成时）：控制模式缺失或不受控 → 不可合并
+  if (
+    input.workerControlMode !== "GATEWAY_ENFORCED" &&
+    input.workerControlMode !== "SANDBOX_ENFORCED"
+  ) {
+    return false;
+  }
+  // TASK-P0.1 第一道封锁（生成时）：合同版本缺失或不可确认 → 不可合并
+  if (
+    typeof input.contractRevision !== "number" ||
+    !Number.isInteger(input.contractRevision) ||
+    input.contractRevision < 1
+  ) {
+    return false;
+  }
+
   if (input.manualConfirmationDeclared) {
     const rec = input.manualConfirmationRecord;
     const isComplete =
