@@ -1903,3 +1903,136 @@ governance:
 <a id="task-p1.1"></a>
 
 > `TASK-P1.1` 已 **COMPLETED**（评估报告 [#437](https://github.com/he18718143986-design/IDE/pull/437) squash `caadfbf8799a2e4ecb74d8cec3df58d79dfd9d6d`；立卡 P-336；完工回写 P-337）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-p1.1) §3.4ci。诚实口径：**P0 独立验收与 Evidence 可信链专项评估已交付（威胁模型、Ed25519 选型、十大负向验收矩阵、信任边界契约草案、三卡建议、更新后风险台账）；评估产出非施工交付，P0 风险未宣称解除**。此处保留立卡说明与审批边界。
+
+### 3.4cj Evidence Ed25519 签名与防篡改验签门禁（TASK-P1.2 · 立卡 P-338）
+
+> **立卡说明（2026-11-26 · P-338）**：授权来源为 Tina 授权立卡「立卡 TASK-P1.2（Evidence Ed25519 签名与防篡改验签门禁，估算 M，P1-Highest）——按评估报告方案出立卡 docs PR」。操作者由我执行。对应评估报告 [`p1-eval-evidence-trust-chain-and-p0-acceptance.md`](../ledger/p1-eval-evidence-trust-chain-and-p0-acceptance.md) 建议施工卡清单第 1 项（原建议编号 `TASK-P1-1`，按顺延卡序统一编号为 **`TASK-P1.2`**）。**施工型卡，立卡 ≠ 开工**。
+>
+> **目标**：在 Evidence 生成端（`writeEvidence`）与消费端（`merger.ts` PRE_MERGE）之间建立基于非对称加密的可信链。采用 Node.js 原生 `crypto` 模块实现 Ed25519 密钥生成/管理、规范化序列化与签名生成，并在合流阶段进行 fail-closed 强校验，阻止本地攻击者篡改或伪造 Evidence 文件绕过门禁。
+>
+> **约束与限制（逐字写入，红线约束）**：
+> 1. 零新增外部运行时依赖：严格使用 Node.js 内置 `crypto` 模块；
+> 2. 私钥隔离：私钥绝不随 Evidence 提交到 Git 或放入 Evidence 目录，私钥文件权限严格设为 `0400`；
+> 3. fail-closed 门禁：无有效签名、签名损坏、公钥不符或内容遭篡改的 Evidence 一律强拦截，阻止合并；
+> 4. 范围外要动就停工修卡：只动授权 `writable_paths`，readonly 路径零 diff。
+>
+> **审批边界（逐字写入）**：本审批**不是代码合并批准**，也**不是 P0 风险解除声明**。本卡为施工立卡，立卡 ≠ 开工；实施须遵循立卡限制与 DoD，PR 全绿且 CLEAN 报授权方可合入。
+>
+> **诚实口径**：**硬件级 Attestation 未做、Merger 不重跑全量测试、容器内无 OS 级只读隔离三条边界保留；不得宣称 P0 风险解除或具备完整合同级权限强制和独立验收能力**。`TASK-P1.3` 与 `TASK-P1.4` 继续挂账待立，硬依赖 `TASK-P1.2`。
+
+<a id="task-p1.2"></a>
+
+#### 【Task P1.2】Evidence Ed25519 签名与防篡改验签门禁 `[NEW_TASK]`
+
+```yaml task-card
+id: TASK-P1.2
+status: NEW_TASK
+contract:
+  intent:
+    title: Evidence Ed25519 签名与防篡改验签门禁
+    description: >-
+      做完后，基于 Node.js 原生 crypto 模块实现 Ed25519 密钥对生成与独立管理（私钥工作区外存储、权限严格 0400）；
+      writeEvidence 落盘前对 Evidence 载荷进行 RFC 8785 规范化序列化并生成 Ed25519 签名文件；
+      merger.ts PRE_MERGE 阶段接入签名校验门禁，无签名/损坏/篡改/公钥不符一律 fail-closed 抛异常阻断合流；
+      Git commit 绑定 Evidence-Sha256 与 Evidence-Signature Trailer；
+      配套单元测试与负向集成测试覆盖签名防篡改与拦截。
+    risk_level: HIGH
+  acceptance:
+    - id: P12-P1
+      check: auto
+      text: >-
+        密钥生成与权限管理：基于 Node.js 原生 crypto 模块生成 Ed25519 密钥对，零外部运行时依赖；私钥存放于独立安全目录（权限严格设为 0400，非当前用户不可读），绝不落盘于工作区或 Evidence 目录；公钥支持脱机导出与分发配置。
+    - id: P12-P2
+      check: auto
+      text: >-
+        规范化与落盘即签名：writeEvidence 在生成 Evidence 记录时，对载荷进行规范化序列化（RFC 8785 键序与空白规范化）并使用 Ed25519 私钥生成非对称数字签名，写入独立签名文件或内嵌签名凭据。
+    - id: P12-P3
+      check: auto
+      text: >-
+        merger.ts PRE_MERGE 验签 fail-closed 门禁：merger.ts 在执行合流前，使用可信公钥强核验 Evidence 签名；若缺失签名、签名损坏、公钥不匹配或内容被篡改，一律抛出 EVIDENCE_SIGNATURE_INVALID 或 EVIDENCE_SIGNATURE_MISSING 阻止合流。
+    - id: P12-P4
+      check: auto
+      text: >-
+        Git Trailer 哈希与签名绑定：提交合流时注入并核对 Evidence-Sha256 与 Evidence-Signature Git Trailer，将提交历史与特定 Evidence 强哈希绑定，防止跨提交嫁接或替换。
+    - id: P12-P5
+      check: auto
+      text: >-
+        单元与负向集成测试覆盖：单元测试与负向集成测试覆盖合法签名放行、篡改 Evidence 内容被拒、缺失签名被拒、篡改签名被拒、公钥不匹配被拒；既有测试与门禁零回归。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/pipeline/orchestrator.ts
+      - daemon/pipeline/merger.ts
+      - src/lib/evidence.schema.ts
+      - daemon/pipeline/evidence-signer.ts
+      - tests/unit/evidence-signer.test.ts
+      - tests/integration/p1-evidence-signature-gate.test.ts
+    readonly_paths:
+      - daemon/worker/sandbox/container-host.ts
+      - daemon/worker/cli-host/docker-container-host.ts
+      - tests/unit/container-mount-scope.test.ts
+      - tests/unit/docker-container-host-mounts.test.ts
+      - tests/daemon/p0-3b-container-scope-fail-closed.test.ts
+  verification:
+    commands:
+      - { alias: evidence-signer-unit, executable: npx, args: [vitest, run, tests/unit/evidence-signer.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) 在 daemon/pipeline/evidence-signer.ts 封装基于 Node.js 原生 crypto 的 Ed25519 签名与验签辅助模块：
+       支持密钥对生成、POSIX 0400 私钥文件权限校验、RFC 8785 JSON 规范化及 SHA512withEd25519 签名与验签。
+    2) 在 daemon/pipeline/orchestrator.ts 的 writeEvidence 逻辑中，生成 Evidence 规范化摘要并调用 signer 生成签名凭据，
+       将签名保存为同名 .sig 文件或在 Evidence 中携带签名结构体。
+    3) 在 daemon/pipeline/merger.ts 的 PRE_MERGE 阶段接入 verifyEvidenceSignature 检查；
+       若未配置签名、签名不匹配或内容篡改，fail-closed 抛出异常阻断 Merge。
+    4) 在合流 commit 逻辑中写入并验证 Git Trailer (Evidence-Sha256 / Evidence-Signature)。
+    5) 编写 tests/unit/evidence-signer.test.ts 与 tests/integration/p1-evidence-signature-gate.test.ts，
+       覆盖正常验签通过及五类负向篡改/缺失拦截。
+  touches:
+    - { path: daemon/pipeline/evidence-signer.ts, change: create, why: Ed25519 密钥生成、权限检查、规范化签名与验签纯函数, symbols: [generateEvidenceKeyPair, signEvidencePayload, verifyEvidenceSignature] }
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: writeEvidence 写入时调用签名并持久化签名文件, symbols: [writeEvidence] }
+    - { path: daemon/pipeline/merger.ts, change: modify, why: PRE_MERGE 阶段强校验 Evidence 签名与 Git Trailer, symbols: [executeMerge] }
+    - { path: src/lib/evidence.schema.ts, change: modify, why: 扩展 Evidence 模式支持签名凭据与公钥元数据, symbols: [evidenceBundleSchema] }
+    - { path: tests/unit/evidence-signer.test.ts, change: create, why: 密钥生成、0400权限、规范化与签名/验签单测, symbols: [] }
+    - { path: tests/integration/p1-evidence-signature-gate.test.ts, change: create, why: 真实篡改/缺失/伪造签名导致 PRE_MERGE 阻断的集成测试, symbols: [] }
+  interfaces: []
+  data_changes: []
+  dependencies: []
+  decisions: []
+  test_plan:
+    - { acceptance_id: P12-P1, test_path: tests/unit/evidence-signer.test.ts, level: unit, debt: "立卡阶段测试文件尚未创建，待 TASK-P1.2 开工施工时落地" }
+    - { acceptance_id: P12-P2, test_path: tests/unit/evidence-signer.test.ts, level: unit, debt: "立卡阶段测试文件尚未创建，待 TASK-P1.2 开工施工时落地" }
+    - { acceptance_id: P12-P3, test_path: tests/integration/p1-evidence-signature-gate.test.ts, level: integration, debt: "立卡阶段测试文件尚未创建，待 TASK-P1.2 开工施工时落地" }
+    - { acceptance_id: P12-P4, test_path: tests/integration/p1-evidence-signature-gate.test.ts, level: integration, debt: "立卡阶段测试文件尚未创建，待 TASK-P1.2 开工施工时落地" }
+    - { acceptance_id: P12-P5, test_path: tests/integration/p1-evidence-signature-gate.test.ts, level: integration, debt: "立卡阶段测试文件尚未创建，待 TASK-P1.2 开工施工时落地" }
+  knowledge_delta:
+    modules_upsert: []
+    decisions_add: []
+    overview_changed: false
+governance:
+  spec_refs:
+    - docs/ledger/p1-eval-evidence-trust-chain-and-p0-acceptance.md
+    - docs/ledger/p0-line-comprehensive-review.md
+  depends_on:
+    - { id: TASK-P1.1, kind: hard }
+  code_facts:
+    - { ref: "daemon/pipeline/orchestrator.ts:2565", note: "writeEvidence 落盘明文 Evidence JSON" }
+    - { ref: "daemon/pipeline/merger.ts:149", note: "merger 仅对 Evidence 进行 Schema 校验，缺乏防篡改签名校验" }
+  non_goals:
+    - 不引入第三方加解密 NPM 包（严格采用 Node.js 内置 crypto）
+    - 不在本卡执行跨平台动态渗透测试（由 TASK-P1.3 承接）
+    - 不在本卡改动 Gateway 凭据注入与 Nonce（由 TASK-P1.4 承接）
+    - 不宣称硬件级安全或 P0 风险解除
+  fail:
+    - 允许无有效签名或签名损坏的 Evidence 通过 PRE_MERGE 门禁
+    - 私钥文件权限未限制为 0400 或存放在工作区内部
+    - 签名与验签未采用确定性规范化序列化导致偶发验签失败
+    - 引入第三方外部加密 NPM 依赖
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
