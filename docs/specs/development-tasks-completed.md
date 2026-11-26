@@ -12800,3 +12800,185 @@ governance:
 ```
 
 * **完工说明（2026-11-26 · P-325）**：Tina 选 A 按先例授权合并 [#418](https://github.com/he18718143986-design/IDE/pull/418)（由我执行）。施工 squash `dc225a051d2ca9bdeed575fd2b242ad177b6ea26`（2026-11-26 15:58 香港时间合入，父提交 `f83d001181a95aadeb559ecab97c02b9bd843bd2`）。**第一道封锁（生成时）**：`deriveCanMerge` 新增 `workerControlMode` / `contractRevision` 入参（`src/lib/evidence.schema.ts:265-311`）：控制模式非 `GATEWAY_ENFORCED`/`SANDBOX_ENFORCED`（含 `UNCONTROLLED_EXTERNAL` 与缺失）→ `false`；合同版本缺失 / 非正整数 → `false`。orchestrator 把 `contract_revision` 写进证据（`orchestrator.ts:2406`），并把写入证据的同一控制模式值传给派生门（`:2396-2399`、`:2446-2447`）；`baseline-gates.ts:330` 调用点补受控合成输入（该函数只隔离评估退出码贡献）。**第二道封锁（合并时）**：merger 在 `PASSED`/`can_merge` 基本判定之后调 `assertEvidenceControlAndRevision`（`merger.ts:106-131`，调用点 `:590`），读磁盘 Evidence Snapshot 独立重核控制模式与合同版本，不信任快照里的 `can_merge`。**用码**（`runtime-contract-and-safety.md` §8.1 `:267`、`:271-274` 同一处写明）：版本不符与字段缺失用新增 `E_EVIDENCE_REVISION_MISMATCH`（登记 `ERROR_CODES`，归 `EVIDENCE_STALE`）；控制模式拒绝用既有 `E_CANNOT_MERGE`；候选提交不一致用既有 `E_EVIDENCE_STALE`。**Schema 兼容面不变**：两字段仍可选、superRefine 未改；旧证据可读、可展示、不可合并。**候选提交绑定核实（DoD 第 6 条）**：现有指纹覆盖 Worktree HEAD，但 merger squash 的是任务分支 ref；Worktree detach 后移动分支 ref 时指纹仍一致而合并对象已换——**缺口属实**，按卡内授权在 `merger.ts` 补 `assertCandidateCommitBound`（`:138-158`，调用点 `:665`）：分支 tip 必须同时等于 `worktree_snapshot.head_sha` 与 `git_info.task_commit_sha`，读不到 tip 也拒；未新增证据字段。结论见 [`../ledger/p0-1-evidence-merge-fail-closed.md`](../ledger/p0-1-evidence-merge-fail-closed.md)。**负向测试实跑**：新建 `tests/daemon/p0-1-evidence-merge-fail-closed.test.ts` 13 例全过；端到端篡改磁盘快照构造 `PASSED + can_merge=true` 异常证据（伪造 `UNCONTROLLED_EXTERNAL` / 控制模式缺失 / 版本缺失 / 版本不符 / 分支被移走）全部被拒，主干 HEAD 不动、合同仍 `AUDITED`；**反证**：临时去掉 merger 两处新调用后 5 条端到端负向用例全部失败，证明改动前这些路径确实能绕过 merger。相对父提交 11 文件 +710/−15；13 条 `writable_paths` 实动 11 个（`tests/daemon/merger.test.ts` / `tests/daemon/merger-d2b-gates.test.ts` 未改即通过，作零回归证据）；**readonly 五文件零 diff**。本地：卡面 `p01-unit` 六文件 114 例全绿、`tsc --noEmit` 0、lint 0 error / 18 warn（与基线一致）、check:docs error 0。CI 必需面全绿（三平台 Lint/Typecheck、ubuntu/macOS Unit、Docs/Knowledge/Perf/Detect）；Windows Unit 为存量 15 文件 / 26 例（`continue-on-error`，与 #412 失败清单逐条一致、无新增；merger 两条为 CRLF 存量环境问题；本卡用例在 Windows 上 13/13 全绿），`mergeable_state=unstable` 按先例不挡；Cursor Bugbot neutral。诚实口径：**Evidence/Merge 失败关闭已交付（控制模式与合同版本双重封锁、候选提交绑定重核、负向测试实跑含反证）；独立审查验收已完成，P0 风险未宣称解除**。`GATEWAY_ENFORCED`/`SANDBOX_ENFORCED` 字符串仍不构成执行受控的真实性证明（SandboxWitness 深层验证属 P0-3，本轮不立卡）；Sandbox 放行不被误认为容器级合同权限审计已完成。
+---
+
+### 3.4cd 全量候选变更 Scope 审计（P0.2 · 完工回写 P-326）
+
+> 两卡共用立卡说明与审批边界保留在 [`development-tasks-active.md`](./development-tasks-active.md#task-p0.2) §3.4cb。
+
+<a id="task-p0.2"></a>
+
+#### 【Task P0.2】Full Git Candidate Scope Audit（全量候选变更 Scope 审计）`[COMPLETED]`
+
+> **断点（main `a2fa9497df70785f6e4c9d939b74695181e19c44` 直读）**：现有 Scope 守卫只审未跟踪文件：`parseUntrackedPaths` 只取 `git status --porcelain` 的 `??` 行（`daemon/pipeline/untracked-scope-guard.ts:144`）；三检测点 `PRE_EXECUTION` / `POST_VERIFICATION` / `PRE_MERGE` 的 phase 类型已在（`untracked-scope-guard.ts:33-38`），但 `PRE_MERGE` 的 `assertWorktreeUntrackedScope`（`daemon/pipeline/merger.ts:382-400`）同样只看未跟踪；已跟踪文件的修改、删除、重命名与已提交进分支的越权改动不在审计内。白名单 `node_modules/`、`.stagent/`（`untracked-scope-guard.ts:63-66`）。`daemon/diff/diff-files.ts:133-150` 已有 `git diff --name-status` + porcelain 读取（只读参考，非审计）。
+>
+> **审计基线核实项（施工前必做）**：合同 Schema 只有 `authorization.git.base_branch`（`src/lib/contract.schema.ts:416`），**未见独立 Base SHA 字段**；Evidence 有 `git_info.base_commit_sha`（`evidence.schema.ts:133`）。审批要求「用合同绑定的 Base SHA，不用动态 `HEAD`，审计中不可替换；合同已有字段/机制则复用不重复建模」。施工前须核实现有机制（如 Worktree 创建时的基点、证据 `base_commit_sha` 的取值时机）能否稳定代表合同绑定基线：能 → 复用并在施工记录写明；**须新增合同字段或改合同 Schema → 停工修卡报审，不擅自建模**。
+>
+> **三检测点职责（审批原文归纳）**：`PRE_EXECUTION`（施工环境初始状态 / 合同基线 / 前置条件）、`POST_VERIFICATION`（执行后 Worktree 变更集 vs 合同 Scope）、`PRE_MERGE`（候选提交 vs 合同 Base SHA 的完整差异为最终审计对象 + 必要工作区检查）——**branch diff 复核必须保留**。Git 状态解析器须正确处理带空格与特殊字符文件名及 rename 双路径语义，**禁止普通空格拆分 `git status --porcelain`**；审计结果规范化为内部变更对象（原路径 / 新路径 / 变更类型 / 特殊类型标记 / Scope 判定）；Delete 审原路径。用码优先复用 §8.1 既有码，新增须同步 [`runtime-contract-and-safety.md`](./runtime-contract-and-safety.md) §8.1。
+>
+> **DoD（十条 · 审批方 2026-11-26 重述原文，逐字）**：
+> 1. 审计基线为合同 Base SHA 起的全量候选变更，覆盖已跟踪文件的修改、删除、重命名，不只 `??` 未跟踪文件。
+> 2. 重命名按「目标路径」判定 Scope；rename 出 Scope 即拒。
+> 3. symlink、submodule 等特殊条目单独标记并纳入审计。
+> 4. 三检测点 `PRE_EXECUTION`/`POST_VERIFICATION`/`PRE_MERGE` 使用同一审计函数、同一判定规则。
+> 5. `PRE_MERGE` 必须保留分支 diff 复核（`git diff --name-status base...HEAD`），覆盖已提交进分支的越权改动——Worktree 审计不能替代已提交分支审计。
+> 6. `node_modules/`、`.stagent/` 白名单保持既有语义不变。
+> 7. 审计失败时不能继续 Merge（负向测试证明）。
+> 8. 既有 `??` 未跟踪文件守卫行为零回归。
+> 9. 不改 Scope 语义、不动 Gateway 逐文件校验、不接容器。
+> 10. 审计结果（越权路径清单）写入 Evidence 或 graph issue，白话可读。
+>
+> **注**：DoD 第 2 条写「重命名按目标路径判定 Scope」；上一轮审批另有「Rename 新旧路径均审」。两者如在施工中出现取舍冲突（例如源路径在 Scope 外、目标在 Scope 内），停工报审，不自行择一。
+
+```yaml task-card
+id: TASK-P0.2
+status: COMPLETED
+contract:
+  intent:
+    title: Full Git Candidate Scope Audit（全量候选变更 Scope 审计）
+    description: >-
+      做完后，Scope 审计从「只看 ?? 未跟踪文件」扩为合同 Base SHA 起的全量候选变更：已跟踪文件的修改、删除、重命名，
+      symlink 与 submodule 单独标记；三检测点用同一审计函数、同一判定规则；PRE_MERGE 保留分支 diff 复核，
+      已提交进分支的越权改动也拦得住。审计失败不能继续 Merge；越权路径清单白话写进 Evidence 或 graph issue。
+      白名单与既有 ?? 守卫行为不变；不改 Scope 语义、不动 Gateway、不接容器。
+    risk_level: HIGH
+  acceptance:
+    - id: P02-P1
+      check: auto
+      text: >-
+        审计基线为合同 Base SHA 起的全量候选变更，覆盖已跟踪文件的修改、删除、重命名，不只 ?? 未跟踪文件。
+    - id: P02-P2
+      check: auto
+      text: >-
+        重命名按「目标路径」判定 Scope；rename 出 Scope 即拒。
+    - id: P02-P3
+      check: auto
+      text: >-
+        symlink、submodule 等特殊条目单独标记并纳入审计。
+    - id: P02-P4
+      check: auto
+      text: >-
+        三检测点 PRE_EXECUTION/POST_VERIFICATION/PRE_MERGE 使用同一审计函数、同一判定规则。
+    - id: P02-P5
+      check: auto
+      text: >-
+        PRE_MERGE 必须保留分支 diff 复核（git diff --name-status base...HEAD），覆盖已提交进分支的越权改动——
+        Worktree 审计不能替代已提交分支审计。
+    - id: P02-P6
+      check: auto
+      text: >-
+        node_modules/、.stagent/ 白名单保持既有语义不变。
+    - id: P02-P7
+      check: auto
+      text: >-
+        审计失败时不能继续 Merge（负向测试证明）。
+    - id: P02-P8
+      check: auto
+      text: >-
+        既有 ?? 未跟踪文件守卫行为零回归。
+    - id: P02-P9
+      check: auto
+      text: >-
+        不改 Scope 语义、不动 Gateway 逐文件校验、不接容器。
+    - id: P02-P10
+      check: auto
+      text: >-
+        审计结果（越权路径清单）写入 Evidence 或 graph issue，白话可读。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/pipeline/candidate-scope-audit.ts
+      - daemon/pipeline/untracked-scope-guard.ts
+      - daemon/pipeline/orchestrator.ts
+      - daemon/pipeline/merger.ts
+      - docs/specs/runtime-contract-and-safety.md
+      - tests/unit/candidate-scope-audit.test.ts
+      - tests/daemon/p0-2-pre-merge-branch-audit.test.ts
+      - docs/ledger/p0-2-candidate-scope-audit.md
+    readonly_paths:
+      - tests/unit/untracked-scope-guard.test.ts
+      - src/lib/contract.schema.ts
+      - src/lib/evidence.schema.ts
+      - daemon/diff/diff-files.ts
+      - daemon/mcp/gateway.ts
+      - daemon/guard/evidence-integrity.ts
+  verification:
+    commands:
+      - { alias: p02-unit, executable: npx, args: [vitest, run, tests/unit/candidate-scope-audit.test.ts, tests/daemon/p0-2-pre-merge-branch-audit.test.ts, tests/unit/untracked-scope-guard.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) 新建 candidate-scope-audit.ts：以合同绑定基线（施工前核实来源，须新增合同字段则停工修卡）起读全量变更，
+    解析器按 NUL 分隔 / rename 双路径处理特殊字符文件名，禁止普通空格拆分 porcelain；规范化为内部变更对象（原路径 / 新路径 / 类型 / 特殊标记 / Scope 判定）。
+    2) rename 按目标路径判 Scope、出 Scope 即拒；Delete 审原路径；symlink / submodule 单独标记纳入审计。
+    3) 三检测点接同一函数；既有 untracked-scope-guard 的 ?? 行为与白名单语义保持，tests/unit/untracked-scope-guard.test.ts 只读且必须仍绿。
+    4) PRE_MERGE 保留 git diff --name-status base...HEAD 分支复核，审计失败即抛 MergeGateError 不进合并。
+    5) 越权路径清单白话写入 Evidence（复用 scope_audit 既有字段，不改 Schema）或 graph issue；用码优先复用 §8.1，新增须登记。
+  touches:
+    - { path: daemon/pipeline/candidate-scope-audit.ts, change: modify, why: 全量候选变更审计函数（三检测点共用）与 Git 状态解析器, symbols: [] }
+    - { path: daemon/pipeline/untracked-scope-guard.ts, change: modify, why: 接入同一审计函数，?? 行为与白名单语义零回归, symbols: [] }
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: PRE_EXECUTION / POST_VERIFICATION 接入全量审计并把越权清单写入证据, symbols: [] }
+    - { path: daemon/pipeline/merger.ts, change: modify, why: PRE_MERGE 全量审计 + 分支 diff 复核，失败不进合并, symbols: [] }
+    - { path: docs/specs/runtime-contract-and-safety.md, change: modify, why: 如新增码则在 §8.1 登记；复用既有码则写明, symbols: [] }
+    - { path: tests/unit/candidate-scope-audit.test.ts, change: modify, why: 变更类型、rename、特殊条目、特殊字符文件名、白名单用例, symbols: [] }
+    - { path: tests/daemon/p0-2-pre-merge-branch-audit.test.ts, change: modify, why: 已提交进分支的越权改动被 PRE_MERGE 拦截；审计失败不能 Merge 的负向测试, symbols: [] }
+    - { path: docs/ledger/p0-2-candidate-scope-audit.md, change: modify, why: 施工记录：审计基线来源核实结论、用码结论、负向测试实跑记录, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: P02-P1, test_path: tests/unit/candidate-scope-audit.test.ts, level: unit, case: "全量覆盖 M/A/D/R/C/T/U/?? 各种状态码" }
+    - { acceptance_id: P02-P2, test_path: tests/unit/candidate-scope-audit.test.ts, level: unit, case: "正确解析标准转义符" }
+    - { acceptance_id: P02-P3, test_path: tests/unit/candidate-scope-audit.test.ts, level: unit, case: "修改已跟踪文件超出 Scope：判定越界" }
+    - { acceptance_id: P02-P4, test_path: tests/unit/candidate-scope-audit.test.ts, level: unit, case: "重命名判定（选 A 裁决）：源路径与目标路径均必须在 writable_paths 内" }
+    - { acceptance_id: P02-P5, test_path: tests/daemon/p0-2-pre-merge-branch-audit.test.ts, level: integration, case: "分支已提交了对只读文件（package.json）的修改：Worktree 干净仍阻断合并" }
+    - { acceptance_id: P02-P6, test_path: tests/unit/candidate-scope-audit.test.ts, level: unit, case: "正确放行 node_modules/ 与 .stagent/ 目录及子路径" }
+    - { acceptance_id: P02-P7, test_path: tests/daemon/p0-2-pre-merge-branch-audit.test.ts, level: integration, case: "PRE_EXECUTION 阶段：工作区预先存在已跟踪文件的修改即时阻断并产出 BLOCKED 证据" }
+    - { acceptance_id: P02-P8, test_path: tests/unit/untracked-scope-guard.test.ts, level: unit, case: "只取 ?? 行，忽略已跟踪的修改/暂存/删除" }
+    - { acceptance_id: P02-P9, test_path: tests/unit/candidate-scope-audit.test.ts, level: unit, case: "未跟踪文件使用 E_OUT_OF_SCOPE_UNTRACKED，跟踪文件变更使用 E_OUT_OF_SCOPE" }
+    - { acceptance_id: P02-P10, test_path: tests/daemon/p0-2-pre-merge-branch-audit.test.ts, level: integration, case: "重命名判定（选 A 裁决）：将 Scope 外文件 rename 进 Scope 内已 commit 仍阻断" }
+governance:
+  delivered: { pr: 420, commit: bf8d3b9ca1fd1247fe861953e14618b3c969de2c }
+  spec_refs:
+    - docs/specs/runtime-contract-and-safety.md
+  depends_on:
+    - { id: TASK-P0.1, kind: hard }
+  code_facts:
+    - { ref: "daemon/pipeline/untracked-scope-guard.ts:144", note: "parseUntrackedPaths 只解析 porcelain 的 ?? 行" }
+    - { ref: "daemon/pipeline/untracked-scope-guard.ts:33-38", note: "三检测点 phase 类型已存在" }
+    - { ref: "daemon/pipeline/untracked-scope-guard.ts:63-66", note: "白名单 node_modules/、.stagent/" }
+    - { ref: "daemon/pipeline/merger.ts:382-400", note: "PRE_MERGE assertWorktreeUntrackedScope 只审未跟踪文件" }
+    - { ref: "daemon/pipeline/orchestrator.ts:2090-2100", note: "POST_VERIFICATION 越界处置顺序（先写 BLOCKED 证据、回退 EXECUTING、再抛错）" }
+    - { ref: "daemon/diff/diff-files.ts:133-150", note: "已有 git diff --name-status + porcelain 读取（只读参考）" }
+    - { ref: "src/lib/contract.schema.ts:416", note: "合同只有 base_branch，未见独立 Base SHA 字段" }
+    - { ref: "src/lib/evidence.schema.ts:133", note: "Evidence git_info.base_commit_sha" }
+  non_goals:
+    - 不改 Scope 语义（writable_paths / 通配符分级不变）
+    - 不动 Gateway 逐文件校验
+    - 不接容器（P0-3，本轮不立卡）
+    - 不改 node_modules/、.stagent/ 白名单语义
+    - 不擅自新增合同字段或改合同 Schema（基线来源须新建模则停工修卡）
+    - 不改 Evidence Schema（越权清单复用既有字段或写 graph issue）
+  fail:
+    - 用动态 HEAD 作审计基线，或审计中途替换基线
+    - 用普通空格拆分 git status --porcelain，特殊字符文件名或 rename 双路径解析错误
+    - PRE_MERGE 只做 Worktree 审计、去掉分支 diff 复核
+    - 审计失败仍能继续 Merge
+    - 既有 ?? 未跟踪文件守卫行为回归，或修改其只读测试让其变绿
+    - 三检测点使用不同函数或不同判定规则
+    - 越权清单不可读或未落 Evidence / graph issue
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+
+#### 归档注记（P-326 · 2026-11-26）
+
+- **交付 PR**：[#420](https://github.com/he18718143986-design/IDE/pull/420)（head `2ff0d0677765ee82b264f68abbdc10da7f2c3fc2`，squash `bf8d3b9ca1fd1247fe861953e14618b3c969de2c`，操作者由我执行）。
+- **范围与检查**：仅 8 个 `writable_paths`，+1615/−141；readonly 六文件零 diff。17 个单元用例、6 个集成用例、只读 `untracked-scope-guard` 21 个用例均通过。必需 CI 全绿；Windows Unit 的 10 项为已知存量环境差异，本卡三个相关测试文件全通过；Cursor Bugbot neutral。
+- **P02-P1～P3**：统一审计函数覆盖 `git status --porcelain -uall` 状态解析、特殊字符路径及变更分类；PRE_EXECUTION / POST_VERIFICATION / PRE_MERGE 共用；PRE_MERGE 另复核 `git diff --name-status -M base...HEAD`。
+- **P02-P4～P6**：rename 按选 A 同时审新旧路径，删除审原路径，识别 mode-only / symlink / submodule；`node_modules/`、`.stagent/` 白名单不变。
+- **P02-P7～P10**：执行前 / 验证后违规阻断并留证；未跟踪兼容守卫保持原接口；越界按既有码拒绝；分支已提交的越权 rename 在 PRE_MERGE 阻断。
+- **诚实口径**：**全量候选变更 Scope 审计已交付（统一审计函数、三检测点、PRE_MERGE 分支 diff 复核、rename 新旧路径均审）；P0 风险未宣称解除**。
