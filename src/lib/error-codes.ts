@@ -462,3 +462,30 @@ export class StagentRuntimeError extends Error {
     this.reasonCode = mapErrorToReasonCode(code);
   }
 }
+
+// --- 6. TASK-P0.4: 测试基线完整性门禁专用码 ---
+
+/**
+ * 测试完整性保护专用错误码（TASK-P0.4）。
+ * 针对 POST_VERIFICATION 与 PRE_MERGE 阶段针对既有测试篡改、删除与基线重跑故障的专用阻断码。
+ * 与 MergeGateError / 验收门禁协同，不修改 A §9.3 基础运行期 30 项目录基数。
+ */
+export const TEST_BASELINE_ERROR_CODES = [
+  "E_TEST_BASELINE_REGRESSION",
+  "E_TEST_BASELINE_UNAVAILABLE",
+] as const;
+export type TestBaselineErrorCode = (typeof TEST_BASELINE_ERROR_CODES)[number];
+
+export const E_TEST_BASELINE_REGRESSION: TestBaselineErrorCode =
+  "E_TEST_BASELINE_REGRESSION";
+export const E_TEST_BASELINE_UNAVAILABLE: TestBaselineErrorCode =
+  "E_TEST_BASELINE_UNAVAILABLE";
+
+export function isTestBaselineErrorCode(
+  value: unknown,
+): value is TestBaselineErrorCode {
+  return (
+    typeof value === "string" &&
+    (TEST_BASELINE_ERROR_CODES as readonly string[]).includes(value)
+  );
+}

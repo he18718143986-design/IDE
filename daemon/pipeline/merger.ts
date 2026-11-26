@@ -110,6 +110,48 @@ const MERGEABLE_CONTROL_MODES: ReadonlySet<string> = new Set([
  * - `contract_revision` 缺失 / 与当前合同版本不符 → `E_EVIDENCE_REVISION_MISMATCH`
  * 旧证据仍可被 Schema 读取与展示，只是在这里不可合并。
  */
+/**
+ * TASK-P0.4 第二道封锁（合并时）：独立核验 Evidence 快照中的测试完整性记录 (test_integrity)。
+ * 从磁盘快照读取，不信任内存状态：
+ * 1. 若证据声明了豁免 (exemption: true)，核验合同是否确实声明了 allow_baseline_test_mutation: true。防伪造豁免。
+ * 2. 若修改或删除了既有测试文件且未获豁免，必须满足 baseline_rerun_passed === true。
+ * 3. 否则按 failure_code (E_TEST_BASELINE_REGRESSION / E_TEST_BASELINE_UNAVAILABLE) 抛出 MergeGateError 阻断合并。
+ */
+export function assertEvidenceTestIntegrity(
+  snapshot: EvidenceBundle,
+  contract: SoftwareContract,
+): void {
+  const allowMutation =
+    contract.authorization.execution_permissions
+      ?.allow_baseline_test_mutation === true;
+  const ti = snapshot.test_integrity;
+
+  if (ti) {
+    const hasExistingMutation =
+      (ti.modified_existing_tests && ti.modified_existing_tests.length > 0) ||
+      (ti.deleted_existing_tests && ti.deleted_existing_tests.length > 0);
+
+    if (ti.exemption && !allowMutation) {
+      throw new MergeGateError(
+        "E_CANNOT_MERGE",
+        "Evidence claims test integrity exemption but contract does not allow baseline test mutation",
+      );
+    }
+
+    if (hasExistingMutation && !allowMutation) {
+      if (!ti.baseline_rerun_passed) {
+        const code = ti.failure_code ?? "E_TEST_BASELINE_REGRESSION";
+        const reason =
+          ti.failure_reason ?? "Baseline test rerun failed or unavailable";
+        throw new MergeGateError(
+          code,
+          `Test integrity check failed: ${reason}`,
+        );
+      }
+    }
+  }
+}
+
 export function assertEvidenceControlAndRevision(
   snapshot: Pick<
     EvidenceBundle,
@@ -644,6 +686,9 @@ async function mergeInternal(
     contract.contract_revision,
     worktreePath,
   );
+
+  // 2c. TASK-P0.4 第二道封锁（合并时）：独立核验证据快照中的测试完整性（test_integrity）
+  assertEvidenceTestIntegrity(snapshot, contract);
 
   // G2 / G3 守卫条款：若合同声明了 manual_confirmation，追加「确认记录齐全否则拒绝合并」闸门
   if (contract.verification_spec.manual_confirmation !== undefined) {
