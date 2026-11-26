@@ -1,4 +1,13427 @@
+# 研发任务卡 · 已完成
 
+> DOC-1 拆分产物：**已完成卡**（`COMPLETED`；含矩阵标 `PASS` 的 W.5a）。
+> 枢纽与索引见 [`development-tasks.md`](./development-tasks.md)、[`development-tasks-index.md`](./development-tasks-index.md)。
+
+### 3.1 契约基线与通信底座（Sprint 0 基础设施与演进）
+
+<a id="task-0.2b"></a>
+
+#### 【Task 0.2b】Schema v1.2.0 增量演进、双状态机联动与存量迁移
+* **任务编号**：`TASK-0.2b`
+* **前置依赖**：`TASK-0.1` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-20 交付，提交 `52c807c` 锁定基线；v1.3.1/v1.3.2 增补第 4 条 PREPARING 回退断言与 G-09 分列记账规范映射——G-15 错误码映射测试为 v1.3.0 已交付内容，非本次新增。**v1.3.3 口径更正**：该卡交付当日的用例数为历史快照，当前有效基线以最新一次 CI 实际运行结果 + 提交哈希为准；增量断言验证记录随下一次回归运行一并存档，不再单列"待补录"状态）
+* **字段事实说明**：`max_command_executions` 与 `max_tool_calls` 已属于本卡交付字段；本卡不包含 v1.3.0 之后的新增合同迁移要求。
+* **核心目标**：
+  1. 升级 `SoftwareContractV12` 与 `EvidenceBundleV11` 完整定义，逐字段 100% 对齐 A §9.1/§9.2（含 `budget_limits` 可选 `max_command_executions` 与 `max_tool_calls`）。
+  2. 落实 `can_merge` 派生不变式：`superRefine` 校验 `status === "PASSED"` 且无违规无超额；外部写入类型 `Omit<Verdict, "can_merge">`。
+  3. 重构状态机校验器：实现 `validateStatePair` 与 `validateTransition`，落盘采用原子写入 (`writeTemp + fsync + rename`)。
+  4. **补齐状态机 4 条关键分支断言 (G-17)**：
+     - 正例：`ABORTED + APPROVED`（已批准后发生故障安全中止，保留历史审批记录）；
+     - 负例：合同被拒绝 (`ABORTED + REJECTED`) 后不得原地回到 `DRAFT`；
+     - 负例：`ABORTED` 为终态，不得经 `resume` 跃迁至 `EXECUTING`；
+     - 异常回退联动：`PREPARING` 初始化异常中断时，lifecycle 回退 `PENDING_APPROVAL` 同步原子回置 `approval.status = "PENDING_REVIEW"`（杜绝以历史批准态静默重建 Worktree）。
+  5. **补齐用量账本 3 项断言 (G-09)**：
+     - 用量跨 Daemon 重启持久化重载一致；
+     - 切换模型供应商后累计开销不清零；
+     - 模型费用上限与命令/工具调用上限分列记账，独立触发熔断。
+  6. **补齐 ErrorCode Catalog 完备性测试 (G-15)**：新建 `tests/unit/error-codes-mapping.test.ts`，表驱动测试 15 个 `error_code` 到 10 个 `reason_code` 的双向映射（新增 `E_UNSAFE_EXECUTION ➔ UNSAFE_EXECUTION`、`FRAME_DIRECTION_FORBIDDEN ➔ PROTOCOL_VIOLATION` 等）。
+  7. 存量 v1.1.3 合同迁移工具：备份至 `.stagent/migrations/`，禁止静默执行，标记需显式重批。
+* **涉及核心文件**：
+  - 修改：`src/lib/contract.schema.ts`
+  - 修改：`src/lib/evidence.schema.ts`
+  - 新增：`src/lib/state-machine.ts`
+  - 新增：`src/lib/error-codes.ts`
+  - 新增：`src/lib/migration.ts`
+  - 测试：`tests/unit/contract-schema-v12.test.ts`
+  - 测试：`tests/unit/evidence-schema-v11.test.ts`
+  - 测试：`tests/unit/state-machine-matrix.test.ts`
+  - 新增测试：`tests/unit/error-codes-mapping.test.ts`
+* **Pass/Fail 验收判定**：
+  - **PASS**：
+    - Schema 校验通过，`can_merge` 派生反向用例全部阻断成功。
+    - `tests/unit/state-machine-matrix.test.ts` 完整通过 A §9.1.1 组合矩阵与 4 条新分支断言（含 PREPARING 初始化异常中断时，lifecycle 回退 `PENDING_APPROVAL` 同步原子回置 `approval.status = "PENDING_REVIEW"`，杜绝静默授权重建 Worktree）。
+    - `tests/unit/error-codes-mapping.test.ts` 15 ➔ 10 双向映射 100% 通过。
+    - 账本持久化与分列记账断言通过。
+  - **FAIL**：缺少任一字段校验；状态机允许非法跃迁。
+
+---
+
+
+---
+
+<a id="task-0.2c"></a>
+
+#### 【Task 0.2c】Schema v1.3.0 增量演进、Fast Path 与自愈迁移边实现 `[认领架构 P0.2c / C-01]`
+* **任务编号**：`TASK-0.2c`
+* **前置依赖**：`TASK-0.2b` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-23 交付：分支 `feat/task-0.2c-contract-v1.3-statemachine` 提交 `fb2cc67`，经 `cd7e7e0` 合入 main。落地内容：Schema 1.2.0/1.3.0 双版本白名单（新合同签发 1.3.0）、`creator` 增 `system:fast-path`、`authorization.git` 的 `allowed_operations`/`forbidden_flags`/`enforce_clean_base`（禁用参数强制内嵌五项、不可覆盖）、`approval` 增签名/准入决策/决策说明/驳回者并约束 `ADMITTED_AUTOMATIC` 仅限 `system:fast-path`；状态机增三条受控边——Fast Path `DRAFT→PREPARING`（Guard：系统凭证 + LOW 风险，`DRAFT→EXECUTING` 恒非法）、自愈 `PENDING_RESUME→PREPARING`（`WORKTREE_MISSING_HEAL`）、降级 `AUDITED→VERIFYING`（`EXTERNAL_MUTATION`）；`migrateContractToV13` 执行态族白名单回填 `user:legacy`，草案/待审保持原态并清除残留审批戳记，`ABORTED` 保留「批准后中止」历史。门禁：`tsc --noEmit` 0 错、eslint 0 错、全量 903 例（896 通过 / 6 跳过 / 1 例为 daemon 夹具 `git init` 被沙箱拦截的环境性失败，非断言失败）。偏差：审批枚举沿用架构 §9.1 的 `DRAFT/PENDING_REVIEW/APPROVED/REJECTED`（非任务书正文的 `PENDING/SUPERSEDED`）；lifecycle 保持 `VERIFYING`（规范无 `MERGING`）；`approved_at` 保持 ISO 字符串。未纳入本卡：`worker_spec` 的 `SANDBOX_ENFORCED`/`billing_model`/`verified_on`、顶层 `scope`、`EvidenceBundleV12`、未跟踪文件检查（由 TASK-W.2b 承担））
+* **v0.1 范围**：数据模型从 v1.2.0 升级至 v1.3.0，实现审批与 Git 授权完整字段校验，增补 Fast Path、恢复自愈与外部改码降级三条关键状态转移边，升级存量合同无静默授权迁移。
+* **核心目标**：
+  1. **数据模型升级与 Zod 校验 (`src/lib/contract.schema.ts`)**：
+     - 升级 `SoftwareContractV13` 与 `EvidenceBundleV12` 定义，严格对齐架构规范 §9.1；
+     - 新增必填字段 `authorization.git`：包含 `allowed_operations: string[]`（白名单操作）、`forbidden_flags: string[]`（禁止参数，如 `--force`, `-f`, `--hard`, `--amend`, `--no-verify`）与 `enforce_clean_base: boolean`；
+     - 新增必填字段 `approval`：包含 `status: "DRAFT" | "PENDING_REVIEW" | "APPROVED" | "REJECTED"`、`approved_by: string`、`approved_at: number`（可空）；
+     - Zod 校验不变式：在 `SoftwareContractSchemaV13` 中使用 `superRefine` 校验当且仅当合同处于执行态族时 `approval.status` 必须为 `"APPROVED"` 且 `approved_by` 与 `approved_at` 非空。
+  2. **状态机迁移路径闭环 (`src/lib/state-machine.ts`)**：
+     - **Fast Path 直通流转边**：严格实现 `DRAFT -> PREPARING -> EXECUTING`，在 `validateTransition` 中坚决禁止任何跳过 `PREPARING` 的直跳边（违规抛出 `ILLEGAL_TRANSITION`）；
+     - **外部改码级联降级边**：增设 `AUDITED -> VERIFYING`（触发原因：`EXTERNAL_MUTATION`），当外部文件修改导致 Evidence 降级为 `STALE` 时，原子将合同态从 `AUDITED` 拉回 `VERIFYING`，强制触发复检；
+     - **恢复探测自愈边**：增设 `PENDING_RESUME -> PREPARING`（触发原因：`WORKTREE_MISSING_HEAL`），在 Daemon 恢复合同时若探测到工作树目录丢失，自愈回退至 `PREPARING` 重新物理检出；
+     - 校验 9 种 lifecycle 状态迁移边矩阵，并验证 15 种展示状态投影；不得把展示态数量当作 lifecycle 状态数量。
+  3. **存量合同向后兼容无静默授权迁移 (`src/lib/migration.ts`)**：
+     - 实现 `migrateContractToV13(v12Contract)`：
+       - 执行态族白名单回填：仅对处于 `{PREPARING, EXECUTING, VERIFYING, PENDING_RESUME, AUDITED, MERGED}` 的历史合同回填 `status: "APPROVED", approved_by: "user:legacy"`；
+       - 待审与草案态安全保持：历史合同若处于 `DRAFT` 则回填 `status: "DRAFT"`；若处于 `PENDING_APPROVAL` 则回填 `status: "PENDING_REVIEW"`，**绝对严禁静默回填为 APPROVED**；
+       - 中止态闭环分支：历史合同处于 `ABORTED` 则回填 `status: "REJECTED", rejected_by: "system:aborted"`；
+       - `authorization.git` 默认安全填充：注入默认白名单与禁用参数。
+* **涉及核心文件**：
+  - 修改：`src/lib/contract.schema.ts`
+  - 修改：`src/lib/state-machine.ts`
+  - 修改：`src/lib/migration.ts`
+  - 测试：`tests/unit/contract-schema-v13.test.ts`
+  - 测试：`tests/unit/state-machine-v13-transitions.test.ts`
+* **Pass/Fail 验收判定**：
+  - **PASS**：`contract-schema-v13.test.ts` 全绿；9 态 lifecycle 迁移边矩阵与 15 展示态投影测试通过；Fast Path (`DRAFT->PREPARING->EXECUTING`)、自愈 (`PENDING_RESUME->PREPARING`)、降级 (`AUDITED->VERIFYING`) 全部通过；迁移函数零静默授权（对 DRAFT 和 PENDING_APPROVAL 绝不输出 APPROVED）。
+  - **既有基线守护**：开工前归档 `main`@`6d7fa59` 的实测结果（86 文件 / 785 通过 / 6 跳过）；完成后要求既有用例零非预期回归。重点运行 `tests/unit/state-machine-matrix.test.ts`、`tests/unit/migration-v113.test.ts`、`tests/unit/contract-schema-v12.test.ts`、`tests/unit/contract-auto-approve.test.ts`、`tests/e2e/happy-path.spec.ts`。矩阵测试任何既有期望的改动均须逐条记录原因及其对应的新合法边，不得为通过新测试而整体放宽矩阵。
+  - **FAIL**：出现 `DRAFT -> EXECUTING` 直跳；迁移函数将未审批历史合同静默标记为 APPROVED；或既有测试失败而未说明并修复。
+
+---
+
+<a id="task-d.1"></a>
+
+#### 【Task D.1】CLI 引导入口与安全 WebSocket 通信桥
+* **任务编号**：`TASK-D.1`
+* **前置依赖**：`TASK-0.2b`
+* **任务状态**：**[COMPLETED]**（2026-10-20 交付；验证：`npm test` 全量 48 文件 / 377 用例绿、`tsc --noEmit` 0 错误、eslint 0 违规、verify-env 通过；变更明细与偏差记录见本节末尾「D.1 交付附注」）
+* **核心目标**：
+  1. CLI 工具 (`stagent start`)：动态端口 (3001~3010) 探测、PID 锁获取（若已被存活进程占用抛出 `E_WORKSPACE_LOCKED` 拒绝重复启动）、Token 写入 (`.stagent/session-token`，权限 `0600`) 并唤起浏览器。
+  2. **首帧 AUTH 鉴权闭环**：首帧必须为 `{ type: "AUTH", payload: { token } }`，校验失败立即以关闭码 `4401` 断开连接，不产生无限重连；服务端日志严禁打印 Token 明文。
+  3. **规范 WS 帧字典 (G-02)**：
+     - 同时保留 `EVIDENCE_READY`（证据生成完成待核销）与 `EVIDENCE_STATUS_CHANGED`（状态流转与外部变动失效）以及 `TERMINAL_STREAM`（命令执行流式日志）。
+  4. **补齐 Origin、速率与心跳防护 (G-12/G-13)**：
+     - 校验 `Origin`，仅放行本地合法来源 (`http://127.0.0.1:*` / `http://localhost:*`)，拒绝非法来源；
+     - 限制单连接帧大小 ≤ 2MB，限制连接频率防 DoS；
+     - 客户端 5s 心跳 PING，连续 3 次未收到 PONG（15s）在前端呈现重连遮罩；
+     - Daemon 获取 PID 锁后强制轮换 Token，崩溃残留旧 Token 自动失效。
+* **涉及核心文件**（已按仓库实际布局修正，见文末「路径映射约定」）：
+  - 修改：`bin/stagent.ts`（CLI 入口：参数解析、动态端口探测、PID 锁检查与浏览器唤起）
+  - 修改：`daemon/server.ts`（WS 服务端：首帧握手鉴权、Origin/Host 校验、帧大小与速率限制）
+  - 修改：`src/lib/ipc/frames.ts`（帧字典与 FRAME_CATALOG：Daemon 与 UI 共享双向通信协议规范）
+  - 修改：`src/lib/ipc/client.ts`（前端 WS 客户端：心跳探测与 15s 失联判定）
+  - 修改：`src/lib/daemon-api.ts`（Token 仅经 `#fragment` 引导传递，删除 `?token=` query 通道）
+  - 修改：`src/hooks/use-daemon-stream.ts`（前端 React Hook：连接管理、心跳状态与帧分发）
+  - 测试：`tests/unit/ws-auth-handshake.test.ts`（首帧握手 / 50ms 切断 / Token 轮换 / 日志无明文）
+  - 测试：`tests/unit/ws-frame-dictionary.test.ts`（13 类规范帧 + 目录完备性）
+  - 测试：`tests/unit/cli-entry.test.ts`（参数解析 / fragment 构造 / 平台 opener）
+  - 测试：`tests/daemon/ws-security.test.ts`（Origin / Host / 2MB / 速率 429 / query 禁令 / 方向门禁 / 默认端口）
+  - 测试：`src/hooks/use-daemon-stream.test.tsx`（3 次心跳失联 → reconnecting）、`src/tests/daemon-api-token.test.tsx`（query 忽略 / fragment 抹除）
+* **Pass/Fail 验收判定**：
+  - **PASS**：
+    - 工作区检测到已有存活 PID 锁时，启动失败并返回/抛出 `E_WORKSPACE_LOCKED`，拒绝重复占用工作区。
+    - 首帧非 AUTH 或 Token 错误在 50ms 内被 4401 切断。
+    - 非法 Origin 连接被直接拒绝。
+    - 模拟 3 次心跳丢失触发 UI 重连遮罩。
+    - Token 轮换断言：新实例启动后，旧 Token 发送 AUTH 必然返回 4401。
+  - **FAIL**：允许 URL Query 传 Token；未鉴权连接可接收广播帧。
+* **D.1 交付附注**（2026-10-20）：
+  - 心跳判定修正为「AUTH_OK 立即 PING，第 3 次失联落在 15s」（原实现为 20s，off-by-one）；UI 遮罩由 `status === "reconnecting"` 驱动，遮罩组件本体属 TASK-C.1。
+  - 增强项（不超出规范）：Host 头回环校验（DNS Rebinding 防线，A §6.1"校验 Origin 与会话权限"的补足，因重绑定后 GET 不带 Origin）；WS `maxPayload = 2MB`（超限以 1009 关闭）；连接速率限制默认 30 次/10s/IP 可配置；帧方向门禁（客户端伪造 `server->client` 帧返回 `FRAME_DIRECTION_FORBIDDEN` 错误帧，不断连）。
+  - 规范设计与符合项说明：① Origin 白名单放行 `::1` 属于 loopback 本地回路的标准符合项；② 浏览器唤起时 Token 经 URL **fragment**（`#token=`）传递 —— A §6.1 未指定页面凭证透传通道，fragment 不随 HTTP 请求发送且读取后立即 `history.replaceState` 抹除，完全满足"日志不得记录 token"的要求；③ `WORKER_LOG`/`SCOPE_ALERT` 两个 v1.1 历史扩展帧按 A §6.1"至少包括"措辞保留，证据失效现已同时广播规范帧 `EVIDENCE_STATUS_CHANGED`。
+  - 端口默认值由 41792~41802 修正为本卡片的 3001~3010（`daemon/server.ts`、`src/lib/daemon-api.ts`）。
+
+---
+
+
+---
+
+<a id="task-d.1b"></a>
+
+#### 【Task D.1b】一键打开项目（Daemon 托管控制台 + open CLI）`[COMPLETED · 2026-10-24]`
+* **任务编号**：`TASK-D.1b`
+* **前置依赖**：`TASK-D.1` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main，merge `d5b35e0`；分支 `feat/task-d1b-one-click-open` 功能 `946e9fc`。门禁：合后四件套全绿（1188 passed / 6 skipped）；tsc 0 错、eslint 0 errors、build 通过。落地清单：`bin/stagent.ts`（`open` 子命令：复用健康 Daemon / 新启、同源或 Vite+#base=、自动唤起浏览器）、`daemon/console/static-host.ts` + `daemon/server.ts`（同源托管 SPA 仅 `/`/`/index.html`+资产）、`daemon/core/pid-lock.ts` + `src/lib/error-codes.ts`（`E_WORKSPACE_LOCKED` 白话）、`src/lib/daemon-api.ts`（`#token=&base=` 解析与同端口段推断）、`OpenProjectEntry` / README、`scripts/package-dist.mjs` 写入 `dist/public/index.html`。**口径说明**：① 控制台同源托管不改变 D.1 AUTH/fragment/Origin；② Demo 仍 4100~4110 独立 Origin；③ 无 `dist/public` 时回退 Vite 5173 并在 fragment 注入 `base=`。**残余口径差**：最近项目列表已交 `TASK-D.1c`（COMPLETED）；**同源托管空白页**已交 `TASK-D.1d` 并合入 main tip `b11d15b`（COMPLETED）；不含 Electron/Tauri/系统协议）
+* **对照痛点**：当前启动常需第二终端 + 手拷 Token；目标体验接近 Cursor「打开项目」——一条命令、单浏览器窗口即可聊。
+* **v0.1 范围**：`stagent open <路径>` → Daemon 托管 `dist/public` 同源控制台 + 自动唤起浏览器 `#token=` fragment → 工作台已连上；可选最近项目列表；Demo 仍独立 Origin（4100~4110），不与控制台同源。底座复用 D.1（端口/PID 锁/Token/AUTH/Origin），只补 DX 粘合、不重砌鉴权。
+* **明确不包含**：
+  - Electron / Tauri 桌面壳
+  - 系统自定义协议（可后续）
+  - 推翻 D.1 鉴权模型（仍须 AUTH / fragment Token / Origin 校验；日志不得打印 Token 明文）
+  - 修改《系统架构设计规范》或另开 ADR
+* **核心目标**：
+  1. **一条命令打开**：`stagent open <工作区路径>`（或无参走最近项目）启动/复用本工作区 Daemon，托管控制台静态资源（与 Daemon 同源），自动 `open` 浏览器至带 `#token=` 的控制台 URL；用户无需第二终端、无需手拷 Token。
+  2. **鉴权不变**：无钥匙（无 fragment / 未 AUTH）地址连不上工作台；Token 仍经 fragment 传递并立即抹除；服务端日志严禁打印 Token 明文（继承 D.1）。
+  3. **换项目 / 锁冲突白话**：对另一路径再 `open` 打开新项目；若目标工作区已有存活 PID 锁，抛出/展示白话 `E_WORKSPACE_LOCKED`（或等价提示），不静默抢占。
+  4. **Demo 仍独立 Origin**：S.4 Demo 预览继续 4100~4110 独立 Origin + 严 CSP；控制台同源托管不得让 Demo iframe 获得 Daemon 同源权限。
+* **涉及核心文件（实施时以实际接线为准，本卡仅定范围）**：
+  - CLI：`bin/stagent.ts`（或等价）新增 `open` 子命令；可选最近项目落盘
+  - Daemon：托管 `dist/public` 静态控制台（同源）；复用 D.1 端口/PID 锁/Token/AUTH
+  - 前端：无钥匙入口拒绝；fragment Token 读取与抹除（既有 D.1）
+  - 测试：open CLI、无 Token 拒绝、锁冲突白话、Demo Origin 隔离回归
+* **Pass/Fail 验收断言（≤5，可测、白话）**：
+  1. **一条命令单窗口可聊**：在空目录或已有项目上执行 `stagent open <路径>`，只出现一个浏览器窗口，工作台已连上并可与右侧聊天（无需第二终端、无需手拷 Token）。
+  2. **无钥匙连不上**：打开不带有效 `#token=` / 未 AUTH 的控制台地址，工作台连不上（不得旁路 D.1 鉴权）。
+  3. **换路径 / 锁冲突白话**：对另一路径 `open` 打开新项目；若工作区已锁，用户看到白话锁冲突提示（如 `E_WORKSPACE_LOCKED`），不静默抢占。
+* **Pass/Fail 验收判定**：
+  - **PASS**：上述断言 1–3 均可在本地手测复现；Demo 仍独立 Origin；日志无 Token 明文；不引入 Electron/系统协议。
+  - **FAIL**：仍要求用户拷 Token 或开第二终端；无钥匙可进工作台；Demo 与控制台同源导致 iframe 可打 Daemon；打印 Token 明文；把缺口塞回已完成的 D.1 而不立本卡。
+
+---
+
+<a id="task-d.1c"></a>
+
+#### 【Task D.1c】最近项目一键重开（控制台「打开项目」）`[COMPLETED · 2026-10-24]`
+* **任务编号**：`TASK-D.1c`
+* **前置依赖**：`TASK-D.1b` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main，tip `f3e371e`；分支 `feat/task-d1c-recent-projects` 快进合入。门禁：合后四件套全绿（1204 passed / 6 skipped）；tsc 0 错、eslint 0 errors、build 通过。落地清单：`daemon/core/recent-projects.ts`（用户级 `~/.stagent/recent-projects.json` 0600，非业务仓保护区）、`daemon/core/open-workspace.ts`（复用健康 Daemon / spawn 本仓 `stagent start`）、`daemon/server.ts`（`GET/POST /api/recent-projects`）、`bin/stagent.ts`（open 成功写入最近）、`OpenProjectEntry` + `daemon-api`（列表渲染 / 一点重开带 `#token=`）、spawn 白名单登记。**口径说明**：① 不含任意路径文件夹选择器；新路径首次仍走 `stagent open`；② 不推翻 D.1/D.1b AUTH/fragment/Origin；③ 锁冲突白话 `E_WORKSPACE_LOCKED`。**残余口径差**：真·任意路径选择器留给 `TASK-D.1e`（可 defer：本机助手/Electron）；同源空白已由 `TASK-D.1d` 合入 `b11d15b` 收口）
+* **对照痛点**：D.1b 后仍常要在终端敲 `stagent open <路径>`；用户期望在已打开的控制台里点「打开项目」看到最近列表，一点即进带钥匙会话（接近 Cursor「最近打开」）。
+* **v0.1 范围**：控制台「打开项目」入口展示最近工作区列表；点击某一项 → 复用健康 Daemon 或按 D.1b 路径唤起 → 打开/切换到带 `#token=`（及必要 `#base=`）的同源控制台会话，无需再敲 `stagent open`。最近列表由本机受控落盘（如用户级或 `.stagent` 旁的最近路径记录），在 `open` / 成功连接时更新。**明确不含**浏览器真·任意路径文件夹选择器（留给后续本机小助手 / Electron）。
+* **明确不包含**：
+  - 真·任意路径文件夹选择器（`<input type="file" webkitdirectory>` 或系统对话框选任意本地路径）
+  - Electron / Tauri 桌面壳、系统自定义协议
+  - 推翻 D.1 / D.1b 鉴权（仍须 AUTH / fragment Token / Origin；日志不得打印 Token 明文）
+  - 修改《系统架构设计规范》或另开 ADR
+* **核心目标**：
+  1. **最近列表看得见**：已连上的控制台里，「打开项目」展示最近工作区路径列表（空列表时白话提示：可用 `stagent open <路径>` 首次打开后出现在此）。
+  2. **一点即重开带钥匙**：点击列表中某一项，复用/唤起该工作区 Daemon 并进入已带 `#token=` 的会话（同源或既有 D.1b `#base=` 回退），用户无需再敲 `stagent open`、无需手拷 Token。
+  3. **不含任意路径选择器**：本卡不提供「浏览磁盘选任意文件夹」；新路径首次仍走 D.1b CLI（或后续本机助手/Electron 卡）。锁冲突时白话 `E_WORKSPACE_LOCKED`（或等价），不静默抢占。
+* **涉及核心文件（实施时以实际接线为准，本卡仅定范围）**：
+  - 前端：控制台「打开项目」/最近列表 UI（可扩展既有 `OpenProjectEntry`）
+  - 最近记录：本机受控落盘读写（路径规范化、上限条数、去重）；`open` / 成功连接时更新
+  - Daemon / CLI：复用 D.1b 复用健康 Daemon、同源托管、`#token=&base=` 唤起；可选轻量 API 供控制台请求「打开某最近路径」
+  - 测试：最近列表渲染、一点重开带 token、无钥匙拒连回归、锁冲突白话；负例：本卡不出现任意路径系统选择器
+* **Pass/Fail 验收断言（≤5，可测、白话）**：
+  1. **最近列表看得见**：在控制台点「打开项目」，能看到最近打开过的工作区列表（至少含曾用 `stagent open` 成功打开的路径）。
+  2. **一点即带钥匙可聊**：点击列表中某一项后，进入/切换到该项目工作台且已连上（带有效钥匙），无需再敲 `stagent open`、无需手拷 Token。
+  3. **不含任意路径选择器**：本卡交付界面没有「浏览磁盘选任意文件夹」；新项目首次仍用 D.1b CLI；无钥匙地址仍连不上；锁冲突白话提示。
+* **Pass/Fail 验收判定**：
+  - **PASS**：断言 1–3 均可在本地手测复现；不引入 Electron/任意路径选择器；日志无 Token 明文；不推翻 D.1/D.1b。
+  - **FAIL**：仍只能靠终端 `stagent open` 重开最近项目；一点后仍要手拷 Token；夹带真·任意路径选择器却标本卡完成；把缺口塞回已完成的 D.1b 而不立本卡。
+
+---
+
+<a id="task-d.1d"></a>
+
+#### 【Task D.1d】修复同源控制台空白（生产可用单窗口）`[COMPLETED · 2026-10-24]`
+* **任务编号**：`TASK-D.1d`
+* **前置依赖**：`TASK-D.1b` (COMPLETED), `TASK-C.2` (COMPLETED)；建议亦具备 `TASK-D.1c` (COMPLETED) 以便最近重开联调，**不以 D.1c 为硬阻断**
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main，tip `b11d15b`；分支 `feat/task-d1d-same-origin-console` 快进合入。门禁：合后四件套全绿（**1208 passed / 6 skipped**）；tsc 0 错、eslint 0 errors、build 通过。落地清单：启用 `tanstackStart.spa`；`scripts/package-dist.mjs` 将预渲染 `_shell.html` 提升为 `dist/public/index.html`；`daemon/console/static-host.ts` 仅托管含 `$_TSR` + `index-*.js` 的可 hydrate 壳；新增/扩展 `console-dist-spa-shell` 等 dist 静态可用性回归。**口径说明**：① 根因=空白 `index.html` + `hydrateRoot(document)` 不匹配，且 static-host 曾忽略 SPA `_shell.html`；② 不推翻 D.1 loopback+#token/AUTH/Origin；③ Demo 仍 4100~4110 独立 Origin；④ Vite+#base 可保留为开发态可选绕路，不再是生产必经。对照：见 Git 历史（原 `docs/archive/open-project-vision-and-status.md`）。**本轮文档回写不改**架构规范（已有注记 8））
+* **对照痛点 / 已修复缺陷（合入前）**：D.1b 宣称「同源单窗口」；合入前 `scripts/package-dist.mjs` 写入的 `dist/public/index.html` 为极简静态壳（仅挂 `assets/index-*.js`），TanStack Start 无法完成客户端启动 → `http://127.0.0.1:30xx/#token=…` 常见空白页。临时绕路曾为 Vite + `#token=` / `#base=`。**合入 `b11d15b` 后**：生产路径以可 hydrate SPA 壳为准，不再把残缺空白壳标为已验收。
+* **v0.1 范围**：使 Daemon 同源托管的控制台在 `stagent open` 后**生产可用**——单浏览器窗口展示完整三栏工作台并完成 AUTH 连接，可与右侧聊天；不再依赖「必须再开 Vite」才能用。允许保留 Vite+#base 作为开发态可选绕路，但不得再把空白壳标成已验收的单窗口体验。
+* **明确不包含**：
+  - 推翻 D.1 鉴权（仍须 `127.0.0.1` + `#token=` fragment + WS AUTH + Origin；日志不得打印 Token 明文）
+  - 将 Demo 预览改为与 Daemon/控制台同源（Demo 仍 4100~4110 独立 Origin + 禁 `allow-same-origin`）
+  - Electron / Tauri / 系统文件夹选择器（归 `TASK-D.1e`）
+  - 重开 S.6 八步旅程或 W.5b/c 施工适配
+* **核心目标**：
+  1. **同源页不再空白**：`npm run build` 后 `stagent open <路径>` 打开的 Daemon 端口页面须渲染完整工作台（非白屏），`#token=` 完成连接。
+  2. **单窗口可聊**：无需第二终端手拷 Token、无需必须再起 Vite，即可右侧聊天（开发态 Vite+#base 可保留为可选）。
+  3. **安全与隔离不回退**：无钥匙仍连不上；Demo 独立 Origin 回归仍绿；锁冲突白话。
+* **涉及核心文件（实施时以调查为准，本卡不锁死改法）**：
+  - 构建装配：`scripts/package-dist.mjs`（当前 `writeConsoleIndexHtml`）、`dist/public/**`
+  - 托管：`daemon/console/static-host.ts`、`daemon/server.ts`
+  - 前端启动：TanStack Start / Vite 客户端入口与路由水合所需资源（可能需 client-only 构建或正确 SSR 静态导出——**由实现卡调查后选定，文档不预设唯一根因处方**）
+  - 测试：同源 open 冒烟（非空白 + 已连接）、无 Token 拒连、Demo Origin 隔离回归；可选 Playwright/组件级「根节点可见」
+* **Pass/Fail 验收断言（≤5，可测、白话）**：
+  1. **同源不再空白**：`npm run build` 后执行 `stagent open <临时目录或样例仓>`，打开的 Daemon 同源 URL（含 `#token=`）在合理时间内出现工作台主壳（左/中/右结构可见），**不是**持续空白 HTML。
+  2. **单窗口可聊**：同一窗口内完成连接后，右侧输入框可用（发一条非破坏性消息或至少出现已连接会话态）；无需用户再开 Vite 或手拷 Token。
+  3. **无钥匙仍拒连**：去掉或篡改 `#token=` 后工作台连不上（不旁路 D.1）。
+  4. **Demo 仍独立 Origin**：S.4 Demo 预览仍在独立端口 Origin；控制台同源不得使 Demo iframe 获得 Daemon 同源权限（禁 `allow-same-origin` 等既有负例仍过）。
+  5. **门禁**：四件套全绿（`npm test` / `typecheck` / `lint` 0 errors / `build`）；新增或扩展 **`dist` 静态打包产物可用性回归**（build 后同源入口可挂载，禁止再把残缺空白壳标为 PASS）。
+* **Pass/Fail 验收判定**：
+  - **PASS**：断言 1–5 本地可复现；日志无 Token 明文；不引入桌面壳冒充本卡完成。
+  - **FAIL**：同源仍空白却标完成；只能靠 Vite 才算「能用」却声称 D.1d 完成；无 dist 静态可用性回归却标完成；Demo 与控制台同源可打 Daemon；打印 Token 明文。
+
+---
+
+<a id="task-d.3"></a>
+
+#### 【Task D.3】15 状态确定性投影持久化与防死锁自愈引擎
+ `[认领架构 P3.7]`
+* **任务编号**：`TASK-D.3`
+* **前置依赖**：`TASK-0.2c`, `TASK-D.1`
+* **任务状态**：**[COMPLETED]**（2026-10-23 合入 main，merge `9a19f4d`；分支 `feat/task-d3-deadlock-persistence`：`c2fcb8a`（持久化 / 投影广播 / D-1~D-5 引擎）+ `83ec516`（D-2/D-4/D-5 生产接线）；首段投影词汇表仍为 `f548aeb` / `cd7e7e0`。门禁：合后四件套全绿（1084 passed / 6 skipped）；tsc 0 错、eslint 0 错、build 通过。落地清单：`src/lib/state/presentation-state.ts`（15 态词汇表，daemon/前端共用）、`daemon/state/presentation-store.ts` / `presentation-projector.ts`（`.stagent/state.json` 落盘，不写回合同）、`daemon/state/deadlock-resilience.ts`（可注入时钟 + `sweep`；D-1~D-5）、`daemon/core/contract-mutex.ts`（D-2 租约观察者 + 锁文件白名单回收）、`daemon/pipeline/merger.ts`（D-4 `assertTargetBranchNotAdvanced` + `TargetBranchAdvancedError`）、`daemon/pipeline/orchestrator.ts`（`replayOnCurrentBaseline` / `healResume` / 超时证据）、`daemon/mcp/gateway.ts` + `daemon/runner/command-runner.ts`（D-5 分层登记与 pid 回填）、`daemon/server.ts`（回收钩子、`POST .../merge` 409 options、`POST .../merge-decision`）。**口径说明**：① 展示态变化不写进合同，避免误触发 `contract_revision` 重新审批；② 看门狗不用裸 `setTimeout`，由心跳驱动 `sweep`，挂起恢复后一次补齐过期项；③ D-1 强杀经 `orchestrator.abort` → runner 进程树 SIGTERM→SIGKILL（Daemon 无独立 worker pid 登记表）；④ D-5 超时证据借用 `BLOCKED + BUDGET_EXHAUSTED` + `TIMEOUT:` 前缀（Evidence verdict 无独立 `TIMEOUT` 枚举）。**残余口径差（不阻塞验收，需登记）**：① D-4 仅比证据 `base_commit_sha` 与当前 main tip，不校验工作树真实 merge-base；② 沙箱 `SAFE_DELETE_BULK_CONFIRM_REQUIRED` 配额耗尽时 D-2 盘上锁文件断言可跳过（租约事件断言仍严格）；③ 信息不足时投影返回 `null`，界面停在上一帧而不猜状态）
+* **v0.1 范围**：15 种展示状态确定性映射引擎、`presentation_state` 持久化落盘与 WebSocket 广播、五类死锁自愈机制 (D-1~D-5)。
+* **核心目标**：
+  1. **确定性状态投影引擎 (`daemon/state/presentation-state.ts`)**：
+     - 严格实现架构规范 §6.3.1 的唯一 15 态词汇表，输入 `(approval.status, lifecycle_state)` 及运行时上下文；以下每一对均明确按该顺序书写，不能把 lifecycle 与 approval 对调：
+       - `(DRAFT, DRAFT) + demo_service.status !== "RUNNING" ➔ EXPLORING`
+       - `(DRAFT, DRAFT) + demo_service.status === "RUNNING" ➔ DEMO_PREVIEW`
+       - `(APPROVED, PREPARING) + DAG 生成中 ➔ GRAPH_MAPPING`
+       - `(PENDING_REVIEW, PENDING_APPROVAL) + 等待用户授权 ➔ NEEDS_APPROVAL`
+       - `(APPROVED, EXECUTING) + stopping_requested === false ➔ EXECUTING`
+       - `(APPROVED, EXECUTING) + stopping_requested === true ➔ STOPPING`
+       - `(APPROVED, PENDING_RESUME) + suspend_reason 已设置 ➔ PAUSED`
+       - `(APPROVED, VERIFYING) + verification_passed !== false ➔ VERIFYING`
+       - `(APPROVED, VERIFYING) + verification_passed === false 且 retry_count < max_retries ➔ FAILED`
+       - `(APPROVED, AUDITED) + real_preview.status === "RUNNING" 且无质疑 ➔ REAL_PLAYTEST`
+       - `(APPROVED, AUDITED) + dispute_session.status === "OPEN" ➔ DISPUTED_INSPECTING`
+       - `(APPROVED, AUDITED) + evidence.can_merge === true 且无冲突 ➔ READY_TO_MERGE`
+       - `(APPROVED, AUDITED) + 检测到目标分支推进 ➔ CONFLICT`
+       - `(APPROVED, MERGED) ➔ MERGED`
+       - `(REJECTED 或 APPROVED, ABORTED) ➔ ABORTED`（保留历史审批事实，对齐架构 §9.1.1 配对矩阵）
+       - **`(APPROVED, AUDITED)` 四分支判定优先级（必须按序短路求值，安全优先）**：`CONFLICT` > `DISPUTED_INSPECTING` > `REAL_PLAYTEST` > `READY_TO_MERGE`；即目标分支已推进时即使存在 OPEN 质疑也先呈现 `CONFLICT`，存在 OPEN 质疑时即使真机预览在跑也先呈现 `DISPUTED_INSPECTING`，禁止四者同真时的实现自由裁量。
+       - 上述为架构 §6.3.1 的全部 15 种用户可见状态；禁止引入旧版 `CONTRACT_REVIEW`、`GRAPH_ORCHESTRATING`、`PREPARING` 等额外展示态。底层非执行态中间转换不得伪装为第 16 个 UI 状态。
+     - 将派生出的 `presentation_state` 持久化写入 `.stagent/state.json`；
+     - 通过 WebSocket 向 UI 实时广播状态变更帧，断线重连能够瞬间无损还原界面视图。
+  2. **五类死锁自愈看门狗 (`daemon/state/deadlock-resilience.ts`)**：
+     - **D-1 停止超时看门狗**：`STOPPING` 态超过 15 秒触发强杀看门狗，发送 SIGKILL 回收子进程，强制释放工作区互斥锁，原子转入 `ABORTED`；
+     - **D-2 孤儿锁与租约心跳**：互斥锁租约设为 60 秒，Daemon 心跳周期 15 秒续租；超过 90 秒无心跳自动判定为崩溃死锁，由看门狗安全回收释放；
+     - **D-3 恢复自愈探测**：`PENDING_RESUME` 时探测任务工作树物理存在性，若已被外部意外删除，自动触发 `PENDING_RESUME -> PREPARING` 重建自愈；
+     - **D-4 目标分支前进二选一**：合并前检测目标分支向前推进，提示【以当前分支为基线重演】或【放弃候选成果】，禁止前端死锁；
+     - **D-5 分层超时机制**：命令执行按 60s/300s/600s 分层看门狗兜底，超限安全回收并生成 TIMEOUT 证据。
+* **涉及核心文件（以实际落地为准）**：
+  - 共享词汇表：`src/lib/state/presentation-state.ts`（首段 `f548aeb`；daemon/前端共用）
+  - 新增：`daemon/state/presentation-store.ts`、`daemon/state/presentation-projector.ts`
+  - 新增：`daemon/state/deadlock-resilience.ts`
+  - 修改：`daemon/core/contract-mutex.ts`、`daemon/mcp/gateway.ts`、`daemon/pipeline/merger.ts`、`daemon/pipeline/orchestrator.ts`、`daemon/pipeline/contract-store.ts`、`daemon/runner/command-runner.ts`、`daemon/server.ts`
+  - 测试：`tests/unit/presentation-state.test.ts`、`tests/unit/presentation-persistence.test.ts`、`tests/unit/deadlock-resilience.test.ts`、`tests/unit/deadlock-call-sites.test.ts`、`tests/integration/merge-decision-d4.test.ts`
+* **Pass/Fail 验收判定**：
+  - **PASS**：架构 §6.3.1 的 15 种展示状态均由明确的 `(approval.status, lifecycle_state)` 二元组及运行时判据确定性派生；D-1~D-5 故障注入测试 100% 成功解除死锁，断网断线重连无数据丢失。
+  - **FAIL**：前端展示态脱离底层物理状态伪造；子进程卡死超过 15 秒未强制回收导致锁悬挂。
+
+---
+
+### 3.2 Supervisor 建议中枢、原型生成、质疑自查与非技术旅程串联（v1.5.0 全生命周期升级；含 S.6）
+
+<a id="task-s.1"></a>
+
+#### 【Task S.1】Supervisor 建议会话与持久化存储管理
+* **任务编号**：`TASK-S.1`
+* **前置依赖**：`TASK-D.1`
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main，merge `a9066dd`；分支 `feat/task-s1-throttler` 提交 `a7d7292`。门禁：合后四件套全绿（1122 passed / 6 skipped）；tsc 0 错、eslint 0 错、build 通过（dist 33 文件 / 3.35 MB）。落地清单：既有会话/Prompt/权限/独立预算分账 + `daemon/supervisor/throttler.ts`（`SupervisorWakeupThrottler`，`idleDebounceEnabled` 默认 `false`）+ `tests/unit/supervisor-debounce-trigger.test.ts`（**23 例**：默认关闭 5 + 历史开启态 18）。规则优先 L0/L1 仍记在 TASK-S.2。**口径说明**：①「对话停顿 3s」默认关闭，显式点击/控制面阻断/回合结束仍立即唤醒；② Worker `STREAMING`/`TOOL_RUNNING` 硬静默；③ `SNOOZE` 默认 10 分钟；④ `mapWakeTriggerToDraftTrigger` 对齐 draft-generator 枚举（`IDLE_DEBOUNCE`→`DEBOUNCE_TIMER` 双保险）。**残余口径差（不阻塞验收，需登记）**：① Daemon 聊天/会话路由侧尚未挂载节流器实例（模块已从 `daemon/supervisor/index.ts` 导出，合入后接聊天即可）；② 旧版「完成记录」中 2026-10-22 归档校正注仍保留为历史，勿与本轮交付混读）
+* **核心目标**：
+  1. Local-First 会话管理，落盘至 `.stagent/sessions/{session_id}.json`，文件模式 `0600`。
+  2. 依赖层 AST 扫描禁令：禁止引入 Gateway/Merger/Verifier/ProcessRunner/child_process。
+  3. **落实运行时越权调用拦截正例断言 (G-11b)**：
+     - 若 Supervisor 上下文尝试调用 `approveContract`、`mergeContract`、`setVerdict`、`execCommand`，底层控制面坚决抛出权限拒绝异常，产生 `GATEWAY_VIOLATION` 审计事件。
+  4. **预算分账（v1.3.3 修订）**：Supervisor 拥有独立日预算（`.stagent/supervisor-budget.json`），**不再计入当前合同账本**；Supervisor 预算耗尽不影响 Worker 执行；Worker 合同账本不得含 Supervisor 用量。
+  5. **唤醒节流器（v1.3.3 修订：规则优先 L0/L1）**：严禁伴随 Worker 逐 Token 轮询。唤醒时机修订为：① 用户显式请求；② Gateway 违规/熔断事件；③ Worker 回合结束且 diff 触及保护区。**「对话停顿 3s 即评估」默认关闭**（throttler 代码保留，配置开关控制）；VIBE 下 30 分钟连续聊天 Supervisor 模型调用应为 0（除非用户点击）。三类时机（修订前存档）：
+     - ① 对话流静默 3s（输入停顿 Debounce 窗口）——**v1.3.3 默认关闭，仅保留代码与可配置开关**；
+     - ② 用户在 UI 显式点击建议卡/请求分析（实测启用）；
+     - ③ 捕获到 Daemon 抛出的 `BLOCKED`、连续测试失败或预算报警事件（实测启用）。
+     - **断言（v1.3.3 口径）**：Worker 流式生成过程中 Supervisor 模型请求触发次数为 0；时机 ②③ 触发率 100%；时机 ① 在开关关闭时触发次数必须为 0。
+* **涉及核心文件（以实际落地为准）**：
+  - 新增：`daemon/supervisor/session-manager.ts`
+  - 新增：`daemon/supervisor/prompt-builder.ts`
+  - 新增：`daemon/supervisor/types.ts`
+  - 新增：`daemon/supervisor/throttler.ts`（唤醒节流器：3s 防抖 + 三类唤醒时机 + Worker 流式静默 + SNOOZE）
+  - 测试：`tests/unit/supervisor-session.test.ts`
+  - 测试：`tests/unit/supervisor-zero-tool-lint.test.ts`
+  - 测试：`tests/unit/supervisor-runtime-permission.test.ts`
+  - 测试：`tests/unit/supervisor-debounce-trigger.test.ts`（Worker 流式生成期间零模型调用断言、3s 停顿与事件唤醒测试）
+* **Pass/Fail 验收判定**：
+  - **PASS**：
+    - 会话文件原子落盘与恢复成功。
+    - 静态依赖 AST 扫描零违规。
+    - 运行时越权调用测试：调用审批/合并/写入 verdict/执行命令 100% 抛错被拒并记录告警。
+    - 唤醒节流器测试：在 Worker 流式生成期间 Supervisor 模型调用次数严格为 0；UI 显式请求与控制面异常事件 100% 正确触发；3s 防抖开关关闭时零触发、开启时按既有 18 用例通过。
+    - Supervisor 独立预算耗尽时模型调用被阻断，且**不影响 Worker 继续执行**（v1.3.3）。
+  - **FAIL**：Supervisor 能绕过控制面直接执行命令或修改工作区，或在 Worker 流式生成过程中伴随发起模型轮询。
+* **完成记录（历史记录 · 旧版 S.1，2026-10-20；当时 3s 防抖默认开启，非 v1.3.3 口径）**：
+  - ⚠️ **2026-10-22 归档校正**：以下 `throttler.ts` 与 18 例**不在 main**，仅存于未合并分支 `wip/s2-s3-supervisor-old-design`（`2319459`）；main 上 `1a75616` 只含 `session-manager.ts` / `prompt-builder.ts` / `permissions.ts` / `budget.ts` 四文件。本段整体保留为历史记录，**不得作为 v0.1 验收依据**。
+  - 交付物：`daemon/supervisor/throttler.ts`（`SupervisorWakeupThrottler`）+ `daemon/supervisor/index.ts` 导出。
+  - 测试：`tests/unit/supervisor-debounce-trigger.test.ts`，共 **18 个用例**全部 PASS，分组如下：
+    | 分组 | 用例数 | 覆盖断言 |
+    |---|---|---|
+    | 防抖窗口 | 3 | 3s 内 5 次输入仅 1 次评估（`coalesced_inputs=5`）；2999ms 不触发 / 3000ms 触发；持续输入重置窗口 |
+    | 显式唤醒 | 2 | 显式点击立即触发并取消待触发窗口；连续显式请求各自触发 |
+    | Worker 静默 | 3 | STREAMING / TOOL_RUNNING 期间 `model_calls` 严格为 0；静默开始时取消已排队窗口 |
+    | 静默解除 | 4 | Turn End 解除静默并触发；积压阻断合并为 `WORKER_BLOCKED`；解除后防抖恢复；Turn End 合并待触发输入不重复评估 |
+    | 控制面阻断 | 1 | 空闲态阻断事件立即唤醒 |
+    | SNOOZE | 2 | 10 分钟静默期内全部拒绝；到期自动恢复 |
+    | 生命周期/可观测性 | 3 | `dispose()` 清窗；评估异常被捕获不阻断后续；统计口径仅放行递增 `model_calls` |
+
+---
+
+
+---
+
+<a id="task-s.2"></a>
+
+#### 【Task S.2】按需合同草案生成引擎（L0 规则 / L1 强模型；v1.3.3 拆分精简）
+* **任务编号**：`TASK-S.2`
+* **前置依赖**：`TASK-S.1`
+* **任务状态**：**[COMPLETED]**（v0.1 精简版于 **2026-10-22** 在 `feat/s1-s2-supervisor-draft-pipeline` 落地：按需触发 + L0 规则 + L1 按需补全 + G-11 未决问题零丢失 + 独立预算记账 + `redaction.ts` 移植，三套新单测 45 例全绿；成熟度评分器/徽章/气泡按 v1.3.3 明令**未引入**。旧设计的 4 维评估器 + 草案编译器仍存于未合并分支 `wip/s2-s3-supervisor-old-design`，非 v0.1 验收依据）
+* **v1.3.3 范围拆分**：
+  - **v0.1（本卡）**：按需合同草案生成——仅在用户显式请求或控制面事件触发时生成；L0 规则（保护清单匹配、路径提取、默认命令/预算）优先，L1 强模型按需补全；白话文案；计入 Supervisor 独立预算。
+  - **v0.2+（推迟，`[用户已确认 D4]`）**：需求成熟度评分（4 维评估器、`maturity_assessment` 打分、HUD 徽章）。
+* **核心目标**：
+  1. 按需生成草案：输出 `rationale`、`unresolved_questions`、`assessed_at`、`model_id`（不再要求成熟度打分）。
+  1b. **分级自适应准入评估器 (Adaptive Admission Risk Evaluator, v1.4.0 新增)**：
+     - **Fast Path（轻量快速通道）**：分析修改意图与路径，若为单文件非核心展示层修改（如 CSS / 文案 / 单组件），无 Shell 执行且不触碰保护清单，自动打标 `auto_admitted: true`，生成静默合同由 Daemon 自动放行，免去用户弹窗审批；
+     - **Standard / Strict Path**：多文件逻辑重构或涉及敏感配置时，进入标准或强门禁合同草案生成。
+  2. 草案授权遵循架构规范 §0.2：Scope 与保护清单无交集自动批准，有交集仅一次白话是/否；不存在任何基于分数的门禁。
+  3. **未决问题 100% 保留至草案元数据 (G-11)**：提取生成符合 `SoftwareContractV12` 的草案，状态初始为 `DRAFT`，自动注入必填的 `worker_spec`；若存在 `unresolved_questions`，必须完整保存在草案中供用户核对。
+* **涉及核心文件**（v0.1，✅ 均已落地；文件名按实际交付校正）：
+  - 新增：`daemon/supervisor/draft-generator.ts`（原计划名 `contract-draft-generator.ts`，草案编译 + `submitDraftForApproval()`）
+  - 新增：`daemon/supervisor/rules-l0.ts`（L0 规则草案装配：路径提取 / 保护清单匹配 / 默认命令与预算）
+  - 移植：`src/lib/ipc/redaction.ts`（共享深度脱敏，自旧 S.3 保留）
+  - 修改：`daemon/supervisor/index.ts`（公开出口）
+  - 修改：`daemon/supervisor/budget.ts`（改为独立账本 `independent()`）、`daemon/supervisor/types.ts`（快照注释口径同步）
+  - 测试：`tests/unit/supervisor-contract-generator.test.ts`、`tests/unit/ipc-redaction.test.ts`、`tests/unit/supervisor-budget.test.ts`
+  - v0.2+（推迟）：`daemon/supervisor/maturity-evaluator.ts`、`tests/unit/supervisor-maturity-evaluator.test.ts`
+* **Pass/Fail 验收判定**：
+  - **PASS**：
+    - 草案 100% 通过 `SoftwareContractV12Schema.parse()`。
+    - 断言：当 `unresolved_questions.length > 0` 时，草案元数据中的 `unresolved_questions` 逐项保留无遗漏。
+    - 断言：草案必须包含合规的 `worker_spec`；未请求时 Supervisor 模型调用 = 0。
+  - **FAIL**：草案遗漏未决问题；草案缺失 `worker_spec` 导致校验失败。
+* **历史记录（旧设计实现，仅存于未合并分支 `wip/s2-s3-supervisor-old-design`，非 v0.1 验收依据）**：该分支上两个专用套件共 32 个用例曾报告 PASS（2026-10-20）。
+  | 套件 / 分组 | 用例数 | 覆盖断言 |
+  |---|---|---|
+  | 评估器 A 分数收敛 | 4 | 模糊意图 <50 且 `NEEDS_CLARIFICATION`、未决问题非空；明确意图 ≥80 且四维均 ≥80；明确比模糊高 ≥40 分；部分信息只拉高对应维度 |
+  | 评估器 B 结构 | 3 | 四维齐备、权重合计 1；分数均在 0–100 且理由非空；总分可按维度加权复算 |
+  | 评估器 C 建议性守卫 | 3 | 空对话不抛错、0 分 + 4 条未决问题；0 分与满分 `advisory_only` 均为 true；未决问题数量等于弱维度数 |
+  | 评估器 D 输出契约 | 2 | `toAssessment()` 通过 `maturityAssessmentSchema`；`assessed_at` 来自注入时钟、`model_id` 可覆盖 |
+  | 生成器 A 合规与状态 | 5 | 草案 100% 通过 Schema；初始 `DRAFT/DRAFT`；`DRAFT+PENDING_REVIEW` 被拒；提交后 `PENDING_APPROVAL/PENDING_REVIEW`；非 DRAFT 不可重复提交 |
+  | 生成器 B worker_spec / 非门禁 | 3 | `GATEWAY_ENFORCED` + `MANAGED_TOOL_CALLING`；`score=0` 仍生成且元数据 score 为 0；无评分同样生成 |
+  | 生成器 C G-11 | 2 | 未决问题逐项无遗漏无改写；评估报告转存后 score/rationale/model_id/assessed_at 完全一致 |
+  | 生成器 D 装配 | 8 | 对话提取可写路径与禁区；显式 scope 覆盖；空对话安全兜底；默认两条验证命令；命令可覆盖；默认预算含计数值上限；预算可覆盖且合规；默认命令常量防漂移 |
+  | 生成器 E 溯源 | 2 | `suggestion_id` + `suggested_scope` 落元数据；`conversation_ref` 保留全部消息 id |
+  - 规范说明：A §9.1.1 状态矩阵只允许 `DRAFT↔DRAFT`、`PENDING_APPROVAL↔PENDING_REVIEW`，故草案初始态为 `DRAFT/DRAFT`；`submitDraftForApproval()` 原子推进至 `PENDING_APPROVAL/PENDING_REVIEW`。`DRAFT+PENDING_REVIEW` 被显式断言拒绝，已固化为可回归事实。
+* **完成记录（v0.1 精简版 · 2026-10-22 落地，Sprint 4）**：
+  - 交付物：`daemon/supervisor/rules-l0.ts`（L0 规则引擎，零模型调用）、`daemon/supervisor/draft-generator.ts`（按需生成 + L1 补全 + G-11 + 费用分账）、`src/lib/ipc/redaction.ts`（三层脱敏）、`daemon/supervisor/budget.ts`（改独立账本）。
+  - 关键实现口径：
+    - **按需触发是结构性的，不是配置项**：`DraftTriggerKind` 中 `IDLE_TIMER` / `DEBOUNCE_TIMER` 一律返回 `{ generated: false, reason: "NOT_REQUESTED", model_calls: 0 }`，函数体在装配之前即返回，模型调用不存在发生路径。这是「VIBE 下 30 分钟连续聊天 Supervisor 调用 = 0」的结构保证。
+    - **L0 只匹配不削减**：命中保护清单的路径**仍保留在 `writable_paths`**，另外回报 `protected_files` / `protected_entry_names` / `needs_protection_approval` / `protection_error`，交由 §0.2「有交集 ≤2 次交互」处理，规则引擎不代替用户做决定。
+    - **L1 必须带账本**：`enrich` 与 `budgetLedger` 同时存在才允许调用模型，否则抛 `MISSING_BUDGET_LEDGER`，杜绝"免费调用"绕过费用分账。
+    - **G-11 不去重**：L0 与 L1 的 `unresolved_questions` 按序拼接、刻意不去重（去重会静默吞条），完整写入 `supervisor_metadata.maturity_assessment`。
+    - **剔除项**：`maturity_assessment` 只写 `rationale` / `unresolved_questions` / `model_id` / `assessed_at`，**不写 `score`**；无评估器、无徽章、无风险气泡（Schema 中 `score` 仍为可选字段以兼容旧数据，但不参与任何 refine 或授权分支）。
+  - 测试（45 例全绿，`npm test` 全量 722 passed / 6 skipped 无回归）：
+    | 套件 | 用例数 | 覆盖断言 |
+    |---|---|---|
+    | `tests/unit/ipc-redaction.test.ts` | 21 | 键名脱敏（大小写/下划线/连字符变体）、真实凭据值指纹脱敏（≥6 字符）、形态脱敏（sk-/ghp_/AKIA/xoxb-/Bearer/PEM/`KEY=`）、先脱敏后截断、嵌套对象/数组、计数按出现次数、循环引用不爆栈 |
+    | `tests/unit/supervisor-budget.test.ts` | 7 | 独立落盘 `.stagent/supervisor-budget.json`、重启后累计值恢复、超额在 `call` 之前抛 `E_BUDGET_EXCEEDED`、**Worker 合同账本零污染**、快照剩余额度口径 |
+    | `tests/unit/supervisor-contract-generator.test.ts` | 17 | 定时/防抖触发零生成零调用、L0 路径提取与默认命令、保护清单命中仍保留可写路径并置 `needs_protection_approval`、草案 100% `parse()` 通过、初始 `DRAFT/DRAFT`、`submitDraftForApproval` 状态跃迁与非法态拒绝、G-11 未决问题零丢失、L1 无账本抛错、L1 用量只记独立账本、`maturity_assessment` 不含 `score` |
+  - 如实保留的残余（不阻塞验收）：
+    - **L1 尚无生产模型适配器**：`enrich` 是注入函数，当前仅测试与未来编排层可调用；未接线前生产路径恒为纯 L0（零费用），不会误触发。
+    - **草案生成器尚未接入 UI / 控制面**：属 `TASK-C.2`（Studio 精简版）与 `TASK-S.3`（推迟 v0.2+）范围。
+    - ~~`throttler.ts` 仍缺失~~ → **已于 2026-10-24 合入**（merge `a9066dd` / `a7d7292`），`TASK-S.1` 升为 `[COMPLETED]`；见 S.1 交付说明。
+
+---
+
+
+---
+
+<a id="task-s.4"></a>
+
+#### 【Task S.4】Demo 静态原型生成器与 Mock 预览服务 `[v1.6.1 升级]`
+* **任务编号**：`TASK-S.4`
+* **前置依赖**：`TASK-S.2`
+* **任务状态**：**[COMPLETED]**（2026-10-23 交付：分支 `feat/task-s4-demo-service`，提交 `95ea2a3`、`07af0f2`，经 `d5ee448` 合入 main。落地内容：需求摘要 → 纯静态原型生成（`.stagent/demo/`，产出 `index.html`/`styles.css`/`app.js`）、单文件 2MB UTF-8 字节闸门（`E_DEMO_PAYLOAD_TOO_LARGE`，HTTP 413，先全量校验再统一落盘）、独立 Origin 预览服务（仅绑 127.0.0.1:4100~4110，`findAvailablePort` + `listen` 双重端口回退）、CSP `default-src 'none'; connect-src 'none'` 与路径逃逸/隐藏文件防护、版本快照与按 ID 回退（含残留资源清理）、`DEMO_PREVIEW_STATUS` 生命周期广播（`RUNNING`/`STOPPED`/`ERROR`）、Daemon HTTP 与 WS 入口对 Demo 来源 403（**置于 CORS 放行之前**，并覆盖 sandbox iframe 的 `Origin: null`）。门禁：tsc 0 错、eslint 0 错、19 项定向单测全绿。偏离说明：采用三资源而非单文件——严格 CSP 下 `script-src 'self'` 不允许内联脚本，维持单文件需放开 `'unsafe-inline'`，安全性优先；2MB 仍按单文件独立判定。范围外（经需求方裁决）：`createDemoPreview` 的上层调用归 TASK-C.2/旅程编排层，热重载归右栏会话打补丁时对接）
+* **v0.1 范围**：受控单页静态 HTML/React 原型生成 + 虚拟 Mock 数据构造 + 独立端口与跨源沙箱隔离预览服务。
+* **核心目标**：
+  1. **原型受控构建器 (`daemon/supervisor/demo/demo-generator.ts`)**：
+     - 在需求澄清告一段落后，根据已收敛的 `.stagent/specs/requirements.md`，提取页面布局、核心功能分支与表单字段；
+     - 自动组装纯静态前端页面（包含 Tailwind/CSS 样式与内嵌虚拟 Mock 数据），落地于 `.stagent/demo/` 临时工作区；
+     - **单文件落盘上限 ≤ 2MB**：落盘前检查生成资产尺寸，单文件超过 2MB 立即拒绝写入并抛出 `E_DEMO_PAYLOAD_TOO_LARGE`；
+     - 严禁赋予任何真实数据库或外部网络权限（纯静态前端 Mock）。
+  2. **跨源沙箱预览服务与 CSP 隔离 (`daemon/supervisor/demo/preview-server.ts`)**：
+     - 在本地分配独立随机未占用端口（如 4100~4110），启动基于 Node 的静态 Web 预览服务（独立 Origin）；
+     - 前端 Studio 视口必须通过 `<iframe sandbox="allow-scripts">` 嵌入，**严格严禁添加 `allow-same-origin`**；
+     - 注入严格 Content-Security-Policy (CSP)：禁止 Demo 页面发起向 Daemon 端口或外部非白名单域名的网络请求；
+     - Daemon 端 RPC/API 网关增加 Origin 校验，来自 Demo iframe 的跨源请求一律以 403 阻断；
+     - 通过 WebSocket 向 UI 广播 `DEMO_PREVIEW_STATUS`（包含独立预览 URL 与更新时间戳）；
+     - 支持热重载更新：当用户在右侧对话中打补丁时，增量重写 Demo 文件并触发页面无刷新重载。
+  3. **增量原型演进与历史快照回退 (`daemon/supervisor/demo/demo-evolution.ts`)**：
+     - 每次需求变更生成新的 Demo patch，并将历史版本保存于 `.stagent/demo/snapshots/`；
+     - 支持用户在 Studio 中一键回退到任一历史 Demo 试玩快照。
+* **涉及核心文件**：
+  - 新增：`daemon/supervisor/demo/demo-generator.ts`
+  - 新增：`daemon/supervisor/demo/preview-server.ts`
+  - 新增：`daemon/supervisor/demo/demo-evolution.ts`
+  - 新增：`daemon/supervisor/demo/types.ts`
+  - 测试：`tests/unit/supervisor-demo-generator.test.ts`
+  - 测试：`tests/unit/supervisor-demo-server.test.ts`
+  - 测试：`tests/e2e/demo-iframe-isolation.test.ts`
+* **Pass/Fail 验收判定**：
+  - **PASS**：输入 Markdown 需求文档可稳定产出包含 Mock 数据的静态页面；本地预览服务在独立端口启动且在 2 秒内响应；Demo 嵌入 iframe 无法读取主应用 Cookie/LocalStorage，CSP 成功阻断向 Daemon 端口的 RPC 访问；单文件 > 2MB 被坚决拦截。
+  - **FAIL**：iframe 配置了 `allow-same-origin`；Demo 页面能够调用 Daemon API；端口冲突未能自动回退。
+
+---
+
+<a id="task-s.5"></a>
+
+#### 【Task S.5】Supervisor 质疑自查与根因分流归因引擎 `[v1.6.1 升级]`
+* **任务编号**：`TASK-S.5`
+* **前置依赖**：`TASK-S.1`, `TASK-S.2`, `TASK-D.2b`
+* **任务状态**：**[COMPLETED]**（2026-10-23 交付于 `feat/task-s5-dispute-engine`：`a1469b7` 主体 + `a83f18a` 口径修正，经 `2bb1313`、`5748ad0` 合入 main。门禁：`npm run typecheck` 0 错；`tests/unit/requirements-store.test.ts` 7 通过、`tests/unit/dispute-triad.test.ts` 12 通过；main 上 4 个定向文件 60 例、集成 30 例全绿。落地清单：`daemon/supervisor/specs/requirements-store.ts`（`requirements.md` 读写、合同意图初始化、`specs/revisions/req-v*.md` 版本冻结、执行期锁定与 SHA-256 完整性校验）、`daemon/supervisor/dispute/evidence-triad.ts`（会话/规范/Worktree 三方抓取，终端与退出码取自最新 Evidence）、`classification.ts`（确定性归因 + 置信度 + 返工/变更提案）、`index.ts`（60s 看门狗与报告装配）、`types.ts`、`daemon/server.ts` 的 `POST /api/supervisor/dispute` 与 `DISPUTE_REPORT_READY` 广播。**口径说明**：① 文件命名按实际落地为 `classification.ts` / `index.ts` / `types.ts`（卡内设计期 `root-cause-analyzer.ts` / `rework-dispatcher.ts` / `dispute-types.ts` 未沿用）；② 需求快照按架构 §5.1 落在 `.stagent/specs/revisions/req-v<N>-<sha8>.md`，索引 `.stagent/specs/requirements.snapshots.json`；③ 归因是确定性规则而非模型打分，置信度由证据信号计算，`< 0.7` 强制降级；④ 越界返工以 `rejected_paths` + `requires_scope_expansion` 阻断并提示升版，未新增 `EXPANDED_SCOPE_REQUIRED` 错误码，避免扩充错误码目录。**残余口径差（不阻塞验收，需登记）**：① 路由级 401/404/超时降级未加集成用例（按交付指令仅两个单测文件）；② 终端日志取自最新 Evidence 的 stdout/stderr tail，无 Evidence 时为空且置信度下调；③ 返工提案与变更草案均为未落盘对象，执行/审批沿用既有链路）
+* **v0.1 范围**：自然语言质疑入口 + 三方事实交叉核验管道 + 看门狗超时控制 + 置信度治理 + 严格 Scope 子集自动返工。
+* **质疑入口路由**：右栏会话在真实试玩/验收阶段识别质疑意图时，提供转入 Studio 质疑自查的明确入口；该路由由本卡与 TASK-C.2 集成实现，不属于已完成 TASK-C.6 的交付内容。
+* **核心目标**：
+  1. **三方事实核验管道 (`daemon/supervisor/dispute/evidence-triad.ts`)**：
+     - 响应用户的自然语言质疑（例如：“订单页面没有满减折扣功能”）；
+     - 自动抓取三方物理事实：① 会话历史中用户原始提问与意图确认记录；② `.stagent/specs/requirements.md` 中的已批准规范条目；③ 当前 Worktree 实际代码 Diff、终端日志与测试退出码；
+     - **自查对照源**：质疑分析时，必须对照触发本轮施工的**不可变需求快照**（`.stagent/specs/revisions/req-v*.md`），而非仅读取可能已被后续对话修改的 `requirements.md` 最新态；
+     - 引入 60 秒自查看门狗：自查计算超过 60 秒触发超时兜底，安全降级。
+  2. **确定性分流归因与置信度治理 (`daemon/supervisor/dispute/root-cause-analyzer.ts`)**：
+     - 模型对归因结论输出评估置信度 `confidence`：
+       - 当且仅当 `confidence >= 0.7` 时，输出确定性裁决：
+         - **分支 A (实现偏差 Bug)**：需求文档已明文记载但代码实现缺失或抛错，裁决为 `IMPLEMENTATION_DEVIATION`，输出“系统实现偏差，本轮免费修复”，生成 `DefectFixTask`；
+         - **分支 B (需求变更 Drift)**：代码完全符合已批准需求与 Demo，系用户提出新业务规则，裁决为 `REQUIREMENT_DRIFT`，输出“识别到新需求，开始增量演变”，引导用户进入需求文档增删与 Demo 迭代；
+       - 当 `confidence < 0.7` 时，**坚决严禁模型武断下结论**，自动降级为 `UNCERTAIN`，仅并排呈现用户原话、规范条目与代码改动事实，由用户人工勾选确认是 Bug 还是新需求。
+  3. **自动返工 Scope 严格子集检查 (`daemon/supervisor/dispute/rework-dispatcher.ts`)**：
+     - 实现偏差派发的 `DefectFixTask`，其可修改文件范围必须严格限制在原已批准合同 `writable_paths` 的**真子集或全集**之内；
+     - 若自查修复方案需要新增文件或引入新依赖，必须抛出 `EXPANDED_SCOPE_REQUIRED`，立即阻断自动返工并转入需求变更增量合同审批流程；
+     - 资产关联贯通：在会话、草案与 Evidence 中贯穿统一关联键 `change_request_id`，实现全链路可审计溯源。
+* **涉及核心文件（以实际落地为准）**：
+  - 新增：`daemon/supervisor/specs/requirements-store.ts`
+  - 新增：`daemon/supervisor/dispute/evidence-triad.ts`
+  - 新增：`daemon/supervisor/dispute/classification.ts`
+  - 新增：`daemon/supervisor/dispute/index.ts`
+  - 新增：`daemon/supervisor/dispute/types.ts`
+  - 修改：`daemon/server.ts`（`POST /api/supervisor/dispute` 与 `DISPUTE_REPORT_READY`）、`src/lib/ipc/frames.ts`、`src/lib/error-codes.ts`
+  - 测试：`tests/unit/requirements-store.test.ts`（7 用例）
+  - 测试：`tests/unit/dispute-triad.test.ts`（12 用例）
+* **Pass/Fail 验收判定**：
+  - **PASS**：对于需求已写但代码写漏的典型 Case，置信度高且 100% 裁决为实现偏差；低置信度案例自动降级为事实陈述并由用户裁决；自动返工超出原合同 Scope 时被坚决拦截并提示升版审批；60 秒内必出结果或安全超时。
+  - **FAIL**：低置信度时向用户强加主观判定；自动返工越界修改了原合同未授权的文件。
+
+<a id="task-s.6"></a>
+
+#### 【Task S.6】非技术旅程串联（右侧唯一入口分流 + 确认原型开工）`[COMPLETED · 2026-10-24]`
+* **任务编号**：`TASK-S.6`
+* **前置依赖**：`TASK-S.4` (COMPLETED), `TASK-C.7` (COMPLETED), `TASK-S.5` (COMPLETED), `TASK-C.2` (COMPLETED), `TASK-S.2` (COMPLETED), `TASK-W.5a` (PASS)
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main，merge `6415fbd`；分支 `feat/task-s6-journey-orchestration` 功能提交 `bbab79e`。门禁：合后四件套全绿（1155 passed / 6 skipped）；tsc 0 错、eslint 0 错、build 通过。落地：`classifyJourneyIntent` / `orchestrateJourney` / `POST /api/supervisor/journey`；右侧 `onBeforeSend` 分流卡；`buildProposalFromContract` + `createTaskGraph` 真接线【确认原型】；需求 hint 刷新；Studio 视口建议切换；单测 `journey-intent-router` / `journey-orchestrate` / `journey-proposal-from-contract`。**S.6b 已收口 [COMPLETED]**：merge `024d2b8` / 功能 `613ff51`（分支 `feat/task-s6b-real-playtest`）；合后四件套 1165 passed / 6 skipped；真机预览服务 4200–4210、`RealPlaytestPane` iframe+外链、旅程 `REAL_PLAYTEST`→`START_REAL_PLAYTEST`、Origin 防线。不改架构规范；未做 W.5b/c / S.3 HUD / C.2 重做。）
+* **对照白话验收**：见 Git 历史（原 `docs/archive/non-technical-journey-acceptance.md`）（八步 + Fast Path + 右侧唯一入口）
+* **v0.1 范围**：右侧唯一入口的白话分流路由器 +「确认原型 → 建全灰 TaskGraph → 进入可审批/开工链」主链粘合；聊完一段落后左侧需求说明可感知刷新；审批/开工后中栏图随真实 Evidence 点亮（复用既有 illumination verify）。底座（S.4 Demo、C.7 Graph、S.5 dispute、C.2 四视口、S.2 草案、W.5a Worker）只接线、不重砌。
+* **明确不包含**：
+  - `TASK-W.5b` / `TASK-W.5c`（第二/第三个 Agent）
+  - UI 抛光与视觉重设计
+  - `TASK-S.3` HUD / 成熟度徽章 / Snooze（仍 DEFERRED→v0.2+）
+  - 重做 `TASK-C.2` 四视口壳（只补编排接线）
+  - 修改《系统架构设计规范》或另开 ADR
+* **核心目标**：
+  1. **右侧白话分流（唯一入口）**：用户只跟右侧聊天；系统按意图静默路由——质疑纠错 → 调 `POST /api/supervisor/dispute` 并出白话摘要卡（可切质疑视口）；大事/提需求 → 出或更新草案与左侧需求说明；小事（字号/文案等）→ Fast Path 静默合同，**免强制整套 Demo**。
+  2. **确认原型 → 建图开工主链**：中栏 Demo（S.4 独立端口）可试玩；用户点【确认原型并实施真实工程】后，必须真实创建初始**全灰** TaskGraph（C.7）并进入可审批/开工链；**禁止**只改预览 nonce / 假状态切换冒充开工。
+  3. **Evidence 驱动点亮**：审批/开工后，中栏图随 Worker 真实写入产生的 Evidence，经既有 `illumination-verifier` / `POST /api/graph/verify` 逐节点点亮；不自报假绿。
+  4. **可选 / S.6b（本卡可降级登记）**：当展示态进入代码事实态 `REAL_PLAYTEST`（勿写作 `PREVIEW_READY`）时，将真预览 URL 挂到中栏或外链；若本卡工期超范围，明确登记为后续子卡，不阻塞主链验收。
+* **涉及核心文件（实施时以实际接线为准，本卡仅定范围）**：
+  - 编排/分流：`daemon/supervisor/` 下会话意图路由与 Fast Path / dispute / 草案触发粘合（复用 S.1/S.2/S.5，不另起炉灶重写引擎）
+  - 前端粘合：右侧会话 → 分流结果卡片；`DemoPreviewPane`【确认原型】→ Graph 建图 API；左侧规范资产区需求刷新；质疑卡与视口切换（复用 C.2 `StudioViewportShell`）
+  - 既有复用：S.4 Demo 预览服务、C.7 `graph-engine` / verify、S.5 dispute API、C.2 四视口、W.5a 执行通道
+* **Pass/Fail 验收断言（≤5，可测、白话）**：
+  1. **右侧一句话分流**：质疑 → 调 dispute 并出白话卡（可切质疑视口）；大事 → 出/更新草案；小事 → Fast Path（免强制 Demo）。
+  2. **聊到一段落**：左侧需求说明出现或更新（用户可感知刷新，不必手写技术规格）。
+  3. **确认原型开工**：Demo 可进中栏试玩；点【确认原型并实施真实工程】→ 建全灰 TaskGraph 并进入可审批/开工链（**禁止只改 nonce**）。
+  4. **点亮**：审批/开工后，中栏图可随真实 Evidence 点亮（复用现有 verify；空验证集仍不得假绿）。
+  5. **可选/S.6b**：`REAL_PLAYTEST` 真预览 URL 挂中栏或外链；本项已由 S.6b 合入收口（merge `024d2b8`）。
+* **Pass/Fail 验收判定**：
+  - **PASS**：上述断言 1–4 均可在本地 main 上手测复现；断言 5 要么交付要么在卡内显式降级登记；无产品代码范围外改动混入本卡。
+  - **FAIL**：确认原型只改 nonce/假态；分流把质疑当闲聊或把小事逼进全套 Demo；点亮不经 Evidence；把缺口塞回已完成的 C.2/S.3/S.5 卡而不立本卡。
+
+---
+
+### 3.3 受控 Coding Worker、安全策略、威胁守卫与成熟 Agent 适配（W.1/W.2 已完成；W.3/W.4 落 Sprint 2；W.5a 落 Sprint 1，绕过负例收尾落 Sprint 3）
+
+<a id="task-w.1"></a>
+
+#### 【Task W.1】Coding Worker 适配器抽象与任务指令装配
+* **任务编号**：`TASK-W.1`
+* **前置依赖**：`TASK-D.1`
+* **任务状态**：**[COMPLETED]**（2026-10-20 收尾：能力声明第 9 项 `known_limitations`、合同上下文装配、Worktree 边界校验与工具暴露收窄全部落地；专用用例 **34 个**全通过；用例总数以最新 CI 为准）
+* **v1.3.3 定位调整**：自研 API Worker 由主线转为**保底运行基线与单元测试替身**；成熟 Agent 接入由 TASK-W.5a/b/c 承载。`AdapterCapabilityDeclaration` 增补字段：`billing_model`、`streaming_protocol`、`resume_mechanism`、`interrupt_supported`、`native_tools_disabled: string[]`、`verified_on`（实测 CLI 版本号与日期，空即「待实机验证」）。
+* **核心目标**：
+  1. 定义 `CodingWorkerAdapter` 接口，支持 Managed AI 与 CLI。
+  2. **合同生效后的任务指令下发与装配 (Task Instruction Injection)**：
+     - 当收到合同批准事件时，Session Router 组装标准任务指令卡片并推入**右侧 Worker 对话窗口**；
+     - 注入最高优先级任务上下文（目标意图、文件白名单、禁止触碰目录、验收要求）；
+     - 将 Worker 执行的工作目录强行锁定为生成的 Worktree 物理路径。
+  3. **`AdapterCapabilityDeclaration` 补齐第 9 项 `known_limitations` (G-10)**：声明对象完整包含 9 项能力规范与平台矩阵。
+  4. 注册中心默认拒绝未经能力证明的外部适配器进入 `GATEWAY_ENFORCED` 受控模式。
+* **涉及核心文件**：
+  - 新增：`daemon/worker/worker-adapter.interface.ts`
+  - 新增：`daemon/worker/session-task-injector.ts`
+  - 新增：`daemon/worker/adapter-registry.ts`
+  - 修改：`daemon/worker/ai-worker.ts`（`prepare()` 装配 + 失败上下文回传）
+  - 修改：`daemon/worker/openai-client.ts`（System Prompt 单一事实源）
+  - 修改：`daemon/pipeline/orchestrator.ts`（传入宿主根强制 Worktree 隔离校验）
+  - 测试：`tests/unit/worker-adapter.test.ts`
+* **接口定义**：
+  ```typescript
+  export interface AdapterCapabilityDeclaration {
+    adapter_id: string;
+    protocol_version: string;
+    model_metering_source: "PROVIDER" | "LOCAL_ESTIMATE";
+    tool_interception_supported: boolean;
+    filesystem_permissions: "GATEWAY_ONLY" | "DIRECT_UNCONTROLLED";
+    command_permissions: "WHITELIST_ONLY" | "UNRESTRICTED_SHELL";
+    cancellation_supported: boolean;
+    session_recovery_supported: boolean;
+    network_requirements: "NONE" | "EXPLICIT_ONLY" | "DIRECT_INTERNET";
+    platform_support: ("darwin-arm64" | "darwin-x64" | "linux-x64" | "win32-x64")[];
+    known_limitations: string[]; // 第 9 项必填已知限制 (G-10)
+  }
+  ```
+* **Pass/Fail 验收判定**：
+  - **PASS**：未声明 `known_limitations` 或声明直连 FS 的适配器，无法被注册为受控模式。
+  - **FAIL**：未知黑盒适配器被登记为受控。
+* **完成记录（2026-10-20）**：`tests/unit/worker-adapter.test.ts` 共 **34 个用例**全 PASS：
+  | 分组 | 用例数 | 覆盖断言 |
+  |---|---|---|
+  | A 合同上下文装配 | 8 | 目标/白名单/只读/禁区/验收/预算逐字段注入；Worktree 根与段落结构；known_limitations 默认注入与未声明告警；未批准合同拒绝装配 |
+  | B 工具暴露 | 4 | 无命令授权时 exec 不暴露；有授权恢复；只能收窄子集；未授权显式请求被拒 |
+  | C Worktree 边界 | 8 | 等于宿主根 / 祖先 / 非隔离目录 / 完全外部 / 相对路径 / 符号链接穿透 全部拒绝 |
+  | D 能力声明与注册中心 | 8 | 空限制、直连 FS、无限制 Shell、无法拦截工具、空平台矩阵逐项拒绝；重复 ID 拒绝；黑盒仅可非受控登记 |
+  | E AiWorker 集成 | 5 | Prompt 单一事实源；网关落盘；模型异常 `MODEL_CALL` 上下文；工具失败 `TOOL_WRITE` 上下文；越权 `SCOPE_VALIDATION` 零落盘 |
+  | F 静态边界 | 1 | `daemon/worker/**` 零 `child_process` / 零原生执行 API（**v1.3.3 收窄**：唯一例外为 `daemon/worker/cli-host/` 专用子进程隔离模块，该模块允许 spawn 但强制结构化 argv + `shell:false` + 进程树托管回收；静态测试改为断言"cli-host 之外零 spawn"） |
+
+---
+
+
+---
+
+<a id="task-w.2"></a>
+
+#### 【Task W.2】Scoped Gateway 强制工具注入与执行拦截
+* **任务编号**：`TASK-W.2`
+* **前置依赖**：`TASK-W.1`, `TASK-A.2` (COMPLETED), `TASK-A.4` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-20 收尾：5 大工具注入、`expected_hash` 乐观锁、`delete_file`、别名 argv 执行与路径/命令拦截全部落地；专用用例 **29 个**全通过，全仓 55 文件 / 522 用例）
+* **核心目标**：
+  1. 注入 `stagent_*` 5 大标准工具。
+  2. **`stagent_write_file` 的 `expected_hash?` 调整为可选 (G-03)**：
+     - 若传入 `expected_hash`，执行严格乐观锁比对，哈希不符抛 `E_CONFLICT`；
+     - 若未传入 `expected_hash`，视为新建文件，仅在合同 `writable_paths` 范围内放行。
+  3. **强制结构化 argv 且 `shell:false` 调用 (G-04)**：
+     - 命令执行必须以 `spawn(executable, args, { shell: false })` 执行；
+     - 严密检查参数，包含未转义连接符（`;`, `&&`, `|`, `$()`）的参数作为字面量抛出 `E_UNAUTHORIZED_COMMAND`。
+  4. 越界访问抛 `E_OUT_OF_SCOPE`，禁区抛 `E_FORBIDDEN_PATH`，违规后合同与证据标 `BLOCKED`。
+  5. **网关物理先阻断与合同 v2 升版联动 (v1.4.0 新增)**：
+     - Gateway 检测到未授权读写或非白名单命令时，必须物理拒绝执行，不可依赖 LLM 自觉停手；
+     - 单次常规越界向 Worker 返回错误码由其自愈；若属于业务需求扩大导致的范围突破，触发生成 `Contract v2` 差异补丁，旧执行凭证立即停用，等待用户重新审批；
+     - 代码发生新提交后，旧候选版本的测试与 Diff 证据自动标记为失效（STALE），禁止冒充通过。
+* **涉及核心文件**：
+  - 修改：`daemon/mcp/types.ts`（`expected_hash` / `command_alias` / `list_directory` / `delete_file` Schema）
+  - 修改：`daemon/mcp/gateway.ts`（五工具分发、乐观锁、删除、别名 argv、Scope 码映射）
+  - 新增：`daemon/worker/worker-toolset.ts`（按授权挂载的工具实例层）
+  - 修改：`daemon/worker/session-task-injector.ts`（`WORKER_MCP_TOOLS` 五席位与 exec 暴露判定）
+  - 修改：`daemon/worker/ai-worker.ts`（经 toolset 读写）
+  - 测试：`tests/unit/worker-mcp-tools.test.ts`
+* **Pass/Fail 验收判定**：
+  - **PASS**：
+    - 未传 `expected_hash` 时新文件正常创建；传入错误 `expected_hash` 时被拒绝。
+    - 包含注入符号（`;`, `&&`）的命令参数被字面量拦截，测试断言未进入系统 shell 执行。
+    - 越界写入被阻断，合同与证据被标为 `BLOCKED`。
+  - **FAIL**：使用 `shell: true` 执行命令；新文件因强制要求前值哈希而无法创建。
+* **完成记录（2026-10-20）**：`tests/unit/worker-mcp-tools.test.ts` 共 **29 个用例**全 PASS：
+  | 分组 | 用例数 | 覆盖断言 |
+  |---|---|---|
+  | 五工具基本功能 | 9 | 读回内容+SHA-256；写入落盘；列举隐藏禁区/`.git`/`.stagent`；递归路径；历史别名等价；删除与 `ENOENT`；拒删目录 `E_NOT_A_FILE`；别名执行 exit 0；未知别名 `E_UNAUTHORIZED_COMMAND` |
+  | 乐观锁 `expected_hash` | 4 | 命中写入；外部改动后 `E_CONFLICT` 且零覆盖；缺失文件传 hash 判冲突；非法 hash `INVALID_INPUT` |
+  | 命令防注入 | 6 | `&&`/`\|`/`;`/`$()` 四类参数逐一拒绝且无副作用；旧式字符串拼接被拦；argv 字面量透传 |
+  | 路径边界 | 6 | 穿越/绝对路径 `PATH_TRAVERSAL_DETECTED`；禁区 `E_FORBIDDEN_PATH`；越界 `E_OUT_OF_SCOPE`（写/删各一） |
+  | 授权挂载 | 4 | 未授权 commands 时 exec 不挂载；授权后五工具全挂；收窄后未挂载即拒绝；AiWorker 经 toolset 落盘 |
+
+---
+
+
+---
+
+<a id="task-w.2b"></a>
+
+#### 【Task W.2b】未跟踪文件 Scope 联合检查与越界阻断
+* **任务编号**：`TASK-W.2b`
+* **前置依赖**：`TASK-0.2c`, `TASK-W.2`
+* **任务状态**：**[COMPLETED]**（2026-10-23 核验回写：提交 `87f909c`，经 `05f090f` 合入 main。落地 `daemon/pipeline/untracked-scope-guard.ts`，错误码 `E_OUT_OF_SCOPE_UNTRACKED` 已登记于 `src/lib/error-codes.ts`；执行后联合检查 tracked Diff 与 untracked，合同外未跟踪文件阻断并留 BLOCKED 证据。合并门禁由 TASK-D.2b 承接，不在本卡范围）
+* **范围**：在执行后 Scope 校验中联合检查已跟踪 Diff 与未跟踪文件，新增统一错误码 `E_OUT_OF_SCOPE_UNTRACKED`；本卡只负责执行侧检测与阻断，不负责合并门禁。
+* **涉及核心文件**：新增 `daemon/pipeline/untracked-scope-guard.ts`；修改 `daemon/pipeline/orchestrator.ts`、`src/lib/error-codes.ts`；配套执行侧越界测试。
+* **Pass/Fail**：PASS：`git status --porcelain -uall` 覆盖未跟踪文件；合同内新文件可继续，合同外文件在执行后检查被阻断并留下可追溯 BLOCKED 证据；FAIL：仅检查 `git diff --name-only` 或错误码不一致。
+
+<a id="task-w.3"></a>
+
+#### 【Task W.3】测试环境、秘密脱敏与网络/端口策略守卫
+* **任务编号**：`TASK-W.3`
+* **前置依赖**：`TASK-W.2`
+* **任务状态**：**[COMPLETED]**（2026-10-21 只读核验，状态校正：`daemon/worker/policy-guard.ts` 提供环境白名单 / `CI=true` / `env_file_grants` / 网络策略，接入 `daemon/mcp/gateway.ts`（`buildCommandEnvironment`）与 `daemon/runner/command-runner.ts`（`resolveEnvironment`）；秘密遮蔽由 `redactSecrets` 在双窗口截断**之前**执行；`GatewayCallCounters` 对工具调用与命令执行分列记账并独立熔断；专用用例 `tests/unit/policy-guard-env-network.test.ts` 5 个 + `tests/unit/w3-command-policy.test.ts` 9 个全绿）
+* **核心目标**：
+  1. 环境变量过滤：默认注入 `CI=true`，严禁继承宿主全部环境变量，仅放行合同 `allowed_environment_variable_names`。
+  2. `env_file_grants` 授权：按命令 alias 注入对应的测试环境配置文件。
+  3. **秘密遮蔽严密在截断之前执行**：对注入的秘密值做掩码替换，遮蔽必须早于输出双窗口截断，防止截断边界泄露。
+  4. 网络与端口策略：`network_policy = "DENY"` 时拦截外部网络；动态端口冲突时给出可诊断错误，不误报为断言失败。
+  5. **工具与命令预算分列记账断言 (闭环 G-09 第 3 子项)**：
+     - 在命令执行器与 MCP 工具代理层实现独立记账；
+     - `budget_limits` 中命令执行次数与工具调用次数分列记录并实时累加至账本；
+     - 任何单项超限立即触发 `E_BUDGET_EXCEEDED` 熔断，断言不因模型 Token 未超标而放行违规工具调用。
+* **涉及核心文件**：
+  - 新增：`daemon/worker/policy-guard.ts`
+  - 修改：`daemon/runner/command-runner.ts`
+  - 测试：`tests/unit/policy-guard-env-network.test.ts`
+* **Pass/Fail 验收判定**：
+  - **PASS**：宿主非白名单变量完全隔离；秘密遮蔽在截断前执行完毕；网络阻断生效；工具与命令分列记账超限时 100% 触发 E_BUDGET_EXCEEDED 熔断。
+  - **FAIL**：环境变量泄露；秘密在截断边缘明文泄露。
+
+---
+
+
+---
+
+<a id="task-w.4"></a>
+
+#### 【Task W.4】高风险执行威胁守卫与运行时能力复检 (闭环 G-01 & G-20)
+* **任务编号**：`TASK-W.4`
+* **前置依赖**：`TASK-W.3`
+* **任务状态**：**[COMPLETED]**（2026-10-21 只读核验，状态校正：`daemon/worker/threat-guard.ts`（argv 拆段/包装命令展开/特权命令/主机路径/仓库信任）与 `daemon/worker/runtime-interceptor.ts`（配置漂移降级 + 未知通道检测）已接入 `daemon/mcp/gateway.ts` 与 `daemon/pipeline/orchestrator.ts`；`tests/unit/threat-guard-runtime-check.test.ts` 26 个用例全绿，其中「4 类绕过负例全部阻断」为显式用例。**口径说明**：本卡证明为注入层 + Gateway 层；真实 CLI 版本的同口径负例归 `TASK-W.5a`）
+* **核心目标 (闭环 A §4.2.3, §6.4.7, §7.3)**：
+  1. **高风险执行威胁守卫 (产出 `E_UNSAFE_EXECUTION`)**：
+     - 在命令启动前校验 argv 与仓库信任标记；
+     - 命中不可信仓库、特权操作（`sudo`, `chown`, `insmod`）、访问任意主机路径或无法可靠限制子进程的高风险命令时，坚决拒绝执行；
+     - 抛出 `E_UNSAFE_EXECUTION`，将 Evidence 置为 `status: "BLOCKED"` 且 `reason_code: "UNSAFE_EXECUTION"`，并在 UI 提示外置隔离。
+  2. **运行时强制能力复检与降级**：
+     - 在 Worker 会话期间，周期性或在每步工具调用前复检 Adapter 强制能力；
+     - 若探测到启动配置被篡改、原生 FS/Shell 工具未被拦截或出现未知通道，立即将当前会话降级为 `UNCONTROLLED_EXTERNAL`，停止受控执行，阻断 Evidence 通过，并广播 `GATEWAY_VIOLATION`。
+  3. **落实 4 类绕过路径不可用负例断言**：
+     - 绕过 1：直接向 Worktree 外路径写入 ➔ 必然失败；
+     - 绕过 2：执行未授权 Shell ➔ 必然失败；
+     - 绕过 3：跨 Worktree 直接访问主工作树 ➔ 必然失败；
+     - 绕过 4：跳过 Gateway 直接调用原生工具 ➔ 必然失败。
+* **涉及核心文件**：
+  - 新增：`daemon/worker/threat-guard.ts`
+  - 新增：`daemon/worker/runtime-interceptor.ts`
+  - 测试：`tests/unit/threat-guard-runtime-check.test.ts`
+* **Pass/Fail 验收判定**：
+  - **PASS**：
+    - 特权命令（如 `sudo ls`）被 Threat Guard 拦截，抛出 `E_UNSAFE_EXECUTION`，未产生子进程，Evidence 被标记为 `BLOCKED` + `UNSAFE_EXECUTION`。
+    - 运行时注入未知工具通道后，Adapter 立即被降级为非受控状态，当前合同禁止生成通过证据。
+    - 4 类绕过负例测试 100% 触发阻断。
+  - **FAIL**：特权命令进入执行；绕过 Gateway 能够读写文件。
+
+---
+
+
+---
+
+<a id="task-w.5a"></a>
+
+#### 【Task W.5a】Claude Code 适配器与 cli-host 黑盒实测 (v1.3.3 新增)
+* **任务编号**：`TASK-W.5a`
+* **前置依赖**：`TASK-W.2`, `TASK-C.6`（右栏会话通道）
+* **任务状态**：**[PASS · verified_on: `Claude Code 2.1.296 (DeepSeek API 兼容模式) · 2026-10-21`]**（分支 `feat/w5a-claude-code`。cli-host 唯一 spawn（shell:false、进程组、SIGINT→SIGTERM→整树 SIGKILL）；一律 API Key；隔离启动见核心目标 2；真实 CLI 上流式输出、工具卡片、打断（约 0.5s）、跨 Daemon 重启 `--resume` 续接、4 类绕过负例均实测通过，证据见 见 Git 历史（原 `docs/archive/claude-code-isolation-design.md`）。**2026-10-21 步骤 D 实测收口**：以 `deepseek-chat` @ `https://api.deepseek.com/anthropic` 复跑真实 CLI 负例 **6/6 全绿**（48.58s），首次落盘 `PreToolUse hook` 的 `deny` 日志原文（含 symlink 逃逸判定）；并补测 `allowBash=true` 分支——Shell 命令触碰保护清单路径时，`shellProtectionVerdict` 按字面量拒绝并投递白话确认卡（`rm`/`mv` 均被拦，目标文件完好），证据归档 `docs/reports/W5a-真实CLI验证报告-2026-10-21.md` §4.4。**后续回归项（不阻塞）**：用官方 Anthropic 原装模型 + 官方 CLI 重跑负例；每次升级 CLI 重跑 `STAGENT_REAL_CLAUDE=1` 真实测试；Gateway MCP HTTP 端点由 W.8 实现；W.4 是 threat-guard。**同轮发现并已加固（2026-10-22）**：`allowBash=true` 原先只做保护清单字面量匹配，缺「命令是否指向工作目录之外」的通用检查，`../` 越界写与 `rm -rf .stagent` 实测可绕；现 Bash 分支已串接 `reservedMetadataHit()`（`.stagent/.git/.claude/.cursor/.env` 按路径段拒绝）与 `shellEscapeVerdict()`（重定向目标与全部词元的越界判定，含 symlink 真实路径），同一攻击复测被拒且 `outside/` 为空；`/dev/null`、通配符前缀等常规用法保留，21 条命令矩阵零误伤；证据见报告 §4.5。）
+* **核心目标**：
+  1. 在 `daemon/worker/cli-host/` 专用子进程隔离模块中以 spawn 挂载 Claude Code CLI（结构化 argv、`shell:false`、进程树托管回收）；**全仓其余位置维持零 `child_process` 静态禁令**。
+  2. **收敛策略（已实测，verified_on: `Claude Code 2.1.296 (DeepSeek API 兼容模式) · 2026-10-21`）**：优先保留 Claude Code 原生工具，通过官方 **Pre-tool hook** 配合 Stagent 网关拦截；辅以工具白名单/黑名单收窄内置 Edit/Write/Bash/WebFetch；避免粗暴剥离原生工具导致模型死循环。工作目录锁定 Worktree。**隔离启动（`[用户已确认 · 2026-10-20]`，替代 `--bare`——实测 2.1.296 的 `--bare` 会跳过 `--settings` 中的 hooks）**：
+     - argv：`claude --setting-sources "" --tools Read,Glob,Grep,Edit,Write,MultiEdit,TodoWrite -p <prompt> --output-format stream-json --verbose --include-partial-messages --settings <Stagent 生成> --mcp-config <Stagent 生成> --strict-mcp-config --permission-mode acceptEdits --allowedTools <同 --tools> --disallowedTools WebFetch,WebSearch,NotebookEdit,Task,Bash [--resume <session_id>]`（允许 Bash 时 `--tools`/`--allowedTools` 加 Bash、`--disallowedTools` 去掉 Bash）；永不 `--bare`、永不 bypassPermissions、永不 `--continue`。
+     - `permissions.deny`：`WebFetch, WebSearch, NotebookEdit, Task, Bash, Edit/Write(./.git/**), Edit/Write(./.stagent/**), Edit/Write(./.claude/**), Read(./.stagent/claude-config/**), Read(./.stagent/session-token)`；PreToolUse hook `matcher:"*"`、`onFailure:"block"`。
+     - 子进程 env 白名单：`PATH, HOME, LANG, STAGENT_HOOK_ROOT, STAGENT_HOOK_LOG, [STAGENT_HOOK_ALLOW_BASH], ANTHROPIC_API_KEY, CLAUDE_CONFIG_DIR`，另仅转发 `ANTHROPIC_BASE_URL, ANTHROPIC_MODEL, ANTHROPIC_SMALL_FAST_MODEL, ANTHROPIC_DEFAULT_{HAIKU,SONNET,OPUS}_MODEL, API_TIMEOUT_MS, CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`。
+     - 专用配置目录：`CLAUDE_CONFIG_DIR=<repo>/.stagent/claude-config`（0700、gitignored、Agent 不可读写），会话记录不写用户 `~/.claude`。
+     - 备选：`--restricted`（实测不跳过 hook，但不收窄工具、默认 auto 模式），仅在 `--setting-sources ""` 行为变化时启用。
+  3. 接入其 Headless 模式与结构化输出（流式 JSON）对接右栏会话（TASK-C.6）；接入其会话续接能力实现 resume。
+  4. 在 cli-host 中对**真实 CLI 版本**执行 W.4 的 4 类绕过负例实测，全部失败关闭后填写 `verified_on`（CLI 版本号 + 日期），方标记 `GATEWAY_ENFORCED`。
+* **涉及核心文件**：
+  - 新增：`daemon/worker/cli-host/claude-code-adapter.ts`
+  - 新增：`daemon/worker/cli-host/process-host.ts`（spawn 托管与进程树回收）
+  - 新增：`daemon/worker/cli-host/pretool-hook.mjs`（PreToolUse 门卫：越界/保留区/保护清单判定，含 2026-10-22 Shell 加固）
+  - 测试：`tests/unit/cli-host-claude-code.test.ts`（确定性，含 hook 层 4 类绕过负例）；`tests/e2e/claude-code-isolation.real.test.ts`（真实 CLI，`STAGENT_REAL_CLAUDE=1` 时运行：配置注入负例、4 类绕过、专用配置目录续接）
+* **Pass/Fail 验收判定**：
+  - **PASS**：4 类绕过负例在真实 CLI 版本上 100% 失败关闭（2026-10-21/22 复测 **6/6 全绿**：4 类绕过 + `allowBash` 的保护清单字面量拦截 + `allowBash` 的越界/元数据加固；MCP 工具与 Read 越界读负例仍为空集合下的未测项，见 见 Git 历史（原 `docs/archive/claude-code-isolation-design.md`））；`verified_on` 非空；流式输出与打断/续接实测达标。
+  - **FAIL**：任一绕过路径可用；未实测即标记受控。
+
+
+---
+
+### 3.4 Cursor 式三栏 IDE 工作台与多维 Studio 视口（C.1/C.3 落 Sprint 1；C.2 落 Sprint 4 多维视口；C.8a/b/c 走查 Top3 已合；C.9a–C.9d 第二轮指挥权已合；C.10a–q 第三/四轮体验打磨已合；**C.11a–e Supervisor 五步体感链 COMPLETED**；**C.12a–e Spec Freeze Top5 Delta COMPLETED**；**C.14a–c 基线档案 COMPLETED**；**C.14d/e 安全闭环加固 NEW**；C.4 推迟）
+
+<a id="task-c.1"></a>
+
+#### 【Task C.1】Cursor 式三栏 IDE 响应式工作台骨架与 Studio 视口
+* **任务编号**：`TASK-C.1`
+* **前置依赖**：`TASK-D.1`
+* **任务状态**：**[COMPLETED]**（分支 `feat/c1-three-column-layout` 提交 `e48f614`，**2026-10-21 核验：已合入 main**；当时门禁：tsc 0 错、eslint 0 错、npm test 53 文件 / 435 用例全过，其中 tests/ui/workspace-layout.test.tsx 7 用例；当前该套件 8 用例）
+* **核心目标**：
+  1. 构建左栏（文件树/雷达）、中栏（Monaco/Diff/Supervisor Studio 多标签与分屏）、右栏（Coding Agent 对话）的三栏 IDE 布局。
+  2. **中栏多标签与分屏架构**：
+     - 支持中栏多标签页切换，支持系统级 `SupervisorStudio` 标签页；
+     - 支持 Split Pane（分屏）：左侧打开代码/Diff，右侧打开 Supervisor Studio，实现并排对照。
+  3. **Header 补齐 5 项展示要素与 HUD 胶囊 (G-06)**：
+     - 仓库名称；
+     - **当前分支**（活动合同执行期展示 `task/{contract_id}`，平时展示 Base 分支）；
+     - **运行模式**（v1.3.3：清晰展示 `VIBE` 自由模式（默认）vs `PROTECTED` 保护模式；是否有合同正在执行由合同信息与执行状态单独展示）；
+     - 当前合同 ID 与绑定的 Worktree 物理绝对路径；
+     - **Worker 受控状态徽标**（`GATEWAY_ENFORCED` 绿色受控 vs `UNCONTROLLED_EXTERNAL` 黄色非受控）；
+     - **Supervisor 入口**（v0.1：一键打开 Studio 快捷入口；成熟度打分徽章、未决风险气泡推迟 v0.2+）。
+  4. **工作区默认绑定与切换提示 (G-18)**：合同批准后编辑区默认绑定 Worktree；切回主工作树时给出显式切换提示与执行状态指示。
+* **涉及核心文件**：
+  - 新增：`src/components/WorkspaceLayout.tsx`
+  - 新增：`src/components/FileTree.tsx`
+  - 新增：`src/components/WorkspaceHeader.tsx`
+  - 新增：`src/components/SplitPaneContainer.tsx`
+  - 测试：`tests/ui/workspace-layout.test.tsx`
+* **Pass/Fail 验收判定**：
+  - **PASS**：Header 完整包含模式指示、受控徽标、Studio 入口；中栏支持 Supervisor 专属标签页与分屏布局；审批后工作区自动切换绑定 Worktree。
+  - **FAIL**：缺少受控徽标或模式指示；中栏无法渲染分屏或系统标签页。
+
+---
+
+
+---
+
+<a id="task-c.2"></a>
+
+#### 【Task C.2】中栏 Supervisor Studio 多维视口（Demo / Graph / 质询 / 合同）`[v1.5.0 升级]`
+* **任务编号**：`TASK-C.2`
+* **前置依赖**：`TASK-C.1`, `TASK-S.2`, `TASK-S.4`, `TASK-C.7`, `TASK-S.5`
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main，merge `51039aa`；分支 `feat/task-c2-four-viewports` 提交 `c1ad3be`。门禁：合后四件套全绿（1099 passed / 6 skipped）；tsc 0 错、eslint 0 错、build 通过（dist 33 文件 / 3.35 MB）。落地清单：`StudioViewportShell`（四视口 `hidden` 保活）、`DemoPreviewPane` / `TaskGraphPane` / `DisputeConsolePane`、`viewport-routing.ts`（展示态→默认视口）、`use-daemon-stream`/`daemon-api` 消费 `presentation_state`、`demo-origin.ts`、`tests/ui/studio-viewport-switching.test.tsx`（15）。**口径说明**：① 默认视口只跟 Daemon 展示态，手动 Tab 覆盖，展示态一变清覆盖；② Demo iframe 沙箱仅 `allow-scripts`，严禁 `allow-same-origin`；③ Graph 复用 C.7 `TaskGraphPanel`，质疑复用 S.5 API。**残余口径差（不阻塞验收，需登记）**：①【修改原型】/【确认原型并实施真实工程】按钮 UI 在位，旅程编排层仍为弱接线——**已转交 `TASK-S.6` 吸收**；② 矩阵旧注「水表」非本卡 Pass 项，未纳入本次交付）
+* **核心目标**：
+  1. **Studio 四重视口集成切换**：
+     - **视口 1: Demo 原型试玩视口 (`DemoPreviewPane.tsx`)**：以 iframe/Webview 嵌入 TASK-S.4 启动的本地轻量预览服务，顶部配备【修改原型】与【确认原型并实施真实工程】大操作栏；
+     - **视口 2: Task Graph 拓扑看板 (`TaskGraphPane.tsx`)**：挂载 TASK-C.7 的业务功能思维导图与任务执行 DAG，展现由灰变绿渐进点亮；
+     - **视口 3: 质疑自查质询台 (`DisputeConsolePane.tsx`)**：呈现用户质疑输入框与 TASK-S.5 产出的三方比对自查报告卡片；
+     - **视口 4: 合同与 Diff 审阅视口 (`SupervisorStudioPane.tsx`)**：保留结构化合同审阅、全局保护清单白话是/否卡片与 Monaco 代码编辑。
+  2. **视口智能路由**：根据当前生命周期状态自动激活对应视口（如处于 `DEMO_PREVIEW` 自动切至 Demo 视口；处于 `EXECUTING` 自动切至 Task Graph 视口；处于 `DISPUTED_INSPECTING` 自动切至质询台）。
+  3. **模式指示与保护清单兜底**：保留 Header 模式指示（自由模式 / 保护模式）与全局保护清单单项白话卡片。
+* **涉及核心文件（以实际落地为准）**：
+  - 新增：`src/components/studio/StudioViewportShell.tsx`、`DemoPreviewPane.tsx`、`TaskGraphPane.tsx`、`DisputeConsolePane.tsx`、`viewport-routing.ts`
+  - 新增：`src/lib/ipc/demo-origin.ts`
+  - 修改：`src/components/SupervisorStudioPane.tsx`、`src/routes/index.tsx`、`src/hooks/use-daemon-stream.ts`、`src/lib/daemon-api.ts`
+  - 测试：`tests/ui/studio-viewport-switching.test.tsx`（+既有 route/admission/draft wiring 适配）
+* **Pass/Fail 验收判定**：
+  - **PASS**：用户可在 Demo 试玩、Task Graph 看板、质询自查台与合同代码之间平滑切换；状态流转自动切换主视口；保护清单命中白话卡片维持零弹窗/单卡标准。
+  - **FAIL**：视口切换丢失已填表单或点亮状态；iframe 无法内嵌加载本地 Demo。
+
+---
+
+<a id="task-c.8a"></a>
+
+#### 【Task C.8a】老板模式文案与默认助手（消演示恐吓 / Key 向导）`[COMPLETED · 2026-10-24]`
+* **任务编号**：`TASK-C.8a`
+* **前置依赖**：`TASK-D.1d` (COMPLETED，main tip `b11d15b`；文档基线含 `fea44e2`)
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main，tip `15ef8e6`，分支 `feat/task-c8a-boss-copy` 快进；合后四件套 **1213 passed / 6 skipped**；tsc 0 / eslint 0 errors / build 通过。交付：练习沙箱可折叠、默认真助手、右栏 Key 三步向导 + 设置白话闭环；涉及 `AgentChatPane` / `pick-chat-adapter` / `WorkspaceLayout` / `SettingsTab` / `routes/index` 等。**不推翻**鉴权 / Demo Origin）
+* **对照痛点（走查）**：默认「演示 Agent」+ 大黄字「不调用模型、不读文件」与右栏「说需求」打架；真助手显示未配 Key 却无一条龙向导——老板会以为「不能干活」。
+* **v0.1 范围**：把工作台默认话术与助手选择收成**老板模式**：① 默认呈现不恐吓、与「可以提需求」一致；② 未配模型 Key 时给白话一步步向导（去哪配、配完怎么知道好了）；③ 演示/沙箱能力若仍保留，须降级为可折叠的次要说明，不得用整页黄条阻断心智。
+* **明确不包含**：
+  - 推翻 D.1 鉴权 / loopback / `#token=` / AUTH / Origin
+  - 改变 Demo 独立 Origin 隔离（ADR-008）
+  - 实现系统文件夹选择器或桌面壳（归 `TASK-D.1e`）
+  - 改 Fast Path 准入规则或状态机边（归 `TASK-C.8b` 只做呈现）
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **核心目标**：
+  1. **消恐吓**：首屏/右栏不再用「不调用模型、不读文件」大黄条否定「右侧说需求」；演示态若存在，须明确是可选沙箱且可一键切到真助手路径。
+  2. **默认助手可预期**：默认选中的助手与文案一致（能干活或明确「还差一步」）；禁止「默认演示」与「请说需求」并存无解释。
+  3. **Key 向导一条龙**：真助手未配 Key 时，UI 给出配置入口/粘贴位置提示与「配完如何验证」的短路径，不甩终端堆栈或工程师后台术语墙。
+* **涉及核心文件（实施时以调查为准）**：右栏 Agent 选择器 / 欢迎或空态文案、Header 或会话横幅、Key/凭证配置入口相关组件与文案常量；测试以 UI 走查断言 + 组件快照/文案单测为主。
+* **Pass/Fail 验收断言（≤5，可测/可走查）**：
+  1. **不再恐吓**：冷开工作台后，主路径 10 秒内看不到「不调用模型 / 不读文件」级整页恐吓与「请说需求」并排打架；若演示态存在，须可折叠或明确次要。
+  2. **默认一致**：默认助手名称/状态与右栏可操作提示一致（能提需求，或明确「差 Key」并给出按钮）。
+  3. **Key 向导**：未配 Key 时，用户可不查 README，只靠 UI 完成「打开配置入口 → 填 Key（本卡不测真实云调用）→ 看见已就绪/可重试」白话闭环。
+  4. **安全不回退**：日志/UI 不打印 Token 或 API Key 明文；鉴权与 Demo Origin 回归仍绿。
+  5. **门禁**：四件套全绿；新增或扩展至少 1 条文案/空态 UI 回归（禁止恐吓文案与主 CTA 冲突）。
+* **Pass/Fail 验收判定**：
+  - **PASS**：断言 1–5 本地可复现；老板模式只改呈现与向导，不弱化鉴权。
+  - **FAIL**：仍默认演示恐吓却标完成；未配 Key 仍只有工程师报错无向导；打印密钥明文；夹带 D.1e 桌面壳冒充本卡。
+
+---
+
+<a id="task-c.8b"></a>
+
+#### 【Task C.8b】Fast Path 老板三步台（藏工程师合同细节）`[COMPLETED · 2026-10-24]`
+* **任务编号**：`TASK-C.8b`
+* **前置依赖**：`TASK-D.1d` (COMPLETED), `TASK-S.6` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（合入 main tip `6d16939`，分支 `feat/task-c8b-boss-fastpath` 快进；合后四件套 **1224 passed / 6 skipped**；tsc 0 / eslint 0 errors / build 通过。交付：`BossFastPathDesk` 默认三步；高级详情折叠 Scope/npm/Daemon；保护命中需勾选；大事仍完整合同台；**不改**准入规则/状态机边）
+* **对照痛点（走查）**：右侧说一件小事后，中栏仍甩出合同台（`src/**`、npm、Daemon、保护解锁），像审批工单，不像「改哪里 → 确认开改」。
+* **v0.1 范围**：在**不改变** Fast Path 准入规则与状态机边的前提下，把小事确认台改成老板三步默认视图：「① 改哪里（白话文件/位置）② 要不要动保护（是/否白话）③ 确认开改」。工程师细节（Scope glob、npm、Daemon、解锁暗号等）默认折叠，需要时再展开。
+* **明确不包含**：
+  - 放宽/收紧 Fast Path 准入条件或改 Contract Schema / lifecycle 边
+  - 取消保护清单拦截或静默跳过保护区
+  - 重做整套 Studio 四视口（C.2 已 COMPLETED）
+  - 系统文件夹选择器（D.1e）
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **核心目标**：
+  1. **三步默认**：小事 Fast Path 中栏默认只见三步白话卡，一眼能点「确认开改」。
+  2. **细节可展开**：原合同工程字段仍可「高级/详情」展开，不得物理删除审计所需信息。
+  3. **大事不变**：非 Fast Path / 大事草案仍可走既有合同/Graph 路径（S.6），本卡不把大事也强行三步化。
+* **涉及核心文件（实施时以调查为准）**：Fast Path / 合同审阅中栏组件、S.6 journey 接线的确认台、文案与折叠控件；测试：UI 走查 + 组件测「默认三步可见 / 细节默认隐藏」。
+* **Pass/Fail 验收断言（≤5，可测/可走查）**：
+  1. **三步可见**：对一条合格小事（走查脚本固定文案），中栏默认出现「改哪里 / 要不要动保护 / 确认开改」三步，无需滚动才能找到主按钮。
+  2. **细节默认藏**：`src/**`、npm、Daemon、保护解锁等工程字段默认不占主视线（折叠或次级区）；展开后仍可读。
+  3. **保护不哑火**：若小事命中保护清单，第二步必须白话问清楚，不得因折叠而跳过确认。
+  4. **大事不误伤**：非 Fast Path 路径仍可进入既有合同/Graph 体验（至少一条对照走查不过度三步化）。
+  5. **门禁**：四件套全绿；至少 1 条 UI 回归锁定「默认三步 / 细节折叠」。
+* **Pass/Fail 验收判定**：
+  - **PASS**：断言 1–5 成立；准入规则与保护拦截行为与改前一致（仅呈现变化）。
+  - **FAIL**：仍默认甩满工程师合同台却标完成；折叠导致保护区未确认即开改；借本卡改状态机却不另立卡。
+
+---
+
+<a id="task-c.8c"></a>
+
+#### 【Task C.8c】连接与打开死路自救（无钥匙一键重开 + 粘贴路径打开）`[COMPLETED · 2026-10-24]`
+* **任务编号**：`TASK-C.8c`
+* **前置依赖**：`TASK-D.1b` (COMPLETED), `TASK-D.1c` (COMPLETED), `TASK-D.1d` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（合入 main tip `950e53e`，分支 `feat/task-c8c-open-rescue` 快进；合后四件套 **1217 passed / 6 skipped**；tsc 0 / eslint 0 errors / build 通过。交付：`POST /api/session/relaunch` 无钥匙一键重开；粘贴绝对路径 `/api/recent-projects/open`；主路径少催终端/#token=；**不抢** D.1e）
+* **对照痛点（走查）**：无 token 冷开锁死对话；开新文件夹仍大段催 `npx stagent open`（D.1e 已 DEFERRED，本卡**只做**文案 + 粘贴路径 / 一键重开，**不**实现系统选择器）。
+* **v0.1 范围**：给「连不上 / 要开新夹」两条死路自救：① 无钥匙或 Unauthorized 时，一键唤起/重开带 `#token=` 的合法会话（复用 D.1b/D.1c 能力），不死锁在空对话；② 「打开项目」支持粘贴本机绝对路径并一键 open/重开，文案少催终端说明书。**明确不抢** `TASK-D.1e`。
+* **明确不包含**：
+  - 系统级文件夹选择器 / Electron / Tauri / 本机助手选夹（**整段归 `TASK-D.1e`，本卡 FAIL 若夹带并标完成**）
+  - 取消 `#token=` / AUTH；把 Token 写入可分享 query 或长期明文 localStorage
+  - 将 Demo 改为与控制台同源
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **核心目标**：
+  1. **无钥匙可自救**：冷开无 token / 鉴权失败时，主按钮是「一键重开（带钥匙）」或等价，而不是只显示 Unauthorized 说明书。
+  2. **粘贴路径可开**：打开项目面板可粘贴绝对路径 → 一点即走 open/唤起（成功则进已连接工作台）；失败给白话原因（如锁冲突）。
+  3. **少催终端**：主路径文案不再把「去终端敲 `npx tsx bin/stagent.ts open …`」当唯一出路；终端命令可留在「高级/仍失败时」。
+* **涉及核心文件（实施时以调查为准）**：`OpenProjectEntry`、无 AUTH/空态页、`daemon-api` 打开/最近项目接线、相关文案；测试：无 token 自救 UI、粘贴路径 open 冒烟（可用临时目录）、不打印 Token。
+* **Pass/Fail 验收断言（≤5，可测/可走查）**：
+  1. **无钥匙自救**：去掉 `#token=` 冷开后，可见一键重开/带钥匙入口；点后进入可聊会话（或明确正在唤起），不是永久锁死空输入框。
+  2. **粘贴路径**：在「打开项目」粘贴合法绝对路径并确认，能复用/启动会话进入工作台（与 `stagent open` 同权结果）；无需先手拷 Token。
+  3. **文案**：主路径不再把终端 `stagent open` 当唯一 CTA；终端说明可降级到高级区。
+  4. **不抢 D.1e / 不回退安全**：无系统选夹冒充完成；无钥匙仍不能旁路 AUTH；日志无 Token 明文；Demo Origin 不回退。
+  5. **门禁**：四件套全绿；至少 1 条打开/鉴权空态回归。
+* **Pass/Fail 验收判定**：
+  - **PASS**：断言 1–5 成立；D.1e 仍保持 DEFERRED 且本卡未伪称已交付系统选夹。
+  - **FAIL**：无钥匙仍锁死无按钮；开新夹仍只催终端却标完成；夹带系统选择器却标本卡（应开 D.1e）；打印 Token 明文。
+
+---
+
+<a id="task-c.9a"></a>
+
+#### 【Task C.9a】首屏单一主路径（三态只留一个指挥信号）`[COMPLETED · 2026-10-24]`
+* **任务编号**：`TASK-C.9a`
+* **前置依赖**：`TASK-C.8a` (COMPLETED), `TASK-C.8b` (COMPLETED), `TASK-C.8c` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main，tip `ef0e1a7`，分支 `feat/task-c9a-single-command-surface` 快进；合后四件套 **1231 passed / 6 skipped**；tsc 0 / eslint 0 errors / build 通过。交付：`resolveCommandSurface` 三态单一主 CTA；欢迎区/打开面板/顶栏徽标降级；涉及 `command-surface.ts` / `WorkspaceLayout` / `WelcomePane` / `AgentChatPane` / `OpenProjectEntry` 等。**不推翻**鉴权 / Demo Origin）
+* **对照痛点（第二轮走查）**：冷开首屏同时出现——中栏欢迎教打开文件、右栏要你说话/配钥匙、顶栏 PROTECTED、左栏「打开项目」面板——4～5 个声音抢指挥，老板不知道先听谁。
+* **v0.1 范围**：把工作台首屏收成**单一主路径**：按连接与会话态只保留一个主指挥信号——① **无钥匙**：只指挥「一键重开/配钥匙」；② **有钥匙空闲**：只指挥「右侧说需求」；③ **进行中**：只指挥当前对话/三步台/确认动作。其它面板与横幅降级为次要或默认收起，不得并排抢注意力。
+* **明确不包含**：
+  - 推翻 D.1 鉴权 / loopback / `#token=` / AUTH / Origin
+  - 改变 Demo 独立 Origin（ADR-008）
+  - 实现系统文件夹选择器或桌面壳（`TASK-D.1e`）
+  - 重做助手模式互斥细则（归 `TASK-C.9b`）、打开面板生命周期细则（归 `TASK-C.9c`）、进行中中栏让路细则（归 `TASK-C.9d`）——本卡只定「同一时刻谁当指挥官」的呈现纪律
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **核心目标**：
+  1. **三态互斥指挥**：无钥匙 / 有钥匙空闲 / 进行中，同一时刻主 CTA 与主说明只来自一个指挥源。
+  2. **次要降噪**：打开项目面板、IDE 欢迎页、PROTECTED 工程师暗号、练习沙箱说明等不得与主 CTA 同级并排恐吓或抢焦点。
+  3. **可走查**：给定三态脚本，10 秒内能指出「现在该点哪一个主按钮」，无需读多段互相打架的说明书。
+* **涉及核心文件（实施时以调查为准）**：`WorkspaceLayout` / 首屏空态 / Header 横幅 / 右栏欢迎与向导入口 / 打开项目入口的默认可见性；测试以 UI 三态走查断言为主。
+* **Pass/Fail 验收断言（≤5，可测/可走查）**：
+  1. **无钥匙态**：主视线只有「一键重开/配钥匙」类单一指挥；中栏欢迎「打开文件」与「请说需求」不得同级并排争夺。
+  2. **有钥匙空闲态**：主指挥是「右侧说需求」；打开项目面板默认不展开盖住左栏；恐吓级黄条不再与主 CTA 打架。
+  3. **进行中态**：主指挥交给当前对话或三步台/确认；欢迎页/空页签堆叠不得继续当指挥官（细则落实可与 C.9d 联验）。
+  4. **安全不回退**：不打印 Token/Key 明文；鉴权与 Demo Origin 回归仍绿。
+  5. **门禁**：四件套全绿；至少 1 条「三态单一主 CTA」UI 回归。
+* **Pass/Fail 验收判定**：
+  - **PASS**：断言 1–5 成立；首屏指挥权清晰，不弱化鉴权。
+  - **FAIL**：仍 4～5 个同级声音抢指挥却标完成；借本卡改鉴权或夹带 D.1e。
+
+---
+
+<a id="task-c.9b"></a>
+
+#### 【Task C.9b】助手模式互斥（练习 vs 真助手 vs 向导）`[COMPLETED · 2026-10-24]`
+* **任务编号**：`TASK-C.9b`
+* **前置依赖**：`TASK-C.9a` (COMPLETED), `TASK-C.8a` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main，tip `c4818fa`，分支 `feat/task-c9b-assistant-mode-mutex` 快进；合后四件套 **1239 passed / 6 skipped**；tsc 0 / eslint 0 errors / build 通过。交付：`resolveAssistantMode` wizard/practice/real；向导发送禁用+去配置；练习横幅；中栏随模式；`src/lib/assistant-mode.ts` + `AgentChatPane` / `routes/index`；单元+UI 回归。**不推翻**鉴权 / 真实云调用门禁）
+* **对照痛点（第二轮走查）**：一边提示「还差钥匙 / 练习沙箱」，一边发送键仍可点、中栏仍像在干活——信号互斥失败，老板以为系统在装忙或装坏。
+* **v0.1 范围**：把右栏助手收成三态**互斥机**：① **练习沙箱**（明确不可当真干活）；② **真助手就绪**；③ **Key 向导**（未配钥匙）。发送键可用性、占位文案、中栏提示必须随模式切换，禁止「缺钥匙还能发消息假装干活」。
+* **明确不包含**：
+  - 放宽/绕过真实模型鉴权或把 API Key 写入可分享通道
+  - 取消练习沙箱能力（可保留，但必须互斥且标明）
+  - 重做首屏三态指挥纪律（归 C.9a）或设置深链回跳（归 C.9d，本卡只要求向导态有唯一「去配置」出口）
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **核心目标**：
+  1. **三态互斥**：同一时刻只处于练习 / 真助手 / 向导之一；切换有可见反馈。
+  2. **发送键随模式**：向导态与「不可当真」的练习态不得呈现「已在干活」的发送反馈；真助手就绪才是正常发送主路径。
+  3. **中栏随模式**：模式切换时中栏提示与右栏一致（缺钥匙不装忙；练习不装生产）。
+* **涉及核心文件（实施时以调查为准）**：`AgentChatPane` / `pick-chat-adapter` / Key 向导入口 / 发送按钮禁用逻辑；测试：三态互斥 UI + 发送键断言。
+* **Pass/Fail 验收断言（≤5，可测/可走查）**：
+  1. **互斥**：无法同时显示「请配钥匙」主向导与「真助手正在处理」级发送成功反馈。
+  2. **向导态**：未配 Key 时发送键禁用或点击只导向配置，不得假装流式干活。
+  3. **练习态**：若进入练习沙箱，文案明确「练习/不可当真」；切回真助手路径一键可达。
+  4. **真助手态**：Key 就绪后主路径可发送；与 C.8a 向导闭环不回退。
+  5. **门禁**：四件套全绿；至少 1 条模式互斥/发送键回归；不打印 Key 明文。
+* **Pass/Fail 验收判定**：
+  - **PASS**：断言 1–5 成立；三态信号一致。
+  - **FAIL**：缺钥匙仍可装忙发送却标完成；练习与真助手文案并存无解释。
+
+---
+
+<a id="task-c.9c"></a>
+
+#### 【Task C.9c】打开项目面板生命周期（默认收 / 成功即关 / 已连接降级为切换）`[COMPLETED · 2026-10-24]`
+* **任务编号**：`TASK-C.9c`
+* **前置依赖**：`TASK-C.9a` (COMPLETED), `TASK-C.8c` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main，tip `2f5d653`，分支 `feat/task-c9c-open-panel-lifecycle` 快进；合后四件套 **1246 passed / 6 skipped**；tsc 0 / eslint 0 errors / build 通过。交付：默认收；成功即关；已连接「切换项目」；`src/lib/open-project-panel.ts` + `OpenProjectEntry`；单元+UI 回归。**不抢** D.1e；**不回退** C.8c）
+* **对照痛点（第二轮走查）**：「打开项目」面板粘住不收，盖住左栏；选完/连上也不关；已连接时仍像冷开首屏再盖一层。
+* **v0.1 范围**：规范打开项目面板生命周期——① 默认收起；② 打开或切换成功后自动关闭；③ 已连接会话中入口文案/行为降级为「切换项目」，不再以冷开全屏指挥官姿态盖住主路径。**不抢** `TASK-D.1e`（不做系统选夹）。
+* **明确不包含**：
+  - 系统级文件夹选择器 / Electron / Tauri（`TASK-D.1e`）
+  - 取消 C.8c 的无钥匙一键重开与粘贴路径能力
+  - 推翻 D.1/D.1b 鉴权与 `#token=`
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **核心目标**：
+  1. **默认收**：有钥匙空闲/进行中冷开后，打开项目面板不默认展开挡左栏。
+  2. **成功即关**：最近项目一点重开、粘贴路径打开、一键重开成功后，面板关闭并回到主路径。
+  3. **已连接降级**：已鉴权连接下，入口是「切换项目」次要动作，不是再盖一层首屏指挥官。
+* **涉及核心文件（实施时以调查为准）**：`OpenProjectEntry` / 左栏打开按钮状态 / 成功回调关面板；测试：默认收、成功关、已连接文案降级。
+* **Pass/Fail 验收断言（≤5，可测/可走查）**：
+  1. **默认收**：有钥匙空闲首屏，打开项目面板不默认展开盖住左栏主树。
+  2. **成功即关**：完成一次打开/切换/重开成功后，面板关闭，主指挥回到 C.9a 对应态。
+  3. **已连接降级**：已连接时入口不再以「你还没打开项目」级首屏指挥官姿态出现。
+  4. **不抢 D.1e / 不回退 C.8c**：无系统选夹冒充；粘贴路径与一键重开仍可用；无 Token 明文。
+  5. **门禁**：四件套全绿；至少 1 条面板生命周期 UI 回归。
+* **Pass/Fail 验收判定**：
+  - **PASS**：断言 1–5 成立。
+  - **FAIL**：面板仍粘住不关却标完成；夹带系统选夹冒充本卡。
+
+---
+
+<a id="task-c.9d"></a>
+
+#### 【Task C.9d】进行中中栏让路（收欢迎页 / 设置深链回跳）`[COMPLETED · 2026-10-24]`
+* **任务编号**：`TASK-C.9d`
+* **前置依赖**：`TASK-C.9a` (COMPLETED), `TASK-C.9b` (COMPLETED), `TASK-C.8b` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main，tip `edc28ce`，分支 `feat/task-c9d-middle-yield-settings-return` 快进；合后四件套 **1254 passed / 6 skipped**；tsc 0 / eslint 0 errors / build 通过。交付：`middle-yield` 收欢迎页；三步台/保护确认自动开 Studio；设置深链模型钥匙 + 返回对话；PROTECTED 聊≠改白话；`src/lib/middle-yield.ts` + `WorkspaceLayout` / `SettingsTab` / `routes/index`；单元+UI 回归。**不含**重做 Studio 四视口路由）
+* **对照痛点（第二轮走查）**：右侧已开聊或小事已走 Fast Path，中栏仍停在 IDE 欢迎页/空页签堆叠，C.8b 三步台接不上主视线；进设置配钥匙时其它面板叠罗汉，配完不知道回哪。另：锁着（PROTECTED）仍可聊时，须白话说清「先聊方案，动文件才要你点头」——与中栏让路同一「进行中指挥」闭环。
+* **v0.1 范围**：① 对话进行中或小事三步台出现时，中栏收起 IDE 欢迎页与无意义空页签堆叠，让路给对话上下文或 `BossFastPathDesk`；② 从 Key 向导进入设置须深链到模型钥匙区，配完提供一键回跳右栏/主路径，避免设置叠罗汉；③ 进行中若仍可聊，一句白话说明「聊不等于改文件」。
+* **明确不包含**：
+  - 重做 Studio 四视口路由算法本体（C.2）或改 Fast Path 准入/状态机边（C.8b 已定呈现）
+  - 取消 PROTECTED / 保护清单
+  - 系统选夹（D.1e）
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **核心目标**：
+  1. **让路**：进行中中栏主视线是对话结果或三步台，不是欢迎页。
+  2. **深链回跳**：向导 → 设置（钥匙区）→ 配完回跳，不丢上下文、不叠多层面板。
+  3. **聊改分离白话**：可聊但未批准改文件时，一句说清，不靠 PROTECTED 暗号。
+* **涉及核心文件（实施时以调查为准）**：中栏 Tab/欢迎空态、`BossFastPathDesk` 挂载条件、Settings 深链与返回栈、Header/右栏进行中提示；测试：进行中让路、设置回跳、白话提示。
+* **Pass/Fail 验收断言（≤5，可测/可走查）**：
+  1. **让路**：发送一条小事进入 Fast Path 后，中栏默认可见三步台（或明确进行中主视图），IDE 欢迎页不再占主视线。
+  2. **深链**：从 Key 向导一键进设置后落在模型钥匙相关区，而非无关总览叠罗汉。
+  3. **回跳**：配钥匙流程结束后，一键回到右栏主路径（或等价），无需手动关多层面板。
+  4. **聊改分离**：进行中可聊未批准改文件时，可见一句白话说明（不依赖工程师 PROTECTED 暗号）。
+  5. **门禁**：四件套全绿；至少 1 条让路/回跳 UI 回归；不打印 Token/Key。
+* **Pass/Fail 验收判定**：
+  - **PASS**：断言 1–5 成立；C.8b 三步台真正接到主路径。
+  - **FAIL**：聊起来中栏仍欢迎页却标完成；设置叠罗汉无回跳；借本卡改状态机不另立卡。
+
+---
+
+<a id="task-c.10a"></a>
+
+#### 【Task C.10a】进行中生命周期收口（退出 in_progress / 无空让路壳）`[COMPLETED · 2026-10-24]`
+* **任务编号**：`TASK-C.10a`
+* **前置依赖**：`TASK-C.9a` (COMPLETED), `TASK-C.9d` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main，tip `5207df2`，分支 `feat/task-c10a-in-progress-lifecycle` 快进；合后四件套 **1261 passed / 6 skipped**；tsc 0 / eslint 0 errors / build 通过。交付：`src/lib/in-progress-lifecycle.ts`（`resolveActiveInProgress` / `resolveInProgressCta` / `shouldRenderMiddleYieldShell`）；`routes/index` 不再用 `journeyCards.length` 粘住进行中；`WorkspaceLayout` 无空让路壳 + 三步台保持 Studio；单元+UI 回归。**不含**重做 Studio 四视口；改鉴权）
+* **对照痛点（第三轮走查）**：说过一件事后「进行中」容易一直挂着；关掉中间台后中栏只剩「中栏已让路」空壳，不知道还要干什么。根因倾向：`journeyCards` 只增不减 → `inProgress` 粘住；C.9d 做了让路，没收进行中退出与空态。
+* **v0.1 范围**：① 旅程卡 / 保护确认 / Fast Path 三步台结束后，退出 `in_progress`，主指挥回到 C.9a 的 idle（或 no_key）；② 中栏在无确认卡、无三步台、无其它进行中主视图时，**不要**渲染空的 `middle-yield` 让路壳；③ 与 C.9a 单一指挥信号、C.9d 让路纪律一致——有东西才让路，没事回到空闲主路径。
+* **明确不包含**：
+  - 重做 Studio 四视口路由本体（C.2）
+  - 改鉴权 / Demo Origin / 状态机边 / Fast Path 准入规则
+  - 系统选夹（D.1e）；界面暗号清扫（归 C.10c / 统一抛光）
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **核心目标**：
+  1. **可退出**：进行中可结束；结束后不再假「进行中」。
+  2. **无空壳**：让路只在有确认/三步台/进行中主视图时发生；关掉后不剩空 middle-yield。
+  3. **指挥一致**：结束后主 CTA 回到 C.9a idle/no_key，不与设置/打开面板抢戏。
+* **涉及核心文件（实施时以调查为准）**：`resolveCommandSurface` / `inProgress` 判定、`journeyCards` 生命周期、`middle-yield` / `WorkspaceLayout`、旅程/确认/BossFastPathDesk 结束钩子；测试：进行中退出、空让路壳不渲染、至少 1 条 UI 回归。
+* **Pass/Fail 验收断言（≤5，可测/可走查）**：
+  1. **退出**：旅程或 Fast Path/确认流程结束后，指挥面不再停留在 `in_progress`（回到 idle 或 no_key）。
+  2. **无空壳**：中栏无确认卡且无三步台时，不出现仅含「中栏已让路」类空壳主视图。
+  3. **有料才让路**：进行中且有三步台/确认时，仍遵守 C.9d 让路（欢迎页不抢主视线）。
+  4. **不回退 C.9a**：结束后单一主 CTA 纪律仍成立（不突然恢复多指挥官堆叠）。
+  5. **门禁**：四件套全绿；至少 1 条进行中退出 / 空壳 UI 回归；不打印 Token/Key。
+* **Pass/Fail 验收判定**：
+  - **PASS**：断言 1–5 成立。
+  - **FAIL**：结束后仍永久「进行中」却标完成；关台后空让路壳仍占中栏；借本卡改鉴权/Studio 路由不另立卡。
+
+---
+
+<a id="task-c.10b"></a>
+
+#### 【Task C.10b】设置页老板主路径（钥匙主视线 / 工程师项进高级）`[COMPLETED · 2026-10-24]`
+* **任务编号**：`TASK-C.10b`
+* **前置依赖**：`TASK-C.9d` (COMPLETED), `TASK-C.8a` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main，tip `be33a26`，分支 `feat/task-c10b-settings-boss-path` 快进；合后四件套 **1265 passed / 6 skipped**；tsc 0 / eslint 0 errors / build 通过。交付：`SettingsTab` 模型钥匙置顶；`settings-advanced` 默认折叠收纳后台连接/诊断/工作区；C.9d 深链与返回对话保留；UI 回归 4 条。**不含**改鉴权语义；取消 token 能力）
+* **对照痛点（第三轮走查）**：去配钥匙时，设置最上仍是 Daemon / Session Token / GATEWAY_ENFORCED 等后台词；虽能滚到钥匙区并回跳，仍像误入机房。C.9d 深链+回跳已有，未做老板可读化。
+* **v0.1 范围**：① 设置页主视线是**模型钥匙**（老板能看懂的配钥匙主路径）；② Daemon / Session Token / GATEWAY 等工程师项收进可折叠「高级」；③ **保留** C.9d：从向导深链到钥匙区 +「配完了，返回对话」；④ 不改鉴权语义、不取消 token 能力——只调整文案与信息层级。
+* **明确不包含**：
+  - 改鉴权语义（loopback / `#token=` / AUTH）或取消 Session Token 能力
+  - 重做整个设置信息架构以外的 Studio / 打开项目
+  - 界面暗号清扫全集（归 C.10c）；系统选夹（D.1e）
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **核心目标**：
+  1. **钥匙优先**：打开设置（含深链）第一眼是配模型钥匙，不是机房仪表盘。
+  2. **高级折叠**：Daemon/Token/网关等默认不抢主视线，需要时再展开。
+  3. **回跳仍在**：C.9d 深链与「配完了，返回对话」行为不回退。
+* **涉及核心文件（实施时以调查为准）**：`SettingsTab` 区块顺序与折叠、深链滚动锚点、返回对话 CTA；测试：主视线钥匙、高级折叠、深链/回跳回归。
+* **Pass/Fail 验收断言（≤5，可测/可走查）**：
+  1. **主视线**：设置默认可见区以模型钥匙/老板配钥匙路径为主，不先堆 Daemon/Token 标题。
+  2. **高级**：Daemon / Session Token / GATEWAY 类项在「高级」（或等价折叠）内，默认不抢首屏。
+  3. **深链保留**：从 Key 向导进设置仍落到钥匙相关区（C.9d 不回退）。
+  4. **回跳保留**：「配完了，返回对话」（或等价）仍可用。
+  5. **门禁**：四件套全绿；至少 1 条设置主路径 UI 回归；不打印 Token/Key；鉴权行为不变。
+* **Pass/Fail 验收判定**：
+  - **PASS**：断言 1–5 成立。
+  - **FAIL**：首屏仍是机房词却标完成；借本卡取消 token/改 AUTH；深链或回跳回退。
+
+---
+
+<a id="task-c.10c"></a>
+
+#### 【Task C.10c】界面暗号/命名清扫（白话标签 + 图谱单入口）`[COMPLETED · 2026-10-24]`
+* **任务编号**：`TASK-C.10c`
+* **前置依赖**：`TASK-C.10a` (COMPLETED), `TASK-C.10b` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main，tip `6811f44`，分支 `feat/task-c10c-cipher-cleanup` 快进；合后四件套 **1267 passed / 6 skipped**；tsc 0 / eslint 0 errors / build 通过。交付：`workbench-labels.ts`；Tab/ActivityBar/底栏白话名；左栏图谱→`onOpenStudioGraph` 开合同操作台内视口；页脚「本机服务 / 有证据才合入」；欢迎新建需求弱链；UI 回归 2 条。**不含**改鉴权、指挥纪律、D.1e）
+* **对照痛点**：中栏「Supervisor / Supervisor Studio / 任务图谱」像三套产品；Studio Tab 与 ActivityBar / 底栏仍甩英文暗号；任务图谱左栏独立 Tab 与合同操作台内视口**双入口**；空闲「说需求 / 新建需求」像两条路；页脚 Daemon / Evidence-gated。
+* **v0.1 范围（施工合同）**：
+  1. **单壳多标签**：不拆多路由；不把打开项目升成独立欢迎站；不做「简洁 IDE」新产品模式。
+  2. **白话改名**（与既有 C.8b「合同操作台」一致，不另造「干活台」）：
+     - Supervisor → **项目审阅**
+     - Supervisor Studio → **合同操作台**
+     - SmartTerminal / 底栏工程师词 → **验证输出**
+     - ActivityBar `title`/`aria-label` 去掉英文暗号（保留图标 + 白话）
+  3. **任务图谱双入口收口**：日常只留合同操作台内「任务图谱」视口一扇门；左栏图谱入口改为打开/聚焦合同操作台并切到图谱视口（或等价弱化），不再新建独立中栏「任务图谱」系统 Tab 作为主路径。
+  4. **可选轻量**：空闲「说需求 / 新建需求」文案弱化合并（次要入口措辞降噪，不改 C.9a 单一指挥纪律）。
+* **明确不包含**：不重做 C.9 / C.10a / C.10b 指挥纪律与生命周期；不改鉴权 / Demo Origin；不抢 D.1e；不打印 token；不重做 Studio 四视口路由本体（只改命名与入口）。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **涉及核心文件（预期）**：
+  - `src/components/WorkspaceLayout.tsx`、`layout/ActivityBar.tsx`、`SupervisorStudioPane.tsx`、`layout/WelcomePane.tsx`
+  - `src/routes/index.tsx`（页脚 / 可选双 CTA / 图谱→Studio 视口信号）
+  - 相关 UI 回归：`tests/ui/ide-shell.test.tsx` 等
+* **Pass/Fail 验收判定**（≤5）：
+  1. **命名**：中栏系统 Tab / ActivityBar / 底栏抽屉对用户可见文案不再出现 `Supervisor Studio`、`SmartTerminal` 作主标签（测试用 `getByRole`/`aria-label` 可断言新白话名）。
+  2. **项目审阅**：原 Supervisor 入口对用户显示为「项目审阅」（或等价白话），功能仍为审阅/确认，不改合同准入。
+  3. **图谱单入口**：点击左栏图谱入口后，打开的是合同操作台内图谱视口（或等价单门），**不再**以独立「任务图谱」系统 Tab 作为日常主路径双开。
+  4. **不回退指挥纪律**：C.9a 单一主 CTA、C.10a 进行中收口、C.10b 设置钥匙主路径行为不回退（抽测既有回归仍绿）。
+  5. **四件套**：`npm test` / `typecheck` / `lint`（0 errors）/ `build` 全绿；至少 1 条命名/入口 UI 回归；不打印 token。
+* **FAIL**：仍双开图谱 Tab+视口当日常主路径；Tab 名与 C.8b「合同操作台」打架；回退鉴权或指挥纪律。
+
+---
+
+
+<a id="task-c.10d"></a>
+
+#### 【Task C.10d】左栏老板主路径（换项目主视线 / 文件与资产进折叠）`[COMPLETED · 2026-10-24]`
+* **任务编号**：`TASK-C.10d`
+* **前置依赖**：`TASK-C.10c` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main，tip `51ae8ae`，分支 `feat/task-c10d-left-boss-path` 快进；合后四件套 **1273 passed / 6 skipped**；tsc 0 / eslint 0 errors / build 通过。交付：`left-panel-boss.ts`；`left-project-files` 默认折叠含规范与资产+文件树；空闲 `left-chat-hint`；`specsOpen` 默认 false；单元+UI 回归。**不含**改鉴权、D.1e、指挥纪律）
+* **对照痛点**：左栏把打开/切换项目、规范与资产、完整源码树一次性铺开，主视线吵；老板日常只需要换项目 + 跟右侧说话。
+* **v0.1 范围（施工合同）**：
+  1. **默认主视线**：打开/切换项目（沿用 C.9c 简洁面板）保持可见；必要时加一句「跟右侧说话」提示（不新增第二指挥官，不改 C.9a）。
+  2. **默认收进折叠**：规范与资产、完整文件树收入默认折叠的「项目文件」（或等价「高级」）；展开后能力与今日一致。
+  3. **不取消能力**：文件仍可点开编辑；规范资产仍可查看；仅改默认层级与文案。
+  4. **纪律对齐**：与 C.9a 单一指挥、C.10c 白话/单入口一致；不拆多路由；不做「简洁 IDE」新产品模式。
+* **明确不包含**：不改鉴权 / Demo Origin；不抢 D.1e 系统选夹；不重做指挥纪律/生命周期；不删除 FileTree / Specs 能力。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **涉及核心文件（预期）**：
+  - `src/components/WorkspaceLayout.tsx`（左栏组装层级）
+  - `src/components/FileTreeSpecsSection.tsx` / `src/routes/index.tsx`（规范区默认折叠）
+  - 可选：`src/lib/left-panel-boss.ts` 呈现辅助
+  - UI 回归：`tests/ui/workspace-layout.test.tsx` 或新增 `left-boss-path.test.tsx`
+* **Pass/Fail 验收判定**（≤5）：
+  1. **默认主视线**：资源管理器展开后，首屏可见打开/切换项目区；完整文件树与规范与资产**默认不铺开**（在折叠「项目文件」内）。
+  2. **能力保留**：展开「项目文件」后仍可浏览文件树、打开文件、查看规范与资产（行为与合入前一致）。
+  3. **提示不抢戏**：若有「跟右侧说话」文案，仅为次要说明，不新增与 C.9a 并列的主 CTA。
+  4. **不回退**：C.9a/C.9c/C.10c 既有回归仍绿；不改鉴权、不抢 D.1e。
+  5. **四件套**：`npm test` / `typecheck` / `lint`（0 errors）/ `build` 全绿；至少 1 条左栏默认层级 UI 回归；不打印 token。
+* **FAIL**：默认仍同时铺开三块；取消文件树/资产能力；回退鉴权或指挥纪律；抢做 D.1e。
+
+---
+
+<a id="task-c.10e"></a>
+
+#### 【Task C.10e】Cursor 式欢迎页承载打开/切换项目 `[COMPLETED · 2026-10-24]`
+* **任务编号**：`TASK-C.10e`
+* **前置依赖**：`TASK-C.10d` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main，tip `592f825`，分支 `feat/task-c10e-f-welcome-explorer` 快进；合后四件套 **1274 passed / 6 skipped**；tsc 0 / eslint 0 errors / build 通过。交付：`ProjectWelcomePage`；`OpenProjectEntry` page 变体；顶栏「切换项目」；左栏不再渲染开项目；保留 C.8c；**不含** D.1e）
+* **对照痛点**：打开/切换项目塞在 IDE 左栏，和文件树抢戏；老板期望类似 Cursor 欢迎页单独管「开哪个项目」。
+* **v0.1 范围（施工合同）**：
+  1. **欢迎页主阵地**：`ProjectWelcomePage`（或等价）承载打开/切换项目；`OpenProjectEntry` `variant="page"` 整页展开。
+  2. **保留 C.8c**：最近项目一键重开 + 粘贴路径 + 无钥匙 relaunch；**不含** D.1e 系统选夹。
+  3. **IDE 左栏不再渲染** OpenProjectEntry；顶栏提供「切换项目」回欢迎页。
+  4. **纪律**：开项目仍是次要指挥角色（`data-command-role=secondary`）；不拆多路由成独立网站。
+* **明确不包含**：不改鉴权 / Demo Origin；不抢 D.1e；不重做指挥生命周期。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **涉及核心文件（预期）**：
+  - `src/components/layout/ProjectWelcomePage.tsx`（新增）
+  - `src/components/layout/OpenProjectEntry.tsx`（page 变体）
+  - `src/components/WorkspaceLayout.tsx` / `WorkspaceHeader.tsx`
+  - `src/lib/left-panel-boss.ts`
+  - UI：`tests/ui/left-boss-path.test.tsx` / `open-project-panel-lifecycle.test.tsx` / `command-surface.test.tsx`
+* **Pass/Fail 验收判定**（≤5）：
+  1. 首屏欢迎可见打开/切换项目面板（page）；左栏**无** `open-project` 入口。
+  2. 最近一键重开 + 粘贴路径仍可用；无系统选夹控件。
+  3. 顶栏「切换项目」可从文件编辑态回到欢迎开项目面。
+  4. C.8c/C.9c 相关回归仍绿；不改鉴权。
+  5. 四件套全绿；不打印 token。
+* **FAIL**：开项目仍塞左栏；丢掉 C.8c 能力；抢做 D.1e；回退鉴权。
+
+<a id="task-c.10f"></a>
+
+#### 【Task C.10f】资源管理器纯文件树 + 规范与资产进项目审阅 `[COMPLETED · 2026-10-24]`
+* **任务编号**：`TASK-C.10f`
+* **前置依赖**：`TASK-C.10e`（同 tip 合入）
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main，tip `592f825`，与 C.10e 同提交；合后四件套 **1274 passed / 6 skipped**。交付：`left-explorer` 纯文件树；`SupervisorTab.specsSection`；路由插槽迁移；规范区默认在审阅页展开。**不含**改鉴权。**热修（同日）**：① 停渲染 `leftExtra` 合同列表，迁 `SupervisorTab.requirementList`（1275）；② 空文件树——`files` 改绑 `GET /api/repo/tree` 建连加载（1277））
+* **对照痛点**：规范与资产是 Supervisor 产物，不应和 `src`/`node_modules` 混在资源管理器里吓老板。
+* **v0.1 范围（施工合同）**：
+  1. **资源管理器**：左栏只展示纯文件树（「文件」标题）；去掉规范与资产与「项目文件」大折叠壳。
+  2. **项目审阅**：`SupervisorTab` 增加「本轮依据（规范与资产）」；路由把 `FileTreeSpecsSection` 注入审阅页。
+  3. **能力保留**：点开规范文件仍可在中栏编辑/预览；不取消 Specs 组件。
+  4. **纪律**：与 C.10c 白话「项目审阅」、C.10e 欢迎开项目一致。
+* **明确不包含**：不改鉴权；不拆多路由；不新造第二套资产系统。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **涉及核心文件（预期）**：
+  - `src/components/supervisor/SupervisorTab.tsx`（`specsSection`）
+  - `src/components/WorkspaceLayout.tsx`（左栏纯树）
+  - `src/routes/index.tsx`（插槽迁移）
+  - `src/components/FileTreeSpecsSection.tsx`（注释/呈现位）
+  - UI：`tests/ui/left-boss-path.test.tsx`
+* **Pass/Fail 验收判定**（≤5）：
+  1. 左栏无 `file-tree-specs`；有 `left-explorer` + `file-tree`。
+  2. 打开项目审阅可见 `supervisor-specs` / `file-tree-specs`。
+  3. 点文件仍可打开编辑 Tab。
+  4. 不回退 C.10e/C.10c/C.9a；不改鉴权。
+  5. 四件套全绿。
+* **FAIL**：资产仍在左栏主路径；审阅页无资产；取消文件树能力。
+
+
+<a id="task-c.10g"></a>
+
+#### 【Task C.10g】文件树展开/折叠（默认只展开第一层）`[COMPLETED · 2026-10-24]`
+* **任务编号**：`TASK-C.10g`
+* **前置依赖**：`TASK-C.10f` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main，tip `a3fa7c7`；合后四件套 **1281 passed / 6 skipped**。交付：`src/lib/file-tree-expand.ts`；`FileTree` 点目录展开/折叠；默认根下第一层展开、更深收起；点文件仍 `onOpen`）
+* **对照痛点**：资源管理器文件树整棵摊开、文件夹无法折叠，老板看不清结构。
+* **v0.1 范围（施工合同）**：
+  1. **交互**：点文件夹展开/折叠（`aria-expanded`）；有可见展开指示。
+  2. **默认**：只展开根下第一层目录；更深目录默认收起。
+  3. **保留**：点文件仍打开中栏编辑；换项目/重拉树时按默认重置展开态。
+  4. **纪律**：与 C.10f 纯文件树一致；不改鉴权；不抢 D.1e。
+* **明确不包含**：虚拟滚动/懒加载远端；Git 状态着色；搜索面板；改鉴权。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **涉及核心文件（预期）**：
+  - `src/components/FileTree.tsx`
+  - `src/lib/file-tree-expand.ts`
+  - 单元：`tests/lib/file-tree-expand.test.ts`
+  - UI：`tests/ui/file-tree-expand.test.tsx`
+* **Pass/Fail 验收判定**（≤5）：
+  1. 默认可见根下第一层内容；更深文件默认不可见。
+  2. 点文件夹可展开再折叠。
+  3. 点文件仍触发打开。
+  4. 不回退 C.10f/C.10e；不改鉴权。
+  5. 四件套全绿；不打印 token。
+* **FAIL**：仍整棵摊开无法折叠；默认展开全部深层；文件打不开。
+
+
+<a id="task-c.10h"></a>
+
+#### 【Task C.10h】文件树右键删除（确认 / P.1 / 尽量废纸篓）`[COMPLETED]`
+* **任务编号**：`TASK-C.10h`
+* **前置依赖**：`TASK-C.10g` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main tip `008fd3a`；热修 tip `be4968b` 确认框可点；分支 `feat/task-c10h-file-tree-delete` 快进；四件套 1292 passed / 6 skipped；Tina 授权 t657u）
+* **对照痛点**：资源管理器只能看/开文件，不能像 Cursor 一样右键删除；老板需要确认后安全删除。
+* **v0.1 范围（施工合同）**：
+  1. **交互**：文件/文件夹右键菜单「移到废纸篓… / 删除…」→ 确认对话框 → 再执行。
+  2. **门禁**：`POST /api/repo/delete` **必须鉴权**；路径安全；P.1 保护清单命中 → 拒绝 + 白话（不绕过）。
+  3. **删除方式**：macOS 尽量废纸篓（`/usr/bin/trash` / Finder）；做不到则仅普通文件永久删除并诚实文案；目录在无废纸篓时拒绝。
+  4. **刷新**：删除成功后刷新资源管理器树；已打开的同路径标签关闭。
+  5. **纪律**：不改鉴权语义；不抢 D.1e；不绕过 P.1；不打印 token。
+* **明确不包含**：批量多选删除；Git 撤销面板；改保护清单规则本身；D.1e 系统选夹。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **涉及核心文件（预期）**：
+  - `daemon/editor/repo-delete.ts` + `daemon/server.ts`（`POST /api/repo/delete`）
+  - `src/lib/daemon-api.ts` / `src/lib/file-tree-delete.ts`
+  - `src/components/FileTree.tsx` / `WorkspaceLayout.tsx` / `src/routes/index.tsx`
+  - 单元：`tests/unit/repo-delete.test.ts`；daemon：`tests/daemon/repo-delete-api.test.ts`；UI：`tests/ui/file-tree-delete.test.tsx`
+* **Pass/Fail 验收判定**（≤5）：
+  1. 右键可见删除项；未确认不删；确认框「确认删除」可点（菜单关闭后延后打开）。
+  2. 无 token → 401；保护清单命中 → 403 白话且文件仍在。
+  3. 成功删除后树刷新；文案诚实区分废纸篓 / 永久删除。
+  4. 不回退 C.10g/f/e；不改鉴权。
+  5. 四件套全绿；不打印 token。
+* **FAIL**：无确认直接删；绕过鉴权或保护清单；把目录静默永久删掉且不说明。
+
+
+
+---
+
+<a id="task-c.10i"></a>
+
+#### 【Task C.10i】文件树第一批（折叠整树 / 新建 / Finder·复制·重命名·删除）`[COMPLETED]`
+* **任务编号**：`TASK-C.10i`
+* **前置依赖**：`TASK-C.10h` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（tip `5388f9c`；四件套绿 · **1305 passed / 6 skipped**）
+* **目标**：资源管理器达到老板够用的 Cursor 式第一批文件操作，不一次复刻整张右键菜单。
+* **范围**：
+  1. **顶栏**：点击项目路径折叠整棵文件树；右侧提供新建文件 / 新建文件夹。
+  2. **右键（本批）**：在 Finder 中显示、复制路径、重命名、删除（沿用 C.10h）。
+  3. **后端**：`POST /api/repo/create`、`/api/repo/rename`、`/api/repo/reveal`（鉴权）；写操作过 P.1 保护清单白话拒绝。
+  4. **明确不包含（v0.2+ 锚定）**：加进 Chat、在集成终端中打开、选择以进行比较、打开时间线、在浏览器中打开、将文件夹添加到工作区等——见 `v0.2-multi-agent-pipeline.md` 附录锚点；**不实施**、不推翻现架构。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **主要改动**：
+  - `daemon/editor/repo-fs-ops.ts` + `daemon/server.ts` 路由
+  - `src/components/FileTree.tsx` / `WorkspaceLayout.tsx` / `src/routes/index.tsx`
+  - `src/lib/file-tree-ops.ts` / `file-tree-expand.ts`（collapseAll）
+* **验收**：
+  1. 点顶栏路径后子节点收起；新建/重命名/删除后树刷新。
+  2. 保护清单命中白话拒绝；系统路径（.git/.stagent）不可改。
+  3. 四件套绿；不回退 C.10h/g/f/e；不改鉴权。
+
+
+<a id="task-c.10j"></a>
+
+#### 【Task C.10j】中栏 Markdown 预览阅读（默认预览 / 可切源码）`[COMPLETED]`
+* **任务编号**：`TASK-C.10j`
+* **前置依赖**：`TASK-C.10i` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main tip `836ad6e`；Tina 授权 t666u；四件套 **1311 passed / 6 skipped**；tsc 0 / eslint 0 errors / build 通过）
+* **对照痛点**：打开 `.md` 只见 Monaco 源码，缺少 Cursor 式好看阅读（标题/引用/代码高亮）。
+* **v0.1 范围（施工合同）**：
+  1. **默认**：打开 `.md` / `.markdown` / `.mdx` 进入好看预览（标题层级、引用、GFM 表格/列表、围栏代码高亮）。
+  2. **切换**：顶栏「预览 | 源码」；源码仍走 Monaco，保存门禁不变（C.3 / P.1）。
+  3. **非 Markdown**：行为与 C.3 一致，不出现切换控件。
+  4. **纪律**：对齐 Cursor 阅读感；**不做**完整 VS Code（分栏预览、完整面包屑、插件生态等）；不改鉴权；不抢 D.1e；不打印 token。
+* **明确不包含**：Markdown 分栏同步预览；完整路径面包屑导航条；WYSIWYG 所见即所得编辑；扩展语言包/主题市场。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **涉及核心文件（预期）**：
+  - `src/lib/markdown-file.ts`
+  - `src/components/editor/MarkdownPreview.tsx`
+  - `src/components/MonacoEditorPane.tsx` / `src/styles.css`
+  - 单元：`tests/unit/markdown-file.test.ts`；UI：`tests/ui/markdown-preview-pane.test.tsx`（并回归 `monaco-editor-pane.test.tsx`）
+* **Pass/Fail 验收判定**（≤5）：
+  1. `.md` 默认可见预览标题/引用；无 Monaco。
+  2. 点「源码」出现 Monaco；再点「预览」回到阅读。
+  3. 非 `.md` 无切换控件。
+  4. 不回退 C.10i/h；不改鉴权与保存门禁。
+  5. 四件套全绿；不打印 token。
+* **FAIL**：`.md` 仍只能看源码；预览无标题/引用样式；切换破坏保存门禁。
+
+
+
+<a id="task-c.10k"></a>
+
+#### 【Task C.10k】右栏只留双方对话（去工程师噪声；Cursor 右栏进 v0.2）`[COMPLETED]`
+* **任务编号**：`TASK-C.10k`
+* **前置依赖**：`TASK-C.10j` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main tip `0da870c`；Tina 授权 t669u；四件套 **1313 passed / 6 skipped**；tsc 0 / eslint 0 errors / build 通过）
+* **对照痛点**：右栏堆适配器/历史会话/元信息/说明书/工具 JSON，不像「跟助手说话」；Cursor 右栏整页复刻会抢戏。
+* **v0.1 范围（施工合同）**：
+  1. **主视线**：只保留用户 ↔ 助手对话记录（含旅程系统卡）；输入框 + 发送/停止。
+  2. **删除/隐藏**：AI 助手适配器下拉、新会话/历史会话、`chat-session-meta`、当前对话使用行、空闲说明书条、工具调用 JSON 卡片。
+  3. **保留门禁提示**：缺钥匙向导、练习沙箱短提示、进行中短状态、未连接一键重开（不打印 token）。
+  4. **自动会话**：无工程师「新会话」时，用首选助手自动开会话。
+  5. **v0.2 锚定**：Cursor 右侧对话对齐能力写入 `v0.2-multi-agent-pipeline.md` 附录 B（**不实施整页复刻**）。
+  6. **纪律**：不改鉴权；不抢 D.1e；不推翻一个指挥官。
+* **明确不包含**：@ 上下文、/ skills、多模型切换 UI、语音、Review Keep/Undo 条、聊天内嵌浏览器/终端等（见附录 B）。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **涉及核心文件（预期）**：
+  - `src/components/AgentChatPane.tsx`
+  - UI：`tests/ui/agent-chat-pane.test.tsx`（并回归 `assistant-mode.test.tsx`）
+  - 文档：任务卡 / 见 Git 历史（原走查报告 §6.20） / v0.2 RFC 附录 B
+* **Pass/Fail 验收判定**（≤5）：
+  1. 连接后右栏不可见「AI 助手：」/「选择 Agent」/「历史会话」/会话元信息。
+  2. 用户与助手消息可见；工具 JSON 卡片不可见。
+  3. `journey-entry-hint` 主 CTA 锚点仍在（可 sr-only）；向导/练习门禁仍可用。
+  4. Cursor 右栏项仅在 v0.2 附录 B，无整页复刻代码。
+  5. 四件套全绿；不打印 token。
+* **FAIL**：右栏仍堆工程师控件；或借机整页复刻 Cursor；或破坏鉴权/指挥面。
+
+
+
+<a id="task-c.10l"></a>
+
+#### 【Task C.10l】设置「高级」可选会话/适配器（不回潮右栏）`[COMPLETED]`
+* **任务编号**：`TASK-C.10l`
+* **前置依赖**：`TASK-C.10k` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main tip `d407b5c`；Tina 授权 t671u；四件套 **1316 passed / 6 skipped**；tsc 0 / eslint 0 errors / build 通过）
+* **对照痛点**：C.10k 从右栏去掉适配器/新会话/历史后，工程师偶发仍需换助手或切历史；不宜塞回右栏主视线，也不宜塞进老板设置主路径。
+* **v0.1 范围（施工合同）**：
+  1. **位置**：设置页「高级」（`settings-advanced`）内新增「对话助手」区（`settings-chat-session`）。
+  2. **控件**：助手（适配器）下拉、新会话、历史会话下拉——语义对齐 C.10k 移除前右栏能力。
+  3. **共享状态**：Console 上提 `useAgentSession`，注入右栏与设置，保证换会话两边一致。
+  4. **右栏纪律**：保持 C.10k——主视线只留双方对话；不回潮工程师控件。
+  5. **仍不展示**：会话元信息（adapter id / 原生会话 / 首字耗时）、工具调用 JSON——不进设置、不进右栏。
+  6. **纪律**：不改鉴权；不抢 D.1e；不打印 token。
+* **明确不包含**：把说明书条/工具 JSON/会话元信息塞进设置；右栏恢复适配器条；整页复刻 Cursor 右栏。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **涉及核心文件（预期）**：
+  - `src/components/settings/SettingsTab.tsx`
+  - `src/components/AgentChatPane.tsx`（可选 `session` 注入）
+  - `src/routes/index.tsx`（上提共享会话）
+  - UI：`tests/ui/settings-tab.test.tsx`（并回归 `agent-chat-pane.test.tsx`）
+* **Pass/Fail 验收判定**（≤5）：
+  1. 设置高级展开可见「对话助手」；模型钥匙主视线无适配器/历史控件。
+  2. 右栏仍不可见「选择 Agent」/「历史会话」/「新会话」按钮。
+  3. 高级内点「新会话」会创建并切到新会话（与右栏同实例）。
+  4. 未注入时高级不出现对话助手区（单测 Settings 独立渲染）。
+  5. 四件套全绿；不打印 token。
+* **FAIL**：控件回潮右栏；或高级与右栏各管一份会话不同步；或改鉴权。
+
+
+<a id="task-c.10m"></a>
+
+#### 【Task C.10m】质疑自查裁决按钮接线（缺陷修复 / 新需求演进）`[COMPLETED]`
+* **任务编号**：`TASK-C.10m`
+* **前置依赖**：`TASK-C.10l` (COMPLETED)；工作区恢复干净 tip `8dd039d`
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main tip `0d65890`；Tina 授权 t673u；四件套 **1319 passed / 6 skipped**；tsc 0 / eslint 0 errors / build 通过）
+* **对照痛点**：非 IDE 走查发现质疑自查「按缺陷修复 / 按新需求演进」可点但无反应（空接线）；脏工作区有误回退风险，须先恢复 tip 再改。
+* **v0.1 范围（施工合同）**：
+  1. **恢复**：`/Users/tina/Desktop/1020` reset 到干净 tip（C.10l / `8dd039d`），丢弃误回退脏区。
+  2. **UI**：`DisputeConsolePane` 暴露 `onChooseBugFix` / `onChooseRequirementChange`；降级或 UNATTRIBUTED 时两按钮可点。
+  3. **接线**：`index.tsx` 把按钮接到 `runDisputeSelfCheckUi(challenge, user_choice)`；`BUG_FIX` / `REQUIREMENT_CHANGE`。
+  4. **API/引擎**：`submitDisputeSelfCheck` 传 `user_choice`；Daemon 校验；`outcomeFromUserChoice` 强制分类与 next_action。
+  5. **产品反馈**：选择后旅程卡白话确认；需求演进切合同视口并打开表单。
+  6. **纪律**：不改鉴权；不抢 D.1e；不打印 token。
+* **明确不包含**：重做整套质疑引擎；自动改代码不经审阅；Cursor 整页右栏复刻。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **涉及核心文件（预期）**：
+  - `src/components/studio/DisputeConsolePane.tsx`
+  - `src/routes/index.tsx`
+  - `src/lib/daemon-api.ts`
+  - `daemon/server.ts` / `daemon/supervisor/dispute/*`
+  - UI：`tests/ui/studio-viewport-switching.test.tsx`；单测：`tests/unit/dispute-triad.test.ts`
+* **Pass/Fail 验收判定**（≤5）：
+  1. 降级报告下两按钮可点且回调触发（Harness UI 测）。
+  2. `user_choice=BUG_FIX` → IMPLEMENTATION_BUG + REWORK；`REQUIREMENT_CHANGE` → 需求演进路径。
+  3. 非法 `user_choice` 被 Daemon 拒绝。
+  4. 工作区恢复 hash 为 `8dd039d`（或文档记载的干净 tip）。
+  5. 四件套全绿；不打印 token。
+* **FAIL**：按钮仍空接线；或借机改鉴权/绕过保护清单。
+
+
+<a id="task-c.10n"></a>
+
+#### 【Task C.10n】任务图谱空态可感知（禁用无效切换 / 刷新反馈 / 建图 CTA）`[COMPLETED]`
+* **任务编号**：`TASK-C.10n`
+* **前置依赖**：`TASK-C.10m` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main tip `bcad27f`；Tina 授权 t675u「立卡开做」；四件套 **1322 passed / 6 skipped**；tsc 0 / eslint 0 errors / build 通过。**热修** tip `3e9bb22`：建图 CTA 错误回显图谱顶栏；Tina t676u；四件套 **1323 passed / 6 skipped**）
+* **对照痛点**：非 IDE 走查点「任务图谱」顶栏「业务功能导图 / 执行拓扑 / 刷新」像没反应；根因是当前合同无图时正文永远空态，切视图画面不变。
+* **v0.1 范围（施工合同）**：
+  1. **无图**：禁用（或等效不可用）「业务功能导图 / 执行拓扑」；刷新按钮可见 loading（「刷新中…」/ aria-busy）。
+  2. **空态文案**：白话「当前合同还没有图」+ 说明须先确认原型；CTA「确认原型并建图」接到既有 `handleConfirmPrototype` 主路径。
+  3. **有图**：顶栏一句只读预期「这里只看进度…不会开工」；选中执行拓扑节点后高亮，并滚到 NodeDetail。
+  4. **纪律**：不改鉴权；不接 start/verify；不抢 D.1e；不改架构大方向。
+* **明确不包含**：节点开工/验证接线；重做点亮引擎；拆多路由。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **涉及核心文件（预期）**：
+  - `src/components/graph/TaskGraphPanel.tsx`
+  - `src/components/graph/ExecutionDag.tsx`
+  - `src/components/studio/TaskGraphPane.tsx`
+  - `src/routes/index.tsx`
+  - UI：`tests/ui/task-graph-illumination.test.tsx`
+* **Pass/Fail 验收判定**（≤5）：
+  1. 无图时视图切换按钮 disabled，点击不改变空态。
+  2. loading 时刷新按钮文案/aria-busy 可见；空态非 loading 显示「当前合同还没有图」与 CTA（有回调时）。
+  3. 有图时只读提示存在；点 DAG 节点出现详情且 `data-selected=true`。
+  4. 四件套全绿；不打印 token。
+  5. 不引入 start/verify 接线。
+* **FAIL**：无图切视图仍「像没反应」且无任何反馈；或借机改鉴权/接开工。
+
+<a id="task-c.10o"></a>
+
+#### 【Task C.10o】任务图谱开工/核销入口（接 start/verify）`[COMPLETED]`
+* **任务编号**：`TASK-C.10o`
+* **前置依赖**：`TASK-C.10n` (COMPLETED)、`TASK-C.7` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main tip `830fca1`；Tina 授权 t680u「立卡接开工/核销入口」；四件套 **1331 passed / 6 skipped**；tsc 0 / eslint 0 errors / build 通过）
+* **对照痛点**：图谱已是只读看板（C.10n）；Daemon 已有 `POST /api/graph/nodes/start` 与 `POST /api/graph/verify`（C.7），UI 未接。老板看见「排队中」无法感知地往前推。
+* **v0.1 范围（施工合同）**：
+  1. **开工**：有图时顶栏「开工下一节点」（按依赖取下一 PENDING 且前置已点亮）；详情对可开工节点提供「开工此节点」。回调 `startTaskGraphNode` → Daemon `startNode`。
+  2. **核销**：顶栏「核销点亮」优先选中可核销节点，否则取第一个 RUNNING/REPAIRING/STALE_REVERIFY；详情亦可核销。回调 `verifyTaskGraphNode`；COMMAND 按声明别名提交 exit 0；写入/Scope/HEAD 仍由 Daemon 现算。
+  3. **反馈**：忙态「开工中…/核销中…」；失败/未点亮黄条 `graph-error`；有动作时提示文案改为可开工说明（不再写死「不会开工」）。
+  4. **纪律**：点亮只认物理证据（不假绿）；不改鉴权；不抢 D.1e；架构仅 §11 注记 9 轻量锚定。
+* **明确不包含**：自动 Worker 全图施工；伪造退出码绕过物理证据；重做点亮引擎；改鉴权大方向。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **涉及核心文件（预期）**：
+  - 新增：`src/lib/graph/startable.ts`
+  - 修改：`src/components/graph/TaskGraphPanel.tsx`、`src/components/studio/TaskGraphPane.tsx`、`src/routes/index.tsx`
+  - 测试：`tests/unit/graph-startable.test.ts`、`tests/ui/task-graph-illumination.test.tsx`
+* **Pass/Fail 验收判定**（≤5）：
+  1. 有图且存在可开工节点时「开工下一节点」可点，回调正确 node_id；无前置点亮时下游禁用。
+  2. RUNNING（等）时可「核销点亮」；未点亮时黄条可见且 graph 仍更新。
+  3. 无 onStart/onVerify 回调时仍保持 C.10n 只读提示（兼容）。
+  4. 四件套全绿；不打印 token。
+  5. 不引入假绿路径；不改鉴权。
+* **FAIL**：点开工无请求/无状态变化且无任何反馈；或借机改鉴权/伪造证据点亮。
+
+<a id="task-c.10p"></a>
+
+#### 【Task C.10p】图谱开工/核销自动确保任务 Worktree `[COMPLETED]`
+* **任务编号**：`TASK-C.10p`
+* **前置依赖**：`TASK-C.10o` (COMPLETED)、`TASK-A.1` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main tip `35b56c9`；Tina 报错 t681u「任务 Worktree 不存在」隐含授权修复；四件套 **1335 passed / 6 skipped**；tsc 0 / eslint 0 errors / build 通过）
+* **对照痛点**：C.10o 接上 start/verify 后，历史已 MERGED 合同的图仍可点核销，但批准时创建的 Worktree 合入后已清理；`collectWorktreeEvidence` 直接 409，老板看到黄条「任务 Worktree 不存在：…/task-contract_…」。
+* **根因（代码事实）**：Worktree 由 `orchestrator.approve` / `healResume` 创建；`/api/graph/nodes/start` 只改图态、不建树；`/api/graph/verify` 要求树已在盘。合入清理后图与树脱节。
+* **v0.1 范围（施工合同）**：
+  1. 新增 `ensureTaskWorktree` + `resolveExistingBaseBranch`（`daemon/git/worktree-manager.ts`）。
+  2. `POST /api/graph/nodes/start` 与 `POST /api/graph/verify` 在改态/采证前调用确保；缺失则重建。
+  3. 基线优先合同 `authorization.git.base_branch`，不存在则回退 `main`/`master`/`HEAD`。
+  4. 主工作区脏：`acknowledgeDirty: true`（脏文件本就不进任务树，图谱不得因此卡死）。
+  5. 纪律：不假绿；点亮仍只认物理证据；不改鉴权；不抢 D.1e。
+* **明确不包含**：自动替 Worker 写业务文件；伪造证据点亮；改合同生命周期机；重做 A.1。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **涉及核心文件（预期）**：
+  - 修改：`daemon/git/worktree-manager.ts`、`daemon/server.ts`
+  - 测试：`tests/daemon/worktree-manager.test.ts`（ensure 用例）
+* **Pass/Fail 验收判定**（≤5）：
+  1. 人为删掉 `task-{contractId}` 后，start 能重建并 PENDING→RUNNING。
+  2. 同上条件下 verify 不再报「Worktree 不存在」（缺写入仍可未点亮黄条，不假绿）。
+  3. 合同 base_branch 已删除时仍能回退 main/HEAD 建树。
+  4. 主区有未提交文件时 ensure 不抛脏确认阻断。
+  5. 四件套全绿；不打印 token。
+* **FAIL**：核销仍只抛「Worktree 不存在」且无重建；或借机假绿/改鉴权。
+
+
+<a id="task-c.10q"></a>
+
+#### 【Task C.10q】Studio 全景/施工双视角壳 + 改名消歧义
+* **任务编号**：`TASK-C.10q`
+* **前置依赖**：`TASK-C.10p` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-24 合入 main tip `4280de6`；Tina 授权 t684u「都放进方案，然后 v0.1 先立双视角壳」；四件套 **1342 passed / 6 skipped**；tsc 0 / eslint 0 errors / build 通过）
+* **对照痛点**：非专业用户需要「能干嘛 / 怎么用 / 管什么 / 这轮改哪」四张透视卡；现有「业务功能导图」易与进门全仓脑图撞名；确认原型前中栏只有施工空态。
+* **v0.1 范围（施工合同）**：
+  1. Studio 中栏「全景 / 施工」双视角切换壳（`StudioLensShell`）；两视角 `hidden` 保活。
+  2. 未确认原型（无图）：默认全景；极薄摘要读合同 intent / requirements 提示；诚实空态；三张真全景图仅占位标 v0.2。
+  3. 确认原型建图后：自动（无→有）切到施工 = 既有 `TaskGraphPanel`（空态/开工/核销不变）。
+  4. 改名消歧义：施工侧「业务功能导图」→「本轮施工·功能汇总」；全景侧「项目功能清单」。
+  5. **禁止**全景展示施工绿灯；**不改** illumination / start / verify / C.10o / C.10p。
+  6. 方案文档写入四卡体系；三张真全景图记入 v0.2 RFC 附录 C（本卡不实现）。
+* **明确不包含**：进门自动业务脑图、用户旅程泳道、业务概念图的真实生成；假绿；改鉴权；抢 D.1e。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **涉及核心文件**：
+  - 新增：`src/lib/studio/lens-routing.ts`、`src/components/studio/StudioLensShell.tsx`、`src/components/studio/PanoramaPane.tsx`
+  - 修改：`src/components/studio/TaskGraphPane.tsx`、`src/components/graph/TaskGraphPanel.tsx`、`src/components/graph/FunctionalTree.tsx`、`src/routes/index.tsx`
+  - 文档：见 Git 历史（原 `docs/archive/task-graph-and-panorama-design.md`） §9；`docs/rfc/v0.2-multi-agent-pipeline.md` 附录 C；走查 §6.26
+  - 测试：`tests/unit/studio-lens-routing.test.ts`、`tests/ui/studio-lens-shell.test.tsx`
+* **Pass/Fail 验收判定**（≤5）：
+  1. 无图时 Studio 图谱视口默认「全景」；可见项目功能清单/占位，无 functional-tree 绿灯。
+  2. 有图或刚建图后默认「施工」；可见「本轮施工·功能汇总」按钮文案。
+  3. 手动全景↔施工可切换；面板 hidden 保活。
+  4. 四件套全绿；不打印 token。
+  5. 规范/RFC 已写明 v0.2 三卡不实施。
+* **FAIL**：全景出现施工点亮态；或顺手改了 start/verify/illumination；或把 v0.2 三卡当成本卡交付。
+
+
+<a id="task-c.11a"></a>
+
+#### 【Task C.11a】右栏白话推荐选择题（≤2 轮收敛）`[COMPLETED]`
+* **任务编号**：`TASK-C.11a`
+* **前置依赖**：`TASK-C.10q` (COMPLETED)、`TASK-C.10k` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-26 过夜合入；立卡+授权 t747u/t748u；见 BRIEF-C11）
+* **对照痛点**：Supervisor 定妆照第 1 步——用户说话后应看到带推荐的白话选择题，而不是开放式技术追问；澄清无轮次上限。
+* **v0.1 范围（施工合同）**：
+  1. 右栏可渲染选择题卡片：每题唯一「推荐」徽标 + 一行通俗理由；选项点击即回填。
+  2. 主动澄清轮次硬顶 **≤2**；未决细项用安全默认写入后续合同草案字段（可一键确认）。
+  3. 禁止开放式技术填空卷；与 C.10k 右栏只留双方对话纪律兼容（卡片算对话内容）。
+  4. 对齐 Top7#4、《Supervisor运转机制》§2.1。
+* **明确不包含**：完整 LLM Supervisor 大脑重写；Impact AST；改鉴权；抢 D.1e；升格澄清讨论稿全文。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **涉及核心文件（实现时锚定，可微调）**：
+  - 右栏对话消息渲染 / journey 分流相关组件与 hooks
+  - 可选：`POST /api/supervisor/journey` 扩展选择题载荷
+  - 测试：UI 渲染推荐徽标 + 轮次上限单元/UI
+* **Pass/Fail 验收判定**（≤5）：
+  1. 演示路径可见带「推荐」徽标的选择题卡。
+  2. 第 3 轮主动澄清被拒绝或自动收束为默认项（可测）。
+  3. 四件套绿；不打印 token。
+  4. 不回退 C.10k 右栏主视线纪律。
+* **FAIL**：出现无推荐的开放技术问卷；或轮次无上限；或改鉴权。
+
+<a id="task-c.11b"></a>
+
+#### 【Task C.11b】隔离 Demo 预览挂载与感官确认 `[COMPLETED]`
+* **任务编号**：`TASK-C.11b`
+* **前置依赖**：`TASK-C.11a` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-26 过夜合入）
+* **对照痛点**：定妆照第 2 步——先玩玩具再写真码；Demo 须可复看且不脏主干。
+* **v0.1 范围**：
+  1. Demo 资产目录 `.stagent/prototypes/<prototype_id>/`；根 `.gitignore` 忽略该树（或等价忽略规则）。
+  2. 独立预览（iframe / 既有 Origin 预览通道均可，须可点试玩）。
+  3. 「感官对齐 / 确认 Demo」按钮；未确认不得进入写真码路径（门禁可与 C.11c 衔接）。
+  4. 对齐 Top7#1；拒约/轻改默认保留 Demo（资产治理）。
+* **明确不包含**：把 Demo 合入用户 package.json/主干；完整多租户沙盒产品化；假绿。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **Pass/Fail**：
+  1. 确认后磁盘可见 prototypes 目录且不被 git 跟踪进主干。
+  2. 预览可打开；确认按钮可点并留下状态。
+  3. 未确认时写主干被拒（或 UI 阻断）——与 C.11c 联调可接受。
+  4. 四件套绿。
+* **FAIL**：Demo 进主干；或无确认仍可开工写真码。
+
+<a id="task-c.11c"></a>
+
+#### 【Task C.11c】白话合同卡片与签署拦截 `[COMPLETED]`
+* **任务编号**：`TASK-C.11c`
+* **前置依赖**：`TASK-C.11b`
+* **任务状态**：**[COMPLETED]**（2026-10-26 过夜合入）
+* **对照痛点**：定妆照第 3 步——一张白话卡说清要干什么/能改哪/怎么验；签前主干零写入。
+* **v0.1 范围**：
+  1. 白话合同卡：意图、Scope 摘要、验收要点；一键授权/拒绝/改细节。
+  2. **签署前**对项目主干 `writable` 物理零写入（Gateway/Daemon 门禁；只读与 prototypes 除外）。
+  3. 签署后签发短命执行凭证（Top7#2：轻量 Token + IPC 校验——本卡至少接线护照生命周期；IPC 深度可与既有 Gateway 对齐，缺口登记但不假称 JWT 离线唯一方案）。
+  4. 拒约默认留 Demo；草案版本 `vN-draft` 递增。
+* **明确不包含**：整份 API 清单升格；完整 Impact AST；改 D.1 loopback+#token 模型。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **Pass/Fail**：
+  1. 未签署时尝试写主干失败或 UI 不可达写真码。
+  2. 签署后合同态推进可观测；护照/token 短命可吊销或过期（至少一种可测）。
+  3. 拒绝后 Demo 仍可打开。
+  4. 四件套绿。
+* **FAIL**：未签署已改主干；或口头改约无重签。
+
+<a id="task-c.11d"></a>
+
+#### 【Task C.11d】施工图 Evidence 点亮 + 越界挂起弹窗 `[COMPLETED]`
+* **任务编号**：`TASK-C.11d`
+* **前置依赖**：`TASK-C.11c`、`TASK-C.10o` (COMPLETED)、`TASK-C.10p` (COMPLETED)、`TASK-C.10q` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-26 过夜合入）
+* **对照痛点**：定妆照第 4 步——灯是证据亮的；越界要敲门问人。
+* **v0.1 范围**：
+  1. 图谱节点点亮必须绑定真实 Evidence / verify 路径（延续 C.10o 不假绿）。
+  2. `E_OUT_OF_SCOPE` / 保护否决：阻断当次 IO + 任务 `PAUSED` + 前端「扩权 / 回滚」挂起弹窗（Top7#3）。
+  3. 禁止静默放行；禁止默认 `kill -9` 整树（用户显式终止除外）。
+* **明确不包含**：重做 illumination 算法；全量 AST Impact；D.1e。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **Pass/Fail**：
+  1. 无证据不能点亮（回归）。
+  2. 模拟越界出现挂起弹窗且任务暂停。
+  3. 四件套绿。
+* **FAIL**：假绿；或越界静默；或默认杀进程。
+
+<a id="task-c.11e"></a>
+
+#### 【Task C.11e】真机对照验收与质疑自查回灰 `[COMPLETED]`
+* **任务编号**：`TASK-C.11e`
+* **前置依赖**：`TASK-C.11d`、`TASK-C.10m` (COMPLETED)、`TASK-S.6b` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-26 过夜合入）
+* **对照痛点**：定妆照第 5 步——真页对照 Demo；质疑先自查图纸不是重写需求。
+* **v0.1 范围**：
+  1. 验收视图可同时感知 Demo 参照与真机预览（复用 S.6b 真机试玩通道）。
+  2. 「质疑」触发 Supervisor S.5 风格自查（接线强化 C.10m）；失败则相关图谱节点回灰待重做。
+  3. 成功核销才保持点亮；对齐核心资产治理 Evidence 作废规则。
+* **明确不包含**：完整红队模型产品化；改鉴权。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **Pass/Fail**：
+  1. 质疑后可见自查结果或明确进行中态。
+  2. 自查失败节点回灰（可测 fixture）。
+  3. 四件套绿。
+* **FAIL**：质疑无响应；或失败仍假绿。
+
+
+
+
+<a id="task-c.12a"></a>
+
+#### 【Task C.12a】双层执行令牌（exec_token + resume_token/jti）`[COMPLETED]`
+* **任务编号**：`TASK-C.12a`
+* **前置依赖**：`TASK-C.11c` (COMPLETED)、`TASK-C.11e` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-26 合入；main tip `12b14b1`；Tina t819u 全部一起实现；专用单测 `tests/unit/task-c12-top5-delta.test.ts`）
+* **对照痛点 / Spec 锚点**：封版记录 §2.4 / §3 Top5#1；澄清 §6.1；Checklist §3；右栏 **EO-07**。现网仅单层 `session-token` + 同进程拦写；多进程/暂停恢复缺精细凭证。
+* **v0.1 范围（施工合同 · Delta，不推翻骨架）**：
+  1. **保留**外部 `session-token` 鉴权与 D.1 loopback+#token 通道原则。
+  2. 签署后内部施工通道签发 **`exec_token`**：至少绑定 `contract_id`、worktree 路径、可写 Scope 摘要；Gateway/Daemon 写路径校验必须验此令牌。
+  3. 进入 **`PAUSED`**（越界/中断/用户挂起）时 **硬吊销**当前 `exec_token`；旧令牌一律拒绝。
+  4. 恢复施工时下发**一次性** **`resume_token`**，必须带 **`jti`**（用过即废）；校验失败不得恢复写权。
+  5. 字段级目标对齐澄清 §6.1 / Checklist 附录 Schema 草稿（内存级轻量 Token + IPC 即可；**不强制** JWT/gRPC）。
+* **明确不包含**：改 D.1 鉴权模型；抢 D.1e；整份讨论稿升格改架构规范正文；Mode 0–4 / 容器沙盒。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **涉及核心文件（实现时锚定，可微调）**：
+  - Daemon 签署/暂停/恢复路径；Gateway 写拦截校验
+  - Token 签发/吊销/jti 存储（进程内或本地侧车均可，须可测）
+  - 单测：签发→PAUSED 拒旧 token→resume 一次性 jti
+* **Pass/Fail 验收判定**（≤5）：
+  1. 签署后无 `exec_token` 时写 worktree 被拒。
+  2. `PAUSED` 后旧 `exec_token` 写请求失败。
+  3. 合法 `resume_token`+未用 `jti` 可恢复；同一 `jti` 第二次失败。
+  4. 外部 session 通道回归不破；四件套绿；不打印 token 明文到日志。
+* **FAIL**：仅改 UI 文案无真实吊销；或默默沿用 session 当施工写权；或改 D.1 通道。
+
+<a id="task-c.12b"></a>
+
+#### 【Task C.12b】状态广播 epoch/seq + EO-01 DeliveryState `[COMPLETED]`
+* **任务编号**：`TASK-C.12b`
+* **前置依赖**：`TASK-C.12a` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-26 合入；main tip `12b14b1`；与 C.12a–e 同批）
+* **对照痛点 / Spec 锚点**：封版 §2.1 / §3 Top5#2；澄清 §6；右栏 **EO-01**。现网粗粒度全量 STATE 回放，缺序列 → 重连乱序/倒流。
+* **v0.1 范围**：
+  1. 在现有 STATE / `STATE_CHANGED` 通道上叠 **`session_epoch`**（会话世代）与单调递增 **`state_seq`**。
+  2. 广播载荷主交付态严格映射 EO-01 **`DeliveryState`** 强类型枚举（含 `PLAN_*`、Demo 三态 READY、`CONTRACT_SIGNED`、`IMPLEMENTING`/`PAUSED`、`CANDIDATE_VERIFIED`→`MERGED`→`DELIVERED` 等）。
+  3. **轨 C 瞬态**：Demo 确认后、`CONTRACT_SIGNED` 前允许 **`CONTRACT_SIGNING`**（白话合同卡渲染/解锁）；不得与轨 A 揉成假主态。
+  4. 客户端按 `(epoch, seq)` **去重、拒倒流**；epoch 递增时允许重置 seq。
+  5. 资产轨 `DocumentAssetStatus`（DocGov）**不得**冒充 DeliveryState 广播。
+* **明确不包含**：重做整套前端状态管理；Impact AST；云端多端同步。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **Pass/Fail**：
+  1. 连续两次 STATE 的 `state_seq` 递增可观测。
+  2. 注入更小 seq（同 epoch）被客户端忽略。
+  3. 广播中可见 EO-01 枚举值（非笼统 VERIFIED/FROZEN 冒充）。
+  4. `CONTRACT_SIGNING` 仅作签署前瞬态可测；四件套绿。
+* **FAIL**：仍仅全量无序回放；或资产 FROZEN 当已开工主态。
+
+<a id="task-c.12c"></a>
+
+#### 【Task C.12c】越界原子拦截（SIGINT 3s → SIGKILL → 吊销 → 清锁）`[COMPLETED]`
+* **任务编号**：`TASK-C.12c`
+* **前置依赖**：`TASK-C.12a` (COMPLETED)、`TASK-C.11d` (COMPLETED)、`TASK-C.12b` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-26 合入；main tip `12b14b1`；与 C.12a–e 同批；软停路径可测钩子）
+* **对照痛点 / Spec 锚点**：封版 §2.4 / Top5#3；澄清 §6；**EO-02 / EO-07**。现网有抛错+PAUSED 弹窗，缺进程/锁原子收尾 → 僵尸写。
+* **v0.1 范围**：
+  1. 保留 C.11d「扩权/回滚」弹窗体感；**补齐弹窗背后**的原子序列。
+  2. 触发越界 / 强制中断：先 **阻断当次 IO**，再对施工子进程发 **`SIGINT`，软停等待 3 秒**释锁。
+  3. 超时未退出 → **`SIGKILL`**；然后 **吊销 `exec_token`**；清理 **`.git/index.lock`**（及本 worktree 等价锁）；任务进入 **`PAUSED`** 问人。
+  4. **禁止静默放行**；**禁止**把「默认立刻 kill -9 整树」当唯一路径（用户显式终止除外）。
+  5. Worker 物理范围仍只认 `.stagent/worktrees/{contract_id}/`（本卡不实现容器 Mode）。
+* **明确不包含**：容器级沙盒 Mode 0–4；重做 illumination；默认杀整个 Daemon。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **Pass/Fail**：
+  1. 模拟越界可观测：软停窗口内进程收到 SIGINT（或等价可测钩子）。
+  2. 超时路径执行 SIGKILL + token 吊销 + 锁文件清除（fixture）。
+  3. UI 仍出现 PAUSED 弹窗；无静默继续写。
+  4. 四件套绿。
+* **FAIL**：只弹窗不吊销/不清锁；或默认无软停直接杀树；或静默放行。
+
+<a id="task-c.12d"></a>
+
+#### 【Task C.12d】Demo 三态门禁 + can_sign + records 轻量拷贝 `[COMPLETED]`
+* **任务编号**：`TASK-C.12d`
+* **前置依赖**：`TASK-C.11b` (COMPLETED)、`TASK-C.11c` (COMPLETED)、`TASK-C.12b` (COMPLETED)、`TASK-C.12c` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-26 合入；main tip `12b14b1`；与 C.12a–e 同批）
+* **对照痛点 / Spec 锚点**：封版 §2.1/§2.4 / Top5#4；**EO-05 / EO-06**。现网 prototypes + 布尔确认；缺三态与 `can_sign`，流程卡可偷渡。
+* **v0.1 范围**：
+  1. 确认事件升级为 **`demo_mode` 三态**：`INTERACTIVE_DEMO` / `NATIVE_FLOW_CARD` / `DEGRADED_FLOW_CARD`（或主干 `DEMO_READY` + `demo_mode` 字段）。
+  2. 签署入库执行 **`can_sign` 硬谓词**：降级/流程卡不得冒充可交互 Demo 偷渡签署（须显式接受并带 ⚠️ 等既有约定）。
+  3. **不推翻** `.stagent/prototypes/` 目录与 C.11b 预览骨架；prototypes **不进** Worker worktree 挂载。
+  4. 验收合入主干（`MERGED` 路径）后，向 **`.stagent/records/{contract_id}/`** 做**轻量无依赖**拷贝（Demo 快照/必要元数据）；失败不得标 `DELIVERED`。
+* **明确不包含**：完整多租户沙盒；云端 records；假绿。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **Pass/Fail**：
+  1. 三态可写入并在 UI/状态机可读。
+  2. 故意用流程卡冒充交互 Demo 时 `can_sign` 失败（可测）。
+  3. 合入后 `records/{contract_id}/` 出现拷贝产物（或明确失败阻断 DELIVERED）。
+  4. 四件套绿。
+* **FAIL**：仍仅布尔确认可签任意类型；或 Demo 进 worktree 沙盒。
+
+<a id="task-c.12e"></a>
+
+#### 【Task C.12e】无 Git 审计侧车 audit-manifest `[COMPLETED]`
+* **任务编号**：`TASK-C.12e`
+* **前置依赖**：`TASK-C.12d` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-26 合入；main tip `12b14b1`；与 C.12a–e 同批）
+* **对照痛点 / Spec 锚点**：封版 §2.4 / Top5#5；**EO-03 / EO-04 / EO-05**。无 Git / Trailer 不可用时仍需证明交付完整性。
+* **v0.1 范围**：
+  1. 落地 **`.stagent/records/{contract_id}/audit-manifest.json`**。
+  2. 经**脱敏管道**后落盘：关键快照哈希、审计事件哈希、合同/断言标识（UUIDv5 等既有钉桩）、关联 commit SHA（若有则记录；**无 Git 时仍须可生成清单**）。
+  3. **不依赖** Git Trailer 作为唯一审计源；与 D.2 Trailer **并存**时不得互相拆台。
+  4. 本地 only；云端多端同步 = **v0.2+**（封版 §4）。
+* **明确不包含**：云归档；改写 Git 历史；把 manifest 当签名 CA。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **Pass/Fail**：
+  1. 合入/归档路径生成 `audit-manifest.json` 且字段含哈希与 contract_id。
+  2. 模拟无 Git 环境仍能生成清单（不抛「必须有 remote」）。
+  3. 清单不含明文密钥/token；四件套绿。
+* **FAIL**：仅写 Git Trailer 无侧车；或明文泄密；或阻断 v0.1 只因无 remote。
+
+
+<a id="task-c.14a"></a>
+
+#### 【Task C.14a】只读沙盒静态扫描器（基线 P0 骨架）`[COMPLETED]`
+* **任务编号**：`TASK-C.14a`
+* **前置依赖**：`TASK-C.12e` (COMPLETED)、`TASK-C.10q` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-26 合入 tip `0417203`；Tina t836u 实现+走查；只读沙盒静态扫描器 + 负例单测。**验收注**：逻辑级只读/断网意图已测；**非** OS 只读挂载——已知不挡体验缝，OK）
+* **对照痛点 / Spec 锚点**：讨论稿 见 Git 历史（原 `docs/archive/baseline-archive-onboarding-design.md`）（tip `3c8411b`）文首 Tina 定案 3 + 工程补丁 1 + 原则 4 / §7.3。打开已有项目须「打开即自动深扫、零弹窗」，但不得动态执行项目脚本或触网。
+* **v0.1 范围（施工合同 · Delta）**：
+  1. 实现（或挂载）**基线静态扫描器**：在 **只读挂载 + 物理断网 + 约 3 秒超时熔断** 的轻量沙盒内跑；**禁止**动态执行用户项目脚本（含 Webpack/Vite 配置副作用、加载 `.env` 触发外网、CLI 插件 init）。
+  2. **P0 骨架秒级**（目标 T+0~2s）：至少抽出 `package.json` / 顶层目录树 / 粗路由或模块入口线索，供后续全景亮起与右栏解锁（具体接线见 C.14b）。
+  3. 扫描过程**不写入**用户业务树；允许仅写入 Stagent 侧车路径（若本卡落地侧车，须可测且不冒充施工合同）。
+  4. 界面目标文案：「正在为您安全探查项目结构（纯本地只读分析，不触碰线上业务）」——**机制未证明前**不得当作已兑现硬承诺；可先诚实写「本次会读这些路径」。
+  5. 敏感信息扫描须对齐 EO-04 遮蔽精神：不得把密钥/PII 明文写入可展示档案（完整脱敏管道可与 C.14b 协同，本卡至少不得明文落日志）。
+* **明确不包含**：完整 Impact AST 产品化（仍 v0.2+ B.1）；云端扫描；改 D.1 鉴权；抢 D.1e；把基线状态并入正式 Delivery/Task 状态机；Spec Freeze 五文档扩写。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **涉及核心文件（实现时锚定，可微调）**：
+  - Daemon 侧基线扫描入口 / 沙盒启动与熔断
+  - 只读挂载与断网证明钩子（可测）
+  - 单测：动态执行被拒；超时熔断；P0 骨架在时限内返回
+* **Pass/Fail 验收判定**（≤5）：
+  1. 带副作用的 fixture 配置在扫描中**不被执行**（可测负例）。
+  2. 沙盒内出网尝试失败或被阻断（可测）。
+  3. 超时触发熔断，不挂死进程；P0 骨架字段可返回。
+  4. 不写入用户业务树受测路径；四件套绿。
+* **FAIL**：扫描触发用户脚本/外网；或同步卡死 > 数秒无熔断；或改 D.1 / 扩 Freeze。
+
+<a id="task-c.14b"></a>
+
+#### 【Task C.14b】渐进扫 + 基线档案落盘 + 全景视口 `[COMPLETED]`
+* **任务编号**：`TASK-C.14b`
+* **前置依赖**：`TASK-C.14a` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-26 tips `0417203`/`dd14fa0`；Tina t836u；渐进扫 + `.stagent/records/baseline/` 落盘 + 全景视口 + 确认≠授权。**验收注**：全景可见「项目现状基线档案」与「认可此基线作为后续参考」；深度进度为轮询——已知缝 OK）
+* **对照痛点 / Spec 锚点**：讨论稿定案 1–2、工程补丁 2、阶段 A–E、升格备忘 3；产品名 **项目现状基线档案**；落盘 **`.stagent/records/baseline/`**（可带时间戳/commit）；**禁止** `contract_000` 伪合同命名。
+* **v0.1 范围**：
+  1. **两段式渐进扫描**：P0 骨架亮起后解锁右栏对话；P1/P2（依赖/语义等）后台流式加深，节点逐个亮起；深度未完**不阻塞**用户提需求。
+  2. 基线档案落盘至 **`.stagent/records/baseline/`**（语义清晰；可含扫描时点、工具版本、忽略规则、未完成标记）。
+  3. Studio **全景**视口呈现基线材料（尽量全：结构图 + 功能图 + 测试统计等均可）；严格遵守「观察 ≠ 质量结论」「结构存在 ≠ 保证可用」。
+  4. **确认 ≠ 授权**：确认按钮文案统一为「**认可此基线作为后续参考**」；确认**不得**签发施工 `exec_token`、不得进入正式微合同签署态、不得改 Delivery 主态冒充已授权。
+  5. 基线「待审阅 / 已确认」须与正式 Delivery/Task 状态机**隔离**（独立 Baseline 轨或全景资产状态；不得串台）。
+* **明确不包含**：把确认写成质量验收/免责签署；三张「真全景图」产品化（仍 v0.2 RFC 附录 C）；改鉴权；整包 Spec Freeze。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **Pass/Fail**：
+  1. 打开已有项目可见「正在整理现状」类进度，且 P0 后右栏可输入。
+  2. 深度扫描未完成时右栏不空白/不抛未处理异常（与 C.14c 防抢跑协同）。
+  3. 落盘路径在 `.stagent/records/baseline/` 下可观测；无 `contract_000` 目录/字段作产品主名。
+  4. 点击「认可此基线作为后续参考」后档案标记已确认，但施工写权仍未授予（可测）；四件套绿。
+* **FAIL**：确认即开写；或深度扫卡死右栏；或落盘用 Contract #0 / contract_000 冒充施工合同。
+
+<a id="task-c.14c"></a>
+
+#### 【Task C.14c】Workspace Dirty Check + 图谱白话 + Supervisor 防抢跑 `[COMPLETED]`
+* **任务编号**：`TASK-C.14c`
+* **前置依赖**：`TASK-C.14b` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-26 tips `0417203`/`e01188f`；Tina t836u；Dirty Check 管家黄标 + 首张微合同排除 + 图谱两行白话 + Supervisor 防抢跑。**验收注**：脏区黄标需工作区确有未提交/未跟踪文件才可见——已知缝 OK）
+* **对照痛点 / Spec 锚点**：讨论稿 §2.3、工程补丁 3、升格备忘 1–2；对齐 S.4 / `E_OUT_OF_SCOPE_UNTRACKED` 精神；文案「管家保护」而非系统报错。
+* **v0.1 范围**：
+  1. 基线扫描强制 **Workspace Dirty Check**：记录扫描时是否存在 `uncommitted changes` / `untracked files`。
+  2. 若脏：全景基线打**黄色提示**（非错误恐慌），管家话术示例：「发现您本地有 N 个未保存的临时文件。请放心，系统已自动把它们加入保护白名单，后续施工绝不触碰或覆盖它们。」
+  3. **首张正式微合同**默认把上述未跟踪/未提交路径排除在可写 Scope 之外（防止误覆盖）；与既有未跟踪门禁精神一致，不得静默放行覆盖。
+  4. 功能基线图谱节点展开统一两行白话：`来源线索：…`；`状态说明：已识别模块结构，但未经自动化测试验证`（或等价诚实表述）。
+  5. **P0 解锁后防抢跑**：深度分析未完时，Clarification / Impact 挂等待或按 P0 **保守降级**澄清，不得因深度未完成抛异常或空白。
+* **明确不包含**：自动 `git clean`/丢弃用户脏文件；把黄标做成阻断打开项目；完整 Impact AST；改 D.1。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **Pass/Fail**：
+  1. 脏工作区 fixture 下基线出现黄标 + 管家话术（非「代码损坏」类恐吓）。
+  2. 首张微合同 Scope/门禁默认可观测地排除脏路径（负例：尝试写入被排除路径失败或需显式扩权）。
+  3. 图谱节点展开可见两行白话。
+  4. P0 完成后、P1 未完时提问不导致未处理异常；有等待或保守澄清；四件套绿。
+* **FAIL**：黄标恐吓成报错；或脏文件被首张合同默认可写覆盖；或深度未完右栏崩溃。
+
+<a id="task-c.14d"></a>
+
+#### 【Task C.14d】脏区→Scope 真链路硬门禁 `[COMPLETED]`
+* **任务编号**：`TASK-C.14d`
+* **前置依赖**：`TASK-C.14c` (COMPLETED)、`TASK-C.12c` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-26 Tina t854u「开工」；合入见本条验收注。`dirty_exclusions`→`scope.forbidden_paths`+白话「绝不触碰」；Gateway touch 脏区→`E_OUT_OF_SCOPE_UNTRACKED`+C.12c 软停链；E2E `.env.local`+未跟踪脚本内容不变。单测 `tests/daemon/baseline-c14d.test.ts`。）
+* **对照痛点 / Spec 锚点**：讨论稿 见 Git 历史（原 `docs/archive/baseline-archive-onboarding-design.md`） §2.3 Dirty Check + 升格备忘；对齐 S.4 / `E_OUT_OF_SCOPE_UNTRACKED`；兑现 C.14c「默认排除」从口头约定到物理白名单。Tina 计划：契约安全防线 P0。
+* **v0.1 范围（施工合同 · Delta）**：
+  1. **扫描期**：Workspace Dirty Check 产出物理清单 `dirty_exclusions`（含 `uncommitted changes` 与 `untracked files`）。
+  2. **契约期**：生成**首张**微合同草案时，强制把 `dirty_exclusions` 注入 `scope.forbidden_paths`（或等价禁写字段），并在白话合同正文**显式列出**「绝不触碰」路径。
+  3. **施工期**：Worker 若 touch 任一脏区路径，立刻触发越界防御：`E_OUT_OF_SCOPE_UNTRACKED` + **C.12c** 原子链（SIGINT 软停 3s → 超时 SIGKILL → 吊销 exec_token → 清锁 → PAUSED 问人）；**禁止**静默放行覆盖。
+  4. **验收套件**：端到端用例——故意放置未提交 `.env.local` 与未跟踪脚本；验证首张合同施工**绝不**修改或删除它们（文件内容/mtime 或哈希不变）。
+* **明确不包含**：自动 `git clean`/丢弃用户脏文件；深度进度改 WS；右栏 EO 余面全量补齐；改 D.1 鉴权；扩 Spec Freeze 五正文；抢 D.1e。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **涉及核心文件（实现时锚定，可微调）**：
+  - Dirty Check → `dirty_exclusions` 序列化/落盘或入基线侧车
+  - 微合同草案装配：`scope.forbidden_paths` 注入 + 白话列表
+  - Worker/Gateway 越界路径与 C.12c 软停链接线
+  - E2E：脏区保护负例
+* **Pass/Fail 验收判定**（≤5）：
+  1. 脏工作区下首张微合同 JSON/`forbidden_paths`（或等价）可观测含脏路径；白话合同可见排除名单。
+  2. Worker 尝试写入脏路径必触发 `E_OUT_OF_SCOPE_UNTRACKED`（或等价越界码），且走软停→杀链路，不静默成功。
+  3. E2E：`.env.local` 与未跟踪脚本内容在施工后不变。
+  4. 四件套绿；不改 D.1；不扩 Freeze 五正文。
+* **FAIL**：排除仅文案无字段；或脏文件被默认可写覆盖；或越界不触发 C.12c。
+
+<a id="task-c.14e"></a>
+
+#### 【Task C.14e】扫描器 OS 级只读与断网沙盒证明 `[COMPLETED]`
+* **任务编号**：`TASK-C.14e`
+* **前置依赖**：`TASK-C.14a` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-26 Tina t854u「开工」。`daemon/baseline/os-sandbox.ts`；渐进扫附 `archive.os_sandbox` 证明。**Darwin 实情**：`sandbox-exec` Seatbelt；写拒码多为 **`EPERM`**（平台等价 EROFS，**不是** Linux EROFS）；断网多为 **`ENOTFOUND`**。Linux：`unshare -n`，无 RO mount 权限则 `logical_fallback`。反向证伪单测 `tests/daemon/baseline-c14e.test.ts`。证明前不得升级硬承诺文案。）
+* **对照痛点 / Spec 锚点**：讨论稿原则 4 / §7 只读证明；C.14a 验收注「逻辑级只读/断网意图已测；**非** OS 只读挂载」。Tina 计划：物理安全底线 P0。
+* **v0.1 范围（施工合同 · Delta）**：
+  1. **物理挂载隔离**：扫描分析进程经轻量只读容器或只读绑定挂载（RO bind mount / sandbox read-only）运行；对用户业务树写操作在 OS 层失败。
+  2. **物理断网**：扫描进程禁用外网（unshare network namespace 或空网络隔离）；禁止出站请求。
+  3. **确定性反向证伪单测**：
+     - `test_scan_fails_on_write`：扫描器试图 `fs.writeFileSync`（或等价）业务树路径时必报 `EROFS`（Read-only file system）或平台等价只读错误；
+     - `test_scan_fails_on_outbound_network`：试图 `fetch()` / `socket` 出站时必失败（网络不可达/被隔离）。
+  4. 机制证明前，界面仍不得把「绝不触碰线上业务」写成已兑现硬承诺；证明通过后可升级文案。
+* **明确不包含**：云端扫描；完整 Impact AST；深度进度改 WS；改 D.1；扩 Spec Freeze 五正文；抢 D.1e。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **涉及核心文件（实现时锚定，可微调）**：
+  - 扫描器沙盒启动：RO mount + network namespace
+  - 平台适配说明（macOS/Linux 路径差异须诚实登记）
+  - 反向证伪单测两则
+* **Pass/Fail 验收判定**（≤5）：
+  1. write 负例稳定得到 EROFS（或文档登记的平台等价错误），业务树文件未改。
+  2. outbound 负例稳定失败，无外网成功回包。
+  3. 既有 C.14a P0 骨架时限与禁动态执行回归仍绿。
+  4. 四件套绿；不改 D.1；不扩 Freeze 五正文。
+* **FAIL**：仍仅逻辑约定无 OS 证明；或负例可写/可出网；或改鉴权/扩 Freeze。
+
+
+<a id="task-c.14f"></a>
+
+#### 【Task C.14f】基线深度进度真 WS/流式 `[COMPLETED]`
+* **任务编号**：`TASK-C.14f`
+* **前置依赖**：`TASK-C.14b` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（Tina t855u 实现；合入 tip `5f6ca93` `feat: C.14f BASELINE_PROGRESS WS + C.15a–d EO 余面 Delta`；矩阵与卡内双写已于 DOC-2 / 2026-11-01 对齐）
+* **对照痛点 / Spec 锚点**：基线讨论稿 §5 渐进扫 + §7 流式协议仍 OPEN；C.14b 验收注「深度进度为轮询——已知缝」。项 2（P1 体验）升格。
+* **v0.1 范围（施工合同 · Delta）**：
+  1. Daemon 在渐进扫 `onP0` / 深度进展 / `onDone` 时经已有 WebSocket 广播 **`BASELINE_PROGRESS`**（载荷含 `scan_id`、`phase`、`progress_copy`、节点增量或全量摘要、`grants_construction:false`）。
+  2. 前端全景**停止**固定 2s `setInterval` 轮询作为主路径；改为订阅 WS；保留首连/重连一次 `GET /api/baseline` 兜底。
+  3. **P0 秒级解锁右栏**不变；深度未完不阻塞提需求（与 C.14c 防抢跑协同）。
+  4. 帧字典 bump：`BASELINE_PROGRESS` 入 `IPC_FRAME_TYPES` / `FRAME_CATALOG`（server→client）；更新字典单测。
+* **明确不包含**：改 D.1 鉴权；抢 D.1e；扩 Spec Freeze 五正文；假百分比进度条；云端多端同步。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **涉及核心文件（实现时锚定，可微调）**：
+  - `src/lib/ipc/frames.ts`；`daemon/server.ts` `ensureBaselineScan` 回调广播
+  - `src/routes/index.tsx` / 全景消费路径
+  - 单测：广播可观测；前端不再依赖 2s 轮询主路径
+* **Pass/Fail 验收判定**（≤5）：
+  1. 扫描过程中客户端可在无 2s 轮询情况下收到 ≥1 次 `BASELINE_PROGRESS`（P0 与 done）。
+  2. P0 后右栏仍可输入；深度未完不抛未处理异常。
+  3. 帧字典含 `BASELINE_PROGRESS`；字典单测绿。
+  4. 相关单测绿；不改 D.1；不扩 Freeze 五正文。
+* **FAIL**：仍仅靠 2s 轮询更新全景；或阻塞右栏；或改鉴权。
+
+<a id="task-c.15a"></a>
+
+#### 【Task C.15a】EO-01 DeliveryState 完备 `[COMPLETED]`
+* **任务编号**：`TASK-C.15a`
+* **前置依赖**：`TASK-C.12b` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（Tina t855u 实现；合入 tip `5f6ca93`；`src/lib/delivery-state.ts` + 转移 DAG；DOC-2 / 2026-11-01 对齐）
+* **对照痛点 / Spec 锚点**：右栏 §14.11 EO-01；C.12b 已落地 epoch/seq + 简化枚举投影，缺完整态与合法转移表。
+* **v0.1 范围**：
+  1. 扩展 `DeliveryState` 至 EO-01 完备集（至少补 `PLAN_READY`、`VERIFYING`、`REWORK_REQUIRED`、`ESCALATED_HUMAN`；Demo 三态可用主干 `DEMO_READY`+`demo_mode` 或分立 `DEMO_*_READY`，须可测且与 C.12d 不打架）。
+  2. 提供**合法转移**辅助（DAG/单向精神）：`REWORK_REQUIRED` 仅 `VERIFYING` 且 `MERGED` 前；`MERGED` 后新缺陷不得倒流，须新微合同。
+  3. `projectDeliveryState` 覆盖更多 lifecycle；`DELIVERED` 仅在归档成功路径投影。
+  4. **不推翻** C.12b 的 `session_epoch`/`state_seq` 与客户端去重。
+* **明确不包含**：重做前端状态管理；Impact AST；云同步；重复实现 Top5 Token/软停。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **Pass/Fail**：
+  1. 新枚举值 `isDeliveryState` 为真；非法倒流（如 `MERGED`→`REWORK_REQUIRED`）被拒。
+  2. 资产 `FROZEN` 仍不得冒充 DeliveryState。
+  3. 与 C.12b 单测回归绿。
+* **FAIL**：删掉 epoch/seq；或允许 MERGED 后倒流返工。
+
+<a id="task-c.15b"></a>
+
+#### 【Task C.15b】EO-08 断言身份与返工计数 `[COMPLETED]`
+* **任务编号**：`TASK-C.15b`
+* **前置依赖**：`TASK-C.15a` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（Tina t855u 库；t866u 活路径接线）
+* **对照痛点 / Spec 锚点**：§14.11 EO-08 / DEC-05；返工 2 次上限须不可伪造身份。
+* **v0.1 范围**：
+  1. Daemon 以确定性 **`UUIDv5(namespace, assertion_text)`**（或 `contract_id + acceptance_assertion_id`）生成 `assertion_id`。
+  2. 返工计数由 Daemon 权威存储；Worker/LLM **只读**；同断言满 2 次 → `ESCALATED_HUMAN`。
+  3. **`REWORK_REQUIRED` 期间禁止追加新断言**（须合同修订/新微合同）。
+  4. 拆流钩子（可测）：同句老 Bug+新需求时，老断言 +1、新需求标 Out-of-Scope（至少 API/纯函数可测）。
+* **明确不包含**：完整 Supervisor 自然语言拆流产品化；改 D.1；云端计数。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **Pass/Fail**：
+  1. 同文本反复生成同一 `assertion_id`；改写文本得新 ID 不得清零旧计数器（旧 ID 仍在）。
+  2. 计数到 2 → 进入 `ESCALATED_HUMAN`（或返回该态建议）。
+  3. 返工期 `addAssertion` 失败。
+  4. 单测绿。
+  5. **活路径（t866u）**：签署 seed → execute 断言失败计返工 → 第 3 次升格 `PENDING_RESUME`；HTTP rework 读写权威。
+* **FAIL**：模型可自造 ID 清零；或返工期默许加断言；或库绿但 Daemon 不计数。
+
+<a id="task-c.15c"></a>
+
+#### 【Task C.15c】EO-05 两阶段归档/GC 细项 `[COMPLETED]`
+* **任务编号**：`TASK-C.15c`
+* **前置依赖**：`TASK-C.12d` (COMPLETED)、`TASK-C.12e` (COMPLETED)、`TASK-C.15a`
+* **任务状态**：**[COMPLETED]**（Tina t855u 实现；合入 tip `5f6ca93`；签署期白名单 GC + MERGED→DELIVERED 事务边界；DOC-2 / 2026-11-01 对齐）
+* **对照痛点 / Spec 锚点**：§14.11 EO-05 / DEC-01；C.12d/e 已有轻量 records+manifest，缺签署期白名单 GC 与完整 `MERGED`→`DELIVERED` 事务边界。
+* **v0.1 范围**：
+  1. **签署期 GC**：仅白名单临时缓存（未采纳 Diff 碎片、Demo `.cache/` 等）；**禁止**清 drafts / 活跃 Demo / 刚冻结 snapshot。
+  2. **`MERGED`→`DELIVERED`**：顺序 ①脱敏 Audit Log ②轻量 Demo 拷贝至 records（无 `node_modules`）③按 EO-09 精神清理/封存 worktree；**任一步失败 → 停 `MERGED` 告警，严禁标 `DELIVERED`**。
+  3. 与现有 `archiveContractRecords` / `audit-manifest` **并存加固**，不推翻 C.12e。
+* **明确不包含**：云归档；莽撞 `rm -rf` drafts；改 D.1。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **Pass/Fail**：
+  1. 白名单外路径在签署 GC 中保留。
+  2. 模拟归档中段失败 → 状态/标志不得为 `DELIVERED`。
+  3. 成功路径可标 `DELIVERED`（或返回可交付证明）。
+  4. C.12d/e 回归绿。
+* **FAIL**：签署 GC 误删 drafts；或失败仍 DELIVERED。
+
+<a id="task-c.15d"></a>
+
+#### 【Task C.15d】P0 AC-ISOL 草稿隔离 + EO-09 Worktree seal `[COMPLETED]`
+* **任务编号**：`TASK-C.15d`
+* **前置依赖**：`TASK-C.15c`
+* **任务状态**：**[COMPLETED]**（Tina t855u 实现；合入 tip `5f6ca93`；`.stagent/` gitignore + drafts 路由 + worktree seal manifest；DOC-2 / 2026-11-01 对齐）
+* **对照痛点 / Spec 锚点**：§13 P0 / AC-ISOL（§8.5.2）；§14.11 EO-09。P1 sufficiency / P2 确认分级 / P3 视口防抖 **本卡不实现，仍 backlog**。
+* **v0.1 范围**：
+  1. 项目初始化/打开时确保根 `.gitignore` 含 **`.stagent/`**（可幂等追加；不当 ACL）。
+  2. 草稿默认路由 **`.stagent/drafts/`**（目录可创建；与 Worker 可写 Scope 隔离精神一致）。
+  3. Worktree **路径稳定封存**：写 `.stagent/worktrees/{contract_id}/.stagent_manifest.json`（`sealed: true` 等）；封存失败不得假装已释放排他锁（可测钩子/标志）。
+* **明确不包含**：P1 Schema / P2 里程碑 UX / P3 防抖；容器 Mode；改 D.1；裸 `mv` worktree。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **Pass/Fail**：
+  1. fixture 无 `.stagent/` ignore 时调用后出现规则。
+  2. seal manifest 可写可读；`sealed:true`。
+  3. 单测绿；不扩 Freeze 五正文。
+* **FAIL**：把 gitignore 当沙盒 ACL 宣传；或 seal 失败仍释放锁且无登记。
+
+
+
+<a id="task-c.16"></a>
+
+#### 【Task C.16】ActivityBar 单门：列表+操作台 `[COMPLETED]`
+* **任务编号**：`TASK-C.16`
+* **前置依赖**：`TASK-C.10f` (COMPLETED)、`TASK-C.10c` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-26 Tina t892u 点头授权「单门：列表+操作台」；立卡+实现同批）
+* **对照痛点**：左侧 ActivityBar 挂「项目审阅」与「合同操作台」像两套产品；非开发用户懵。
+* **v0.1 范围（薄卡）**：
+  1. ActivityBar **日常只挂一扇**「合同操作台」门（`activity-workbench`）；收掉并列的审阅/图谱日常图标。
+  2. 进门后：本项目**需求/合同列表** + **规范与资产**在操作台**左侧栏**；点需求即在五视口干活。
+  3. 「项目全景」（原审阅深页：架构/准入）改为操作台内次入口，**不**再占第二 ActivityBar 图标。
+  4. 资源管理器保持**纯文件树**；规范与资产不塞回文件树。
+* **明确不包含**：改鉴权 / D.1e；拆多路由；扩 Spec Freeze 五正文；football 项目；重做指挥纪律。
+* **三项不变**：本卡不改变鉴权、Demo Origin、点亮三证（ADR-0001 后果节）；核验方式为评审期对照本声明检查代码 diff，不存在运行时证据。
+* **涉及核心文件**：`ActivityBar.tsx`、`workbench-labels.ts`、`StudioViewportShell.tsx`、`WorkspaceLayout.tsx`、`routes/index.tsx`；单测 `tests/ui/task-c16-single-door.test.tsx` + ide-shell / left-boss / index-route 回归。
+* **Pass/Fail**：
+  1. ActivityBar 无 `activity-supervisor` / `activity-graph` 日常图标；有 `activity-workbench`。
+  2. 点单门可见 `studio-contract-rail` 需求列表；点需求仍停在合同操作台。
+  3. 左栏文件树无需求列表 / 规范与资产。
+* **FAIL**：仍挂双门当日常入口；或把规范与资产塞回文件树。
+
+<a id="task-c.17"></a>
+
+#### 【Task C.17】P0 调试日志（JSONL + 旅程 + Worker + UI trace） `[COMPLETED]`
+* **任务编号**：`TASK-C.17`
+* **前置依赖**：`TASK-C.16` (COMPLETED)、`TASK-H.8` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-26 Tina t894u「按这四项开干」；立卡+实现同批）
+* **对照痛点**：Tina 真实试用只能收集主观感受；刷新后「点了没反应 / 澄清绕 / 视口空 / 模型慢」对不上完整时间线——默认无 Daemon 文件日志，右栏对话与点击几乎不落盘。
+* **v0.1 范围（薄卡 · 四项）**：
+  1. Daemon 默认 JSONL：`<repo>/.stagent/logs/daemon.jsonl`（ts、requestId、contractId、sessionId?、route/frame、code?、duration_ms?；info；约 8MiB 简单轮转 `.1`）。
+  2. Supervisor 澄清旅程落盘：每轮 user/assistant → `journey-<cid|orphan>.jsonl`（+ 可选 SupervisorSession）；`GET /api/supervisor/journey` 刷新还原。
+  3. WORKER_LOG / TERMINAL_STREAM 有界落盘：`.stagent/logs/worker-<cid>.jsonl`（与 WS 并行）。
+  4. 前端轻量 UI trace：CTA 点击 / viewport 切换 / disabled 原因 → `POST /api/client-events` 写入同日志体系；刷新不丢。
+  5. （尽量）Enrich/Worker LLM 记 duration_ms、enrichCode/model、token（**禁密钥**）。
+* **明确不包含**：改鉴权 / D.1e；扩 Spec Freeze 五正文；football 项目；扩 v0.2；云端日志同步。
+* **涉及核心文件**：`daemon/core/debug-log.ts`、`daemon/server.ts`、`daemon/supervisor/enrich-openai.ts`、`daemon/worker/openai-client.ts`、`bin/stagent.ts`、`daemon/pipeline/orchestrator.ts`、`src/lib/ui-trace.ts`、`src/lib/daemon-api.ts`、`src/routes/index.tsx`、`StudioViewportShell.tsx`、`AgentChatPane.tsx`；单测 `tests/unit/task-c17-debug-log.test.ts`、`tests/unit/task-c17-ui-trace.test.ts`。
+* **Pass/Fail**：
+  1. 起 Daemon 后发任意 `/api/*` → `.stagent/logs/daemon.jsonl` 出现含 ts/requestId/route/duration_ms 的行。
+  2. 走一轮澄清 → `journey-*.jsonl` 有 user+assistant；刷新工作台右栏可还原摘要。
+  3. 施工/验收有输出 → `worker-<cid>.jsonl` 有界行；与 WS 并存。
+  4. 点 CTA / 切视口 / 点禁用发送 → client-events 入 daemon.jsonl（kind=client）。
+* **FAIL**：日志写密钥；或落盘失败拖垮施工主路径；或扩写 v0.2 能力。
+
+### 3.4b v0.1 硬化与稳定性收敛（Hardening · Tina t877u 立卡；不碰 v0.2 封印）
+
+<a id="task-c.18"></a>
+
+#### 【Task C.18】方案工作台单页（自由对话 + 方案审阅 + 确认方案开工） `[COMPLETED]`
+
+* **任务编号**：`TASK-C.18`
+* **任务名称**：方案工作台单页（自由对话 + 方案审阅 + 确认方案开工）
+* **前置依赖**：`TASK-C.17` (COMPLETED)、`TASK-C.16` (COMPLETED)
+* **优先级**：P4 体验打磨（Tina 试用阻塞）
+* **状态**：`[COMPLETED]`（2026-10-26 Tina t905u「改代码…只需要一个页面」）
+* **一句话目标**：去掉五视口；右侧真正自由聊挖需求；中间单页方案审阅（图/决策/冲突）；够完整才「生成 Demo」；最底仅「确认方案」冻结 Spec 并直接开工。
+* **范围**：
+  1. `StudioViewportShell` 收敛为单页「方案审阅」；ActivityBar 仍单门进「方案工作台」。
+  2. 右栏 `AgentChatPane` 取消 ≤2 轮选择题门控；对话启发式刷新 `SchemeDraft`。
+  3. `SchemeReviewPane`：mermaid/模块/决策确认/冲突抉择/手改备注；`demoReady` 才显示「生成 Demo」；最底「确认方案」→ 冻结 + PENDING_APPROVAL + approve + 任务图 + Worker。
+  4. 旧五视口组件文件保留但不作日常入口；合同/授权主链路经「确认方案」收敛。
+* **非目标**：不扩 Spec Freeze 五正文；不抢 D.1e；不扩 v0.2；不做完美 LLM 自动画图（启发式薄切片）。
+* **验收**：
+  - 打开工作台不见五视口 Tab；见「方案审阅」单页。
+  - 右侧可自由发送，不强制选择题。
+  - 对话后中间方案更新；完整度≥阈值才出现「生成 Demo」；无「继续澄清」按钮。
+  - 「确认方案」后合同进入授权/执行链路。
+* **关键文件**：`src/components/studio/StudioViewportShell.tsx`、`SchemeReviewPane.tsx`、`src/lib/journey/scheme-draft.ts`、`src/routes/index.tsx`、`src/lib/workbench-labels.ts`、`src/components/studio/viewport-routing.ts`
+
+<a id="task-c.19"></a>
+
+#### 【Task C.19】Supervisor SSOT 合流（DOC-SSOT-Supervisor） `[COMPLETED]`
+* **任务编号**：`TASK-C.19`（别名 `DOC-SSOT-Supervisor`）
+* **任务名称**：将 Supervisor 散落设计合流为唯一权威源 v2.0
+* **前置依赖**：`TASK-C.18` (COMPLETED)
+* **优先级**：P4 规范合流（Tina t906u 点名）
+* **状态**：`[COMPLETED]`（2026-10-26 Tina t906u「直接…起草统合后的 Supervisor 完整规范」）
+* **一句话目标**：新建 `supervisor.md` 五大章 SSOT；旧右栏/工作流/澄清授权/接口清单等加指针；结束多文档打架。
+* **范围**：
+  1. 新建 `docs/specs/supervisor.md`：角色人设、旁观编译、中栏呈现、硬门禁、生命周期异常。
+  2. 洗练合并右栏设计、端到端工作流、澄清授权、接口清单、运转机制、C.14/C.16/C.18 与已验硬防线；写入 C.18 现行体验定案。
+  3. 旧关键文档文首「已迁入 SSOT」指针；reports README + Spec Freeze 指向 SSOT。
+  4. 本任务规范薄卡回写 COMPLETED。
+* **非目标**：不改 daemon/src 产品代码；不整份删除旧文；不升格 Impact AST/v0.2 封印；不抢 D.1e。
+* **验收**：
+  - SSOT 文件存在且含五大核心章节。
+  - 至少 4 份旧 Supervisor 相关文文首指向 SSOT。
+  - 本文矩阵/详细卡/changelog 含 C.19 COMPLETED。
+* **关键文件**：`docs/specs/supervisor.md`、`docs/reports/*Supervisor*`、`docs/reports/Stagent_Clarification*`、`docs/reports/Stagent_Interface*`、`docs/reports/README.md`、`docs/reports/spec-freeze-record.md`
+
+
+<a id="task-c.20"></a>
+
+#### 【Task C.20】Supervisor 合流前碎片归档（DOC-ARCHIVE-Supervisor-pre-SSOT） `[COMPLETED]`
+* **任务编号**：`TASK-C.20`（别名 `DOC-ARCHIVE-Supervisor-pre-SSOT`）
+* **任务名称**：将 Supervisor SSOT 合流前散落文档归档（不硬删）
+* **前置依赖**：`TASK-C.19` (COMPLETED)
+* **优先级**：P4 规范归档（Tina t908u 点名「归档」）
+* **状态**：`[COMPLETED]`（2026-10-26 Tina t908u「归档」）
+* **一句话目标**：5 份 Supervisor 碎片迁入 见 Git 历史（原 `docs/archive/supervisor-pre-ssot/`）；原路径 stub；SSOT 仍为唯一权威。
+* **范围**：
+  1. 新建 见 Git 历史（原 `docs/archive/supervisor-pre-ssot/`） + README。
+  2. `git mv`：右栏设计、E2E 工作流、澄清授权、接口清单、运转机制。
+  3. 原 `docs/reports/` 同名 stub → SSOT + 归档路径；更新 archive/reports README、Spec Freeze 指针、SSOT §0 路径表。
+  4. Spec Freeze 总册保留在 reports（全局多主题）；本任务规范薄卡回写 COMPLETED。
+* **非目标**：不硬删；不改 daemon/src 产品代码；不整份归档 Spec Freeze / DocGov / 合同说明 / Top7；不抢 D.1e；不扩 v0.2。
+* **验收**：
+  - 归档目录含 5 份正文 + README。
+  - reports 同名路径为 stub 且指向 SSOT。
+  - 本文矩阵/详细卡/changelog 含 C.20 COMPLETED。
+* **关键文件**：见 Git 历史（原 `见 Git 历史（原 `docs/archive/supervisor-pre-ssot/`）**`）、`docs/reports/*`（stub）、`docs/specs/supervisor.md`、`docs/reports/spec-freeze-record.md`、本文。
+
+<a id="task-c.21"></a>
+
+#### 【Task C.21】Supervisor SSOT 审查补丁（DOC-SSOT-Supervisor-Patch） `[COMPLETED]`
+* **任务编号**：`TASK-C.21`（别名 `DOC-SSOT-Supervisor-Patch`）
+* **任务名称**：将 Tina 审查的 Demo/通配/确认时序/pin/降级/demoReady 冲突钉进 SSOT v2.0.1
+* **前置依赖**：`TASK-C.20` (COMPLETED)
+* **优先级**：P4 规范补丁（Tina t910u「补丁」）
+* **状态**：`[COMPLETED]`（2026-10-26 Tina t910u「补丁」）
+* **一句话目标**：SSOT 升 v2.0.1，覆盖 EO-06 硬卡误读与冷启动通配等六处病灶，供后续实现不走样。
+* **范围**：
+  1. 修订 `docs/specs/supervisor.md`：§2.1/2.2、§3.3/3.4、§4.2/4.6、§5.2.1、§5.4.1 + changelog。
+  2. 本任务规范薄卡回写 COMPLETED（矩阵/详细卡/changelog/DAG）。
+* **非目标**：不改 daemon/src 产品代码；不重开五视口；不抢 D.1e；不扩 v0.2。
+* **验收**：
+  - SSOT 文首版本为 v2.0.1 且含六条补丁摘要。
+  - 本文矩阵/详细卡/changelog 含 C.21 COMPLETED。
+* **关键文件**：`docs/specs/supervisor.md`、本文。
+
+<a id="task-h.1"></a>
+
+#### 【Task H.1】Worker JSON/Patch 解析校验与轻量重试 `[COMPLETED]`
+
+* **任务编号**：`TASK-H.1`
+* **前置依赖**：`TASK-W.5a` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-26 Tina t878u 全部开工；parse-worker-output + OpenAi ≤1 重试；单测 PASS）
+* **对照痛点 / Spec 锚点**：主路径纪要 §4#2 — `run-worker` 偶发 Patch/JSON 解析失败导致施工 flake。
+* **v0.1 范围（微卡 · 单毛刺）**：
+  1. 对 Worker 模型输出做**格式校验拦截**（非法 JSON / 缺必填 patch 字段 → 明确错误，不挂起）。
+  2. 校验失败时允许 **≤1 次**轻量本地重试（同轮）；仍失败则平稳报错退回可观测状态（非无声失败）。
+* **明确不包含**：换模型供应商；W.5b/c 容器；改 Scope/鉴权；扩写新能力。
+* **涉及核心文件（实现时锚定，可微调）**：`daemon/worker/**` 解析路径；单测 `tests/unit/task-h1-worker-parse-retry.test.ts`
+* **Pass/Fail 验收判定**（1~2 条确定性断言）：
+  1. 注入非法 JSON → 返回可识别错误码/消息且进程不挂起；可选触发正好 1 次重试钩子。
+  2. 合法最小 patch → 一次解析成功、零重试。
+* **FAIL**：挂起/无声失败；或重试无限；或借机引入新 Adapter。
+
+<a id="task-h.2"></a>
+
+#### 【Task H.2】MERGED/DELIVERED 终态收口消歧 `[COMPLETED]`
+* **任务编号**：`TASK-H.2`
+* **前置依赖**：`TASK-C.15a` (COMPLETED)、`TASK-C.15c` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-26 Tina t878u；**方案 B**：MERGED=对外终态；DELIVERED 为 EO-01 别名；merger 暴露 deliveryTerminal）
+* **对照痛点 / Spec 锚点**：纪要 §4#1 — 规范文案 `DELIVERED` vs 现网运行时终态 `MERGED` 两层皮。
+* **v0.1 范围（二选一，卡内必须拍板并测通）**：
+  1. **方案 A（升格）**：`MERGED` 后 Daemon 完成本地审计 + 轻量 records 归档校验，**原子**推进 `DELIVERED`；失败停 `MERGED`（对齐 C.15c 精神）。
+  2. **方案 B（精简注记）**：正式在文档与前端统一注记 **`MERGED` 即为交付终态**；废弃对外单独 `DELIVERED` 承诺（或仅作别名投影）。
+* **明确不包含**：云端 records 同步；改 D.1；重做合并门禁。
+* **涉及核心文件**：`DeliveryState` / 归档路径 / 前端终态文案；单测 `tests/unit/task-h2-terminal-state-closure.test.ts`
+* **Pass/Fail**（1~2）：
+  1. 选定方案后：成功归档路径的对外终态与代码枚举**一致可测**（A：出现 `DELIVERED`；B：UI/API 文案认定 `MERGED`=终态且无悬空 DELIVERED 承诺）。
+  2. 归档中段失败不得标交付完成（A：非 DELIVERED；B：不得伪造成功文案）。
+* **FAIL**：规范与代码继续两层皮；或失败仍标交付完成。
+
+<a id="task-h.3"></a>
+
+#### 【Task H.3】基线扫描硬上限与超时熔断 `[COMPLETED]`
+* **任务编号**：`TASK-H.3`
+* **前置依赖**：`TASK-C.14a` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-26 Tina t878u；SCAN_MAX_FILES/DEPTH + truncate 白话；单测 PASS）
+* **对照痛点 / Spec 锚点**：纪要目标 2 — 超大仓库扫描导致 Daemon 假死/内存暴涨风险；C.14a 已有约 3s 熔断意图，缺文件数/深度硬上限固化。
+* **v0.1 范围**：
+  1. 扫描增加**文件数量硬上限**与**目录深度硬上限**（常量可配置但有默认值）；超限提前结束并白话说明「已截断」。
+  2. 超时中断保持可观测；**不**解除 OS 只读挂载证明。
+* **明确不包含**：完整 Impact AST；动态执行扫描；改鉴权。
+* **涉及核心文件**：基线扫描器；单测 `tests/unit/task-h3-scan-hard-cap.test.ts`
+* **Pass/Fail**（1~2）：
+  1. fixture 超文件数上限 → 扫描停止且返回截断标志/文案；Daemon 不假死。
+  2. 超时路径可测中断（或 mock 时钟）且只读证明不被绕过。
+* **FAIL**：无上限扫爆内存；或借机上 AST。
+
+<a id="task-h.4"></a>
+
+#### 【Task H.4】空目录友好 git init 引导 `[COMPLETED]`
+* **任务编号**：`TASK-H.4`
+* **前置依赖**：`TASK-D.1b` (COMPLETED)、`TASK-D.1d` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-26 Tina t878u；ensureGitInit + CLI open 自动 / API 单键；已有仓幂等）
+* **对照痛点 / Spec 锚点**：纪要已知缝 — 空目录打开不会自动 `git init`，后续合同/合并链路卡顿。
+* **v0.1 范围**：
+  1. 打开空（或无 `.git`）目录时提供**友好自动或单键** `git init` 引导（白话确认，非静默破坏已有仓）。
+  2. init 成功后主路径可继续基线/合同；失败给出可理解错误。
+* **明确不包含**：D.1e 系统选文件夹；改写已有 Git 历史；云克隆。
+* **涉及核心文件**：`stagent open` / 打开项目面板；单测 `tests/unit/task-h4-empty-dir-git-init.test.ts`
+* **Pass/Fail**（1~2）：
+  1. 无 `.git` 的空目录经引导后出现合法 `.git` 且打开流程可继续。
+  2. 已有 `.git` 目录不得被再次 init 破坏（幂等/跳过可测）。
+* **FAIL**：静默 `git init` 毁掉已有仓；或抢做 D.1e。
+
+
+<a id="task-h.5"></a>
+
+#### 【Task H.5】旅程草案 `contract_id` 不丢 `[COMPLETED]`
+* **任务编号**：`TASK-H.5`
+* **前置依赖**：`TASK-S.6` (COMPLETED)、`TASK-C.11a` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（2026-10-26 Tina t881u「开工」；persistJourneyDraft + 顶层 contract_id）
+* **对照痛点 / Spec 锚点**：主路径纪要 §4#3 / 走查阻塞 — 旅程草案偶发不直接带出合同 id，靠 API 另立薄卡才继续。
+* **v0.1 范围（微卡 · 单毛刺）**：
+  1. 草案创建成功路径的响应/会话投影**必须**带回可解析非空 `contract_id`（与落盘合同一致）。
+  2. 若创建失败或 id 不可用：返回**显式可观测错误**，禁止静默丢 id 后假装进入签署流。
+* **明确不包含**：重做旅程引擎；改 D.1 鉴权；扩写新 Supervisor 能力；云端会话。
+* **涉及核心文件（实现时锚定，可微调）**：Supervisor 旅程/草案创建路径；单测 `tests/unit/task-h5-draft-contract-id.test.ts`
+* **Pass/Fail 验收判定**（1~2 条确定性断言）：
+  1. 最小成功草案 fixture → 响应含非空 `contract_id` 且可读回同 id 合同。
+  2. 故意打断创建 → 不得出现「无 id 却可签署」的成功态；错误码/消息可识别。
+* **FAIL**：静默丢 id；或借机重写整段旅程/引入新画布。
+
+<a id="task-h.6"></a>
+
+#### 【Task H.6】脏区引导精修（acknowledge_dirty） `[COMPLETED]`
+* **任务编号**：`TASK-H.6`
+* **前置依赖**：`TASK-C.14c` (COMPLETED)、`TASK-C.14d` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（Tina t881u；白话 409 + ack 排除落盘）
+* **对照痛点 / Spec 锚点**：硬化目标 2 — 非技术用户卡在脏区 409；临时凭证/本地文件误入脏区缺低恐慌排除建议。
+* **v0.1 范围**：
+  1. 固化 `acknowledge_dirty` 拦截：未确认开工 → **409** + **白话、低恐慌**排除建议（点名常见凭证/本地文件模式，非堆栈恐吓）。
+  2. 确认后脏路径进入 Scope 排除/禁写清单；Worker 不得改这些路径。
+* **明确不包含**：改鉴权；放松 Scope；OS 沙盒重做；Impact AST。
+* **涉及核心文件**：脏区拦截/文案路径；单测 `tests/unit/task-h6-dirty-guidance.test.ts`
+* **Pass/Fail**（1~2）：
+  1. 未 `acknowledge_dirty` 开工 → 409，且消息含至少一条可执行排除建议（可测子串/结构字段）。
+  2. 确认后脏路径出现在排除/禁写集合，touch 被拒（复用 C.14d 精神，不重做整卡）。
+* **FAIL**：仅抛生硬 409 无引导；或确认后仍可改脏文件。
+
+<a id="task-h.7"></a>
+
+#### 【Task H.7】主链路回归套件锁死 `[COMPLETED]`
+* **任务编号**：`TASK-H.7`
+* **前置依赖**：`TASK-H.1`–`TASK-H.4` (COMPLETED)、`TASK-E.1` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（Tina t881u；`scripts/mainline-regression.mjs` + `npm run test:mainline`）
+* **对照痛点 / Spec 锚点**：硬化目标 3 — 将打开→基线/脏区→需求/Demo→签署→施工→验收→MERGED 及优先补测（质疑回灰、返工超限、git trim）沉淀为可重复回归。
+* **v0.1 范围**：
+  1. 提供**本地可重复**主链路回归脚本/断言入口（CI 可挂；允许 fixture/ stub，不强制真模型账单）。
+  2. 至少锁住：`git porcelain` 行首空格（trim 回归）与 Top5/门禁相关既有绿测不被静默删掉（清单指纹或显式调用）。
+* **明确不包含**：新功能；真云 E2E；W.5b/c；改产品状态机语义。
+* **涉及核心文件**：`scripts/` 或 `tests/` 回归入口；单测/脚本断言 `tests/unit/task-h7-mainline-regression.test.ts`（或等价脚本 exit 码约定）
+* **Pass/Fail**（1~2）：
+  1. 回归入口在干净树上 exit 0（或 vitest 目标绿）且覆盖「打开→…→MERGED」关键节点断言清单（文档列明）。
+  2. 故意破坏 porcelain trim 行为时，回归**失败**（防再打坏）。
+* **FAIL**：只有文档无脚本；或借机塞进新业务功能。
+
+<a id="task-h.8"></a>
+
+#### 【Task H.8】records 脱敏导出与单项目清理 `[COMPLETED]`
+* **任务编号**：`TASK-H.8`
+* **前置依赖**：`TASK-C.12e` (COMPLETED)、`TASK-C.15c` (COMPLETED)
+* **任务状态**：**[COMPLETED]**（Tina t881u；`POST /api/records/export|cleanup`）
+* **对照痛点 / Spec 锚点**：硬化目标 3 / EO-03·EO-05 — 用户需直接拿到交付归档；缺一键脱敏 zip 与单项目彻底清理。
+* **v0.1 范围**：
+  1. `.stagent/records/` **一键脱敏打包**为 zip（导出物不含明文密钥/Token；敏感字段按既有 redact 规则）。
+  2. **单项目彻底清理**机制：可清除该项目 records（及约定附属）且幂等；清理后不影响源码工作树业务文件。
+* **明确不包含**：云端 records 同步；多租户；改 D.1；重做 audit-manifest 语义（可复用 C.12e）。
+* **涉及核心文件**：records 导出/清理 CLI 或 API；单测 `tests/unit/task-h8-records-export-cleanup.test.ts`
+* **Pass/Fail**（1~2）：
+  1. 导出 zip 可解开且抽样断言无未脱敏密钥样式字段；含合同/归档清单类文件。
+  2. 清理后目标 records 目录不存在（或空）且二次清理不抛致命错（幂等）。
+* **FAIL**：zip 含明文 Key；或清理删到源码；或上云。
+
+
+<a id="task-h.9"></a>
+
+#### 【Task H.9】废止 `.stagent/metadata/` 写入（对齐 ADR-0011）`[COMPLETED]`（ledger **DLV-4**）
+
+* **任务编号**：`TASK-H.9`
+* **任务名称**：清除代码对 `.stagent/metadata/` 的写入，统一到 `.stagent/records/`
+* **对应规格**：[ADR-0011](../adr/0011-audit-sidecar-records-path.md)；ledger **DLV-4**；scheme REJ-007
+* **前置依赖**：`TASK-C.12e` / `TASK-C.15c`（COMPLETED · records 侧车已落地）
+* **优先级**：P3 · **NON_BLOCKER**（**不阻断** `TASK-L.15`）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#50](https://github.com/he18718143986-design/IDE/pull/50) / tip `34213c8`（`fix(H.9): move demo-confirm from .stagent/metadata to records`；GitHub squash merge）
+* **合入说明**：写入统一 `.stagent/records/demo-confirm.json`；`LEGACY_` 旧路径只读。`readDemoConfirm` 首次读取会迁移落盘；`upsert` 仅在新文件不存在时合并 legacy（有意清空不复活）。
+* **对照痛点（代码事实）**：`daemon/supervisor/demo/prototypes.ts` 仍常量 `".stagent/metadata/demo-confirm.json"`；与 ADR-0011「`.stagent/metadata/` 自本 ADR 起废止，任何新代码不得写入」冲突。
+* **一句话目标**：仓库内无生产路径再创建或写入 `.stagent/metadata/**`；Demo 确认类侧车迁到 `.stagent/records/`（或既有 prototypes 约定目录）并测过。
+* **范围**：
+  1. 全文检索 `metadata/` 写入点；将 `demo-confirm`（及同类）迁到 ADR-0011 允许路径（优先 `.stagent/records/...` 或现行 `.stagent/prototypes/` 约定，卡内 PR 说明选型）。
+  2. 读路径兼容：若旧文件存在可只读迁移一次，禁止继续写入旧路径。
+  3. 测试：断言写入路径不含 `.stagent/metadata/`；旧路径写入失败或不再调用。
+* **非目标**：不重做 audit-manifest（C.12e 已完成）；不改用户项目历史目录（仅 Stagent 自身写入约定）。
+* **不变声明**：鉴权 / Demo Origin 隔离：**不变**。
+* **验收（PASS）**：`rg '\.stagent/metadata' daemon src` 无写入字面量（测试夹具除外且须注明）；相关 Demo 确认测绿。
+* **FAIL**：仍 mkdir/write `.stagent/metadata/` 却标完成。
+* **关键文件**：`daemon/supervisor/demo/prototypes.ts`（改）、相关测试
+* **估算**：S
+* **台账**：ledger **DLV-4** → 已立卡 `TASK-H.9`。
+
+---
+
+<a id="task-c.3"></a>
+
+#### 【Task C.3】Monaco 核心编辑器集成与受控 Worktree 读写
+* **任务编号**：`TASK-C.3`
+* **前置依赖**：`TASK-C.1`, `TASK-A.2` (COMPLETED)（v1.3.3：移除已删除的 `C.2→C.3` 串行边）
+* **任务状态**：**[COMPLETED]**（分支 `feat/c3-monaco-editor` 提交 `88aec68`，**2026-10-21 核验：已合入 main**。Monaco（`@monaco-editor/react`，编辑器本体默认从 jsDelivr CDN 加载，离线不可用）可写/只读区分；保存只走 `POST /api/worktree/files`，越权 403 + `.stagent/audit/gateway-violations.jsonl` + `GATEWAY_VIOLATION` 帧，文件无改动；`EVIDENCE_STATUS_CHANGED=STALE` 时中栏顶部横幅；Agent 的 Edit/Write 完成后中栏自动打开并刷新该文件。无合同（Vibe）时根为主工作树，仅禁写 .git/.stagent（保护清单待 P.1）。）
+* **核心目标**：
+  1. Monaco Editor 嵌入，可写/只读视觉区分。
+  2. **编辑器内 Evidence STALE 提示 (G-18)**：当关联合同 Evidence 变为 STALE 时，在中栏顶部弹出警告横幅，提示代码已被外部修改需重新验证。
+  3. 服务端强制保存校验：保存必须调用 `POST /api/worktree/files`，越权保存由 Daemon 403 拒绝，记录 `GATEWAY_VIOLATION`，文件物理无改动。
+* **涉及核心文件**：
+  - 新增：`src/components/MonacoEditorPane.tsx`
+  - 新增：`src/hooks/useWorktreeFile.ts`
+  - 修改：`daemon/server.ts`
+  - 测试：`tests/ui/monaco-editor-pane.test.tsx`
+* **Pass/Fail 验收判定**：
+  - **PASS**：越权写入请求返回 403 并在服务端留下违规记录；Evidence 失效时编辑器横幅即时展现。
+  - **FAIL**：前端允许写入未授权路径；缺少 STALE 视觉指示。
+
+---
+
+
+---
+
+### 3.4n Worker 执行器链路（W.9a）
+
+<a id="task-w.9a"></a>
+
+#### 【Task W.9a】探测报告指纹升格 + launch 解耦 `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#99](https://github.com/he18718143986-design/IDE/pull/99)/`22168ee`，squash；基线 #98）。
+- **交付**：升格只消费服务端 `.stagent/workers.json` 权威 `last_report`，按 report id + fingerprint 查找并绑定 adapter/target/version/witness；错误分别区分报告不存在、指纹不匹配与报告绑定事实无效。cursor-agent / Claude Code 缺 MCP endpoint 返回显式 `preview_only` / degraded 状态，执行入口 fail-closed。
+- **测试与门禁**：定向 4 文件 116 项通过；全量测试相对 baseline 零新增失败（基线原有失败保留）；全仓 TypeScript 54 条诊断，与 baseline 数量相同，改动文件零新增；`git diff --check` 通过。PR 描述须注明 `cli-host-claude-code.test.ts` 的 spawn 静态禁令 LEGACY 白名单新增四文件仅为既有 `child_process` 使用补登记，非本卡新增执行面或放松 spawn 禁令。
+- **后续挂账（两项）**：① 清理未再使用的 `E_CURSOR_AGENT_MCP_ENDPOINT_MISSING` 导出；② W.9c 接执行面时重新评估 `bindProbeReportAuthority` 作为公开方法可被进程内重绑的信任边界。
+- **边界**：不宣称端到端闭环；W.9b 执行器抽象与见证接线另行施工，W.9c 自注册工厂闭环仍待 W.9a+b 完成。
+
+
+### 3.4o Worker 执行器链路（W.9b）
+
+<a id="task-w.9b"></a>
+
+#### 【Task W.9b】执行器抽象 + 容器见证接线 `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#101](https://github.com/he18718143986-design/IDE/pull/101)/`b98e463`，squash；基线 #100/#99 之后）。
+- **交付**：新增 `ContainerCliAdapter` + `executeContainerCli`，外部 CLI 仅委托 `runInSandbox()`，无本地 `spawn`；容器环境采用白名单，日志中的敏感值脱敏。仅当 `via === "exit" && exitCode === 0` 才生成本次 `sandboxWitness` 并读取精确声明的 Worktree 相对产物；失败、拒绝、超时不接收产物或 witness。`resolveEvidenceControlMode()` 消费执行见证，无 witness 自动回落 `UNCONTROLLED_EXTERNAL`。`orchestrator` 通过 `sandboxWitnesses` Map 将见证带入证据面。`server.ts` / `WorkerRegistrationService` 的派工可用性投影与 `requireControlledDispatch()` 共用判定源：`SANDBOX_ENFORCED` + 宿主可用 + 工厂齐备才可派工；自注册记录尚无派工工厂仍不可派工。Gateway mediation 与容器 CLI 边界分开记录，不宣称 Gateway capability。
+- **Cursor 未实证边界**：Cursor CLI 容器镜像与运行协议均未确认；`cursor-agent` 仍以 `E_CURSOR_AGENT_NO_EXECUTOR` 明确拒绝执行。本卡不声称 Cursor 已实现真容器执行，也不声称端到端闭环。
+- **后续挂账（四项）**：① `WorkerRegistrationService.builtinView()` 对每个内建适配器行创建 `DockerContainerHost`；SANDBOX 档判定会通过 `isAvailable()` 探测宿主，行数增长可能放大 Docker probe。静态形态预检仍可诚实反映工厂/档位，但宿主可用性探测成本与副作用需另行评估；② `isControlledDispatchable()` 捕获全部拒绝异常并仅返回 boolean，`dispatch_blocked_reason` 因而为泛化文案、具体拒绝码丢失，诊断信息面收窄；③ env 白名单允许 `LLM_API_KEY`、`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`CURSOR_API_KEY` 直通容器进程环境，容器内进程可读取明文；日志脱敏仅约束日志输出，不改变容器内可读事实；④ Cursor CLI 容器镜像 / 运行协议尚未实证，generic `runInSandbox()` 桥不等于已跨越 Cursor 真容器执行边界。
+- **边界**：容器见证是执行记录，不代表绝对隔离；本卡没有接通最终自注册 Worker 工厂闭环（W.9c），不宣称端到端闭环。
+
+---
+
+
+
+#### 【Task W.9c】自注册工厂闭环 `[COMPLETED]`
+
+> **归档注记（2026-11-03 · P-134）**：本卡已完成（[#107](https://github.com/he18718143986-design/IDE/pull/107)/`d3397a6`）；交付、验证与未宣称边界见 [`development-tasks-completed.md` §3.4q](./development-tasks-completed.md#task-w.9c)。
+
+* **任务编号**：`TASK-W.9c`
+* **任务名称**：自注册工厂闭环
+* **对应规格（R-1）**：`AdapterRegistry::registerDispatchFactory/getDispatchFactory`、`requireControlledDispatch()`、`WorkerDispatchFactory`、自注册 worker store；W.6 §3.4g、W.7 §3.4l 挂账 1、W.9a/W.9b。
+* **前置依赖（R-3）**：W.9a AND W.9b COMPLETED（DAG 两条硬边）；W.6/W.7 COMPLETED；W.9 SPLIT。全部前置满足；本卡已完成（P-134）。
+* **优先级**：P5 · 已完成（P-134）
+* **状态**：`[COMPLETED]`（[#107](https://github.com/he18718143986-design/IDE/pull/107)/`d3397a6`）
+* **对照痛点（R-4）**：自注册记录在 `.stagent/workers.json`，但未建 `CodingWorkerAdapter.run()` 或调用 `registerDispatchFactory()`；`requireControlledDispatch()` 对缺工厂会拒绝，升格与派工因此脱节。
+* **一句话目标（R-2）**：只有真实实现 run、工厂已注册且控制档/宿主门禁合格的 worker 才能派工，API/UI 与门禁共用同一 dispatchable 判据。
+* **ADR 修订（R-9）**：无；遵守 ADR-0001/0003/0014 与 REJ-010。
+* **采用的默认值（R-10）**：`dispatchable` 由有效 run、匹配当前 id/version 的已注册工厂及控制档/宿主可用性共同计算，调用方不能自报；升格不自动授予派工。
+* **范围（R-5）**：
+  1. 在 AdapterRegistry/自注册服务建立 id/version 绑定工厂，注册变更、撤销、改版使旧映射失效。
+  2. 接通 `requireControlledDispatch()`，检查控制档、factory 与实际 `run()` 合约；工厂失败或对象不合约均拒绝。
+  3. API/UI `dispatchable` 与派工门禁复用单一判据；无工厂/run 恒 false。
+  4. 增正反例：有效工厂可派工；升格无工厂、无 run、旧版本 factory/witness 均拒绝；状态投影与门禁一致。
+* **非目标（R-6）**：不重做 W.9a 报告/指纹校验或 W.9b 执行器抽象；不做多 Agent DAG；不改右栏只读白名单；不伪造 verified_on。
+* **不变声明（R-12）**：鉴权、Demo Origin、点亮三证、网关写范围不变；未通过门禁不派工；无 Gateway/容器绕行 fallback。
+* **验收（PASS，R-7）**：`EW9C-01` 有效工厂+run+合法档可派工；`EW9C-02` 升格无工厂仍不可派工并拒绝；`EW9C-03` 无 run 工厂拒绝；`EW9C-04` id/version 变化或撤销使旧 factory 失效；`EW9C-05` API/UI 与门禁判定一致；`EW9C-06` 代码与 DAG 均阻止 a/b 完成前抢跑。
+* **FAIL（R-8）**：无 run/工厂却 `dispatchable:true`；错版本工厂/witness 仍消费；升格等同自动派工；无 witness 仍记 SANDBOX_ENFORCED；存在绕过 Gateway/容器 fallback。
+* **关键文件**：`daemon/worker/adapter-registry.ts`、`worker-dispatch.ts`、`worker-registration-service.ts`、worker API/status projection；dispatch/registry unit tests。
+* **估算（R-11）**：M；若需引入执行器重构则退回重新估算，不混入本卡。
+
+
+### 3.4q 自注册工厂闭环（W.9c）
+
+<a id="task-w.9c"></a>
+
+#### 【Task W.9c】自注册工厂闭环 `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#107](https://github.com/he18718143986-design/IDE/pull/107)/`d3397a644603d8b49a96d765456031cba4254981`，squash；基线 `5774662b299d7faf220f0cd9b3f74913be03f31f`，父提交 #105/#106 链路已在该 main 中）。纯代码 PR；本次文档回写不改产品代码。
+- **交付**：`AdapterRegistry` 按 adapter id + protocol version 强绑定 factory；版本错配、撤销/注销及降级同步清理旧 factory 与升格档，重注册须重新验证。`WorkerRegistrationService` 接通自注册生命周期与 `ContainerCliAdapter` / `executeContainerCli`，复用 W.9b 的 `runInSandbox()` 和既有 `SandboxWitness → resolveEvidenceControlMode` 证据链，不另造容器执行路径。`requireControlledDispatch()` 与 API/UI 使用同一 `isControlledDispatchable()` 判据；升格、factory、可执行 `CodingWorkerAdapter.run()` 与宿主门禁均满足才可派工。缺档位、执行器或 factory 有可区分的拒绝结果；撤销后重注册不继承旧 `promoteControlMode` 结果。Cursor CLI 镜像/运行协议未实证，继续 `E_CURSOR_AGENT_NO_EXECUTOR`，无本地/Gateway/容器绕行 fallback。
+- **状态投影与门禁**：自注册 worker「升格但无执行面」负例保持 `dispatchable:false` 并拒绝；factory id/version 与当前注册版本不匹配时派工失败关闭。SANDBOX_ENFORCED 无本次有效 witness 不被证据链记为受控。W.9c 完成的是本卡自注册派工工厂闭环范围；**不宣称产品整体端到端闭环或绝对隔离**。
+- **测试与验证**：定向 5 个派工 / 执行器 / 沙箱测试文件 **132/132 passed**（干净 main baseline 126）；全量 **2765 passed / 17 failed**（baseline 2759 / 17）。失败差异逐项比对：`ws-security` 曾在并发全量中失败、单跑复验 **9/9 passed**，记录为「曾观察到、未复现」；`scheme-confirm-scope-drift` 为既有环境快照漂移。TypeScript 检查 **54 条诊断**，与 baseline 按诊断内容一致、零新增（行号偏移属正常）；`git diff --check` 通过。
+- **后续挂账（W.9b 四项，仍未销项、不新增 OP）**：① `WorkerRegistrationService.builtinView()` / `storedView()` 为行投影构造 Docker host 并可能探测可用性，行数增长的 probe 成本与副作用仍待评估；② `isControlledDispatchable()` 仍捕获拒绝并仅返回 boolean，虽然部分服务层视图单独补有说明，API 诊断仍可能丢失具体拒绝原因；③ `LLM_API_KEY`、`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`CURSOR_API_KEY` 仍可能通过允许的容器 env 被容器内进程读取，日志脱敏不改变此事实；④ Cursor CLI 镜像与运行协议仍未实证，generic 容器桥不代表 Cursor 可执行。详情沿用 W.9b 归档 §3.4o。
+- **边界**：W.9 母卡仍以 `[SPLIT]` 保留拆分追溯；三张子卡 W.9a/b/c 均已 COMPLETED，母卡实质闭合。不得把四条 W.9b 挂账写作已解决；Cursor 保持 fail-closed。
+> **（P-153 立卡指针 · 保留原文作溯源）**：挂账①→[`TASK-W.9d`](./development-tasks-active.md#task-w.9d) `[NEW_TASK]`；挂账②→[`TASK-W.9e`](./development-tasks-active.md#task-w.9e) `[NEW_TASK]`；挂账③→[`TASK-W.9f`](./development-tasks-active.md#task-w.9f) `[NEW_TASK]`；挂账④→[`TASK-W.9g`](./development-tasks-active.md#task-w.9g) `[NEW_TASK]`。**立卡≠销项、未开工、不宣称闭环**。
+> **（P-154 · 保留作溯源）**：挂账① → [`TASK-W.9d`](#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账②/③/④当时仍立卡未销。
+> **（P-155 · 保留作溯源）**：挂账① → [`TASK-W.9d`](#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账② → [`TASK-W.9e`](#task-w.9e) `[COMPLETED]`（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`）；挂账③/④当时仍立卡未销。
+> **（P-156 · 保留作溯源）**：挂账① → [`TASK-W.9d`](#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账② → [`TASK-W.9e`](#task-w.9e) `[COMPLETED]`（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`）；挂账③ → [`TASK-W.9f`](#task-w.9f) `[COMPLETED]`（[#156](https://github.com/he18718143986-design/IDE/pull/156)/`b92accc`）；挂账④当时仍立卡未销。
+> **（P-157 现行）**：挂账① → [`TASK-W.9d`](#task-w.9d) `[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de`）；挂账② → [`TASK-W.9e`](#task-w.9e) `[COMPLETED]`（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55b`）；挂账③ → [`TASK-W.9f`](#task-w.9f) `[COMPLETED]`（[#156](https://github.com/he18718143986-design/IDE/pull/156)/`b92accc`）；挂账④ → [`TASK-W.9g`](#task-w.9g) `[COMPLETED]`（[#158](https://github.com/he18718143986-design/IDE/pull/158)/`691b8b8`）。**四项挂账均已销（①～④）**；④口径=**钉协议 + fail-closed + 失败留证**（`empirically_verified=false`），**≠ Cursor 已受控 / 可派工**；真跑容器仍待 KEY+Docker。**仍不宣称**端到端闭环。
+
+
+### 3.4p 中栏方案审阅页嵌入试玩认可提交（L.17c · 产品验收挂账）
+
+<a id="task-l.17c"></a>
+
+#### 【Task L.17c】中栏方案审阅页嵌入试玩认可提交 `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#104](https://github.com/he18718143986-design/IDE/pull/104)/`06661be`，squash；基线 #103/`8f33b73` P-132 立卡之后）。
+- **交付**：新增 `src/components/studio/PlaytestAcceptBlock.tsx`，在中栏 `SchemeReviewPane` **同页**嵌入既有 `CompareView`（**不改**组件本体 / props 契约）。原话框默认空（禁止引导文案自动填入）；「认可完成」**只**调用 `submitPlaytestEvidence(conn, { contract_id, user_verdict })`（请求体不含 `release_id`/`timestamp`/`operator`）。读侧选型为薄 HTTP：`GET /api/playtest/status?contract_id=` 委托既有 `evaluatePlaytestGuard`（**零改** `playtest-guard.ts`）；前端 `fetchPlaytestStatus` 反映拒绝态。`src/routes/index.tsx` 传 `contractId` / `references` / LIVE preview / `conn`。测试：`tests/ui/scheme-review-playtest.test.tsx` + `tests/unit/playtest-status-wiring.test.ts`（11 passed）；全量相对干净 main **零新增失败**。
+- **后续挂账（三项 · 不宣称关闭）**：① L.17a 参考站抓取成果 → CompareView `snapshots` 前端拉数（本卡可空左栏渲染）；② 会话原话候选列表接线（props 已留 `sessionVerbatimCandidates`；`index` 暂未灌聊天原话）；③ **真机整段 `check playtest` 执行债**（卡明文另挂，本卡不做门禁执行链路）。
+> **（P-149 立卡指针 · 保留原文作溯源）**：挂账①→[`TASK-L.17d`](./development-tasks-active.md#task-l.17d) `[NEW_TASK]`；挂账②→[`TASK-L.17e`](./development-tasks-active.md#task-l.17e) `[NEW_TASK]`；挂账③→[`TASK-L.17f`](./development-tasks-active.md#task-l.17f) `[NEW_TASK]`。**立卡≠销项、未开工、不宣称闭环**。
+> **（P-150 · 保留作溯源）**：挂账① → [`TASK-L.17d`](#task-l.17d) `[COMPLETED]`（[#145](https://github.com/he18718143986-design/IDE/pull/145)/`e2b8dd3`）；挂账②/③当时仍 `[NEW_TASK]`。
+> **（P-151 · 保留作溯源）**：挂账①/②已销；挂账③当时仍 `[NEW_TASK]`（L.17f）。
+> **（P-152 现行）**：挂账① → [`TASK-L.17d`](#task-l.17d) `[COMPLETED]`（[#145](https://github.com/he18718143986-design/IDE/pull/145)/`e2b8dd3`）；挂账② → [`TASK-L.17e`](#task-l.17e) `[COMPLETED]`（[#147](https://github.com/he18718143986-design/IDE/pull/147)/`aeedecd`）；挂账③ → [`TASK-L.17f`](#task-l.17f) `[COMPLETED]`（[#149](https://github.com/he18718143986-design/IDE/pull/149)/`86da495`）。L.17c 三项挂账均已销。**仍不宣称**端到端闭环。
+- **边界**：**窄口径**——UI 已挂 / 代码合入；**不**宣称端到端 UI/产品闭环；不碰 orchestrator / 派工 / AdapterRegistry（W.9c 施工面）；不复活多视口 Tab / 新设右栏入口；不改 CompareView / `submitPlaytestEvidence` / `playtest-guard` 判定与契约本体。
+
+---
+
+### 3.4c 闭环旅程 v2.1 第一批（Journey · 规格 `supervisor.md` 第三部分 §13～§20；对应 §19 落差 L-01～L-10）
+
+<a id="task-j.1"></a>
+
+#### 【Task J.1】右栏 AI 搭档只读工具集（P0 安全） `[COMPLETED]`
+
+* **任务编号**：`TASK-J.1`
+* **任务名称**：方案工作台右栏搭档以只读工具集运行
+* **对应规格**：SSOT 第三部分 §13.2「AI 搭档只读是硬约束」；§18 `P-01`；§19 `L-02`
+* **前置依赖**：无（可立即开工；`TASK-J.7` 硬依赖本卡）
+* **优先级**：**P0**（现网安全缺口）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#29](https://github.com/he18718143986-design/IDE/pull/29) / tip `4144a20`（`feat(daemon): TASK-J.1 右栏 partner 只读化`）；partner 只读；相关测本机 51 passed
+* **对照痛点（代码事实）**：右栏默认首选适配器是 `ClaudeCodeAdapter`（`daemon/server.ts::defaultChatAdapters`），其 `BASE_TOOLS` 含 `Edit` / `Write` / `MultiEdit`，以 `--permission-mode acceptEdits` 启动，`cwd` 为用户仓库根（`daemon/chat/session-manager.ts` 的 `resolveCwd ?? repoRoot`）。也就是说，右栏聊天今天可以**不经合同、不经 Worktree** 直接改用户主干——违反签署分水岭「签署前主干改动为 0 字节」。
+* **一句话目标**：在方案工作台里，无论接哪个适配器，右栏只能读、搜、列目录，不能写文件、不能跑 shell、不能联网。
+* **范围**：
+  1. `ClaudeCodeAdapter` 新增角色选项 `role: "partner" | "worker"`（默认 `"partner"`）。`partner` 时：`--tools` / `--allowedTools` 仅 `Read,Glob,Grep`（LS 在 CLI 2.1.296 不存在，列目录经 Glob）；`--disallowedTools` 追加 `Edit,Write,MultiEdit,NotebookEdit,Bash,TodoWrite,Task,WebFetch,WebSearch`；`permissions.defaultMode` 与 `--permission-mode` 改为 `default`（**不**用 `acceptEdits`）；`permissions.deny` 同步加入写类工具。`worker` 角色保持现行行为（仅供 Worker 路径使用，不进右栏）。
+  2. `defaultChatAdapters` 构造右栏适配器时显式传 `role: "partner"`。
+  3. `ChatAdapterInfo` 增加 `tool_mode: "read_only" | "read_write"`；`BaselineChatAdapter` / `DemoChatAdapter` 标 `read_only`。右栏适配器选择（`pick-chat-adapter`）**拒绝**选中 `read_write` 适配器，并在设置页显示白话原因。
+  4. PreToolUse hook（`pretool-hook.mjs`）在 `partner` 角色下对任何写类工具调用返回 block（双保险：hook 失败时 CLI 参数仍拦截）。
+  5. 同步删除两处 LS 残留（LS 在 CLI 2.1.296 不存在）：`claude-code-adapter.ts` `BASE_TOOLS` 中的 `"LS"`；`pretool-hook.mjs` `READ_TOOLS` 中的 `"LS"`。
+* **非目标**：不改 Worker 适配器行为；不做施工对话分流（第二批）；不改 `BaselineChatAdapter` 的提示词。
+* **验收（PASS）**：
+  - `tests/unit/cli-host-claude-code.test.ts` 新增用例：`role: "partner"` 生成的 argv 中 `--tools` 与 `--allowedTools` 恰为 `Read,Glob,Grep`；`--disallowedTools` 含 `Edit`、`Write`、`MultiEdit`、`Bash`、`Task`、`WebFetch`、`WebSearch`；`--permission-mode` 不是 `acceptEdits`；settings 的 `permissions.deny` 含全部写类工具。
+  - `tests/unit/pick-chat-adapter.test.ts` 新增用例：`tool_mode: "read_write"` 的适配器不会被选为右栏适配器。
+  - 新增 `tests/integration/partner-readonly.test.ts`（对应 SSOT `P-01`）：用替身 spawn 捕获启动参数并模拟一次 `Write` 工具调用经 hook，断言被 block、仓库内目标文件不存在。
+  - `worker` 角色既有用例全部不回归。
+* **FAIL**：右栏任一适配器在方案工作台中可产生写文件或 shell 调用；或仅靠 hook、无 CLI 参数层拦截。
+* **关键文件**：`daemon/worker/cli-host/claude-code-adapter.ts`、`daemon/worker/cli-host/pretool-hook.mjs`、`daemon/server.ts`、`daemon/chat/types.ts`、`src/lib/chat-events.ts`、`src/lib/pick-chat-adapter.ts`（以实际路径为准）
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证 / 网关写范围（本卡只收紧右栏 partner 工具白名单与 permission-mode；不放宽 Gateway `writable_paths`）。合入证据见卡内「合入证据」；真 Key 补验仍挂账 OP-28。
+* **估算**：S
+
+<a id="task-j.2"></a>
+
+#### 【Task J.2】`ScopePlan` 纯函数与 Daemon 范围预检构建器 `[COMPLETED]`
+
+> **交付全链路备注（2026-10-30）**：本卡不变。后续 `TASK-L.3`、`L.9`、`L.12` 会在 `scope-plan-builder.ts` 中追加签署前的系统范围（`withSystemScope`：`tests/stagent/**`、`docs/system/**`、`stagent check` 命令、按桩种类的安装权限）。实现本卡时请把「组合各来源 → 计算 digest」写成可追加来源的形式。
+
+* **任务编号**：`TASK-J.2`
+* **任务名称**：范围预检单一事实源（类型 + 纯函数 + 构建器）
+* **对应规格**：SSOT 第三部分 §15.3、§15.4（数据部分）；§18 `S2-02`、`S2-04`；§19 `L-03`（前半）
+* **前置依赖**：无
+* **优先级**：P1（本批主链起点）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#4](https://github.com/he18718143986-design/IDE/pull/4) / tip `e6e1730`（`feat(J.2): ScopePlan 纯函数与范围预检构建器`）
+* **对照痛点（代码事实）**：合同范围今天在「确认方案」那一刻由 `buildL0Plan` 从意图文本临时推出；推不出路径时兜底为 `["src/**"]`（`daemon/supervisor/rules-l0.ts::buildL0Plan`），而老项目（有 `package.json`）的 `src/**` 正是通配符分级必拒的 `bare_top_glob`——这就是「确认后 403」的根因。
+* **一句话目标**：把「这一轮会改哪里、不会碰哪里、要谁点头、怎么验收、多大规模」算成一个与方案修订号绑定、可摘要、确定性的 `ScopePlan`，并让它成为后续预检与合同创建**共用**的唯一来源。
+* **范围**：
+  1. 新建 `src/lib/journey/scope-plan.ts`（前后端共享，**纯函数、零 fs**）：导出 SSOT §15.3 的 `ScopePlan` 类型；`scopePlanDigest(plan)`（规范化 `stableStringify`，剔除时间戳，摘要不含 `plan_digest` 自身）；`applyScopeDecisions(plan, { excluded_area_ids, approvals })`（用户排除区域 / 敏感项表态 → 新 plan，重算 digest）；`scopePlanToContractScope(plan)`（→ `writable_paths` / `forbidden_paths` / `verification_spec` / `budget`，供 J.4/J.5 共用）。
+  2. 新建 `daemon/supervisor/scope-plan-builder.ts`：`buildScopePlan({ repoRoot, scheme, decisions })`。内部组合既有 `buildL0Plan`（以方案标题、摘要、模块名、备注合成输入）、`gradeWritableScope` / `isGreenfieldRepo`、保护清单匹配（`protected_files` → `needs_approval`）、`dirty_exclusions` 与 `DEFAULT_FORBIDDEN_PATHS`（→ `never_touch` 白话分组）。
+  3. **自动收敛（确定性，写死规则）**：分级拒绝的 `bare_top_glob` 在非绿野仓库中，按以下顺序尝试收敛，命中即替换，全部未命中则保留在 `grade.rejected`：① 方案模块名 / 备注中出现的、仓库里**真实存在**的子目录名（大小写不敏感的英文 token 匹配）→ `<top>/<dir>/**`；② 方案中显式出现的相对路径（已由 `extractPathsFromText` 提取）→ 精确保留。**禁止**为不存在的目录编造路径（如凭空生成 `src/features/<slug>/**`）——新建模块的落点由第二批意图编译器的 `project_anchor` 提供。
+  4. `verification`：取仓库 `package.json` 实际存在的 `typecheck` / `test` 脚本生成命令；一个都没有 → `commands = []`、`manual_only = true`、白话「这个项目没有自动检查，完成后需要你试玩确认」。
+  5. `budget.plain`：由 `max_file_modifications` 与 `max_duration_seconds` 生成「最多改约 N 个文件，预计 A～B 分钟」；**不得**出现 Token / tool calls 字样。
+  6. `areas[].label`：模块可对应时用模块名；否则用目录的白话描述（「`src/pages/home` 这一块」）。
+* **非目标**：不建 HTTP 接口（J.4）；不改「确认方案」流程（J.5）；不做 UI（J.6）；不接意图编译器。
+* **验收（PASS）**：新增 `tests/unit/scope-plan.test.ts`（对应 SSOT `S2-02`、`S2-04`）：
+  - **单一来源**：同一 `(repoRoot, scheme, decisions)` 两次构建得到相同 `plan_digest`；`scopePlanToContractScope` 的输出再经 `gradeWritableScope` 必为 `ok`（当 `plan.grade.ok`）。
+  - **三类夹具**：绿野（无 `package.json`）→ `src/**` 作为种子放行；老项目（有 `package.json`）+ 意图命中真实子目录 `src/pages` → 收敛为 `src/pages/**` 且 `grade.ok`；老项目 + 无任何可匹配目录 → `grade.ok === false` 且 `rejected` 含 `src/**`（**不**编造路径）；非 npm（Python 布局）不因缺 `package.json` 被误判。
+  - 命中保护清单的路径进入 `needs_approval`，`approved === null`；`applyScopeDecisions` 表态后 digest 变化。
+  - 无 `typecheck` / `test` 脚本 → `manual_only === true`。
+  - `budget.plain` 与 `areas[].label` 不含 `token`、`tool`、`glob`、`**` 字样。
+* **FAIL**：任何收敛结果指向仓库中不存在的目录；或同输入 digest 不稳定。
+* **关键文件**：`src/lib/journey/scope-plan.ts`（新）、`daemon/supervisor/scope-plan-builder.ts`（新）、`daemon/supervisor/rules-l0.ts`（只读复用，必要时导出内部函数）、`src/lib/writable-scope-grade.ts`、`daemon/pipeline/scheme-snapshot-store.ts`（复用 `stableStringify`，可抽到共享模块）
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证。网关写范围：本卡把 `ScopePlan` 定为唯一来源（对齐 [ADR-0018](../adr/0018-intent-to-executable-seal.md) INV-SEAL-01/02），**不**放宽 Gateway 物理门禁；签署路径禁止 `buildL0Plan(chat)` 旁路（旁路删除在 J.5）。
+* **估算**：M
+
+<a id="task-j.3"></a>
+
+#### 【Task J.3】唯一确认谓词纳入 `ScopePlan` `[COMPLETED]`
+
+> **ADR-0014 修订（2026-10-30，[`delivery-lifecycle.md`](./delivery-lifecycle.md) §5 SA-1，推荐默认，待用户确认）**：`E_SCOPE_APPROVAL_REQUIRED` 保留，但「表态」不再是逐项点击。`needs_approval` 只收用户原话点名的敏感项与系统必需的敏感项（如锁文件），其余默认移入 `never_touch`。授权仍存在 `ScopePlan.needs_approval[].approved` 中：前端在「确认开工」时用 `applyScopeDecisions` 一次性把全部项置为 `true`，带着新 `plan_digest` 提交。T-GATE 用例中「有未表态敏感项」改为「提交的 `ScopePlan` 中仍有 `approved !== true` 的敏感项」。其余判定顺序不变。
+
+* **任务编号**：`TASK-J.3`
+* **任务名称**：`evaluateSchemeConfirmation(draft, demo, scopePlan)` 与三个范围拒绝码
+* **对应规格**：SSOT 第三部分 §15.5、§17 D7；§7 D1 拒绝码表（v2.1 三行）；`runtime-contract-and-safety.md` §2.3；§18 `S2-01`、`S2-03`（及 `S2-02` 谓词侧）；§19 `L-04`
+* **前置依赖**：`TASK-J.2`（类型）
+* **优先级**：P1
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#5](https://github.com/he18718143986-design/IDE/pull/5) / tip `f4656a9`（`feat(J.3): 确认谓词纳入 ScopePlan（SCOPE_GATE 默认关）`）
+* **一句话目标**：「能不能点确认方案」的唯一谓词把范围也算进去，前端在确认**之前**就能把所有范围问题用白话说清。
+* **范围**：
+  1. `src/lib/journey/scheme-draft.ts::evaluateSchemeConfirmation` 增加第三参数 `scopePlan: ScopePlan | null`。判定顺序（先命中先返回）：既有 `E_SCHEME_ALREADY_FROZEN` → `E_SCHEME_CONFLICTS_OPEN` → `E_SCHEME_NOT_REVIEWABLE` → Demo 四码 → **`E_SCOPE_NOT_READY`**（`scopePlan == null` 或 `scopePlan.scheme_revision !== draft.scheme_revision`）→ **`E_SCOPE_POLICY`**（`!scopePlan.grade.ok`）→ **`E_SCOPE_APPROVAL_REQUIRED`**（提交的 `ScopePlan` 中存在 `needs_approval[i].approved !== true` 的敏感项；依 ADR-0014 / SA-1，不再支持逐项表态，开工时一并授权）。
+  2. 三个码的白话文案按 SSOT §15.5 表格原文；`E_SCOPE_POLICY` 文案须带出被拒的白话区域名（来自 `grade.rejected` 与 `areas`），**不**直接打印 glob。
+  3. `canConfirmScheme` 兼容别名改为传 `null` 并在 JSDoc 标注「新代码禁止使用」——其结果将恒为 `E_SCOPE_NOT_READY`，从而迫使遗留调用点暴露出来；`grep` 全仓调用点并列入 PR 描述。
+  4. `src/routes/index.tsx` 的 `schemeConfirmation` `useMemo` 暂传 `null`（真正接线在 J.5）。**本卡合入后「确认方案」按钮会显示「正在核对要改哪些地方…」而不可点**——为避免主干出现不可用窗口，本卡与 `TASK-J.5` **必须同一 PR 合入或 J.5 紧随其后**；若需单独合入，用临时开关 `SCOPE_GATE_ENABLED`（默认关）包住第 1 步新增的三条判定，J.5 合入时移除开关。
+* **非目标**：不改 Daemon（J.4）；不做 UI 区块（J.6）。
+* **验收（PASS）**：
+  - `tests/unit/scheme-confirmation-gate.test.ts` 新增 `T-GATE-012`～`T-GATE-016`：修订号不一致 → `E_SCOPE_NOT_READY`；`null` → `E_SCOPE_NOT_READY`；`grade.ok=false` → `E_SCOPE_POLICY` 且文案含白话区域名、不含 `**`；存在未授权敏感项（`approved !== true`） → `E_SCOPE_APPROVAL_REQUIRED`；全部满足 → `ok`。
+  - 判定顺序用例：有 OPEN 冲突且范围未就绪时返回 `E_SCHEME_CONFLICTS_OPEN`（冲突优先）。
+  - 既有 `T-GATE-001`～`011` 在传入合规 `scopePlan` 夹具后全部不回归。
+* **FAIL**：存在第二套范围判断（UI 自行推导 `disabled`）；或谓词读取 `completeness`。
+* **关键文件**：`src/lib/journey/scheme-draft.ts`、`src/routes/index.tsx`、`tests/unit/scheme-confirmation-gate.test.ts`
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证 / 网关写范围物理门禁。本卡只把确认谓词纳入已算好的 `ScopePlan`（含 `E_SCOPE_*`），不另开写路径。
+* **估算**：S
+
+<a id="task-j.4"></a>
+
+#### 【Task J.4】Daemon 范围预检接口与快照绑定 `[COMPLETED]`
+
+* **任务编号**：`TASK-J.4`
+* **任务名称**：`POST /api/supervisor/scope/preflight` + 快照写入 `ScopePlan` + 签署链按快照校验
+* **对应规格**：SSOT 第三部分 §15.5「签署链对齐」1～4；`runtime-contract-and-safety.md` §1「护照的来源」、§2.1 v2.1 补充、§2.3「Daemon 专属码」；§18 `S2-05`、`S2-06`、`S2-07`；§19 `L-03`（后半）
+* **前置依赖**：`TASK-J.2`
+* **优先级**：P1
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#6](https://github.com/he18718143986-design/IDE/pull/6) / tip `4832506`（`feat(J.4): ScopePlan 预检接口与快照签署绑定`）
+* **一句话目标**：Daemon 能随时为当前方案算出 `ScopePlan`；冻结时把它锁进快照；带 `confirmation_id` 的合同只能与快照里的范围一字不差，从此签署链上不可能再出现范围 403。
+* **范围**：
+  1. **预检接口**：`POST /api/supervisor/scope/preflight`，入参 `{ scheme, decisions }`，返回 `ScopePlan`。只读、零模型、零落盘、不建 Worktree；鉴权同 `/api/supervisor/draft`；前端客户端 `src/lib/daemon-api.ts` 增加 `preflightScope()`。
+  2. **快照绑定**：`daemon/pipeline/scheme-snapshot-store.ts` 的 `SchemeSnapshot` 增加 `scope_plan: ScopePlan`，`SCHEME_SNAPSHOT_SCHEMA_VERSION` 升到 `"1.1"`；快照 `digest` 纳入 `scope_plan.plan_digest`。读取 `1.0` 旧快照时 `scope_plan` 视为缺失。
+  3. **冻结时重跑预检**：`POST /api/supervisor/scheme/freeze` 入参增加 `scope_plan`。Daemon 用快照内 `scheme` + `scope_plan` 中的用户表态重跑 `buildScopePlan`，`plan_digest` 不一致 → **`409 E_SCOPE_PLAN_DRIFT`**，响应体附新 `ScopePlan`，**不写快照**。
+  4. **签署链校验**：`POST /api/contracts` 与 `POST /api/contracts/:id/approve` 在带 `confirmation_id` 时：快照缺 `scope_plan`（1.0 旧快照）→ `409 E_SCHEME_SNAPSHOT_NOT_FOUND`（沿用既有码，消息注明「快照版本过旧」）；合同的 `writable_paths` / `forbidden_paths` / `verification_spec` / `budget` 与 `scopePlanToContractScope(snapshot.scope_plan)` 不一致 → **`409 E_SCHEME_SNAPSHOT_MISMATCH`**；一致时**跳过**对该合同再调 `assertContractScopeAllowed`（预检已保证合规），并在跳过前用 `gradeWritableScope` 做一次断言，失败则记告警并返回 `500 E_SCOPE_INVARIANT_BROKEN`（D1 违约，不得返回 403）。
+  5. 不带 `confirmation_id` 的旧路径行为**不变**（仍走 `assertContractScopeAllowed`）。
+  6. 新码登记：在 `daemon/server.ts` 错误映射处补 `E_SCOPE_PLAN_DRIFT`、`E_SCHEME_SNAPSHOT_MISMATCH`；若新增 `E_SCOPE_INVARIANT_BROKEN`，须同步补进 `runtime-contract-and-safety.md` §2.3「Daemon 专属码」表与 SSOT §15.5（文档改动随本卡 PR）。
+* **非目标**：不改前端确认流程（J.5）；不做 UI。
+* **验收（PASS）**：新增 `tests/integration/scheme-confirm-scope-drift.test.ts`（端口段 **3930–3939**，起真 Daemon，断言落盘后的权威状态）：
+  - `T-HTTP-S205`：冻结前把临时仓库从绿野改为有 `package.json` → freeze 返回 `409 E_SCOPE_PLAN_DRIFT`，快照文件不存在，响应附新 plan。
+  - `T-HTTP-S206`：带 `confirmation_id` 创建合同，`writable_paths` 比快照多一条 → `409 E_SCHEME_SNAPSHOT_MISMATCH`，合同未落库。
+  - `T-HTTP-S207a/b/c`：老项目、绿野、非 npm 三类夹具各走一遍「preflight → freeze → create(confirmation_id) → approve(confirmation_id)」，全程不出现 `E_WRITABLE_SCOPE_POLICY`，合同 `lifecycle_state` 到达批准后状态。
+  - `T-HTTP-S207d`：1.0 旧快照 + `confirmation_id` → `409 E_SCHEME_SNAPSHOT_NOT_FOUND`。
+  - 既有 `tests/integration/scheme-confirm-http-injection.test.ts`（7 条）与 `contract-api` / `resume-abort` 不回归；`tests/unit/test-port-map.test.ts` 通过。
+* **FAIL**：preflight 写盘或调用模型；签署链在带 `confirmation_id` 时任何路径返回 403。
+* **关键文件**：`daemon/server.ts`、`daemon/pipeline/scheme-snapshot-store.ts`、`daemon/supervisor/scope-plan-builder.ts`、`src/lib/journey/scope-plan.ts`、`src/lib/daemon-api.ts`
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证。网关写范围：经 `scope/preflight` 与快照 `scope_plan`/`plan_digest` 绑定后进入签署（INV-SEAL-03）；漂移拒绝，不放宽 Gateway。
+* **估算**：M
+
+<a id="task-j.5"></a>
+
+#### 【Task J.5】「确认方案」接线改造：范围先算好、按快照签 `[COMPLETED]`
+
+> **ADR-0014 修订（2026-10-30）**：按 SA-1，确认请求提交的是已用 `applyScopeDecisions` 置好授权的 `ScopePlan`（见 J.3 修订），Daemon 用快照 + 同一组表态重算，摘要一致；不再有逐项表态往返。防抖预检保留（范围仍须在点击前算好，只是不强迫用户审阅）。
+
+* **任务编号**：`TASK-J.5`
+* **任务名称**：前端确认链改用 `ScopePlan`，删除事务前的临时合同推断
+* **对应规格**：SSOT 第三部分 §15.5、§16.3（失败分支）；§19 `L-03`、`L-04`
+* **前置依赖**：`TASK-J.3`、`TASK-J.4`
+* **优先级**：P1
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#7](https://github.com/he18718143986-design/IDE/pull/7) / tip `c877d1c`（`feat(J.5): 确认链接线 ScopePlan 并移除 SCOPE_GATE`）
+* **对照痛点（代码事实）**：`src/routes/index.tsx::handleConfirmScheme` 在事务开始前用 `formatSchemeAsIntent` → `submitJourneyMessage` 生成合同骨架，再在 `signAndPrepare` 里 `createContractWithAdmission`——范围从未展示给用户，且失败发生在右栏已锁之后。
+* **一句话目标**：方案每变一次就预检一次；确认时只冻结、只按快照建合同；任何范围问题都在点击前暴露。
+* **范围**：
+  1. `Console()` 新增 `scopePlan` 状态：`schemeDraft.scheme_revision` 变化后 300ms 防抖调用 `preflightScope()`（依 ADR-0014 审阅后置，无开工前逐项表态交互）；在途请求被新修订作废；结果修订号不匹配时丢弃。
+  2. `schemeConfirmation` `useMemo` 传入 `scopePlan`（替换 J.3 的 `null`，移除 `SCOPE_GATE_ENABLED` 开关）。
+  3. 删除事务前的 `formatSchemeAsIntent` → `submitJourneyMessage` 合同推断块。`persistSnapshot` 发送 `scope_plan`；`signAndPrepare` 用 `scopePlanToContractScope(scopePlan)` 与方案标题 / 摘要组装合同后调用 `createContractWithAdmission(..., { confirmationId })`。
+  4. `src/lib/journey/confirm-scheme-atomic.ts`：`persistSnapshot` 抛出 `409 E_SCOPE_PLAN_DRIFT` 时，事务结果码为 `E_SCOPE_PLAN_DRIFT`，执行 `restoreRightChat`（右栏解锁），**不进入** `SIGN_AND_PREPARE`；调用方用响应附带的新 plan 刷新 `scopePlan` 并显示 SSOT §16.3 白话「项目刚刚有变化，我重新核对了改动范围，请再看一眼」。
+  5. `formatSchemeAsIntent` 如无其他调用点则删除；有则保留并在 PR 中列出调用点。
+* **非目标**：不做范围 UI 区块（J.6，本卡中栏只多一行状态文案）；不改交接进度 UI（J.7）。
+* **验收（PASS）**：
+  - `tests/unit/confirm-scheme-atomic.test.ts` 新增 `T-ATOM-012`：`persistSnapshot` 抛 `E_SCOPE_PLAN_DRIFT` → 结果码 `E_SCOPE_PLAN_DRIFT`、`signAndPrepare` 调用 0 次、`restoreRightChat` 调用 1 次。
+  - `tests/ui/task-c22-confirm-wiring.test.tsx` 新增 `T-UI-011`～`T-UI-013`：预检未返回时按钮不可点且显示「正在核对要改哪些地方…」；预检返回合规 plan 后可点；点击后 `createContractWithAdmission` 收到的 `writable_paths` 与 plan 一致、且**未**调用 `submitJourneyMessage`。
+  - J.4 的集成测试继续通过；`T-UI-001`～`010` 不回归（夹具补合规 plan）。
+* **FAIL**：确认链任何一步仍从意图文本推断范围；或 drift 后右栏保持锁定。
+* **关键文件**：`src/routes/index.tsx`、`src/lib/journey/confirm-scheme-atomic.ts`、`src/lib/daemon-api.ts`、`tests/ui/task-c22-confirm-wiring.test.tsx`、`tests/unit/confirm-scheme-atomic.test.ts`
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证。网关写范围：确认链改用冻结 `ScopePlan` 建合同，删除事务前聊天推断；对齐 INV-SEAL-01（禁 `buildL0Plan(chat)` 签署用法）。
+* **估算**：M
+
+<a id="task-j.6"></a>
+
+#### 【Task J.6】中栏《改动范围与验收方式》区块 `[COMPLETED]`
+
+> **ADR-0014 修订（2026-10-30，审阅后置）**：开工前**不展示**路径与区域调整控件。区块在开工前只显示三行白话：「这次大概改 N 处、不碰 M 处」「怎么算做完」「预计多大」；如有敏感项，再显示「含 N 处敏感改动」与「不碰这些，其余照做」按钮。范围 `2` 中「会改动的地方 / 这次不会碰」的完整清单，后置到试玩验收幕**只读**展示，与证据并列。范围 `3` 的「不要改这里」按钮删除：签署后范围已冻结，用户对范围的异议走 supervisor §16.7「这里不对」，或在右栏说出来，按 §16.5 C 类进入下一份合同。验收用例同步调整：开工前页面不含区域级按钮；验收幕清单只读。
+
+* **任务编号**：`TASK-J.6`
+* **任务名称**：`ScopeAcceptanceBlock` 白话呈现与用户表态
+* **对应规格**：SSOT 第三部分 §15.2、§15.4；§18 `S2-08`
+* **前置依赖**：`TASK-J.5`
+* **优先级**：P1
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#11](https://github.com/he18718143986-design/IDE/pull/11) / tip `a9d7cb2`（`feat(J.6): 中栏改动范围与验收白话区块`）
+* **一句话目标**：用户在点「确认开工」之前，用三行白话看清改动概览（大概改 N 处、不碰 M 处、怎么算做完、预计规模）；如有敏感项，显示白话敏感项与「不碰这些」按钮；具体路径树与命令明细后置到试玩验收幕只读展示。
+* **范围**：
+  1. 新建 `src/components/studio/ScopeAcceptanceBlock.tsx`，插入 `SchemeReviewPane` 的决议区之后、「生成 Demo」之前（SSOT §15.2 顺序）。
+  2. [ADR-0014 / SA-1 条款级重写] 开工前仅展示三行白话概览：1) 改动概览（大概改 N 处、不碰 M 处；不展示路径树与区域按钮）；2) 验收方式（怎么算做完）；3) 预计规模（预计多大）。如有用户点名的敏感项，展示「含 N 处敏感改动：<白话名>」与「不碰这些，其余照做」按钮。原设计的完整清单与路径树后置到验收幕只读展示。原设计的「每项『可以/不行』」物理废止删除。
+  3. [ADR-0014 / SA-1 条款级重写] 物理删除「不要改这里」与逐项「可以/不行」按钮；仅保留「不碰这些，其余照做」按钮（以 `excluded_area_ids` 重新预检，将敏感项移入 `never_touch`）。「确认开工」点击时通过 `applyScopeDecisions` 一并记录授权并提交。
+  4. `E_SCOPE_POLICY` 时，区块顶部显示谓词返回的白话说明；`E_SCOPE_APPROVAL_REQUIRED` 时，点「确认开工」提示敏感项未授权并展开查看。
+  5. 方案冻结后区块只读，表态按钮隐藏。
+* **非目标**：不接意图编译器的 `acceptance[]`（第二批）；不提供手写 glob 输入框（SSOT §15.4 明确禁止）。
+* **验收（PASS）**：新增 `tests/ui/scope-acceptance-block.test.tsx`（对应 SSOT `S2-08`）：
+  - 渲染开工前三行白话概览；开工前不含路径树及区域级按钮。
+  - 文案中不出现 `token`、`tool`、`**`、`glob`（大小写不敏感）。
+  - 点「不碰这些，其余照做」→ 以 `excluded_area_ids` 触发预检；开工点击 → 一键授权敏感项并带 `plan_digest` 提交。
+  - `manual_only` 夹具显示「没有自动检查」提示。
+  - 冻结态与验收幕下清单完整且只读。
+  - `tests/ui/task-c18-scheme-single-pane.test.tsx` 与 `task-c22` 不回归。
+* **FAIL**：区块显示技术单位或原始合同 JSON；或用户表态未进入预检。
+* **关键文件**：`src/components/studio/ScopeAcceptanceBlock.tsx`（新）、`src/components/studio/SchemeReviewPane.tsx`、`src/routes/index.tsx`
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证 / 网关写范围（纯中栏呈现与敏感项旁路 UI；写范围仍以预检 `ScopePlan` 为准）。
+* **估算**：M
+
+<a id="task-j.7"></a>
+
+#### 【Task J.7】交接三步进度与右栏解锁（施工对话过渡态） `[COMPLETED]`
+
+> **ADR-0014 / DEC-005 修订（2026-10-30）**：范围 `3` 的「插入系统消息」改为**中栏画布**卡片，右栏不出现任何 Supervisor 消息；范围 `4` 输入框上方的提示同样移到画布。验收用例「系统消息含节点数」改为「画布卡片含节点数，右栏消息列表无新增系统消息」。
+
+* **任务编号**：`TASK-J.7`
+* **任务名称**：「确认方案」交接 UI + COMMIT 后右栏解锁
+* **对应规格**：SSOT 第三部分 §16.3、§17 D9；§18 `J-02`；§19 `L-05`
+* **前置依赖**：`TASK-J.1`（**硬依赖**：右栏未只读前不得在施工期解锁）、`TASK-J.5`
+* **优先级**：P1
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#13](https://github.com/he18718143986-design/IDE/pull/13) / tip `67d7605`（`feat(J.7): 交接三步进度与右栏解锁`）
+* **对照痛点（代码事实）**：交接成功后 `setSchemeChatLocked(true)` 一直保持，只有「新建需求」解锁（`src/routes/index.tsx`）；冻结后的输入会被 `rebuildSchemeFromCorpus` 静默丢弃。
+* **一句话目标**：点击确认后用三步人话进度替代「假死」；成功后右栏立即恢复可用，且冻结后的消息绝不写进方案。
+* **范围**：
+  1. 「确认方案」按钮原地切换为三步进度（SSOT §16.3 线框）：「保存你确认的方案」对应 `CLAIM_AND_QUIESCE`～`FREEZE_SNAPSHOT`；「准备隔离的施工区」对应 `SIGN_AND_PREPARE` 的建合同与批准；「安排施工步骤」对应建任务图。`runConfirmSchemeAtomic` 增加可选 `onStage(stage)` 回调驱动进度。
+  2. 交接期间右栏输入框禁用，占位文案「正在交接，几秒后可以继续聊」。
+  3. [ADR-0014 / DEC-005 条款级重写] `COMMIT` 成功 → 右栏**解锁**；中栏画布展示卡片「开工了。一共 N 步…你可以离开，做完或需要你的时候我会提醒你。」（N = 任务图节点数；时长估算取 `ScopePlan.budget.plain`）。严禁向右栏注入任何系统消息。
+  4. [ADR-0014 条款级重写] 右栏保持纯净自由对话输入，中栏画布展示过渡态提示；严禁在右栏输入框上方硬编码注入提示。
+  5. 失败分支：回到方案态并解锁（沿用既有 `restoreRightChat`）；仅 `E_COMPENSATION_FAILED` 保持锁定并显示「这次准备没清理干净，需要你手动处理」与诊断入口。
+* **非目标**：不做四类分流卡片（第二批）；不做施工幕 UI（第二批）。
+* **验收（PASS）**：新增 `tests/ui/journey-handoff.test.tsx`（对应 SSOT `J-02`）：
+  - 点击后依次出现三步进度，交接期间输入框 `disabled`。
+  - 成功后输入框可用；画布卡片含节点数，右栏消息列表新增系统消息数为 0。
+  - 冻结后发送一条消息：搭档发送函数被调用 1 次，`rebuildSchemeFromCorpus` 调用 0 次，方案 `scheme_revision` 不变。
+  - `E_SIGN_AND_PREPARE_FAILED`（补偿成功）→ 解锁；`E_COMPENSATION_FAILED` → 保持锁定并显示诊断入口。
+  - `tests/ui/supervisor-studio-approval.test.tsx`、`task-c22` 不回归。
+* **FAIL**：成功后右栏仍锁定；或冻结后的消息改变了方案、合同或任务图。
+* **关键文件**：`src/routes/index.tsx`、`src/lib/journey/confirm-scheme-atomic.ts`、`src/components/studio/SchemeReviewPane.tsx`、`src/components/AgentChatPane.tsx`
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证 / 网关写范围（交接 UX + 右栏解锁；解锁不改变 partner 工具权限，仍受 J.1 只读约束）。
+* **估算**：M
+
+<a id="task-j.8"></a>
+
+#### 【Task J.8】`JourneyStage` 投影与广播 `[COMPLETED]`
+
+* **任务编号**：`TASK-J.8`
+* **任务名称**：四幕状态由 Daemon 投影并随 `STATE_CHANGED` 下发
+* **对应规格**：SSOT 第三部分 §16.2 映射表、§17 D8；§18 `J-01`；§19 `L-08`（呈现层）、`L-10`
+* **前置依赖**：无（可与主链并行）
+* **优先级**：P1
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#10](https://github.com/he18718143986-design/IDE/pull/10) / tip `b90241e`（`feat(J.8): JourneyStage 投影与 STATE_CHANGED 广播`）
+* **对照痛点（代码事实）**：前端在 `index.tsx` 中自行组合合同、图谱与预览状态决定显示什么；`DELIVERY_STATES` 仍含 ADR-0012 已废止的 `DELIVERED`。
+* **一句话目标**：用户可见的「当前在哪一幕、幕内什么子态」只有一个来源——Daemon 按规格映射表算出并广播；前端只消费，不推导。
+* **范围**：
+  1. 新建 `src/lib/state/journey-stage.ts`（纯函数）：`JourneyStage = "scheme" | "construction" | "playtest" | "merged" | "aborted"`，`JourneySubstate` 按 SSOT §16.2 表每一行一个枚举值；`projectJourneyStage({ delivery_state, transient, lifecycle_state, presentation_state, has_contract })` → `{ stage, substate, warning? }`。表外组合 → `{ stage: "construction", substate: "waiting_for_you", warning: "UNMAPPED_COMBINATION" }`。`DELIVERED` 投影为 `merged` 并附 `archived: true`（呈现层收口 `L-08`；**本卡不删枚举**，删除枚举另立卡并评估迁移）。
+  2. `src/lib/ipc/frames.ts::StateChangedPayload` 增加可选 `journey_stage`、`journey_substate`、`journey_archived`。
+  3. `daemon/state/presentation-projector.ts` 在生成 `STATE_CHANGED` 时调用投影并填充；投影返回 `warning` 时写一条 `daemon.jsonl` 告警（沿用 C.17 日志）。
+  4. 前端只把字段存进状态，**本卡不改任何界面**（四幕外壳在第二批）。
+* **非目标**：不改 `DELIVERY_TRANSITIONS`；不做四幕 UI；不删 `DELIVERED`。
+* **验收（PASS）**：新增 `tests/unit/journey-stage-projection.test.ts`（对应 SSOT `J-01`）：
+  - 表驱动：SSOT §16.2 每一行至少一条用例，断言 `stage` 与 `substate`。
+  - 表外组合（如 `MERGED` + `EXECUTING`）→ `waiting_for_you` + `UNMAPPED_COMBINATION`。
+  - `DELIVERED` → `merged` 且 `archived === true`。
+  - `tests/integration/presentation-state-wiring.test.ts` 补断言：`STATE_CHANGED` 帧携带 `journey_stage`；既有断言不回归。
+* **FAIL**：前端新增任何基于底层状态组合推导幕次的代码；或映射表有行缺测试。
+* **关键文件**：`src/lib/state/journey-stage.ts`（新）、`src/lib/ipc/frames.ts`、`daemon/state/presentation-projector.ts`、`src/lib/state/delivery-state.ts`（只读复用 `projectDeliveryState`）
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证 / 网关写范围（本卡只做 `JourneyStage` 投影与广播，不改门禁）。
+* **估算**：S
+
+<a id="task-j.9"></a>
+
+#### 【Task J.9】SchemePatch 零模型确定性合并引擎 `[COMPLETED]`
+
+* **任务编号**：`TASK-J.9`
+* **任务名称**：编译器补丁的确定性合并、证据锚定与墓地复活判定（纯函数）
+* **对应规格**：SSOT 第三部分 §14.2、§14.3、§14.11（`INV-LEDGER-01～03`）；§18 `V-01`～`V-04`、`V-10`～`V-13`。**实施口径**：[`scheme-patch-engine.md`](./scheme-patch-engine.md)（与 SSOT 冲突时以 SSOT 为准）
+* **前置依赖**：无硬依赖（纯函数，可立即开工）。合并成功后触发范围预检的接线在 `TASK-J.10`，届时依赖 `TASK-J.2`
+* **优先级**：P1（闭环 v2.1 第二批首卡；`J.10` 硬依赖本卡）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#12](https://github.com/he18718143986-design/IDE/pull/12) / tip `1ad6eab`（`feat(J.9): SchemePatch 零模型确定性合并引擎`）
+* **对照痛点（代码事实）**：方案今天由 `src/lib/journey/scheme-draft.ts` 的 `MODULE_HINTS` 正则启发式整份生成，没有补丁、没有证据、没有 pin 合并规则，也没有墓地；SSOT §14.3 的合并表与 §14.11 的不变式在代码里 0 命中。
+* **一句话目标**：给定当前台账状态、编译器补丁与只读对话记录，引擎零模型地算出「整补丁冻结 / 拒绝 / 过期」或「逐 op 写入 / 出卡 / 丢弃」，同样输入永远得到逐字节相同的输出。
+* **范围**：
+  1. 新建 `src/lib/journey/scheme-patch-types.ts`：类型、zod Schema、码表（`PATCH_CODES` / `OP_CODES` / `SUGGESTION_KINDS` / `WARNING_CODES`）与常量（实施口径 §5.2、§5.3）。
+  2. 新建 `src/lib/journey/evidence-anchor.ts`：`normalizeForAnchor`（CRLF、零宽、按字素 NFKC、空白折叠、去首尾）、`anchorQuote`（全部出现位置、短引用整句边界、默认取最后一处、原文偏移映射）（实施口径 §3）。
+  3. 新建 `src/lib/journey/graveyard-revival.ts`：墓碑指纹、`matchesTombstone`（id / key / Dice ≥ 0.75）、`judgeRevival`（R0～R9 三值判定）、`buildTombstone`、`migrateGraveyardEntry`（实施口径 §4）。
+  4. 新建 `src/lib/journey/scheme-patch-engine.ts`：`mergeSchemePatch` 及其 `stage*` Pipeline；配套 `applyUserEdit`、`undoLastPatch`、`acceptSuggestion`、`rejectSuggestion`、`rejectItemToGraveyard`、`expireSuggestionsOnFreeze`、`auditLedgerState`、`projectEvidenceLedger`（实施口径 §2、§5.4～§5.6）。
+  5. 四个文件零 `node:*` 导入、零时钟、零随机数、零网络；id 由 `ctx.newId` 注入。
+* **非目标**：不接真模型、不做防抖与预算（`J.10`）；不改 `scheme-draft.ts` 现行启发式（`J.10` 降级为离线兜底）；不做 `renderSchemeDiagrams`（`J.9b`）；不做 Worker 产出物墓地门禁；不做冻结后回写补丁（`INV-LEDGER-04`，`J.16`）；不改任何 UI；不向 `src/lib/error-codes.ts` 的 `ERROR_CODES` 增码（实施口径 K-9）。
+* **验收（PASS）**：实施口径 §6 测试矩阵全部用例通过，具体为：
+  - `tests/unit/evidence-anchor.test.ts`：Q-01～Q-23 全部判例，锚点偏移逐字段相等。
+  - `tests/unit/graveyard-revival.test.ts`：R-01～R-17 与 TM-Y-18～30。
+  - `tests/unit/scheme-patch-merge.test.ts`：TM-G（含 144 组笛卡尔积对拍）、TM-P、TM-S、TM-C、TM-X、TM-A、TM-R、TM-D、TM-L、TM-E。
+  - `tests/unit/scheme-patch-precedence.test.ts`：TM-Z 14 组对拍 + TM-Z-13～15；对拍神谕由第二人按实施口径 §2.3 表格独立编写。
+  - `npm run typecheck` 相对基线无新增；`npm run lint` 0 error。
+* **FAIL**：任一 op 在证据不合格时被部分应用；墓地命中的内容以覆盖建议卡形式出现在用户面前（Z-04）；一次成功合并使修订号增加超过 1；同一输入两次调用结果不同；引擎源码出现 `node:` 导入、`Date.now`、`Math.random` 或网络调用。
+* **关键文件**：`src/lib/journey/scheme-patch-types.ts`（新）、`src/lib/journey/evidence-anchor.ts`（新）、`src/lib/journey/graveyard-revival.ts`（新）、`src/lib/journey/scheme-patch-engine.ts`（新）、`tests/helpers/scheme-patch-fixtures.ts`（新）
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证 / 网关写范围（纯函数 `SchemePatch` 合并引擎；不触签署/Gateway）。
+* **估算**：M
+* **备注**：`runtime-contract-and-safety.md` §8 L3 行的门禁层拒绝码无 §2.3 式闭集。`E_CHECKPOINT_FAILED`（`daemon/server.ts` 两处 catch，Daemon HTTP 层以 409 直接返回）与 `E_WRITABLE_SCOPE_POLICY`（类 `WritableScopePolicyError` 定义于 `daemon/supervisor/scope-gate.ts`）均未登记入 `ERROR_CODES`；待派工门禁产出证据归因时统一补登，不在本卡范围。注意 `E_SCOPE_POLICY`（§2.3 表内，v2.1）与 `E_WRITABLE_SCOPE_POLICY` 是两个不同的码，仅名字相近。
+* **待定风险（K-12）**：确认路径（`mark_user_confirmed`，§3.4 / §5.3）同样接受编译器 `occurrence`，存在同型洗白面（「我同意。算了不同意」+ `occurrence: 0`）。复活路径已由 K-12 修复；确认路径修法待定，落地前不得把「待定」读成「无问题」。J.11 金标须含此类对抗样本。
+
+<a id="task-j.10"></a>
+
+#### 【Task J.10】意图编译器生成端与 Daemon 编译循环 `[COMPLETED]`
+
+> **ADR-0014 / DEC-004 修订（2026-10-30）**：删除范围 `5`（`partner-hint-filter.ts`）及生成 Schema 中的 `partner_hint` 字段；编译器输出不得回流到右栏。编译器实现形态开放（单次结构化调用即可），`compile-loop.ts` 对模型的依赖经可替换接口注入。intent-compiler-prompt §5 的 partner_hint 设计作废，以本修订为准。
+
+* **任务编号**：`TASK-J.10`
+* **任务名称**：编译器 System Prompt、生成 Schema、输出组装与编译循环
+* **对应规格**：SSOT 第三部分 §14.4～§14.8、§14.10；§18 `V-05`、`V-06`、`V-09`；§19 `L-01`、`L-07`。**实施口径**：[`intent-compiler-prompt.md`](./intent-compiler-prompt.md)（与引擎 [`scheme-patch-engine.md`](./scheme-patch-engine.md) 冲突时以引擎为准）
+* **前置依赖**：`TASK-J.9`（硬：引擎）；合并成功后触发范围预检依赖 `TASK-J.2`
+* **优先级**：P1
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#17](https://github.com/he18718143986-design/IDE/pull/17) / tip `97bb0db`（`feat(J.10): 意图编译器生成端与 Daemon 编译循环`）
+* **一句话目标**：用户发消息后 1.2 秒，编译器在结构化输出约束下产出补丁，经组装送进引擎；结构层让近一半（21/47）的引擎码不可能被触发（注：`47` 为定稿时口径，现行引擎码表 51 码，待按 51 重算，见 `consistency-audit.md` OP-15），其余由提示词纪律降低、由引擎兜底。
+* **范围**：
+  1. `src/lib/journey/compiler-output-schema.ts`：按消息别名、本批别名、现有 id、墓碑 id 动态构造 zod Schema；`assembleCompilerOutput`（别名 → `turn_id`、摘录 qid 展开、`new:` id 替换、代填 `base_revision` 与 `compiled_from_turns`；失败映射 `E_PATCH_SCHEMA_INVALID` 并记子原因）。
+  2. `daemon/supervisor/intent-compiler/system-prompt.ts`：实施口径 §6.2 骨架 + §6.5 八条 few-shot；`COMPILER_PROMPT_VERSION`。
+  3. `daemon/supervisor/intent-compiler/render-input.ts`：实施口径 §6.3（nonce 标签、N1～N3 预规范化、AI 回复无别名、墓碑只注入是什么与为什么）。
+  4. `daemon/supervisor/intent-compiler/compile-loop.ts`：实施口径 §7（防抖、单在途、只重试 STALE 一次、CAS 落盘、三次失败提示、预算账本、离线兜底）。
+  5. [ADR-0014 / DEC-004 已废止] 物理删除 `partner-hint-filter.ts` 及生成 Schema 中的 `partner_hint` 字段；编译器输出严禁回流到右栏，保持右栏无系统提示与暗中注入。
+  6. `demoReady` 改判（§14.10）。
+* **非目标**：不改引擎；不做金标评测脚本（J.11）；不把搭档与编译器合并成一次调用（实施口径 §5.1 已否决）。
+* **依赖与风险**：GAP-1（聊天否决不入墓）、GAP-2（墓碑命中不看 `revival_keys`）已由 J.9a 增补关闭，见 `supervisor.md` §14.11 K-10、K-11。
+* **验收（PASS）**：
+  - `tests/unit/compiler-output-schema.test.ts`：S 类码在组装后不可能出现（逐码构造非法模型输出，断言组装期拒绝）；qid 展开、`new:` 替换、代填字段正确。
+  - `tests/unit/compiler-render-input.test.ts`：同一状态两次渲染逐字节相同；AI 回复无别名；nonce 出现在边界标签；墓碑不含 `revival_keys`。
+  - `tests/unit/intent-compiler-trigger.test.ts`（`V-05`）：空闲计时与 AI 回复完毕触发模型调用计数为 0。
+  - `tests/unit/compile-loop.test.ts`：桩模型重放实施口径 §8.2 ADV-26～28，断言重试次数、批次游标与失败计数。
+  - `tests/eval/intent-compiler-adversarial.test.ts`：以对抗补丁回放 ADV-01～29 喂引擎，断言 `expected_engine`（确定性，可进 CI）。
+  - `tests/ui/intent-compiler-offline.test.tsx`（`V-06`）。
+* **FAIL**：生成 Schema 允许 `occurrence`、`anchor`、`user_confirmed`、`edit` 证据任一出现；模型输出 `base_revision` 或 `compiled_from_turns` 并被采信；op 级丢弃触发重试；提示词出现引擎词表或阈值。
+* **关键文件**：见范围 1～4（范围 5 已废止）
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证 / 网关写范围。本卡只做意图编译生成端与 Daemon 编译循环（产出 `SchemePatch` → 引擎）；编译结果须经 [ADR-0018](../adr/0018-intent-to-executable-seal.md) 密封进入签署，**禁止**确认路径用聊天直推 `ScopePlan`/`buildL0Plan(chat)`；输出不得回流右栏（DEC-004）。不放宽 Gateway `writable_paths`。
+* **估算**：M
+
+<a id="task-j.18a"></a>
+
+#### 【Task J.18a】G-MATCH 纯函数与产出物投影 `[COMPLETED]`
+
+* **任务编号**：`TASK-J.18a`
+* **任务名称**：墓地匹配单一实现、别名表与产出物投影（纯函数层）
+* **对应规格**：SSOT §14.11 第 5 小节 G-MATCH；[`worker-graveyard-gate.md`](./worker-graveyard-gate.md) §2、§4.1～§4.3、§6.1～§6.2（`graveyard-match` / `artifact-*`）、§7.2～§7.3；[`scheme-patch-engine.md`](./scheme-patch-engine.md) §4.2～§4.3（墓碑指纹，只读复用）
+* **前置依赖**：`TASK-J.9`（硬：`graveyard-revival.ts` / 墓碑结构与 `matchesTombstone` 语义）
+* **优先级**：P1（M3 墓地）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#24](https://github.com/he18718143986-design/IDE/pull/24) / tip `20c2d46`（`feat(J.18a): G-MATCH 纯函数、别名表与产出物投影`）
+* **对照痛点（代码事实）**：
+  - 墓地匹配公式散落在引擎侧；门禁侧尚无 `G-MATCH` 唯一实现文件（`graveyard-match.ts` 0 命中）。
+  - 无「新增行多重集差」与 GateUnit 投影；无法把 Worker 完整文件内容变成强/弱判定单元（F-1、F-7）。
+  - 无版本化 `ALIAS_LEXICON`；别名对抗（mongoose ↔ mongodb）无处落。
+* **一句话目标**：同一自然语言文本经引擎投影与门禁 `U-NL` 投影得到逐位相同的 (b)(c)(d)；同一代码产出物投影出可复现的 GateUnit 列表。
+* **范围**：
+  1. 新建 `src/lib/journey/graveyard-match.ts`：导出 `matchNormalize`、`lexemes`、`dice`、`matchesTombstoneText`、`artifactKeys`、`codeTokens`、`matchArtifactUnit`；常量 `GRAVEYARD_DICE_THRESHOLD`、`CODE_STOPLIST`（签名见实施口径 §6.2）。
+  2. `evidence-anchor.ts`：**再导出**上述 NL 原语，保持引擎既有导入路径有效；禁止第二份实现。
+  3. 新建 `src/lib/journey/artifact-alias-lexicon.ts`：`ALIAS_LEXICON`、`ALIAS_LEXICON_VERSION`（实施口径 §2.4 表）。
+  4. 新建 `src/lib/journey/artifact-projection.ts`：`addedLines`、`projectArtifact`、`projectCommand`、`projectText` 与 `GateUnit` 类型。
+  5. 共享夹具 `tests/fixtures/graveyard-match/cases.json`（`nl_cases` + `code_cases`）；引擎 TM-Y 可后续同消费。
+  6. 单测：`tests/unit/graveyard-match-conformance.test.ts`（TM-GM）、`tests/unit/artifact-projection.test.ts`（TM-GU）。
+* **非目标**：不接线 Daemon / Gateway / CLI；不改合同 Schema；不做 `evaluateGraveyardGate`；不登记 `E_PROPOSAL_PREVIOUSLY_REJECTED`。
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证 / 网关写范围。本卡只新增纯函数与夹具，不触达写盘门禁。
+* **验收（PASS）**（均可翻成 `it(...)`）：
+  - TM-GM-01～07：`cases.json` 的 `nl_cases` 经引擎投影与门禁 `U-NL` 的 (b)(c)(d) 逐位相等；Dice 0.75/0.74；`graveyard-match.ts` 之外出现墓地阈值字面量 `0.75` → 失败。
+  - TM-GU-01～12：`package.json` / npm 别名 / 行移动 / requirements / go.mod / 安装命令 / 新路径 / 注释行 / `\r\n` 归一等投影结果与实施口径 §7.3 表一致。
+  - `npm run typecheck` 相对基线无新增；`npm run lint` 0 error。
+* **FAIL**：引擎与门禁对同一自然语言文本的匹配结果不同；`graveyard-match.ts` 之外出现第二份墓地匹配逻辑；弱通道（注释）产出 `U-IDENT` 强单元。
+* **关键文件**：`src/lib/journey/graveyard-match.ts`（新）、`artifact-alias-lexicon.ts`（新）、`artifact-projection.ts`（新）、`evidence-anchor.ts`（再导出）、`tests/fixtures/graveyard-match/cases.json`（新）、上述两单测文件
+* **估算**：M
+
+<a id="task-j.18b"></a>
+
+#### 【Task J.18b】合同 `scheme_binding` 与快照墓地权威源 `[COMPLETED]`
+
+* **任务编号**：`TASK-J.18b`
+* **任务名称**：GAP-W1 / GAP-W2——把确认身份与冻结墓地写入合同与快照
+* **对应规格**：[`worker-graveyard-gate.md`](./worker-graveyard-gate.md) §3.4、§8 GAP-W1/W2；SSOT §14.11「冻结后以快照为唯一权威」；`runtime-contract-and-safety.md` §1、§2；J.4 快照 1.1 基线
+* **前置依赖**：`TASK-J.4`（硬：`plan_digest`、`E_SCHEME_SNAPSHOT_MISMATCH`、快照 1.1 含 `scope_plan`）；`TASK-J.9`（硬：墓地条目结构可供冻结）
+* **优先级**：P1（M3 墓地）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#22](https://github.com/he18718143986-design/IDE/pull/22) / tip `ca9ed8f`（`feat(j18b): scheme_binding 合同字段与快照 schema 1.2 墓地权威源`）
+* **对照痛点（代码事实）**：
+  - `confirmation_id` 只在 `POST /api/contracts` / `/approve` 请求体出现，**不写入合同**（F-8）→ 派工无从回到快照（GAP-W1）。
+  - 冻结快照只含方案 / Demo /（J.4 后）`scope_plan`，**不含 `graveyard`**（F-11）→ GAP-W2。
+* **一句话目标**：带 `confirmation_id` 建出的合同永久带有不可改的 `scheme_binding`；对应快照升到 1.2 且含冻结时完整墓地，派工侧可读到权威墓碑列表。
+* **范围**：
+  1. `src/lib/contract.schema.ts`：合同新增可选 `scheme_binding = { confirmation_id, snapshot_digest, plan_digest }`；签署后不可改（既有「改合同本身」禁止不变）。
+  2. 建合同路径（J.4 按快照建合同处）：带 `confirmation_id` 且校验通过后写入 `scheme_binding`。
+  3. `scheme-snapshot-store.ts`（及快照类型）：快照版本升 **1.2**，增加 `graveyard`（冻结时完整墓地，含 revived）及其 digest 字段；读 1.1 时行为保持兼容，但派工侧对无墓地的 1.1 按「版本过旧」处理（口径见实施口径 TM-GB-05，本卡交付快照读写与 digest；绑定失败语义由 `J.18c` 断言）。
+  4. 单测：合同 Schema 往返；建合同写入 `scheme_binding`；快照 1.2 读写含 `graveyard`；篡改 digest 可被检测（哈希不等）。
+* **非目标**：不实现 `verifyDispatchBinding` / gate pack（`J.18c`）；不接线写路径（`J.18d`）；不改签署期 `E_SCOPE_PLAN_DRIFT` 语义。
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证；**不改变** Gateway 物理路径写范围。本卡只扩展合同可选字段与快照内容，不放宽任何写盘门禁。
+* **验收（PASS）**：
+  - 带 `confirmation_id` 的建合同响应/落盘合同含 `scheme_binding` 三字段，且与所用快照 digest / `plan_digest` 一致。
+  - 冻结快照 `version === "1.2"`（或项目既有版本字段等价表示）且含 `graveyard` 数组；digest 随墓地内容变化。
+  - 1.1 旧快照仍可读取；写入路径对新确认产出 1.2。
+  - 签署后尝试改写 `scheme_binding` 被拒绝（或 Schema/运行时断言失败）。
+  - `npm run typecheck` / `lint` 相对基线无新增 error。
+* **FAIL**：派工仍只能从请求体猜 `confirmation_id`；快照无墓地却被当成权威源；旧直签合同被强制写入假 `scheme_binding`。
+* **关键文件**：`src/lib/contract.schema.ts`、`daemon/supervisor/scheme-snapshot-store.ts`（及 J.4 建合同接线文件）、相关单测
+* **估算**：M
+
+<a id="task-j.18c"></a>
+
+#### 【Task J.18c】墓地门禁裁决、优先级格与派工绑定 `[COMPLETED]`
+
+* **任务编号**：`TASK-J.18c`
+* **任务名称**：`evaluateGraveyardGate` / 优先级格 / `verifyDispatchBinding` / 码表与 L3 闭集
+* **对应规格**：[`worker-graveyard-gate.md`](./worker-graveyard-gate.md) §2.5、§3、§5.3、§6.2～§6.3、§7.4～§7.7、§7.9；runtime §8 / §8.1 提案；DEC-1（K-15）
+* **前置依赖**：`TASK-J.18a`、`TASK-J.18b`（均须 `COMPLETED`）
+* **优先级**：P1（M3 墓地）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#26](https://github.com/he18718143986-design/IDE/pull/26) / tip `b6922ac`（`feat(J.18c): 墓地门禁裁决、优先级格与派工绑定`）
+* **对照痛点（代码事实）**：无 `evaluateGraveyardGate` / `pickPrimaryVerdict` / `verifyDispatchBinding`；L3 无闭集表；`E_PROPOSAL_PREVIOUSLY_REJECTED` 未入 `ERROR_CODES`（DEC-1 待代码登记）。
+* **一句话目标**：给定快照墓地与一批产出物，门禁确定性给出是否拦截、主码与全部命中证据；派工前绑定失败则不签发 `exec_token`。
+* **范围**：
+  1. 新建 `daemon/guard/worker-graveyard-gate.ts`：`evaluateGraveyardGate`、`pickPrimaryVerdict`、`buildGatePack`（§6.2 签名）。
+  2. 新建 `daemon/guard/dispatch-binding.ts`：`verifyDispatchBinding`（读快照；bound / legacy / 失败三态）。
+  3. 码表：`E_PROPOSAL_PREVIOUSLY_REJECTED` 登记入 `ERROR_CODES`（映射 `SCOPE_VIOLATION`，DEC-1）；新增 `E_GATE_SCAN_FAILED` 与门禁日志码 `W_GRAVEYARD_*` / `W_GATE_*`（§6.3；`W_*` 不进 `ERROR_CODES`）。
+  4. `runtime-contract-and-safety.md` §8.1：落地 L3 执行期码闭集表（GAP-W5）。
+  5. 单测：`worker-graveyard-gate.test.ts`（TM-GS、TM-GA、TM-GE）、`gate-priority.test.ts`（TM-GP 120 组 + 表列特例）、`dispatch-binding.test.ts`（TM-GB）。
+* **非目标**：不改 `ai-worker` / `gateway` / `orchestrator` / `merger` / `pretool-hook` 生产接线（`J.18d`）；不做 §16.6 前端卡片 UI（可只导出供接线的结构化结果）；不在施工期提供复活通道。
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证；**不改变** Gateway 物理路径写范围与 `E_SCOPE_PLAN_DRIFT` 签署期语义。**会改变（收紧，不放宽）**：新增内容级裁决纯函数与派工绑定 API，供后续接线调用；本卡本身不把拦截挂到写盘路径。
+* **验收（PASS）**：
+  - TM-GS-01～08、TM-GA-01～18（含 ⚠ 残余风险的现行口径断言）、TM-GP 笛卡尔积与 TM-GP-01～06、TM-GB-01～07、TM-GE-01～09 与实施口径表一致。
+  - `pickPrimaryVerdict`：强用户墓地 + 越界 → 主码墓地（P4>P5）；保护路径 + 强安全墓地 → 主码保护路径（P2>P3）；执行期主码永不为 `E_SCOPE_PLAN_DRIFT`。
+  - legacy 合同 → `mode: "legacy"`，不拦截。
+  - `ERROR_CODES` 含 `E_PROPOSAL_PREVIOUSLY_REJECTED`；runtime §8.1 闭集表已写。
+* **FAIL**：弱证据或软墓碑导致 `block: true`；越界与墓地同时命中时主码为越界；legacy 路径静默启用活台账墓地。
+* **关键文件**：`daemon/guard/worker-graveyard-gate.ts`（新）、`daemon/guard/dispatch-binding.ts`（新）、`src/lib/error-codes.ts`（或对应码表）、`docs/specs/runtime-contract-and-safety.md`、上述单测
+* **估算**：M
+
+<a id="task-j.18d"></a>
+
+#### 【Task J.18d】写路径接线、CLI pack、全量扫描与集成 `[COMPLETED]`
+
+* **任务编号**：`TASK-J.18d`
+* **任务名称**：把墓地门禁挂到派工 / 写入 / 合并检查点，并交付 CLI gate pack 与集成证明
+* **对应规格**：[`worker-graveyard-gate.md`](./worker-graveyard-gate.md) §4.4、§5.1～§5.2、§6.4、§7.8、§7.10、§8 GAP-W3/W4/W6；SSOT §15.6、§16.6；runtime §5.2
+* **前置依赖**：`TASK-J.18c`（硬）
+* **优先级**：P1（M3 墓地）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#27](https://github.com/he18718143986-design/IDE/pull/27) / tip `a2fa7df`（`feat(J.18d): 墓地门禁生产写路径接线（dispatch/Worker/Gateway/CLI/扫描）`）
+* **对照痛点（代码事实）**：
+  - `buildWorkerTaskInstruction` 不注入墓地（F-10 / GAP-W3）。
+  - CLI PreToolUse hook 只看路径不看内容（F-3 / GAP-W4）。
+  - `validateChanges` / `handleWriteFile` / `POST_VERIFICATION` / `PRE_MERGE` 无墓地调用（§6.4）。
+  - blockers 推送原始 `access.reason` 而非映射后 `E_*`（GAP-W6）。
+* **一句话目标**：真实施工路径上，强证据命中活跃硬墓碑时写盘前或合并前停工并留下证据；弱证据只进审阅；旧直签路径明示 `unavailable` 不静默。
+* **范围**：
+  1. 派工：`verifyDispatchBinding` → `buildGatePack` 写入 `.stagent/claude-config/graveyard-pack.json`；`session-task-injector.ts` 注入「用户否决过的方案」白话段（只列 `proposal` / `rejection_reason`，不列 `artifact_keys`）（GAP-W3）。
+  2. API Worker：`ai-worker.ts::validateChanges` 内调用 `evaluateGraveyardGate` + `pickPrimaryVerdict`；阻断则整批不写。
+  3. Gateway：`handleWriteFile` 在保护清单之后调用门禁；阻断走既有 `onScopeBlocked` / `runBoundaryStop`。
+  4. CLI：`pretool-hook.mjs` 读 gate pack 做集合查找（GAP-W4）；pack 缺失 → allow + `W_GATE_PACK_MISSING`。
+  5. `orchestrator.ts`（`POST_VERIFICATION`）与 `merger.ts`（`PRE_MERGE`）全量扫描；扫描失败 → `E_GATE_SCAN_FAILED`。
+  6. GAP-W6：blockers 改为 `scopeErrorCode` 映射后的 `E_*`。
+  7. 测试：`tests/unit/pretool-hook-graveyard.test.ts`（TM-GH）；`tests/integration/worker-graveyard-gate.test.ts`（TM-GI，端口 **3950–3959**，登记于 `tests/unit/test-port-map.test.ts`）。
+* **非目标**：不做语义/AST 判定；不在施工期提供复活捷径（「我改主意了」只回到方案幕流程，由引擎复活）；不修 OBS-1（`workerPid: null`）；不实现 J.15 三段式卡片完整 UI（本卡交付结构化停工与证据；卡片文案若已有通用意外卡则复用）。
+* **不变声明（R-12）**：不改变：鉴权 / Demo Origin / 点亮三证；**不改变** Gateway 物理路径写范围（`writable_paths` / 既有路径门禁）与 `E_SCOPE_PLAN_DRIFT` 签署期语义。**会改变（收紧，不放宽）**：在派工 / `gateway.handleWriteFile` / 执行期校验 / `PRE_MERGE` 等检查点按墓地做**内容级**拦截；弱证据只进审阅不停工。
+* **验收（PASS）**：
+  - TM-GH-01～06；TM-GI-01～04（含：桩 Worker 含 mongoose → 未写盘 + `PENDING_RESUME`；绕过 hook 时 `PRE_MERGE` 拒合并；legacy + mongoose → 放行且 `graveyard_check: "unavailable"`）。
+  - 派工提示含否决方案白话且不含 `artifact_keys`。
+  - blockers 中的码为映射后的 `E_*`，可供 `pickPrimaryVerdict` 比较。
+  - `npm run typecheck` / `lint` 相对基线无新增 error。
+* **FAIL**：弱证据导致停工；软墓碑导致停工；执行期出现 `E_SCOPE_PLAN_DRIFT`；越界与墓地同时命中时用户面主码为越界；legacy 路径静默启用活台账。
+* **关键文件**：`daemon/worker/ai-worker.ts`、`daemon/mcp/gateway.ts`、`daemon/pipeline/orchestrator.ts`、`daemon/pipeline/merger.ts`、`daemon/worker/cli-host/pretool-hook.mjs`、`daemon/worker/session-task-injector.ts`、上述测例与端口表
+* **估算**：M
+
+#### 第二批预告（本批合入后再细化立卡，**本条不立卡**）
+
+| 预定编号 | 内容 | 规格 | 依赖 |
+| :--- | :--- | :--- | :--- |
+| ~~J.9~~ | **已立卡**（见上方【Task J.9】）：补丁协议与确定性合并。`renderSchemeDiagrams` 拆出为 J.9b | §14.2、§14.3、§14.11；V-01～V-04、V-10～V-13 | — |
+| J.9b | `renderSchemeDiagrams`：三张图由结构确定性渲染 | §14.1 原则 1、§14.2 注；V-07 | J.9 |
+| ~~J.10~~ | **已立卡**（见上方【Task J.10】） | §14.4～§14.8、§14.10 | J.9 |
+| J.11 | 金标对话集与评测脚本。**种子**：[`intent-compiler-prompt.md`](./intent-compiler-prompt.md) §8 的 29 组对抗样例与生成端指标 | §14.9；V-08；**必含**「模块名重叠但意图不同」正反两向样本（§4.2 残余风险兜底）、确认路径 `occurrence` 洗白对抗样本（待定风险） | J.10 |
+| J.12 | 用户主动暂停接口 `POST /api/contracts/:id/pause` | §16.4；L-09 | — |
+| J.13 | 四幕外壳与施工幕（白话步骤、自动推进、等你确认卡） | §16.1、§16.4；J-06；L-06 | J.8、J.12 |
+| J.14 | 施工对话四类分流与中栏卡片 | §16.5；J-03、J-04、J-05 | J.7、J.13 |
+| J.15 | 三段式意外卡 | §16.6；J-07 | J.13 |
+| J.16 | 试玩幕、对话式验收、合入与「基于这次继续」 | §16.7、§16.8；J-08～J-10 | J.13、J.14；硬依赖 J.4（快照 `scope_plan`）、**J.18b** GAP-W1（`scheme_binding`） |
+| J.17 | 单页 Fast Path「直接改」 | §16.11；J-11 | J.5、J.13 |
+| ~~J.18~~ | **已立卡并拆分**（母卡 `[SPLIT]` → **J.18a～J.18d**）：Worker 派工墓地门禁 | §14.11 INV-LEDGER-03、G-MATCH | J.4、J.9 → 子卡 |
+
+> **J.17 实施硬性要求（C-3 裁决，2026-10-28）**：实施期必须交付一份可枚举的 glob 匹配规则清单，用于判定「非生产产物」，使「免 Worktree 仅限非生产产物」可在运行时强制执行。本 PR 中的最低清单（`docs/**`、`*.md`、`demos/**`、`.stagent/**`）保留为参考基线，不作为最终规则。J.17 目前仅在预告表中，尚无正式任务卡；立卡时须将本条并入其验收条款。
+
+
+### 3.4d 交付全链路 · 目标能力（L 系列 · 2026-10-30 立卡）
+
+<a id="task-l.1"></a>
+
+#### 【Task L.1】右栏纯净化：去掉系统提示与消息前缀（DEC-004） `[COMPLETED]`
+
+* **任务编号**：`TASK-L.1`
+* **对应规格**：ADR-0014 §1；`scheme.md` conf-2、conf-4、acc-2；`ledger/README.md` DEC-004
+* **前置依赖**：无
+* **优先级**：P1（M2）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#9](https://github.com/he18718143986-design/IDE/pull/9) / tip `8eb6896`（`feat(L.1): 右栏纯净化去掉系统提示与前缀`）
+* **对照痛点（代码事实）**：`daemon/chat/baseline-adapter.ts` 调 `streamText` 时带 `system: "你是 Stagent 右栏助手，用简体中文简洁回答。"`；`daemon/chat/session-manager.ts` 在发给右栏前用 `buildProtectionPromptNotice` 把保护清单拼在用户消息前面。
+* **一句话目标**：右栏收到的内容与用户输入逐字节相同，没有任何系统提示或前缀。
+* **范围**：
+  1. `daemon/chat/baseline-adapter.ts`：删除 `system` 字段，`messages` 只含历史与本条用户消息。
+  2. `daemon/chat/session-manager.ts`：删除对 `buildProtectionPromptNotice` 的调用，发送的 `prompt === text`。若 `buildProtectionPromptNotice` 再无调用方，连同其单测一起删除；有调用方则保留函数。
+  3. `daemon/worker/cli-host/claude-code-adapter.ts`：不改行为，只加断言测试，证明 argv 不含系统提示参数。
+* **非目标**：不改右栏只读工具集（J.1）；不改保护清单的物理拦截（P.1，网关仍按清单拒写）。
+* **不变声明**：鉴权、Demo Origin、点亮三证、网关写范围均不变。保护清单从「提示词劝导」变为「仅物理拦截」；右栏本来就没有写工具，所以安全属性不变（ADR-0007 判定口径：删掉提示词后属性仍成立）。
+* **验收（PASS）**：新增 `tests/unit/partner-purity.test.ts`：
+  - `BaselineChatAdapter.run` 调用 `streamText` 时入参不含 `system`（mock `ai` 模块断言）。
+  - 保护清单非空时，`session-manager` 交给适配器的 `prompt` 与用户输入全等。
+  - `ClaudeCodeAdapter.buildLaunch` 的 `args` 不含 `--system-prompt`、`--append-system-prompt`。
+  - `tests/integration/partner-readonly.test.ts` 与 P.1 既有用例不回归。
+* **FAIL**：右栏请求中出现任何非用户撰写的文本；P.1 拦截用例变红。
+* **关键文件**：`daemon/chat/baseline-adapter.ts`、`daemon/chat/session-manager.ts`、`daemon/protection/protection-list.ts`（只读核对调用方）
+* **估算**：S
+
+<a id="task-l.2"></a>
+
+#### 【Task L.2】Worker 指令补全「你会被这样检查」 `[COMPLETED]`
+
+* **任务编号**：`TASK-L.2`
+* **对应规格**：[`verification-strategy.md`](./verification-strategy.md) §8 第 1 项
+* **前置依赖**：无
+* **优先级**：P1（M2）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#8](https://github.com/he18718143986-design/IDE/pull/8) / tip `16c5176`（`feat(L.2): Worker 指令「你会被这样检查」`）
+* **对照痛点（代码事实）**：`daemon/worker/session-task-injector.ts::buildWorkerTaskInstruction` 只用 `verification_spec.commands` 决定是否暴露执行工具（约 L227），不把命令写进指令。
+* **一句话目标**：Worker 指令里原样列出验证命令与期望退出码。
+* **范围**：
+  1. `buildWorkerTaskInstruction` 在「输出契约」之前新增一段「你会被这样检查」：逐条列出 `alias`、`executable` + `args` 拼成的 argv 字符串、`expected_exit_code`。
+  2. 命令为空且声明了 `manual_confirmation` 时，输出「本合同没有自动检查，完成后由用户人工确认」。
+  3. 导出 `renderChecksSection(contract, extras?: string[])`，供 L.4（分段义务）与 L.12（知识库规则）追加条目，本卡只实现 `extras` 为空的情形。
+* **非目标**：不列测试义务（L.4）；不列知识库规则（L.12）；不改判卷与执行工具暴露规则。
+* **不变声明**：判卷仍由 Daemon 按退出码派生（ADR-0005）。
+* **验收（PASS）**：新增 `tests/unit/worker-instruction-checks.test.ts`：
+  - 两条命令的合同 → 指令包含两条 argv 字符串与期望退出码，且位于「输出契约」之前。
+  - 无命令 + `manual_confirmation` → 指令含人工确认句，不含命令列表。
+  - `renderChecksSection(contract, ["X"])` 输出包含 `X`。
+  - `tests/unit/worker-adapter.test.ts` 不回归。
+* **FAIL**：指令列出的命令与合同不一致。
+* **关键文件**：`daemon/worker/session-task-injector.ts`
+* **估算**：S
+
+<a id="task-l.3"></a>
+
+#### 【Task L.3】测试义务：合同元数据、`ScopePlan` 系统范围、证据字段与 `stagent check` `[COMPLETED]`
+
+* **任务编号**：`TASK-L.3`
+* **对应规格**：[`verification-strategy.md`](./verification-strategy.md) §2、§3.1、§3.4、§3.5、§5；[`delivery-lifecycle.md`](./delivery-lifecycle.md) §6；`scheme.md` acc-7
+* **前置依赖**：`TASK-J.2`（`buildScopePlan`）、`TASK-J.4`（按快照建合同）
+* **优先级**：P1（M2）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#15](https://github.com/he18718143986-design/IDE/pull/15) / tip `b4e0091`（`feat(L.3): 测试义务、系统范围与 stagent check`）
+* **对照痛点（代码事实）**：
+  - 合同 `intent.acceptance_criteria` 是无 id、无 `check` 的 `string[]`（`src/lib/contract.schema.ts` 约 L443），无法派生测试义务。
+  - `supervisorMetadataSchema`（约 L278）是非 strict 的 zod 对象，未知键在解析时被剥掉。
+  - 两处 refine 只对「当前版本」生效（约 L520-534），一旦升版，1.3.1 合同的 `manual_confirmation` 与 git 字段校验会失效或误拒。
+  - `reasonCodeSchema` 是 9 值闭集（`src/lib/evidence.schema.ts` L26）。
+* **一句话目标**：合同能追溯到方案验收条目；义务测试的写范围与运行命令在签署前进入 `ScopePlan`；义务结论由真实进程退出码给出。
+* **采用的默认值**：L.11 上线前，义务测试路径为 `tests/stagent/<acceptance_id>.test.<ext>`（`ext` 取项目主语言：`ts` / `js` / `py` / `go`）。
+* **范围**：
+  1. `src/lib/contract.schema.ts`：
+     - `supervisor_metadata` 增加可选 `acceptance_refs: { id, text, check: "auto" | "playtest" | "both" }[]`、`scheme_item_ids: string[]`、`stub_id: string | null`；
+     - `SOFTWARE_CONTRACT_SCHEMA_VERSION` 升为 `"1.3.2"`；
+     - 把两处「仅当前版本」的 refine 改写为版本集合判断（1.3.0 / 1.3.1 / 1.3.2 行为保持现状）。
+  2. J.4 的按快照建合同处：从快照方案的 `acceptance[]` 与合同桩填充上述字段。
+  3. 新建 `src/lib/verification/obligations.ts`（纯函数）：
+     - `detectRunner(repoFacts) → { kind: "vitest" | "jest" | "pytest" | "go" | null, reportArgs: string[] }`；
+     - `deriveObligations(contract, runner) → { obligations: TestObligation[], waived: { acceptance_id, reason: "no_runner" }[] }`；
+     - `obligationCommand(runner, paths) → argv`（vitest `--reporter=json`、jest `--json`、pytest `--junitxml=<file>`、go `test -json`）；
+     - `classifyRun(report) → "red" | "red_invalid" | "green"`。规则：收集到 ≥1 个用例且 ≥1 个断言失败才算 `red`；收集或编译错误算 `red_invalid`。
+  4. `scope-plan-builder.ts`（J.2）增加系统贡献 `withSystemScope(plan, ctx)`：
+     - 方案含 `check: auto/both` 条目且 `detectRunner` 非空时，加入写范围 `tests/stagent/**`；
+     - 加入义务命令，以及 `stagent check obligations` / `stagent check test-integrity` 两条验证命令（argv 精确，进入 `allowed_commands` 与 `plan_digest`）。
+  5. `src/lib/evidence.schema.ts`：
+     - `EvidenceBundle` 增加可选 `obligations: { acceptance_id, test_path, red, green }[]`；
+     - `reasonCodeSchema` 增加 `OBLIGATION_NOT_RED`、`OBLIGATION_RED_INVALID`、`OBLIGATION_NOT_GREEN`、`TEST_WEAKENED`。
+  6. `daemon/guard/test-integrity.ts`：新增 `detectTestWeakening(baseText, candidateText, lang)`（规则见 verification-strategy §5）。
+  7. `bin/stagent.ts`：`CliCommand` 增加 `"check"`，子命令 `obligations`（读运行报告，调用 `classifyRun`）与 `test-integrity`（比对基线与候选），退出码 0 / 1，stdout 输出 JSON。
+* **非目标**：不做两段式编排（L.4）；不生成测试内容；不把义务写进合同正文（义务是运行期产物，存 `.stagent/records/<id>/obligations.json` 与证据）。
+* **不变声明**：网关不变（L.4 改）；`can_merge` 仍只由命令退出码派生。
+* **验收（PASS）**：新增 `tests/unit/test-obligations.test.ts`：
+  - 1.3.1 合同（含 `manual_confirmation`）照常可读；1.3.2 合同的新元数据解析后保留。
+  - `deriveObligations`：两条 `auto` 验收 → 两条义务；`detectRunner` 为空 → 两条均在 `waived`。
+  - `classifyRun`：1 失败 → `red`；收集错误 → `red_invalid`；全过 → `green`；0 用例 → `red_invalid`。
+  - `withSystemScope`：有 `auto` 条目时 `writable_paths` 含 `tests/stagent/**`，`plan_digest` 随之变化；无条目时不变。
+  - `detectTestWeakening`：删一条 `expect(` → weakened；新增 `it.only` / `.skip` / `@pytest.mark.skip` → weakened；只增断言 → 不 weakened。
+  - `stagent check obligations` 对夹具报告分别以 0 / 1 退出。
+* **FAIL**：签署后合同被改写；1.3.1 合同读取失败；义务结论不来自进程退出码。
+* **关键文件**：`src/lib/contract.schema.ts`、`src/lib/evidence.schema.ts`、`src/lib/verification/obligations.ts`（新）、`daemon/supervisor/scope-plan-builder.ts`（J.2 新建）、`daemon/guard/test-integrity.ts`、`bin/stagent.ts`
+* **估算**：M
+
+<a id="task-l.4"></a>
+
+#### 【Task L.4】两段式施工编排：先红后绿 `[COMPLETED]`
+
+* **任务编号**：`TASK-L.4`
+* **对应规格**：[`verification-strategy.md`](./verification-strategy.md) §3.2、§3.3、§3.5、§8 第 2 项
+* **前置依赖**：`TASK-L.3`、`TASK-L.2`
+* **优先级**：P1（M2）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#18](https://github.com/he18718143986-design/IDE/pull/18) / tip `9263504`（`TASK-L.4：先红后绿两段式施工（phaseOverlay + T/I 编排）`）
+* **对照痛点（代码事实）**：
+  - `daemon/pipeline/orchestrator.ts` 一次性运行 Worker 后提交并验证（约 L778），Worker 可以同时写实现与测试。
+  - `scopeExplicitlyIncludesTests`（`daemon/guard/test-integrity.ts` L46）对整组 `writable_paths` 做一次 `some()`：只要有一条测试路径，任何测试文件都可写。
+* **一句话目标**：Worker 先只写义务测试并被证明「红」，再在这些测试只读的情况下实现并被证明「绿」。
+* **范围**：
+  1. 网关（`daemon/mcp/gateway.ts`）增加**运行期收窄**入参 `phaseOverlay?: { testWriteAllowlist?: string[]; extraForbidden?: string[] }`：
+     - `testWriteAllowlist` 存在时，测试文件只有列表内的路径可写；
+     - `extraForbidden` 并入禁止判定（优先于可写，复用 `src/lib/scope.ts::checkWriteAccess` 的禁止优先顺序）。
+
+     收窄只能比合同更窄，不持久化、不改合同。
+  2. `orchestrator.ts`：存在未豁免义务时分两段：
+     - **T 段**：`phaseOverlay = { testWriteAllowlist: 义务路径 }`，并把非测试的写范围全部放进 `extraForbidden`；结束提交记 `red_sha`；运行义务命令，`stagent check obligations --phase t`：`red` 进入 I 段，`red_invalid` / `green` 回 T 段返工（计入 `max_verification_retries`）。
+     - **I 段**：`phaseOverlay = { extraForbidden: T 段写过的文件 }`；结束后照现有流程验证（含 `stagent check obligations --phase i` 判绿）。
+     - **回 T 段**：I 段义务判绿连续失败 2 次时，允许回到 T 段一次（附失败输出）；再失败 → `PENDING_RESUME`，原因写入 `.stagent/records/<id>/suspension.json`。
+  3. 全部义务均被豁免时，跳过 T 段，行为与现在一致；合入卡显示豁免白话（verification-strategy §3.5）。
+  4. `renderChecksSection(contract, extras)`（L.2）在 T / I 段分别追加本段义务清单。
+  5. 证据写入 `obligations`（L.3 字段）。
+* **非目标**：不生成测试内容；不做 DesignNote（L.11）。
+* **不变声明**：**网关有变更**（新增运行期收窄入参，依据本卡与 ADR-0005 / ADR-0001：只收窄不放宽）；鉴权、Demo Origin、点亮三证不变。
+* **验收（PASS）**：新增 `tests/integration/two-phase-construction.test.ts`（桩 Worker）：
+  - T 段写一条基线失败的测试 → 进入 I 段；T 段试图写实现文件 → 网关拒绝。
+  - T 段测试有语法错误 → `OBLIGATION_RED_INVALID`，返工计数 +1。
+  - T 段测试在基线上通过 → `OBLIGATION_NOT_RED`。
+  - I 段试图写 T 段测试文件，或写未列出的既有测试 → 网关拒绝。
+  - I 段实现后判绿 → `obligations[0].green.exit_code === 0` 且 `can_merge === true`。
+  - I 段连续 2 次判绿失败 → 回到 T 段一次。
+  - 全部豁免 → 只运行一段，与 `tests/e2e/happy-path.spec.ts` 结果一致。
+* **FAIL**：I 段能修改 T 段测试；收窄被持久化进合同；无义务合同行为改变。
+* **关键文件**：`daemon/pipeline/orchestrator.ts`、`daemon/mcp/gateway.ts`、`src/lib/scope.ts`（只读复用）、`daemon/worker/session-task-injector.ts`
+* **估算**：M
+
+<a id="task-l.5"></a>
+
+#### 【Task L.5】真实预览：在 Worktree 里启动用户应用 `[COMPLETED]`
+
+* **任务编号**：`TASK-L.5`
+* **对应规格**：[`verification-strategy.md`](./verification-strategy.md) §7；`scheme.md` gap-15
+* **前置依赖**：无
+* **优先级**：P1（M2）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#14](https://github.com/he18718143986-design/IDE/pull/14) / tip `0b6bc7f`（`feat(L.5): Worktree 真实应用预览`）
+* **对照痛点（代码事实）**：`daemon/supervisor/preview/real-preview-server.ts` 只服务静态目录或登记已有 URL；都没有时 `daemon/server.ts`（约 L861）写占位页。没有任何代码在 Worktree 里执行 `dev` / `start`。
+* **一句话目标**：施工完成后，中栏试玩加载的是 Worktree 里正在运行的真实应用。
+* **范围**：
+  1. 新建 `daemon/supervisor/preview/app-runner.ts`：`pickPreviewCommand(worktreeDir)`（`dev` → `start` → `preview`，读 `package.json`）；`startAppPreview({ worktreeDir, port })` 用 `daemon/worker/cli-host/process-host.ts::spawnManaged` 启动长驻进程（`runCommand` 只在进程退出时返回，不适用），`PORT` 注入，环境走 `daemon/runner/env-filter.ts` 白名单；`waitReady(port, { intervalMs, timeoutMs })`（默认 500 / 30000，可注入，测试用 3000）；`stopAppPreview(handle)` 复用 `daemon/runner/process-tree.ts`。预览是 Daemon 自有进程（与 Demo 预览服务同类），不进合同 `allowed_commands`，不改合同。
+  2. 端口从 `daemon/supervisor/preview/types.ts` 的真机预览段（4200～4210）分配。
+  3. 就绪后以「登记已有 URL」模式注册到 real-preview-server；`RealPlaytestPane` 无需改协议。
+  4. 合入、放弃、`ABORTED`、Daemon 退出四个时机回收进程组。
+  5. 选不到命令时回退到现有静态目录模式；仍无 → 白话「这个项目没有可预览的页面」。
+* **非目标**：不做发布（L.15）；不做反向代理；不改 Demo 预览（4100～4110）。
+* **不变声明**：Demo Origin 隔离不变（ADR-0008）；预览进程退出码不进 `can_merge`。
+* **验收（PASS）**：新增 `tests/unit/app-preview-runner.test.ts`（夹具：一个 `dev` 脚本启动最小 HTTP 服务的临时仓库）：
+  - `pickPreviewCommand`：有 `dev` 取 `dev`；只有 `start` 取 `start`；都没有返回 `null`。
+  - 启动后 `waitReady` 在 30 秒内返回 true，GET 端口得到 200。
+  - 夹具脚本不监听端口 → 注入 `timeoutMs: 3000` 后返回失败，结果含 stderr 尾部。
+  - `stopAppPreview` 后端口可再次绑定。
+* **FAIL**：预览进程在合入后仍存活；端口落在 4100～4110。
+* **关键文件**：`daemon/supervisor/preview/app-runner.ts`（新）、`daemon/supervisor/preview/real-preview-server.ts`、`daemon/server.ts`、`daemon/worker/cli-host/process-host.ts`、`daemon/runner/process-tree.ts`、`daemon/runner/env-filter.ts`
+* **估算**：M
+
+<a id="task-l.6"></a>
+
+#### 【Task L.6】黄金切片端到端测试（M2 退出标准） `[COMPLETED]`
+
+* **任务编号**：`TASK-L.6`
+* **对应规格**：[`delivery-lifecycle.md`](./delivery-lifecycle.md) §8 M2
+* **前置依赖**：`TASK-L.1`～`L.5`、`TASK-J.2`～`J.10`（含各卡「ADR-0014 修订」）
+* **优先级**：P1（M2 收口）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#21](https://github.com/he18718143986-design/IDE/pull/21) / tip `93589bf`（`test(L.6): 黄金切片 E2E——一句需求到合入主链`）
+* **对照痛点（代码事实）**：`tests/e2e/happy-path.spec.ts` 从已批准合同开始，不覆盖「右栏一句话 → 方案 → 确认开工」；`scripts/mainline-regression.mjs` 只针对 Stagent 自身节点。
+* **一句话目标**：一条自动化测试证明「一句话需求 → 一次开工 → 真实预览 → 一次合入」全程跑通，用户只点 2 次。
+* **范围**：
+  1. 新建 `tests/e2e/golden-slice.test.ts`：临时夹具仓库（有 `dev`、`test`、`typecheck` 脚本）；替身模型端点（复用 J.1 验证用的 stub 思路）返回固定的编译补丁与 Worker 输出。
+  2. 步骤：右栏发一条消息 → 断言中栏方案出现 → 调用「确认开工」API（第 1 次点击）→ 等待验证完成 → 断言证据含红绿义务 → 断言真实预览 URL 可访问 → 调用「合入」API（第 2 次点击）→ 断言 `MERGED` 且主分支有 `Stagent-Contract-ID` Trailer。
+  3. 把该测试加入 `scripts/mainline-regression.mjs` 的清单。
+* **非目标**：不测多合同（M3）；不测发布（M4）。
+* **不变声明**：只新增测试。
+* **验收（PASS）**：
+  - `golden-slice.test.ts` 通过；
+  - 全程调用的用户授权类 API 恰好 2 次；
+  - 过程中右栏收到的请求不含任何非用户文本（复用 L.1 断言）。
+* **FAIL**：需要第 3 次用户点击；预览为占位页。
+* **关键文件**：`tests/e2e/golden-slice.test.ts`（新）、`scripts/mainline-regression.mjs`
+* **估算**：M
+
+<a id="task-l.7"></a>
+
+#### 【Task L.7】`ProjectPlan` 类型、校验与存储 `[COMPLETED]`
+
+* **任务编号**：`TASK-L.7`
+* **对应规格**：[`project-decomposition.md`](./project-decomposition.md) §2、§3、§6、§8；[`project-architecture-baseline.md`](./project-architecture-baseline.md) §3～§5；ADR-0015、ADR-0018、ADR-0019
+* **前置依赖**：`TASK-L.6`（M2 收口后才开 M3）；ADR-0018 意图密封路径可用；需实现 PAB Schema/校验并要求 `architecture_baseline_ref`
+* **优先级**：P2（M3）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#23](https://github.com/he18718143986-design/IDE/pull/23) / tip `607d742`（`feat(L.7): ProjectPlan 类型、确定性校验与落盘`）
+* **对照痛点（代码事实）**：全库无项目级计划；任务图一份合同一张（`src/lib/journey/proposal-from-contract.ts`）。
+* **一句话目标**：项目计划有类型、有确定性校验、有带版本的落盘。
+* **范围**：
+  1. 新建 `src/lib/project/project-plan.ts`：§2 全部类型（含 `origin`、`context`、`dependency` 种类与系统验收条目常量 `SYSTEM_ACCEPTANCE`）；`validateProjectPlan(plan, scheme, repoFacts) → { ok, violations: { rule: "D-1"…"D-11", target }[] }`（纯函数；`repoFacts` 由调用方传入：是否有测试脚本、是否有 `docs/system/modules.yaml`、存在的目录列表）。
+  2. 新建 `daemon/project/plan-store.ts`：`readPlan(repoRoot)`、`writePlan(repoRoot, plan)`（写 `.stagent/project/plan.json`，旧版写入 `plan.revisions/<revision>.json`；原子写：临时文件 + rename）。
+  3. 错误码 `E_PLAN_INVALID`、`E_PLAN_STALE`、`E_PLAN_STUB_LOCKED`、`E_PLAN_STUB_TOO_LARGE`、`E_PLAN_STUB_REVIVED` 登记进 `src/lib/error-codes.ts`。
+* **非目标**：不做补丁合并（L.8）；不做分解器；不做 UI。
+* **不变声明**：不触及合同、网关、状态机。
+* **验收（PASS）**：新增 `tests/unit/project-plan.test.ts` 覆盖 project-decomposition §8 的 PD-01～PD-07、PD-12、PD-13；`tests/daemon/plan-store.test.ts`：写入后读回等值；第二次写入后 `plan.revisions/1.json` 存在。
+* **FAIL**：校验依赖文件系统；同一输入两次校验结果不同。
+* **关键文件**：`src/lib/project/project-plan.ts`（新）、`daemon/project/plan-store.ts`（新）、`src/lib/error-codes.ts`
+* **估算**：M
+
+<a id="task-l.8"></a>
+
+#### 【Task L.8】计划补丁合并与分解器 `[COMPLETED]`
+
+* **任务编号**：`TASK-L.8`
+* **对应规格**：[`project-decomposition.md`](./project-decomposition.md) §1、§4、§8（PD-08、PD-09、PD-11）；[`project-architecture-baseline.md`](./project-architecture-baseline.md) §2～§5；ADR-0018、ADR-0019
+* **前置依赖**：`TASK-L.7`、`TASK-J.9`（方案结构）；先经 ADR-0018 密封方案，再生成并通过 PAB，再生成 ProjectPlan
+* **优先级**：P2（M3）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#33](https://github.com/he18718143986-design/IDE/pull/33) / tip `fb27504`（`feat(L.8): PlanPatch 合并、分解器与 /api/project/plan 接线`）
+* **对照痛点（代码事实）**：
+  - 计划类型与校验已在 `src/lib/project/project-plan.ts::validateProjectPlan` / `::ProjectPlan` / `::orderedStubs`（L.7）；落盘已在 `daemon/project/plan-store.ts::readPlan` / `::writePlan`。**今日无** `src/lib/project/plan-patch.ts`、**无** `applyPlanPatch` / `PlanPatch` / `PlanOp` 符号；**无** `daemon/supervisor/decomposer/` 目录（全库对计划侧 `PlanPatch`/`applyPlanPatch`/`decompose` 实现 **0 命中**）。
+  - 方案侧已有同构补丁引擎可作挂接参照：`src/lib/journey/scheme-patch-engine.ts::mergeSchemePatch` 与 `src/lib/journey/scheme-patch-types.ts::SchemeDraftV2`；L.8 应对齐该模式做计划补丁，而非再造方案合并。
+  - 密封快照入口已在 `daemon/pipeline/scheme-snapshot-store.ts::writeSchemeSnapshot` / `::readSchemeSnapshot` / `::schemeBindingFromSnapshot`（ADR-0018 路径）。分解器应吃密封后的 `SchemeDraftV2` + ready PAB，但 **今日无**「密封方案 → `PlanPatch`」调用链。
+  - HTTP：`daemon/server.ts` 已有大量 `/api/*` 路由登记，**今日无** `POST /api/project/plan/patch`（pathname **0 命中**）；用户侧 `remove_stub`/`reorder` 尚无处可挂。
+* **一句话目标**：方案冻结前，分解器产出计划补丁；Daemon 确定性合并，不合规整体拒绝。
+* **范围**：
+  1. `src/lib/project/plan-patch.ts`：`PlanPatch` / `PlanOp` 类型；`applyPlanPatch(plan, patch, scheme, repoFacts)`（纯函数，规则见 §4；合并后调 `validateProjectPlan`）。
+  2. `daemon/supervisor/decomposer/decompose.ts`：输入已密封方案（`SchemeDraftV2`）+ `repoFacts` + ready PAB，输出引用 PAB revision/digest 的 `PlanPatch`（`reason: "initial"`）；PAB 缺失、过期或有阻断决策时不得生成可签署合同桩。实现形态开放（同 ADR-0014 §1）：单次结构化模型调用，输出用 zod Schema 约束；`size_hint === "standard"` 时不调模型，确定性生成单里程碑单桩。
+  3. 合并失败时把 `violations` 回喂分解器重试一次；仍失败 → 画布白话「这个需求我还没拆好」，不生成合同。
+  4. HTTP `POST /api/project/plan/patch`（带 session token）：只接受用户发起的 `remove_stub`（`removed_by: "user"`）与 `reorder`，其余 op 返回 422；供 L.10 调用。
+  5. 方案在两份合同之间变化时：§16.5 C 类（新需求）→ `add_stub`；B 类（本轮范围内补充）不产生计划补丁，仍并入当前合同（project-decomposition §5）。
+* **非目标**：不做合同序列（L.9）；不做 UI（L.10）。
+* **不变声明**：计划不是授权凭据；不改签署链。
+* **验收（PASS）**：`tests/unit/plan-patch.test.ts`：PD-08、PD-09、PD-11；`standard` 方案零模型调用得到 1 里程碑 1 桩；桩模型返回违反 D-7 的补丁 → 重试 1 次 → 第二次合法则合并成功。
+* **FAIL**：对 `merged` 桩的修改被采纳；用户删除的桩被同义复活且未报 `E_PLAN_STUB_REVIVED`。
+* **关键文件**：`src/lib/project/plan-patch.ts`（新；导出 `PlanPatch`/`PlanOp`/`applyPlanPatch`）、`daemon/supervisor/decomposer/decompose.ts`（新）、`daemon/server.ts`（挂 `POST /api/project/plan/patch`）；调用既有 `src/lib/project/project-plan.ts::validateProjectPlan`、`daemon/project/plan-store.ts::readPlan`/`::writePlan`、`daemon/pipeline/scheme-snapshot-store.ts::readSchemeSnapshot`
+* **估算**：M
+
+<a id="task-l.9"></a>
+
+#### 【Task L.9】合同序列、桩视图预检与「下一份」交接 `[COMPLETED]`
+
+* **任务编号**：`TASK-L.9`
+* **对应规格**：[`project-decomposition.md`](./project-decomposition.md) §5、§8（PD-10）
+* **前置依赖**：`TASK-L.8`、`TASK-J.4`、`TASK-J.5`
+* **优先级**：P2（M3）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#35](https://github.com/he18718143986-design/IDE/pull/35) / tip `e1cf1bb`（`feat(L.9): 合同序列、桩视图预检与下一份交接`）
+* **对照痛点（代码事实）**：J.2 `buildScopePlan` 以整份方案为输入；合入后没有「下一份」的概念。
+* **一句话目标**：合入一份后，系统自动选出下一份并为它预检范围；用户只需再点一次「确认开工」。
+* **范围**：
+  1. `src/lib/project/next-stub.ts`：`nextStub(plan)`（规则见 §5）。
+  2. `src/lib/project/stub-view.ts`：`schemeViewForStub(scheme, stub)` → 只含该桩 `scheme_item_ids` 的方案视图 + `area_hints`，作为 `buildScopePlan` 的 `scheme` 入参。
+  3. 合同生成时写入 `supervisor_metadata.scheme_item_ids` 与 `supervisor_metadata.stub_id`；合入后回填桩 `status: "merged"`、`contract_id`。
+  4. **合同级互斥**：签署路径（J.5 确认 / J.4 建合同）检查是否已有合同处于 `PREPARING`～`AUDITED`；有则拒绝 `409 E_CONTRACT_IN_FLIGHT`（现行代码只有 Daemon 进程锁 `daemon/core/pid-lock.ts`，`server.ts` 的 `activeContracts` 未被填充）。错误码登记进 `src/lib/error-codes.ts`。
+  5. **按桩种类的签署前范围规则**（project-decomposition §5.1）：`test_foundation` / `dependency` 桩在 `buildScopePlan` 中加入 `dependency_changes_allowed: true`、精确安装命令（如 `npm install -D vitest`）、`network_policy: "EXPLICIT_TARGETS"`（目标仅包管理器注册表域名），锁文件进入 `needs_approval`（由 SA-1 一次点击授权）。
+  6. 合同 `ABORTED` → 桩 `aborted` → 若 `nextStub` 返回 `null` 且仍有 `planned`，触发 L.8 重新分解（`reason: "contract_aborted"`）。
+* **非目标**：不做项目地图 UI（L.10）。
+* **不变声明**：每份合同仍单独签署；新增合同级互斥是对 ADR-0002「单工作区串行」的落实。
+* **验收（PASS）**：`tests/unit/next-stub.test.ts`：PD-10；`tests/integration/contract-sequence.test.ts`：两桩计划，合入第一份后 `nextStub` 返回第二份，其 `ScopePlan` 只含第二份的区域；第一份 `ABORTED` 时第二份（依赖第一份）不可选，并触发重新分解调用；第一份处于 `EXECUTING` 时签第二份 → `E_CONTRACT_IN_FLIGHT`；`test_foundation` 桩的 `ScopePlan` 含安装命令与 `EXPLICIT_TARGETS`。
+* **FAIL**：上一份未终结时能签下一份；`ScopePlan` 混入其他桩的区域。
+* **关键文件**：`src/lib/project/next-stub.ts`（新）、`src/lib/project/stub-view.ts`（新）、`daemon/server.ts`（合入回调处）
+* **估算**：M
+
+<a id="task-l.10"></a>
+
+#### 【Task L.10】画布「项目地图」视图 `[COMPLETED]`
+
+* **任务编号**：`TASK-L.10`
+* **对应规格**：[`project-decomposition.md`](./project-decomposition.md) §7；[`supervisor.md`](./supervisor.md) §16（同页四幕 / `PROJECT_MAPPING`）
+* **前置依赖**：`TASK-L.9`、`TASK-L.8`
+* **优先级**：P2（M3）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#38](https://github.com/he18718143986-design/IDE/pull/38) / tip `e4351b0`（`feat(L.10): 画布同页嵌项目地图与 GET /api/project/plan`）
+* **对照痛点（代码事实）**：
+  - 中栏方案工作台已在 `src/components/studio/SchemeReviewPane.tsx::SchemeReviewPane`；Studio 可关 Tab 常量在 `src/components/WorkspaceLayout.tsx::STUDIO_TAB_ID`；ActivityBar 壳在 `src/components/layout/ActivityBar.tsx::ActivityBar`（**今日无**「项目」入口）。**Tina 2026-10-31 裁决：跟 supervisor / §7**——地图必须**同页嵌**于方案工作台，**禁止**另开 ActivityBar「项目」Tab / 独立视口 / 第二套导航（不得再造类似 `STUDIO_TAB_ID` 的「项目」Tab）。
+  - 计划「下一份」纯函数已在 `src/lib/project/next-stub.ts::nextStub`（L.9）；前端补丁客户端已在 `src/lib/daemon-api.ts::patchProjectPlan`（挂 L.8 `POST /api/project/plan/patch`）。**今日无** `GET /api/project/plan`（`daemon/server.ts` 仅有 POST `.../patch` 与 `.../decompose`，GET pathname **0 命中**）；**今日无** `src/components/project/ProjectMapPane.tsx` / `ProjectMapPane` 符号；**今日无** `tests/ui/project-map-pane.test.tsx`（卡要求的 UI 测尚未落盘）。
+  - 中栏现状仍是单合同方案与施工视图；用户无法在同页一眼看到里程碑/桩进度/下一份。
+* **一句话目标**：用户在中栏一眼看到整个项目：几个里程碑、每份做到哪、下一份是什么。
+* **范围**：
+  1. `GET /api/project/plan`（`daemon/server.ts`，带 session token）返回计划 + 每桩状态（含服务端权威的下一份标识；前端**不得**本地重算 `nextStub` 代替）。
+  2. 新建 `src/components/project/ProjectMapPane.tsx`：里程碑列表、桩卡片、「下一份」高亮 +「确认开工」按钮（复用 J.5 确认流程）、「先不做这个」「这个往前排」两个操作（调用 L.8 的 `POST /api/project/plan/patch` / `patchProjectPlan`）。
+  3. **入口形态（Tina 2026-10-31 裁决：跟 supervisor / [`project-decomposition.md`](./project-decomposition.md) §7）**：将 `ProjectMapPane` **同页嵌**于方案工作台 / `SchemeReviewPane`（「方案 · 整理项目地图」/`PROJECT_MAPPING` 完成后展开，或施工幕顶部嵌套条/折叠区）。**禁止** ActivityBar 增「项目」入口、**禁止**可关独立「项目」Tab、**禁止**另开视口；旧卡面「ActivityBar 增项目入口、可关 Tab（`STUDIO_TAB_ID` 同款）」作废，以本条为准。
+* **非目标**：不展示文件路径、glob、Token 单位；不允许在地图上编辑桩内容；不新增 ActivityBar 项。
+* **不变声明**：前端只经 `src/lib/daemon-api.ts` 调接口，不自行推导状态（含「下一份」）。
+* **验收（PASS）**：`tests/ui/project-map-pane.test.tsx`：渲染两个里程碑三份桩；「下一份」高亮唯一；页面文本不含 `**`、`glob`、`token`；点「先不做这个」调用补丁接口一次且 `removed_by: "user"`；组件挂在方案工作台同页路径下（非独立 Tab）。
+* **FAIL**：地图显示技术单位；前端自行计算「下一份」；出现独立「项目」Tab / ActivityBar「项目」入口。
+* **相关文件**：`src/components/project/ProjectMapPane.tsx`（新；导出 `ProjectMapPane`）、`src/components/studio/SchemeReviewPane.tsx::SchemeReviewPane`（同页挂载点）、`src/lib/daemon-api.ts`（新建 GET 客户端；复用 `::patchProjectPlan`）、`daemon/server.ts`（挂 `GET /api/project/plan`）；只读复用 `src/lib/project/next-stub.ts::nextStub`；对照 `src/components/WorkspaceLayout.tsx::STUDIO_TAB_ID` / `src/components/layout/ActivityBar.tsx::ActivityBar`（**不**增项目入口）
+* **估算**：M
+
+<a id="task-l.11"></a>
+
+#### 【Task L.11】DesignNote 生成、校验与注入 `[COMPLETED]`
+
+* **任务编号**：`TASK-L.11`
+* **对应规格**：[`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) §2、§3、§6（TD-01～TD-05）；[`project-architecture-baseline.md`](./project-architecture-baseline.md) §6；ADR-0016、ADR-0018、ADR-0019
+* **前置依赖**：`TASK-L.4`、`TASK-L.9`（DN-2 插入依赖桩）
+* **优先级**：P2（M3）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#43](https://github.com/he18718143986-design/IDE/pull/43) / tip `78ec236`（`feat(L.11): DesignNote generate/validate/inject on EXECUTING path`）
+* **已知挂账（合入时）**：DN-2「可以」领域方法 `PipelineOrchestrator.resolveDesignDependencyAllow` 已交付并由集成测覆盖；**无** HTTP / 画布意外卡入口可达（`POST .../resume` 不路由至此）。入口接线属后续卡职责（与既有预算/熔断挂起卡片同类债；可挂 J.7 交接类或另立接线卡），本卡不宣称端到端 UI 闭环。见 ledger DLV-6。
+* **对照痛点（代码事实）**：Worker 直接从合同开工，没有设计产物；技术决策不被记录。
+* **一句话目标**：每份合同开工时先出一份通过校验的设计说明，Worker 按它施工，五类决策才打扰用户。
+* **范围**：
+  1. 新建 `src/lib/knowledge/modules-schema.ts`：`modules.yaml` 的 zod Schema 与 `ModuleEntry` 类型（L.12 复用）。
+  2. 新建 `src/lib/design/design-note.ts`：§2.2 类型；`validateDesignNote(note, contract, modules)`（DN-1～DN-5）；`detectEscalations(note, protectionList, paidSdkList)`（§3 二次判定）。
+  3. 新建 `daemon/supervisor/design/design-step.ts`：输入合同 + `docs/system/`（若存在），输出 DesignNote（形态开放；zod Schema 约束）；落盘 `.stagent/records/<id>/design-note.json`。
+  4. `orchestrator.ts`：进入 `EXECUTING` 后、T 段之前调用设计步骤；校验失败重试 1 次，仍失败 → `EXECUTING → PENDING_RESUME`；有升级项 → `PENDING_RESUME`。原因（`DESIGN_INVALID` / `DESIGN_ESCALATION` / `DESIGN_NEEDS_DEPENDENCY`）写入 `.stagent/records/<id>/suspension.json`（现行 `PENDING_RESUME` 迁移不带原因字段；这些不是证据原因码，不进 `reasonCodeSchema`）。
+  5. **DN-2（需要新依赖但合同不允许）**：设计步骤先重试一次「不引入依赖」；仍需要 → 意外卡「需要装新库 X」：选「可以」→ 本合同安全中止（`ABORTED`），经 L.8 补丁在原桩前插入 `kind: "dependency"` 桩，原桩随后重签；选「不用」→ 本合同按无依赖方案继续或中止，由用户在卡上二选一。**不修改已签合同**。
+  6. DesignNote 的 `test_plan` 覆盖 L.3 约定路径（必须落在签署前已进 `ScopePlan` 的 `tests/stagent/**` 内），写入 `.stagent/records/<id>/obligations.json`；`buildWorkerTaskInstruction` 注入「技术方案」段（§2.4）。
+  7. `src/lib/design/paid-sdk-list.ts`：付费 SDK 名单（初版：stripe、twilio、@google/maps、openai、@anthropic-ai/sdk、aws-sdk、@aws-sdk/*）。
+* **非目标**：不做知识库校验（L.12）。
+* **不变声明**：不新增生命周期状态或迁移边。
+* **验收（PASS）**：`tests/unit/design-note.test.ts`：TD-01～TD-05；`tests/integration/design-step.test.ts`：桩设计步骤返回合法 DesignNote → Worker 指令含「技术方案」段与 `touches` 路径；返回含 `costs_money` 的决策 → 合同 `PENDING_RESUME` 且 `suspension.json` 原因为 `DESIGN_ESCALATION`；DN-2 选「可以」→ 原合同 `ABORTED`、计划出现 `dependency` 桩、原合同 JSON 字节未变。
+* **FAIL**：未校验的 DesignNote 被注入 Worker；二次判定命中却未升级。
+* **关键文件**：`src/lib/knowledge/modules-schema.ts`（新）、`src/lib/design/design-note.ts`（新）、`src/lib/design/paid-sdk-list.ts`（新）、`daemon/supervisor/design/design-step.ts`（新）、`daemon/pipeline/orchestrator.ts`、`daemon/worker/session-task-injector.ts`
+* **估算**：M
+
+<a id="task-l.12"></a>
+
+#### 【Task L.12】系统知识库：Schema、引导合同与漂移门禁 `[COMPLETED]`
+
+* **任务编号**：`TASK-L.12`
+* **对应规格**：[`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) §4、§6（TD-06～TD-10）；ADR-0016；`scheme.md` acc-8
+* **前置依赖**：`TASK-L.11`
+* **优先级**：P2（M3）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#47](https://github.com/he18718143986-design/IDE/pull/47) / tip `39f426a`（`feat(L.12): 系统知识库 checkKnowledge / withSystemScope / bootstrap`；本地 squash 后推送）
+* **合入前拍板（Tina）**：① KB-1 维持「每个改动文件」（含非源码；真实物业口径），不收窄为仅源码；② bootstrap 启发式改 B——只认 `contract_type === "knowledge_bootstrap"`，不以标题含「知识库」触发。
+* **对照痛点（代码事实）**：目标项目没有任何系统描述；`daemon/arch/graph.ts::buildDependencyGraph` 结果不落盘。
+* **一句话目标**：每份合同合入时，目标仓库的 `docs/system/` 都覆盖本次改动；漂移即判不合格。
+* **范围**：
+  1. `src/lib/knowledge/modules-schema.ts`（L.11 已建）增加 `coversPath(modules, path)`，glob 匹配复用 `src/lib/scope.ts::matchesAnyPattern`。
+  2. 新建 `daemon/knowledge/check-knowledge.ts`：`checkKnowledge({ worktreeDir, baseSha, candidateSha, designNote }) → { ok, failures: { rule: "KB-1"…"KB-5", target }[] }`；由 `bin/stagent.ts` 子命令 `stagent check knowledge` 以真实进程调用（退出码 0 / 1，ADR-0005），作为验证命令排在 V2 之后；失败 → 证据 `FAILED`、原因码 `KNOWLEDGE_DRIFT`。
+  3. `withSystemScope`（L.3）扩展：目标仓库已有 `docs/system/modules.yaml`，或本桩为 `knowledge_bootstrap` 时，在签署前把 `docs/system/**` 与 `stagent check knowledge` 并入 `ScopePlan`；`daemon/mcp/gateway.ts` 的文件预算计数排除 `docs/system/**`。
+  4. 新建 `daemon/knowledge/bootstrap-draft.ts`：`draftModules(repoRoot)`：顶层源码目录 → 候选模块，`buildDependencyGraph` → `depends_on`（确定性）。`knowledge_bootstrap` 合同的设计步骤以它为输入（触发条件仅 `contract_type`）。
+  5. `reasonCodeSchema`（`src/lib/evidence.schema.ts`）增加 `KNOWLEDGE_DRIFT`。
+  6. `renderChecksSection` 追加 KB-1～KB-5 规则摘要（verification-strategy §8 第 3 项）。
+* **非目标**：不做「为什么有这段代码」入口（L.13）；不做系统地图 UI（**`TASK-L.18`** / DLV-5）。
+* **不变声明**：网关写范围判定函数不变，只扩合同范围。
+* **验收（PASS）**：`tests/unit/knowledge-check.test.ts`：TD-06～TD-08、TD-10；`tests/unit/knowledge-bootstrap.test.ts`：TD-09。
+* **FAIL**：未覆盖的改动文件仍 `can_merge`；`docs/system/**` 写入占用文件预算。
+* **关键文件**：`src/lib/knowledge/modules-schema.ts`、`daemon/knowledge/check-knowledge.ts`（新）、`daemon/knowledge/bootstrap-draft.ts`（新）、`bin/stagent.ts`、`daemon/mcp/gateway.ts`、`src/lib/scope.ts`（只读复用）、`daemon/arch/graph.ts`（只读复用）
+* **估算**：M
+
+<a id="task-l.13"></a>
+
+#### 【Task L.13】追踪链：Trailer 扩展与「这段为什么存在」反查 `[COMPLETED]`
+
+* **任务编号**：`TASK-L.13`
+* **对应规格**：[`delivery-lifecycle.md`](./delivery-lifecycle.md) §6；[`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) §5
+* **前置依赖**：`TASK-L.9`（合同带 `scheme_item_ids`）、`TASK-L.12`（`changelog.md` 条目保证存在）
+* **优先级**：P2（M3）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#51](https://github.com/he18718143986-design/IDE/pull/51) / tip `51ea872`（`feat(L.13): Trailer Scheme-Items + explainLine 追踪链反查`；GitHub squash merge）
+* **合入说明（行号准确范围）**：反查以 Daemon `repoRoot` 的 HEAD 做 `git blame`；**仅对已合入主干、且本地无未提交改动的文件行准确**。Worktree 打开中的未合入文件、或与 HEAD 行号错位的脏工作区，可能「看起来像查成功」但来历对不上——已知限制，未在本卡修 worktree/ref 传参。
+* **已知挂账（合入时）**：① 未提交行（blame 全 0 SHA）当前可能报成「提交无 Stagent Trailer」，更准确应是「该行尚未提交」；② 方案条目只在**当前账本草稿**中查找，后续修订删条目会导致旧代码断在「方案条目」环（规格允许的限制）；③ `rel.includes("..")` 会对合法文件名如 `a..b.ts` 误拒；④ 截断超长 `Stagent-Scheme-Items` 时可能在无知识库仓库凭空建最小 `docs/system/changelog.md`（只在截断路径触发）。
+* **对照痛点（代码事实）**：`daemon/pipeline/merger.ts` 的 Trailer 只到合同与证据（约 L204）；没有方案条目；没有反查入口。
+* **一句话目标**：任意一行合入的代码，都能一键反查到合同、方案条目和用户原话。
+* **范围**：
+  1. `merger.ts`：新增 Trailer `Stagent-Scheme-Items: goal-3,acc-5`（来自合同 `supervisor_metadata.scheme_item_ids`）；超出 512B 单行上限时截断为合同号，并在 `docs/system/changelog.md` 条目中保留全量（L.12 已保证条目存在）。
+  2. 新建 `daemon/trace/why.ts`：`explainLine({ repoRoot, path, line })` → `git blame --porcelain` 取提交 → 解析 Trailer → 读合同、方案快照 → 返回 `{ commit, contract_id, scheme_items: { id, text, quotes: { qid, text }[] }[] }`；任一环缺失返回 `E_TRACE_BROKEN` 并指出断在哪一环。
+  3. `GET /api/trace/why?path=&line=`；编辑器右键「这段为什么存在」调用并以白话卡片显示。
+  4. 错误码 `E_TRACE_BROKEN` 登记。
+* **非目标**：不做影响分析（另卡）。
+* **不变声明**：Trailer 既有键不变；512B / 4KB 上限不变。
+* **验收（PASS）**：`tests/integration/trace-why.test.ts`：夹具仓库合入一份带 `scheme_item_ids` 的合同 → 对新增行调用 `explainLine` 返回原话；对合入前已存在的行返回 `E_TRACE_BROKEN`（断在「提交无 Stagent Trailer」）；超长条目列表时 Trailer 单行 ≤512B。
+* **FAIL**：Trailer 超长导致合并失败；反查返回编造的原话。
+* **关键文件**：`daemon/pipeline/merger.ts`、`daemon/trace/why.ts`（新）、`daemon/server.ts`、`src/components/MonacoEditorPane.tsx`
+* **估算**：M
+
+
+<a id="task-l.14"></a>
+
+#### 【Task L.14】凭据保险库 `[COMPLETED]`
+
+* **任务编号**：`TASK-L.14`
+* **对应规格**：[`release-and-operations.md`](./release-and-operations.md) §4；ADR-0014 §3；`scheme.md` conf-6、oq-3
+* **前置依赖**：`TASK-L.6`；**OQ-REL-1 裁决**（存储后端）
+* **优先级**：P2（M4）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#31](https://github.com/he18718143986-design/IDE/pull/31) / tip `ae57543`（`feat(L.14): 凭据保险库（OS Keychain）`）
+* **对照痛点（代码事实）**：只有模型 Key 的内存存储（`daemon/worker/key-store.ts`）；无通用密钥存储；`daemon/runner/command-runner.ts::redactSecrets(text, secretValues)` 已支持精确值遮蔽，但跳过 6 个字符以下的值；`daemon/core/debug-log.ts` 另有一份不支持精确值的 `redactSecrets`。
+* **采用的默认值**：OQ-REL-1 未裁决前按推荐值 A（系统钥匙串）实现，Linux 无 Secret Service 时回退 B（`.stagent/vault.enc`）。用户改判时只换存储后端，接口不变。
+* **一句话目标**：用户的密钥只存在保险库里，只在发布与外网摄取时注入进程环境，任何日志、证据、模型输入里都找不到明文。
+* **范围**：
+  1. 新建 `daemon/vault/vault.ts`：`setSecret(name, value)`、`listNames()`、`deleteSecret(name)`、`resolveEnv(names) → Record<string,string>`（仅 Daemon 内部调用）；后端适配 `keychain-backend.ts` / `file-backend.ts`。
+  2. HTTP：`PUT /api/vault/:name`（只写）、`GET /api/vault`（只返回名字）、`DELETE /api/vault/:name`。永不返回值。
+  3. 脱敏：所有命令输出经 `command-runner.ts::redactSecrets(text, vault.currentValues())` 遮蔽；`debug-log.ts` 的 `redactSecrets` 同样接受并使用保险库值。`setSecret` 拒绝短于 8 个字符的值（`E_VAULT_VALUE_TOO_SHORT`，保证遮蔽可靠）。
+  4. 设置页新增「密钥」区（`src/components/settings/SettingsTab.tsx`）：掩码输入、列表、删除。
+* **非目标**：不做发布（L.15）；不做外网摄取（L.17）。
+* **不变声明**：模型 Key 存储方式不变（`key-store.ts`）；Worker 环境白名单不变，保险库值不进 Worker。
+* **验收（PASS）**：`tests/daemon/vault.test.ts`：设值后 `GET /api/vault` 只含名字；`resolveEnv` 返回值；对含该值的字符串调用 `redactSecrets` → `[REDACTED]`；Worker 指令构建、Supervisor 输入构建对一个含该值的上下文进行全文搜索 → 0 命中（RO-08）。
+* **FAIL**：任何 HTTP 响应出现密钥明文；值写入 `.stagent/` 明文文件。
+* **关键文件**：`daemon/vault/*`（新）、`daemon/runner/env-filter.ts` 或 `redactSecrets` 所在模块、`src/components/settings/SettingsTab.tsx`、`daemon/server.ts`
+* **估算**：M
+
+<a id="task-l.15"></a>
+
+#### 【Task L.15】发布生命周期与两类部署目标 `[COMPLETED]`
+
+* **任务编号**：`TASK-L.15`
+* **对应规格**：[`release-and-operations.md`](./release-and-operations.md) §1～§3、§6、§7（RO-01～RO-09）；ADR-0017；`scheme.md` acc-9
+* **前置依赖**：`TASK-L.14`
+* **优先级**：P2（M4）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#52](https://github.com/he18718143986-design/IDE/pull/52) / tip `9829385`（`feat(L.15): 发布生命周期与两类部署目标`；GitHub squash merge）
+* **对照痛点（代码事实）**：deploy / release / health_check 全库 0 命中；合并即终点。
+* **一句话目标**：用户点一次「发布」，已合并的提交被构建、部署、探活；失败自动回到上一个能用的版本。
+* **范围**：
+  1. 新建 `src/lib/release/release.ts`：`ReleaseRecord`、`ReleaseState`、`RELEASE_TRANSITIONS`、`canTransition`（纯函数）；不变式 R-INV-1～3 的校验函数。
+  2. 新建 `daemon/release/release-manager.ts`：创建草稿、执行（build → deploy → health → 失败回滚）、持久化 `.stagent/releases/<id>.json`；导出干净目录 `.stagent/releases/<id>/checkout`：用 `git archive <sha> | tar -x`（只读 git，不创建 worktree 元数据，避开 ADR-0002 背景中的并发 `worktree add` 锁问题）；构建前执行检测到的安装命令（`npm ci` 等），复用全局包缓存只读侧（ADR-0002）。
+  3. 新建 `daemon/release/target-adapter.ts` 与 `targets/local-process.ts`、`targets/user-command.ts`；目标配置 `.stagent/release-targets.json`。
+  4. 一次性命令（install、build、`user_command` 部署、健康命令）经 `command-runner.ts`；`local_process` 长驻进程经 `spawnManaged`（同 L.5）。保险库值只注入 deploy 与 health 步骤（`vault.resolveEnv(target.env_keys)`），不注入 install / build（build 只拿目标配置中的明文 `build_env`）；`log_tail` 经脱敏。
+  5. `local_process` 部署顺序：停当前 LIVE 进程 → 启新版本 → 探活；失败 → 停新版本 → 以上一个 LIVE 的导出目录重启 → 探活。手动「回滚」= 以上一个 LIVE 的 `commit_sha` 新建一次发布（不新增状态迁移）。
+  6. HTTP：`POST /api/releases`（草稿）、`POST /api/releases/:id/run`（用户点击）、`POST /api/releases/:id/rollback`、`GET /api/releases`。
+  7. 画布「发布」页（`src/components/release/ReleasePane.tsx`）：选目标、发布、进度、回滚。
+* **非目标**：不做云平台适配器；不做线上问题回流（L.16）。
+* **不变声明**：合同状态机与 `MERGED` 终态不变（ADR-0012）。
+* **验收（PASS）**：`tests/unit/release-state.test.ts`：转移表与 R-INV-1～3；`tests/integration/release-local-process.test.ts`：RO-01～RO-03；`tests/integration/release-user-command.test.ts`：RO-06、RO-07、RO-09；RO-04、RO-05 在 `release-manager` 单测中覆盖。
+* **FAIL**：发布失败改变了任何合同的状态；日志出现密钥明文。
+* **关键文件**：`src/lib/release/release.ts`（新）、`daemon/release/*`（新）、`src/components/release/ReleasePane.tsx`（新）、`daemon/server.ts`
+* **已知挂账（合入时）**：
+  1. `process-registry` 仅内存：Daemon 重启后 LIVE 记录与进程句柄脱节（启动时未自动标 incident）。
+  2. `POST /api/releases/:id/run` 同步阻塞（build 超时上限可达 10 分钟），HTTP/UI 干等。
+  3. 集成测 RO-01～03 注入替身适配器：`git archive` 真实执行，**未**跑真 `npm start` + HTTP 探活路径——不得写成「真实进程已验证」。
+* **估算**：M（如超出，拆为「状态机 + 存储」与「目标适配器 + UI」两卡）
+
+### 3.5 架构感知、监听与差异审阅（C.5 落 Sprint 2；B.1/B.2/C.4 推迟至 v0.2+）
+
+---
+
+<a id="task-l.16"></a>
+
+#### 【Task L.16】线上问题回流 `[COMPLETED]`
+
+* **任务编号**：`TASK-L.16`
+* **对应规格**：[`release-and-operations.md`](./release-and-operations.md) §5、§7（RO-10）
+* **前置依赖**：`TASK-L.15`、`TASK-L.9`
+* **优先级**：P3（M4）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#62](https://github.com/he18718143986-design/IDE/pull/62) / tip `e4dfe1c`（`feat(L.16): 线上问题回流（LiveIncident + E 类分流）`；GitHub squash merge；合入前接线补丁 `52f4eca` 已 squash 进 tip）
+* **对照痛点（代码事实）**：无运行监测；合入后的缺陷只能靠用户重新描述。
+* **一句话目标**：线上应用出错时，画布出现「线上」卡，用户点一下就生成一份带现场信息的修复合同。
+* **范围**：
+  1. `release-manager.ts`：`local_process` 进程退出时记录退出码与脱敏 stderr 尾部；LIVE 后每 60 秒探活（目标配置 `watch: false` 可关）。
+  2. 新建 `src/components/release/LiveIncidentCard.tsx`：「<目标> 停了，最后的错误是…」+「让 AI 看看」。
+  3. 「让 AI 看看」→ 生成 `PlanPatch`：`add_stub` 置顶，`kind: "feature"`，`title` 为白话，`origin: "system"`，`context: { release_id, commit_sha, log_tail }`（L.7 字段），按 project-decomposition §2 放置规则插入。
+  4. supervisor §16.5 分流新增 E 类「线上问题」的判定函数（`src/lib/journey/intent-router.ts`）：消息含 LIVE 目标名或「线上 / 上线后 / 生产」且无施工中合同。
+* **非目标**：不做告警推送到外部渠道；不做热修。
+* **不变声明**：合并后缺陷开新微合同（supervisor §5），不在 `MERGED` 合同上返工。
+* **验收（PASS）**：`tests/integration/live-incident.test.ts`：RO-10；`tests/unit/intent-router.test.ts` 新增 E 类判定用例（命中两条、不命中两条）。
+* **FAIL**：回流修改了已合并合同；日志尾部含密钥明文。
+* **关键文件**：`daemon/release/release-manager.ts`、`daemon/release/live-incident-stub.ts`（新）、`src/components/release/LiveIncidentCard.tsx`（新）、`src/lib/journey/intent-router.ts`、`src/lib/journey/live-incident-context.ts`（新）、`daemon/server.ts`、`daemon/supervisor/journey/orchestrate.ts`
+* **已知挂账（合入时）**：
+  1. 「线上」卡挂在发布页（`ReleasePane`），**未**进主画布中栏。
+  2. 探活失败（`health_watch_failed`）路径有代码；集成夹具偏 `process_exit`。
+  3. E 类分流只指引、不自动触发 ask-ai / 开合同。
+  4. Daemon 重启后 watch 不重挂（与 L.15 `process-registry` 仅内存同源：定时器随 manager 实例消失；持久化 LIVE 记录重启后无探活、无退出监听）。
+  5. E 类词表（`线上`/`生产`/`prod`）可能误报非事故语境（如「线上活动」「生产报表」）；只指引不动作，代价低。
+  6. 插桩 patch `reason: "user_request"` 与桩上 `origin: "system"` 语义略歪（无伤大雅）。
+  7. （核实无问题）`sys-acc-incident` 已在 `SYSTEM_ACCEPTANCE`；`server.ts` 调用 `orchestrateJourney` 已传 `liveTargetNames` / `hasInProgressContract`（接线 tip `52f4eca`，squash 进 `e4dfe1c`）。
+* **估算**：M
+* **纪律尾注**：仅文档回写销项；**不**宣称端到端产品闭环；**不**开工 L.17 / W.6。
+
+<a id="task-a.7"></a>
+
+#### 【Task A.7】Worktree seal 路径前缀对齐 `[COMPLETED]`
+
+* **任务编号**：`TASK-A.7`
+* **任务名称**：seal / manifest 目录与 `worktree-manager` 统一为 `task-{id}`
+* **对应规格**：[`runtime-contract-and-safety.md`](./runtime-contract-and-safety.md) §10.5 D1；ledger DOC-5 / 「第 1 波遗留 · Worktree seal 路径前缀」；[`../ledger/README.md`](../ledger/README.md)
+* **前置依赖**：`TASK-A.1`（COMPLETED）、`TASK-C.15d`（COMPLETED）
+* **优先级**：P3 · **NON_BLOCKER**（**不阻断** `TASK-L.15` 主序；不抢 Sprint「当前首要」）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#49](https://github.com/he18718143986-design/IDE/pull/49) / tip `4b7a709`（`fix(A.7): align worktree-seal dir with manager task-{id} prefix`；GitHub squash merge）
+* **合入说明**：旧无前缀 `.stagent/worktrees/{id}/` **不迁移**；读时判「未封存」。合前本地已清旧无前缀目录（提交说明自证）。
+* **对照痛点（代码事实）**：`daemon/guard/worktree-seal.ts::worktreeDir` 拼 `.stagent/worktrees/{contractId}/`（**无** `task-` 前缀）；`daemon/git/worktree-manager.ts` 创建路径为 `.stagent/worktrees/task-{contractId}`（约 L217）；`daemon/editor/launcher.ts` / Evidence 文案亦按 `task-{id}`。seal 与真实 Worktree 目录错位。
+* **一句话目标**：封存 / 清单读写命中与创建 Worktree **同一**物理目录 `task-{id}`，不再写到无前缀的孤儿路径。
+* **范围**：
+  1. 修改 `daemon/guard/worktree-seal.ts::worktreeDir`：目录名改为 `` `task-${sanitizedId}` ``，与 `worktree-manager` 一致。
+  2. 迁移/兼容：若旧无前缀目录仅含 seal manifest、且对应 `task-{id}` 已存在，测试约定只读新路径；不要求本卡做批量磁盘迁仓工具。
+  3. 单测：`tests/unit/worktree-seal-path.test.ts`（或扩既有 C.15d seal 测）断言 manifest 路径含 `/task-` 前缀且与 manager 解析一致。
+* **非目标**：不改 Worktree 分支名约定；不重做 EO-09 语义；不改 A.1 生命周期 API 面；不做 DLV-4 metadata。
+* **不变声明**：鉴权 / Demo Origin / 点亮三证 / 网关写范围：**不变**。
+* **验收（PASS）**：
+  - seal 写入路径 === manager 创建路径（同 `repoRoot`+`contractId`）。
+  - 既有 seal 单测全绿；新增前缀断言绿。
+* **FAIL**：仍写入 `.stagent/worktrees/{id}/`（无 `task-`）；或 seal 与 manager 路径不一致却标完成。
+* **关键文件**：`daemon/guard/worktree-seal.ts`（改）、`daemon/git/worktree-manager.ts`（只读对照）、相关 seal 测试（新/改）
+* **估算**：S
+* **台账**：关闭 ledger「Worktree seal 路径前缀」待立卡 → 本卡；DOC-5 代码侧收口归属本卡。
+
+<a id="task-c.5"></a>
+
+<a id="task-l.18"></a>
+
+#### 【Task L.18】系统地图 UI 与「改这里会影响什么」`[COMPLETED]`（ledger **DLV-5**）
+
+* **任务编号**：`TASK-L.18`
+* **任务名称**：中栏系统地图（知识库第二页）+ 影响闭包入口
+* **对应规格**：[`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) §5；supervisor 中栏/地图嵌入；ledger **DLV-5**；对照 `TASK-L.10`（项目地图已 COMPLETED）
+* **前置依赖**：`TASK-L.10`（COMPLETED）、`TASK-L.12`（COMPLETED · 提供 `modules.yaml`；**本卡不抢 L.15**）
+* **优先级**：P3 · **NON_BLOCKER**（合入时相对 Sprint 首要；前置 `L.12`/`L.13` 已 COMPLETED）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#54](https://github.com/he18718143986-design/IDE/pull/54) / tip `c8e6a81`（`feat(L.18): 系统地图 UI + impactClosure（/api/knowledge/*）`；本地 squash merge 后推送 main）
+* **合入说明**：同页嵌 `SystemMapPane`；`impactClosure` 纯函数；`GET /api/knowledge/modules|impact`（Auth）。
+* **已知挂账（合入时）**：interfaces 消费者解析只认 `consumers:` / `消费者:` 行——模块文档不写该行则静默漏消费者；`rel.includes("..")` 与 L.13 同款误拒（如 `a..b.ts`）。**不宣称端到端闭环**。
+* **对照痛点（代码事实 · 合入前）**：L.10 已有「项目地图」；本卡落地系统地图与 impactClosure（见合入证据）。
+* **一句话目标**：用户能在中栏看到系统模块地图，并在编辑器/右栏只读问答里问「改这里会影响什么」得到确定性闭包，而不是空话。
+* **范围**：
+  1. 中栏方案工作台内嵌「系统地图」页（**同页嵌**，禁止另开 ActivityBar「项目」Tab——沿用 L.10 入口纪律）：读目标仓 `docs/system/modules.yaml`，代码渲染依赖图（不由模型画图）。
+  2. `daemon` 或 `src/lib`：`impactClosure({ modules, path })` → 受影响模块列表（反向 `depends_on` + interfaces 消费者）；`GET /api/knowledge/impact?path=`。
+  3. 编辑器右键 / 右栏只读问答入口调用上述 API，白话展示。
+  4. 测试：`tests/unit/knowledge-impact.test.ts` + UI 烟测（地图空态 / 有 modules 渲染）。
+* **非目标**：不做 L.13「这段为什么存在」（Trailer 反查）；不重做 L.10 项目计划地图；不引入 Cytoscape 架构雷达（C.4 仍 DEFERRED）。
+* **不变声明**：右栏只读（J.1）；网关写范围不变。
+* **验收（PASS）**：有 `modules.yaml` 时地图可见模块卡；对已知边 `impactClosure` 与夹具一致；无 modules 时诚实空态。
+* **FAIL**：另开独立 ActivityBar Tab；或用模型生成依赖图当权威。
+* **关键文件**：`src/components/` 地图页（新）、impact 纯函数/API（新）、L.10 同页嵌入口（改）、测试
+* **估算**：M
+* **台账**：ledger **DLV-5** → 已立卡 `TASK-L.18`；L.12 非目标「系统地图另卡」→ 本卡。
+
+---
+
+<a id="task-j.19"></a>
+
+#### 【Task J.19】DN-2「可以」HTTP / 画布入口接线 `[COMPLETED]`（ledger **DLV-6**）
+
+* **任务编号**：`TASK-J.19`
+* **任务名称**：把已测的 `resolveDesignDependencyAllow` 接到用户可达入口
+* **对应规格**：[`technical-design-and-knowledge.md`](./technical-design-and-knowledge.md) DN-2；L.11 合入挂账；ledger **DLV-6**；可参照 `TASK-J.7` 交接/意外卡 UX 模式
+* **前置依赖**：`TASK-L.11`（COMPLETED）、`TASK-J.7`（COMPLETED · 交接三步/右栏解锁模式可复用）
+* **优先级**：P3 · **NON_BLOCKER**（不阻断 L.11 领域验收；**不阻断** `TASK-L.16`）
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#55](https://github.com/he18718143986-design/IDE/pull/55) / tip `4bae423`（`feat(J.19): DN-2「可以/不行」HTTP + 画布入口`；本地 squash merge 后推送 main；rebase 时 `server.ts` 保留 `/api/knowledge/*` + `/api/design/*`）
+* **合入说明**：HTTP `/api/design/:id/dependency-surprise|allow|deny`；allow → `resolveDesignDependencyAllow`；deny → abort 不插桩；侧车 `.stagent/records/`；resume 不误路由。
+* **已知挂账（合入时）**：无 ledger 时 HTTP 用 `synthesizeSchemeFromPlan` 合成最小 scheme（goals/modules 标 `source: "user_said"`）——降级路径，不是真用户原话。**不宣称端到端产品闭环**。
+* **对照痛点（代码事实）**：`daemon/pipeline/orchestrator.ts::resolveDesignDependencyAllow` 已合入且集成测覆盖；`POST .../resume` **不**路由至此；画布无「可以」装新库入口 → 用户不可达（DLV-6）。
+* **一句话目标**：设计步骤因 DN-2 挂起时，用户在意外卡点「可以」能走到领域方法并触发重签/依赖桩流程；「不行」走既有拒绝路径。
+* **范围**：
+  1. HTTP：例如 `POST /api/contracts/:id/design/dependency-allow`（名称以实装为准）鉴权后调用 `resolveDesignDependencyAllow`；对称的 deny/拒绝若缺则补。
+  2. 画布意外卡：「可以 / 不行」按钮接线；文案白话；禁止假闭环（须真实调用领域方法）。
+  3. 测试：API 级 + UI/集成各至少一条命中 `resolveDesignDependencyAllow`；`resume` 仍不误路由。
+* **非目标**：不重做 DN-1～DN-5 校验；不改 DesignNote schema；不把入口做成静默自动装依赖。
+* **不变声明**：鉴权不变；未获「可以」不得放行新依赖进施工。
+* **验收（PASS）**：用户路径可达；领域方法被调用；重签/abort 语义与 L.11 卡内「已知挂账」描述一致且不再挂「无入口」。
+* **FAIL**：仅 UI 按钮无 handler；或宣称端到端闭环但未调 `resolveDesignDependencyAllow`。
+* **关键文件**：`daemon/server.ts`（路由）、编排调用、画布意外卡组件、测试
+* **估算**：S
+* **台账**：ledger **DLV-6** → 已立卡 `TASK-J.19`。
+
+---
+
+<a id="task-j.20"></a>
+
+#### 【Task J.20】OP-1 授权清单落地（dec-10 实施约束）`[COMPLETED]`
+
+* **任务编号**：`TASK-J.20`
+* **任务名称**：确认路径敏感项授权清单的存储、scope 与失效条件
+* **对应规格**：[`../scheme.md`](../scheme.md) dec-10 / q23 / R-OP1；supervisor §14.11 **K-12**（确认路径 occurrence 洗白）；[`delivery-lifecycle.md`](./delivery-lifecycle.md) §5 **SA-1**；consistency-audit OP-1（裁决已销项，**实施**归本卡）
+* **前置依赖**：`TASK-J.3` / `TASK-J.5` / `TASK-J.9`（均 **COMPLETED**）；**不**重开 `TASK-J.9`
+* **优先级**：P2 · **NON_BLOCKER** 相对 L.15 主序（**不抢** Sprint「当前首要」）；实施敏感授权面，须单卡审
+* **状态**：`[COMPLETED]`
+* **合入证据**：PR [#57](https://github.com/he18718143986-design/IDE/pull/57) / tip `4d2f8e1`（`feat(J.20): OP-1 授权清单落地（records 侧车 + 确认路径自动放行）`；GitHub squash merge）
+* **合入说明**：存储 `.stagent/records/authorization-allowlist.json`；确认路径 `buildScopePlan` 末尾挂载；复活路径源码级断言仍 `ignoreOccurrence` 且不含 allowlist 字样。
+* **已知挂账（合入时）**：① 「同一敏感项」= 规范化路径集合完全相同（精确匹配，不是语义区域）；② 路径含 `|` 字符理论上会撞键（现实几乎不存在）。**不宣称端到端闭环**。
+* **为何不改 J.9**：`TASK-J.9` 已 **COMPLETED**（SchemePatch 零模型合并引擎，[#12](https://github.com/he18718143986-design/IDE/pull/12)）。裁决原文曾写「落地细节由实施卡确定 / 留待 J.9」——**J.9 当时已合入**，属过时指针。证据纪律禁止把未完成实施塞回 COMPLETED 卡。本卡为 **新实施卡**，只补约束与代码，**不重开裁决**、不改 dec-10 方向。
+* **对照痛点（代码事实）**：K-12 / dec-10 已定「确认开工点名敏感项 → 授权清单 → 后续合同同项自动放行」；今日无独立授权清单存储与 scope/失效规则，SA-1 仍以单次合同 `needs_approval` 为主。
+* **一句话目标**：跨合同自动放行**可审计、可失效**；「批一次」≠「永久免检」。
+* **采用的默认值（实施约束 · 本卡写死，勿再开产品冲突卡）**：
+  1. **存储位置**：项目级侧车（建议 `.stagent/records/authorization-allowlist.json` 或 SchemeSnapshot 附属字段；PR 内二选一并测；**禁止**写入已废止的 `.stagent/metadata/`）。
+  2. **scope 粒度**：默认 **按仓库（repoRoot）** 生效；条目键 = 规范化敏感路径或保护项 id（与 SA-1 点名规则同款）；**跨合同**复用同一清单。
+  3. **失效条件**（满足任一即不得自动放行，须重新点名/确认开工）：清单项被用户显式撤销；保护清单/P.1 规则升级导致项重新分类；仓库更换；条目 TTL（若实装则默认 ≤ 90 天，可配置）；契约 `plan_digest` 基线被用户「清空授权」动作清除。
+  4. **不对称**：复活路径仍忽略 `occurrence`（K-12）；本清单**只**服务确认路径自动放行。
+* **范围**：
+  1. 类型 + 读写：`readAllowlist` / `writeAllowlist` / `isPreauthorized(sensitiveId)`。
+  2. 「确认开工」成功路径：将本次点名敏感项写入清单（带 `authorized_at`、`source_contract_id`、`quote` 溯源）。
+  3. `evaluateSchemeConfirmation` / Scope 预检：同项已授权且未失效 → 不再阻塞 `E_SCOPE_APPROVAL_REQUIRED`；证据可审计。
+  4. 测试：跨合同同项自动放行；撤销/TTL/换仓后恢复拦截；复活路径行为不变。
+* **非目标**：不重开 OP-1 裁决；不改 J.9 合并引擎公式；不放宽 P.1 物理门禁（未授权敏感写入仍拒）。
+* **不变声明**：物理保护清单与网关写范围：**不放宽**；鉴权 / Demo Origin：**不变**。
+* **验收（PASS）**：`tests/unit/authorization-allowlist.test.ts`（名可调）覆盖写入、跨合同命中、失效再拦截、复活路径不读清单。
+* **FAIL**：无失效条件的「永久免检」；或把清单写进 `.stagent/metadata/`。
+* **关键文件**：新 allowlist 模块、确认/预检接线、supervisor/delivery 短注（若行为入规格）、测试
+* **估算**：M
+* **台账**：OP-1 裁决仍销项；consistency-audit / scheme R-OP1 补「实施卡 = TASK-J.20」。
+
+---
+
+
+#### 【Task C.5】双栏 Diff 审阅器与结构化终端日志回放
+* **任务编号**：`TASK-C.5`
+* **前置依赖**：`TASK-C.1`, `TASK-A.4` (COMPLETED)（v1.3.3：移除已推迟的 `TASK-C.4`）
+* **任务状态**：**[COMPLETED]**（2026-10-21 只读核验，状态校正：`src/components/diff/*` 双栏/内联 Diff + `src/components/StructuredTerminal.tsx` 结构化终端；服务端 `GET /api/contracts/:id/diff-files` 返回逐文件真实基线/当前内容（`daemon/server.ts:1347`）；超长输出经 `redactSecrets` 先脱敏、后头尾双窗口截断；`tests/ui/diff-terminal-viewer.test.tsx` 5 个用例全绿）
+* **核心目标**：
+  1. 双栏/内联展示真实 Git Diff。
+  2. 结构化终端流式回放日志，ANSI 彩色，超长日志先脱敏后头尾截断 (保留各 200 行)。
+* **涉及核心文件**：
+  - 新增：`src/components/DiffViewer.tsx`
+  - 新增：`src/components/StructuredTerminal.tsx`
+  - 测试：`tests/ui/diff-terminal-viewer.test.tsx`
+* **Pass/Fail 验收判定**：
+  - **PASS**：Diff 准确匹配 git；敏感信息在截断前已被遮蔽；超大输出前端不崩溃。
+  - **FAIL**：未脱敏即截断。
+
+---
+
+
+---
+
+<a id="task-c.6"></a>
+
+#### 【Task C.6】右栏 Agent 流式会话与打断续接 (v1.3.3 新增)
+* **任务编号**：`TASK-C.6`
+* **前置依赖**：`TASK-C.1`, `TASK-D.1`
+* **任务状态**：**[COMPLETED]**（已合并主线 `43496c0`。已用假适配器 + 演示 Agent 测过：流式、工具卡片、排队、打断（门闩立即生效、适配器 <2s 停止）、`.stagent/sessions/` 持久化与重启续接；真实 Claude Code 的流式/打断/续接见 W.5a。Adapter：自研保底（OpenAI 兼容，只聊天）/ 演示 Agent（不调用模型）。打断会清空排队消息。）
+* **核心目标**：
+  1. 右栏会话流式渲染（逐 Token）、工具调用卡片、改动预览；
+  2. Stop/打断：用户随时中断，Agent 进程 2s 内停止输出；排队追加消息；
+  3. Adapter 切换（自研保底 Worker / Claude Code / 其他已验证 Adapter）；
+  4. 会话列表与 resume：映射各 CLI 的原生会话 ID，持久化于 `.stagent/sessions/`；关闭浏览器与重启 Daemon 后可续接同一会话并保留上下文；
+  5. 消费 `CHAT_EVENT` 子类型帧（`delta`/`tool_call`/`tool_result`/`turn_end`/`interrupted`/`error`，架构规范 §6.1）。
+* **涉及核心文件**：
+  - 新增：`src/components/AgentChatPane.tsx`
+  - 新增：`src/hooks/use-agent-session.ts`
+  - 测试：`tests/ui/agent-chat-pane.test.tsx`
+* **Pass/Fail 验收判定**：
+  - **PASS**：首 token 可见延迟 ≤1s（本地测量）；打断后 2s 内 Agent 进程停止输出；Daemon/UI 重启后会话可续接且上下文完整。
+  - **FAIL**：打断后仍有输出；重启丢会话。
+
+---
+
+
+---
+
+<a id="task-c.7"></a>
+
+#### 【Task C.7】业务功能树与 Task Graph 渐进点亮视口 `[v1.6.1 升级]`
+* **任务编号**：`TASK-C.7`
+* **前置依赖**：`TASK-D.1`, `TASK-S.2`, `TASK-C.1`, `TASK-D.3`
+* **任务状态**：**[COMPLETED]**（2026-10-23 合入 main，merge `5117b27`；原交付于 `feat/task-c7-graph-engine`，基线 `main@05f090f`。门禁：干净环境四件套全绿（1032 passed / 6 skipped）；`tests/unit/graph-engine-invariants.test.ts` 24 通过；`tests/ui/task-graph-illumination.test.tsx` 7 通过；`tests/ui/ide-shell.test.tsx` 12 通过（新增 Activity Bar 图谱入口后同步顺序断言）。落地清单：`daemon/graph/graph-engine.ts`（Daemon 独占内存权威 + 原子落盘 `.stagent/specs/task_graph.json`，`revision` 单调递增、对外只给快照）、`daemon/graph/illumination-verifier.ts`（三证充要条件 + C-04 空集拦截）、`daemon/graph/evidence-collector.ts`（目标文件 SHA-256 / 合同 Scope / `git rev-parse HEAD` 全部由 Daemon 现算）、`src/lib/graph/task-graph.ts`（七态、提案类型与 `TASK_GRAPH_UPDATED` 载荷）、`daemon/server.ts` 5 个 `/api/graph*` 端点与全量快照广播、`src/components/graph/{TaskGraphPanel,FunctionalTree,ExecutionDag}.tsx` + `graph-view-model.ts`、`src/components/FileTreeSpecsSection.tsx`、`src/routes/index.tsx` 接线。**口径说明**：① 视图文件名按实际实现落为 `TaskGraphPanel` / `FunctionalTree` / `ExecutionDag`（本卡设计期的 `TaskGraphViewer` / `FunctionalMindmap` / `GraphNodeCard` 命名未沿用）；② 空验证集按架构 §3.2.2 置 `FAILED` + `E_EMPTY_VERIFICATION_BLOCKED`，UI 以「警告灰」（`data-tone="warning"`）呈现，不新增第八个节点状态；③ 点亮同时绑定 Worktree HEAD 的 Commit SHA 与目标文件 SHA-256 指纹，兼容 ADR-009 的 `node_patch_fingerprint` 口径；④ 需求条目以合同 `intent` 呈现（仓库暂无 `.stagent/specs/requirements.md` 实体），Demo 仅在真实文件存在时标「就绪」，进度由 `TASK_GRAPH_UPDATED` 驱动（源头为真实写入与验证，不由模型自报）。**残余口径差（不阻塞验收，需登记）**：① 节点详情暂只展示目标文件/验证命令/Commit SHA/问题码，卡片要求的 Git Diff 摘要与测试报告抽屉未接入；② `POST /api/graph/verify` 的验证命令结果仍由执行器提交（文件写入、Scope、SHA 已不可自报）；③ 建图入口仅控制面 API，不提供「从合同自动拆节点」的伪造拓扑）
+* **v0.1 范围**：在中栏呈现业务思维导图与任务执行 DAG 流程图；实现由灰变绿的渐进点亮动效与持久化状态渲染；Daemon 独占权威状态；提案类型剥离运行态；空验证集强拦截。
+* **核心目标**：
+  1. **Daemon 独占权威状态与提案类型安全 (`daemon/graph/graph-engine.ts`)**：
+     - Task Graph 权威状态由 Daemon 单独维护并持久化于 `.stagent/specs/task_graph.json`，严禁前端或 Supervisor 自行篡改；
+     - Supervisor 提交的 Graph 提案结构 `SupervisorProposalV1` 在类型层使用 `Omit<TaskNode, "state" | "executed_at" | "commit_sha">` 严格剥离所有运行态字段；
+     - 节点七态维护（严格对齐架构 §3.2.1）：`PENDING`（未开始）、`RUNNING`（执行中）、`REPAIRING`（定向返工中）、`ILLUMINATED`（已点亮绿灯）、`FAILED`（失败红灯）、`BLOCKED`（上游失败级联阻断）、`STALE_REVERIFY`（失效待验灰灯）。
+  2. **物理证据点亮与空验证集拦截 (`daemon/graph/illumination-verifier.ts`)**：
+     - **物理点亮充要条件**：节点由灰变绿点亮，必须同时满足：① 对应受控 Worktree 产生了物理文件写入；② 关联的 `EvidenceBundle` 包含退出码为 0 的验证结果；③ 成功派生 Git Commit SHA 指纹；
+     - **空验证集强拦截 (C-04)**：COMMAND 类型的节点若 `verification_commands` 为空或验证结果集为空，**坚决严禁全绿点亮**，状态保持为警告灰；
+     - **外部改码级联失效**：当检测到外部文件修改使 Evidence 变为 `STALE` 时，相关任务节点由绿变灰并标记为 `STALE`，提示用户重新执行验证。
+  3. **双重视图渲染与点亮动效 (`src/components/graph/TaskGraphViewer.tsx`)**：
+     - **业务功能导图 (Functional Tree)**：树状/脑图展开展示一级模块与二级功能点；
+     - **任务执行 DAG (Execution DAG)**：直观展示任务节点与依赖连线；
+     - 监听 WebSocket 的 `TASK_GRAPH_UPDATED` 帧，当后台验证通过事件到达时，触发平滑翠绿过渡点亮动效（延迟 ≤ 100ms）；
+     - 点击任何已点亮节点，可在抽屉中展开查看关联的 Git Diff 摘要与测试报告。
+* **文件树规范资产专区**：左侧固定展示 `.stagent/specs/requirements.md`、`contract.json` 与 `.stagent/demo/` 原型入口；文件生成动效必须由真实文件系统变更事件驱动，不得由模型自报进度触发。
+* **涉及核心文件（以实际落地为准）**：
+  - 新增：`daemon/graph/graph-engine.ts`
+  - 新增：`daemon/graph/illumination-verifier.ts`
+  - 新增：`daemon/graph/evidence-collector.ts`（文件 / Scope / HEAD 现算，不接受调用方自报）
+  - 新增：`src/lib/graph/task-graph.ts`（七态、提案类型、帧载荷与持久化守卫）
+  - 新增：`src/components/graph/TaskGraphPanel.tsx`（双视图容器与 100ms 点亮动效）
+  - 新增：`src/components/graph/FunctionalTree.tsx`
+  - 新增：`src/components/graph/ExecutionDag.tsx`
+  - 新增：`src/components/graph/graph-view-model.ts`
+  - 新增：`src/components/FileTreeSpecsSection.tsx`（按 §5 路径映射约定落在 `src/components/`）
+  - 修改：`daemon/server.ts`（`/api/graph*` 与 `TASK_GRAPH_UPDATED`）、`src/lib/ipc/frames.ts`、`src/lib/daemon-api.ts`、`src/hooks/use-daemon-stream.ts`、`src/routes/index.tsx`、`src/components/WorkspaceLayout.tsx`、`src/components/layout/ActivityBar.tsx`
+  - 测试：`tests/unit/graph-engine-invariants.test.ts`（24 用例）
+  - 测试：`tests/ui/task-graph-illumination.test.tsx`（7 用例）
+* **Pass/Fail 验收判定**：
+  - **PASS**：Supervisor 提案在 Schema 校验层成功剥离运行态；节点点亮严格绑定物理退出码 0 与 Commit SHA；空验证集的 COMMAND 节点无法被点亮；外部改码能触发节点变灰 STALE；页面刷新无损恢复点亮状态。
+  - **FAIL**：前端通过 Mock 数据自行点亮节点；空验证集节点被显示为绿色已完成。
+
+---
+
+### 3.5b 全局保护清单与 Vibe 安全网 (Sprint 2)
+
+<a id="task-p.1"></a>
+
+#### 【Task P.1】全局保护清单与 Vibe 模式安全网 (v1.3.3 新增) `[用户已确认 D1 / D2 · 2026-10-20]`
+* **任务编号**：`TASK-P.1`
+* **前置依赖**：`TASK-D.1`
+* **任务状态**：**[COMPLETED]**（2026-10-21 只读核验，状态校正：提交 `08e95da`「feat(p1): 全局保护清单、Vibe 安全网与门卫拦截」已合入 main 且为 HEAD 祖先。落地清单：`daemon/protection/protection-list.ts`（清单读写/自锁/模式判定/匹配/授权卡/待审批持久化/推荐/失败关闭/Prompt 注入/hook 请求队列）、`daemon/protection/auto-checkpoint.ts`（快照与整轮撤销）、`src/components/ProtectionCard.tsx`（推荐卡 + 同意卡）、`daemon/server.ts` 9 个 `/api/protection*` 端点、`daemon/mcp/gateway.ts:815` 强制门卫、`daemon/chat/session-manager.ts:226` Prompt 注入、`src/lib/perf-guards.ts:75` 自适应轮询。用例：`protection-silent-contract` 13 + `protection-endpoint` 1 + `gateway-protection` 3 全绿。**残余口径差（不阻塞验收，需登记）**：①「静默合同」当前为 `.stagent/silent-contracts.jsonl` 备案形态，非 `SoftwareContract` 正式落盘——与《P1 白话设计稿》第 5 条一致，但与架构 §0.6.3「后台自动静默生成合同与快照」字面表述存在口径差；②【撤销本轮改动】按 checkpoint 存在与否条件渲染，设计稿写「顶栏常驻」；③ 保护命中后自动进入完整合同 + Evidence 链未实现，合同仍由 UI 手动创建）
+* **核心目标**：
+  1. `.stagent/protection.json` 全局保护清单（路径 glob + 白话名称），UI 一键加锁/解锁；
+  2. 首导入推荐：Supervisor 以规则扫描识别核心模块，弹出白话推荐卡片（"为您推荐锁定【登录】与【支付】模块，一键保护"）；
+  3. **Prompt 前置注入**：组装 Worker Prompt 时直接注入已锁定保护清单，引导 AI 主动规避；
+  4. **静默合同（Silent Contract）**：Worker 改动未触碰保护清单时，Daemon 后台静默生成合同与快照，前端不弹窗；触碰保护清单时抛出极简白话是/否卡片；
+  5. **Vibe 安全网**：Agent 执行改动前 Daemon 自动生成轻量 Git 快照（Auto-Checkpoint）；UI 顶层常驻白话按钮【撤销本轮改动】；
+  6. **User-First Discard Rule**：合并冲突永远以用户主分支版本为准，丢弃 Worktree 冲突改动并提示 AI 重新修改；不向用户展示 Git 冲突界面。
+  7. **命中行为（任何模式，见架构 §0.6.5）** `[用户已确认 · 2026-10-20]`：先拦后写；多路径合并为一张卡并列出文件清单；同意仅覆盖本轮清单内文件，超出清单才弹补充卡（超出清单时弹出的补充卡属于同一次是/否授权的**补充授权**，计入"≤2"规则内，不另算一次交互）；不同意则拒写并让 AI 换方案；待审批状态跨断线/重启持久化、永不自动放行；验证全绿后一键合并、无二次确认。总交互 ≤ 2。
+  8. **保护清单自锁**：`.stagent/protection.json` 本身恒受保护，仅可经 UI 开关修改；快照失败则本轮不开工。
+  9. **撤销范围（v0.1 定稿）**：v0.1 撤销 = 回滚整轮快照：本轮开始后这些文件的所有改动（**包括用户本轮的手动修改**）一并撤回；撤销确认文案必须白话写明这一点。细粒度撤销（只撤 Agent 改动、保留手改）推迟至后续版本。
+  10. **范围外说明**：锁定 AI 配置文件（`.claude/`、`.mcp.json`、`.cursor/`）不属于本卡验收项，若要纳入须另行更新任务卡与路径规则。
+  11. **网关级只读绝对防御 (v1.4.0 新增)**：全局保护清单中声明的敏感核心文件为底层 Scoped Gateway 的不可覆盖只读层；即使用户在对话中输入授权，系统依然阻断对绝对禁区的破坏性操作。
+* **涉及核心文件**：
+  - 新增：`daemon/protection/protection-list.ts`
+  - 新增：`daemon/protection/auto-checkpoint.ts`
+  - 新增：`src/components/ProtectionCard.tsx`
+  - 测试：`tests/unit/protection-silent-contract.test.ts`
+* **Pass/Fail 验收判定**：
+  - **PASS**：保护路径在 VIBE 与 PROTECTED 下写入均被规则拦截（零模型调用）；无保护清单全程零弹窗；撤销按钮一键恢复现场；冲突时主分支版本永远胜出；触保护区任务交互 ≤ 2（一张清单卡 + 一键合并），同轮清单内不重复弹窗；待审批断线/重启后不自动放行；门卫出错/超时按拒绝处理，且原生工具、Shell、改名/删除、符号链接四类绕过负例均失败关闭。
+  - **FAIL**：保护路径被静默写入；出现 Git 冲突解决界面；弹窗超过一个是/否问题；同轮清单内文件重复弹窗；待审批被自动放行；合并出现二次确认。
+
+---
+
+
+---
+
+### 3.6 控制面 API 补齐、快照持久化与合并核销（Sprint 3；前置 C.5/P.1/W.4 于 Sprint 2 完成）
+
+<a id="task-d.2"></a>
+
+#### 【Task D.2】控制面 API 补齐、合并门禁（一键合并）与 Git Trailer 审计
+* **任务编号**：`TASK-D.2`
+* **前置依赖**：`TASK-D.1`, `TASK-W.4`, `TASK-C.5`, `TASK-P.1`（v1.3.3：移除已推迟的 `TASK-B.2`）
+* **任务状态**：**[COMPLETED]**（2026-10-21 步骤 D 收口。**已落地**——控制面 `approve` / `execute` / `run-worker` / `merge` / `resume` / `abort` / `diff-files` / `evidence` 端点（`daemon/server.ts` 中对应控制面路由处理器（以 handler 名称为锚点，行号易漂移））；`squashMerge` 门禁链 Gate 0~4（AUDITED、Evidence 快照存在且同合同、STALE 阻断、Worktree 指纹复核 `assertEvidenceIntegrity`、主树 clean、重复合并防御）；4 条标准 Git Trailer（`daemon/pipeline/merger.ts` 中 Trailer 构造常量/函数）；User-First Discard 冲突仲裁（`daemon/pipeline/merger.ts` 中 User-First Discard 处理器（以函数名为锚点），含 `nothingToMerge` 兜底）；前端一键合并无二次确认（`index.tsx:1014`）。**核心目标 1（原缺口 G-1）已闭环**（`9691b23`，合并 `742d27d`）：`daemon/protection/protection-list.ts` 新增 `intersectWithProtection()`（见证路径 `witnessPath()` + glob 双向覆盖判定 + 清单解析异常一律返回 `hit:true` 的失败关闭）；`daemon/pipeline/orchestrator.ts` 新增 `admit()`，产出 `AUTO_APPROVED` / `AUTO_APPROVAL_FAILED` / `NEEDS_APPROVAL` / `SKIPPED` 四态，无交集或本轮全部同意且无拒绝时自动 `approve()`（`approved_by: "stagent-auto"`）并写 `contract_auto_approved`，门卫异常写 `contract_admission_fail_closed` 阻断，**拒绝优先于同意**；`POST /api/contracts` 创建即准入（响应回传 `admission`），新增 `POST /api/contracts/:id/admit`（`NEEDS_APPROVAL` 返回 202）；并发撞状态机以 `SKIPPED` 兜底不误报失败。`tests/unit/contract-auto-approve.test.ts` 9 用例绿（空清单/无交集/glob×glob/具体路径/本轮同意/本轮拒绝/清单损坏/清单自锁/幂等），全量基线 **682 通过 / 4 跳过**。**残余（不阻塞 v0.1）**——`resume` 在"触碰保护清单时要求新审批版本"未实现：当前 `PENDING_RESUME → EXECUTING` 不区分是否触碰清单，即始终不重批（未触清单的"不重批"减负已满足，触碰清单的"应重批"缺失），与 P.1「静默合同」口径统一一并列为 v0.2+ 待办。）
+* **核心目标**：
+  1. `POST /api/contracts/:id/approve`：校验 `contract_revision` 与授权指纹（防 TOCTOU），原子推进双状态并创建 Worktree。**v1.3.3 减负**：合同 Scope 与全局保护清单**无交集时自动批准**（记录备案，无需用户点击）；有交集时向用户发**至多一个**白话是/否问题。
+  2. `POST /api/contracts/:id/resume`：**双路径裁决负例断言 (G-14)**：
+     - 安全违规类 (`SCOPE_VIOLATION`, `UNAUTHORIZED_COMMAND`, `UNSAFE_EXECUTION`) 调用 resume 返回 `409 Conflict`；
+     - 预算类 resume：**v1.3.3 减负**——未触碰保护清单时不重批、只记录备案，恢复前后重试计数与累计开销保持连续；触碰保护清单时才要求新审批版本。
+  3. `POST /api/contracts/:id/abort` 与 `reject` 接口。
+  4. **并发互斥与工作区互斥锁守卫 (G-21)**：
+     - 依据 A §6.4(2) 与互斥锁规范，同合同并发冲突返回 409 / `E_WORKSPACE_LOCKED` 并生成 BLOCKED 证据。
+  5. **合同与证据快照持久化 (闭环 G-05)**：
+     - 合并核销成功后，将合同快照写入 `.stagent/contracts/{contract_id}.json`，证据快照写入 `.stagent/evidence/{contract_id}-{evidence_id}.json`，文件模式严格设为 `0600`。
+  6. 严格执行合并门禁（Gate 0 受控源 ➔ Gate 1 主树 Clean ➔ Gate 2 状态通过 ➔ Gate 3 实时指纹复核 ➔ Gate 4 测试完整性）。**v1.3.3 修订**：删除 Gate 5 二次确认弹窗，`can_merge=true` 时**一键合并**；Gate 3 实时指纹复核保留为 Daemon 后台兜底，用户不可见。**合并冲突仲裁（User-First Discard Rule）**：发生 Git 冲突时永远以用户主分支当前版本为准，直接丢弃 Worktree 冲突改动并提示 AI 重新基于最新代码修改，不向用户展示冲突解决界面。
+  7. 写入 A §5.2 的 4 个标准 Git Trailer（`Audited-By`, `Stagent-Contract-ID`, `Stagent-Evidence-ID`, `Stagent-Verdict`），执行 Squash Merge 并清理 Worktree。
+* **涉及核心文件**：
+  - 修改：`daemon/server.ts`
+  - 修改：`daemon/pipeline/merger.ts`
+  - 修改：`daemon/pipeline/evidence-verifier.ts`
+  - 修改：`daemon/pipeline/orchestrator.ts`（`admit()` 准入判定，步骤 D 新增）
+  - 修改：`daemon/protection/protection-list.ts`（`intersectWithProtection()` / `witnessPath()`，步骤 D 新增）
+  - 测试：`tests/unit/contract-auto-approve.test.ts`（步骤 D 新增，9 用例：无交集自动批准 / 拒绝优先 / Fail-Closed / 幂等）
+  - 已存在的相关覆盖（按本轮代码对照报告核验）：`tests/integration/contract-api.test.ts`、`tests/integration/resume-abort.test.ts`、`tests/daemon/merger.test.ts`、`chaos-concurrency.test.ts`、`tests/unit/contract-auto-approve.test.ts`；后续新增测试必须确认仓库目录与文件名后再登记。
+  - 本卡不再引用不存在的 `control-plane-approve/merge-gates/resume/concurrent-lock.test.ts` 文件名。
+* **Pass/Fail 验收判定**：
+  - **PASS**：
+    - 边界违规合同调用 resume 必然返回 409。
+    - **双门禁合入门槛严格校验 (v1.4.0 新增)**：
+      * 校验 EvidenceBundle 携带的 `target_commit_sha` 与 Worktree HEAD 的 Commit SHA 严格一致，防止代码变动后复用旧证据；
+      * 合并执行瞬间执行目标分支基线漂移校验（`git merge-base --is-ancestor <base_sha> <target_branch_head>`），若目标分支已推进，跃迁至 `CONFLICT` 并安全阻断合并；
+    - **异步停止端点 `/api/task/stop` (v1.4.0 新增)**：接收停止请求后立即置状态为 `STOPPING`，发送 SIGTERM 优雅退出并在 5 秒后 SIGKILL，释放工作区锁后置为 `ABORTED`；
+    - 主树 Dirty、Evidence STALE 或 Agent 非受控时 Merge 坚决拒绝。
+    - 合并成功后，Commit 包含 4 个标准 Trailer，且 `.stagent/contracts/` 与 `.stagent/evidence/` 快照文件完整落地。
+  - **FAIL**：残留 `X-Stagent-*` 临时键；合并后未写入规范快照；SHA 不一致或基线漂移时仍允许合并。
+
+---
+
+
+---
+
+<a id="task-d.2b"></a>
+
+#### 【Task D.2b】未跟踪文件合并门禁与 Contract v1.3 零静默迁移接入
+* **任务编号**：`TASK-D.2b`
+* **前置依赖**：`TASK-0.2c`, `TASK-D.2`, `TASK-W.2b`
+* **任务状态**：**[COMPLETED]**（2026-10-23，提交 `150dc47`；`npm run typecheck` 0 error，新增 `tests/daemon/merger-d2b-gates.test.ts` 10 例全绿，定向回归 86 例与扩展回归 23 例全绿）
+* **范围**：在合并前复核完整工作树范围，阻断合同外未跟踪文件；接入 `migrateContractToV13`，确保旧合同加载时不发生静默授权。该卡不重开 TASK-D.2 已完成的控制面主体。
+* **Git Trailer 边界**：沿用已完成 D.2 的单条 ≤512B、合计 ≤4KB 限制；若仓库当前实现/测试事实不符，应先作为差异报告，不把既有完成声明当作新增实现。
+* **交付事实与差异报告（2026-10-23）**：
+  1. **D.2 并未实现该限制**：`merger.ts` 中不存在任何 Trailer 尺寸度量、常量或断言，D.2 交付的仅是「写入 4 个 Trailer 字段」。本卡新增 `measureTrailerBounds` / `assertTrailerBounds` 与常量 `MAX_TRAILER_LINE_BYTES = 512`、`MAX_TRAILER_BLOCK_BYTES = 4096`，属**新增实现**。
+  2. **文档口径冲突**：架构规范 §5.2 写「单条 ≤1024B、合计 ≤4096B」，本卡与裁决写「单条 ≤512B、合计 ≤4KB」。经裁决取**更严格**的 512 并已在代码注释留痕；若后续对齐 §5.2，只需改一个常量。
+  3. **旧合同的实际缺口不是「静默授权」而是「读不出来」**：原 `ContractStore.get()` 直接用 v1.3.0 Schema 解析 v1.2.0 文件，失败即返回 `null`，合并时报 `E_CONTRACT_NOT_FOUND`。本卡改为 `getWithMigration` 内存迁移（不写盘），并由 `migration.requiresReapproval` 派生 `E_CONTRACT_REQUIRES_REAPPROVAL` 阻断核销。
+* **涉及核心文件**：修改 `daemon/pipeline/merger.ts`、合同加载/迁移调用点及相关测试；测试路径按仓库实存文件核定，避免引用未创建的文件名。
+* **Pass/Fail**：PASS：已跟踪和未跟踪文件均参与 Scope 检查；超范围即拒绝合并并产生稳定错误码；DRAFT/PENDING_APPROVAL 历史合同绝不被迁移为 APPROVED；执行态历史合同按明确白名单迁移；FAIL：使用旧 Evidence 或未授权合同仍可合入。
+
+### 3.7 端到端集成与自举发版（v0.1 基线已完成；后续扩展另开卡）
+
+<a id="task-e.1"></a>
+
+#### 【Task E.1】双 Agent 协同与全流程 E2E 自动化测试
+* **任务编号**：`TASK-E.1`
+* **前置依赖**：`TASK-D.2`
+* **任务状态**：**[COMPLETED]**（提交 `c82a7bb`；`tests/e2e/dual-agent-workflow.test.ts`、`tests/e2e/fault-injection-regression.test.ts` 已存在）
+* **核心目标**：
+  1. Happy Path 全生命周期无人值守自动化回归。
+  2. **覆盖 8 类故障分支自动化拦截 (闭环 G-07)**：
+     - 故障 1：超时重试熔断；
+     - 故障 2：测试文件未经授权篡改阻断；
+     - 故障 3：外部手动修改触发 Evidence STALE 阻断；
+     - 故障 4：主树 Dirty 阻断合并；
+     - **故障 5（v1.3.3 限定）：保护模式下，未批准合同尝试触碰保护资产必须被拒绝**（Vibe 模式下无合同门槛，不适用本条，但保护清单拦截恒生效）；
+     - **故障 6：Supervisor 建议尝试直接触发执行必须被拒绝**；
+     - **故障 7：Worker 完成声明不得直接改变状态为 PASSED**；
+     - **故障 8：外部非受控 Agent 的输出严禁作为受控 Evidence 通过**。
+  3. **Vibe 模式新增用例（v1.3.3）**：
+     - 新项目、无保护清单、无合同：Agent 新建/修改文件并运行测试，全程零弹窗零审批，Header 显示"自由模式"；
+     - Auto-Checkpoint 生成与【撤销本轮改动】一键恢复现场；
+     - 保护路径在 VIBE 与 PROTECTED 下写入均被规则拦截；
+     - 未触保护区任务用户交互次数 = 1（合并按钮）；触保护区 ≤ 2（一个是/否 + 合并）；
+     - 合并冲突时 User-First Discard：以主分支为准丢弃 Worktree 冲突改动。
+* **涉及核心文件**：
+  - 新增：`tests/e2e/dual-agent-workflow.test.ts`
+  - 新增：`tests/e2e/fault-injection-regression.test.ts`
+* **Pass/Fail 验收判定**：
+  - **PASS**：全链路 E2E 退出码为 0；8 类故障分支全部断言成功触发阻断。
+  - **FAIL**：出现任何安全越权或测试挂起。
+
+---
+
+
+---
+
+<a id="task-e.2"></a>
+
+#### 【Task E.2】Stagent 仓库自举 (Dogfooding) 与发版交付
+* **任务编号**：`TASK-E.2`
+* **前置依赖**：`TASK-E.1`
+* **任务状态**：**[COMPLETED]**（提交 `9b15c20`、`178a8a6`）
+* **⚠️ 文档事实校正（2026-10-27）**：本卡原文宣称「报告 `docs/reports/v0.1-dogfooding-report.md` 在位」。该报告已于 **2026-10-25 `docs/reports/` 目录精简时删除**，当前仓库中**不存在**。为杜绝事实性错误，此处按 D-7 裁决更正：
+  - **本卡的验收证据** = 提交 `9b15c20` / `178a8a6` + `npm run build` 生产构建 0 错误 + 自举 Commit 含 4 个 Trailer；
+  - **不再引用任何已删除的报告路径**；历史自举结论如需复核，以 git 历史中该文件的末次快照为准。
+* **核心目标**：
+  1. 在 Stagent 自身代码库中通过本地工作台完成真实自举演练。
+  2. 输出自举演练结论，客观披露实际开销与平台边界（**原报告 `v0.1-dogfooding-report.md` 已于 2026-10-25 目录精简时删除**，结论不再以独立文件承载）。
+  3. 执行 `npm run build`，产出完整干净的生产发行包。
+* **涉及核心文件**：
+  - 产出：自举 Commit（含 4 个 Trailer）与生产构建产物（**原新增报告已随 2026-10-25 目录精简删除**）
+  - 产出：`package.json`（v0.1.0）、生产 dist 目录
+* **Pass/Fail 验收判定**：
+  - **PASS**：自举 Commit 合规包含 4 个 Trailer，CLI 输出正常，生产构建 0 错误。
+  - **FAIL**：生产构建失败或缺少依赖。
+
+---
+
+
+### 3.4e 台账前置交付（C.22 / W.8）
+
+<a id="task-c.22"></a>
+
+#### 【Task C.22】合同 schema references[] 字段 `[COMPLETED]`
+* **任务编号**：`TASK-C.22`
+* **状态与证据**：`[COMPLETED]`（[#67](https://github.com/he18718143986-design/IDE/pull/67)/`014cbfc`，squash merge）。
+* **交付**：合同顶层可选 `references: string[]` URL 数组；SchemeDraft 和签署投影透传；不可变 scheme snapshot 冻结并将 references 纳入摘要。兼容缺省与空数组，拒收非法 URL。
+* **验证**：PR 报告 7 项专用测试通过；相关回归 80 项通过；`git diff --check` 通过。以上为 PR 报告的验证结果。
+* **关键文件**：`src/lib/contract.schema.ts`、`src/lib/journey/scheme-draft.ts`、`src/lib/journey/confirm-scheme-contract.ts`、`daemon/pipeline/scheme-snapshot-store.ts`、`tests/unit/contract-schema-references.test.ts`。
+
+<a id="task-w.8"></a>
+
+#### 【Task W.8】Worker 侧 Stagent MCP HTTP 端点 `[COMPLETED]`
+* **任务编号**：`TASK-W.8`
+* **状态与证据**：`[COMPLETED]`（[#68](https://github.com/he18718143986-design/IDE/pull/68)/`090e5c1`，squash merge）。
+* **交付**：Daemon 提供 MCP HTTP/SSE 端点；Worker strict MCP 配置挂载受管端点，首批仅 `stagent_web_ingest`；工具调用复用 Gateway 校验、权限与审计路径；右栏 Partner 维持隔离且未开放外部 MCP。
+* **安全决策留痕**：Worker MCP 使用专用 `mcpToken`，通用路由 `isAuthorized` 只识别 session token，MCP token 不具备通用路由授权能力；MCP 路由另走 `isMcpAuthorized` 双轨校验。此处是刻意的最小权限隔离，不以路由前缀作为唯一边界。
+* **残余边界 / 后续观察**：
+  1. `claude-code-adapter.ts` 的 token 解析顺序仍为 `opts.authToken` → `STAGENT_MCP_TOKEN` → `STAGENT_SESSION_TOKEN`。Worker 正常注入首项；若环境中仍设置 session token，最后一级回退可能放宽权限。建议后续移除回退或另立修复。
+  2. `mcpToken` 访问 `/api/shutdown` 返回 401 的双轨路由行为测试使用手写 mock server，不是真实 daemon 路由；作为协议参照即可。真实 `StagentDaemon` 实例测试验证了 Worker 生成的 `mcp.json` Authorization 使用 `mcpToken`，但这不是对真实 shutdown 路由拒绝的直接覆盖。建议为 mock 测试添加该边界说明，后续补真实路由测试。
+* **验证**：PR 报告 7 项 MCP endpoint 测试、47 项 Gateway 回归测试通过，`git diff --check` 通过；此处为 PR 报告，并非本次重新运行。
+* **关键文件**：`daemon/mcp/http-server.ts`、`daemon/mcp/gateway.ts`、`daemon/server.ts`、`daemon/worker/cli-host/claude-code-adapter.ts`、`tests/unit/mcp-http-endpoint.test.ts`。
+---
+
+### 3.4d 北极星受控摄取交付（L.17a）
+
+<a id="task-l.17a"></a>
+
+#### 【Task L.17a】受控摄取与代登代理 `[COMPLETED]`
+* **任务编号**：`TASK-L.17a`
+* **状态与证据**：`[COMPLETED]`（[#70](https://github.com/he18718143986-design/IDE/pull/70)/`8516c3d`，squash merge）。
+* **对应规格**：ADR-0014 §3；`scheme.md` goal-2、conf-6、dec-13、oq-3；[`delivery-lifecycle.md`](./delivery-lifecycle.md) M5
+* **交付内容**：
+  1. Daemon 受控只读 GET 代理（`daemon/web-ingest/proxy.ts`），域名白名单精确匹配合同顶层 `references[]`（C.22），未授权域名返回 403 `E_WEB_INGEST_FORBIDDEN_DOMAIN`，非 GET 请求返回 405 `E_WEB_INGEST_METHOD_NOT_ALLOWED`。
+  2. 防御资源滥用与攻击：响应大小限制（Content-Length 预检 + 流式大小双保险，超限 413 `E_WEB_INGEST_PAYLOAD_TOO_LARGE`），突发与分钟级速率限制（429 `E_WEB_INGEST_RATE_LIMITED`）。
+  3. **302 重定向逐跳白名单防线**：`fetch` 显式设置 `redirect: "manual"`，拦截 3xx 重定向并对 Location 目标逐跳重新校验 `references[]` 白名单（上限 3 跳），彻底封堵借合法域名跳转绕过白名单的旁路。
+  4. **Worker 请求头防注入**：强制过滤请求头中的 `Cookie` / `Set-Cookie` / `Authorization`，Daemon 会话凭据优先级强制覆盖，杜绝 Worker 注入或篡改 Session。
+  5. **dec-13 凭据生命周期与静默重登闭环**（`daemon/web-ingest/auth-session.ts`）：
+     - 条款 1：Vault 凭据由用户管理至手动删除，项目切换或会话结束仅清理内存会话，不联动清理 Vault。
+     - 条款 2：上游 401/403 触发 Daemon 读取 Vault 账密静默代登重试一次，Worker 全程无感知。
+     - 诚实鉴权失败：代登无 `Set-Cookie` 或失败时抛出 401 `E_WEB_INGEST_AUTH_FAILED`，绝不伪造凭据。
+  6. **零账密泄漏**：`sanitizeForWorker` 深度脱敏 Vault 活跃值、JSON 字段及内存 Session Cookie，Worker 环境与日志零明文。
+  7. 接通网关：替换 `daemon/mcp/gateway.ts` 的 `E_INGEST_NOT_WIRED` 临时阻断为真实受控 Proxy 调用。
+* **残余边界 / 后续挂账**：
+  1. `request.headers` 目前已对敏感头做严格剥离过滤；当前 gateway 调用暂不传 headers，未来若不需要自定义头可彻底裁剪该字段。
+* **验证**：31 项专用测试全部通过（`web-ingest-proxy.test.ts`、`web-ingest-auth.test.ts`、`web-ingest-lifecycle.test.ts`、`web-ingest-relogin.test.ts`、`mcp-http-endpoint.test.ts`、`contract-schema-references.test.ts`）。
+* **关键文件**：`daemon/web-ingest/proxy.ts`、`daemon/web-ingest/auth-session.ts`、`daemon/mcp/gateway.ts`、`daemon/vault/vault.ts`、`tests/unit/web-ingest-proxy.test.ts`、`tests/unit/web-ingest-auth.test.ts`、`tests/unit/web-ingest-relogin.test.ts`。
+
+---
+
+### 3.4f 北极星对话试玩与证据桩交付（L.17b · M5 主序收官）
+
+<a id="task-l.17b"></a>
+
+#### 【Task L.17b】对比视图与试玩证据桩 `[COMPLETED]`
+* **任务编号**：`TASK-L.17b`
+* **状态与证据**：`[COMPLETED]`（[#72](https://github.com/he18718143986-design/IDE/pull/72)/`d26def6`，squash merge；分支阶段 HEAD `9c75af9`）。**M5 北极星主序（L.16 → L.17a → L.17b）至此全部落完**。
+* **对应规格**：ADR-0014 §3；`scheme.md` goal-2、dec-12、oq-2、acc-6、gap-11；[`delivery-lifecycle.md`](./delivery-lifecycle.md) M5
+* **前置依赖**：`TASK-L.17a`（COMPLETED · #70/`8516c3d`）+ `TASK-L.16`（COMPLETED · #62/`e4dfe1c`，复用「让 AI 看看」通道做试玩引导）
+* **交付内容**：
+  1. **对比视图 `src/components/project/CompareView.tsx`**：左栏参考站抓取成果（HTML 快照 / DOM 摘要 / 截图预览），右栏 `iframe` 直连真机 / LIVE 预览端口并保留外链直达；**仅复用 lib 层 `realPlaytestIframeProps`**，不引入 studio 层 `RealPlaytestPane` 布局依赖；标题栏明写「仅供人眼对照 · 不做自动比对」——**像素 / DOM 量化机器比对不复活（REJ-009）**。
+  2. **右栏试玩引导 `src/lib/journey/playtest-guidance.ts`**：复用 L.16「让 AI 看看」通道（`origin:system` 插桩 + `classifyJourneyIntent` 分流），引导用户对照参考站试玩、提修改意见；修改意见回流微合同修正闭环，路由结论**不带可执行动作**；引导消息维持只读白名单（`read_only:true` / `executable:false` / `permissions:[]`）。
+  3. **证据客户端 `src/lib/journey/playtest-evidence.ts`**：仅 zod schema + `submitPlaytestEvidence()` 客户端调用；不 import `node:fs`、不直碰 `.stagent/`。
+  4. **Daemon 证据端点与原子落盘**：`POST /api/playtest/evidence`（`daemon/playtest/evidence.ts` + `daemon/server.ts`）请求体**只收** `contract_id + user_verdict`（非空原话，空/缺省/空白三态均拒）；`release_id`（服务端从当前 LIVE 记录解析）/`timestamp`(ISO 精确)/`operator:"user"` 全部服务端装配，请求体携带任一装配字段即判伪造拒绝（400 `E_PLAYTEST_FORGED_FIELD`），无 LIVE 返回 409 `E_PLAYTEST_NO_ACTIVE_RELEASE`；落盘 `.stagent/evidence/playtest-{contract_id}.json` 经 `writeJsonAtomic`（临时文件 → fsync → rename → 目录项 fsync），禁裸 `writeFileSync(finalPath)`。
+  5. **版本指纹单一事实源 `daemon/release/active-live.ts`**：独立只读解析当前 LIVE `release_id`，**刻意不 import `release-manager`**，避开 `vault/keychain-backend → node:child_process` 闭包，令 `daemon/supervisor/**` 零工具 lint 不新增违规。
+  6. **门禁 `check playtest`**：`bin/stagent.ts` 注册子命令，委托 `daemon/supervisor/preview/playtest-guard.ts` 单一判定源。证据 `release_id` 与当前 LIVE 不匹配 → `STALE_VERSION` + `reset_approval:true`（旧认可即刻失效，不跨版本穿透）；合同无 `references[]` / 非北极星场景 → 明确 `NOT_NORTHSTAR_SCENARIO`，**不静默 PASS**；检查**不碰 canvas 模块**。
+* **不变声明**：右栏只读工具白名单不变；AI 仅做引导不代判；证据必须经用户明确表态（原话）后由服务端装配生成；机器自动比对不复活。
+* **验收（PASS）**：四组 `tests/unit`（`compare-view` / `playtest-guidance` / `playtest-evidence` / `playtest-reset`）**33 passed**；含真实 HTTP daemon 接线（401 未鉴权 / 400 伪造字段 / 400 空原话 / 201 有效原话且 `release_id` 服务端填入）；核心用例「同 `contract_id` 不同 `release_id` → `STALE_VERSION`」非「文件不存在」退化路径。`npx tsc --noEmit` 全仓 57 个 `error TS` 与 clean `main` 基线一致，新增/修改文件 0 报错。
+* **残余边界 / 后续挂账（P-112 归拢，共 6 条）**：
+  1. **`resolveCurrentLiveReleaseId` 回退语义**：合同 `contract_ids` 无匹配时回退「最近一条 LIVE」——多合同仓里合同 A 的认可可能绑到合同 B 的发布上。方向保守（绑错后版本变更照样 `STALE_VERSION`，逼重新认可而非误放行），但语义是「最新 LIVE 即当前版本」而非「本合同的 LIVE」，**多合同场景证据绑定粒度粗**。
+  2. **合同文件名口径不一致**：`readContractReferences` 用原始 `contractId + ".json"`（不做别名归一），而 `playtestEvidencePath` 对 `contract_id` 做字符归一；两套命名约定并存，含特殊字符的 `contract_id` 会读不到合同文件但写得了证据。实际合同 id 受控生成，风险低。
+  3. **每合同只留最新证据**：`playtest-{contract_id}.json` 覆盖写、无历史链；重新认可后旧证据丢失，审计上只有「当前认可」没有「认可历史」。dec-12 未要求历史，可接受。
+  4. **（W.8）`claude-code-adapter.ts` token 回退**：解析顺序仍为 `opts.authToken` → `STAGENT_MCP_TOKEN` → `STAGENT_SESSION_TOKEN`；环境中若仍设 session token，最后一级回退可能放宽权限。建议后续移除回退或另立修复。
+  5. **（W.8）`/api/shutdown` 401 双轨路由测试用手写 mock**：不等同真实 daemon 路由；真实 `StagentDaemon` 实例测试验证了 `mcp.json` Authorization 使用 `mcpToken`，但非对真实 shutdown 拒绝的直接覆盖。建议补边界说明与真实路由测试。
+  6. **（L.17a）`request.headers`**：已对敏感头做严格剥离过滤；当前 gateway 调用暂不传 headers，未来若不需要自定义头可彻底裁剪该字段。
+  > 另：**`check playtest` 目前是独立命令、尚未被任何 verification profile 引用**——**已裁决（ruling 3 · 2026-11-02 · P-114 落盘）**：北极星合同（带 `references[]`）的 `verification_spec.commands` **自动附加** `{alias:"playtest", executable:"stagent", args:["check","playtest","<contract_id>"]}`，使试玩认可成为合并门禁；**非北极星合同不附加**。实现属小卡（合同装配段 + 测试），**另行立卡或挂账**——本轮仅落裁决口径，**未立卡、未开工**（不顺手立 `TASK-C.23`，避免新增未达 `task-card-standard.md` DoR 的薄卡债，DOR-3 同款）。裁决原文见 [`development-tasks-changelog.md`](./development-tasks-changelog.md) P-114 与 ledger [`../ledger/consistency-audit.md`](../ledger/consistency-audit.md) P-114 落笔。
+* **未宣称 / 未接线（不宣称端到端闭环）**：`CompareView` 未挂载进任何 UI 路由；用户原话采集 UI 未实现（右栏引导仅提示，不含提交动作）；`check playtest` 尚未被 verification profile 引用（**ruling 3 裁决已落盘、实现未开工，见上条**；本句是代码事实，不与「已裁决」混淆）。**本卡交付组件 + lib + 端点 + 门禁判定源，端到端 UI 串联与真机端口联调属后续。**
+> **（P-132 立卡指针 · 保留上句原文作溯源）**：端到端 UI 接线立为 [`TASK-L.17c`](./development-tasks-active.md#task-l.17c) `[NEW_TASK]`（中栏挂载 CompareView + 原话「认可完成」+ 读侧反映 playtest-guard；**未开工、未宣称闭环**）。`check playtest` 装配侧已由 `TASK-C.23` COMPLETED（#82）；本句「尚未被 verification profile 引用」为 L.17b 归档当日事实。
+> **（P-133 现行指针）**：`TASK-L.17c` → `[COMPLETED]`（[#104](https://github.com/he18718143986-design/IDE/pull/104)/`06661be`）；交付与三项挂账见 [`#task-l.17c`](#task-l.17c)；**仍不宣称**端到端闭环。
+* **关键文件**：`src/components/project/CompareView.tsx`、`src/lib/journey/playtest-guidance.ts`、`src/lib/journey/playtest-evidence.ts`、`src/lib/daemon-api.ts`、`daemon/playtest/evidence.ts`、`daemon/release/active-live.ts`、`daemon/supervisor/preview/playtest-guard.ts`、`daemon/server.ts`、`bin/stagent.ts`、`tests/unit/compare-view.test.ts`、`tests/unit/playtest-guidance.test.ts`、`tests/unit/playtest-evidence.test.ts`、`tests/unit/playtest-reset.test.ts`。
+
+---
+
+### 3.4g 受控 Worker 派工接线与默认适配器注册（W.6 · 主序收官后首张债卡）
+
+<a id="task-w.6"></a>
+
+#### 【Task W.6】AdapterRegistry 接线与 Claude Code Worker 派工 `[COMPLETED]`
+* **任务编号**：`TASK-W.6`
+* **状态与证据**：`[COMPLETED]`（[#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`，squash merge；分支阶段 HEAD `638129d`，含合入前审阅修复）。ledger **DLV-3** 台账债销项；**M5 主序收官后首张落完的债卡**。
+* **对应规格**：架构 / W.1 适配器抽象；ledger **DLV-3** [`../ledger/README.md`](../ledger/README.md)；`daemon/worker/worker-adapter.interface.ts` 能力契约
+* **前置依赖**：`TASK-W.1`（COMPLETED）、`TASK-W.5a`（COMPLETED · Claude Code 适配器已有）
+* **交付内容**：
+  1. **默认注册表 `daemon/worker/default-worker-registry.ts`**：`createDefaultWorkerRegistry()` 在 daemon 构造 `ContractOrchestrator` 时经 `DaemonServerOptions.workerRegistry` 注入（缺省则构造默认表，每次返回独立实例不做全局单例）。内置 Managed AI（`AiWorker` 封装）以 `GATEWAY_ENFORCED` 注册并挂 `managedAiDispatchFactory`；**双 id** `stagent.builtin.ai-sdk`（合同默认 `DEFAULT_WORKER_SPEC.adapter_id`）/ `stagent.managed-ai.v0`（`MANAGED_AI_CAPABILITY` 声明 id）指向同一工厂，化解两者不一致且**不改存量合同默认值**。
+  2. **Claude Code worker 登记口径（红线）**：以 `stagent.claude-code.worker.v0` **仅登记为 `UNCONTROLLED_EXTERNAL`、不挂派工工厂**。能力声明如实写 `filesystem_permissions: DIRECT_UNCONTROLLED` / `command_permissions: UNRESTRICTED_SHELL` / `tool_interception_supported: false` + 三条 `known_limitations`（外部 CLI 不受编排器 ScopedWorktreeGateway 写范围约束、工具调用经 MCP HTTP 端点无法逐次拦截、产物不得作为受控/可合并证据）。**双保险**：受控门禁先拒（非 `GATEWAY_ENFORCED`） + 无工厂兜底。走 W.8 MCP 端点外部 CLI 路径，本就不经 `runWorker`，未接入编排器受控派工。
+  3. **派工接线 `daemon/pipeline/orchestrator.ts`**：单段与两段式两处 `new AiWorker(...)` 全部改为 `requireControlledDispatch(registry, worker_spec.adapter_id)` → 由工厂产出 `run(signal)` 执行器。`WorkerDispatchContext` 的 `gateway` / `costMonitor` / `modelClient` / `repoRoot` 由编排器在 `buildRuntime()` 之后装配，适配器工厂**无自造 Gateway、绕过写范围的机会**（Gateway 语义在类型层面封死）；`checksExtras` 保留两段式「你会被这样检查」注入面。`OrchestratorOptions.registry` 与 `runWorker` 单次 `options.registry` 双通道可注入。
+  4. **门禁与错误码 `daemon/worker/worker-dispatch.ts` + `adapter-registry.ts`**：`requireControlledDispatch()` 复用 `registry.requireControlled()` 判定，把 `AdapterRegistrationError.rejection` 映射为带 `.code` 的 `WorkerDispatchError`——未注册 `E_ADAPTER_NOT_REGISTERED` / 非受控（含 `UNCONTROLLED_EXTERNAL`）`E_ADAPTER_NOT_CONTROLLED` / 已注册但未挂工厂 `E_ADAPTER_NO_DISPATCH_FACTORY`。`.code` 经 `daemon/server.ts::sendActionError` 透出 HTTP（`.rejection` 字段不透的坑已被接住）。**任何分支都不返回裸执行兜底，绝不静默降级到无网关执行**。`registerDispatchFactory` 要求 adapter 先注册，防「幽灵 id 挂工厂」。
+  5. **能力载体 `run()` 语义（合前审阅修复）**：`capabilityAdapter` 与 `claudeCodeWorkerRegistration` 的 `run()` 原返回 `{changes:[]}`「假成功」，合入前按 Tina 2026-11-02 审阅意见改为**显式 `throw new Error("capability carrier is not executable; dispatch via registry dispatchFactory")`**——任何误走 `registry.get(id).run(input)` 的路径显式失败而非静默空转（W.8「假成功返回」同款隐患换了位置）。附测试断言三个默认注册 id 的 `adapter.run()` 均 `rejects`。
+  6. **配置面（最小可用）**：合同创建表单 `src/routes/index.tsx`「高级」折叠区可选 `worker_spec.adapter_id`（留空用默认 `stagent.builtin.ai-sdk`）；复用既有 `workerSpecSchema.shape` 五键，**未新增 schema 字段**（`contract-schema-v12.test.ts` 锁定键集）。新增 `GET /api/adapters` 只读诊断端点，列出已注册适配器的 `adapter_id` / `control_mode` / `kind` / `dispatchable`（`control_mode === GATEWAY_ENFORCED` 派生），沿用既有 `isAuthorized` 鉴权、不新增豁免。校验后置到派工门禁（「UI 可糙」卡面允许）。
+* **不变声明**：Gateway 写范围 / Demo Origin / 鉴权**不变**；`UNCONTROLLED_EXTERNAL` 仍不得作为受控执行/可合并证据；右栏 `role:"partner"` 只读白名单（J.1）**不动**；未做 W.5b/c 人工实测、未做多 Agent 并行 DAG。
+* **验收（PASS）**：`tests/unit/adapter-registry-dispatch.test.ts` **14 passed**——
+  - **OCP 正例**：真 repo + 真 `ContractOrchestrator` + `approve()` + 注入含 `FakeControlledWorkerAdapter` 的 registry；合同 `adapter_id` 指向 Fake 时 `factoryCalls===1` / `workerRuns===1`、`result.changes` 来自 Fake 执行器，证明「Fake 只能经 Registry 到达派工」而非「工厂被调用了」。
+  - **OCP 静态边界（C 组）**：直接读 `orchestrator.ts` 源码断言无 `new AiWorker(`、无 `import { AiWorker }` 值导入、无 `FakeControlledWorkerAdapter` / `ClaudeCodeAdapter`，派工必经 `requireControlledDispatch`。
+  - **负例**：未注册 `adapter_id` → `E_ADAPTER_NOT_REGISTERED`；指向 `UNCONTROLLED_EXTERNAL` 适配器 → `E_ADAPTER_NOT_CONTROLLED`；已注册受控但未挂工厂 → `E_ADAPTER_NO_DISPATCH_FACTORY`。
+  - 默认注册表：双内置 id 受控可解析且挂工厂；Claude Code worker 登记非受控、派工被明确拒绝；能力载体 `run()` 显式抛错；每次调用返回独立实例。
+  - 集成回归：`design-step` / `two-phase-construction` / `ai-worker` / `index-route` / `mcp-http-endpoint` 5 文件 37 passed；`worker-adapter.test.ts` F 组（扫 `daemon/worker/*.ts` 零 `child_process`/原生执行）通过。`npx tsc --noEmit` 全仓 57 个 `error TS` 与 clean `main` 基线一致，改动文件 0 报错（`orchestrator.ts(1459)` 为 clean 基线 `(1431)` 同一处 `runDesignStep` `exactOptionalPropertyTypes` 旧债，因前置 import/字段插入行号下移 28 行）。全量 unit 5 个失败（cli-host-claude-code / evidence-schema-v11 / spawn-whitelist / supervisor-zero-tool-lint / test-port-map 28 对既有端口区间重叠）经 clean-tree stash 对比确认 **pre-existing**，与本卡无关。
+* **残余边界 / 后续挂账（P-113 归拢，共 2 条）**：
+  1. **能力载体 `run()` 语义（合前已修 · 记为设计决策）**：注册用能力载体不可执行，`run()` 显式 `throw`；派工**只**经 Registry 登记的 dispatchFactory 产出执行器。本条已在合入前修复并加测试断言，此处登记为设计决策以防回潮，**非未修挂账**。
+  2. **`GET /api/adapters` 未做端到端 HTTP 验证**：为避免新增测试端口登记段、加剧既有 `test-port-map.test.ts` 端口区间重叠债，本端点仅验证 `ContractOrchestrator.listRegisteredAdapters()` 逻辑，未起真 daemon 做 HTTP 401/200 端到端覆盖。后续若解掉端口重叠债可补。
+  > **口径说明（非挂账）**：卡面「验收」原写「至少一条非 OpenAI 受控适配器可被派工测试命中 / Claude Code worker 可受控派工」；实现按红线落地为「内置 Managed AI 受控派工 + Claude Code worker 仅登记 `UNCONTROLLED_EXTERNAL`」，即 **Claude Code worker 未作为受控执行器进入派工路径**。此口径经 Tina 2026-11-02 审阅明确认可（「把它包装成受控要不如实」），OCP 正例以 Fake 受控适配器达成「非默认适配器经 Registry 派工命中」的验收本质。
+* **未宣称 / 未接线（不宣称端到端闭环）**：Claude Code worker 仅登记在案、未接入编排器受控派工（走 W.8 MCP 端点外部 CLI 路径）；`GET /api/adapters` 未做端到端 HTTP 验证；配置面为「UI 可糙」最小可用（无下拉联动 / 设置页持久化）；`TASK-W.7` 自动探测升格与 `W.5b/c` 实测均未开工。**本卡交付注册表 + 派工门禁 + 错误码 + OCP 验收测试，端到端产品接线属后续。**
+* **关键文件**：`daemon/worker/default-worker-registry.ts`（新）、`daemon/worker/worker-dispatch.ts`（新）、`daemon/worker/adapter-registry.ts`、`daemon/pipeline/orchestrator.ts`、`daemon/server.ts`、`src/routes/index.tsx`、`tests/unit/adapter-registry-dispatch.test.ts`（新）。
+
+---
+
+### 3.4h 双枚举 `SANDBOX_ENFORCED` 与 `workerSpec` 目标字段（W.5c-i · 容器隔离第一张子卡）
+
+<a id="task-w.5c-i"></a>
+
+#### 【Task W.5c-i】双枚举 `SANDBOX_ENFORCED` 与 `workerSpec` 目标字段 `[COMPLETED]`
+* **任务编号**：`TASK-W.5c-i`
+* **状态与证据**：`[COMPLETED]`（[#81](https://github.com/he18718143986-design/IDE/pull/81)/`c3e75cc`，squash merge；分支阶段 HEAD `22ed653`，本地两提交 `1a93fb9` 主体 + `22ed653` 下游收窄收尾）。母卡 `TASK-W.5c` 已于 P-118 经授权拆为 `i`/`ii`/`iii`，本卡为**第一张子卡**（纯 Schema / 类型机械层，不依赖容器运行时）。
+* **对应规格**：[`system-architecture.md`](./system-architecture.md) §9.1（`worker_spec` 目标模型：三值 `control_mode` + `billing_model` + `verified_on`，标题标 `[待实现 - 目标数据模型]`）、§4.2.3 P-17；ADR-0001（底层强隔离与防越权控制面不变）、ADR-0003；[`task-card-standard.md`](./task-card-standard.md) R-1～R-12；母卡 `TASK-W.5c` 拆分规划（P-118）
+* **前置依赖**：`TASK-W.6`（COMPLETED · #74/`b5d8c53`，`requireControlledDispatch` 派工门禁已就位，窗口期拒绝语义挂接在此）
+* **交付内容**：
+  1. **双枚举同步扩 `SANDBOX_ENFORCED`（漏改单边即 FAIL）**：`daemon/worker/worker-adapter.interface.ts::AdapterControlMode` 与 `src/lib/contract.schema.ts::workerControlModeSchema` **两处**同改，均为三值 `GATEWAY_ENFORCED` / `SANDBOX_ENFORCED` / `UNCONTROLLED_EXTERNAL`。能力声明校验 `validateAdapterCapability()` 对 `SANDBOX_ENFORCED` 走**受控严格模式**（与 `GATEWAY_ENFORCED` 同），该档位是**更严**而非更宽。
+  2. **`workerSpecSchema` 增 §9.1 两可选目标字段**（缺省不写）：`billing_model?`（`PER_TOKEN` / `SUBSCRIPTION` / `QUOTA`）与 `verified_on?`（`{ cli_version, verified_at }`）。既有四必需键语义不变，`DEFAULT_WORKER_SPEC` 仍为 `GATEWAY_ENFORCED`。
+  3. **窗口期语义写死（Tina 2026-11-02 定）：注册接受、派工显式拒绝**。`requireControlledDispatch()` 在调 `registry.requireControlled()` **之前**直接查 `registry.get(adapterId)?.control_mode === "SANDBOX_ENFORCED"`，抛**新增**错误码 `E_ADAPTER_SANDBOX_LOCKED`，消息注明「待 `W.5c-ii` `container-host` 落地解锁」；**即便已挂派工工厂也拒绝**。刻意**不复用** `E_ADAPTER_NOT_CONTROLLED`（语义为「非受控适配器」，与本档位「受控档位待解锁」不同）。`GATEWAY_ENFORCED` 既有派工语义与 `E_ADAPTER_NOT_REGISTERED` / `E_ADAPTER_NOT_CONTROLLED` / `E_ADAPTER_NO_DISPATCH_FACTORY` 三码不变，不静默降级到无网关执行。
+  4. **下游档位收窄（扩枚举的必然连带，`22ed653`）**：三值档位流入三处二值赋值点（`orchestrator.ts:1177` / `:1827` / `:2224`）与两处 UI 展示类型（`src/routes/index.tsx`），tsc 报 5 处 TS2322。新增 `toRuntimeControlMode()` 作为**唯一收窄口径**：`SANDBOX_ENFORCED` 在写入 Evidence `worker_control_mode` 与装配 `RuntimeInterceptor` 快照时按 `UNCONTROLLED_EXTERNAL` 记档——窗口期该档位本就不可派工（路径不可达），即便有人绕开门禁写入，证据也不会出现「沙箱档受控」的假记录。`src/components/workspace-types.ts::WorkerControl`（**纯展示类型**）同步为三值以保证工作台显示真实档位，不涉及门禁判定、不改右栏 `role:"partner"` 只读白名单（J.1）。
+* **不变声明**：鉴权 / Demo Origin / 点亮三证 / 网关写范围**不变**（ADR-0001 纪律）。`SANDBOX_ENFORCED` **不放宽** `GATEWAY_ENFORCED` 既有门禁；`UNCONTROLLED_EXTERNAL` 仍不得作为受控 / 可合并证据；窗口期派工拒绝**只收窄、不扩张**可执行面。
+* **验收（PASS）**：新建 `tests/unit/worker-spec-schema.test.ts` **13 passed**——
+  - `SE-01`：两处枚举均含 `SANDBOX_ENFORCED`；**读 `worker-adapter.interface.ts` 源码做正则断言**，只改 `contract.schema.ts` 单边在源码层面即 FAIL，不依赖类型系统间接报错。
+  - `SE-02`：`workerSpecSchema` 接受 `billing_model` / `verified_on` 且缺省不写时解析通过；`DEFAULT_WORKER_SPEC` 仍 `GATEWAY_ENFORCED`（明确断言未被改成 `SANDBOX_ENFORCED`）。
+  - `SE-03`：注册 `SANDBOX_ENFORCED` 成功（登记面接受），**挂了派工工厂后** `requireControlledDispatch()` 仍抛 `E_ADAPTER_SANDBOX_LOCKED`，消息含 `W.5c-ii` / `container-host`；`GATEWAY_ENFORCED` 派工正例仍通过（不回归）。
+  - `SE-04`：五键锁定断言更新后既有四必需键语义不变。
+  - `SE-05`：`toRuntimeControlMode()` 收窄口径（`SANDBOX_ENFORCED` → `UNCONTROLLED_EXTERNAL`）。
+  - 同步更新 `tests/unit/contract-schema-v12.test.ts`：`:199` 五键 shape 断言（含两可选键）与 `:220` 二值枚举断言（卡正文未列后者，但扩三值后必然 FAIL，属必然配套）。
+  - `npx tsc --noEmit` 全仓 **57 个 `error TS` 与 clean `main` 基线一致**（收窄后 `SANDBOX_ENFORCED` 相关 0 报错）；全量 `vitest run` **2555 passed / 10 failed**，10 项失败逐条与 baseline 复跑一致（`cli-host-claude-code` 缺 MCP endpoint 属 TASK-W.8 行为、`tmp-helper` ×3 为并发下磁盘探测 flaky 且单跑全绿、其余为既有静态扫描/端口区间债），**本卡零新增失败**。
+* **残余边界 / 后续挂账（P-119 归拢，共 4 条）**：
+  1. **`evidence.schema.ts` 的 `worker_control_mode` 仍为二值**（有意未扩）：冻结的证据模型不在本卡范围，扩列会污染历史证据的语义稳定性。**`W.5c-ii` 落地时若 `SANDBOX_ENFORCED` 要成为真受控证据档，需另评证据模型版本语义**（本卡以收窄替代扩列，见「交付内容」第 4 条）。
+  2. **下游收窄登记为设计决策（防回潮）**：`toRuntimeControlMode()` 的收窄是**窗口期**语义；`W.5c-ii` 解锁后应改为按容器宿主可用性判定，而非继续按 `UNCONTROLLED_EXTERNAL` 记档。
+  3. **五键测试文件名的指令误传已按代码事实修正**：施工指令写「`tests/unit/worker-mcp-tools.test.ts` 五键锁定测试」；代码事实为该文件是 **TASK-W.2「五大受控 MCP 工具」**测试（`WORKER_MCP_TOOLS`），对 `worker_spec` / `control_mode` / `adapter_id` **零断言**；真正的五键锁定断言在 `tests/unit/contract-schema-v12.test.ts:199`（与卡正文一致）。按代码事实更新后者，前者无需改动。
+  4. **容器运行时未实现**：`runInSandbox` 归 `W.5c-ii`；`verified_on` 实测值与 OpenHands 适配器归 `W.5c-iii`。
+* **P-121 回写（2026-11-02 · 现行口径）**：上述挂账 1 / 挂账 2 已于 `TASK-W.5c-ii`（[#85](https://github.com/he18718143986-design/IDE/pull/85)/`648be31`）**兑现**——`evidence.schema.ts::worker_control_mode` 由二值扩三值、`toRuntimeControlMode()` 窗口期收窄已移除、Evidence 与 `RuntimeInterceptor` 如实记三值；挂账 4 的「容器运行时未实现」亦**部分消解**（围栏逻辑与 `ContainerHostPort` 注入端口就位，但 `runInSandbox` 尚未接入执行面）。原文保留作溯源，现行口径见 §3.4j。
+* **未宣称 / 未接线（不宣称端到端闭环）**：`SANDBOX_ENFORCED` 今日仍是「**有档位、无运行时**」——可登记、可写进合同、派工被显式拒绝，但没有任何容器隔离执行能力。本卡交付枚举 / schema / 门禁 / 测试，**容器隔离执行面属 `W.5c-ii`**。（P-121 注：本句为 `W.5c-i` 归档当日状态；`W.5c-ii` 落地后已变为「有门禁、有围栏逻辑、无真实容器执行」，见 §3.4j。）
+* **关键文件**：`daemon/worker/worker-adapter.interface.ts`、`src/lib/contract.schema.ts`、`daemon/worker/worker-dispatch.ts`、`daemon/pipeline/orchestrator.ts`、`src/components/workspace-types.ts`、`tests/unit/worker-spec-schema.test.ts`（新）、`tests/unit/contract-schema-v12.test.ts`。
+
+---
+
+### 3.4i `check playtest` 接入北极星合同验收档（C.23 · ruling 3 兑现）
+
+<a id="task-c.23"></a>
+
+#### 【Task C.23】北极星合同自动附加 `check playtest` 验收命令 `[COMPLETED]`
+* **任务编号**：`TASK-C.23`
+* **状态与证据**：`[COMPLETED]`（[#82](https://github.com/he18718143986-design/IDE/pull/82)/`a5223fb`，squash merge；分支 HEAD `1d84f52`，A 卡合入后 rebase 为 `6f819dd`）。兑现 **ruling 3**（2026-11-02 · P-114 落盘裁决）。
+* **对应规格**：ruling 3 裁决（P-114，原文见 [`development-tasks-changelog.md`](./development-tasks-changelog.md) P-114、ledger [`../ledger/consistency-audit.md`](../ledger/consistency-audit.md) P-114）；[`../scheme.md`](../scheme.md) dec-12（北极星「一模一样」= 用户对话试玩 + 结构化证据桩，AI 不代判、禁像素/DOM 机器比对）、REJ-009；本文件 §3.4f（L.17b 交付的 `check playtest` 判定源）
+* **前置依赖**：`TASK-L.17b`（COMPLETED · #72/`d26def6`，`check playtest` 命令与判定源已交付）
+* **交付内容（双装配点，只改单边即 FAIL）**：以**单一 helper** 保证两条路径同口径——
+  1. `src/lib/contract.schema.ts`：新增唯一装配口径 `PLAYTEST_ALIAS` / `buildPlaytestCommand()` / `withPlaytestCommand()`；`createContractDraft()` 在 `:805` 调用。
+  2. `src/lib/journey/confirm-scheme-contract.ts::buildConfirmContractFromScopePlan()` 在 `:119` 调用同一 helper——该路径以 `verification_spec` **重新覆盖** draft 的命令集合，只在 `createContractDraft` 单边接线会被覆盖而失效。
+  - 装配值（ruling 3 唯一口径）：`{ alias:"playtest", executable:"stagent", args:["check","playtest",<contract_id>] }`。
+  - **北极星判据** = `references[]` 非空（与 `playtest-guard.ts` 判定源判据一致，只读复用）；**非北极星不附加**，并**剔除**调用方自带的 `playtest` 项（不得绕开判据手动挂验收命令，卡正文未写、属语义必然的加固）；**幂等**（已存在同 `alias` 命令时不重复追加，结果恰好 1 条）；**防伪造**（`args` 内 `contract_id` 一律取服务端装配值，不接受调用方传入）。
+* **不变声明**：鉴权 / Demo Origin / 点亮三证 / 网关写范围**不变**（ADR-0001 纪律）。不改 dec-12 / dec-13 判定口径、**不复活 REJ-009**（不引入像素/DOM 机器比对）；判定源 `daemon/supervisor/preview/playtest-guard.ts` **完全未动**；本卡只增验收命令装配，不放宽任何既有门禁。
+* **验收（PASS）**：新建 `tests/unit/contract-playtest-wiring.test.ts` **10 passed**，`PW-01`/`PW-02`/`PW-03` 在**两条装配路径各验一遍**——
+  - `PW-01`：`references[]` 非空 → `commands` 含 `playtest`，`args[2]` 等于本合同 `contract_id`；既有默认 `test` 命令保留、`playtest` 追加在后。
+  - `PW-02`：无 `references` / `references: []` → 不含任何 `alias:"playtest"` 项，默认 `test` 命令不受影响；非北极星合同即便调用方自带 `playtest` 也被剔除。
+  - `PW-03`：调用方 `commands` 已含 `playtest`（`args` 传伪造 `contract_forged`）→ 结果恰好 1 条且 `args[2]` 被服务端 `contract_id` 覆盖（显式断言 `!== "contract_forged"`）；重复执行装配仍恰好 1 条。
+  - 相关回归 7 文件 **97 passed**（`contract-schema-references` / `confirm-scheme-atomic` / `j18b-scheme-binding` / `test-obligations` / `contract-schema-v12` / `contract-schema-v13` / `task-c22-confirm-wiring`）。`npx tsc --noEmit` **57 = baseline**；全量 `vitest run` **2555 passed / 8 failed**，失败项逐条为 baseline 既有或并发 flaky（`demo-service` 单独跑 19/19 全绿属端口类 flaky），**本卡零新增失败**。
+* **残余边界 / 后续挂账（P-119 归拢，共 3 条）**：
+  1. **`scopePlanToContractScope()` 未按卡正文点名改动**：该函数**不接收** `references`（`references` 来自 `scheme`，在确认路径 `:128-130` 才投影进合同），故接线落在确认路径的**覆盖装配处**——即卡正文所指「覆盖式装配路径同步接线」。若要求落到该函数内部，需先为其加 `references` 入参（改动面更大）。
+  2. **非北极星剔除调用方自带 `playtest`**：卡正文只写「不附加」，实现上进一步剔除已存在项以防绕开判据（**收紧**）。若调用方确有合法用途需保留，须另行裁决。
+  3. **不宣称端到端闭环**：`check playtest` 判定源由 L.17b 交付、本卡只做装配接线；`CompareView` UI 路由挂载与用户原话采集 UI 仍属后续（L.17b 已声明未接线）。 **（P-132）** 该后续曾立为 [`TASK-L.17c`](./development-tasks-active.md#task-l.17c) `[NEW_TASK]`（未开工）。 **（P-133）** `TASK-L.17c` → `[COMPLETED]`（[#104](https://github.com/he18718143986-design/IDE/pull/104)/`06661be`）；UI 已挂，三项挂账与真机执行债仍挂，见 [`#task-l.17c`](#task-l.17c)；**仍不宣称**端到端闭环。
+* **未宣称 / 未接线（不宣称端到端闭环）**：本卡交付「合同装配时自动带验收命令」，**未**验证真实 `check playtest` 在门禁链路上的端到端执行；装配出的命令是否真被执行、执行结果如何回写，属门禁执行链路（后续）。
+* **关键文件**：`src/lib/contract.schema.ts`、`src/lib/journey/confirm-scheme-contract.ts`、`tests/unit/contract-playtest-wiring.test.ts`（新）；只读复用 `bin/stagent.ts`、`daemon/supervisor/preview/playtest-guard.ts`。
+
+---
+
+### 3.4j 容器运行时 `runInSandbox` 与派工门禁按宿主可用性解锁（W.5c-ii · 容器隔离第二张子卡）
+
+<a id="task-w.5c-ii"></a>
+
+#### 【Task W.5c-ii】`daemon/worker/sandbox/container-host.ts` 容器运行时 `runInSandbox` `[COMPLETED]`
+* **任务编号**：`TASK-W.5c-ii`
+* **状态与证据**：`[COMPLETED]`（[#85](https://github.com/he18718143986-design/IDE/pull/85)/`648be31`，squash merge；分支 `feat/w5cii-container-host`，本地两提交 `5be9569` 主体 + `e3345b9` `workerControlModeSchema` 注释与已解锁语义对齐）。母卡 `TASK-W.5c` 已于 P-118 经授权拆为 `i`/`ii`/`iii`，本卡为**第二张子卡**（容器运行时逻辑层，mock / stub 可测，**不依赖真实容器环境**）。
+* **对应规格**：[`system-architecture.md`](./system-architecture.md) §4.2.3 P-17（「沙箱」仅用于 OS 级命名空间 / cgroups / MicroVM / 专用容器隔离，**普通本地子进程严禁自称沙箱**）、§2.7 Git Worktree Engine (Isolation Guard)、§9.1；[`../adr/0001-target-user-positioning.md`](../adr/0001-target-user-positioning.md) **ADR-0001**、[`../adr/0003-worktree-capability-boundary.md`](../adr/0003-worktree-capability-boundary.md) **ADR-0003**；[`task-card-standard.md`](./task-card-standard.md) R-1～R-12；母卡 `TASK-W.5c` 范围第 3/4/5 条
+* **前置依赖**：`TASK-W.5c-i`（COMPLETED · #81/`c3e75cc`，`SANDBOX_ENFORCED` 枚举与 `workerSpecSchema` 目标字段复用）；`TASK-W.6`（COMPLETED · #74/`b5d8c53`，派工门禁语义就位）
+* **交付内容**：
+  1. **新建 `daemon/worker/sandbox/container-host.ts`**（222 行）：`ContainerHostPort` 注入端口（`isAvailable(): boolean` **同步**判定以保持派工门禁同步语义 + `run(input, signal)` 执行）、`SandboxRunInput`（`worktreeRoot` / `cwd?` / `argv` / `mounts?` / `networkPolicy?` / `allowedTargets?` / `timeoutMs?` / `env?`）、`SandboxRunOutcome`（`exitCode` / `stdout` / `stderr` / `via: "exit" | "timeout" | "SIGKILL" | "rejected"` / `rejection?` / `durationMs`）、唯一执行入口 `runInSandbox(host, input, signal?)`，以及三个**纯逻辑**围栏函数 `assertMountAllowed` / `assertNetworkAllowed` / `validateSandboxInput`（无容器环境亦可确定性断言）。
+  2. **挂载围栏（失败关闭，不降级到「照常挂载」）**：字面 `..` → `MOUNT_PATH_TRAVERSAL`（先于归一化判定，保住穿越语义）；归一化后越出任务 Worktree → `MOUNT_OUTSIDE_WORKTREE`；路径段命中保护区（`.git` / `.stagent`）→ `MOUNT_PROTECTED_PATH`；`cwd` 越出 Worktree（绝对 / 相对两种写法均归一后判定）→ `CWD_OUTSIDE_WORKTREE`；空 `argv` → `EMPTY_ARGV`。全部抛 `SandboxRejectedError`（带 `.code`）。
+  3. **网络围栏**：`DENY` 携带任何出口目标 → `NETWORK_TARGET_NOT_ALLOWED`；`EXPLICIT_TARGETS` 未给白名单（缺省 / 空数组）→ 同码；`USER_APPROVED` 与 `DENY`（无目标）放行。缺省策略按 `DENY`。
+  4. **派工门禁切换 `daemon/worker/worker-dispatch.ts::requireControlledDispatch(registry, adapterId, options?)`**：`W.5c-i` 的**窗口期「永远拒绝」语义解除**，改按**容器宿主可用性**判定——已注册 + `SANDBOX_ENFORCED` → 未注入 `ContainerHostPort` 或 `isAvailable()` 为 false 时抛 `E_ADAPTER_SANDBOX_LOCKED`；宿主可用则放行。**关键实现约束**：沙箱档放行后**不再调用** `registry.requireControlled()`（该方法只放行 `GATEWAY_ENFORCED`，沙箱档过它会被误判为 `E_ADAPTER_NOT_CONTROLLED`），故 `SANDBOX_ENFORCED` 分支**自足**。未注册 → `E_ADAPTER_NOT_REGISTERED`、`UNCONTROLLED_EXTERNAL` → `E_ADAPTER_NOT_CONTROLLED` 两个分支显式化（**即便注入可用宿主，非受控档位也不得借沙箱宿主洗白为受控执行**）；`GATEWAY_ENFORCED` 仍走 `registry.requireControlled()`，既有三码语义不变、不静默降级到无网关执行。
+  5. **三值如实记档（`W.5c-i` 挂账 1/2 的兑现与裁决）**：移除 `toRuntimeControlMode()` 收窄（W.5c-i 窗口期产物，`5be9569` 删除该导出），`src/lib/evidence.schema.ts::worker_control_mode`、`daemon/worker/runtime-interceptor.ts::AdapterSnapshot.control_mode` / `getControlMode()`、`orchestrator.ts` 三处赋值（`:1184` 证据写入 / `:1849` 拦截器装配 / `:2253` 证据装配）**如实记三值**。原收窄会让「受控派工成功」产出 `UNCONTROLLED_EXTERNAL` 证据 → 产物不可合并，属自相矛盾。此裁决经 Tina 确认（**「本卡同步扩三值」**）。
+  6. **`OrchestratorOptions.containerHost` + 单次派工覆盖**：构造器持有宿主端口，`runWorker` / `runWorkerInternal` 的 `options.containerHost` 可单次覆盖，`requireControlledDispatch(..., { containerHost })` 透传；未注入即拒绝派工（不静默降级）。真实宿主（Docker / Podman）绑定归 `W.5c-iii`。
+* **证据面裁决注记（记实不记名 · 2026-11-02 · 经 Tina 裁决）**：`worker_control_mode` 记的是**实际执行面**，不是合同声明档位——**容器路径未实际执行时一律记 `UNCONTROLLED_EXTERNAL`**（沿用 `TASK-W.4` 运行时降级「记实」惯例，`:1184` 的 `interceptorBlocked → UNCONTROLLED_EXTERNAL` 即同一口径），不得因「合同写了 `SANDBOX_ENFORCED` 且门禁放行」就记成受控档。**与现码的差距（显式登记，不静默）**：本卡只做到「门禁按宿主可用性放行 + 档位如实记三值 + 拦截器降级仍走 `UNCONTROLLED_EXTERNAL`」，系统内**尚无**「本次执行是否真经 `runInSandbox`」的信号（`runInSandbox` 生产代码零调用，见挂账 1），故该裁决在**执行面接线前不可强制执行**；强制执行随 `W.5c-iii` 绑定真实宿主一并落地。
+* **不变声明**：鉴权 / Demo Origin / 点亮三证 / 网关写范围**不变**（ADR-0001 纪律）。`SANDBOX_ENFORCED` 为新增**更严**档位，**不放宽** `GATEWAY_ENFORCED` 既有门禁；`UNCONTROLLED_EXTERNAL` 仍不得作为受控 / 可合并证据；`runInSandbox` 自身**不启动任何进程**，故**不声称**回收进程树（见挂账 2/3 与「未宣称」）。
+* **验收（PASS）**：新建 `tests/unit/container-host.test.ts` **18 passed**（全 mock 宿主，不要求本机容器运行时）——
+  - `CH-01`（4 例）：Worktree 内路径放行；诱导挂载宿主根 / `.git` / `.stagent` → `SandboxRejectedError`。
+  - `CH-02`（4 例 + 空 argv 1 例）：字面 `..` 得 `MOUNT_PATH_TRAVERSAL`、`path.join` 归一化后的等价逃逸得 `MOUNT_OUTSIDE_WORKTREE`（两条分支分别覆盖，避免「归一化吃掉穿越语义」漏测）；`cwd` 逃出 → `CWD_OUTSIDE_WORKTREE`；`DENY` 带目标与 `EXPLICIT_TARGETS` 空白名单 → `NETWORK_TARGET_NOT_ALLOWED`。
+  - `CH-03`（3 例）：宿主 `timeout` 终止态原样透出；`signal` 启动前已取消 → 返回 `SIGKILL` 且**不进入宿主执行**（`host.calls` 长度 0，无孤儿）；宿主 `SIGKILL` 终止态透出。
+  - `CH-04`（7 例）：mock 宿主跑通并校验交给宿主的 `worktreeRoot` 已归一化；**未注入宿主 → `E_ADAPTER_SANDBOX_LOCKED`**（消息含 `ContainerHostPort`）；`isAvailable() === false` → 同码；`isAvailable() === true` → 返回注册的工厂（窗口期「永远拒绝」确已解除）；未注册 → `E_ADAPTER_NOT_REGISTERED`；`UNCONTROLLED_EXTERNAL` + 可用宿主 → 仍 `E_ADAPTER_NOT_CONTROLLED`（不得借宿主洗白）；`GATEWAY_ENFORCED` 不回归。
+  - 配套：`tests/unit/worker-spec-schema.test.ts` **14 passed**（`SE-03` 由「窗口期永远拒绝」改为「未注入宿主即拒绝」、消息断言改 `ContainerHostPort`；`SE-05` 由「收窄断言」改为「三值如实记档 + `evidence.schema.ts` 源码正则断言」）。`tests/unit/contract-schema-v12.test.ts` 等 3 文件合计 **52 passed**。
+  - `npx tsc --noEmit` 全仓 **57 个 `error TS` 与 clean `main` 基线一致**（收窄移除 + 三值扩列后新增 3 处 TS 错误已在本卡内修净：`workerControlMode?` 扩三值、`runWorker` / `runWorkerInternal` options 补 `containerHost`）。全量 `vitest run` **2585 passed / 10 failed / 10 skipped（278 文件）**；在 `64b737f` 独立 worktree 复跑同一批 9 个失败文件得 7 failed + 1 suite failed（`cli-host-claude-code`），与分支逐条一致，分支多出的仅 `tmp-helper` ×3（并发磁盘探测 flaky，单跑 8/8 全绿），**本卡零新增失败**。`prettier` / `eslint` 新增与改动行全合规（仅余 2 处基线遗留：`worker-dispatch.ts:31`、`worker-spec-schema.test.ts:128`，均 `W.5c-i` 引入、为保持 diff 聚焦未顺手改）。
+* **残余边界 / 后续挂账（P-121 归拢，共 3 条 + 1 条兼容性注记 + 1 条指令误传校正）**：
+  1. **`ContainerHostPort` 是「给工厂用」的注入端口，执行面无法外部强制走 `runInSandbox`**：`runInSandbox` 在**生产代码中零调用**（仅本模块定义 + 测试调用），门禁只验 `isAvailable()` 这一布尔，**不验本次执行是否真进了容器**——`SANDBOX_ENFORCED` 派工仍可能绕过容器走本地执行。→ **`W.5c-iii` 的 FAIL 判据应含「`SANDBOX_ENFORCED` 派工未走 `runInSandbox` → FAIL」**；`W.7` 自助注册的探测包可将其作为验证项（探测在沙箱执行，天然覆盖此路径）。
+  2. **`runInSandbox` 内 `durationMs ?? Date.now() - started` 属死代码**：`SandboxRunOutcome.durationMs` 为**必填** `number`（`container-host.ts:71`），`??` 分支永不命中。不构成缺陷（保留它与宿主契约「必填」一致、且对 JS 调用方宽容），本轮**未静默清理**，登记备改。
+  3. **取消前置返回 `via: "SIGKILL"` 语义偏移**：`signal` 在启动前已取消时返回 `via: "SIGKILL"` + `stderr: "aborted before start"`，而 `abort` ≠ 实际发送 `SIGKILL`。**枚举内可接受**（`SandboxRunOutcome.via` 未设「未启动」值；新增枚举值会破坏宿主契约），登记待 `W.5c-iii` 绑定真实宿主时按「未启动 / 已杀」细分。
+  4. **`evidence.schema.ts` 扩三值的跨版本可读性（兼容性注记）**：`worker_control_mode` 由二值扩为三值后，**旧读者**（按 v1.1 二值集合做白名单校验的外部消费方 / 归档回放工具）读到 `SANDBOX_ENFORCED` 会判为非法值。zod 侧为**放宽**（`enum` 增项）、既有二值证据不受影响；但历史证据与外部消费方**须同步升级枚举**，否则跨版本回放报校验失败。本卡不改证据模型版本号，登记为兼容性注意项（与 W.5c-i 挂账 1「二值有意未扩」互为续：扩列时机与版本语义由本卡兑现）。
+  5. **施工指令误传的错误码已按代码事实处理**：施工清单写「`E_ADAPTER_SANDBOX_AVAILABLE` / `E_ADAPTER_SANDBOX_FAILED` 路径」；代码事实为 `daemon/worker/worker-dispatch.ts` **仅有 `E_ADAPTER_SANDBOX_LOCKED` 一个**（连同既有 `E_ADAPTER_NOT_REGISTERED` / `E_ADAPTER_NOT_CONTROLLED` / `E_ADAPTER_NO_DISPATCH_FACTORY` 共四码），全仓 `grep` 无 `E_ADAPTER_SANDBOX_AVAILABLE` / `E_ADAPTER_SANDBOX_FAILED`。按代码事实记录，**未虚构两个错误码**；`E_ADAPTER_SANDBOX_LOCKED` 的语义已随本卡由「窗口期永远拒绝」改为「未注入宿主 / 宿主不可用」。
+* **未宣称 / 未接线（不宣称端到端闭环）**：本卡交付**围栏逻辑 + 终止态契约 + 门禁切换**，`runInSandbox` **未接入编排器执行面**，真实容器宿主**未绑定**（`W.5c-iii`）；`known_limitations` / `verified_on` 未填、OpenHands 适配器未实现、`default-worker-registry` 未登记 OpenHands。**不宣称**「`SANDBOX_ENFORCED` 已能在容器内执行」、**不宣称**「越界挂载 / 逃逸在真实容器里实测失败关闭」（本卡只在逻辑层断言围栏函数拒绝，未触真实容器）。
+* **关键文件**：`daemon/worker/sandbox/container-host.ts`（新）、`daemon/worker/worker-dispatch.ts`、`daemon/worker/runtime-interceptor.ts`、`daemon/pipeline/orchestrator.ts`、`src/lib/evidence.schema.ts`、`src/lib/contract.schema.ts`（注释同步）、`tests/unit/container-host.test.ts`（新）、`tests/unit/worker-spec-schema.test.ts`（改）。
+
+---
+
+### 3.4k OpenHands 适配器、真实容器实测与 `verified_on`（W.5c-iii · 容器隔离第三张子卡 · 链路收官）
+
+<a id="task-w.5c-iii"></a>
+
+#### 【Task W.5c-iii】OpenHands 适配器 + 真实容器实测 + `verified_on` `[COMPLETED]`
+* **任务编号**：`TASK-W.5c-iii`
+* **状态与证据**：`[COMPLETED]`（[#87](https://github.com/he18718143986-design/IDE/pull/87)/`2313597a`，squash merge；分支 `feat/w5ciii-openhands-real`，本地三提交 `d23b185` 主体 + `00c0494` 证据面消费见证 + docs 开工声明）。母卡 `TASK-W.5c` 已于 P-118 经授权拆为 `i`/`ii`/`iii`，本卡为**第三张、也是最后一张**子卡——`W.5c` 容器隔离链路（档位 → 运行时围栏 → 真实宿主 + 实测）至此三段贯通。
+* **对应规格**：[`system-architecture.md`](./system-architecture.md) §9.1（`worker_spec` 三值 `control_mode` + `billing_model` + `verified_on`）、§4.2.3 P-17（「沙箱」仅用于 OS 级命名空间 / cgroups / MicroVM / 专用容器隔离，**普通本地子进程严禁自称沙箱**）、§2.7；[`../adr/0001-target-user-positioning.md`](../adr/0001-target-user-positioning.md) **ADR-0001**、[`../adr/0003-worktree-capability-boundary.md`](../adr/0003-worktree-capability-boundary.md) **ADR-0003**；[`../scheme.md`](../scheme.md) §10 **REJ-010**（本卡落盘）；[`task-card-standard.md`](./task-card-standard.md) R-1～R-12；先例 §3.3 `TASK-W.5a` 黑盒实测纪律
+* **前置依赖**：`TASK-W.5c-i`（**COMPLETED** · [#81](https://github.com/he18718143986-design/IDE/pull/81)/`c3e75cc`）、`TASK-W.5c-ii`（**COMPLETED** · [#85](https://github.com/he18718143986-design/IDE/pull/85)/`648be31`）、`TASK-W.6`（**COMPLETED** · [#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`）；**环境硬前置已于 2026-11-02 满足**（P-116 曾坐实「仅 Docker 客户端、无守护进程」致本卡 `[BLOCKED]`，开工前按施工纪律先做环境验证，结果见下条）
+* **环境自证（施工前第一步：`docker info` 服务端可达，不是仅客户端）**：`docker info --format '{{.ServerVersion}}|{{.OperatingSystem}}|{{.Architecture}}'` → `29.6.1|Docker Desktop|aarch64`；Engine 29.6.1 / containerd v2.2.5 / runc 1.3.6；OpenHands 镜像按**摘要固定**拉取 `ghcr.io/all-hands-ai/openhands@sha256:00968de7…fa6`（1.83GB，`linux/arm64`，`2025-10-10T18:42:25Z`）；容器内 `openhands 0.59.0` / `python 3.13.7`，headless CLI `python -m openhands.core.main --help` 参数齐全（`-t/-f/-n/-l/-d/-c/-i/-b/--no-auto-continue/--selected-repo`）。实测记录见 [`../reports/w5c-iii-real-container-test-2026-11-02.md`](../reports/w5c-iii-real-container-test-2026-11-02.md)。**环境验证失败即不施工、不标 READY**（本次全绿，故进入施工）。
+* **交付内容**：
+  1. **围栏档校验（ruling A · 经 Tina 裁决）**：`daemon/worker/worker-adapter.interface.ts` 新增 `validateSandboxFenceTier()`，`validateAdapterCapability()` 由「二档」改「**三档**」——`UNCONTROLLED_EXTERNAL` 走**标识档**（只校验 id + 协议版本，原样）、`GATEWAY_ENFORCED` 走**严格档**（原样不动：`GATEWAY_ONLY` / `WHITELIST_ONLY` / `tool_interception_supported === true` / `known_limitations` 非空 / 平台矩阵非空）、`SANDBOX_ENFORCED` 走**围栏档**（只校验 `known_limitations` 非空 + 平台矩阵非空，**允许** `DIRECT_UNCONTROLLED` / `UNRESTRICTED_SHELL` / `tool_interception_supported=false`）。**裁决口径**：`SANDBOX_ENFORCED` 的隔离语义是**容器围栏**（唯一挂载点 + 能力裁剪 + 网络拒绝），不是网关语义——要求它声明 `GATEWAY_ONLY` 就是逼它按宿主侧修辞口径造假；隔离改由**运行时**（宿主可用性门禁 + 唯一挂载点 + `runInSandbox` 唯一路径 + 见证）保证。**不新增拒绝码**：复用 `KNOWN_LIMITATIONS_UNDECLARED` / `PLATFORM_MATRIX_EMPTY`。测试含「**同一份声明：围栏档接受、严格档拒绝（`FILESYSTEM_DIRECT_UNCONTROLLED`）**」对账用例，证明两档口径差异真实存在（而非把严格档悄悄放松）。**REJ-010 已落盘** [`../scheme.md`](../scheme.md) §10 墓地：「能力声明不得按宿主侧修辞口径造假」——为过校验而把 `DIRECT_UNCONTROLLED` 写成 `GATEWAY_ONLY`、把 `tool_interception=false` 写成 `true` 一律否决。
+  2. **`DockerContainerHost`（真实 `ContainerHostPort` 实现）**：新建 `daemon/worker/cli-host/docker-container-host.ts`（385 行），落 `cli-host` 以满足「全仓唯一可起外部进程」静态闸门（`tests/unit/spawn-whitelist.test.ts`），执行统一走 `spawnManaged`（结构化 argv / `shell:false` / 整树回收），**不新开启动入口**。构造期 `probe()` 用 `spawnSync(docker, ["info", "--format", "{{.ServerVersion}}"])` 探测 **daemon**（空串视为不可达，**非仅客户端**），`kind` 记 `docker/<server_version>` 或 `docker/unavailable`。`docker run` 参数：`--cap-drop ALL` + 最小回补 `--cap-add DAC_OVERRIDE`（**实测约束**：镜像 `/app` 属 uid 42420、`entrypoint.sh` 为 `0770`，全量 cap-drop 会让容器起不来）、`--security-opt no-new-privileges`、`--pids-limit 512` / `--memory 2g` / `--cpus 2`、唯一挂载 `-v <worktreeRoot>:/work` + `-w <containerCwd>`。网络：`DENY → --network none`；`EXPLICIT_TARGETS` / `USER_APPROVED` 在 `docker run` 层**不可兑现 → 直接拒绝**（`NETWORK_TARGET_NOT_ALLOWED`），不假装放行。执行前**宿主侧再跑一次** `validateSandboxInput`（纵深防御）；超时 / 取消后 `docker rm -f` 清容器（防孤儿容器）。**双路径拒绝**：门禁侧未注入宿主 / `isAvailable()` false → `E_ADAPTER_SANDBOX_LOCKED`（**派工前**拒）；执行侧宿主不可用 → `rejected` + `HOST_UNAVAILABLE`（**执行时**拒，`SandboxRejectionCode` 新增第七码）。两条路径**都不降级为本地执行**。
+  3. **OpenHands 适配器注册**：新建 `daemon/worker/cli-host/openhands-adapter.ts`（259 行）。`OPENHANDS_ADAPTER_ID = "stagent.openhands.sandbox.v0"`；镜像常量按 `repo@sha256:` **固定摘要**（不用 `:latest`，防漂移）。能力声明**按事实写**：`filesystem_permissions: "DIRECT_UNCONTROLLED"`、`command_permissions: "UNRESTRICTED_SHELL"`、`tool_interception_supported: false`、`model_metering_source: "LOCAL_ESTIMATE"`、`network_requirements: "EXPLICIT_ONLY"`、`platform_support: ["darwin-arm64"]`（只写**真跑过**的平台），`known_limitations` **11 条**（容器挂载边界 / 不经 Gateway / 只兑现 DENY / 模型端到端未实测 / diff 由后续采集 / usage 粗估 / API Key 经 env 可读 / cap 回补原因 / `.git` 随根挂载路径信息可读 / 仅 darwin-arm64 实测 / 会话恢复未实现）。`verified_on` 按实测填 `{ cli_version: "OpenHands 0.59.0 (python 3.13.7, headless CLI)", verified_at: "2026-11-02" }`；`billing_model: "PER_TOKEN"`（headless 经 LiteLLM 直连按 token 计量，非订阅 / 非配额）。`default-worker-registry.ts::createDefaultWorkerRegistry()` 末尾登记，档位由 `openhandsControlMode(OPENHANDS_VERIFIED_ON)` 判定——有实测 → `SANDBOX_ENFORCED` 且**挂沙箱派工工厂**；无实测 → `UNCONTROLLED_EXTERNAL` 且不挂工厂（指向它的派工一律被门禁拒绝）。注册表由 3 项增至 **4 项**（`tests/unit/adapter-registry-dispatch.test.ts` 同步 3→4 并注明新增登记）。**口径校正（写实，防误读）**：`network_requirements: "EXPLICIT_ONLY"` 是**声明适配器想要什么**，`DockerContainerHost` 实际**只兑现 `DENY`**——二者不矛盾，但**不得**读成「已兑现逐目标出站」；该差距同时写入 `known_limitations` 第 3 条与挂账 3。
+  4. **派工即入沙箱（P-121 必收边界）**：适配器 `host` 构造参数**必填**，缺省直接 `throw new Error("OpenHandsSandboxAdapter requires a ContainerHostPort; there is no local fallback (TASK-W.5c-iii)")`；文件内**零** `spawn|child_process`；`run()` 的**唯一执行路径**是 `runSandbox(this.opts.host, sandboxInput, signal)`；派工工厂 `openhandsSandboxDispatchFactory` 在缺 `context.containerHost` 时**再兜一次** `E_ADAPTER_SANDBOX_LOCKED`（即便门禁被绕过也不本地执行）。非零退出 / 被围栏拒绝 / 超时 → 抛 `OpenHandsSandboxError`，**不产见证**（失败不冒认受控）。
+  5. **`SandboxWitness` 见证 + `resolveEvidenceControlMode` 证据面消费（用户评审阻断项，`00c0494` 补完）**：`sandbox/container-host.ts` 增 `SandboxWitness`（`host_kind` / `via` / `exit_code` / `duration_ms` / `worktree_root`），唯一产出点 `sandboxWitness()`，注释明写「进程内无法密码学不可伪造，这是**结构性约束**」；`worker-adapter.interface.ts` 增 `resolveEvidenceControlMode(declared, witness)`——声明 `SANDBOX_ENFORCED` 且**无见证** → 记 `UNCONTROLLED_EXTERNAL`，其余档位原样返回。`orchestrator.ts` 增 `sandboxWitnesses` Map（`recordSandboxWitness()` 两处记录点：单段 `:1600` / 两段式 `:1725`；`runWorkerInternal` 开头清空 `:1495`），`writeEvidence` 的 `worker_control_mode` 改由 `resolveEvidenceControlMode(声明档, 见证)` 产出（`:2304`）。**这条是把 P-121「记实不记名」裁决从纸面变成强制执行点**——见证产生却无人读，裁决等于没有。
+* **验收（PASS）**：
+  - **真实容器实测（`STAGENT_REAL_OPENHANDS=1`）**：`tests/e2e/openhands-isolation.real.test.ts` **11 passed**（8.7s），事后 `docker ps -a --filter name=stagent-sbx` **为空**（无孤儿容器）。11 条**全是负例 / 自证**，测的是「失败关闭」而非「能跑通」：`OH-R00` 环境自证、`OH-R01` headless CLI 版本按行取（镜像有 `Starting OpenHands...` / `Running OpenHands as root` 两行横幅，故用 `/^\d+\.\d+\.\d+$/` 取版本号）、`OH-03` 容器内 `CWD=/work` 且 `HOSTPATH=False` / `HOSTROOT=False`（宿主路径不可见）、`OH-02` 逃逸 / 提权（`CAPEFF=0000000000000002`，`NET_ADMIN`/`SYS_ADMIN`/`SYS_PTRACE` 全无）/ `DENY` 出站（`BLOCKED:`）、`OH-01` 越界挂载拒绝、非零退出失败关闭、超时熔断、适配器失败关闭、`OH-05`。
+  - **无容器环境**：同一文件 **11 skipped / 1 file skipped**——**跳过 ≠ 通过**；未设 `STAGENT_REAL_OPENHANDS=1` 的 CI 不会假绿（`describe.skipIf(!REAL)`，`REAL = process.env["STAGENT_REAL_OPENHANDS"] === "1"`）。
+  - **确定性负例（无容器可跑）**：`tests/unit/openhands-sandbox.test.ts` **35 passed**——`OH-01`～`OH-05`、派工即入沙箱、门禁错误码口径（`E_ADAPTER_SANDBOX_LOCKED` 不复用「非受控」码）、以及「记实不记名」6 条（4 条纯函数 + 2 条真实链路：「派工带见证 → 证据记 `SANDBOX_ENFORCED`」「声明沙箱档但派工无见证 → 证据降记 `UNCONTROLLED_EXTERNAL`」）。复跑命令与结果：`npx vitest run tests/unit/openhands-sandbox.test.ts tests/e2e/openhands-isolation.real.test.ts` → `35 passed | 11 skipped (46)`。
+  - `npx tsc --noEmit` 全仓 **57 个 `error TS` 与 clean `main` 基线一致**；全量 `vitest run` **9 条失败 = 7 条基线**（`m2-hardening` / `contract.schema` / `ide-shell` / `evidence-schema-v11` / `spawn-whitelist` / `supervisor-zero-tool-lint` / `test-port-map`）**+ 2 条计时型 flaky**（`app-preview-runner` 3000ms 超时 / `demo-service` 快照回退，单独复跑 30/30 全绿）；`spawn-whitelist` 的 5 处 `.exec(` 命中在 `648be31` 独立 worktree 复跑并逐条 `diff` = **IDENTICAL**，确认为既有问题而非本卡引入。
+* **残余边界 / 后续挂账（P-122 归拢，共 4 条）**：
+  1. **`openhandsControlMode` 的降级分支是「防呆」，当前不可达（不是废码）**：`OPENHANDS_VERIFIED_ON` 是常量、恒有值，故默认注册表永远走 `SANDBOX_ENFORCED` 分支，`UNCONTROLLED_EXTERNAL` 路径在今日代码里**走不到**。判定函数本身正确、测试也覆盖了 `openhandsControlMode(undefined)`；它的价值在**防呆**——将来镜像 / CLI 版本变更需重实测时，把常量置空即自动降级为「未受控、不挂工厂」，无需改逻辑。刻意**不加默认参数**（写成 `verifiedOn = OPENHANDS_VERIFIED_ON` 会让 `undefined` 被吞成「已实测」，降级变不可测）。
+  2. **`runInSandbox` 内 `durationMs ??` 属死代码**（P-121 已登记，本卡未清）：`SandboxRunOutcome.durationMs` 为**必填** `number`，`??` 分支永不命中。不构成缺陷（保留它与宿主契约「必填」一致、对 JS 调用方宽容），本轮**未静默清理**，登记备改。
+  3. **`EXPLICIT_TARGETS` 逐目标出站需 netns / iptables 级实现**：`docker run` 层只能「全通」或「全断」，无法按域名 / IP 逐目标放行，故宿主对 `EXPLICIT_TARGETS` / `USER_APPROVED` **一律拒绝而非降级放行**（`NETWORK_TARGET_NOT_ALLOWED`）。要真兑现需在容器内建 netns + iptables / nftables 规则或加 sidecar 代理解析，属后续独立卡，本卡不做。
+  4. **`runWorker` outcome 的 `worker_control_mode` 仍为声明档、未校正——两个记录点，只有证据面被校正**：`00c0494` 只改了 `writeEvidence`（`orchestrator.ts:2304`）这一个记录点；`execute()` 处（约 `:1212`）传给下游的 `workerControlMode` 仍是 `interceptorBlocked ? "UNCONTROLLED_EXTERNAL" : current.worker_spec.control_mode`（**合同声明档**）。即「证据面已记实不记名、运行结果面尚未」。今日**不构成假证据**（合同证据只认 `writeEvidence` 产物），但两处口径不一致是债，登记待统一（宜与 `W.7` 探测包同批处理）。
+* **未宣称 / 不宣称端到端闭环**：
+  - **不宣称模型驱动的端到端闭环**：出站 `DENY` 使容器内**无法调用模型 API**，`verified_on` 明确**不覆盖**该场景（`known_limitations` 第 4 条）；diff 与范围校验由后续网关侧采集，适配器不回传逐文件内容；`usage` 为字符数粗估（`LOCAL_ESTIMATE`），**不能用于账单对账**。
+  - **不宣称「绝对受控」**：`SandboxWitness` 是**结构性约束而非密码学不可伪造**（进程内可伪造，源码注释已明写）；实测措辞限定「**通过已知探测集**」（`OH-01`～`OH-05` 已知负例），**不等于穷尽逃逸面**。
+  - **不宣称跨平台**：仅 `darwin-arm64` + Docker Desktop 实测；其他平台未实测、**不写入**平台矩阵（宁缺不虚报）。
+  - **不改变**：鉴权 / Demo Origin / 点亮三证 / 网关写范围（ADR-0001 纪律）；右栏 `role:"partner"` 只读白名单未动（J.1）；`SANDBOX_ENFORCED` 不放宽 `GATEWAY_ENFORCED` 既有门禁；`UNCONTROLLED_EXTERNAL` 仍不得作为受控 / 可合并证据。
+* **关键文件**：`daemon/worker/cli-host/openhands-adapter.ts`（新）、`daemon/worker/cli-host/docker-container-host.ts`（新）、`daemon/worker/sandbox/container-host.ts`（改 · `SandboxWitness` + `HOST_UNAVAILABLE`）、`daemon/worker/worker-adapter.interface.ts`（改 · 围栏档 + `resolveEvidenceControlMode`）、`daemon/worker/default-worker-registry.ts`（改 · OpenHands 登记 + 沙箱派工工厂）、`daemon/worker/worker-dispatch.ts`（改 · `WorkerDispatchContext.worktreeRoot`）、`daemon/worker/ai-worker.ts`（改 · `WorkerRunResult.sandbox`）、`daemon/pipeline/orchestrator.ts`（改 · 见证 Map + 证据面校正）、`tests/unit/openhands-sandbox.test.ts`（新）、`tests/e2e/openhands-isolation.real.test.ts`（新）、`tests/unit/adapter-registry-dispatch.test.ts`（改）、`docs/reports/w5c-iii-real-container-test-2026-11-02.md`（新 · 实测证据）。
+
+---
+
+### 3.4l Worker 自助注册与自动探测升格（W.7 · 五类断言 + 两级注册语义）
+
+<a id="task-w.7"></a>
+
+#### 【Task W.7】Worker 自助注册与自动验证 `[COMPLETED]`
+* **任务编号**：`TASK-W.7`
+* **状态与证据**：`[COMPLETED]`（[#89](https://github.com/he18718143986-design/IDE/pull/89)/`be480bb`，squash merge；分支 `feat/w7-worker-self-serve-verify`，本地单提交 `63ee74a`；parent `5dccebdd`（#88 P-122 docs 回写），链序核实无旁支）。**纯代码 PR，未改 `docs/`**——文档回写由本条（P-123）承接。
+* **对应规格**：[`system-architecture.md`](./system-architecture.md) §9.1（`worker_spec` 三值 `control_mode` + `verified_on`）、§4.2.3 P-17（「沙箱」仅用于 OS 级隔离，`普通本地子进程严禁自称沙箱`）；[`../scheme.md`](../scheme.md) §10 **REJ-010**（能力声明不得按宿主侧修辞口径造假——本卡为其下游执行面）；[`task-card-standard.md`](./task-card-standard.md) R-1～R-12；先例 §3.4k `TASK-W.5c-iii`（`SandboxWitness` / `resolveEvidenceControlMode` / `DockerContainerHost`）
+* **前置依赖**：`TASK-W.6`（**COMPLETED** · [#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53`，Registry 进派工，硬前置已解除）；`TASK-W.5c` 三张子卡全部 **COMPLETED**（#81 / #85 / #87，探测沙箱地基与见证机制就位）
+* **开工前 readiness review（按纪律先做，结论已报）**：三处「卡正文 vs 代码事实」脱节，均按代码事实校正后再施工——
+  1. 范围 3「把 `SANDBOX_ENFORCED` 扩进两处枚举，漏改即 FAIL」被当作待做前置，**实际 `W.5c-i` 已完成双扩三值、`validateAdapterCapability()` 已按三档分派** → 改为**源码回归断言**（两处枚举 + 三档分派 + P5 复用点），防的是将来只在单边加档位；
+  2. 范围 1「探测通过后升格」被当作既有能力，**实际 `AdapterRegistry.register()` 遇同 id 抛 `ADAPTER_ID_DUPLICATED`，注册中心无升格亦无注销 API**——「升格」这个动作在 W.7 之前**根本不存在** → 新增 `promoteControlMode()`（唯一入口，单向守卫）；
+  3. 范围 2 的四类断言默认候选是「经 Gateway 的 CLI」，**实际今日无通用 Gateway CLI 适配器、`DockerContainerHost` 生产侧从未被 `new`** → 探测执行面做成注入端口，默认只实装容器目标，GATEWAY 目标**如实报未实现**（不拿 mock 冒充生产）。
+* **交付内容**：
+  1. **两级注册语义（红线：填表不等于受控）**：新建 `daemon/worker/verify/worker-registration.ts`（401 行，纯函数零 I/O）。`normalizeRegistration()` 产出的记录档位**恒为** `UNCONTROLLED_EXTERNAL`；请求体出现 `control_mode` / `worker_control_mode` / `verified_on` / `verified` / `promoted` / `promotion` / `probe` / `probe_report` / `report` 九类字段**直接拒绝**（`E_WORKER_FORBIDDEN_FIELD`），**不是忽略**——忽略会让调用方以为它生效了。启动命令走**结构化 argv**（`command` 拒空格与 shell 元字符 `;` `&` `|` 反引号 `$` `>` `<` 换行回车），不接受 shell 字符串，因为这道门本身就是注入面。`declaration.adapter_id` 强制等于顶层 `adapter_id`，避免「探测结论绑定的对象」与「注册的对象」错位。
+  2. **档位变更的唯一入口 `promoteControlMode()`（`adapter-registry.ts`）**：降级（→ `UNCONTROLLED_EXTERNAL`）**恒允许**、不需要证据；升格（目标为受控档）必须 ① 附 `report_fingerprint`，② **重新跑** `validateAdapterCapability(declaration, next)`（注册期只按标识档校验过，结论**不得**复用为升格依据）；同档位重复调用幂等；幽灵 id → `ADAPTER_ID_INVALID`；缺指纹 → 新增拒绝码 `ADAPTER_PROMOTION_REFUSED`。变更记 `last_transition`（`from` / `to` / `report_fingerprint` / `reason` / `decided_at`）。
+  3. **探测包五类断言**（`daemon/worker/verify/worker-probe.ts`，338 行）：
+     - `filesystem_fence`（容器执行面）：工作区内写在宿主侧可见且内容一致 **+** 容器内写 `/tmp` 的文件**不得**出现在宿主 `/tmp`；
+     - `command_fence`（容器执行面）：docker socket 不可见、网络仅 `lo`、`CapEff ∈ {0x0, 0x2}`；
+     - `evidence_integrity`（容器执行面）：两次写操作在宿主侧逐条可读、内容可分（直连写与受控写可区分）；
+     - `capability_declaration`（`validateAdapterCapability`）：声明与目标档位口径对账；
+     - `dispatch_witness`（**`resolveEvidenceControlMode`**）：`SANDBOX_ENFORCED` 派工是否带 `SandboxWitness`。
+     **P5 严格复用**：只调 `resolveEvidenceControlMode("SANDBOX_ENFORCED", witness)`，本文件**不**自己判 `witness === undefined`——否则两处口径将来一分叉，就会出现「探测说受控、证据说不受控」的自相矛盾；测试另做交叉断言（探测判 pass ⇔ 证据面校正后仍为 `SANDBOX_ENFORCED`）。GATEWAY 目标下 P5 记 `not_verified` + `required:false`（本就不进容器，既不算通过也不算失败）。执行面漏项按 `not_verified` 处理，**不补假通过**。
+  4. **容器探测执行面**（`daemon/worker/verify/probe-execution-sandbox.ts`，329 行）：**不启动任何进程**，全部经 `runInSandbox(host, …)` 交宿主执行（故无需落 `cli-host/`，静态闸门照常成立）。探测工作区是 `mkdtemp` 的独立临时目录，**绝不挂载仓库主树**；`networkPolicy: DENY`；不传 `cwd`（`SandboxRunInput.cwd` 是**宿主侧**语义，传容器路径 `/work` 会被围栏判 `CWD_OUTSIDE_WORKTREE`——施工期真踩过）。见证 `getWitness()` 只能取自宿主实际返回的 `SandboxRunOutcome`（`sandboxWitness()` 唯一产出点），探测包不提供「补见证」路径。
+  5. **无沙箱即拒绝探测**：`runProbePack()` 首行判 `port.isAvailable() !== true` → 抛 `E_PROBE_SANDBOX_UNAVAILABLE`、**不产报告**。测试断言「执行面不可用时**一次容器调用都不发生**」——这是卡正文 FAIL「探测无沙箱直接跑主树」的机制防线，不靠注释约束。
+  6. **指纹绑定与读侧降级**：`workerFingerprint()` 对 `adapter_id` / `adapter_version` / `launch` / `declaration` 做**键序无关**稳定序列化后取 sha256 前 32 位；`effectiveControlMode()` **每次读时重算**——指纹不一致或缺 `verified_on` → 降级 `UNCONTROLLED_EXTERNAL` 并附 `demoted_reason`。刻意不在写入时判定：`.stagent/workers.json` 就是本机文件，只在写入时判等于允许手改绕过。
+  7. **持久化与编排**：`worker-store.ts`（147 行）落 `.stagent/workers.json`（复用 `writeJsonAtomic()`：tmp + fsync + rename + 目录 fsync；内容损坏抛 `E_WORKER_STORE_CORRUPT`，**不静默重置**——静默重置会让档位记录无声消失）；`worker-registration-service.ts`（390 行）编排「登记 → 探测 → 升格」，并做存储与注册表**双写**（注册表那份是 `declarationOnlyAdapter()`，`run()` 只抛 `E_WORKER_NO_EXECUTOR`——**不伪造执行器**）。
+  8. **路由与 UI**：`GET /api/workers`、`POST /api/workers`、`GET /api/workers/:id`、`POST /api/workers/:id/verify`（沿用既有 `isAuthorized`，**不新增豁免**）；错误码映射 400 / 403（内建锁定）/ 404 / 409（重复 / 升格被拒）/ **503**（沙箱不可用）/ **501**（执行器未实现）——把 501 混进 400 会让界面显示成「你的输入有问题」，而真相是能力缺口。前端 `WorkerRegistrationPanel.tsx`（330 行）挂在「设置 → 高级 → Worker 自助注册」，报告结语**原样展示**，不可派工时显式标注。
+  9. **报告措辞机制闸门**：`assertReportWording()` 拦 `/绝对受控/`、`/绝对安全/`、`/完全安全/`、`/100\s*%\s*(安全|受控)/`、`/零风险/`，对**注入执行面返回的 `detail`** 一视同仁（执行面可能是第三方实现，一句「本适配器绝对受控」会原样进报告、进而成为升格依据的注脚）。
+* **验收（PASS）**：
+  1. **注册默认且仅能落 `UNCONTROLLED_EXTERNAL`**：`normalizeRegistration()` 恒产出该档；携带 `control_mode` / `verified_on` / `probe_report` / `report` 四类字段均被拒（逐字段断言）。
+  2. **五类断言在（注入的）沙箱执行面上跑通，正负例俱在**：正向——三项全 pass → 升格；负向——容器写宿主 `/tmp` 可见 → 文件围栏 fail、docker socket 可见 / 多网卡 / `CapEff` 未收敛 → 命令围栏 fail、执行面漏项 → `not_verified` 且不许升格。
+  3. **PASS 3 未达成（如实标注，见挂账 1）**：升格目标是 `SANDBOX_ENFORCED`，`requireControlled()` 只放行 `GATEWAY_ENFORCED`，且自注册 worker 无 `run()` / 派工工厂 → `dispatchable: false`。**「升格」只到档位记录层，未到派工层**。
+  4. **失败者留 `UNCONTROLLED_EXTERNAL` 且附探测报告**：`verify()` 失败路径同样落盘 `last_report`（`status: "failed"` + 逐条 `refusals`），档位不升——「探测失败但档位升了」这个状态在本流程里不存在。
+  5. **指纹变更后自动降级**：版本变更 / 启动命令替换 / 缺 `verified_on` 三种情形均降级并给出 `demoted_reason`。
+  6. **P5 派工见证校验**：缺 `SandboxWitness` → 其余四项全绿也**不升格**，`refusals` 含 `dispatch_witness`；判定与 `resolveEvidenceControlMode` 结论一致（交叉断言）。
+  - **测试**：`tests/unit/worker-self-serve-verify.test.ts`（790 行）**34 passed**，覆盖 6 组正例 + 4 类负例（表单直进受控 / 无沙箱探测 / 报告「绝对受控」/ 枚举单边） + 枚举双扩回归 4 条。复跑：`npx vitest run tests/unit/worker-self-serve-verify.test.ts tests/unit/openhands-sandbox.test.ts` → **69 passed (69)**。
+  - `npx tsc --noEmit` 全仓 **57 个 `error TS`，与 clean `main` 基线一致**（零新增）。
+  - 全量 `vitest run`：**270 passed files / 9 failed / 2 skipped（281）**；把 9 个失败文件单独复跑，**改动树与 `main` 基线均为「8 失败文件 / 7 失败用例」且逐文件一致**——差额为 `supervisor-session` 的计时型 flaky（全量并发下失败、单跑通过），属既有 flaky 集合；`spawn-whitelist` 的 24 处 `.exec(` 命中在 `5dccebd` 基线上 stash 复跑同样失败，且违规清单**不含任何新增文件**。**零新增失败**。
+* **残余边界 / 后续挂账（P-123 归拢，共 6 条）**：
+  1. **PASS 3 的「升格 ≠ 可派工」是结构性边界，不是缺陷**：自注册 worker 只有 `declaration` + `launch`，**没有 `CodingWorkerAdapter.run()` 实现、也没有派工工厂**；而 `requireControlled()` 只放行 `GATEWAY_ENFORCED`、`requireControlledDispatch()` 对 `SANDBOX_ENFORCED` 还要求工厂。故档位升到 `SANDBOX_ENFORCED` 后视图恒 `dispatchable: false`（附 `dispatch_blocked_reason`），`declarationOnlyAdapter.run()` 只抛 `E_WORKER_NO_EXECUTOR`——**刻意不造一个假执行器来「看起来闭环」**。真正接通需另卡：「按 `launch` 起 CLI 并注入 Gateway / 容器」的执行器 + 派工工厂。**读本卡时不得把「升格」理解为 W.7 闭合了派工环路**。
+  2. **无真实容器实测**：本卡容器执行面只在**桩宿主**上做确定性断言（`runInSandbox()` 的围栏校验是真跑，容器内执行是模拟），没有 `STAGENT_REAL_OPENHANDS=1` 级别的实测。与 §3.4k 的量级不同，**不得**按「已验证真实隔离」引用；真机复核宜与挂账 1 的执行器同批做。
+  3. **命令围栏只兑现 3 项可确定性观测**：`docker socket 不可见` / `网络仅环回` / `CapEff` 收敛；卡正文「白名单外命令须被拒」的**逐命令枚举未做**——它依赖具体 CLI 的命令面，属被测对象而非执行环境，本卡不做。
+  4. **文件围栏改为等价断言**：卡原话是「诱导越权写、扫主树与 `.stagent/records/`」，实际实现为「容器内写 `/tmp` 的文件不得出现在宿主 `/tmp`」+「工作区内写在宿主侧可见且一致」。意图等价（证明唯一可见挂载点就是工作区），但**不是卡正文写的那个动作**，不得按原话引用。
+  5. **两处形态差异**：报告查询走 `GET /api/workers/:id`（返回体含 `last_report`），**未单开** `GET /api/workers/:id/verify`；范围 4 的「定期重测机制留接口」只兑现了指纹机制，**未留调度器 hook / 类型**。
+  6. **`W.5c-iii` 遗留未动**：`ContainerHostPort` 仍未注入派工路径（本卡只在 verify 时按需 `new DockerContainerHost()`）、`EXPLICIT_TARGETS` 逐目标出站仍未实现（需 netns / iptables 级），沿用 §3.4k 挂账 3。
+* **未宣称 / 不宣称端到端闭环**：
+  - **不宣称注册即受控 / 探测即安全**：报告结语固定为「通过已知探测集（仅覆盖上述探测项）」，且闸门对「绝对受控」类措辞做机制性拦截；施工期该闸门逮到过自己写的固定结语（结语里含「不等于『绝对受控』」的否定式引用），已改为不含禁用短语的表述，并在代码里写明「闸门不做语义判断，否定式引用同样不放行」——**否定句放行本身就会成为可绕过的口子**。
+  - **不宣称探测覆盖第三方 CLI 全部行为**：探测对象是「目标档位提供的执行环境是否兑现围栏」，CLI 本体的实测仍走适配器 `verified_on`（§3.4k），两者不互相冒充。
+  - **不宣称多平台**：平台矩阵只是声明结构校验，本卡未在任何平台做真实容器实测（见挂账 2）。
+  - **不改变**：鉴权 / Demo Origin / 点亮三证 / 网关写范围（ADR-0001 纪律）；`UNCONTROLLED_EXTERNAL` 仍不得作为受控 / 可合并证据；`requireControlled()` 的放行口径未放宽。
+* **关键文件**：`daemon/worker/verify/worker-registration.ts`（新）、`daemon/worker/verify/worker-probe.ts`（新）、`daemon/worker/verify/worker-store.ts`（新）、`daemon/worker/verify/probe-execution-sandbox.ts`（新）、`daemon/worker/verify/worker-registration-service.ts`（新）、`daemon/worker/adapter-registry.ts`（改 · `promoteControlMode()` + `ADAPTER_PROMOTION_REFUSED`）、`daemon/server.ts`（改 · `/api/workers*` 四路由 + 错误码映射）、`src/lib/daemon-api.ts`（改 · 四个客户端方法与类型）、`src/components/settings/WorkerRegistrationPanel.tsx`（新）、`src/components/settings/SettingsTab.tsx`（改 · 挂载入口）、`tests/unit/worker-self-serve-verify.test.ts`（新 · 34 用例）。
+
+---
+
+### 3.4m cursor-agent 外部适配器与探测包非容器回归基准（W.5b · 双重身份）
+
+<a id="task-w.5b"></a>
+
+#### 【Task W.5b】cursor-agent 适配器黑盒实测（外部适配器实测 + W.7 探测包非容器回归基准）`[COMPLETED]`
+* **任务编号**：`TASK-W.5b`
+* **状态与证据**：`[COMPLETED]`（[#92](https://github.com/he18718143986-design/IDE/pull/92)/`bdac805`，squash merge；分支 `feat/w5b-cursor-agent-verify`，本地单提交 `33cf6c2`，parent `b8d53c5`；合入后 main 的 tree 与分支**完全一致**）。**口径经 Tina 2026-11-02 裁决：代码侧闭环 → `[COMPLETED]` + CA-06 挂账**（PASS 8 条中 `CA-06` 未执行，见挂账 1）；`verified_on` 保持空，**本卡不产出任何受控证据**。
+> **（P-160 现行）** §3.4m **挂账 1（CA-06）已销**：代码侧 `CURSOR_AGENT_VERIFIED_ON = { cli_version: "2026.10.22-27dcf5f", verified_at: "2026-11-05" }` 早已回填（`daemon/worker/cli-host/cursor-agent-adapter.ts`）。证据：GitHub Actions run [`41959697673`](https://github.com/he18718143986-design/IDE/actions/runs/41959697673)（`ca06-real`，main `cec8c6c5d` / #141 后）全绿；ledger README / consistency-audit 已有「CA-06 实测通过」非 OP 注记（2026-11-05）——本条**补卡账与矩阵对齐，不重复造假证据**。`cli_version` = 安装包构建号（job 日志下载地址），**不是** `cursor-agent --version` 自报。**档位不变**：仍 `UNCONTROLLED_EXTERNAL`（结构性上界）；`verified_on` ≠ 已受控 / 可派工；**不**宣称端到端闭环。拦截边界（ledger 已写）：写入/命令/MCP 由 CLI `plan` 只读档拒绝，非适配器白名单功劳；上游 plan mode 语义变化会击穿——如实保留。
+* **对应规格**：[`system-architecture.md`](./system-architecture.md) §2.3（`:393` Coding Worker Agent / `:394` 把 cursor-agent 列入 Worker 例）、§4.2.3 P-17（`:591` 术语纠偏：「沙箱」仅用于 OS 级隔离）、§0.6.1（`:265` VIBE vs PROTECTED —— 「仅 Vibe 可用」的出典）、§9.1（`:937` 三值 `control_mode` + `verified_on` 目标模型）、`:1374` **P5.5**（各 Adapter 记录真实 `verified_on`）；[ADR-0001](../adr/0001-target-user-positioning.md) / [ADR-0003](../adr/0003-worktree-capability-boundary.md)；[`../scheme.md`](../scheme.md) §10 墓地 **REJ-010**（能力声明不得按宿主修辞口径造假）
+* **前置依赖**：`TASK-W.5a`（**COMPLETED** · cli-host 黑盒实测先例与 env 白名单纪律）、`TASK-W.6`（**COMPLETED** · [#74](https://github.com/he18718143986-design/IDE/pull/74)/`b5d8c53` · 派工门禁四码）、`TASK-W.7`（**COMPLETED** · [#89](https://github.com/he18718143986-design/IDE/pull/89)/`be480bb` · 探测包五类断言与被测对象）——三者均已在位
+* **交付内容**：
+  1. **适配器能力载体**（`daemon/worker/cli-host/cursor-agent-adapter.ts`，新，393 行）：`CURSOR_AGENT_WORKER_ADAPTER_ID = "stagent.cursor-agent.v0"`、`CURSOR_AGENT_CAPABILITY`（9 项 + 6 条 `known_limitations`）、`CursorAgentAdapter`（`kind: "CLI"`）。
+  2. **声明按最坏事实写**：`filesystem_permissions: "DIRECT_UNCONTROLLED"`、`command_permissions: "UNRESTRICTED_SHELL"`、`tool_interception_supported: false`。**只读档（`--mode plan|ask`）能否真正拒写写进 `known_limitations` 而不是写成缓解**——因为它未实测；把未验证的缓解写成事实就是 REJ-010。
+  3. **`buildLaunch()` 纯构建（本卡唯一可测契约面）**：argv = `--print` / `--output-format stream-json` / `--mode plan` / `--workspace <worktree_root>` /（可选 `--resume`）/ `--` / `<prompt>`；env 仅 `PATH` / `HOME`（**改写到专用配置目录**）/ `LANG` / `CURSOR_API_KEY`；MCP 只写一份 `<HOME>/.cursor/mcp.json`（仅 `stagent` 一项），端点缺失即抛 `E_CURSOR_AGENT_MCP_ENDPOINT_MISSING`（不静默空集合）。
+  4. **`assertNoForbiddenFlags()` 独立强制点**：`-f`/`--force`/`--yolo`/`--auto-review`/`--approve-mcps`/`--trust`/`--add-dir`/`-w`/`--worktree`/`--worktree-base`/`--skip-worktree-setup`/`--plugin-dir`/`--api-key` 一律拦（`E_CURSOR_AGENT_FORBIDDEN_FLAG`）；只检查 `--` 终止符之前的**旗标位**。
+  5. **`run()` 两段失败**（**本卡不提供执行入口**）：缺 key → `E_CURSOR_AGENT_NO_API_KEY`；有 key → `E_CURSOR_AGENT_NO_EXECUTOR`（`stream-json` 字段 schema 未实测，不猜解析器，避免把「能跑」伪装出来）。
+  6. **登记**：`default-worker-registry.ts` 增 1 行 `registry.register(new CursorAgentAdapter(), "UNCONTROLLED_EXTERNAL")`、**不挂派工工厂**；注册表项数 4 → 5。
+  7. **探测包五类断言适用性表**（写进测试并断言覆盖 `PROBE_IDS` 全量，N/A 必写理由、不跳计数）：`capability_declaration` **适用且应判 `fail`**（负向基准）；`dispatch_witness` **N/A-by-design**（`required:false`，且 `FenceProbeInput.target_mode` 类型不含 `UNCONTROLLED_EXTERNAL`）；`filesystem_fence` / `command_fence` / `evidence_integrity` **不可执行**（唯一执行面 `SandboxProbeExecutionPort` 经 `runInSandbox()` 入容器；`runProbePack()` 首行判 `isAvailable()` 即抛 `E_PROBE_SANDBOX_UNAVAILABLE`，**拒绝退回主树**）。
+  8. **实测中新发现并当场修掉的注入面**：不带 `--` 时 `cursor-agent --print --yolo` 解析成功（`--yolo` 被当作真旗标）→ **prompt 内容可变成启动参数**。argv 已在 prompt 前插入 `--` 终止符，`assertNoForbiddenFlags()` 同步改为只查终止符之前的旗标位（否则 prompt 里写 `--force` 会被误杀）。
+* **验收（PASS）**：新增 `tests/unit/cursor-agent-adapter.test.ts`（33 用例）+ `tests/e2e/cursor-agent-real.real.test.ts`（8 用例，`STAGENT_REAL_CURSOR=1`）：
+  1. `CA-01` 声明如实且严格档必拒——**达成**（`validateAdapterCapability(cap, "GATEWAY_ENFORCED").ok === false`，拒因 `FILESYSTEM_DIRECT_UNCONTROLLED`；另加反向断言：美化副本「能过严格档」，证明失败源于如实而非校验失效）。
+  2. `CA-02` 档位与门禁——**达成**（`UNCONTROLLED_EXTERNAL`；`requireControlledDispatch()` 抛 `E_ADAPTER_NOT_CONTROLLED`；`getDispatchFactory()` 为 `undefined`；项数 5；`WorkerRegistrationService.get()` 返回 `builtin:true` / `dispatchable:false` 附阻断原因，且**不写** `.stagent/workers.json`）。
+  3. `CA-03` argv 白名单——**达成**（含 `--print` / `--output-format stream-json` / `--mode plan` / `--workspace <cwd>`；禁用旗标逐个断言不出现；key 不进 argv；`--flag=value` 形态同样被拦）。
+  4. `CA-04` env 白名单与凭证前置——**达成但判法调整**（见挂账 3）：键集合 ⊆ {`PATH`,`HOME`,`LANG`,`CURSOR_API_KEY`}；哨兵环境变量不透传；缺 key 与有 key 的错误**码**不同（证明凭证检查先于执行器检查）。
+  5. `CA-05` MCP 面——**达成**（落点 `<HOME>/.cursor/mcp.json`；只有 `stagent` 一项；token 走 `Authorization: Bearer`；无 token 不写空 headers）。
+  6. `CA-06` 真实 CLI 四类越权负例——**未执行**（挂账 1）：本机无有效 `CURSOR_API_KEY`，四类负例需模型驱动工具调用；e2e 里写成 `describe.skipIf(!HAS_KEY)` + **启用即显式失败**的桩，不用 skip 冒充通过。
+     > **（P-160 现行）** CA-06 **已执行并通过**：run [`41959697673`](https://github.com/he18718143986-design/IDE/actions/runs/41959697673) 全绿；四类越权负例（工作区外写、保护区写、白名单外命令、MCP 越权）及 symlink 写入逐项拒绝；`CURSOR_AGENT_VERIFIED_ON` 已回填。上句「未执行」为 P-125 当时事实，保留作溯源。
+  7. `CA-07` 探测包非容器负向回归——**达成**（`capability_declaration` 判 `fail`；`dispatch_witness` 在 `GATEWAY_ENFORCED` 目标下 `not_verified` + `required:false`，换 `SANDBOX_ENFORCED` 目标即判 `fail`（说明 N/A 只对非容器档成立）；执行面不可用时 `runProbePack()` 抛 `E_PROBE_SANDBOX_UNAVAILABLE`）。
+  8. `CA-08` `verified_on` 与升格拒绝——**达成**（`CURSOR_AGENT_VERIFIED_ON === undefined`；升格到 `GATEWAY_ENFORCED` 被严格档拒（`FILESYSTEM_DIRECT_UNCONTROLLED`）；无指纹升格被 `ADAPTER_PROMOTION_REFUSED` 拒）。
+     > **（P-160 现行）** `CURSOR_AGENT_VERIFIED_ON` **已非空**（`{ cli_version: "2026.10.22-27dcf5f", verified_at: "2026-11-05" }`）；升格拒绝口径不变（档位仍 `UNCONTROLLED_EXTERNAL`，严格档 / 无指纹升格仍拒）。上句 `=== undefined` 为 P-125 当时事实，保留作溯源。
+* **测试与证据**：
+  - `npx vitest run tests/unit/cursor-agent-adapter.test.ts` → **33 passed**。
+  - `STAGENT_REAL_CURSOR=1 npx vitest run tests/e2e/cursor-agent-real.real.test.ts` → **7 passed | 1 skipped**（跳过的是需有效 API Key 的 `CA-06`）。真跑到的观测：专用 `HOME` 下 `status` = `Not logged in`；无 key 直跑 = `Error: Authentication required...`（**未回落订阅会话**）；假 key = `The provided API key is invalid.` + 来源为 `CURSOR_API_KEY` 环境变量；`--help` 逐项核对白名单与禁用旗标**都是真旗标**；`mcp list` 只读到 `stagent` 一项。
+  - `npx tsc --noEmit`：**57 个 `error TS`，与基线一致**（`cursor` 相关 0 条）。
+  - 全量 `vitest run`：**272 passed files / 8 failed / 3 skipped（283）**，`2694 passed / 7 failed`；8 个失败文件经 `git stash -u` 在 `main` 基线复跑**同组同因**（`cli-host-claude-code` 缺 `STAGENT_MCP_URL` 时 buildLaunch 抛错、`spawn-whitelist` 违规清单为 `why.ts` / `proxy.ts`，**不含新增文件**）。
+  - 真实 CLI 版本与环境：`cursor-agent` `2026.10.01-e373342` @ `darwin-arm64`，实测日 `2026-11-02`（记录在 `CURSOR_AGENT_MEASUREMENT`）。
+* **残余边界 / 后续挂账（P-125 归拢，共 6 条）**：
+  1. **`CA-06` 四类越权负例未执行（本卡唯一的 PASS 缺口）**：本机 `CURSOR_API_KEY` 未设置且 CLI 处于订阅登录态；按卡内 FAIL「凭证走订阅会话 = FAIL」，**没有**拿订阅会话凑数。因此 `CURSOR_AGENT_VERIFIED_ON` 恒 `undefined`、`CURSOR_AGENT_MEASUREMENT.negative_cases_executed: false`。补齐条件：有效 API Key + 隔离 `HOME`（断言 `status` 未登录）下跑完四类负例，**才能**填 `verified_on`。**在此之前不得把 cursor-agent 读成「已验证」**，它只是「已登记、未受控、不可派工」。
+     > **（P-160 现行 · 挂账 1 销项）** CA-06 **已执行**：run [`41959697673`](https://github.com/he18718143986-design/IDE/actions/runs/41959697673)（`ca06-real`，main `cec8c6c5d` / #141 后）全绿；`CURSOR_AGENT_VERIFIED_ON = { cli_version: "2026.10.22-27dcf5f", verified_at: "2026-11-05" }` 已回填（代码侧早已填好；本条对齐卡账）。`cli_version` = 安装包构建号，非 CLI 自报。**档位不变**：仍 `UNCONTROLLED_EXTERNAL`；`verified_on` ≠ 已受控 / 可派工；**不**宣称 Cursor 已受控或端到端闭环。拦截边界：写入/命令/MCP 由 CLI `plan` 只读档拒绝，非适配器白名单功劳；上游 plan mode 语义变化会击穿。上句「未执行 / 恒 undefined」为 P-125 当时事实，保留作溯源。证据详见 ledger README「CA-06 实测通过」非 OP 注记（2026-11-05）——**不重复造假证据**。
+  2. **`WorkerSpecRegistry` 符号不存在**：施工指令里「注册（`WorkerSpecRegistry` 持久化 `.stagent/workers.json`）」与代码事实不符——全仓无该类，`.stagent/workers.json` 是 W.7 **自注册** worker 的持久层，内建项写进去会与注册表同 id 冲突（`E_WORKER_DUPLICATED` / 「已被内建适配器占用」）。故按卡正文走**内建登记**，并加断言证明「列表可见 + 显示未受控 + 不可派工 + 不写 `workers.json`」。
+  3. **`CA-04` 的「spawn 零调用（spy 断言）」换成了顺序断言**：本卡无执行器，`run()` 物理上不启动任何进程，「spy 零调用」会变成永远为真的空断言。改为「缺 key 抛 A、有 key 抛 B」的错误码顺序断言——证明凭证检查先于执行器检查，且两条路径都不执行。
+  4. **env 白名单比卡内更窄**：卡写 `PATH`/`HOME`/`LANG`/`CURSOR_API_KEY`/`STAGENT_*`，实现**没有**透传任何 `STAGENT_*`（无观测需求）；窄于卡内，不是放宽。
+  5. **`docs/reports/` 实测证据归档未做**：本 PR 限定纯代码、不碰 `docs/`；证据记录在 `CURSOR_AGENT_MEASUREMENT` 常量与 #92 描述里。
+  6. **两处已知边界（如实登记，未修）**：① `AdapterRegistry.promoteControlMode()` 只校验指纹**形态**，自造指纹可把该适配器档位改成 `SANDBOX_ENFORCED`（改后派工仍被 `E_ADAPTER_SANDBOX_LOCKED` 拒）——真正挡住它的是「探测包产不出报告」；本卡非目标不许改注册表语义，故只做特征化断言。② 项目级 `.cursor/mcp.json` 在 `mcp list` 显示 `not loaded (needs approval)`，故 MCP 只写专用 `HOME`；这也意味着「仅挂 Stagent MCP」靠**配置目录隔离**而非 CLI 强约束（无 `--strict-mcp-config` 等价开关）。
+* **未宣称 / 不宣称端到端闭环**：
+  - **不宣称 cursor-agent 受控**：档位是结构性上界而非「还没测出来」——`GATEWAY_ENFORCED` 要求 `tool_interception_supported === true`（本进程无拦截点），`SANDBOX_ENFORCED` 要求派工经 `runInSandbox()` 并携 `SandboxWitness`（宿主进程不经该入口），故唯一合法档位是 `UNCONTROLLED_EXTERNAL`；**实测不改变档位**，只决定声明真实性与 Vibe 可用性。
+  - **不宣称 `stream-json` 契约已验证**：未接执行器，未解析过任何真实输出；`run()` 显式抛错而不是猜 schema。
+  - **不宣称「通过校验 = 够格标沙箱」**：`validateSandboxFenceTier()` 只查 `known_limitations` + 平台矩阵，宿主进程适配器也能过——这条陷阱已固化为断言。
+  - **不改变**：鉴权 / Demo Origin / 点亮三证 / 网关写范围（ADR-0001 纪律）；三档判据与 `resolveEvidenceControlMode()` 唯一强制点；`worker-probe.ts` 五类断言语义与 `target_mode` 类型；`UNCONTROLLED_EXTERNAL` 仍不得作为受控 / 可合并证据。
+* **关键文件**：`daemon/worker/cli-host/cursor-agent-adapter.ts`（新 · 393 行）、`daemon/worker/default-worker-registry.ts`（改 · 增 1 行登记）、`tests/unit/cursor-agent-adapter.test.ts`（新 · 33 用例）、`tests/e2e/cursor-agent-real.real.test.ts`（新 · 8 用例）、`tests/unit/adapter-registry-dispatch.test.ts`（改 · 项数断言 4 → 5）；**只读复用**：`daemon/worker/cli-host/claude-code-adapter.ts`、`daemon/worker/verify/worker-probe.ts`、`daemon/worker/adapter-registry.ts`、`daemon/worker/key-store.ts`（核对无 cursor 通道，未改）。
+
+---
+
+### 3.4r 本地 AST 增量依赖图分析引擎（B.1 · 架构感知层首卡）
+
+<a id="task-b.1"></a>
+
+#### 【Task B.1】本地 AST 增量依赖图分析引擎 `[COMPLETED]`
+* **任务编号**：`TASK-B.1`
+* **状态与证据**：`[COMPLETED]`（[#124](https://github.com/he18718143986-design/IDE/pull/124)/`9c177e92992566522929efecd9c1435244a17491`，squash merge；分支 `feat/b1-arch-graph`，parent `ad19bcd3`；合入后 main 的 tree 与分支完全一致）。
+* **对应规格**：[`../rfc/v0.2-scope.md`](../rfc/v0.2-scope.md) §2、§4.1；[`system-architecture.md`](./system-architecture.md) G-16；[`task-card-standard.md`](./task-card-standard.md) R-1～R-12；[`development-tasks.md`](./development-tasks.md) §1.1。
+* **前置依赖**：`TASK-D.1`（**COMPLETED**）；与 `TASK-B.2` 无依赖，可并行；`TASK-C.4` 对本卡为硬依赖（沿用 P-141 DAG）。
+* **交付内容**：
+  1. **存量代码重构增强**：
+     - `daemon/arch/parser.ts`：扩展名表补齐 `.json`，`.json` 入图为叶子节点（有入边、无出边、不参与环检测）；增加 JS/MJS/CJS AST 解析支持；别名解析兜底规范化与单文件异常降级防护（解析失败不炸整图，降级为空出边并记录日志）。
+     - `daemon/arch/graph.ts`：节点生命周期治理（`removeModule` 清理被删除节点的所有出边及悬空反向边 dangling reverse edges）；仓库级单例缓存管理（按规范化 `repoRoot` 进程内复用 `DependencyGraph` 实例，`updateRepoGraphFile` 与实例方法 `updateFile` 走 mtime/size 增量修补）。
+     - `daemon/server.ts`：`GET /api/arch/graph` 端点接入图单例与缓存协同，避免每请求全量扫盘。
+  2. **新建专用测试套件**：
+     - `tests/perf/arch-graph-benchmark.test.ts`：冷启动、单文件增量更新、GC 堆增量中位数、高深度环 Tarjan 性能基准测试。
+     - `tests/unit/arch-graph-boundaries.test.ts`：`.json` 叶节点无出边/不入环、`.cjs`/`.mjs` 导入、语法错误单文件隔离降级、反向边清理等边界恶魔测试。
+     - `tests/unit/arch-graph-cache.test.ts` & `tests/daemon/arch-graph.test.ts`：增量缓存复用、生命周期清理、既有拓扑/环检测/序列化回归。
+     - `tests/integration/contract-api.test.ts`：加强 `/api/arch/graph` 响应形状与数据结构断言防线。
+  3. **契约兼容超集**：
+     - `toJSON()` 还原旧契约超集：返回 `{ nodes: GraphNode[], edges: Array<{from, to}> }`，每个节点携带完整 `filePath`、`exports` 与 `imports`（`resolved` 经 `path.resolve` 规范化），为 C.4 雷达提供开箱即用数据源；内部邻接表形式保留为 `toAdjacencyList()` 与内部属性。
+     - `topologicalSort()` 返回值恢复 `{ order, hasCycle }`，且排序语义纠正为标准依赖优先拓扑序（被依赖者先出队；`.json` 叶子节点 in-degree 0 优先入队，不误报环）。
+     - 实例方法补齐别名兼容：保留 `hasNode` / `getModule`，同时提供 `has()` 与 `getNode(): GraphNode | undefined`；提供标准 `updateFile(filePath, content, aliases): number`。
+     - 只读消费方 `daemon/knowledge/bootstrap-draft.ts` 零改动、零破坏，签名保持完全兼容。
+* **实测性能数据（实测值，非目标值）**：
+  1. **1000 模块冷启动**：**228.81ms**（门禁目标值 ≤1500ms，达标）。
+  2. **单文件 `updateFile` 增量修补**：**平均 0.080ms / 最大 0.122ms**（门禁目标值 ≤20ms，达标）。
+  3. **全量图常驻内存增量**：强制 GC 后 `heapUsed` 差值三次中位数 **1.00 MiB**（门禁目标值 ≤40 MiB，达标）。
+  4. **10000 节点高深度环 Tarjan 环检测**：**17.11ms** 收敛且不爆栈（门禁目标值 ≤100ms，达标）。
+* **残余边界 / 后续挂账（共 4 条；P-145 后：挂账②已销项，在账 ①③ 共 2 条，已核销 ④ 与挂账② 共 2 条）**：
+  1. **挂账①（CI 环境 GC 暴露）**：`tests/perf/arch-graph-benchmark.test.ts` 在未注入 `--expose-gc` 参数的 CI 环境下，`global.gc` 不存在导致内存门禁退化为空真；需在后续专用性能基准工作流或启动参数中补显式配置。
+  2. **挂账②（Scan-root 边界收敛）**：`updateRepoGraphFile(repoRoot, filePath)` 当前未对 `filePath` 前置执行 `isUnderScanRoot()` 过滤收敛；若外部 watcher 传入 `src/` 之外的文件变更，仍会进入单文件解析流程，需后续补前缀守卫。**【已销项 · P-145】**：#128（`b1aa44f`）已在 `updateRepoGraphFile` 前置 `isUnderScanRoot` 守卫，并对移出 `src/` 的文件执行 `purgeDeletedModule` 完整 purge，无僵尸节点残留（见 §3.4s）。
+  3. **挂账③（目录遍历过滤防御）**：`walkSourceFiles` 递归收集源码时仅基于简单子目录扫描，未对 `.git`、`node_modules`、`dist` 等配置显式 `IGNORED_DIRS` 集合做剪枝过滤；当前因受限于固定 `SCAN_SUBDIR = "src"` 暂不引发问题，但在根路径或非标子树下存在潜在冗余扫描风险。
+  4. **挂账④（addModule 覆盖式语义 · 已核销）**：经源码走查 `daemon/arch/graph.ts` 确认，`addModule` 在向 `modules` 插入前显式执行 `this.clearModuleEdges(key)`，先清空目标节点旧出边并从所有被引节点的 `reverse` 索引中剔除该源节点，再按新解析模块建立正反向边；文件 import 减少时不会残留悬空废旧边，本条挂账确认闭合核销。
+* **未宣称 / 不宣称端到端闭环**：
+  - **不宣称架构雷达前后台闭环**：前端雷达视口（C.4）尚未接入，本卡仅交付底座数据源与 API 契约超集。
+  - **不宣称多工作树文件监听联动已实现**：外部变更由 B.2 负责监听与 STALE 联动，本卡仅提供单进程内图引擎增量修补能力。
+  - **不改变**：Daemon API 鉴权、Demo Origin、点亮三证、网关写范围（ADR-0001 纪律）；`src/` 扫描前缀限制（G-16）；P-141 DAG 拓扑关系。
+* **关键文件**：`daemon/arch/parser.ts`（增强）、`daemon/arch/graph.ts`（增强）、`daemon/server.ts`（接入端点缓存）、`tests/perf/arch-graph-benchmark.test.ts`（新）、`tests/unit/arch-graph-boundaries.test.ts`（新）、`tests/unit/arch-graph-cache.test.ts`（增强）、`tests/integration/contract-api.test.ts`（增强契约断言）；**只读复用**：`daemon/knowledge/bootstrap-draft.ts`、`tests/daemon/arch-graph.test.ts`。
+
+
+### 3.4s 多活跃 Worktree 监听与 Evidence 状态联动（B.2 · 架构感知层第二卡）
+
+<a id="task-b.2"></a>
+
+#### 【Task B.2】多活跃 Worktree 监听与 Evidence 状态联动 `[COMPLETED]`
+* **任务编号**：`TASK-B.2`
+* **状态与证据**：`[COMPLETED]`（[#128](https://github.com/he18718143986-design/IDE/pull/128)/`b1aa44f320a33f0c61197f63550e8c0f173a3a82`，squash merge；分支 `feat/b2-multi-worktree-watcher`）。
+* **对应规格**：[`../rfc/v0.2-scope.md`](../rfc/v0.2-scope.md) §2、§4.2；[`system-architecture.md`](./system-architecture.md) §3.2.1、§4.2.3 P-4、§5.2；[`task-card-standard.md`](./task-card-standard.md) R-1～R-12；[`development-tasks.md`](./development-tasks.md) §1.1 与 §2 DAG（P-141）。
+* **前置依赖**：`TASK-A.1`（**COMPLETED**）、`TASK-A.6`（**COMPLETED**）、`TASK-D.1`（**COMPLETED**）；与 `TASK-B.1` 无依赖、可并行；为 `TASK-C.4` 的软前置。
+* **交付清单**：
+  1. **多任务并发监听 Map**：`armedWatchers`（key = `contractId`）替代单实例退化点；重复武装同一合同时先释放旧资源再重建；`stopEvidenceWatcher` 精确解除指定合同，不踢掉其他任务的 watcher。
+  2. **指纹单点统一**：`computeWorktreeFingerprint` 与 `computeWorktreeFingerprintSync` 共享同一套 git + 降级口径；`invalidation-engine` 与 `merger` 合并前复核同源，杜绝算法不一致导致的假失效或漏失效。
+  3. **合并前兜底复核**：合并前快照指纹复核独立于 watcher 状态；watcher 未启动、被关闭或丢包时仍强制执行。
+  4. **`isUnderScanRoot` 守卫**：事件路径先过 scan-root 守卫；移出 `src/` 的文件执行 purge，清理僵尸节点（同时销项 B.1 挂账②）。
+  5. **`waitUntilReady` 生产路径集成**：默认 5s 超时，超时 warn 后降级继续、不挂死；`armEvidenceWatcher` 未就绪时 warn 但不阻断武装，合并前兜底仍在。
+  6. **`shouldIgnore` 精确段匹配**：忽略判定按相对路径段精确匹配 `IGNORED_SEGMENTS`；越界判断精确为「`..` 本身或 `..` + 分隔符开头」，不再误伤合法的 `..cache` 类目录。
+  7. **macOS 修复链留痕**：`waitUntilReady` 超时兜底；root 构造期 `realpathSync` 归一；`.git/HEAD` 直读，worktree 的 gitdir / commondir / packed-refs 不可直读时回退 `git rev-parse`。
+* **实测性能（实测值，非目标值）**：
+  1. **门禁①（外部修改 → STALE 响应）**：中位 **67.9ms**。过门禁上限 ≤100ms；**未达 ≤50ms 体验目标，如实记为已知边界**。
+  2. **门禁③（合并前指纹复核）**：中位 **29.40ms**（macOS CI 实测，[#133](https://github.com/he18718143986-design/IDE/pull/133) CI run `41800987599`，`headDirect=true`；原 Linux 本地 8.37ms 已由 CI 实测替代）。
+  3. **门禁②（≥5 worktree 并发常驻内存增量）**、**门禁④（句柄 / 定时器 100% 释放）**：达标。
+* **门禁①口径统一**：卡内原「≤50ms」标题与「≤100ms」断言不一致。本卡统一为「体验目标 ≤50ms，门禁上限 ≤100ms」；67.9ms 按门禁判定通过，按体验目标记为未达。
+* **残余挂账与注记（共 6 条）**：
+  1. **B.1 挂账②（`updateRepoGraphFile` 无 scan-root 收敛）→ 已销项**：#128 已补 `isUnderScanRoot` 前置守卫与 purge，见 `daemon/arch/graph.ts`。
+  2. **`record.fingerprint` 死字段（待裁决）**：`daemon/watcher/invalidation-engine.ts` 的增量判定记录写入 `fingerprint` 字段，`daemon/` 内无读取方。二选一：保留并注明意图，或删除。本次文档 PR 不改代码，裁决挂入后续代码卡。
+  3. **降级语义放宽（口径变化）**：非 Git 目录由「抛错」改为「降级哈希」（`daemon/guard/evidence-integrity.ts` 的 `fallback:v1` 口径）。调用方不应再依赖抛错作为非 Git 判定。
+  4. **`shouldIgnore` 语义变化**：`..` 前缀目录（如 `..cache`）现纳入指纹范围，此前被误排除。
+  5. **门禁①标题与断言不一致**：已按上文「门禁①口径统一」对齐。
+  6. **`readyState` 迟到 ready 不翻回（注释级小项）**：`timeout` 之后迟到的 `ready` 事件不会把状态翻回 `ready`，`isReady` 永久为 `false`；`waitUntilReady` 的超时降级语义不受影响。记一笔，暂不修。
+* **未宣称 / 不宣称端到端闭环**：
+  - 不宣称架构雷达联动已完成（`TASK-C.4` 未开工）。
+  - 不宣称 Windows 单测全绿：`Unit tests (windows-latest)` 在 head `81fe18c` 上仍红，该 job 不在必需检查内（挂账，见 PR #128 记录）。
+  - 不改变 Daemon API 鉴权、Demo Origin 隔离、点亮三证、网关写范围；不改变 P-141 DAG 拓扑。
+* **关键文件**：`daemon/watcher/fs-watcher.ts`（`shouldIgnore`、`WorktreeWatcher`、`waitUntilReady`）；`daemon/watcher/invalidation-engine.ts`（增量判定与 record）；`daemon/guard/evidence-integrity.ts`（`computeWorktreeFingerprint` 单点与降级口径）；`daemon/server.ts`（`armedWatchers` Map、`armEvidenceWatcher`）；`daemon/pipeline/merger.ts`（合并前复核）；`daemon/arch/graph.ts`（`isUnderScanRoot`、`purgeDeletedModule`）；测试 `tests/unit/multi-worktree-watcher.test.ts`、`tests/unit/multi-worktree-cross-talk.test.ts`、`tests/unit/pre-merge-fingerprint-fallback.test.ts`。
+
+### 3.4t 架构雷达视图与 Scope 圈选抽屉（C.4 · 架构感知层第三卡）
+
+<a id="task-c.4"></a>
+
+#### 【Task C.4】架构雷达视图与 Scope 圈选抽屉
+
+```yaml task-card
+id: TASK-C.4
+status: COMPLETED
+contract:
+  intent:
+    title: 架构雷达视图与 Scope 圈选抽屉
+    description: 用户在 Supervisor 工作台流畅查看 1000 模块拓扑与新鲜度着色；对已批准合同圈选修改 Scope 时强制派生新 Revision 并清空旧审批。
+    risk_level: HIGH
+  acceptance:
+    - { id: C4-P1, check: auto, text: 1000 节点 2000 边单批次局部 patch ≤16ms }
+    - { id: C4-P2, check: auto, text: 50 次连续 patch 后元素数与图模型一致（jsdom 实体计数代理；真实堆内存待 Playwright） }
+    - { id: C4-P3, check: auto, text: ">1000 节点降级为 grid/preset 静态布局" }
+    - { id: C4-P4, check: auto, text: 仅卸载时 cy.destroy() 一次 }
+    - { id: C4-P5, check: auto, text: 数据 / 环路 / 搜索变化复用同一 Cytoscape 实例 }
+    - { id: C4-P6, check: auto, text: applyFreshnessClasses 先清 fresh/stale/changed 类，再按 freshnessMap 为节点加对应类（STALE → stale，CHANGED → changed） }
+    - { id: C4-P7, check: auto, text: "抽屉内确认后以 (paths, mode) 调用 onApplyScope；已批准合同 mode 为 derive_revision" }
+    - { id: C4-P8, check: auto, text: 已批准且处于 PREPARING 的合同改 Scope 时派生新 Revision 并清空旧审批 }
+    - { id: C4-P9, check: auto, text: 旧 Revision 审批被 assertApprovalBinding 判定为 APPROVAL_REVISION_STALE }
+    - { id: C4-P10, check: auto, text: 合并时旧 revision 审批被 APPROVAL_REVISION_STALE 拒绝 }
+    - { id: C4-P11, check: auto, text: DRAFT 草案原地更新 Scope，不自增 revision }
+    - { id: C4-P12, check: auto, text: 执行中合同改 Scope 返回 409 E_SCOPE_CHANGE_FORBIDDEN 且磁盘不变 }
+  scope:
+    writable_paths:
+      - src/components/radar/**
+      - src/lib/contract.schema.ts
+      - src/lib/state-machine.ts
+      - src/lib/daemon-api.ts
+      - src/routes/index.tsx
+      - daemon/pipeline/merger.ts
+      - daemon/pipeline/contract-store.ts
+      - daemon/server.ts
+      - tests/components/RadarGraph.test.tsx
+      - tests/components/RadarGraph.perf.test.tsx
+      - tests/unit/contract-scope-revision.test.ts
+      - tests/daemon/contract-scope-revision-store.test.ts
+      - tests/daemon/scope-revision-api.test.ts
+    readonly_paths:
+      - daemon/arch/**
+  verification:
+    commands:
+      - alias: radar
+        executable: npx
+        args: [vitest, run, tests/components/RadarGraph.test.tsx, tests/components/RadarGraph.perf.test.tsx]
+      - alias: scope-revision
+        executable: npx
+        args: [vitest, run, tests/unit/contract-scope-revision.test.ts, tests/daemon/contract-scope-revision-store.test.ts, tests/daemon/scope-revision-api.test.ts]
+      - alias: typecheck
+        executable: npm
+        args: [run, typecheck]
+design:
+  approach: >-
+    RadarGraph 改为挂载期创建一次的持久 Cytoscape 实例，数据变化经 patchGraphElements 在 cy.batch() 内按
+    删 → 增 → 更新做元素级 patch；ScopeSelector 原地升级为抽屉。Scope 变更走 applyContractScopeChange：
+    已批准且处于 PREPARING 的合同派生新 Revision、经 ContractStore.transition 落盘并清空审批，其余组合
+    Fail-Closed；合并门禁复用 state-machine.ts 的 assertApprovalBinding，不另造错误码。
+  touches:
+    - { path: src/components/radar/RadarGraph.tsx, change: modify, why: 持久实例与增量 patch, symbols: [patchGraphElements, applyFreshnessClasses, updateCycleHighlight, GraphElementsDiff, FreshnessStatus] }
+    - { path: src/components/radar/ScopeSelector.tsx, change: modify, why: 升级为圈选抽屉, symbols: [ScopeSelector, onApplyScope] }
+    - { path: src/lib/contract.schema.ts, change: modify, why: Scope 变更治理, symbols: [evaluateScopeChange, applyContractScopeChange, ScopeChangeForbiddenError, E_SCOPE_CHANGE_FORBIDDEN] }
+    - { path: src/lib/state-machine.ts, change: modify, why: 审批与 revision 绑定判定, symbols: [assertApprovalBinding] }
+    - { path: daemon/pipeline/merger.ts, change: modify, why: 合并前审批绑定门禁, symbols: [mergeInternal] }
+    - { path: daemon/server.ts, change: modify, why: POST /api/contracts/:id/scope-revision }
+    - { path: src/lib/daemon-api.ts, change: modify, why: 前端调用派生接口, symbols: [updateContractScopeRevision] }
+    - { path: src/routes/index.tsx, change: modify, why: SupervisorTab 接线 }
+    - { path: tests/components/RadarGraph.perf.test.tsx, change: create, why: 性能门禁 }
+    - { path: tests/unit/contract-scope-revision.test.ts, change: create, why: 治理裁决矩阵 }
+    - { path: tests/daemon/contract-scope-revision-store.test.ts, change: create, why: transition 落盘与合并门禁 }
+    - { path: tests/daemon/scope-revision-api.test.ts, change: create, why: HTTP 200 / 409 }
+  interfaces:
+    - name: POST /api/contracts/:id/scope-revision
+      kind: http
+      signature: "{ writable_paths: string[] } → 200 { mode: 'draft' | 'derive_revision', contract } | 409 E_SCOPE_CHANGE_FORBIDDEN"
+      consumers: []
+  test_plan:
+    - { acceptance_id: C4-P1, test_path: tests/components/RadarGraph.perf.test.tsx, level: unit, case: "性能门禁①" }
+    - { acceptance_id: C4-P2, test_path: tests/components/RadarGraph.perf.test.tsx, level: unit, case: "性能门禁②" }
+    - { acceptance_id: C4-P3, test_path: tests/components/RadarGraph.perf.test.tsx, level: unit, case: "性能门禁③" }
+    - { acceptance_id: C4-P4, test_path: tests/components/RadarGraph.perf.test.tsx, level: unit, case: "性能门禁④" }
+    - { acceptance_id: C4-P5, test_path: tests/components/RadarGraph.test.tsx, level: unit, case: "局部状态更新不调用 cy.destroy()" }
+    - acceptance_id: C4-P6
+      test_path: tests/components/RadarGraph.test.tsx
+      level: unit
+      case: 新鲜度着色：STALE / CHANGED 落到节点 class
+    - acceptance_id: C4-P7
+      test_path: tests/components/RadarGraph.test.tsx
+      level: unit
+      case: 圈选抽屉：已批准合同强制派生 Revision
+    - { acceptance_id: C4-P8, test_path: tests/unit/contract-scope-revision.test.ts, level: unit, case: "已批准且处于 PREPARING" }
+    - { acceptance_id: C4-P9, test_path: tests/unit/contract-scope-revision.test.ts, level: unit, case: "旧 Revision 审批失效" }
+    - { acceptance_id: C4-P10, test_path: tests/daemon/contract-scope-revision-store.test.ts, level: integration, case: "合并生产门禁" }
+    - { acceptance_id: C4-P11, test_path: tests/unit/contract-scope-revision.test.ts, level: unit, case: "未批准草案（DRAFT）" }
+    - { acceptance_id: C4-P12, test_path: tests/daemon/scope-revision-api.test.ts, level: integration, case: "EXECUTING 执行中合同" }
+governance:
+  spec_refs:
+    - docs/rfc/v0.2-scope.md#43-task-c4--架构雷达--scope-圈选抽屉建议激活排在-b1-之后
+    - docs/specs/system-architecture.md#321-节点生命周期七态表-v152-统一
+  depends_on:
+    - { id: TASK-B.1, kind: hard }
+    - { id: TASK-B.2, kind: soft }
+    - { id: TASK-C.1, kind: hard }
+    - { id: TASK-C.2, kind: hard }
+    - { id: TASK-C.3, kind: hard }
+  code_facts:
+    - { ref: "src/components/radar/RadarGraph.tsx:100-240", note: 任何数据变化都 cy.destroy() 后全量重建 }
+    - { ref: "src/components/radar/ScopeSelector.tsx::ScopeSelector", note: 只是静态徽标列表，无抽屉与影响面预览 }
+    - { ref: "src/lib/contract.schema.ts::bumpContractRevision", note: 生产零调用方，Scope 可原地修改 }
+  non_goals:
+    - 不改 Daemon 图分析引擎（TASK-B.1 已冻结）
+    - 不替换 Cytoscape
+    - 不做任意多边形套索
+    - 不支持 AUDITED 合同退回待批（需先在 runtime §9.1.1 补受控边）
+  fail:
+    - 任何局部状态变化触发 cy.destroy() 重建
+    - 已批准合同原地修改 Scope
+    - 旧 Revision 审批对新 Revision 仍有效
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 138, commit: 993e3e9 }
+```
+
+* **任务编号**：`TASK-C.4`
+* **前置依赖（R-3）**：`TASK-B.1`（**COMPLETED** · 硬依赖，交付 `/api/arch/graph` 契约超集）；`TASK-B.2`（**COMPLETED** · 软依赖，交付多 worktree watcher 与 `EVIDENCE_STATUS_CHANGED` 广播）；`TASK-C.1`（**COMPLETED**）、`TASK-C.2`（**COMPLETED**）、`TASK-C.3`（**COMPLETED**）。
+* **任务状态**：**[COMPLETED]**（[#138](https://github.com/he18718143986-design/IDE/pull/138) squash `993e3e9`；代码提交 `a445f95` 主体 + `9bf2ccb` 返工；P-148 回写迁入 completed §3.4t）。
+* **DoR 正文重写记录（存量对账矩阵与纠偏注记）**：基于 main@`78ae73b`（含 #128 B.2、#129 P-145 与 #136 P-146 门禁③数字修正 B.2 与 #129 P-145 回写）实存代码只读对账重写，严禁按空白实现写卡：
+  - **纠偏注记（非零调用方）**：此前核查曾误假设雷达组件「零调用方」，经实存源码核实纠偏：`src/components/radar/RadarGraph.tsx`、`FilterToolbar.tsx` 与 `ScopeSelector.tsx` **已实际挂载**于 `src/routes/index.tsx:3040-3085` 的 `SupervisorTab` 架构视图区域中（固定高度约 520px），选择路径可填入新建需求范围。本卡重写与后续实现必须基于现有挂载点平滑重构演进，不得脱离调用上下文凭空新建平行页面或破坏现有挂载。
+  - **已存在**：
+    1. `src/components/radar/RadarGraph.tsx`：基于 Cytoscape 实现，节点期望 `filePath`、`exports`，边期望 `{from, to}`；支持单点点击选中、多选同步、搜索节点居中定位及环路高亮；节点数 > 600 时切 `grid` 布局，否则为 `cose` 布局；
+    2. `src/components/radar/FilterToolbar.tsx`：提供搜索输入框、环路高亮切换开关及节点/边数统计指标（搜索当前仅计数并居中定位首个匹配项，未做子图裁剪过滤）；
+    3. `src/components/radar/ScopeSelector.tsx`：展示已选路径徽标列表、支持清空与调用 `onApply`；
+    4. `daemon/server.ts` 与 `daemon/arch/graph.ts`：`GET /api/arch/graph` 端点已交付旧契约超集：`nodes` 包含 `filePath`/`exports`/`imports`，`edges` 为扁平 `{from, to}` 数组，外加 `durationMs`、`stats`、`cycles`；前端 payload 类型虽漏写 `imports`，但雷达当前不读取该字段，硬依赖完全满足；
+    5. `src/routes/index.tsx`：包含 `loadArchGraph` 手动 fetch 与 Task Graph 联动重新拉取机制；
+    6. WebSocket 订阅基建：已存在 `EVIDENCE_STATUS_CHANGED`（更新合同 stale）与 `SCOPE_ALERT` 帧订阅分发点；
+    7. `src/lib/contract.schema.ts::bumpContractRevision`：已提供递增 revision 并清空 approvals 的状态机辅助函数（生产零调用方）。
+  - **需重构**：
+    1. `src/components/radar/RadarGraph.tsx`：**局部 patch 路径重构（核心性能治理）**。当前实现中拓扑变更、搜索高亮或环路开关均无条件触发 `cy.destroy()` 并全量重新 `cytoscape(...)` 初始化，造成严重性能抖动且无法满足 1000 节点局部更新 ≤16ms 门禁！必须重构为持有持久 `cy` 实例，所有节点/边/属性/新鲜度状态更新一律使用 `cy.batch()` 进行元素级增量 patch（增、删、改样式 class 与 data），禁止因任何状态变化销毁重建 Cytoscape 实例；
+    2. `src/components/radar/ScopeSelector.tsx`：当前为页面内简单列表组件，需重构为交互式 Scope 圈选抽屉（`ScopeSelectorDrawer`），支持滑出抽屉、多选圈选路径树、影响范围预览、以及与已批准合同变更的联动逻辑；
+    3. `src/routes/index.tsx`：重构雷达数据获取与事件订阅，将全量重建改为接收增量变更并调用雷达 patch 接口。
+  - **需新建**：
+    1. **新鲜度着色数据源接线（二选一写死）**：当前 WS `EVIDENCE_STATUS_CHANGED` 帧仅含合同级状态，缺乏节点级文件路径映射。采用**推荐路径（首选）**：扩展 `EVIDENCE_STATUS_CHANGED` 帧结构携带 `worktree_path` / 变更文件相对路径列表；若在当前帧协议冻结约束下，采用**备选路径**：前端收到帧后通过轻量 API 请求获取合同受影响路径映射。雷达根据路径映射通过 `cy.batch()` 快速为对应节点施加新鲜度（FRESH/STALE/CHANGED）着色；
+    2. **Scope → Revision 派生生产路径**：将 `src/lib/contract.schema.ts::bumpContractRevision` 接入生产调用链，新建 Scope 变更派生处理逻辑：已批准合同（`APPROVED` / `DELIVERED`）一旦圈选变更 Scope，强制调用 `bumpContractRevision` 派生新版本，重置审批记录（`approvals: []`），使旧 revision 的审批对新 revision 确定性失效；
+    3. `tests/components/RadarGraph.perf.test.tsx`：前端雷达专项性能基准测试（包含 1000 节点局部 patch 耗时与内存增量断言）；
+    4. `tests/unit/contract-scope-revision.test.ts`：Scope 变更强制派生新 Revision 及旧审批被拒测试。
+* **对应规格（R-1）**：[`../rfc/v0.2-scope.md`](../rfc/v0.2-scope.md) §2、§4.3（C.4 架构雷达与 Scope 圈选抽屉）；[`system-architecture.md`](./system-architecture.md) §11 注记 9、§3.2.1；[`task-card-standard.md`](./task-card-standard.md) R-1～R-12；[`development-tasks.md`](./development-tasks.md) §1.1 与 §2 DAG（P-141）。
+* **目标（R-2）**：Supervisor 工作台用户可通过流畅的架构雷达（Cytoscape 渲染）观察 1000 模块拓扑关系与新鲜度实时着色；用户可通过 Scope 圈选抽屉交互式挑选修改范围，对已批准合同圈选修改 Scope 时系统强制派生新 Revision 并清空旧审批，杜绝在已获批合同上原地扩权。
+* **代码事实与落差（R-4）**：
+  1. `src/components/radar/RadarGraph.tsx:100-240` 每次依赖图数据变动或环路切换均无条件调用 `cy.destroy()` 销毁实例并重新全量构建，不满足 1000 节点局部 patch ≤16ms；
+  2. `src/components/radar/ScopeSelector.tsx` 当前仅为静态徽标列表展示，无抽屉交互与影响面预览能力；
+  3. `src/lib/contract.schema.ts::bumpContractRevision` 存在但为孤立辅助函数（生产零调用方），合同更新路径未阻断原地修改 Scope；
+  4. WS 订阅已有 `EVIDENCE_STATUS_CHANGED` 与 `SCOPE_ALERT`，但帧内缺少文件级变更路径，无法直连雷达节点新鲜度着色；
+  5. 现有 `tests/components/RadarGraph.test.tsx` 仅覆盖基本挂载，无 1000 节点前端局部更新性能与内存门禁测试。
+* **范围与接口（R-5）**：
+  - **重构 `src/components/radar/RadarGraph.tsx`**：
+    - 持久 Cytoscape 实例管理：组件挂载期只执行一次 `cytoscape(...)` 初始化，卸载期执行唯一一次 `cy.destroy()`；
+    - 局部增量 Diff 更新：实现 `patchGraphElements(diff: GraphElementsDiff): void`，利用 `cy.batch()` 批量执行元素增删改与类名修补；
+    - 新鲜度着色接口：提供 `applyFreshnessClasses(statusMap: Map<string, FreshnessStatus>): void`，在 `cy.batch()` 内为节点添加/移除 `stale` / `fresh` / `changed` 样式类；
+    - >1000 节点降级策略：节点数 >1000 时，强制禁用 cose 物理动效，降级为预计算 `grid` 或 `preset` 静态轻量布局，禁用昂贵的连带动画。
+  - **重构 `src/components/radar/ScopeSelector.tsx`（或增强为 `ScopeSelectorDrawer.tsx`）**：
+    - 抽屉形态呈现：采用 Drawer / Sheet 交互容器，展示选中模块路径树、直接依赖与被依赖关系统计；
+    - 圈选应用回调：提供 `onApplyScope(selectedPaths: string[], mode: "draft" | "derive_revision"): Promise<void>`，对已批准合同明确提示将派生新版本重新审批。
+  - **接线 `src/routes/index.tsx`（SupervisorTab）**：
+    - 雷达数据加载与 WS 事件联动：复用现有挂载点，拉取图数据后首次初始化持久雷达实例；后续图谱变更或新鲜度 WS 广播仅触发增量 patch，不重绘整页或重建实例；
+    - Scope 变更治理分流：草稿合同（`DRAFT`）允许原地更新 Scope；已获批合同（`APPROVED` / `DELIVERED` 等）调用 `bumpContractRevision` 派生新合同修订版并提交。
+  - **新建治理与测试文件**：
+    - `tests/components/RadarGraph.perf.test.tsx`
+    - `tests/unit/contract-scope-revision.test.ts`
+* **非目标（R-6）**：
+  - 不修改 Daemon 图分析引擎算法本体（`TASK-B.1` 已完工并冻结）；
+  - 不替换 Cytoscape 底层渲染引擎为 Canvas/WebGL 或其他平行图库（Cytoscape 在 batch patch 机制下经估算达标，避免无谓重构）；
+  - 不修改 Daemon API 鉴权规则、Demo Origin 隔离、点亮三证或网关写范围；
+  - 不在本卡内实现复杂的任意多边形套索（lasso）几何物理算法，交互圈选以节点多选点选、目录树勾选、邻域连带扩散选择为主。
+* **PASS 断言清单（R-7）**：
+  1. **性能门禁①（1000 节点局部 patch 耗时）**：在 `tests/components/RadarGraph.perf.test.tsx` 中，预置 1000 节点 2000 边图实例，执行单批次状态/新鲜度/单节点增量局部更新，`cy.batch()` 执行耗时 ≤ 16ms（满足 60 FPS 帧率要求）；
+  2. **性能门禁②（前端增量内存上限）**：同测试中，加载 1000 节点并连续执行 50 次局部 patch 更新，前后增量堆内存占用 ≤ 30MB；
+  3. **性能门禁③（>1000 节点降级行为明确）**：节点规模超过 1000 时，自动降级为轻量布局（禁用连续 cose 力导向动效，切换为预计算 grid/preset 静态布局），且搜索与过滤不发生卡死；
+  4. **性能门禁④（组件卸载资源彻底释放）**：`RadarGraph` 组件卸载或抽屉关闭时，仅在此时调用 `cy.destroy()`，解绑所有全局事件监听器，多次挂载/卸载后无内存泄漏；
+  5. **持久实例与批处理更新**：图数据变化、环路高亮开关、搜索过滤变更时，复用既有 Cytoscape 实例，通过 `cy.batch()` 元素级 diff 增删改节点与边，零全量销毁重建；
+  6. **新鲜度实时着色连通**：收到新鲜度事件（WS 扩展帧或路径映射响应）后，雷达图精准为受影响节点添加 STALE / CHANGED 样式类，无刷新闪烁；
+  7. **Scope 圈选与路径回填**：在抽屉中圈选目录或文件集合，确认应用后正确回填至需求 Scope 列表，并能正确反显选中态；
+  8. **Scope 变更强制派生 Revision**：在 `tests/unit/contract-scope-revision.test.ts` 中，对处于已批准状态（`APPROVED` / `DELIVERED` 等）的合同圈选修改 Scope，系统自动调用 `bumpContractRevision` 派生新版本，合同 `revision` 递增；
+  9. **旧 Revision 审批失效被拒**：同测试中，Scope 变更后旧 Revision 的审批记录被清空，旧审批签名在当前 Revision 提交合并时被校验逻辑拒绝（`E_APPROVAL_REVISION_MISMATCH`），必须重新发起审批；
+  10. **未批准草案原地修改允许**：处于 `DRAFT` 阶段未获批准的合同，修改 Scope 允许在原 Revision 原地更新，不产生多余版本碎片。
+* **FAIL 红线清单（R-8）**：出现以下任一情况即判定为不合格：
+  1. **任何局部状态变化触发 `cy.destroy()` 重建**：拓扑更新、环路切换、搜索高亮或新鲜度变化时销毁重建 Cytoscape 实例；
+  2. **已批准合同允许原地修改 Scope**：在已获批准合同上原地扩大或变更 Scope 而不递增 Revision，构成越权逃逸；
+  3. **旧 Revision 审批仍对新 Revision 有效**：Scope 派生新版本后，旧审批凭证仍被允许用于放行合并；
+  4. **性能门禁超限**：1000 节点局部 patch 耗时 > 16ms，或增量内存占用 > 30MB；
+  5. **超 1000 节点缺乏降级策略**：大图场景下未触发降级保护，导致浏览器主线程冻结；
+  6. **错误映射新鲜度数据源**：将整图无差别全量标为 STALE，而非按工作树变动文件路径做局部节点映射着色；
+  7. 破坏既有 SupervisorTab 挂载点或破坏鉴权安全门禁。
+* **安全 / ADR（R-9）**：遵循 ADR-0001（防越权安全门禁完全不变）、ADR-0004（双状态机与合同版本治理不可旁路）与 ADR-0014；不修改任何 ADR。已批准合同修改 Scope 必须重跑审批是系统防越权核心红线。
+* **默认值与未决项（R-10）**：
+  - 新鲜度着色数据源写死：首选扩展 WS 帧携带变动路径；备选拉取合同路径映射；
+  - 1000 节点降级阈值写死为 1000；>1000 时默认禁用 cose 动效切换为 grid/preset；
+  - 圈选抽屉默认展示当前合同已锁定的 Scope 文件与直接关联边；
+  - 本卡经 P-141 拍板激活，存量对账矩阵与治理断言已批，无未决产品问题。
+* **估算（R-11）**：**M（≤2 天）**。聚焦于前端雷达组件增量 patch 性能重构、Scope 抽屉交互与合同 Revision 派生接线及专项测试；单一前端呈现层与调用集成，未越层。
+* **不变声明（R-12）**：**不改变** Daemon API 鉴权规则、Demo Origin 隔离、点亮三证、网关写范围；不放宽合同状态机审批门禁（`bumpContractRevision` 严格清空审批）；不破坏 SupervisorTab 架构视图宿主结构。
+---
+
+---
+
+* **交付清单（P-148 核实）**：
+  - **渲染增量**：`RadarGraph` 持久 Cytoscape 实例；元素级增量 `patchGraphElements` 经 `cy.batch()` 执行，顺序为「删 → 增 → 更新」，不再全量重建。
+  - **Scope 圈选抽屉**：`ScopeSelector` 升级为抽屉；`isApproved` 以 `approval === "APPROVED"` 判定，不以生命周期状态推断。
+  - **Scope 派生与治理**：`POST /api/contracts/:id/scope-revision` 对已批准且处于 PREPARING 的合同派生新 Revision，经 `ContractStore.transition({ nextContract })` 校验后落盘（PENDING_APPROVAL / PENDING_REVIEW，旧审批字段清空）。执行中、终态与非法跃迁 Fail-Closed 返回 409 `E_SCOPE_CHANGE_FORBIDDEN`，磁盘不变。
+  - **合并门禁**：`mergeInternal` 在 AUDITED 门禁后调用 `assertApprovalBinding`，旧 revision 审批以 `APPROVAL_REVISION_STALE` 阻断合并；复用 `state-machine.ts` 唯一事实源，删除平行的 `validateApprovalRevision` / `E_APPROVAL_REVISION_MISMATCH`。
+  - **新鲜度口径**：STALE 的 `changed_paths` 映射为与 RadarGraph 节点 id 同口径的绝对路径 key。
+* **测试**：`tests/unit/contract-scope-revision.test.ts`（治理裁决矩阵）、`tests/daemon/contract-scope-revision-store.test.ts`（transition 落盘与合并门禁拒绝旧审批）、`tests/daemon/scope-revision-api.test.ts`（HTTP 200 派生 / 409 拒绝且磁盘不变）；`tests/components/RadarGraph.perf.test.tsx` 门禁①（1000 节点 ≤16ms）与门禁②（内存代理）。本地 Linux 相关套件 203 项通过；#138 的 Ubuntu / macOS lint、typecheck、unit 必需检查全绿。Windows unit 红灯为既有平台问题（main 基线同样失败，非必需检查）。
+* **实测口径（未宣称）**：门禁①以断言 ≤16ms 通过，本回写未记录实测中位数；门禁②内存以 jsdom 实体计数为代理，**未经 Playwright 真实浏览器内存测量**。
+* **挂账（P-148 入账）**：
+  1. `freshnessMap` 拼接 `${repoRoot}/${relativePath}` 在 Windows 上分隔符未归一，与 `path.resolve` 节点 id 口径可能不一致（修法：`path.join` 或统一正斜杠归一）。
+  2. `ContractStore.transition()` 的 revision 回退抛通用 `Error`，server 兜底返回 400（语义可接受，仅记录）。
+  3. 内存门禁真测待 Playwright 真实浏览器验证。
+* **不宣称**：不宣称 AUDITED 合同可退回待批（当前拒绝为默认；支持需先在 §9.1.1 补受控边，另立议题）；不宣称真实浏览器内的渲染性能与内存已验证。
+> **（P-162 · 保留作溯源）** 库层受控边已由 [`TASK-AUDITED.1`](#task-audited.1) 补齐（[#165](https://github.com/he18718143986-design/IDE/pull/165)/`b390254`；规范 §11.3 / §9.1.1.1 对齐）。当时生产路径暂无接线。
+> **（P-171 现行）** 生产接线已由 [`TASK-AUDITED.2`](#task-audited.2) 补齐（[#178](https://github.com/he18718143986-design/IDE/pull/178)/`71684d4`）。#178 合入时 `index.tsx` 父级未接；Tina 已授权 follow-up（进行中）。**仍不宣称**端到端「退回待批」产品闭环；上句「拒绝为默认 / 另立议题」保留作溯源。
+
+
+### 3.4u L.17a 参考站抓取成果接入 CompareView snapshots（L.17d · 产品验收挂账①）
+
+<a id="task-l.17d"></a>
+
+#### 【Task L.17d】L.17a 参考站抓取成果接入 CompareView `snapshots` `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#145](https://github.com/he18718143986-design/IDE/pull/145)/`e2b8dd3`，squash；代码 tip `ff0d6b5`；基线 #144/`a147168` P-149 立卡之后）。
+- **交付**：新增 `daemon/playtest/reference-snapshots.ts`（`buildReferenceSnapshots` / `handleReferenceSnapshotsRequest`）；`daemon/server.ts` 挂薄读侧 `GET /api/playtest/reference-snapshots?contract_id=`；前端 `src/lib/daemon-api.ts::fetchPlaytestReferenceSnapshots`；`src/routes/index.tsx` 合同切换时拉数写入 `playtest.snapshots` → `PlaytestAcceptBlock` → 既有 `CompareView`。摄取**只**走 `WebIngestProxy`（与 L.17a 白名单/禁域同口径）；**不改** CompareView / PlaytestAcceptBlock props 契约；`screenshot_url` **恒 null**（不新开截图管线）；不持久化快照库（即时拉数）；单 URL 失败保留占位 `dom_summary` 错误说明，不伪造 html/截图。测试：`tests/unit/playtest-reference-snapshots.test.ts` 7 passed；`tests/ui/scheme-review-playtest.test.tsx` 8 passed；`tsc` 0。
+- **销项**：兑现 L.17c completed §3.4p **挂账①**（snapshots 前端拉数）。
+- **残余 / 默认未做（不宣称关闭）**：① `screenshot_url` 恒 null（截图管线另卡）；② 无持久快照库（落盘缓存另卡）；③ 挂账② 会话原话候选 → [`TASK-L.17e`](#task-l.17e) `[COMPLETED]`（P-151 · #147/`aeedecd`）；④ 挂账③ 真机 `check playtest` → [`TASK-L.17f`](#task-l.17f) `[COMPLETED]`（P-152 · #149/`86da495`）；⑤ 不碰 W.9（本卡未碰；L.17f 仅最小 orchestrator 旁路）。
+- **边界**：**窄口径**——snapshots 读侧 + 前端灌数已合入；**不**宣称端到端产品闭环；不复活 REJ-009；不绕过 WebIngestProxy。
+
+```yaml task-card
+id: TASK-L.17d
+status: COMPLETED
+contract:
+  intent:
+    title: L.17a 参考站抓取成果接入 CompareView snapshots
+    description: >-
+      用户在中栏对照试玩左栏看见合同 references[] 经 L.17a 受控摄取得到的参考站抓取成果
+      （至少 HTML/摘要），不再长期空白；缺成果时仍诚实空态。
+    risk_level: MEDIUM
+  acceptance:
+    - { id: L17D-P1, check: auto, text: "有 references[] 时 GET /api/playtest/reference-snapshots 返回与 references 对齐的 ReferenceSnapshotView 列表（reference_url 一一对应）" }
+    - { id: L17D-P2, check: auto, text: "摄取走 WebIngestProxy（白名单/禁域与 L.17a 同口径）；非白名单域名不得出现在成功结果中" }
+    - { id: L17D-P3, check: auto, text: "index/SchemeReview 把 snapshots 传入 PlaytestAcceptBlock → CompareView；有成果时 DOM 出现 compare-view-reference，不再仅空左栏" }
+    - { id: L17D-P4, check: auto, text: "无 references / 摄取失败时左栏保持诚实空态或逐条错误说明，不得伪造截图或摘要" }
+  scheme_item_ids: [acc-6, gap-11, goal-2]
+  scope:
+    writable_paths:
+      - daemon/server.ts
+      - daemon/playtest/**
+      - src/lib/daemon-api.ts
+      - src/lib/journey/**
+      - src/routes/index.tsx
+      - tests/unit/playtest-reference-snapshots.test.ts
+      - tests/ui/scheme-review-playtest.test.tsx
+    readonly_paths:
+      - daemon/web-ingest/proxy.ts
+      - daemon/web-ingest/types.ts
+      - src/components/project/CompareView.tsx
+      - src/components/studio/PlaytestAcceptBlock.tsx
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/playtest-reference-snapshots.test.ts] }
+      - { alias: ui, executable: npx, args: [vitest, run, tests/ui/scheme-review-playtest.test.tsx] }
+design:
+  approach: >-
+    新增薄读侧 GET /api/playtest/reference-snapshots?contract_id=：读合同 references[]，
+    对每个 URL 经既有 WebIngestProxy.fetch 受控 GET（format 优先 html/summary），映射为
+    CompareView.ReferenceSnapshotView（reference_url + html_snapshot 与/或 dom_summary；
+    screenshot_url 本卡可为 null，不新开截图管线）。前端 daemon-api 拉数后由
+    src/routes/index.tsx 写入 playtest.snapshots。不改 CompareView / PlaytestAcceptBlock
+    props 契约；不改 WebIngestProxy 白名单语义；不持久化新快照库（本卡默认即时拉数，
+    落盘缓存若需要另立卡）。
+  touches:
+    - { path: daemon/server.ts, change: modify, why: 挂薄读侧路由, symbols: [] }
+    - { path: daemon/playtest/reference-snapshots.ts, change: create, why: 合同 references → ReferenceSnapshotView 装配, symbols: [buildReferenceSnapshots, handleReferenceSnapshotsRequest] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: 前端拉数客户端, symbols: [fetchPlaytestReferenceSnapshots] }
+    - { path: src/routes/index.tsx, change: modify, why: 把 snapshots 传入 playtest, symbols: [] }
+    - { path: tests/unit/playtest-reference-snapshots.test.ts, change: create, why: 路由/映射/白名单负例, symbols: [] }
+    - { path: tests/ui/scheme-review-playtest.test.tsx, change: modify, why: 有 snapshots 时左栏非空断言, symbols: [] }
+  interfaces:
+    - name: GET /api/playtest/reference-snapshots
+      kind: http
+      signature: "{ contract_id } → 200 { snapshots: ReferenceSnapshotView[] } | 4xx"
+      consumers: []
+  test_plan:
+    - { acceptance_id: L17D-P1, test_path: tests/unit/playtest-reference-snapshots.test.ts, level: unit, case: "references 对齐返回" }
+    - { acceptance_id: L17D-P2, test_path: tests/unit/playtest-reference-snapshots.test.ts, level: unit, case: "禁域不得出现成功内容" }
+    - { acceptance_id: L17D-P3, test_path: tests/ui/scheme-review-playtest.test.tsx, level: unit, case: "snapshots 传入后左栏出现 compare-view-reference" }
+    - { acceptance_id: L17D-P4, test_path: tests/unit/playtest-reference-snapshots.test.ts, level: unit, case: "无 references → 诚实空列表" }
+governance:
+  spec_refs:
+    - docs/specs/development-tasks-completed.md#task-l.17c
+    - docs/specs/development-tasks-completed.md#task-l.17a
+    - docs/scheme.md
+  depends_on:
+    - { id: TASK-L.17c, kind: hard }
+    - { id: TASK-L.17a, kind: hard }
+  code_facts:
+    - { ref: "src/routes/index.tsx:3623-3631", note: "playtest 传参有 contractId/references/preview/conn，无 snapshots" }
+    - { ref: "src/components/studio/PlaytestAcceptBlock.tsx::PlaytestAcceptBlockProps", note: "已声明可选 snapshots，透传 CompareView；今日调用方不灌数" }
+    - { ref: "daemon/web-ingest/proxy.ts::WebIngestProxy", note: "L.17a 受控摄取仅 MCP/代理路径可用；无面向 CompareView 的 HTTP 拉数" }
+    - { ref: "daemon/server.ts:5131-5161", note: "仅挂 /api/playtest/status 与 /api/playtest/evidence，无 reference-snapshots" }
+  non_goals:
+    - 不改 CompareView / PlaytestAcceptBlock 组件本体与 props 契约
+    - 不新开截图/像素管线，不复活 REJ-009
+    - 不碰 orchestrator / 派工 / AdapterRegistry（W.9 挂账另序）
+    - 不做真机整段 check playtest（TASK-L.17f）
+    - 不宣称端到端产品闭环
+  fail:
+    - 绕过 WebIngestProxy 用裸 fetch/WebFetch 拉参考站
+    - 伪造 screenshot_url / 摘要冒充抓取成功
+    - 修改 CompareView props 契约或重建对照组件
+  adr_revisions: []
+  defaults:
+    - "即时拉数、不新建持久快照库；screenshot_url 允许 null"
+    - "单 URL 失败不拖垮整表：成功项照常返回，失败项可省略或带错误说明（卡内测试写死一种）"
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 145, commit: e2b8dd35cbcde6a750881fe435e115c11fe16cac }
+```
+
+
+### 3.4v 会话原话候选接入试玩认可框（L.17e · 产品验收挂账②）
+
+<a id="task-l.17e"></a>
+
+#### 【Task L.17e】会话原话候选接入试玩认可框 `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#147](https://github.com/he18718143986-design/IDE/pull/147)/`aeedecd`，squash；代码 tip `9f12b57`；基线 #146/`e46ee5a` P-150 回写之后）。
+- **交付**：新增 `src/lib/journey/session-verbatim-candidates.ts`（`selectSessionVerbatimCandidates` / `SESSION_VERBATIM_CANDIDATE_LIMIT=20`）：只收 `role==="user"` 且 trim 非空原文，去重保序，排除 system/assistant/引导文案，上限写死 20。`src/routes/index.tsx` 把筛选结果写入 `playtest.sessionVerbatimCandidates`。**未改** `PlaytestAcceptBlock.tsx` props/引用按钮行为；默认输入框仍为空，用户手点「引用」才写入原文。测试：`tests/unit/session-verbatim-candidates.test.ts` 5 passed；`tests/ui/scheme-review-playtest.test.tsx` 9 passed；`tsc` 0。
+- **销项**：兑现 L.17c completed §3.4p **挂账②**（会话原话候选接线）。
+- **残余 / 默认未做（不宣称关闭）**：① 不自动填入原话框；② 不做跨会话历史检索；③ 挂账③ 真机 `check playtest` → [`TASK-L.17f`](#task-l.17f) `[COMPLETED]`（P-152 · #149/`86da495`）；④ 不碰 W.9 / orchestrator / daemon（本卡边界；L.17f 另销）。
+- **边界**：**窄口径**——会话 user 原话候选已灌入试玩认可区；**不**宣称端到端产品闭环；不改 `submitPlaytestEvidence` 契约；无 e2e 闭环宣称。
+
+```yaml task-card
+id: TASK-L.17e
+status: COMPLETED
+contract:
+  intent:
+    title: 会话原话候选接入试玩认可框
+    description: >-
+      中栏试玩认可区出现来自当前右栏会话的用户原话「引用」候选；默认输入框仍为空，
+      点选后原样写入，禁止把引导文案当候选。
+    risk_level: LOW
+  acceptance:
+    - { id: L17E-P1, check: auto, text: "index 将当前会话 role=user 消息文本（非空）传入 sessionVerbatimCandidates" }
+    - { id: L17E-P2, check: auto, text: "有候选时 DOM 出现 playtest-verbatim-candidates；默认 textarea/input 值为空" }
+    - { id: L17E-P3, check: auto, text: "点引用后输入框值为候选原文（不做摘要/改写）" }
+    - { id: L17E-P4, check: auto, text: "不得把 playtest-guidance / 系统提示文案塞进候选列表" }
+  scheme_item_ids: [acc-6, dec-12]
+  scope:
+    writable_paths:
+      - src/routes/index.tsx
+      - src/lib/journey/**
+      - tests/ui/scheme-review-playtest.test.tsx
+      - tests/unit/session-verbatim-candidates.test.ts
+    readonly_paths:
+      - src/components/studio/PlaytestAcceptBlock.tsx
+      - src/hooks/use-agent-session.ts
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/session-verbatim-candidates.test.ts] }
+      - { alias: ui, executable: npx, args: [vitest, run, tests/ui/scheme-review-playtest.test.tsx] }
+design:
+  approach: >-
+    从 useAgentSession()/foldChatEvents 得到的 messages 中筛选 role==="user" 且 trim 非空的 text，
+    经小纯函数（建议 src/lib/journey/session-verbatim-candidates.ts）去重保序后，
+    写入 SchemeReviewPane playtest.sessionVerbatimCandidates。不改 PlaytestAcceptBlock 引用按钮行为；
+    禁止把助手/系统/工具消息或引导常量放入候选。
+  touches:
+    - { path: src/lib/journey/session-verbatim-candidates.ts, change: create, why: 纯函数筛选用户原话, symbols: [selectSessionVerbatimCandidates] }
+    - { path: src/routes/index.tsx, change: modify, why: 接线 chatSession.messages → playtest, symbols: [] }
+    - { path: tests/unit/session-verbatim-candidates.test.ts, change: create, why: 筛选/去重/排除非 user, symbols: [] }
+    - { path: tests/ui/scheme-review-playtest.test.tsx, change: modify, why: 候选渲染与默认空框, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: L17E-P1, test_path: tests/unit/session-verbatim-candidates.test.ts, level: unit, case: "只收 user 非空原话（L17E-P1）" }
+    - { acceptance_id: L17E-P2, test_path: tests/ui/scheme-review-playtest.test.tsx, level: unit, case: "候选可见且默认空（L17E-P2）" }
+    - { acceptance_id: L17E-P3, test_path: tests/ui/scheme-review-playtest.test.tsx, level: unit, case: "引用写入原文（L17E-P3）" }
+    - { acceptance_id: L17E-P4, test_path: tests/unit/session-verbatim-candidates.test.ts, level: unit, case: "排除 system/assistant/引导（L17E-P4）" }
+governance:
+  spec_refs:
+    - docs/specs/development-tasks-completed.md#task-l.17c
+    - docs/scheme.md
+  depends_on:
+    - { id: TASK-L.17c, kind: hard }
+  code_facts:
+    - { ref: "src/routes/index.tsx:3623-3631", note: "playtest 未传 sessionVerbatimCandidates" }
+    - { ref: "src/components/studio/PlaytestAcceptBlock.tsx::PlaytestAcceptBlockProps", note: "已留 sessionVerbatimCandidates；有候选才渲染引用按钮" }
+    - { ref: "src/hooks/use-agent-session.ts::foldChatEvents", note: "会话消息已有 role/user 文本，今日未接到试玩块" }
+  non_goals:
+    - 不自动填入原话框、不改 submitPlaytestEvidence 契约
+    - 不做 L.17d snapshots 拉数
+    - 不碰 Daemon / 派工 / W.9
+    - 不宣称端到端闭环
+  fail:
+    - 页面加载即把候选或引导文案写入输入框
+    - 摘要/改写后再提交或再写入输入框
+    - 把 assistant/system 消息当作用户原话候选
+  adr_revisions: []
+  defaults:
+    - "候选 = 当前会话 user 消息原文去重保序；上限实现时可截断但须在测试写死"
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 147, commit: aeedecd11e147c39a6685f2f5e628a5fc6170155 }
+```
+
+
+
+
+### 3.4w 真机/门禁链 check playtest 执行债（L.17f · 产品验收挂账③）
+
+<a id="task-l.17f"></a>
+
+#### 【Task L.17f】真机/门禁链 `check playtest` 执行债 `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#149](https://github.com/he18718143986-design/IDE/pull/149)/`86da495`，squash；代码 tip `dd2e743`；基线 #148/`e486345` P-151 回写之后）。
+- **交付**：新增 `daemon/supervisor/preview/resolve-playtest-check-args.ts`（`isPlaytestCheckCommand` / `ensurePlaytestStagentView` / `resolvePlaytestCheckArgs`）：把 C.23 位置参数规范为 CLI `--contract-id` / `--repo`，并在 Worktree 内挂 `.stagent/{contracts,evidence,releases}` 相对符号链接视图（威胁边界内）。`daemon/pipeline/orchestrator.ts` 仅 +19 行 playtest 旁路（对称 check-knowledge）；**零改** `evaluatePlaytestGuard` / `withPlaytestCommand` / `bin/stagent.ts` / contract.schema。测试：`tests/unit/playtest-gate-execution.test.ts` + `tests/integration/playtest-gate-execution.test.ts` 共 14 passed；`tsc` 0。
+- **销项**：兑现 L.17c completed §3.4p **挂账③**（真机/门禁链 `check playtest` 执行债）。L.17c 三项挂账均已销。
+- **残余 / 默认未做（不宣称关闭）**：① 不改 playtest-guard 判定与 dec-12 口径；② 不改 C.23 装配语义；③ 不销 W.9c §3.4q 四项挂账；④ **不**宣称端到端产品/UI 闭环。
+- **边界**：**窄口径**——verification 真跑 `alias=playtest` 且 Fail-Closed 已实证；旁路在卡 writable_paths 内；不碰 AdapterRegistry / 派工 / W.9 执行面。
+
+```yaml task-card
+id: TASK-L.17f
+status: COMPLETED
+contract:
+  intent:
+    title: 真机/门禁链 check playtest 执行债
+    description: >-
+      北极星合同在验证/合并门禁链上真实执行 alias=playtest（stagent check playtest），
+      无有效认可证据时不得合并通过；有匹配 release_id 的认可时可过该门禁项。
+    risk_level: HIGH
+  acceptance:
+    - { id: L17F-P1, check: auto, text: "北极为 references[] 非空的合同，verification 结果含 alias=playtest 且曾实际执行（非跳过空转）" }
+    - { id: L17F-P2, check: auto, text: "无 playtest 证据或 STALE_VERSION / UNCONFIRMED 时，该命令 passed=false，合并路径 Fail-Closed" }
+    - { id: L17F-P3, check: auto, text: "非北极星合同 verification 不含 playtest（与 C.23 装配一致）" }
+    - { id: L17F-P4, check: both, text: "本机或 CI 可复现：对一北极星合同跑验证，日志/结果可见 check playtest 出口（真机清单写入 PR）" }
+  scheme_item_ids: [acc-6, dec-12]
+  scope:
+    writable_paths:
+      - daemon/pipeline/orchestrator.ts
+      - daemon/supervisor/preview/**
+      - tests/integration/**
+      - tests/unit/playtest-gate-execution.test.ts
+    readonly_paths:
+      - bin/stagent.ts
+      - daemon/supervisor/preview/playtest-guard.ts
+      - src/lib/contract.schema.ts
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/playtest-gate-execution.test.ts] }
+      - { alias: integration, executable: npx, args: [vitest, run, tests/integration] }
+design:
+  approach: >-
+    以集成/单元测锁定「verification_spec 中的 playtest 命令进入 orchestrator 验证循环并产生
+    非跳过结果」；必要时仅补 stagent check playtest 的参数装配/工作目录旁路（对标
+    check-knowledge 特殊分支的最小对称处理），**零改** evaluatePlaytestGuard 判定本体与
+    C.23 装配 helper。真机段：PR 附本机命令与出口摘要（合同 id、exit code、status）。
+  touches:
+    - { path: daemon/supervisor/preview/resolve-playtest-check-args.ts, change: create, why: playtest 参数旁路 + stagent 视图, symbols: [isPlaytestCheckCommand, ensurePlaytestStagentView, resolvePlaytestCheckArgs] }
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: 最小 playtest 执行旁路, symbols: [] }
+    - { path: tests/unit/playtest-gate-execution.test.ts, change: create, why: 门禁执行与 Fail-Closed, symbols: [] }
+    - { path: tests/integration/playtest-gate-execution.test.ts, change: create, why: 真 Daemon/验证链实证, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: L17F-P1, test_path: tests/unit/playtest-gate-execution.test.ts, level: unit, case: "旁路后可真执行（非空转）" }
+    - { acceptance_id: L17F-P2, test_path: tests/unit/playtest-gate-execution.test.ts, level: unit, case: "无证据 → UNCONFIRMED、exitCode=1（不得合并通过）" }
+    - { acceptance_id: L17F-P3, test_path: tests/unit/playtest-gate-execution.test.ts, level: unit, case: "createContractDraft 无 references → commands 不含 playtest" }
+    - { acceptance_id: L17F-P4, test_path: tests/integration/playtest-gate-execution.test.ts, level: integration, case: "北极星无证据：verification 含 alias=playtest 真执行且 passed=false（Fail-Closed）" }
+governance:
+  spec_refs:
+    - docs/specs/development-tasks-completed.md#task-l.17c
+    - docs/specs/development-tasks-completed.md#task-c.23
+    - docs/scheme.md
+  depends_on:
+    - { id: TASK-L.17c, kind: hard }
+    - { id: TASK-C.23, kind: hard }
+    - { id: TASK-L.17b, kind: hard }
+  code_facts:
+    - { ref: "daemon/pipeline/orchestrator.ts:1035-1100", note: "验证循环会跑 verification_spec.commands；对 check-knowledge 有特殊参数装配，对 playtest 无对等旁路/实证测试" }
+    - { ref: "bin/stagent.ts:630-671", note: "check playtest 子命令已注册并委托 evaluatePlaytestGuard" }
+    - { ref: "docs/specs/development-tasks-completed.md:2339", note: "L.17c 明文挂账③：真机整段 check playtest 执行债" }
+  non_goals:
+    - 不改 playtest-guard 判定逻辑与 dec-12 口径
+    - 不改 C.23 withPlaytestCommand 装配语义
+    - 不销 W.9 四项挂账；不做 L.17d/e
+    - 不宣称端到端产品/UI 闭环
+  fail:
+    - skip/假绿冒充 playtest 已执行
+    - 无证据仍合并通过
+    - 改判定源使非北极星静默 PASS
+  adr_revisions: []
+  defaults:
+    - "优先加测证明既有通用执行路径；仅当实跑缺 contract_id/cwd 时才加最小旁路"
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 149, commit: 86da4950c609ca07029d86e06c094f2bc044ce62 }
+```
+
+
+### 3.4x 行投影 Docker host probe 成本收敛（W.9d · W.9c 挂账①）
+
+<a id="task-w.9d"></a>
+
+#### 【Task W.9d】行投影 Docker host probe 成本收敛 `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#152](https://github.com/he18718143986-design/IDE/pull/152)/`f5577de26bf6a34d8377039eb26d71ef6bf506a8`，squash；基线 #151/`2115d5d` P-153 立卡之后）。
+- **交付**：`daemon/worker/verify/worker-registration-service.ts` 新增服务实例单例 `resolveSharedContainerHost()`：仅 **SANDBOX** 行投影解析共享宿主（`list`/`get` 同轮次 `createContainerHost` 至多一次）；**GATEWAY / UNCONTROLLED** 行不构造 host。宿主真实不可用时仍 `dispatchable=false`（不因缓存放行）。新增 `tests/unit/worker-registration-probe-cost.test.ts`（W9D 4/4）；相关回归 61/61；`tsc` 0。**零改** `docker-container-host.ts` / docs / W.9e–g。
+- **销项**：兑现 W.9c completed §3.4q **挂账①**（行投影 Docker host probe 成本）。挂账②/③/④仍由 W.9e/f/g 承接。
+- **残余 / 默认未做（不宣称关闭）**：① 不改 `isControlledDispatchable` 吞码 → [`TASK-W.9e`](#task-w.9e) `[COMPLETED]`（P-155 · #154/`5d3d55b`）；② 不改容器 env 明文 key → [`TASK-W.9f`](#task-w.9f) `[COMPLETED]`（P-156 · #156/`b92accc`）；③ Cursor 容器协议 → [`TASK-W.9g`](#task-w.9g) `[COMPLETED]`（P-157 · #158/`691b8b8`；钉协议+fail-closed，`empirically_verified=false`，**≠ 已受控**）；④ **不**宣称端到端产品闭环。
+- **边界**：**窄口径**——服务级单例共享 SANDBOX 宿主探测；门禁语义零放宽；无 e2e 闭环宣称。
+
+```yaml task-card
+id: TASK-W.9d
+status: COMPLETED
+contract:
+  intent:
+    title: 行投影 Docker host probe 成本收敛
+    description: >-
+      Worker 列表/行投影（builtinView / storedView）不再为每一行新建 DockerContainerHost
+      并触发可用性探测；行数增长时 probe 成本与副作用保持可预期（同进程同轮次至多一次真探测，或等价缓存）。
+    risk_level: MEDIUM
+  acceptance:
+    - { id: W9D-P1, check: auto, text: "list/get WorkerView 路径对 N 个内建+自注册条目，不得产生 N 次独立 docker info（或等价）真探测；同轮次真探测次数有上界且测试写死" }
+    - { id: W9D-P2, check: auto, text: "静态形态预检（工厂/档位/可执行面）在无宿主探测时仍诚实反映；不得因缓存把不可用宿主显示为可派工" }
+    - { id: W9D-P3, check: auto, text: "SANDBOX_ENFORCED 在宿主真实不可用时仍 dispatchable=false / 门禁拒绝（与 W.5c-ii 口径一致）" }
+    - { id: W9D-P4, check: auto, text: "既有 worker-registration / dispatch 单测回归绿；新增 probe 次数断言" }
+  scheme_item_ids: [gap-14]
+  scope:
+    writable_paths:
+      - daemon/worker/verify/worker-registration-service.ts
+      - tests/unit/worker-registration-probe-cost.test.ts
+    readonly_paths:
+      - daemon/worker/cli-host/docker-container-host.ts
+      - daemon/worker/worker-dispatch.ts
+      - daemon/worker/adapter-registry.ts
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/worker-registration-probe-cost.test.ts] }
+design:
+  approach: >-
+    服务实例单例 resolveSharedContainerHost()：仅 SANDBOX 行投影解析共享宿主；
+    GATEWAY/UNCONTROLLED 不构造 host；不可用宿主仍 dispatchable=false。零改 docker-container-host.ts。
+  touches:
+    - { path: daemon/worker/verify/worker-registration-service.ts, change: modify, why: 行投影共用宿主单例, symbols: [resolveSharedContainerHost, builtinView, storedView] }
+    - { path: tests/unit/worker-registration-probe-cost.test.ts, change: create, why: 探测次数上界与门禁负例, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: W9D-P1, test_path: tests/unit/worker-registration-probe-cost.test.ts, level: unit, case: "W9D-P1: N 个 SANDBOX 行 list/get 至多一次 createContainerHost（探测上界=1）" }
+    - { acceptance_id: W9D-P2, test_path: tests/unit/worker-registration-probe-cost.test.ts, level: unit, case: "W9D-P2: 无宿主探测时静态形态仍诚实（UNCONTROLLED 不触发 createContainerHost）" }
+    - { acceptance_id: W9D-P3, test_path: tests/unit/worker-registration-probe-cost.test.ts, level: unit, case: "W9D-P3: SANDBOX_ENFORCED 宿主真实不可用时仍 dispatchable=false（不因缓存放行）" }
+    - { acceptance_id: W9D-P4, test_path: tests/unit/worker-registration-probe-cost.test.ts, level: unit, case: "W9D-P4: 回归既有视图字段；混合档位仍共用一次 SANDBOX 探测" }
+governance:
+  spec_refs:
+    - docs/specs/development-tasks-completed.md#task-w.9c
+    - docs/specs/development-tasks-completed.md#task-w.9b
+  depends_on:
+    - { id: TASK-W.9c, kind: hard }
+    - { id: TASK-W.9b, kind: hard }
+  code_facts:
+    - { ref: "daemon/worker/verify/worker-registration-service.ts::builtinView", note: "每行 try createContainerHost()；缺省 new DockerContainerHost() 构造即 probe" }
+    - { ref: "daemon/worker/verify/worker-registration-service.ts::storedView", note: "同上每行建宿主" }
+    - { ref: "daemon/worker/cli-host/docker-container-host.ts::constructor", note: "this.probeResult = this.probe()；默认 spawnSync docker info" }
+    - { ref: "docs/specs/development-tasks-completed.md:2327", note: "§3.4q 挂账①：行投影构造 Docker host 并可能探测；行数增长 probe 成本待评估" }
+  non_goals:
+    - 不改 isControlledDispatchable 吞码问题（TASK-W.9e）
+    - 不改容器 env 明文 key（TASK-W.9f）
+    - 不做 Cursor 容器协议实证（TASK-W.9g）
+    - 不宣称端到端闭环 / 绝对隔离
+  fail:
+    - 为省探测而把不可用宿主显示为 dispatchable=true
+    - 静默降级 SANDBOX → 本地执行
+  adr_revisions: []
+  defaults:
+    - "优先请求级或服务级单例缓存 ContainerHostPort；构造期仍可探测一次"
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 152, commit: f5577de26bf6a34d8377039eb26d71ef6bf506a8 }
+```
+
+
+### 3.4y 受控派工拒绝码穿透诊断（W.9e · W.9c 挂账②）
+
+<a id="task-w.9e"></a>
+
+#### 【Task W.9e】受控派工拒绝码穿透诊断 `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#154](https://github.com/he18718143986-design/IDE/pull/154)/`5d3d55bb13383cb30265f80df4dd489120bbf9d9`，squash；基线 #153/`f4b4b17` P-154 回写之后）。
+- **交付**：`daemon/worker/worker-dispatch.ts` 新增 `diagnoseControlledDispatch()` 为单一判定/诊断源；`requireControlledDispatch` / `isControlledDispatchable` 薄封装其上（同源、门禁零放宽）。`WorkerView` 可选字段 `dispatch_blocked_code`；`builtinView` / `storedView` 在 `dispatchable=false` 时带回与 `WorkerDispatchError.code` 同源的 machine-readable 拒绝码。新增 `tests/unit/worker-dispatch-diagnostic.test.ts`（W9E-P1～P4）；相关回归 62/62；`tsc` 0。**零改** `daemon/server.ts`（API 已回传 WorkerView）/ docs / W.9f–g。
+- **销项**：兑现 W.9c completed §3.4q **挂账②**（boolean helper 吞拒绝码；API 诊断信息面收窄）。挂账③ → [`TASK-W.9f`](#task-w.9f) `[COMPLETED]`（P-156）；挂账④ → [`TASK-W.9g`](#task-w.9g) `[COMPLETED]`（P-157 · 钉协议+fail-closed，≠ 已受控）。
+- **残余 / 默认未做（不宣称关闭）**：① 不改容器 env 明文 key → [`TASK-W.9f`](#task-w.9f) `[COMPLETED]`（P-156 · #156/`b92accc`）；② Cursor 容器协议 → [`TASK-W.9g`](#task-w.9g) `[COMPLETED]`（P-157 · #158/`691b8b8`；钉协议+fail-closed，`empirically_verified=false`，**≠ 已受控**）；③ **不**宣称端到端产品闭环；④ 不放宽 `requireControlledDispatch` / 档位语义。
+- **边界**：**窄口径**——只穿透拒绝码诊断；boolean 语义保留；门禁放行条件零放宽；无 e2e 闭环宣称。
+
+```yaml task-card
+id: TASK-W.9e
+status: COMPLETED
+contract:
+  intent:
+    title: 受控派工拒绝码穿透诊断
+    description: >-
+      API/WorkerView 在派工被拒时能暴露与 requireControlledDispatch 同源的具体拒绝码
+      （如 E_ADAPTER_NOT_CONTROLLED / E_ADAPTER_SANDBOX_LOCKED / 缺工厂等），
+      不再仅因 isControlledDispatchable 吞异常而只剩泛化文案。
+    risk_level: LOW
+  acceptance:
+    - { id: W9E-P1, check: auto, text: "对可控负例（未注册 / UNCONTROLLED / SANDBOX 无宿主 / 缺工厂），诊断结果含稳定 machine-readable 拒绝码，与 requireControlledDispatch 抛出的 WorkerDispatchError.code 一致或可映射" }
+    - { id: W9E-P2, check: auto, text: "GET /api/workers（或现行 WorkerView 序列化）在 dispatchable=false 时带回该码（字段名在卡内测试写死；可新增可选字段，不得破坏旧客户端必填契约）" }
+    - { id: W9E-P3, check: auto, text: "isControlledDispatchable 若保留 boolean 语义，不得再作为 API 唯一诊断源；门禁放行条件零放宽" }
+    - { id: W9E-P4, check: auto, text: "单测覆盖至少三类不同拒绝码可区分" }
+  scheme_item_ids: [gap-14]
+  scope:
+    writable_paths:
+      - daemon/worker/worker-dispatch.ts
+      - daemon/worker/verify/worker-registration-service.ts
+      - tests/unit/worker-dispatch-diagnostic.test.ts
+    readonly_paths:
+      - daemon/server.ts
+      - daemon/worker/adapter-registry.ts
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/worker-dispatch-diagnostic.test.ts] }
+design:
+  approach: >-
+    diagnoseControlledDispatch 为单一判定源；requireControlledDispatch / isControlledDispatchable
+    薄封装；WorkerView 可选 dispatch_blocked_code；builtinView/storedView 接线。零改 server.ts。
+  touches:
+    - { path: daemon/worker/worker-dispatch.ts, change: modify, why: 诊断助手暴露拒绝码, symbols: [diagnoseControlledDispatch, requireControlledDispatch, isControlledDispatchable] }
+    - { path: daemon/worker/verify/worker-registration-service.ts, change: modify, why: 行投影/API 带出 code, symbols: [builtinView, storedView] }
+    - { path: tests/unit/worker-dispatch-diagnostic.test.ts, change: create, why: 多码可区分, symbols: [] }
+  interfaces:
+    - name: WorkerView.dispatch_blocked_code
+      kind: type
+      signature: "optional string error code when dispatchable=false"
+      consumers: []
+  test_plan:
+    - { acceptance_id: W9E-P1, test_path: tests/unit/worker-dispatch-diagnostic.test.ts, level: unit, case: "W9E-P1: 拒绝码与 requireControlledDispatch 同源（未注册 / 非受控 / 无工厂 / 沙箱锁 / 无执行器）" }
+    - { acceptance_id: W9E-P2, test_path: tests/unit/worker-dispatch-diagnostic.test.ts, level: unit, case: "W9E-P2: View/API 在 dispatchable=false 时带回 dispatch_blocked_code" }
+    - { acceptance_id: W9E-P3, test_path: tests/unit/worker-dispatch-diagnostic.test.ts, level: unit, case: "W9E-P3: 门禁条件不放宽——boolean 与 diagnose/require 一致，放行仍需完整条件" }
+    - { acceptance_id: W9E-P4, test_path: tests/unit/worker-dispatch-diagnostic.test.ts, level: unit, case: "W9E-P4: 三类以上拒绝码可区分（NOT_CONTROLLED / SANDBOX_LOCKED / NO_DISPATCH_FACTORY）" }
+governance:
+  spec_refs:
+    - docs/specs/development-tasks-completed.md#task-w.9c
+    - docs/specs/development-tasks-completed.md#task-w.9b
+  depends_on:
+    - { id: TASK-W.9c, kind: hard }
+    - { id: TASK-W.9b, kind: hard }
+  code_facts:
+    - { ref: "daemon/worker/worker-dispatch.ts::diagnoseControlledDispatch", note: "单一判定/诊断源；返回 ok+factory 或 ok:false+code" }
+    - { ref: "daemon/worker/worker-dispatch.ts::requireControlledDispatch", note: "薄封装 diagnose；失败抛带 .code 的 WorkerDispatchError" }
+    - { ref: "daemon/worker/worker-dispatch.ts::isControlledDispatchable", note: "薄封装 diagnose.ok；保留 boolean 语义" }
+    - { ref: "daemon/worker/verify/worker-registration-service.ts::builtinView", note: "dispatch_blocked_code 可选；dispatchable=false 时带回同源 code" }
+    - { ref: "docs/specs/development-tasks-completed.md:2327", note: "§3.4q 挂账②：boolean helper 吞拒绝；API 诊断可能丢具体原因" }
+  non_goals:
+    - 不放宽 requireControlledDispatch / 不改档位语义
+    - 不做 probe 成本收敛（W.9d 已销）/ env 明文（W.9f）/ Cursor 实证（W.9g）
+    - 不宣称端到端闭环
+  fail:
+    - 为「好看」把拒绝改成可派工
+    - 伪造与门禁不一致的成功码
+  adr_revisions: []
+  defaults:
+    - "新增可选字段优于改写既有 reason 字符串为唯一真相"
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 154, commit: 5d3d55bb13383cb30265f80df4dd489120bbf9d9 }
+```
+
+
+### 3.4z 容器环境 API key 明文可读面收敛（W.9f · W.9c 挂账③）
+
+<a id="task-w.9f"></a>
+
+#### 【Task W.9f】容器环境 API key 明文可读面收敛 `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#156](https://github.com/he18718143986-design/IDE/pull/156)/`b92accc1194c1b4b2417f63ad2baccbcce85355b`，squash；基线 #155/`b7bba0f` P-155 回写之后）。
+- **交付**：四类 API key（`LLM_API_KEY` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `CURSOR_API_KEY`）移出 `SAFE_CONTAINER_ENV_KEYS` 普通 Env 白名单（现仅 `PATH`/`HOME`/`LANG`）；改走 `secretFiles` → 容器内 `/run/secrets/<KEY>:ro` 挂载，并以 `*_FILE` 指针注入约定路径。Docker 宿主拒明文 `-e`（`SECRET_IN_PLAIN_ENV`）。OpenHands `known_limitations` 已回写现行事实，并写明「打开该文件的容器进程仍可读明文……**不宣称绝对不可读**」。新增 `tests/unit/container-cli-secret-injection.test.ts`（W9F-P1～P4）；相关回归 65/65；`tsc`/`eslint` 0；日志脱敏不回退。**零改** vault / cursor-agent-adapter / docs / W.9g。
+- **销项**：兑现 W.9c completed §3.4q **挂账③**（四键仍可能经普通 Env 被容器内进程读取）。挂账④ → [`TASK-W.9g`](#task-w.9g) `[COMPLETED]`（P-157 · 钉协议+fail-closed，≠ 已受控）。
+- **残余 / 默认未做（不宣称关闭）**：① Cursor 容器协议 → [`TASK-W.9g`](#task-w.9g) `[COMPLETED]`（P-157 · #158/`691b8b8`；钉协议+fail-closed，`empirically_verified=false`，**≠ 已受控**）；② **不**宣称绝对不可读或端到端产品闭环；③ 不改 Vault 产品模型 / 不把账密写入合同或对话。
+- **边界**：**窄口径**——只收敛明文 Env 可读面；secret 文件挂载通道仍可被容器进程读取；无 e2e 闭环宣称；无绝对不可读宣称。
+
+```yaml task-card
+id: TASK-W.9f
+status: COMPLETED
+contract:
+  intent:
+    title: 容器环境 API key 明文可读面收敛
+    description: >-
+      LLM_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY / CURSOR_API_KEY 不再经由
+      SAFE_CONTAINER_ENV_KEYS 普通环境变量直通，使容器进程 environ 与 docker inspect Env
+      默认可读明文；改为 secret/文件挂载或等价通道。日志脱敏纪律保持。
+    risk_level: HIGH
+  acceptance:
+    - { id: W9F-P1, check: auto, text: "默认 executeContainerCli / runInSandbox 路径下，上述四键不得出现在传入容器的普通 Env 映射中（测试断言 Env 不含明文值）" }
+    - { id: W9F-P2, check: auto, text: "CLI 仍能在受控通道读到所需凭据完成一次最小调用（可用桩宿主证明注入通道，不必真连模型）" }
+    - { id: W9F-P3, check: auto, text: "日志/错误字符串仍不对上述键值做明文回显（既有脱敏不回退）" }
+    - { id: W9F-P4, check: both, text: "OpenHands known_limitations 中「经容器环境变量注入…未使用 secret 挂载」表述随实现回写为现行事实；不得假装已绝对不可读" }
+  scheme_item_ids: [gap-12]
+  scope:
+    writable_paths:
+      - daemon/worker/sandbox/container-cli-executor.ts
+      - daemon/worker/cli-host/docker-container-host.ts
+      - daemon/worker/cli-host/openhands-adapter.ts
+      - daemon/worker/sandbox/container-host.ts
+      - tests/unit/container-cli-secret-injection.test.ts
+    readonly_paths:
+      - daemon/vault/**
+      - daemon/worker/cli-host/cursor-agent-adapter.ts
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/container-cli-secret-injection.test.ts] }
+design:
+  approach: >-
+    SAFE_CONTAINER_ENV_KEYS 仅 PATH/HOME/LANG；四键走 secretFiles→/run/secrets/:ro + *_FILE 指针；
+    Docker SECRET_IN_PLAIN_ENV 拒明文 -e；OpenHands known_limitations 回写且不宣称绝对不可读。
+  touches:
+    - { path: daemon/worker/sandbox/container-cli-executor.ts, change: modify, why: 收敛 SAFE_CONTAINER_ENV_KEYS 与注入, symbols: [SAFE_CONTAINER_ENV_KEYS, executeContainerCli] }
+    - { path: daemon/worker/cli-host/docker-container-host.ts, change: modify, why: 支持 secret/文件挂载参数 + 拒明文 -e, symbols: [materializeSecretFiles, DockerContainerHost] }
+    - { path: daemon/worker/sandbox/container-host.ts, change: modify, why: secretFiles 类型与拒明文校验, symbols: [SandboxSecretFile, CONTAINER_SECRET_ENV_KEYS, validateSandboxInput, containerSecretFile] }
+    - { path: daemon/worker/cli-host/openhands-adapter.ts, change: modify, why: 改注入并回写 known_limitations, symbols: [secretFilesForKey] }
+    - { path: tests/unit/container-cli-secret-injection.test.ts, change: create, why: Env 无明文 + 通道可读, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: W9F-P1, test_path: tests/unit/container-cli-secret-injection.test.ts, level: unit, case: "W9F-P1: 普通 Env 无四键明文" }
+    - { acceptance_id: W9F-P2, test_path: tests/unit/container-cli-secret-injection.test.ts, level: unit, case: "W9F-P2: 受控通道可读凭据" }
+    - { acceptance_id: W9F-P3, test_path: tests/unit/container-cli-secret-injection.test.ts, level: unit, case: "W9F-P3: 日志不回显" }
+    - { acceptance_id: W9F-P4, test_path: tests/unit/container-cli-secret-injection.test.ts, level: unit, case: "W9F-P4: known_limitations 与实现一致" }
+governance:
+  spec_refs:
+    - docs/specs/development-tasks-completed.md#task-w.9c
+    - docs/specs/development-tasks-completed.md#task-w.9b
+    - docs/scheme.md
+  depends_on:
+    - { id: TASK-W.9c, kind: hard }
+    - { id: TASK-W.9b, kind: hard }
+  code_facts:
+    - { ref: "daemon/worker/sandbox/container-cli-executor.ts::SAFE_CONTAINER_ENV_KEYS", note: "仅 PATH/HOME/LANG；四键不再进普通 Env" }
+    - { ref: "daemon/worker/sandbox/container-host.ts::CONTAINER_SECRET_ENV_KEYS", note: "四键只进 secretFiles；validateSandboxInput 拒明文 Env" }
+    - { ref: "daemon/worker/sandbox/container-host.ts::containerSecretFile", note: "约定 /run/secrets/<KEY> + *_FILE 指针" }
+    - { ref: "daemon/worker/cli-host/docker-container-host.ts::materializeSecretFiles", note: "宿主临时文件 :ro 挂载；明文 -e 四键拒 SECRET_IN_PLAIN_ENV" }
+    - { ref: "daemon/worker/cli-host/openhands-adapter.ts::OPENHANDS_CAPABILITY", note: "known_limitations 已改；写明不宣称绝对不可读" }
+    - { ref: "docs/specs/development-tasks-completed.md:2327", note: "§3.4q 挂账③：四键仍可能被容器内进程读取；日志脱敏不改变该事实——本卡销项" }
+  non_goals:
+    - 不改 Vault 产品模型 / 不把账密写入合同或对话
+    - 不做 Cursor 容器协议实证（W.9g）
+    - 不宣称「绝对不可读」或端到端闭环
+  fail:
+    - 继续默认 Env 直通明文却宣称挂账已销
+    - 凭据进入证据 JSON / 合同 / 用户可见日志
+  adr_revisions: []
+  defaults:
+    - "注入通道优先文件挂载（tmpfs/只读）；具体旗标随 DockerContainerHost 现有 API 最小扩展"
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 156, commit: b92accc1194c1b4b2417f63ad2baccbcce85355b }
+```
+
+
+### 3.4aa Cursor CLI 容器镜像/运行协议实证（W.9g · W.9c 挂账④）
+
+<a id="task-w.9g"></a>
+
+#### 【Task W.9g】Cursor CLI 容器镜像/运行协议实证 `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#158](https://github.com/he18718143986-design/IDE/pull/158)/`691b8b874d0af5f8c6f0e7999f7b01871962d284`，squash；基线 #157/`f11da32` P-156 回写之后）。
+- **交付**：钉死 Cursor 容器协议常量（镜像 tag + digest、argv/cwd/挂载、`CURSOR_API_KEY` secret 路径）于 `daemon/worker/sandbox/cursor-agent-container-protocol.ts`；`CURSOR_AGENT_CONTAINER_PROTOCOL.empirically_verified=false`（诚实）。适配器仍 `has_executor=false`、`run()→E_CURSOR_AGENT_NO_EXECUTOR`；**无派工工厂**；档位保持 `UNCONTROLLED_EXTERNAL`。P3 走失败留证路径（无 KEY → `E_CURSOR_CONTAINER_NO_API_KEY` 等，写入 `W9G_CONTAINER_EMPIRICISM.json`，**不得 skip 冒充通过**）。新增 unit/integration 测（W9G-P1～P4）；相关回归 34/34；`tsc`/`eslint` 0。**零改** docker-container-host / container-cli-executor / docs。
+- **销项**：兑现 W.9c completed §3.4q **挂账④**。**诚实口径（Agent 审条件）**：`empirically_verified=false`；真跑容器仍待 KEY+Docker；**销挂账④ ≠ Cursor 已受控 / 可派工**；宿主 CA-06 ≠ 本卡。
+- **残余 / 默认未做（不宣称关闭）**：① 未把 `empirically_verified` 翻 true、未接容器执行入口、未挂派工工厂；② 真跑容器最小调用仍待有效 `CURSOR_API_KEY` + 可用 Docker；③ **不**宣称 Cursor 受控或端到端产品闭环。
+- **边界**：**窄口径**——钉协议 + 负向锁 + 失败留证；不是「容器内已跑通」；无 e2e 闭环宣称；无 Cursor 已受控 / 可派工宣称。
+
+```yaml task-card
+id: TASK-W.9g
+status: COMPLETED
+contract:
+  intent:
+    title: Cursor CLI 容器镜像与运行协议实证
+    description: >-
+      以固定镜像摘要 + 可复现运行协议，证明 Cursor CLI 可经既有 runInSandbox /
+      executeContainerCli 桥在容器内受控调用；未实证前保持 NO_EXECUTOR fail-closed，
+      不得把 generic 容器桥宣称为 Cursor 已可执行。本卡交付路径为钉协议 + 负向锁 +
+      失败留证（empirically_verified=false），非「容器内已跑通」。
+    risk_level: HIGH
+  acceptance:
+    - { id: W9G-P1, check: both, text: "存在钉死的 Cursor 容器镜像引用（digest 或等价不可漂标签）与最小 argv/cwd/挂载协议文档化在代码常量或卡内证据" }
+    - { id: W9G-P2, check: auto, text: "未通过实证前，Cursor 适配器仍 has_executor=false 且 run()→E_CURSOR_AGENT_NO_EXECUTOR；不得挂派工工厂冒充可派工" }
+    - { id: W9G-P3, check: both, text: "实证通过时：容器路径一次最小调用产出 SandboxWitness，证据面经 resolveEvidenceControlMode；失败则保持 fail-closed 并留下失败证据，不得 fallback 本地/Gateway" }
+    - { id: W9G-P4, check: auto, text: "档位不得因本卡升到 GATEWAY_ENFORCED；无 tool interception 时结构性上界仍受控于既有规则（宿主 CA-06 完成 ≠ 本卡完成）" }
+  scheme_item_ids: [gap-14]
+  scope:
+    writable_paths:
+      - daemon/worker/cli-host/cursor-agent-adapter.ts
+      - daemon/worker/sandbox/cursor-agent-container-protocol.ts
+      - daemon/worker/default-worker-registry.ts
+      - tests/unit/cursor-agent-container-protocol.test.ts
+      - tests/integration/cursor-agent-container-protocol.test.ts
+    readonly_paths:
+      - daemon/worker/cli-host/docker-container-host.ts
+      - daemon/worker/sandbox/container-cli-executor.ts
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/cursor-agent-container-protocol.test.ts] }
+      - { alias: integration, executable: npx, args: [vitest, run, tests/integration/cursor-agent-container-protocol.test.ts] }
+design:
+  approach: >-
+    先定镜像与协议并加负向锁（未实证 → NO_EXECUTOR）；本卡走钉协议 + 失败留证路径
+    （empirically_verified=false）；真跑容器待 KEY+Docker。禁止 generic 桥成功冒充
+    Cursor 协议成功；宿主 plan-mode CA-06 证据不复用为本卡容器实证。
+  touches:
+    - { path: daemon/worker/sandbox/cursor-agent-container-protocol.ts, change: create, why: 钉死镜像/argv/挂载/实证门闩, symbols: [CURSOR_AGENT_CONTAINER_PROTOCOL, empirically_verified] }
+    - { path: daemon/worker/cli-host/cursor-agent-adapter.ts, change: modify, why: 协议常量引用与 known_limitations, symbols: [E_CURSOR_AGENT_NO_EXECUTOR, has_executor, run] }
+    - { path: daemon/worker/default-worker-registry.ts, change: modify, why: 未 empirically_verified 前不挂派工工厂, symbols: [] }
+    - { path: tests/unit/cursor-agent-container-protocol.test.ts, change: create, why: W9G-P1/P2/P4, symbols: [] }
+    - { path: tests/integration/cursor-agent-container-protocol.test.ts, change: create, why: W9G-P3 失败留证, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: W9G-P1, test_path: tests/unit/cursor-agent-container-protocol.test.ts, level: unit, case: "W9G-P1: 镜像引用钉死" }
+    - { acceptance_id: W9G-P2, test_path: tests/unit/cursor-agent-container-protocol.test.ts, level: unit, case: "W9G-P2: 未实证 NO_EXECUTOR" }
+    - { acceptance_id: W9G-P3, test_path: tests/integration/cursor-agent-container-protocol.test.ts, level: integration, case: "W9G-P3: 容器最小调用或失败留证" }
+    - { acceptance_id: W9G-P4, test_path: tests/unit/cursor-agent-container-protocol.test.ts, level: unit, case: "W9G-P4: 不升 GATEWAY_ENFORCED" }
+governance:
+  spec_refs:
+    - docs/specs/development-tasks-completed.md#task-w.9c
+    - docs/specs/development-tasks-completed.md#task-w.9b
+    - docs/specs/development-tasks-completed.md#task-w.5b
+  depends_on:
+    - { id: TASK-W.9c, kind: hard }
+    - { id: TASK-W.9b, kind: hard }
+    - { id: TASK-W.5b, kind: soft }
+  code_facts:
+    - { ref: "daemon/worker/sandbox/cursor-agent-container-protocol.ts::CURSOR_AGENT_CONTAINER_PROTOCOL.empirically_verified", note: "恒 false；唯一执行门闩真相源；CA-06 verified_on 不得写入本字段" }
+    - { ref: "daemon/worker/cli-host/cursor-agent-adapter.ts::has_executor", note: "false；run() 仍抛 E_CURSOR_AGENT_NO_EXECUTOR" }
+    - { ref: "daemon/worker/default-worker-registry.ts::createDefaultWorkerRegistry", note: "未 empirically_verified 前不挂派工工厂；档位 UNCONTROLLED_EXTERNAL" }
+    - { ref: "docs/specs/development-tasks-completed.md:2327", note: "§3.4q 挂账④：Cursor CLI 镜像与运行协议仍未实证——本卡以钉协议+fail-closed+失败留证销项；≠ 真跑通/已受控" }
+    - { ref: "docs/ledger/README.md:191", note: "CA-06 宿主 plan-mode 四类负例已实测；档位仍 UNCONTROLLED_EXTERNAL；≠ 容器协议实证" }
+  non_goals:
+    - 不把宿主 CA-06 冒充容器实证
+    - 不经本地 spawn / Gateway 会话绕过容器桥
+    - 不做 W.9d/e/f
+    - 不宣称 Cursor 受控或端到端闭环
+    - 不把销挂账④读成 Cursor 已受控 / 可派工
+  fail:
+    - 无实证却移除 NO_EXECUTOR 或挂派工工厂
+    - 实证失败仍 fallback 本地执行
+    - 宣称 empirically_verified=true 或端到端闭环
+  adr_revisions: []
+  defaults:
+    - "本卡路径：钉协议 + 负向锁 + 失败留证；真跑容器前置仍为可用容器运行时 + 有效 CURSOR_API_KEY（禁止订阅登录态凑数，同 W.5b FAIL）"
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 158, commit: 691b8b874d0af5f8c6f0e7999f7b01871962d284 }
+```
+
+### 3.4ab B.1 Tarjan 门禁抗 macos CI 抖动（CI.1）
+
+<a id="task-ci.1"></a>
+
+#### 【Task CI.1】B.1 Tarjan 门禁抗 macos CI 抖动 `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#161](https://github.com/he18718143986-design/IDE/pull/161)/`bf971d5b23802aa25ce5ca17fb0f0fe9e577f7b3`，squash；基线 #160/`3766d28` P-158 立卡之后）。
+- **交付**：仅改 `tests/perf/arch-graph-benchmark.test.ts`（+9/−4）；门禁 4 中位上限 `toBeLessThanOrEqual(100)`→`150`；注释写明 Actions run 42369070606 / median 129.75ms；可选一轮预热丢弃（不得替代上限）；正确性断言未放宽（`lastCycles.length===1 && lastCycles[0].length===RING_SIZE`）；门禁 1/2/3 仍 ≤1500 / ≤20 / ≤40。本机 `npx vitest run tests/perf/arch-graph-benchmark.test.ts` → Test Files 1 passed · Tests 4 passed。**零改** `daemon/arch/*` / docs（本卡代码 PR）；**零扩** writable_paths。
+- **销项**：兑现挂账清扫序 **macOS CI** 面（B.1 门禁 4 Tarjan flake）。**诚实口径**：抗抖动门禁，**不**宣称 macOS CI 永久全绿；**不**销 OP-34；不碰 CA-06。
+- **残余 / 默认未做（不宣称关闭）**：① OP-34（平台侧 runner 不稳定）持续观察不销；② CA-06 文档债仍为下一挂账面（按 Tina 授权序）；③ **不**宣称端到端产品闭环 / 永久全绿。
+- **边界**：**窄口径**——perf 门禁 4 上限抗 macos runner 抖动；不是「CI 永久全绿」；不是算法改动；不是 OP-34 销项。
+
+```yaml task-card
+id: TASK-CI.1
+status: COMPLETED
+contract:
+  intent:
+    title: B.1 Tarjan 门禁抗 macos CI 抖动
+    description: >-
+      将 tests/perf/arch-graph-benchmark.test.ts 门禁 4（10000 节点高深度环 Tarjan SCC）
+      的中位耗时上限从 ≤100ms 调整为 ≤150ms，覆盖 GitHub macos-latest runner 上偶发
+      中位 ~130ms 的抖动（证据 run 42369070606 median 129.75ms），使 macOS unit CI
+      不再因该性能门禁假红；正确性断言（环长 / 不爆栈）不得放宽。
+    risk_level: LOW
+  acceptance:
+    - { id: CI1-P1, check: auto, text: "门禁 4 中位上限改为 ≤150ms；注释引用 GitHub Actions run 42369070606（median 129.75ms）" }
+    - { id: CI1-P2, check: auto, text: "正确性断言不变：仍检出且仅检出一个 RING_SIZE=10000 的 SCC；不爆栈" }
+    - { id: CI1-P3, check: auto, text: "writable_paths 仅 tests/perf/arch-graph-benchmark.test.ts；零改 daemon/arch/*" }
+    - { id: CI1-P4, check: auto, text: "门禁 1/2/3 上限与既有正确性断言不被本卡放宽；可选预热丢弃不得替代上限放宽为主验收" }
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - tests/perf/arch-graph-benchmark.test.ts
+    readonly_paths:
+      - daemon/arch/graph.ts
+      - daemon/arch/parser.ts
+      - docs/specs/development-tasks-completed.md
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/perf/arch-graph-benchmark.test.ts] }
+design:
+  approach: >-
+    仅改 perf 基准门禁 4 的 expect(medianDuration).toBeLessThanOrEqual 上限 100→150，
+    并在注释写明 run 42369070606 / median 129.75ms。可加一轮预热丢弃，但主验收仍是
+    ≤150ms 上限。禁止改 daemon/arch/*；禁止放宽环长/不爆栈正确性断言。
+  touches:
+    - { path: tests/perf/arch-graph-benchmark.test.ts, change: modify, why: 门禁 4 抗 macos CI 抖动上限, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: CI1-P1, test_path: tests/perf/arch-graph-benchmark.test.ts, level: unit, case: "门禁 4：10000 节点高深度环 Tarjan SCC ≤ 150ms" }
+    - { acceptance_id: CI1-P2, test_path: tests/perf/arch-graph-benchmark.test.ts, level: unit, case: "门禁 4：10000 节点高深度环 Tarjan SCC ≤ 150ms 收敛不爆栈" }
+    - { acceptance_id: CI1-P3, test_path: tests/perf/arch-graph-benchmark.test.ts, level: unit, case: "门禁 4：10000 节点高深度环 Tarjan SCC ≤ 150ms 收敛不爆栈（五次采样取中位数）" }
+    - { acceptance_id: CI1-P4, test_path: tests/perf/arch-graph-benchmark.test.ts, level: unit, case: "门禁 2：单文件 updateFile 增量更新 ≤ 20ms" }
+governance:
+  spec_refs:
+    - docs/specs/development-tasks-completed.md#task-b.1
+    - docs/specs/development-tasks.md
+  depends_on:
+    - { id: TASK-B.1, kind: hard }
+  code_facts:
+    - { ref: "tests/perf/arch-graph-benchmark.test.ts:204-254", note: "门禁 4：五次采样取中位；现行 expect(medianDuration).toBeLessThanOrEqual(150)；正确性断言 lastCycles.length===1 && lastCycles[0].length===RING_SIZE" }
+    - { ref: "tests/perf/arch-graph-benchmark.test.ts:253-254", note: "flake 证据：GitHub Actions run 42369070606 macos-latest unit job 实测 median 129.75ms，越过旧 ≤100ms 假红（非算法回退）；上限已调至 150" }
+    - { ref: "docs/specs/development-tasks-completed.md:4051-4051", note: "B.1 交付时本机 Tarjan 17.11ms（门禁 ≤100ms）；CI runner 抖动由本卡抗" }
+    - { ref: "docs/ledger/README.md:176-176", note: "OP-34 平台侧持续观察不销项；本卡不销 OP-34" }
+  non_goals:
+    - 不宣称 macOS CI 永久全绿 / 端到端闭环
+    - 不碰 CA-06（cursor-agent 四类越权负例）
+    - 不销 OP-34
+    - 不改 daemon/arch/* 算法或正确性门禁
+    - 不以预热丢弃替代上限放宽作为唯一验收
+  fail:
+    - 放宽环长 / SCC 个数 / 不爆栈等正确性断言
+    - 改动 daemon/arch/* 或扩大 writable_paths 到产品代码
+    - 把门禁 1/2/3 上限一并放宽却无证据
+  adr_revisions: []
+  defaults:
+    - "主验收=门禁 4 中位 ≤150ms；预热丢弃可选、不得替代上限"
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 161, commit: bf971d5b23802aa25ce5ca17fb0f0fe9e577f7b3 }
+```
+
+### 3.4ac AUDITED 合同退回待批受控边（AUDITED.1）
+
+<a id="task-audited.1"></a>
+
+#### 【Task AUDITED.1】AUDITED 合同退回待批受控边 `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#165](https://github.com/he18718143986-design/IDE/pull/165)/`b390254960104e53dae183db8b63ea0826690cb8`，squash；立卡基线 #164/`9067d40` P-161 之后）。
+- **交付**：仅 3 文件均在 writable_paths 内——`src/lib/state-machine.ts`（`TransitionReason` += `USER_RETURN_TO_PENDING`；`LIFECYCLE_TRANSITIONS.AUDITED` 增 `PENDING_APPROVAL`；`EDGE_GUARDS["AUDITED->PENDING_APPROVAL"]`：落点必须 `PENDING_REVIEW` + `reason=USER_RETURN_TO_PENDING` Fail-Closed）；`tests/unit/state-machine-matrix.test.ts` + `tests/unit/state-machine-v13-transitions.test.ts`（正例 + 缺/错 reason + 落点仍 APPROVED 拒绝 + `AUDITED→PREPARING` 仍非法）。本机 vitest matrix+v13：**85 passed**；`tsc` 0。**未**改 `daemon/pipeline/orchestrator.ts`（卡标可选，刻意不做）。**规范（AR1-P1，本 docs 回写）**：`runtime-contract-and-safety.md` §11.3 AUDITED 行增 `PENDING_APPROVAL` + Guard 注；`system-architecture.md` §9.1.1.1 增第 4 条受控边条目——与代码逐字对齐。
+- **销项**：兑现 Sprint「AUDITED 退回待批为另立议题」与 C.4「不宣称」债源（库层受控边已补）。
+- **诚实口径 / grep 自证（P-162 当时）**：合入时生产路径暂无 `USER_RETURN_TO_PENDING` 接线；merger 仍要求 `AUDITED`。**（P-171）** 生产接线见 [`TASK-AUDITED.2`](#task-audited.2)；**仍不**宣称端到端闭环。
+- **残余 / 默认未做（不宣称关闭）**：① 生产 orchestrator/HTTP/ContractCard 已由 [`TASK-AUDITED.2`](#task-audited.2) 承接（#178/`71684d4`）；#178 合入时 `index.tsx` 父级未接 · Tina 已授权 follow-up（进行中）；② 桌面形态 RFC / D.1e / S.3 未碰；③ **不**销 OP-34；④ **不**宣称试玩体验或端到端闭环。
+- **边界**：**窄口径**——库层受控边 + Guard + 单测 + 规范对齐；不是生产路径闭环；不是 UI；不是合并门禁放宽。
+
+```yaml task-card
+id: TASK-AUDITED.1
+status: COMPLETED
+contract:
+  intent:
+    title: AUDITED 合同退回待批受控边
+    description: >-
+      在 runtime §11.3 / 架构 §9.1.1.1 与 src/lib/state-machine.ts 增补受控边
+      AUDITED → PENDING_APPROVAL，并使落点 approval.status 强制回置为 PENDING_REVIEW
+      （对齐既有 PREPARING → PENDING_APPROVAL 回置纪律），从而允许试玩阶段（AUDITED+APPROVED）
+      的合同在用户显式要求下退回待批，而不是只能 MERGED / EXECUTING / VERIFYING / ABORTED。
+    risk_level: MEDIUM
+  acceptance:
+    - id: AR1-P1
+      check: auto
+      text: >-
+        规范先于代码：runtime-contract-and-safety.md §11.3 与 system-architecture.md §9.1.1.1
+        写明受控边 AUDITED→PENDING_APPROVAL 及 Guard（落点 PENDING_REVIEW；reason=USER_RETURN_TO_PENDING）
+    - id: AR1-P2
+      check: auto
+      text: >-
+        LIFECYCLE_TRANSITIONS.AUDITED 含 PENDING_APPROVAL；EDGE_GUARDS["AUDITED->PENDING_APPROVAL"]
+        在落点 approval.status≠PENDING_REVIEW 时 Fail-Closed（ILLEGAL_TRANSITION）
+    - id: AR1-P3
+      check: auto
+      text: >-
+        validateTransition(AUDITED+APPROVED → PENDING_APPROVAL+PENDING_REVIEW, reason=USER_RETURN_TO_PENDING) 合法；
+        同边落点仍 APPROVED / 缺 reason / 错 reason 均拒绝；AUDITED→PREPARING 仍非法
+    - id: AR1-P4
+      check: auto
+      text: >-
+        state-machine-matrix.test.ts 与 state-machine-v13-transitions.test.ts 同步锁定新边与负例；
+        grep 自证：生产路径无静默把 AUDITED 合同标回 APPROVED 待批
+    - id: AR1-P5
+      check: auto
+      text: >-
+        退回待批后 §9.1.1 配对成立（PENDING_APPROVAL↔PENDING_REVIEW）；合并门禁对非 AUDITED 合同仍拒绝；
+        不放宽鉴权 / Demo Origin / 点亮三证 / 网关写范围
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - docs/specs/runtime-contract-and-safety.md
+      - docs/specs/system-architecture.md
+      - src/lib/state-machine.ts
+      - tests/unit/state-machine-matrix.test.ts
+      - tests/unit/state-machine-v13-transitions.test.ts
+      - daemon/pipeline/orchestrator.ts
+    readonly_paths:
+      - docs/specs/supervisor.md
+      - docs/specs/development-tasks-completed.md
+      - src/lib/contract.schema.ts
+      - daemon/pipeline/merger.ts
+  verification:
+    commands:
+      - { alias: unit-matrix, executable: npx, args: [vitest, run, tests/unit/state-machine-matrix.test.ts] }
+      - { alias: unit-v13, executable: npx, args: [vitest, run, tests/unit/state-machine-v13-transitions.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    规范 §11.3 / §9.1.1.1 与 state-machine.ts 同补受控边；EDGE_GUARDS 对齐 PREPARING→PENDING_APPROVAL
+    回置纪律 + reason=USER_RETURN_TO_PENDING Fail-Closed；单测锁定正/负例；orchestrator 薄接线刻意不做。
+  touches:
+    - { path: docs/specs/runtime-contract-and-safety.md, change: modify, why: §11.3 允许迁移表补边 + Guard 注, symbols: [] }
+    - { path: docs/specs/system-architecture.md, change: modify, why: §9.1.1.1 第 4 条受控边规约, symbols: [] }
+    - { path: src/lib/state-machine.ts, change: modify, why: LIFECYCLE_TRANSITIONS + EDGE_GUARDS + USER_RETURN_TO_PENDING, symbols: [LIFECYCLE_TRANSITIONS, EDGE_GUARDS, validateTransition] }
+    - { path: tests/unit/state-machine-matrix.test.ts, change: modify, why: 正负例锁定新边, symbols: [] }
+    - { path: tests/unit/state-machine-v13-transitions.test.ts, change: modify, why: 迁移表快照同步, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: AR1-P1, test_path: tests/unit/state-machine-v13-transitions.test.ts, level: unit, case: "结构边存在：canTransition(AUDITED, PENDING_APPROVAL) === true" }
+    - { acceptance_id: AR1-P2, test_path: tests/unit/state-machine-matrix.test.ts, level: unit, case: "负例：落点仍 APPROVED 被拒绝（Fail-Closed，不得静默授权）" }
+    - { acceptance_id: AR1-P3, test_path: tests/unit/state-machine-matrix.test.ts, level: unit, case: "正例：AUDITED+APPROVED → PENDING_APPROVAL+PENDING_REVIEW + USER_RETURN_TO_PENDING 合法" }
+    - { acceptance_id: AR1-P4, test_path: tests/unit/state-machine-v13-transitions.test.ts, level: unit, case: "跃迁表与规范登记表完全一致" }
+    - { acceptance_id: AR1-P5, test_path: tests/unit/state-machine-matrix.test.ts, level: unit, case: "配对矩阵：退回待批后 PENDING_APPROVAL↔PENDING_REVIEW 成立" }
+governance:
+  spec_refs:
+    - docs/specs/runtime-contract-and-safety.md
+    - docs/specs/system-architecture.md
+    - docs/specs/development-tasks-completed.md#task-c.4
+    - docs/specs/supervisor.md
+  depends_on:
+    - { id: TASK-0.2c, kind: hard }
+    - { id: TASK-C.4, kind: soft }
+  code_facts:
+    - { ref: "src/lib/state-machine.ts:185-185", note: "现行 AUDITED: [MERGED, EXECUTING, VERIFYING, PENDING_APPROVAL, ABORTED]" }
+    - { ref: "src/lib/state-machine.ts:274-292", note: "EDGE_GUARDS AUDITED->PENDING_APPROVAL：落点 PENDING_REVIEW + reason USER_RETURN_TO_PENDING" }
+    - { ref: "src/lib/state-machine.ts:137-137", note: "TransitionReason 含 USER_RETURN_TO_PENDING" }
+    - { ref: "daemon/pipeline/orchestrator.ts:1-1", note: "本卡未改；生产路径无 USER_RETURN_TO_PENDING 接线（grep 自证）" }
+    - { ref: "daemon/pipeline/merger.ts:467-470", note: "合并门禁仍要求 AUDITED；未放宽" }
+  non_goals:
+    - 不碰 TASK-D.1e / 桌面形态 RFC（建议序②另卡）
+    - 不碰 TASK-S.3；不销 OP-34
+    - 不发明试玩 UI 文案 / 新展示态产品方向
+    - 不放宽合并门禁、不绕过 validateTransition、不静默授权
+    - 不宣称端到端闭环 / 试玩体验已完成 / UI 接线
+    - 不把 AUDITED→VERIFYING（EXTERNAL_MUTATION）改语义或与退回待批混用
+    - 不做 orchestrator 薄接线（卡标可选，本卡刻意不做）
+  fail:
+    - 只改代码不改规范，或只改单边规范 / 单测漏锁
+    - 落点仍 APPROVED 却进入 PENDING_APPROVAL（静默授权 / 配对破坏）
+    - 无用户显式触发即可退回待批（自动旁路）
+    - 放宽鉴权 / Demo Origin / 点亮三证 / 网关写范围
+  adr_revisions: []
+  defaults:
+    - "reason = USER_RETURN_TO_PENDING（已落地枚举）"
+    - "规范权威顺序：Supervisor/ADR > 架构 §9.1.1 > runtime §11 > state-machine.ts"
+    - "orchestrator 薄接线未做；UI 未做"
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 165, commit: b390254960104e53dae183db8b63ea0826690cb8 }
+```
+
+
+### 3.4ad macOS 本机助手 · 选文件夹开项目（DS.1 · RFC 切片）
+
+<a id="task-ds.1"></a>
+
+#### 【Task DS.1】macOS 本机助手 · 选文件夹开项目（RFC 切片）`[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#171](https://github.com/he18718143986-design/IDE/pull/171)/`1701cab0b9bb73f5858f229c0851a6047455b5ad`，squash；立卡基线 #170/`3dde462` P-166 之后；含 prettier `f030171` + 端口区间 `5977a37`）。
+- **交付**：writable_paths 内 8 文件——`daemon/desktop/macos-folder-picker.ts`（注入 `execFileSync`，无 `child_process` 直 import；darwin `osascript choose folder`；取消→null；非 darwin→unsupported）+ `daemon/server.ts` `POST /api/desktop/pick-folder`（AUTH+loopback；响应不含 token/launchUrl）+ `src/lib/daemon-api.ts` + OpenProjectEntry/Welcome darwin 选夹入口；选中后复用既有 open/`#token=` / recent-projects；与 `stagent open`/最近/粘贴共存。三套单测 + tsc 0；回归 recent/open；spawn 白名单相关绿。
+- **销项**：兑现 RFC §7 DS-1/DS-2/DS-4/DS-5 第一切片（选夹增强）；DoR 入队后立卡→实现闭环。
+- **诚实口径 / grep 自证**：无 electron/tauri 依赖；pick 响应不含 token/launchUrl；无 `?token=` 旁路；**未**改 `TASK-D.1e` 出 DEFERRED；**本卡完成 ≠ D.1e 完成**；不宣称端到端闭环 / 已接近 Cursor。
+- **残余 / 默认未做（不宣称关闭）**：① Electron/Tauri/单窗 IDE；② Win/Linux 选夹；③ DoR 重写窗口（DS-6）；④ 打包/签名/自动更新完整桌面分发；⑤ D.1e 全量「同壳 Import/New」；⑥ **不**销 OP-34；⑦ **不**激活 S.3。
+- **边界**：**窄口径**——macOS 系统选夹增强 + 既有 open 通道；不是 D.1e 全量；不是桌面壳产品闭环。
+
+```yaml task-card
+id: TASK-DS.1
+status: COMPLETED
+contract:
+  intent:
+    title: macOS 本机助手 · 选文件夹开项目（RFC 切片）
+    description: >-
+      按 RFC desktop-shell-form §7 已拍决议，交付第一可施工切片：在 macOS 上用轻量本机助手
+      （系统文件夹选择器，非 Electron/Tauri）让用户从欢迎页/打开项目面板「选择文件夹」→
+      选中绝对路径 → 复用既有 openWorkspaceByPath / ensureWorkspaceSession / #token= 进入工作台；
+      与 stagent open、最近列表、粘贴路径（C.8c）共存。工作台仍主要是系统浏览器（DS-2）。
+      只先 macOS（DS-4）。不激活 TASK-D.1e；不宣称已接近 Cursor 或端到端闭环。
+    risk_level: MEDIUM
+  acceptance:
+    - id: DS1-P1
+      check: auto
+      text: >-
+        macOS 选夹模块（daemon/desktop/macos-folder-picker.ts）在 darwin 上可调起系统文件夹对话框
+        （osascript choose folder 或等价受控系统二进制）；用户取消返回 null；非 darwin 明确 unsupported
+        （不假装成功）
+    - id: DS1-P2
+      check: auto
+      text: >-
+        Daemon 控制面（如 POST /api/desktop/pick-folder）仅 loopback + 已鉴权可调；选中路径走既有
+        open / ensureWorkspaceSession / #token= 通道写入最近列表；stagent open、GET/POST
+        /api/recent-projects、粘贴路径打开仍可用（回归不回退 D.1b/c/C.8c）
+    - id: DS1-P3
+      check: auto
+      text: >-
+        欢迎页/OpenProjectEntry 在 darwin 呈现「选择文件夹」入口；与最近列表、粘贴路径同屏共存；
+        非 darwin 不展示假选夹或标已完成
+    - id: DS1-P4
+      check: auto
+      text: >-
+        单测/Daemon/UI 锁定正负例；grep 自证：未新增 electron/tauri 依赖；生产路径无 Token 进
+        query/localStorage 明文；日志无 Token 明文
+    - id: DS1-P5
+      check: auto
+      text: >-
+        鉴权 / Demo Origin / 点亮三证 / 网关写范围不变；不旁路 ADR-0018 Seal；不扩大 Supervisor
+        广播面；不激活 S.3；不改 TASK-D.1e 出 DEFERRED
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/desktop/macos-folder-picker.ts
+      - daemon/server.ts
+      - src/lib/daemon-api.ts
+      - src/components/layout/OpenProjectEntry.tsx
+      - src/components/layout/ProjectWelcomePage.tsx
+      - tests/unit/macos-folder-picker.test.ts
+      - tests/daemon/pick-folder-api.test.ts
+      - tests/ui/open-project-folder-picker.test.tsx
+    readonly_paths:
+      - docs/rfc/desktop-shell-form.md
+      - docs/specs/development-tasks-active.md
+      - docs/specs/supervisor.md
+      - docs/adr/0008-demo-isolated-origin.md
+      - docs/adr/0018-intent-to-executable-seal.md
+      - bin/stagent.ts
+      - daemon/core/open-workspace.ts
+      - daemon/core/recent-projects.ts
+      - src/lib/open-project-panel.ts
+  verification:
+    commands:
+      - { alias: unit-picker, executable: npx, args: [vitest, run, tests/unit/macos-folder-picker.test.ts] }
+      - { alias: daemon-pick, executable: npx, args: [vitest, run, tests/daemon/pick-folder-api.test.ts] }
+      - { alias: ui-picker, executable: npx, args: [vitest, run, tests/ui/open-project-folder-picker.test.tsx] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) 新建 daemon/desktop/macos-folder-picker.ts：darwin 上以受控 execFile(osascript,
+    choose folder)（对齐 repo-delete 废纸篓 osascript 纪律：固定系统二进制、超时、路径转义）；
+    取消→null；非 darwin→明确错误码。2) daemon/server.ts 增 POST /api/desktop/pick-folder
+    （AUTH + loopback；返回绝对路径；不把 Token 写入响应以外的可分享存储）。3) 选中后复用
+    既有 recent-projects/open / openWorkspaceByPath，禁止另起鉴权旁路。4) OpenProjectEntry /
+    ProjectWelcomePage 增「选择文件夹」按钮（仅 darwin 或能力探测后展示）。5) 单测 mock
+    osascript；Daemon/UI 锁共存与负例。冲突时 Supervisor / ADR-0018 / ADR-008 优先。
+  touches:
+    - { path: daemon/desktop/macos-folder-picker.ts, change: create, why: macOS 系统选夹本机助手内核, symbols: [pickFolderMacOS] }
+    - { path: daemon/server.ts, change: modify, why: 鉴权 loopback API 暴露选夹, symbols: [handleDesktopPickFolder] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: 前端调用 pick-folder, symbols: [pickFolderViaDaemon] }
+    - { path: src/components/layout/OpenProjectEntry.tsx, change: modify, why: 选夹入口与最近/粘贴共存, symbols: [] }
+    - { path: src/components/layout/ProjectWelcomePage.tsx, change: modify, why: 欢迎页文案/入口不抢 D.1e 全量, symbols: [] }
+    - { path: tests/unit/macos-folder-picker.test.ts, change: create, why: 正负例锁定选夹模块, symbols: [] }
+    - { path: tests/daemon/pick-folder-api.test.ts, change: create, why: API 鉴权与平台门禁, symbols: [] }
+    - { path: tests/ui/open-project-folder-picker.test.tsx, change: create, why: UI 共存与 darwin 入口, symbols: [] }
+  interfaces:
+    - kind: http
+      name: "POST /api/desktop/pick-folder"
+      signature: "() → 200 { path: string } | 200 { cancelled: true } | 501 { code: 'E_UNSUPPORTED_PLATFORM' } | 401"
+      consumers: []
+      note: "AUTH+loopback；body 空；Token 不进 query/localStorage；consumers 待实现接线（daemon-api + OpenProjectEntry）"
+  test_plan:
+    - { acceptance_id: DS1-P1, test_path: tests/unit/macos-folder-picker.test.ts, level: unit, case: "darwin：调起 /usr/bin/osascript choose folder" }
+    - { acceptance_id: DS1-P2, test_path: tests/daemon/pick-folder-api.test.ts, level: unit, case: "鉴权后选中路径可走 recent-projects/open" }
+    - { acceptance_id: DS1-P3, test_path: tests/ui/open-project-folder-picker.test.tsx, level: unit, case: "darwin：显示「选择文件夹」，与最近列表/粘贴路径共存" }
+    - { acceptance_id: DS1-P4, test_path: tests/unit/macos-folder-picker.test.ts, level: unit, case: "DS1-P4：源码无 electron/tauri 依赖导入" }
+    - { acceptance_id: DS1-P5, test_path: tests/daemon/pick-folder-api.test.ts, level: unit, case: "DS1-P5：不旁路鉴权；pick-folder 响应不含 token" }
+governance:
+  spec_refs:
+    - docs/rfc/desktop-shell-form.md#7-已拍决议tina--2026-11-07-按建议拍
+    - docs/specs/system-architecture.md
+    - docs/adr/0008-demo-isolated-origin.md
+    - docs/adr/0018-intent-to-executable-seal.md
+    - docs/specs/supervisor.md
+    - docs/specs/development-tasks-active.md#task-d.1e
+  depends_on:
+    - { id: TASK-D.1c, kind: hard }
+    - { id: TASK-D.1d, kind: hard }
+    - { id: TASK-C.8c, kind: soft }
+    - { id: TASK-D.1e, kind: soft }
+  code_facts:
+    - { ref: "daemon/server.ts:3595-3601", note: "recent-projects API 明文「明确不含系统文件夹选择器（D.1e）」——本卡新增独立 pick-folder，不假装改写该注释语义为 D.1e 完成" }
+    - { ref: "src/lib/daemon-api.ts:338-347", note: "openWorkspaceByPath = openRecentProject；选夹成功后应复用此通道" }
+    - { ref: "src/components/layout/OpenProjectEntry.tsx:13-16", note: "现有入口 = 最近重开 + 粘贴路径；不含系统选夹" }
+    - { ref: "bin/stagent.ts:6-20", note: "stagent open 保留（DS-5）；本卡不改 CLI 主路径为唯一入口" }
+    - { ref: "daemon/editor/repo-delete.ts:44-55", note: "osascript + execFileSync 固定系统二进制先例，选夹同纪律" }
+    - { ref: "daemon/core/recent-projects.ts:1-6", note: "最近列表落盘 ~/.stagent；选夹成功后 recordRecentProject" }
+    - { ref: "daemon/core/open-workspace.ts:1-4", note: "ensureWorkspaceSession + #token= 唤起；选夹后复用" }
+  non_goals:
+    - 不做 Electron / Tauri / 单窗 IDE 壳（DS-1/DS-2 已拍）
+    - 不做 Win / Linux 选夹（DS-4）
+    - 不排 DoR 重写窗口（DS-6）；不重写 TASK-D.1e 卡正文出 DEFERRED
+    - 不废除 stagent open / 最近列表 / 粘贴路径（DS-5：选夹为增强）
+    - 不推翻 D.1 鉴权；不把 Token 写入 query / localStorage 明文
+    - 不把 Demo 改 Daemon 同源（ADR-008）
+    - 不旁路 ADR-0018 Seal；不扩大 Supervisor 广播面；不激活 S.3
+    - 不销 OP-34；不宣称端到端闭环 / 已接近 Cursor Open
+    - 不打包 / 签名 / 自动更新完整桌面分发（另卡）
+  fail:
+    - 未做系统选夹却标完成，或用纯浏览器 File System Access API 冒充
+    - 新增 electron / tauri 依赖完成本卡
+    - 非 darwin 路径假装已支持选夹
+    - 回退 stagent open / 最近列表 / 粘贴路径
+    - 削弱鉴权或 Demo 隔离；Token 明文落盘/入日志
+    - 把 TASK-D.1e 偷偷改出 DEFERRED 或宣称 D.1e 已交付
+  adr_revisions: []
+  defaults:
+    - "选夹实现默认 osascript choose folder（固定 /usr/bin/osascript）；不引入新原生工具链"
+    - "选中后默认走 POST /api/recent-projects/open 等价通道（openWorkspaceByPath）"
+    - "UI 默认仅在 darwin 或能力探测成功后展示选夹按钮"
+    - "权威顺序：Supervisor/ADR > RFC §7 决议 > 本卡 > 实现"
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 171, commit: 1701cab0b9bb73f5858f229c0851a6047455b5ad }
+```
+
+### 3.4ae macOS 本机助手 · 新建空项目开进工作台（DS.2 · RFC 切片）
+
+<a id="task-ds.2"></a>
+
+#### 【Task DS.2】macOS 本机助手 · 新建空项目开进工作台（RFC 切片）`[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#174](https://github.com/he18718143986-design/IDE/pull/174)/`eacd1012438638ea58c3cfd292026aa6b1abd03c`，squash；立卡基线 #173/`2a7c404` P-168 之后）。
+- **交付**：writable_paths 内 8 文件——`daemon/desktop/create-empty-project.ts`（名校验 + mkdir 非 recursive；E_EXISTS/非法名/父不存在明确失败）+ `daemon/server.ts` `POST /api/desktop/create-empty-project`（AUTH+loopback，同 pick-folder 门禁；200 仅 `{ path }`，无 token/launchUrl）+ `src/lib/daemon-api.ts` + OpenProjectEntry/Welcome darwin「新建空项目」入口；流程 名→pick-folder 选父目录→create→reopen/openWorkspaceByPath；取消选夹不 create；与 `stagent open`/最近/粘贴/DS.1 选夹共存。三套单测 16 passed（unit 6 + daemon 5 + UI 5）；tsc 0；回归 port-map+DS.1 UI 8 passed；端口 3700–3719；CI：ubuntu+macOS unit 绿（flake 重跑后）；windows unit 仍红（同 DS.1）。
+- **销项**：兑现 RFC §7 DS-1/DS-2/DS-4/DS-5 第二切片（新建空项目增强）；DoR 入队后立卡→实现闭环。
+- **诚实口径 / grep 自证**：无 electron/tauri 依赖；create 响应不含 token/launchUrl；无 `?token=` 旁路；**未**改 `TASK-D.1e` 出 DEFERRED；**本卡完成 ≠ D.1e 完成**；未碰 orchestrator/supervisor/Seal；不宣称端到端闭环 / 已接近 Cursor。
+- **残余 / 默认未做（不宣称关闭）**：① Electron/Tauri/单窗 IDE；② Win/Linux；③ DoR 重写窗口（DS-6）；④ 打包/签名/自动更新完整桌面分发；⑤ D.1e 全量「同壳 Import/New」；⑥ Import 压缩包/git clone/模板脚手架；⑦ **不**销 OP-34；⑧ **不**激活 S.3。
+- **边界**：**窄口径**——macOS 新建空项目增强 + 既有 open 通道；不是 D.1e 全量；不是桌面壳产品闭环。
+
+```yaml task-card
+id: TASK-DS.2
+status: COMPLETED
+contract:
+  intent:
+    title: macOS 本机助手 · 新建空项目开进工作台（RFC 切片）
+    description: >-
+      按 RFC desktop-shell-form §7 已拍决议，交付第二可施工切片：在 macOS 欢迎页/打开项目面板提供
+      「新建空项目」——用户输入项目名 → 调系统选夹选父目录（复用 DS.1 的 POST /api/desktop/pick-folder /
+      macos-folder-picker）→ Daemon 在父目录下创建空目录（已存在则明确失败、不覆盖、不半创建）→
+      复用既有 open / ensureWorkspaceSession / #token= / recent-projects 进入工作台。与 stagent open、
+      最近列表、粘贴路径、DS.1「选择文件夹」共存。工作台仍主要是系统浏览器（DS-2）。只先 macOS（DS-4）。
+      不激活 TASK-D.1e；不宣称已接近 Cursor 或端到端闭环。
+    risk_level: MEDIUM
+  acceptance:
+    - id: DS2-P1
+      check: auto
+      text: >-
+        darwin：「新建空项目」可走完——合法名 → 选父目录 → 空目录创建成功；取消选夹不创建；非法名 /
+        父目录不存在 / 目标已存在 → 明确失败且不半创建
+    - id: DS2-P2
+      check: auto
+      text: >-
+        创建成功后走既有 open / ensureWorkspaceSession / #token= / 写入最近列表；AUTH+loopback；
+        响应与日志无 Token 明文；不另起鉴权旁路
+    - id: DS2-P3
+      check: auto
+      text: >-
+        欢迎页/OpenProjectEntry 在 darwin 呈现「新建空项目」，与最近/粘贴/「选择文件夹」同屏共存；
+        非 darwin 不展示假入口或标已完成
+    - id: DS2-P4
+      check: auto
+      text: >-
+        单测锁定 mkdir 正负例 + API 鉴权/平台门禁 + UI 共存；grep：无 electron/tauri 新依赖；
+        无 Token 进 query/localStorage
+    - id: DS2-P5
+      check: auto
+      text: >-
+        鉴权/Demo Origin/点亮三证/网关写范围不变；不旁路 ADR-0018；不扩大 Supervisor 广播面；
+        不激活 S.3；不改 D.1e 出 DEFERRED
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/desktop/create-empty-project.ts
+      - daemon/server.ts
+      - src/lib/daemon-api.ts
+      - src/components/layout/OpenProjectEntry.tsx
+      - src/components/layout/ProjectWelcomePage.tsx
+      - tests/unit/create-empty-project.test.ts
+      - tests/daemon/create-empty-project-api.test.ts
+      - tests/ui/open-project-new-empty.test.tsx
+    readonly_paths:
+      - daemon/desktop/macos-folder-picker.ts
+      - daemon/core/open-workspace.ts
+      - daemon/core/recent-projects.ts
+      - docs/rfc/desktop-shell-form.md
+      - docs/specs/development-tasks-active.md
+      - docs/specs/supervisor.md
+      - docs/adr/0008-demo-isolated-origin.md
+      - docs/adr/0018-intent-to-executable-seal.md
+      - bin/stagent.ts
+      - src/lib/open-project-panel.ts
+  verification:
+    commands:
+      - { alias: unit-create, executable: npx, args: [vitest, run, tests/unit/create-empty-project.test.ts] }
+      - { alias: daemon-create, executable: npx, args: [vitest, run, tests/daemon/create-empty-project-api.test.ts] }
+      - { alias: ui-create, executable: npx, args: [vitest, run, tests/ui/open-project-new-empty.test.tsx] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) 新建 daemon/desktop/create-empty-project.ts：校验项目名（禁空/路径分隔/相对段）；
+    在已解析的父目录下 mkdir（recursive:false 或显式存在检查）；目标已存在→明确错误；
+    失败不半创建。2) daemon/server.ts 增 create-empty-project 控制面（AUTH+loopback；
+    父目录可先经 DS.1 pick-folder 取得）；创建成功后复用 recent-projects/open /
+    openWorkspaceByPath，禁止另起鉴权旁路。3) daemon-api 增 createEmptyProjectViaDaemon
+    （或等价）；UI 调 pick-folder 选父目录后再调 create。4) OpenProjectEntry /
+    ProjectWelcomePage 增「新建空项目」入口（仅 darwin / 与 canOfferMacFolderPicker 同门禁），
+    与最近/粘贴/「选择文件夹」同屏共存。5) 单测锁 mkdir 正负例；Daemon/UI 锁鉴权、
+    平台门禁与共存。冲突时 Supervisor / ADR-0018 / ADR-008 优先。
+  touches:
+    - { path: daemon/desktop/create-empty-project.ts, change: create, why: 空项目目录创建内核（名校验+mkdir 正负例）, symbols: [createEmptyProject] }
+    - { path: daemon/server.ts, change: modify, why: 鉴权 loopback API 暴露新建空项目, symbols: [handleDesktopCreateEmptyProject] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: 前端调用 create-empty-project, symbols: [createEmptyProjectViaDaemon] }
+    - { path: src/components/layout/OpenProjectEntry.tsx, change: modify, why: 新建空项目入口与最近/粘贴/选夹共存, symbols: [] }
+    - { path: src/components/layout/ProjectWelcomePage.tsx, change: modify, why: 欢迎页文案/入口不抢 D.1e 全量, symbols: [] }
+    - { path: tests/unit/create-empty-project.test.ts, change: create, why: mkdir 正负例锁定, symbols: [] }
+    - { path: tests/daemon/create-empty-project-api.test.ts, change: create, why: API 鉴权与平台门禁, symbols: [] }
+    - { path: tests/ui/open-project-new-empty.test.tsx, change: create, why: UI 共存与 darwin 入口, symbols: [] }
+  interfaces:
+    - kind: http
+      name: "POST /api/desktop/create-empty-project"
+      signature: "{ parentPath: string, name: string } → 200 { path: string } | 4xx { code, error } | 501 { code: 'E_UNSUPPORTED_PLATFORM' } | 401"
+      consumers: []
+      note: "AUTH+loopback；父目录绝对路径；目标已存在/非法名明确失败；Token 不进 query/localStorage；200 仅 { path }"
+  test_plan:
+    - { acceptance_id: DS2-P1, test_path: tests/unit/create-empty-project.test.ts, level: unit, case: "合法名：在父目录下创建空目录并回绝对 path" }
+    - { acceptance_id: DS2-P1, test_path: tests/unit/create-empty-project.test.ts, level: unit, case: "非法名：空 / 分隔符 / . / .. → E_INVALID_NAME，且不创建" }
+    - { acceptance_id: DS2-P1, test_path: tests/unit/create-empty-project.test.ts, level: unit, case: "父目录不存在 → E_PARENT_NOT_FOUND；父路径是文件 → E_PARENT_NOT_DIR" }
+    - { acceptance_id: DS2-P1, test_path: tests/unit/create-empty-project.test.ts, level: unit, case: "目标已存在 → E_EXISTS，不覆盖、不半创建" }
+    - { acceptance_id: DS2-P1, test_path: tests/ui/open-project-new-empty.test.tsx, level: unit, case: "选夹取消：不调用 create-empty-project" }
+    - { acceptance_id: DS2-P2, test_path: tests/daemon/create-empty-project-api.test.ts, level: unit, case: "未鉴权拒绝 create-empty-project（401）" }
+    - { acceptance_id: DS2-P2, test_path: tests/daemon/create-empty-project-api.test.ts, level: unit, case: "鉴权后创建成功可走 recent-projects/open；#token=；响应无 Token" }
+    - { acceptance_id: DS2-P2, test_path: tests/ui/open-project-new-empty.test.tsx, level: unit, case: "新建：名 → pick-folder → create-empty-project → open（#token=）" }
+    - { acceptance_id: DS2-P3, test_path: tests/ui/open-project-new-empty.test.tsx, level: unit, case: "darwin：显示「新建空项目」，与最近/粘贴/选择文件夹共存" }
+    - { acceptance_id: DS2-P3, test_path: tests/ui/open-project-new-empty.test.tsx, level: unit, case: "非 darwin：不展示假新建空项目入口" }
+    - { acceptance_id: DS2-P3, test_path: tests/ui/open-project-new-empty.test.tsx, level: unit, case: "欢迎页经 OpenProjectEntry 露出新建空项目（≠ 宣称 D.1e 完成）" }
+    - { acceptance_id: DS2-P4, test_path: tests/unit/create-empty-project.test.ts, level: unit, case: "DS2-P4：源码无 electron/tauri 依赖导入；无 Token 明文落盘字面量" }
+    - { acceptance_id: DS2-P5, test_path: tests/daemon/create-empty-project-api.test.ts, level: unit, case: "DS2-P5：不旁路鉴权；create 响应不含 token / launchUrl" }
+governance:
+  spec_refs:
+    - docs/rfc/desktop-shell-form.md#7-已拍决议tina--2026-11-07-按建议拍
+    - docs/specs/system-architecture.md
+    - docs/adr/0008-demo-isolated-origin.md
+    - docs/adr/0018-intent-to-executable-seal.md
+    - docs/specs/supervisor.md
+    - docs/specs/development-tasks-active.md#task-d.1e
+    - docs/specs/development-tasks-completed.md#task-ds.1
+  depends_on:
+    - { id: TASK-DS.1, kind: hard }
+    - { id: TASK-D.1c, kind: soft }
+    - { id: TASK-D.1d, kind: soft }
+    - { id: TASK-C.8c, kind: soft }
+    - { id: TASK-D.1e, kind: soft }
+  code_facts:
+    - { ref: "daemon/desktop/macos-folder-picker.ts:101-147", note: "DS.1 选夹内核已落地；本卡复用 pickFolderMacOS 选父目录，不重写选夹" }
+    - { ref: "daemon/desktop/create-empty-project.ts:86-193", note: "名校验 + mkdir 非 recursive；E_EXISTS / E_INVALID_NAME / E_PARENT_* / E_UNSUPPORTED_PLATFORM" }
+    - { ref: "daemon/server.ts:3645-3700", note: "POST /api/desktop/create-empty-project AUTH+loopback；200 仅 { path }" }
+    - { ref: "src/lib/daemon-api.ts:406-430", note: "createEmptyProjectViaDaemon；与 canOfferMacFolderPicker 同门禁；成功后 openWorkspaceByPath" }
+    - { ref: "src/components/layout/OpenProjectEntry.tsx:182-220", note: "darwin「新建空项目」与最近/粘贴/选夹共存" }
+    - { ref: "bin/stagent.ts:6-20", note: "stagent open 保留（DS-5）；本卡不改 CLI 主路径为唯一入口" }
+  non_goals:
+    - 不做 Electron / Tauri / 单窗 IDE 壳（DS-1/DS-2 已拍）
+    - 不做 Win / Linux（DS-4）
+    - 不排 DoR 重写窗口（DS-6）；不重写 TASK-D.1e 卡正文出 DEFERRED
+    - 不废除 stagent open / 最近列表 / 粘贴路径 / DS.1 选夹（DS-5：新建为增强）
+    - 不做 Import 压缩包 / git clone / 模板脚手架
+    - 不推翻 D.1 鉴权；不把 Token 写入 query / localStorage 明文
+    - 不把 Demo 改 Daemon 同源（ADR-008）
+    - 不旁路 ADR-0018 Seal；不扩大 Supervisor 广播面；不激活 S.3
+    - 不销 OP-34；不宣称端到端闭环 / 已接近 Cursor Open
+    - 不打包 / 签名 / 自动更新完整桌面分发（另卡）
+    - 不改 orchestrator / supervisor / Seal 本体
+  fail:
+    - 未做空目录创建却标完成，或覆盖已有目录
+    - 新增 electron / tauri 依赖完成本卡
+    - 非 darwin 路径假装已支持新建空项目入口
+    - 回退 stagent open / 最近列表 / 粘贴路径 / DS.1 选夹
+    - 削弱鉴权或 Demo 隔离；Token 明文落盘/入日志
+    - 把 TASK-D.1e 偷偷改出 DEFERRED 或宣称 D.1e 已交付
+    - 半创建（mkdir 失败留下残缺树）却标成功
+  adr_revisions: []
+  defaults:
+    - "父目录默认经 DS.1 pick-folder 取得；不引入新原生选夹工具链"
+    - "创建成功后默认走 POST /api/recent-projects/open 等价通道（openWorkspaceByPath）"
+    - "UI 默认仅在 darwin 或与 canOfferMacFolderPicker 同门禁后展示「新建空项目」"
+    - "目标已存在默认明确失败（不覆盖、不合并）"
+    - "权威顺序：Supervisor/ADR > RFC §7 决议 > 本卡 > 实现"
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 174, commit: eacd1012438638ea58c3cfd292026aa6b1abd03c }
+```
+
+
+### 3.4af AUDITED 退回待批生产接线（AUDITED.2）
+
+<a id="task-audited.2"></a>
+
+#### 【Task AUDITED.2】AUDITED 退回待批生产接线 `[COMPLETED]`
+
+- **状态与证据**：`[COMPLETED]`（[#178](https://github.com/he18718143986-design/IDE/pull/178)/`71684d482500e623bc469a96a8ed907642297192`，squash；立卡基线 #177/`7d9fc2b` P-170；分支 tip 含 prettier `735ca06`）。
+- **交付**：writable_paths 内 7 文件——`daemon/pipeline/orchestrator.ts`（`returnToPending`：`withContractLock` + AUDITED/APPROVED 前置 + `USER_RETURN_TO_PENDING`；非法态 `InvalidStateTransitionError`）+ `daemon/server.ts` `POST /api/contracts/:id/return-to-pending` + `src/lib/daemon-api.ts` `returnContractToPending` + `ContractCard`「退回待批」/`data-testid="contract-return-to-pending"`（仅 AUDITED+APPROVED；PENDING_APPROVAL 仍只「批准并开工」）+ 三份测试。本机 vitest 3 files / **24 passed**；`tsc` 0。CI：ubuntu+macOS unit+lint+typecheck 绿；Windows unit 仍红（无关套件 worker-adapter / cli-host / merger 等既有红）；**AUDITED.2 orchestrator 用例在 Windows 亦通过**——不宣称 Windows 全套件绿。**零**改 `state-machine` / docs / `src/routes/index.tsx`（卡 writable_paths 未含父级）。
+- **销项**：兑现 AUDITED.1 完成口径残留①（库层边已有 → 生产 orchestrator / HTTP / ContractCard 接线）。
+- **诚实口径 / grep 自证**：生产路径出现 `returnToPending` / `return-to-pending` / `returnContractToPending` / `contract-return-to-pending`；合并门禁仍要求 `AUDITED`；**不**宣称端到端「退回待批」产品闭环 / e2e。
+- **残余 / 默认未做（不宣称关闭）**：① **#178 合入时** `src/routes/index.tsx` 父级 `onReturnToPending` **未接线**（卡外路径；按卡停工）。按钮 + API 已齐；Tina 已授权另开 **follow-up code PR** 补父级接线（**进行中**）——**非**永久挂账、**不**另立产品卡。② 桌面形态 / D.1e / S.3 未碰；③ **不**销 OP-34；④ **不**宣称试玩体验或端到端闭环；⑤ 不做 DS-6 DoR。
+- **边界**：**窄口径**——卡内 writable_paths 生产接线 + 单测；不是主路径父级装配闭环；不是 e2e；不是合并门禁放宽。
+
+```yaml task-card
+id: TASK-AUDITED.2
+status: COMPLETED
+contract:
+  intent:
+    title: AUDITED 退回待批生产接线
+    description: >-
+      在 AUDITED.1 已落地的库层受控边之上，把「用户显式退回待批」接到生产主路径：
+      orchestrator 薄方法 → Daemon HTTP → daemon-api → ContractCard 按钮。
+      仅当 lifecycle=AUDITED 且 approval.status=APPROVED 时可点；成功后合同为
+      PENDING_APPROVAL + PENDING_REVIEW（reason=USER_RETURN_TO_PENDING），可再次「批准并开工」。
+    risk_level: MEDIUM
+  acceptance:
+    - id: AR2-P1
+      check: auto
+      text: >-
+        PipelineOrchestrator.returnToPending(contractId, reviewer?) 在 AUDITED+APPROVED 下
+        经 store.transition（lifecycleState=PENDING_APPROVAL, approvalStatus=PENDING_REVIEW,
+        transitionContext.reason=USER_RETURN_TO_PENDING）成功；非 AUDITED 或非 APPROVED 抛
+        InvalidStateTransitionError（或等价 Fail-Closed）；持有合同排他锁，与 approve 同纪律
+    - id: AR2-P2
+      check: auto
+      text: >-
+        POST /api/contracts/:id/return-to-pending 挂入 server contracts 路由正则；
+        200 返回 { contract }；非法态 / 未找到走既有 sendActionError 口径；不绕过 validateTransition
+    - id: AR2-P3
+      check: auto
+      text: >-
+        src/lib/daemon-api.ts 导出 returnContractToPending(conn, contractId, reviewer?)；
+        ContractCard 在 AUDITED+APPROVED 显示「退回待批」按钮（可测 testid）；
+        点击调用 API 并向上游回传更新后的合同；PENDING_APPROVAL 仍只显示「批准并开工」
+    - id: AR2-P4
+      check: auto
+      text: >-
+        集成/组件测覆盖主路径：AUDITED+APPROVED → 点退回待批 → 状态 PENDING_APPROVAL+PENDING_REVIEW；
+        负例：PENDING_APPROVAL / MERGED / 缺边 reason 被拒；grep 自证生产路径出现 returnToPending /
+        return-to-pending / returnContractToPending 调用点
+    - id: AR2-P5
+      check: auto
+      text: >-
+        不放宽合并门禁（仍要求 AUDITED）、不改 state-machine 边表语义、不静默授权、
+        不碰鉴权 / Demo Origin / 点亮三证 / 网关写范围；不宣称试玩或合并闭环
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/pipeline/orchestrator.ts
+      - daemon/server.ts
+      - src/lib/daemon-api.ts
+      - src/components/contract/ContractCard.tsx
+      - tests/daemon/orchestrator.test.ts
+      - tests/components/ContractCard.test.tsx
+      - tests/unit/audited-return-to-pending-wiring.test.ts
+    readonly_paths:
+      - src/lib/state-machine.ts
+      - daemon/pipeline/contract-store.ts
+      - docs/specs/runtime-contract-and-safety.md
+      - docs/specs/system-architecture.md
+      - docs/specs/development-tasks-completed.md
+      - docs/specs/supervisor.md
+  verification:
+    commands:
+      - { alias: unit-orch, executable: npx, args: [vitest, run, tests/daemon/orchestrator.test.ts] }
+      - { alias: unit-card, executable: npx, args: [vitest, run, tests/components/ContractCard.test.tsx] }
+      - { alias: unit-wire, executable: npx, args: [vitest, run, tests/unit/audited-return-to-pending-wiring.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) orchestrator 新增 returnToPending：withContractLock → store.get → 断言 AUDITED+APPROVED →
+    store.transition({ lifecycleState: PENDING_APPROVAL, approvalStatus: PENDING_REVIEW,
+    transitionContext: { reason: "USER_RETURN_TO_PENDING" } })；禁止手改 JSON 旁路。
+    2) server.ts contracts 正则增 return-to-pending；POST 调 orchestrator.returnToPending，
+    emitContractUpdate + 200 { contract }；错误走 sendActionError。
+    3) daemon-api.returnContractToPending 镜像 approveContract 形状（POST JSON reviewer 可选）。
+    4) ContractCard：canReturnToPending = AUDITED && APPROVED；按钮「退回待批」；
+    onReturnToPending 回调；不改「批准并开工」语义。
+    5) 单测：orchestrator 正负例 + ContractCard 可见性 + 接线测；grep 自证生产调用点。
+    父级 src/routes/index.tsx 不在 writable_paths，#178 未改——follow-up 另授权。
+  touches:
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: 用户显式退回待批控制面, symbols: [returnToPending] }
+    - { path: daemon/server.ts, change: modify, why: 挂 POST return-to-pending, symbols: [] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: 前端客户端, symbols: [returnContractToPending] }
+    - { path: src/components/contract/ContractCard.tsx, change: modify, why: AUDITED+APPROVED 显示退回待批, symbols: [ContractCard] }
+    - { path: tests/daemon/orchestrator.test.ts, change: modify, why: returnToPending 正负例, symbols: [] }
+    - { path: tests/components/ContractCard.test.tsx, change: modify, why: 按钮可见性与点击, symbols: [] }
+    - { path: tests/unit/audited-return-to-pending-wiring.test.ts, change: create, why: HTTP/装配或 grep 级接线锁定, symbols: [] }
+  interfaces:
+    - name: POST /api/contracts/:id/return-to-pending
+      kind: http
+      signature: "{ reviewer? } → 200 { contract } | 4xx/409"
+      consumers: []
+      note: "server → orchestrator.returnToPending；daemon-api.returnContractToPending 消费；持合同锁；必带 USER_RETURN_TO_PENDING"
+  test_plan:
+    - { acceptance_id: AR2-P1, test_path: tests/daemon/orchestrator.test.ts, level: unit, case: "正例：AUDITED+APPROVED → PENDING_APPROVAL+PENDING_REVIEW（USER_RETURN_TO_PENDING）" }
+    - { acceptance_id: AR2-P1, test_path: tests/daemon/orchestrator.test.ts, level: unit, case: "负例：PENDING_APPROVAL 拒绝 returnToPending" }
+    - { acceptance_id: AR2-P1, test_path: tests/daemon/orchestrator.test.ts, level: unit, case: "负例：MERGED 拒绝 returnToPending" }
+    - { acceptance_id: AR2-P1, test_path: tests/daemon/orchestrator.test.ts, level: unit, case: "负例：EXECUTING+APPROVED（非 AUDITED）拒绝 returnToPending" }
+    - { acceptance_id: AR2-P2, test_path: tests/unit/audited-return-to-pending-wiring.test.ts, level: unit, case: "server contracts 正则与 POST 处理器挂 return-to-pending" }
+    - { acceptance_id: AR2-P3, test_path: tests/components/ContractCard.test.tsx, level: unit, case: "AUDITED+APPROVED 显示「退回待批」并可点击" }
+    - { acceptance_id: AR2-P3, test_path: tests/components/ContractCard.test.tsx, level: unit, case: "PENDING_APPROVAL 不显示「退回待批」" }
+    - { acceptance_id: AR2-P4, test_path: tests/unit/audited-return-to-pending-wiring.test.ts, level: unit, case: "orchestrator 暴露 returnToPending 且必带 USER_RETURN_TO_PENDING" }
+    - { acceptance_id: AR2-P4, test_path: tests/unit/audited-return-to-pending-wiring.test.ts, level: unit, case: "daemon-api 导出 returnContractToPending 指向 return-to-pending" }
+    - { acceptance_id: AR2-P4, test_path: tests/unit/audited-return-to-pending-wiring.test.ts, level: unit, case: "ContractCard 在 AUDITED+APPROVED 路径暴露退回待批" }
+    - { acceptance_id: AR2-P5, test_path: tests/daemon/orchestrator.test.ts, level: unit, case: "正例：AUDITED+APPROVED → PENDING_APPROVAL+PENDING_REVIEW（USER_RETURN_TO_PENDING）" }
+    - { acceptance_id: AR2-P5, test_path: tests/unit/audited-return-to-pending-wiring.test.ts, level: unit, case: "orchestrator 暴露 returnToPending 且必带 USER_RETURN_TO_PENDING" }
+governance:
+  spec_refs:
+    - docs/specs/runtime-contract-and-safety.md#113-允许迁移与-lifecycle_transitions-逐字一致
+    - docs/specs/system-architecture.md#911-合同生命周期与审批子状态联动规则
+    - docs/specs/development-tasks-completed.md#task-audited.1
+    - docs/specs/supervisor.md
+  depends_on:
+    - { id: TASK-AUDITED.1, kind: hard }
+  code_facts:
+    - { ref: "daemon/pipeline/orchestrator.ts:638-670", note: "returnToPending：withContractLock + AUDITED/APPROVED + USER_RETURN_TO_PENDING" }
+    - { ref: "daemon/server.ts:5940-5940", note: "contracts 正则含 return-to-pending" }
+    - { ref: "daemon/server.ts:6364-6375", note: "POST return-to-pending → orchestrator.returnToPending" }
+    - { ref: "src/lib/daemon-api.ts:555-570", note: "returnContractToPending POST" }
+    - { ref: "src/components/contract/ContractCard.tsx:120-122", note: "testid contract-return-to-pending；onReturnToPending 回调" }
+    - { ref: "src/routes/index.tsx:1-1", note: "#178 合入时未传 onReturnToPending（卡外；Tina 已授权 follow-up 进行中）" }
+    - { ref: "src/lib/state-machine.ts:274-292", note: "EDGE_GUARDS AUDITED→PENDING_APPROVAL 未改（只消费 AUDITED.1）" }
+  non_goals:
+    - 不改 state-machine 边表 / Guard 语义（只消费 AUDITED.1）
+    - 不碰 TASK-D.1e / 桌面形态 / DS-6 DoR
+    - 不碰 TASK-S.3；不销 OP-34
+    - 不发明新试玩展示态 / 合并产品向 / 重开 EXECUTING 捷径
+    - 不放宽合并门禁、不绕过 validateTransition、不静默授权
+    - 不宣称端到端闭环 / 试玩体验已完成 / e2e
+    - 不把 #178 未接的 index 父级写成永久挂账或另立产品卡（follow-up 另授权）
+  fail:
+    - 只改 UI 不改 orchestrator/HTTP，或只改后端无生产按钮
+    - 旁路 validateTransition / 手改合同 JSON
+    - 非 AUDITED 或非 APPROVED 仍可退回待批
+    - 落点仍 APPROVED 却进入 PENDING_APPROVAL
+    - 放宽鉴权 / Demo Origin / 点亮三证 / 网关写范围
+    - 扩大 writable_paths 到无关产品面却无授权
+  adr_revisions: []
+  defaults:
+    - "reason 固定 USER_RETURN_TO_PENDING（与 AUDITED.1 Guard 一致）"
+    - "reviewer 可选，缺省与 approve 类似可用 local-user"
+    - "规范权威：Supervisor/ADR > 架构 §9.1.1 > runtime §11 > state-machine.ts；冲突停工升级"
+    - "按钮文案「退回待批」；testid contract-return-to-pending"
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 178, commit: 71684d482500e623bc469a96a8ed907642297192 }
+```
+
+<a id="task-ci.3"></a>
+
+#### 【Task CI.3】测试 fetch 哨兵清零未桩请求并切判红 `[COMPLETED · 立卡 P-178 · 施工 P-179]`
+
+> **立卡说明（2026-11-10 · P-178）**：承接 #198（挂账②修复）。全局 fetch 哨兵当前为「拒绝 + 打印」**降级态，不判红**：未桩请求不再泄漏到 jsdom 销毁之后，但 10 个文件共 115 次未桩请求仍被静默吞掉，对 daemon-api 行为的回归保护是虚的。本卡逐文件补桩至零，再把哨兵切为判红模式。与 CI.2（性能门禁抗抖动）分卡。**立卡 ≠ 开工 ≠ 销项**；不标 COMPLETED；不新增 OP；不改产品代码。
+
+> **归档注记（2026-11-10 · P-179）**：本卡已 **COMPLETED**（[#201](https://github.com/he18718143986-design/IDE/pull/201) squash `bdde65c`；分支 `test/ci3-fetch-sentinel-strict`，分支 tip `0811fb8`，合入前 tree 与分支一致）。验收逐条：
+> - **CI3-P1**：10 文件 115 次未桩请求清零（逐文件单跑，`[unstubbed-fetch]` 计数为 0）。
+> - **CI3-P2**：`UNSTUBBED_FETCH_STRICT = true` 为显式常量；探针测试判红并列出 URL，探针已删除；未用 try/catch 或全局吞错。
+> - **CI3-P3**：`vitest run --project dom` 49 文件 / 301 用例全绿，未新增 skip。
+> - **CI3-P4**：`src/**`（除 setup 外）与 `daemon/**` 的 diff 为空。
+> - **CI3-P5**：**本地** DOM 全量连续 3 次全绿，未桩日志为 0。合入后 main 上的连续 CI 回看**另记，本注记不替代**；观察 checkpoint 见台账挂账⑦（P-180）。
+> - **CI 侧**：Ubuntu/macOS 的 lint、typecheck、unit 全绿（必需项）；Windows 单测失败的 16 个文件与 main 基线逐一相同（非必需，不作 macOS 证据）。
+> - **实现偏差**：补桩采用 fetch 层 `stubOfflineFetch`（定义于 `src/tests/setup.ts`），未用 `vi.mock` daemon-api；行为与哨兵 reject 一致，断言未改，未伪造成功数据。
+> - **不宣称**：不宣称 CI.3 修复了挂账② 的确切根因。
+
+```yaml task-card
+id: TASK-CI.3
+status: COMPLETED
+contract:
+  intent:
+    title: 测试 fetch 哨兵清零未桩请求并切判红
+    description: >-
+      承接 #198。哨兵当前为「拒绝 + 打印」降级态：未桩请求立即 reject，不泄漏到 jsdom 销毁之后，但测试不会因此变红。
+      本卡逐文件补桩至零，再把哨兵切为判红模式，使未桩请求在所在测试内判红并指认 URL。
+      补桩只允许「离线失败」或与真实 schema 一致的最小夹具，不得为求绿伪造成功数据。
+    risk_level: LOW
+  acceptance:
+    - id: CI3-P1
+      check: auto
+      text: >-
+        未桩清零：逐文件单跑 DOM 测试，`[unstubbed-fetch]` 计数均为 0。范围 10 个文件：index-route、settings-tab、supervisor-admission-route、task-c22-confirm-wiring、journey-handoff、middle-yield、project-map-pane、scope-acceptance-block、system-map-pane、task-c18-scheme-single-pane。
+    - id: CI3-P2
+      check: auto
+      text: >-
+        判红模式：`src/tests/setup.ts` 中哨兵判红开关为显式常量且默认开启；未桩请求在所在测试的 afterEach 判红并列出 URL；不得用 try/catch 或全局吞错绕过。
+    - id: CI3-P3
+      check: auto
+      text: >-
+        DOM 全绿：`vitest run --project dom` 通过，用例数不少于 301，不新增 skip。
+    - id: CI3-P4
+      check: auto
+      text: >-
+        产品代码零改动：`src/**`（除 setup 外）与 `daemon/**` 的 diff 为空。
+    - id: CI3-P5
+      check: auto
+      text: >-
+        稳定性：判红模式下 DOM 全量连续 3 次全绿，且无 `window is not defined` 残留。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/tests/setup.ts
+      - tests/ui/index-route.test.tsx
+      - tests/ui/settings-tab.test.tsx
+      - tests/ui/supervisor-admission-route.test.tsx
+      - tests/ui/task-c22-confirm-wiring.test.tsx
+      - tests/ui/journey-handoff.test.tsx
+      - tests/ui/middle-yield.test.tsx
+      - tests/ui/project-map-pane.test.tsx
+      - tests/ui/scope-acceptance-block.test.tsx
+      - tests/ui/system-map-pane.test.tsx
+      - tests/ui/task-c18-scheme-single-pane.test.tsx
+    readonly_paths:
+      - src/lib/daemon-api.ts
+      - daemon/**
+  verification:
+    commands:
+      - { alias: dom-project, executable: npx, args: [vitest, run, --project, dom] }
+      - { alias: dom-index-route, executable: npx, args: [vitest, run, --project, dom, tests/ui/index-route.test.tsx] }
+      - { alias: dom-settings-tab, executable: npx, args: [vitest, run, --project, dom, tests/ui/settings-tab.test.tsx] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: lint, executable: npm, args: [run, -s, lint] }
+design:
+  approach: >-
+    1) 逐文件单跑，按 URL 归类未桩请求（workers、vault、knowledge/modules、supervisor/journey、project/plan、graph、chat/sessions、chat/adapters、baseline、preview/real/status、playtest/*）。
+    2) 每个 URL 以对应 daemon-api 函数的 vi.mock 补桩：默认「离线失败」，与此前未桩行为一致；仅当断言依赖返回值时给与 schema 一致的最小夹具并注明。
+    3) 全部清零后把哨兵切为判红模式。4) 连续 3 次全量验证。
+  touches:
+    - { path: src/tests/setup.ts, change: modify, why: 增加判红开关（默认开），降级态与判红态共用登记逻辑, symbols: [] }
+    - { path: tests/ui/settings-tab.test.tsx, change: modify, why: 36 次未桩，本卡最大头, symbols: [] }
+    - { path: tests/ui/index-route.test.tsx, change: modify, why: 34 次未桩, symbols: [] }
+    - { path: tests/ui/supervisor-admission-route.test.tsx, change: modify, why: 24 次未桩, symbols: [] }
+    - { path: tests/ui/task-c22-confirm-wiring.test.tsx, change: modify, why: 11 次未桩, symbols: [] }
+    - { path: tests/ui/journey-handoff.test.tsx, change: modify, why: 4 次未桩, symbols: [] }
+    - { path: tests/ui/middle-yield.test.tsx, change: modify, why: 2 次未桩, symbols: [] }
+    - { path: tests/ui/project-map-pane.test.tsx, change: modify, why: 1 次未桩, symbols: [] }
+    - { path: tests/ui/scope-acceptance-block.test.tsx, change: modify, why: 1 次未桩, symbols: [] }
+    - { path: tests/ui/system-map-pane.test.tsx, change: modify, why: 1 次未桩, symbols: [] }
+    - { path: tests/ui/task-c18-scheme-single-pane.test.tsx, change: modify, why: 1 次未桩, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: CI3-P1, test_path: tests/ui/index-route.test.tsx, level: integration, case: "首屏是空编辑区" }
+    - { acceptance_id: CI3-P2, test_path: tests/ui/settings-tab.test.tsx, level: unit, debt: "判红开关（src/tests/setup.ts）默认开启且探针实测判红（探针已删，未入库）；持续的判红回归测试未入库，挂账⑦" }
+    - { acceptance_id: CI3-P3, test_path: tests/ui/settings-tab.test.tsx, level: integration, case: "GATEWAY_ENFORCED 显示受控且为绿色" }
+    - { acceptance_id: CI3-P5, test_path: tests/ui/index-route.test.tsx, level: integration, debt: "稳定性证据为本地连续 3 次全量 + CI 运行，非单一用例；合入后 main 连续回看另记，挂账⑦" }
+    - { acceptance_id: CI3-P4, test_path: tests/ui/settings-tab.test.tsx, level: unit, debt: "非测试项：产品代码零改动由 git diff 核验（#201 diff 仅含 setup.ts 与 10 个测试文件）" }
+governance:
+  spec_refs:
+    - docs/ledger/README.md
+  depends_on: []
+  code_facts:
+    - { ref: "src/tests/setup.ts:24-33", note: "main 3c6dfeb（#198）：全局 fetch 哨兵为拒绝 + console.warn 降级态，不判红" }
+    - { ref: "tests/ui/supervisor-draft-wiring.test.tsx:55-59", note: "main 3c6dfeb（#198）：offlineDaemon 补桩 6 个接口，该文件已无未桩请求" }
+  non_goals:
+    - 不改产品代码与 daemon 行为
+    - 不新增 OP；不并入 CI.2（性能门禁）
+    - 不以 try/catch 或全局吞错绕过哨兵
+    - 不宣称 window is not defined 唯一根因；挂账② 销项待 main CI 观察期与本卡完成
+  fail:
+    - 为求绿给未桩接口返回伪造的成功数据
+    - 用 skip / it.skip 绕过未桩失败
+    - 判红开关在完成后仍保持关闭
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 201, commit: bdde65cdc91e1efb842ad2b49adc93f5ce07ed23 }
+```
+
+---
+
+<a id="task-ci.4"></a>
+
+#### 【Task CI.4】判红开关与离线桩的回归用例（挂账⑦）`[COMPLETED · 立卡 P-180 · 施工 P-193]`
+
+> **立卡说明（2026-11-10 · P-180）**：承接 TASK-CI.3 挂账⑦。CI.3 完成后，判红开关 `UNSTUBBED_FETCH_STRICT` 与离线桩 `stubOfflineFetch` 尚无持久回归用例：若有人把开关改为 false，仓库里没有任何测试会变红。本卡只补回归用例，不改哨兵行为。**立卡 ≠ 开工 ≠ 销项**；不新增 OP；不改产品代码；与 TASK-J.16 无依赖。
+
+> **归档注记（2026-11-12 · P-193）**：本卡已 **COMPLETED**（[#227](https://github.com/he18718143986-design/IDE/pull/227) squash `f8bfbad`；分支 `test/ci4-unstubbed-fetch-guard`，分支 tip `56d466c`，合入前 tree 与分支一致）。验收逐条：
+> - **CI4-P1**：回归用例「判红开关为显式常量且默认开启」落于 `src/tests/unstubbed-fetch-guard.test.tsx`，断言 `UNSTUBBED_FETCH_STRICT === true`；若开关被改为 `false`，该用例变红阻断合入。
+> - **CI4-P2**：回归用例「离线桩对声明路径以 reject 应答」落于 `src/tests/unstubbed-fetch-guard.test.tsx`，断言 `stubOfflineFetch` 声明的路径（相对路径与绝对 URL）fetch 被拒绝（错误含「离线桩」），且离线请求不进入未桩登记（`afterEach` 无抛错）。
+> - **CI4-P3**：产品代码零改动：diff 仅包含单一测试文件 `src/tests/unstubbed-fetch-guard.test.tsx`（+32/-0），`src/**`（除该文件外）与 `daemon/**` 的 diff 为空；`vitest run --project dom` 49 文件 / 303 用例全绿（基线 301 + 本卡 2），不新增 skip。
+> - **CI 侧**：Ubuntu/macOS 的 lint、typecheck、unit、Docs check、Knowledge check、Perf threshold gate 全绿（必需项）；Windows 单测失败的 17 个文件 / 30 用例与 main 基线逐一相同（非必需，挂账⑩/⑯，不新增失败）。
+> - **销项**：台账挂账⑦ 销项。
+
+```yaml task-card
+id: TASK-CI.4
+status: COMPLETED
+contract:
+  intent:
+    title: 判红开关与离线桩的回归用例
+    description: >-
+      为 src/tests/setup.ts 的判红开关（UNSTUBBED_FETCH_STRICT）与 stubOfflineFetch 离线桩补持久回归用例：开关被改为 false 时用例变红；离线桩对声明路径以 reject 应答且不计入未桩登记。不改哨兵行为。
+    risk_level: LOW
+  acceptance:
+    - id: CI4-P1
+      check: auto
+      text: >-
+        回归用例「判红开关为显式常量且默认开启」存在于 src/tests/unstubbed-fetch-guard.test.tsx，断言 UNSTUBBED_FETCH_STRICT 为 true；若开关被改为 false，该用例变红。
+    - id: CI4-P2
+      check: auto
+      text: >-
+        回归用例「离线桩对声明路径以 reject 应答」存在，断言 stubOfflineFetch 声明的路径 fetch 被拒绝（错误含「离线桩」），且该请求不进入未桩登记。
+    - id: CI4-P3
+      check: auto
+      text: >-
+        产品代码零改动：src/**（除 src/tests/ 外）与 daemon/** 的 diff 为空；vitest run --project dom 全绿，用例数多于 CI.3 基线（301），不新增 skip。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/tests/unstubbed-fetch-guard.test.tsx
+    readonly_paths:
+      - src/tests/setup.ts
+      - src/lib/daemon-api.ts
+      - daemon/**
+  verification:
+    commands:
+      - { alias: dom-guard, executable: npx, args: [vitest, run, --project, dom, src/tests/unstubbed-fetch-guard.test.tsx] }
+      - { alias: dom-project, executable: npx, args: [vitest, run, --project, dom] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: lint, executable: npm, args: [run, -s, lint] }
+design:
+  approach: >-
+    1) 新建单一测试文件，导入 setup 的导出常量与 stubOfflineFetch。 2) 用例只读判定开关值与离线桩行为，不修改 setup。 3) 验证：文件单跑、DOM 全量、tsc、lint。
+  touches:
+    - { path: src/tests/unstubbed-fetch-guard.test.tsx, change: create, why: 判红开关与离线桩的回归用例, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: CI4-P1, test_path: src/tests/unstubbed-fetch-guard.test.tsx, level: unit, case: "判红开关为显式常量且默认开启" }
+    - { acceptance_id: CI4-P2, test_path: src/tests/unstubbed-fetch-guard.test.tsx, level: unit, case: "离线桩对声明路径以 reject 应答" }
+    - { acceptance_id: CI4-P3, test_path: src/tests/unstubbed-fetch-guard.test.tsx, level: integration, debt: "非单一用例：产品零改动由 git diff 核验，DOM 全绿由 dom-project 验证命令承担" }
+governance:
+  spec_refs:
+    - docs/ledger/README.md
+  depends_on: []
+  code_facts:
+    - { ref: "src/tests/setup.ts:22", note: "UNSTUBBED_FETCH_STRICT = true（TASK-CI.3 #201 `bdde65c`）" }
+    - { ref: "src/tests/setup.ts:50", note: "stubOfflineFetch 离线桩（TASK-CI.3 #201 `bdde65c`）" }
+  non_goals:
+    - 不改哨兵行为与 setup 导出
+    - 不新增与判红开关无关的空用例凑数
+    - 不并入 TASK-J.16 或 TASK-CI.2
+  fail:
+    - 用例通过 try/catch、skip 或 todo 绕过
+    - 断言被放宽为只检查「存在」而不检查取值
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 227, commit: f8bfbadebf5980369bbdd3882851accda4e48a9e }
+```
+
+---
+
+<a id="task-j21"></a>
+
+#### 【Task J.21】intent-compiler 重启后状态恢复（transcript 持久化与证据回放）`[COMPLETED · 立卡 P-187 · 施工 P-194]`
+
+> **立卡说明（2026-11-11 · P-187）**：挂账⑫。集成测试已观察：进程重启后 transcript 只在内存里，台账证据指向的旧 turn 解析不到，审计以 `E_STATE_CORRUPT` 拒绝之后的批次。**生产环境未验证**；影响面按测试观察为「重启后编译循环不可用」，而非仅审计报错。与 ITEM-n 撞号（#214 已合）是两个问题。**立卡 ≠ 开工**；优先级：**P1**（Tina 拍板，P-188）。
+
+> **归档注记（2026-11-12 · P-194）**：本卡已 **COMPLETED**（[#229](https://github.com/he18718143986-design/IDE/pull/229) squash `21b8b35`；分支 `feat/j21-transcript-store-recovery`，分支 tip `60e7a07`，合入前 tree 与分支一致）。验收逐条：
+> - **J21-P1**：端到端冷重启恢复：模拟进程重启（新 host 实例仅从磁盘加载），台账中已引用的证据 turn 均可从落盘 transcript 解析，审计通过并成功 CAS 提交新批次；新增集成测试 `tests/integration/intent-compiler-restart-recovery.test.ts`（+262/-0）全绿。
+> - **J21-P2**：碰撞测试用例转正与去除空补丁回放：`tests/integration/intent-compiler-item-id-collision.test.ts` 中删掉 `replay` 空补丁绕开手段，原 `it.todo("重启后 transcript 恢复（挂账⑫）...")` 转为正式断言用例且持续通过。
+> - **J21-P3**：版本校验与失败关闭：transcript 落盘于 `.stagent/drafts/scheme-ledger/transcript.json`，原子落盘；带 `schema_version: "1.0"`；版本缺失/不识别抛出 `E_TRANSCRIPT_SCHEMA_VERSION`，损坏/字段缺失抛出 `E_TRANSCRIPT_CORRUPT`，不静默忽略；新增单测 `tests/unit/transcript-store.test.ts`（+212/-0）全绿。
+> - **改动范围**：严格位于卡片 6 个 `writable_paths` 内（`host.ts`、`scheme-ledger-store.ts`、`transcript-store.ts`、`intent-compiler-restart-recovery.test.ts`、`intent-compiler-item-id-collision.test.ts`、`transcript-store.test.ts`），无任何超范围改动。
+> - **CI 侧**：Ubuntu/macOS/Windows 的 lint、typecheck、Ubuntu/macOS 单测、Docs check、Knowledge check、Perf threshold gate 12 项必需检查全绿；Windows 单测失败的 9 文件（非必需）均为既有环境/路径与挂账⑩/⑯ 项，本卡改动的 6 个文件在 Windows 0 失败，0 新增。
+> - **销项**：台账挂账⑫ 销项（重启后 transcript 持久化恢复已落地，`E_STATE_CORRUPT` 死锁消除）。
+> - **诚实口径**：集成测试已验证，生产环境真实重启场景未验证。
+
+```yaml task-card
+id: TASK-J.21
+status: COMPLETED
+contract:
+  intent:
+    title: intent-compiler 重启后状态恢复（transcript 持久化与证据回放）
+    description: >-
+      进程重启后，台账已引用的证据 turn 须可从磁盘解析，编译循环可继续提交新批次，不得以 E_STATE_CORRUPT 拒绝全部后续批次。
+      transcript 持久化须版本化：旧数据缺失或版本不识别时明确报错，不静默降级。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J21-P1
+      check: auto
+      text: >-
+        模拟进程重启（新 host 实例仅从磁盘加载）后，台账中已引用的证据 turn 均可解析，审计通过。
+    - id: J21-P2
+      check: auto
+      text: >-
+        重启后提交新批次（不以空补丁回放绕开）不被拒绝；tests/integration/intent-compiler-item-id-collision.test.ts 中以 it.todo 留痕的重启用例转为正式断言。
+    - id: J21-P3
+      check: auto
+      text: >-
+        transcript 持久化带版本号；版本缺失或不识别时返回明确错误码，不静默忽略。
+  scope:
+    writable_paths:
+      - daemon/supervisor/intent-compiler/host.ts
+      - daemon/supervisor/intent-compiler/scheme-ledger-store.ts
+      - daemon/supervisor/intent-compiler/transcript-store.ts
+      - tests/integration/intent-compiler-restart-recovery.test.ts
+      - tests/integration/intent-compiler-item-id-collision.test.ts
+      - tests/unit/transcript-store.test.ts
+    readonly_paths:
+      - docs/specs/intent-compiler-prompt.md
+      - docs/specs/supervisor.md
+  verification:
+    commands:
+      - { alias: regression-intent-compiler, executable: npx, args: [vitest, run, tests/integration/intent-compiler-restart-recovery.test.ts, tests/integration/intent-compiler-item-id-collision.test.ts, tests/unit/transcript-store.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) 先确认 transcript 的生命周期与持久化点（内存 → 磁盘）。2) 持久化带版本号，读取时校验。3) 重启用例以新实例仅从磁盘加载，不以空补丁回放绕开。施工前按当时代码重核 touches。
+  touches:
+    - { path: daemon/supervisor/intent-compiler/host.ts, change: modify, why: transcript 持久化点与重启加载, symbols: [] }
+    - { path: daemon/supervisor/intent-compiler/scheme-ledger-store.ts, change: modify, why: 台账读取与 transcript 版本校验配合, symbols: [] }
+    - { path: daemon/supervisor/intent-compiler/transcript-store.ts, change: create, why: transcript 持久化与版本化读取（新文件，施工前核对是否需要）, symbols: [] }
+    - { path: tests/integration/intent-compiler-restart-recovery.test.ts, change: create, why: 重启后证据回放与新批次提交（J21-P1、P2）, symbols: [] }
+    - { path: tests/integration/intent-compiler-item-id-collision.test.ts, change: modify, why: 将 it.todo 重启用例转正式断言（J21-P2）, symbols: [] }
+    - { path: tests/unit/transcript-store.test.ts, change: create, why: 版本校验与错误码（J21-P3）, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J21-P1, test_path: tests/integration/intent-compiler-restart-recovery.test.ts, level: integration, case: "模拟进程冷重启后，历史证据 turn 可解析" }
+    - { acceptance_id: J21-P2, test_path: tests/integration/intent-compiler-item-id-collision.test.ts, level: integration, case: "重启后 transcript 恢复（挂账⑫）" }
+    - { acceptance_id: J21-P3, test_path: tests/unit/transcript-store.test.ts, level: unit, case: "缺少 schema_version 字段时抛出 E_TRANSCRIPT_SCHEMA_VERSION" }
+governance:
+  spec_refs:
+    - docs/specs/intent-compiler-prompt.md
+    - docs/specs/supervisor.md
+  depends_on: []
+  code_facts:
+    - { ref: "daemon/supervisor/intent-compiler/host.ts::transcript", note: "transcript 仅存内存（挂账⑫，P-186 复现测试观察）" }
+  non_goals:
+    - 不改 E_STATE_CORRUPT 的审计规则本身（只保证合法状态可恢复）
+    - 不做中栏方案来源统一（另卡 TASK-J.22）
+  fail:
+    - 重启后仍以 E_STATE_CORRUPT 拒绝合法台账的新批次
+    - 用空补丁回放或跳过审计让重启用例变绿
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 229, commit: 21b8b3565ad0d293ac871ab657a96d7627b10c58 }
+```
+
+<a id="task-j23"></a>
+<a id="task-j.23"></a>
+
+### 【Task J.23】质疑自查生产链路接线（面板挂载 · DISPUTE 路由 · turn_text_sha256 落盘 · 纯接线不含文案）`[COMPLETED · 立卡 P-195 · 修订 P-196 · 施工 P-198 · 走查通过 P-199]`
+
+> **立卡与修订说明（2026-11-12 · P-195 立卡；2026-11-12 · P-196 路径修订）**：承接 `TASK-J.16` 真实试玩暴露的生产链路未接线（J16-P5 / J16-P6 FAIL）。范围严格收窄为纯接线：质疑面板挂到日常工作台、冻结后「这里不对」走 DISPUTE 路由、`turn_text_sha256` 落盘；不含文案整改（main 上 `DisputeConsolePane.tsx` 源码文案已按 §16.7 合规，挂载后复核）。施工前核对确认冻结后 DISPUTE 需经过 journey API 复用 #222 已有 confirmation_id 透传、服务端格式校验及 surface_log 查证归因，经 P-196 扩充 writable_paths 与集成测试用例。立卡 ≠ 开工。文档计划暂缓。
+
+> **归档注记（2026-11-13 · P-198 施工；2026-11-13 · P-199 走查通过）**：本卡已 **COMPLETED**（[#233](https://github.com/he18718143986-design/IDE/pull/233) squash `ab40f3aaf115a37f6bc9bc75c637d41a2c5bf1e7`；分支 `feat/j23-dispute-wiring`，head `a200e00`；走查通过见 P-199）。验收逐条证据如下：
+> - **J23-P1（面板挂载）**：质疑自查面板（`DisputeConsolePane`）已成功接入日常壳（`StudioViewportShell.tsx` 与 `src/routes/index.tsx`），视口路由扩展支持 `dispute` 视口；用户在真实界面能打开该面板，源码文案符合 §16.7 白话要求（按钮为「这是 Bug，免费修」「我想要新功能，下一轮做」）。新增测试 `tests/ui/dispute-production-wiring.test.tsx` 全部通过。
+> - **J23-P2（冻结后 DISPUTE 路由与 confirmation_id 复用）**：方案冻结后，右栏发送「这里不对」（及同类质疑用语）经 `handleJourneyBeforeSend` 与 `intent-router.ts` 分流进入 DISPUTE 流程，不再因 `partnerMessageMayRebuildScheme` 为假而 passthrough 到普通聊天；透传 `confirmation_id` 并由服务端查证 surface_log，查不到则失败关闭、不写归因。新增集成测试 `tests/integration/journey-dispute-routing.test.ts` 全部通过。
+> - **J23-P3（会话哈希落盘）**：在 `daemon/supervisor/intent-compiler/transcript-store.ts` 与 `daemon/supervisor/journey/orchestrate.ts` 中写出 `turn_text_sha256`（口径为 UTF-8 原文 SHA-256），与 `host.ts` 保持一致。新增单测 `tests/unit/dispute-turn-hash.test.ts` 全部通过。
+> - **J23-P4（真实界面走查）**：Tina 本机真实试玩走查确认：用户在日常工作台能正常打开质疑自查面板，方案冻结后在右栏发送「这里不对」成功进入 DISPUTE 流程并切至质疑自查视口，不再走普通聊天；面板白话文案合规通过；**J23-P4 走查通过**。
+> - **遗留缺口注记**：左栏未展示确认时原话（J16-P5 最后一项失败），经代码排查为反查键未对齐等原因，不推翻 J.23 纯接线与 J23-P4 走查成果，转由 `TASK-J.16`（`NEW_TASK`）继续排查与根因修复。
+> - **改动范围**：严格位于卡片 12 个 `writable_paths` 内（实际修改 10 个，无超范围修改）。
+
+```yaml task-card
+id: TASK-J.23
+status: COMPLETED
+contract:
+  intent:
+    title: 质疑自查生产链路接线（面板挂载 · DISPUTE 路由 · turn_text_sha256 落盘 · 纯接线不含文案）
+    description: >-
+      做完后，用户在日常工作台能打开质疑自查面板；方案确认之后在右栏发送「这里不对」进入 DISPUTE
+      流程而不是普通聊天；真实会话落盘含 turn_text_sha256（sha256(utf8) 口径与
+      intent-compiler/host.ts 一致），左栏显示锚定原话。本卡范围严格限定为纯接线，不含文案整改
+      （main 上面板源码文案已符合 §16.7，待挂载后复核）。真实界面走查通过前不宣称本卡完成。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J23-P1
+      check: auto
+      text: >-
+        质疑自查面板挂到生产日常壳（viewport-routing / StudioViewportShell 或经核对后的实际挂载点），
+        不再只 import 而不 JSX 挂载；用户在真实界面能打开该面板（纯接线挂载，不改动面板源码文案）。
+    - id: J23-P2
+      check: auto
+      text: >-
+        方案冻结后，右栏发送「这里不对」（及同类质疑用语）走 DISPUTE 路由，不得因
+        partnerMessageMayRebuildScheme 为假而 passthrough 到普通聊天；旅程请求复用 #222
+        已有 confirmation_id 透传与服务端格式校验 / surface_log 查证归因链路，不另造机制，
+        缺失或查证失败时继续失败关闭、不写归因。
+    - id: J23-P3
+      check: auto
+      text: >-
+        真实会话落盘出现 turn_text_sha256 或同源的 text_sha256，且等于 sha256(utf8 原文)，
+        与 intent-compiler/host.ts 口径一致；左栏显示锚定原话。
+    - id: J23-P4
+      check: playtest
+      text: >-
+        真实界面走查覆盖 J23-P1～P3 纯接线：能打开面板、冻结后「这里不对」进入质疑流程、哈希可对照且左栏有原话；
+        复核确认 main 既有合规文案在挂载后正常呈现（不含文案整改）。单测 / jsdom / 仅有源码目录不替代本条。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/components/studio/viewport-routing.ts
+      - src/components/studio/StudioViewportShell.tsx
+      - src/lib/journey/intent-router.ts
+      - daemon/supervisor/intent-compiler/transcript-store.ts
+      - src/routes/index.tsx
+      - src/lib/journey/handoff-progress.ts
+      - src/lib/daemon-api.ts
+      - daemon/server.ts
+      - daemon/supervisor/journey/orchestrate.ts
+      - tests/ui/dispute-production-wiring.test.tsx
+      - tests/integration/journey-dispute-routing.test.ts
+      - tests/unit/dispute-turn-hash.test.ts
+    readonly_paths:
+      - docs/specs/supervisor.md
+      - docs/specs/playtest-self-check.md
+      - daemon/supervisor/intent-compiler/host.ts
+      - src/components/studio/DisputeConsolePane.tsx
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: unit-wiring, executable: npx, args: [vitest, run, tests/ui/dispute-production-wiring.test.tsx] }
+      - { alias: integration-dispute-routing, executable: npx, args: [vitest, run, tests/integration/journey-dispute-routing.test.ts] }
+      - { alias: unit-dispute-hash, executable: npx, args: [vitest, run, tests/unit/dispute-turn-hash.test.ts] }
+design:
+  approach: >-
+    预估接线：把 DisputeConsolePane 挂回日常壳（C.18 目前只渲染 scheme）；冻结后仍要把质疑语送入
+    DISPUTE 而不是一律 passthrough；在 Daemon 会话落盘处写出可对照的 turn_text_sha256。
+    上列 writable_paths 含试玩对照后的候选（index.tsx 的 handleJourneyBeforeSend、
+    handoff-progress.ts 的 partnerMessageMayRebuildScheme、transcript-store.ts）。冻结后质疑需经
+    journey API 进入 DISPUTE，并复用 #222 的 confirmation_id 前端透传、服务端校验及 surface_log
+    查证归因机制；因此允许调整 daemon-api.ts、daemon/server.ts、journey/orchestrate.ts 并补生产集成测试，
+    不另造确认机制。施工前仍按实际核对。
+  touches:
+    - { path: src/components/studio/viewport-routing.ts, change: modify, why: C.18 把视口收成单页 scheme，质疑视口无法出现, symbols: [] }
+    - { path: src/components/studio/StudioViewportShell.tsx, change: modify, why: 日常壳需能挂载或切入质疑面板, symbols: [] }
+    - { path: src/lib/journey/intent-router.ts, change: modify, why: DISPUTE 路由接线点（施工前核对是否确需改）, symbols: [] }
+    - { path: daemon/supervisor/intent-compiler/transcript-store.ts, change: modify, why: 预估的会话哈希落盘处（施工前核对）, symbols: [] }
+    - { path: src/routes/index.tsx, change: modify, why: 面板挂载与冻结后 handleJourneyBeforeSend 分流（预估，施工前核对）, symbols: ["handleJourneyBeforeSend"] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: journey 请求透传既有 confirmation_id, symbols: ["submitJourneyMessage"] }
+    - { path: daemon/server.ts, change: modify, why: "journey 请求接收与复用 #222 格式校验及 surface_log 归因链路", symbols: ["handleSupervisorJourney"] }
+    - { path: daemon/supervisor/journey/orchestrate.ts, change: modify, why: "DISPUTE 编排透传确认上下文至既有自查归因机制", symbols: ["orchestrateJourney"] }
+    - { path: tests/integration/journey-dispute-routing.test.ts, change: create, why: "覆盖生产 journey DISPUTE 路由、confirmation_id 复用及失败关闭", symbols: [] }
+    - { path: tests/unit/dispute-turn-hash.test.ts, change: create, why: "覆盖 turn_text_sha256 与 sha256(utf8 原文) 一致", symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J23-P1, test_path: tests/ui/dispute-production-wiring.test.tsx, level: integration, case: "StudioViewportShell 在 activeViewport 为 dispute 时正确渲染挂载的 DisputeConsolePane" }
+    - { acceptance_id: J23-P2, test_path: tests/integration/journey-dispute-routing.test.ts, level: integration, case: "方案冻结判定与意图分类：冻结后「这里不对」属于 DISPUTE，不应盲目 passthrough" }
+    - { acceptance_id: J23-P3, test_path: tests/unit/dispute-turn-hash.test.ts, level: unit, case: "writeTranscript 与 readTranscript 保证 turn_text_sha256 与 text_sha256 正确落盘与读回" }
+    - { acceptance_id: J23-P4, test_path: tests/ui/dispute-production-wiring.test.tsx, level: integration, debt: "Tina 本机真实试玩走查通过（J23-P4 走查完成）" }
+governance:
+  spec_refs:
+    - docs/specs/supervisor.md
+    - docs/specs/playtest-self-check.md
+  depends_on:
+    - { id: TASK-J.16, kind: soft }
+  code_facts:
+    - { ref: "src/routes/index.tsx::handleJourneyBeforeSend", note: "方案冻结后 partnerMessageMayRebuildScheme 为假则一律 passthrough，质疑语进普通聊天（现行 main b3d14d0 仍在）" }
+    - { ref: "src/components/studio/viewport-routing.ts::STUDIO_VIEWPORT_IDS", note: "C.18 只导出 scheme 视口；DisputeConsolePane 在 index.tsx 仅 import 未挂载" }
+    - { ref: "src/lib/daemon-api.ts::submitJourneyMessage", note: "当前 journey 请求无 confirmation_id 字段；POST /api/supervisor/dispute 已有 confirmation_id 透传与服务端校验 / surface_log 查证机制（#222）" }
+    - { ref: "daemon/supervisor/intent-compiler/host.ts::sha256", note: "哈希口径 sha256(utf8)；P-195 试玩的 .stagent 会话事件未写出该字段" }
+  non_goals:
+    - 不标 TASK-J.16 COMPLETED
+    - 纯接线不含文案整改：main 上 DisputeConsolePane.tsx 源码文案已合规，严禁修改面板文案
+    - 不开文档计划、不另立产品方向
+    - 不以单测或 jsdom 替代真实界面走查
+  fail:
+    - 生产界面仍打不开质疑面板
+    - 冻结后「这里不对」仍走普通聊天
+    - 真实落盘仍无对得上的 turn_text_sha256
+    - 以单测替代 J23-P4 走查
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 233, commit: ab40f3aaf115a37f6bc9bc75c637d41a2c5bf1e7 }
+```
+
+<a id="task-j24"></a>
+<a id="task-j.24"></a>
+
+### 【Task J.24】开工路径三缺口（脏目录确认 · 空仓库无 main · Worker provider 默认值）`[COMPLETED · 立卡 P-195 · 修订 P-197 · 施工 P-198]`
+
+> **立卡与修订说明（2026-11-12 · P-195 立卡；2026-11-13 · P-197 路径与方案修订）**：同一轮真实试玩中，正式开工路径被三条缺口挡住，当时只做了试玩绕过、未改仓库。本卡逐项修复，使「确认方案 / 确认开工」在脏工作区、空仓库、以及设置页已配置非 OpenAI 钥匙时，都能走产品自己的路径。施工前核对发现原预估路径缺少前端交互、原子流程与设置页相关文件，经 P-197 扩充 writable_paths，并明确缺口 3 采用「供应商选择器」方案、缺口 1 确认弹窗文案与既有「点确认后会列入禁写名单」语义对齐。立卡/修订 ≠ 开工。文档计划暂缓。
+
+> **归档注记（2026-11-13 · P-198）**：本卡已 **COMPLETED**（[#235](https://github.com/he18718143986-design/IDE/pull/235) squash `72b52abbdb007bb8bf02fb0b7e0a4e6427979fae`；分支 `feat/j24-starter-gaps`，head `5170c0b`）。验收逐条证据如下：
+> - **J24-P1（脏目录确认）**：在 `src/routes/index.tsx` 和 `confirm-scheme-atomic.ts` 中接入确认弹窗与重试逻辑，文案与既有「点确认后会列入禁写名单」语义对齐；未显式确认不得悄悄携带确认标记；显式确认重试后请求携带 `acknowledge_dirty: true`（经 `src/lib/daemon-api.ts::approveContract`），服务端 409 `E_WORKTREE_DIRTY` 正式消除。新增单测 `tests/unit/approve-acknowledge-dirty.test.ts`、`tests/unit/confirm-scheme-atomic.test.ts` 与 UI 测试 `tests/ui/scheme-confirm-dirty-dialog.test.tsx` 全部通过。
+> - **J24-P2（空仓库无 main 引用）**：在 `daemon/git/ensure-git-repo.ts` 的 `ensureGitInit` 与新增 `ensureUsableMainRefSync` 中，对全新无提交空仓库通过 `git commit --allow-empty -m "chore: initial empty commit"` 与 `git branch -M main` 建立初始空提交与可用 `main` 引用；完全不调用 `git add`，严格确保绝不把项目已有文件或密钥纳入初始提交；`createTaskWorktree` 不再因 `fatal: invalid reference: main` 失败。新增单测 `tests/unit/empty-repo-main-ref.test.ts` 全部通过。
+> - **J24-P3（Worker provider 选择器与默认值）**：设置页提供显式「供应商选择器」（支持 DeepSeek、OpenAI、自定义等），经设置接口 `/api/settings/openai-key` 保存 `provider` 与 `baseURL` 至 `daemon/worker/key-store.ts`；Worker 端 `OpenAiWorkerClient` 严格按「设置页显式选择 > runtime 钥匙来源 > `OPENAI_BASE_URL` 环境变量」解析，未配置时构造期直接失败关闭并抛错，严禁靠猜模型名推断；仅有 runtime key、未设 `OPENAI_BASE_URL` 时不再默认打到 `api.openai.com`。新增单测 `tests/unit/worker-provider-base-url.test.ts` 与 UI 测试 `tests/ui/settings-tab.test.tsx` 全部通过。
+> - **改动范围**：严格位于卡片 14 个 `writable_paths` 内（实际修改 13 个，无超范围修改）。
+> - **CI 侧**：Ubuntu/macOS 的 lint、typecheck、单测、Docs check、Knowledge check、Perf threshold gate 等 9 项物理门禁必需检查全绿；Windows 单测（非必需项）失败为存量已知挂账类环境问题，J.24 的 6 个测试文件在 Windows 上 100% 通过（55/55 passed），0 新增失败。
+> - **销项**：台账挂账⑲ 销项（开工路径三缺口修复已落地，见台账挂账⑲ 销项注记）。
+> - **真实验收通过（P-199 · 2026-11-13）**：开工路径三缺口（J24-P1 脏工作区确认带 acknowledge_dirty、J24-P2 空仓库无提交建 main 引用、J24-P3 Worker 供应商选择器与 base URL）经 Tina 本机正式开工路径真实试玩验证全部通过，原「真实开工路径未验证」诚实口径正式销项闭环。
+
+```yaml task-card
+id: TASK-J.24
+status: COMPLETED
+contract:
+  intent:
+    title: 开工路径三缺口（脏目录确认 · 空仓库无 main · Worker provider 默认值）
+    description: >-
+      补上确认开工正式路径上的三条缺口：脏工作区确认须真正发给服务端；空仓库初始化后须有可用的 main
+      引用以便创建施工树；设置页配置的钥匙来源须决定 Worker 的默认 base URL，不得在仅有 runtime
+      钥匙时默认打到 api.openai.com。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J24-P1
+      check: auto
+      text: >-
+        主仓脏且用户已确认时，确认弹窗文案与既有「点确认后会列入禁写名单」语义对齐，确认开工请求携带
+        acknowledge_dirty（或等价确认字段），不再因 E_WORKTREE_DIRTY 409 而无法走完正式路径；未显式确认不得悄悄带上该字段。
+    - id: J24-P2
+      check: auto
+      text: >-
+        对无提交的新仓库，open/init 之后存在可用的 main 引用，createTaskWorktree 不再因
+        fatal: invalid reference: main 失败；不得把已有项目文件或密钥纳入该初始提交。
+    - id: J24-P3
+      check: auto
+      text: >-
+        设置页提供「供应商选择器」（支持 DeepSeek、OpenAI、自定义等），选定或透传的 provider
+        / base URL 经设置接口保存；Worker 实际请求的 base URL 严格跟随该选择；仅有 runtime
+        key、未设 OPENAI_BASE_URL 时，不得默认打到 api.openai.com，严禁靠猜模型名推断。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/routes/index.tsx
+      - src/components/settings/SettingsTab.tsx
+      - src/lib/journey/confirm-scheme-atomic.ts
+      - src/lib/daemon-api.ts
+      - daemon/server.ts
+      - daemon/worker/key-store.ts
+      - daemon/worker/openai-client.ts
+      - daemon/git/ensure-git-repo.ts
+      - tests/unit/approve-acknowledge-dirty.test.ts
+      - tests/unit/confirm-scheme-atomic.test.ts
+      - tests/unit/empty-repo-main-ref.test.ts
+      - tests/unit/worker-provider-base-url.test.ts
+      - tests/ui/settings-tab.test.tsx
+      - tests/ui/scheme-confirm-dirty-dialog.test.tsx
+    readonly_paths:
+      - daemon/pipeline/orchestrator.ts
+      - daemon/git/worktree-manager.ts
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: unit-j24, executable: npx, args: [vitest, run, tests/unit/approve-acknowledge-dirty.test.ts, tests/unit/confirm-scheme-atomic.test.ts, tests/unit/empty-repo-main-ref.test.ts, tests/unit/worker-provider-base-url.test.ts, tests/ui/settings-tab.test.tsx, tests/ui/scheme-confirm-dirty-dialog.test.tsx] }
+design:
+  approach: >-
+    三条缺口分别修：前端确认开工接入弹窗并在显式确认后补 acknowledge_dirty；open/init
+    给空仓库建立可用 main 引用；设置页接入供应商选择器，Worker base URL 严格跟随该选择。
+  touches:
+    - { path: src/routes/index.tsx, change: modify, why: 接入脏工作区确认弹窗交互与设置页模型钥匙供应商选择器, symbols: ["ModelKeyPanel", "Console"] }
+    - { path: src/components/settings/SettingsTab.tsx, change: modify, why: 设置页 Tab 容器适配供应商配置插槽, symbols: ["SettingsTab"] }
+    - { path: src/lib/journey/confirm-scheme-atomic.ts, change: modify, why: 原子确认流程支持脏主仓确认后携带 acknowledge_dirty 重试, symbols: ["runConfirmSchemeAtomic"] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: approveContract 支持透传 acknowledgeDirty，saveOpenAiKey 与 ModelSettings 支持 provider / baseURL, symbols: ["approveContract", "saveOpenAiKey", "ModelSettings"] }
+    - { path: daemon/server.ts, change: modify, why: 仅限 /api/settings/openai-key 与 /api/settings 中 provider / base URL 参数接线与只读透传，不碰其他无关路由, symbols: ["handleHttpRequest"] }
+    - { path: daemon/worker/key-store.ts, change: modify, why: 保存并导出 runtime provider 与 baseURL 默认解析, symbols: ["setRuntimeKey", "getModelSettings", "getRuntimeBaseUrl"] }
+    - { path: daemon/worker/openai-client.ts, change: modify, why: baseURL 跟随设置页供应商选择器，不靠猜模型名、不默认打到 api.openai.com, symbols: ["OpenAiWorkerClient"] }
+    - { path: daemon/git/ensure-git-repo.ts, change: modify, why: git init 后为无提交空仓库建立可用的 main 引用（不将已有文件纳入提交）, symbols: ["ensureGitInit"] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J24-P1, test_path: tests/unit/approve-acknowledge-dirty.test.ts, level: unit, case: "T-J24-ACK-003 用户显式确认后，传递 acknowledgeDirty: true，请求体携带 acknowledge_dirty: true" }
+    - { acceptance_id: J24-P1, test_path: tests/unit/confirm-scheme-atomic.test.ts, level: unit, case: "T-ATOM-J24-001 acknowledgeDirty 从 input 准确透传至 signAndPrepare" }
+    - { acceptance_id: J24-P1, test_path: tests/ui/scheme-confirm-dirty-dialog.test.tsx, level: unit, case: "T-J24-UI-DIRTY-001 文案对齐禁写名单语义并展示脏文件" }
+    - { acceptance_id: J24-P2, test_path: tests/unit/empty-repo-main-ref.test.ts, level: unit, case: "T-J24-EMPTY-001 确认初始化后自动建立 main ref 并支持创建 worktree" }
+    - { acceptance_id: J24-P3, test_path: tests/unit/worker-provider-base-url.test.ts, level: unit, case: "T-J24-WORKER-001 显式选择 DeepSeek 供应商时，base URL 严格为 deepseek 端点" }
+    - { acceptance_id: J24-P3, test_path: tests/ui/settings-tab.test.tsx, level: unit, case: "T-J24-UI-001 生产模型钥匙面板允许选择供应商并透传 Base URL" }
+governance:
+  spec_refs:
+    - docs/specs/supervisor.md
+  depends_on: []
+  code_facts:
+    - { ref: "src/lib/daemon-api.ts::approveContract", note: "approveContract 目前未透传 acknowledge_dirty；服务端已支持该字段" }
+    - { ref: "src/routes/index.tsx::signAndPrepare", note: "当前确认方案直接签署，遇到 E_WORKTREE_DIRTY 阻断，缺少弹窗确认与重试" }
+    - { ref: "daemon/git/ensure-git-repo.ts::inspectGitRepo", note: "可 git init，P-195 试玩中无提交仓库随后 worktree add 因 invalid reference: main 失败" }
+    - { ref: "daemon/worker/openai-client.ts::OpenAiWorkerClient", note: "baseURL 默认 process.env.OPENAI_BASE_URL；未设时 SDK 打 api.openai.com。L1 enrich 已默认 api.deepseek.com/v1" }
+    - { ref: "src/routes/index.tsx::ModelKeyPanel", note: "设置页目前仅输入 key 与 model，需补供应商选择器透传 provider/baseURL" }
+  non_goals:
+    - 不把项目已有文件或密钥纳入初始提交
+    - 不在未确认时自动 acknowledge_dirty
+    - 不靠猜模型名推断供应商
+    - 不开文档计划
+    - 不重启即丢失钥匙的存储策略不在本卡范围（设置页 runtime 钥匙仍可以是内存）
+  fail:
+    - 脏工作区确认开工仍 409 且没有正式确认字段
+    - 空仓库仍因缺少 main 引用无法建施工树
+    - 已配 DeepSeek 钥匙的 Worker 仍默认打到 api.openai.com
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 235, commit: 72b52abbdb007bb8bf02fb0b7e0a4e6427979fae }
+```
+
+<a id="task-j16"></a>
+<a id="task-j.16"></a>
+
+### 【Task J.16】试玩幕 · 质疑自查续作（surface_log → K-14 归因账本 → K-16 trigger 闭集）`[COMPLETED · 立卡 P-176 · 完工回写 P-205]`
+
+
+> **立卡说明（2026-11-09 · P-176）**：S.5 注记（「已知 7 处局限由 TASK-J.16 实施时一并修复」）所指的卡。P-1～P-6 已合（[#188](https://github.com/he18718143986-design/IDE/pull/188) / `859f762`），左栏与 §16.7 文案已合（[#189](https://github.com/he18718143986-design/IDE/pull/189) / `f0ca93c`）。本卡只承接**未落地**部分。**立卡 ≠ 开工 ≠ 销项**：待 Tina 单卡授权后才可施工；不宣称端到端闭环；本卡不标 COMPLETED，直到验收条件全部通过。**施工顺序（依赖注记）**：先完成 TASK-CI.3（测试 fetch 哨兵判红、未桩请求清零），再做本卡的真实会话与真实台账端到端验收（J16-P5）；否则链路测试可能仍含未桩请求，验证可信度打折。
+> **卡修订与进度注记（P-187 · 2026-11-11）**：Tina 拍板挂账⑬ 走方案 A。新增 J16-P7（中栏上半部分渲染台账验收条目，只读投影）及对应 writable_paths / touches。方案 B 另立 `TASK-J.22`；挂账⑫ 另立 `TASK-J.21`。卡状态仍为 `NEW_TASK`，**仍不标 COMPLETED**。
+> **卡修订（P-189 · 2026-11-12）**：挂账⑭ 裁决为新增 `no_surface_record` 枚举值（Tina 拍板）。台账写入需改 `LedgerState` 与台账存储，故 `writable_paths` 追加 `src/lib/journey/scheme-patch-types.ts`、`src/lib/journey/scheme-patch-engine.ts`、`daemon/supervisor/intent-compiler/scheme-ledger-store.ts`；`touches` 同步登记。`attributions` 只追加，不覆盖既有记录；旧台账缺省为空数组，`schema_version` 不变。卡状态仍 `NEW_TASK`。
+> **进度注记（P-188 · 2026-11-12）**：K-14 第一刀（三分类纯算法 + 缺 surface_log 退化）见 [#218](https://github.com/he18718143986-design/IDE/pull/218)。台账 `attributions` 写入与 trigger 接线未做，待卡修订（`LedgerState` 与台账存储不在 writable_paths）；`category` 退化值待 Tina 拍板（挂账⑭）。§5.3 写入分工已在 P-186 落地，P-188 核对无需再改。J16-P5 仍待真实 `.stagent/` 数据。**仍不标 COMPLETED**。
+> **进度注记（P-190 · 2026-11-12）**：K-14 台账写入 [#221](https://github.com/he18718143986-design/IDE/pull/221) 已合（main `930d383`）。K-16 接线 `user_dispute` 见 [#222](https://github.com/he18718143986-design/IDE/pull/222)（head `65cfc9336a5fa674cdff316966826233be61f33f`，待合）。trigger 来源裁决：前端透传 `confirmation_id` + 服务端失败关闭。待确认：J16-P4 与失败关闭的张力（`no_surface_record` 服务端不可达），以及挂账⑮ 的 2b 近似输入。J16-P5 待 `.stagent/`，J16-P6 待渲染层核对。**仍不标 COMPLETED**。
+> **进度注记（P-191 · 2026-11-12）**：K-16 接线 [#222](https://github.com/he18718143986-design/IDE/pull/222) 已合（main `19c99ff`）；docs [#223](https://github.com/he18718143986-design/IDE/pull/223) 已合（main `60b4383`）。J16-P4 按场景拆分落地：退化写入与失败关闭见 [#224](https://github.com/he18718143986-design/IDE/pull/224)（head `ba5cda2`，待合）。挂账⑮ 的 2b 近似已接受，不另立卡。Windows watcher 抗抖动另立挂账⑯。J16-P5 待 `.stagent/`，J16-P6 待渲染层核对。**仍不标 COMPLETED**。
+> **进度注记（P-192 · 2026-11-12）**：J16-P4 降级路径 [#224](https://github.com/he18718143986-design/IDE/pull/224) 已合（main `a5919d9`）。登记挂账⑰（`first_impression`/`acceptance_fail` 暂无生产写入端、§5.1 互引去重未做，属规格预留非缺陷）。J16-P1～P4 代码与降级测试已全部合入。J16-P5 待真实 `.stagent/` 数据核对，J16-P6 待真实面板人工核对。两项通过前 J.16 **仍不标 COMPLETED**。
+> **进度注记（P-195 · 2026-11-12）**：Tina 授权本机真实试玩并登记结果。试玩项目 `/Users/tina/Downloads/aes-douyin`。运行副本为本机 `/Users/tina/IDE` 工作树 `a2363d1`（分支 `docs/ci1-windows-assessment`，2026-11-08），Daemon 于当日 17:01 启动；**不是**当时的 `origin/main`。**J16-P5 FAIL**：方案冻结后在右栏发出一次「这里不对」，质疑面板未出现，请求走了普通聊天（`POST /api/chat/sessions/.../messages`）；`.stagent` 会话记下了原话与「这里不对」，但无 `turn_text_sha256` / `text_sha256` 可与 `intent-compiler/host.ts` 的 sha256(utf8) 对照（目录含登录令牌，未拷出）。对照现行 main `a79bd93`：`handleJourneyBeforeSend` 在方案冻结后仍对所有右栏消息返回 `passthrough`（含「这里不对」）；`DisputeConsolePane` 仅 import、未 JSX 挂载；`viewport-routing.ts` 把视口收成单页 `scheme`。此链路缺口在现行 main 仍在，**转 `TASK-J.23` 处理**。**J16-P6 FAIL**：该次试玩生产界面打不开质疑面板。文案在 `a2363d1` 上 FAIL，main 上已合规，待面板挂载后复核。经直读复核 main 上 `src/components/studio/DisputeConsolePane.tsx`：按钮为「这是 Bug，免费修」「我想要新功能，下一轮做」，`confidence` 仅是类型字段未渲染，分类标签为白话，源码文案已符合 §16.7；但「面板未挂载 + 冻结后『这里不对』走普通聊天」在 main 上仍成立，FAIL 维持。生产界面仍待面板挂载后做真实渲染层走查复核。卡状态仍为 `NEW_TASK`，**仍不标 COMPLETED**。文档计划暂缓，不主动开工新方案。
+> **卡修订与进度注记（P-186 · 2026-11-11）**：`writable_paths` 与 `touches` 追加 `compile-loop.ts` 与 ITEM 撞号复现测试（授权：Tina 拍板方案 A 与「ITEM 撞号先修后进 K-14」）。`surface_log` 采集与前端接线已合（#211 / `273e506`）。ITEM 撞号修复 [#214](https://github.com/he18718143986-design/IDE/pull/214) 须在本修订合入后再合（挂账⑪）。验收条目呈现数据通路未决（挂账⑬，待 Tina 决策）；K-14 未开工；J16-P5 待真实数据。**仍不标 COMPLETED**。
+
+> **卡修订（P-200 · 2026-11-13）**：卡片内部 writable/readonly 冲突核对修复（施工前核对发现，先修卡）。从 `readonly_paths` 移除 `daemon/supervisor/dispute/evidence-triad.ts`（既有 `dispute/**` 通配符已覆盖可写）；`touches` 中该文件的 `why` 更新为本次修复的实际语义（按 `turn_id` 反查 transcript 原话 + 哈希校验）；`test_plan` 补充 `T1/T2` 原生键反查、哈希不匹配失败关闭、transcript 缺失时退化 `session.messages` 三类用例。卡状态仍为 `NEW_TASK`，未开工，**仍不标 COMPLETED**。
+
+> **卡修订核对（P-201 · #240 审核跟进）**：`non_goals` 文件禁动仅保留已列入 `readonly_paths` 的路径；`compile-loop.ts` 与 `dispute/attribution*.ts` 改为「本修订（P-201）不碰」（不作全卡禁动）；`fail`「修改禁动文件」对齐为 `readonly_paths`；`touches` 补 `tests/unit/dispute-surface-log-route.test.ts`（change: modify）。不重写施工口径。
+> **卡修订（P-201 · 2026-11-13）**：J16-P5 根因核定与施工口径（Tina 拍板「按稿施工」）。本机真实试玩（`b4ad38b`，试玩目录 `stagent-j16p5-b4ad38b-playtest`）左栏为空，根因在写侧，不是左栏组件：① 右栏普通消息从未登记为带 `turn_id` 的原话（C.18 `909198a` 起非质疑消息在前端直接走普通聊天，J.10 `97bb0db` 只在 journey 路由调用 `commitUserTurn`）；② 确认冻结不封存原话，快照无原话段；③ 读侧无 Supervisor 会话即提前返回，#239 的反查走不到；④ 确认当时 surface_log 无任何记录（现有 16 条 `area` 写于确认完成之后）。施工口径：说话时 Daemon 登记 `turn_id` + sha256(utf8)，登记失败的消息照常发右栏聊天但不折进方案、提示「没记进方案」，`schemeSourceTurns` 与方案语料同批更新、新建需求时一起清空；冻结请求只带已登记的 `{turn_id, turn_text_sha256}`，Daemon 从 transcript 取原文封入快照 `frozen_quotes` 并计入 digest，校验失败 409（复用 `E_SCHEME_SNAPSHOT_MISMATCH`，ADR-0018 §3.2），不写快照、不签合同；快照不升 `schema_version`（`dispatch-binding.ts` 以版本相等判定墓地权威），以 1.2 追加可选段落地；左栏只读合同绑定快照的封存段，逐条重算哈希，只排序不滤空，无封存段写明「系统没有封存」、不挂「已降级呈递事实」；「确认 N 次」改为快照确认事实；surface_log 记录加阶段字段 `phase`，确认前上报实际展示过的决议区条目（AI 推荐决策与冲突抉择）。`writable_paths` 追加快照存储、快照相关测试、`dispute-anchor-real-session.test.ts` 与前端接线测试 `scheme-turn-seal-wiring.test.tsx`；J16-P1 / P5 / P6 验收文字修订（P5 改为可机核条款，条目级高亮另记）；`touches` / `test_plan` / `verification` / `code_facts` / `non_goals` / `fail` 同步。**文档债务（完工回写时还）**：`runtime-contract-and-safety.md` §2.3「Daemon 专属码」表中 `E_SCHEME_SNAPSHOT_MISMATCH` 的触发说明尚未覆盖「冻结时原话清单校验失败」，已登记为 `fail` 条目。**已于 P-202 还清。**卡状态仍为 `NEW_TASK`，**仍不标 COMPLETED**。
+
+> **落地回写（P-202 · 2026-11-13）**：[#241](https://github.com/he18718143986-design/IDE/pull/241) squash `707028b15fe5b9072f52e20d88ded3c707286e5c` 合入后，Tina 本机官方 Daemon 对新建业务项目正式试玩 J16-P5，五条可机核项全部 PASS（2026-11-13 22:21 香港时间；`confirmation_id` `scheme-confirm-mwf2ep22-o4u1x2h6`；快照 digest `93c8683cab0235878e880aeb99c1aeabe884b0079c8a88b1522db7f342f6a2d7`）。本次登记口径为确认级整句原话；条目级高亮按拍板另记，不得视为本次已覆盖。同一次面板观察到 J16-P6 未出现禁词，确认事实行取自快照；「已降级呈递事实」因分类为 UNATTRIBUTED，且封存存在，不是缺封存的顶替。J16-P6「无封存段」分支本轮未再走；J16-P7 不声称完成。文档债务已还：§2.3 `E_SCHEME_SNAPSHOT_MISMATCH` 触发说明已覆盖冻结时原话清单校验失败。卡状态仍为 `NEW_TASK`，**仍不标 COMPLETED**。
+
+> **落地回写（P-203 · 2026-11-14）**：在 `main`@`c22ef7fd00a52f091f1c8bd759ba6c476ea9fb3b` 上，用旧合同项目 `/Users/tina/aes-douyin` 单独打开质疑面板走查 J16-P6「无封存段」分支（2026-11-14 12:21 香港时间；未重走确认冻结）。合同 `contract_1794481121624_0ymfe`，快照 `scheme-confirm-mwdfm0qn-5mug2rb1`。左栏 `data-seal-status=NOT_SEALED`，徽章「系统没有封存原话」，说明「系统没有封存你确认方案时的原话（这是系统记录缺失，不代表你没说过）」，确认事实行取自快照「你在 11月12日 18:55 确认了这份方案，但系统没有封存你当时说的话」；未出现「已降级呈递事实」「按缺陷修复」「按新需求演进」「实现缺陷」「confidence」「确认 N 次」。J16-P6 无封存段分支 PASS。J16-P7 仍未开工、未授权，不声称完成。卡状态仍为 `NEW_TASK`，**仍不标 COMPLETED**。
+
+> **落地回写（P-204 · 2026-11-14）**：[#244](https://github.com/he18718143986-design/IDE/pull/244) squash `8e985381d76e32184435a6161b85d9f382bb33a6` 合入后（2026-11-14 14:40 香港时间；由 Grok Bot 以 `he18718143986-design` 在 Tina 组件授权下合入；pre-merge head `e5482d9d5473c11e8e60f78713e7501d8a12484d`；标题 `feat(j16): 空台账或读取失败时中栏标「无呈现记录」(J16-P7) (#244)`），Grok Bot 在 Tina 本机对该 main 做官方中栏走查（15:12 香港时间；Tina t1237u 委派走查、t1238u 要求开本回写 PR）。走查前本机 `dist/` 仍为 2026-11-13 21:25 的旧包（BUILD-INFO commit `707028b15fe5b9072f52e20d88ded3c707286e5c`），不含「无呈现记录」；`npm run build` 后 BUILD-INFO 为 `8e985381d76e32184435a6161b85d9f382bb33a6`，官方结果以重建后的当前 main UI 为准（未提交 dist）。官方 Daemon 以 `./node_modules/.bin/tsx bin/stagent.ts open <project> --port N --no-browser` 自 `/Users/tina/IDE` 启动。空台账项目 `/Users/tina/aes-douyin`（无 `.stagent/drafts/scheme-ledger/active.json`）：会话内已有方案稿后，中栏 `scope-acceptance-block` 恰好显示「无呈现记录」（`data-testid=scope-acceptance-no-surface-record`），无验收行、无假条目；方案稿出现前该标记不提前出现。有台账项目为临时副本 `/tmp/stagent-j16p7-items-playtest`，台账条目 ITEM-1「首页显示逾期数」、ITEM-2「报表可导出 CSV」：会话内已有方案稿后，中栏列出这两行（`data-item-ref` 为台账 id），不显示「无呈现记录」。本轮聊天为向导（会话内无模型钥匙），只用练习沙箱 / demo 适配器发送，未确认、未冻结，未改动原 aes-douyin 台账，未要求 Tina 粘贴钥匙；3005 上既有官方 J16-P5 Daemon 未动。J16-P5（P-202）与 J16-P6 无封存段分支（P-203）既有官方 PASS 不改写。J16-P1～P7 验收条件已满足，但卡内 `estimate: L`，按 R-11 / `contract-card` Schema「估算 L 的卡不得进入 READY 及之后的状态，必须拆分」，**本条不标 COMPLETED、不迁档、不销整张卡**；收口方式待 Tina 裁决。不开工 J.22 / CI.2，文档计划暂缓。卡状态仍为 `NEW_TASK`。
+
+> **归档注记（2026-11-14 · P-205）**：本卡已 **COMPLETED**。Tina t1243u 拍板按「就事论事收口」执行：不事后改估算、不追溯拆卡、不假装工作未完成；R-11 对未开工的卡继续有效，本次为一次性例外记录。`governance.delivered` 锚定末次产品施工 [#244](https://github.com/he18718143986-design/IDE/pull/244) squash `8e985381d76e32184435a6161b85d9f382bb33a6`。卡片由 `development-tasks-active.md` 迁入本文件。本条取代 P-204「因 estimate 为 L 仍不标完成、不迁档」的暂扣口径。不开工 J.22；CI.2 攒样本；文档计划暂缓。不宣称端到端闭环。条目级高亮不在本卡（J.22 范畴），不得视为已交付。
+>
+> **例外记录**：估算 L 按 R-11 本应拆卡后施工，实际未拆即分阶段施工并全部验收通过。经 Tina 裁决记为既成事实例外：不事后改估算、不追溯拆卡，R-11 对未开工卡继续有效。治理教训：L 卡立项时应先拆再授权。
+>
+> **阶段交付对应关系（按实际交付，不以清单机械归属）**：
+> - [#188](https://github.com/he18718143986-design/IDE/pull/188) squash `859f7623b8b74f797954102f74d90740ff559914`（2026-11-09 17:33 香港时间）：立卡前已合的试玩自查 P-1～P-6 缺陷修复。J.16 立卡说明写明「本卡只承接未落地部分」，故 #188 是续作之前的前置交付，不是本卡 J16-P1～P7 的产品施工。
+> - [#189](https://github.com/he18718143986-design/IDE/pull/189) squash `f0ca93cc6b9c3e3c0050e55fb53dc19d81a3a7ac`（2026-11-09 18:58 香港时间）：立卡前已合的左栏与 §16.7 白话文案。PR 正文写明不动 surface_log / K-14 / K-16（当时属 J.16 续作），故同为前置交付，不是本卡续作施工。
+> - [#233](https://github.com/he18718143986-design/IDE/pull/233) squash `ab40f3aaf115a37f6bc9bc75c637d41a2c5bf1e7`：这是 **TASK-J.23** 的纯接线施工（面板挂载、冻结后 DISPUTE 路由、`turn_text_sha256` 落盘），**不是 TASK-J.16 的产品交付**。它解开了 J16-P5/P6 生产链路未接线的阻塞（挂账⑱ / P-195），但不计入 J.16 施工 SHA。
+> - 本卡续作实际施工（J16-P1～P4 代码，P-192 已登记全部合入）：
+>   - [#211](https://github.com/he18718143986-design/IDE/pull/211) squash `273e506d371eff955ff0540d432837c368924ee1`：surface_log 采集与接线（J16-P1 / P4 第一刀）
+>   - [#218](https://github.com/he18718143986-design/IDE/pull/218) squash `0b02d351ae8d0f0e17179949a852d4ca4b20fa97`：K-14 三分类纯算法与退化（J16-P2 / P4）
+>   - [#221](https://github.com/he18718143986-design/IDE/pull/221) squash `930d383da3f8eb42c26137759d4d79d333cda9c7`：K-14 账本写入（只追加）+ K-16 trigger 闭集（J16-P2 / P3）
+>   - [#222](https://github.com/he18718143986-design/IDE/pull/222) squash `19c99ffc31071fc5034e891caa233d3dc71a40f7`：K-16 接线（J16-P3）
+>   - [#224](https://github.com/he18718143986-design/IDE/pull/224) squash `a5919d917abf1e7a04e1438a24ca8ec1619e2f1a`：J16-P4 降级路径（`no_surface_record`）
+> - [#239](https://github.com/he18718143986-design/IDE/pull/239) squash `b4ad38b45d45f71fbd9ae50ae63d31c1ea783631`：J16-P5 读侧 `turn_id` 反查与哈希校验。P-201 后续核定根因在写侧，本 PR 未单独关闭 J16-P5。
+> - [#241](https://github.com/he18718143986-design/IDE/pull/241) squash `707028b15fe5b9072f52e20d88ded3c707286e5c`：J16-P5 原话登记与冻结封存（及 P-201 修订的 J16-P1 `phase` / 决议区上报）。
+> - [#244](https://github.com/he18718143986-design/IDE/pull/244) squash `8e985381d76e32184435a6161b85d9f382bb33a6`：J16-P7 空台账或读取失败时中栏标「无呈现记录」。
+>
+> **验收证据（J16-P1～P7）**：
+> - **J16-P1**：代码与单测随 [#211](https://github.com/he18718143986-design/IDE/pull/211) / `273e506d371eff955ff0540d432837c368924ee1` 落地（surface_log 随 §15.4 投影写入）；P-201 增补的阶段字段 `phase`、确认前决议区上报与确认后不得记为确认前，随 [#241](https://github.com/he18718143986-design/IDE/pull/241) / `707028b15fe5b9072f52e20d88ded3c707286e5c` 落地。本条为 auto，不以本机试玩日期代替。
+> - **J16-P2**：K-14 三分类纯算法 [#218](https://github.com/he18718143986-design/IDE/pull/218) / `0b02d351ae8d0f0e17179949a852d4ca4b20fa97`；台账只追加写入 [#221](https://github.com/he18718143986-design/IDE/pull/221) / `930d383da3f8eb42c26137759d4d79d333cda9c7`。本条为 auto。
+> - **J16-P3**：K-16 trigger 闭集与 `linked_reason_code` 见 [#221](https://github.com/he18718143986-design/IDE/pull/221) / `930d383da3f8eb42c26137759d4d79d333cda9c7`；`user_dispute` 接线见 [#222](https://github.com/he18718143986-design/IDE/pull/222) / `19c99ffc31071fc5034e891caa233d3dc71a40f7`。本条为 auto。
+> - **J16-P4**：缺 surface_log 退化在 [#211](https://github.com/he18718143986-design/IDE/pull/211) / `273e506d371eff955ff0540d432837c368924ee1` 与 [#218](https://github.com/he18718143986-design/IDE/pull/218) / `0b02d351ae8d0f0e17179949a852d4ca4b20fa97` 已有路径；按场景拆分的 `no_surface_record` 写入见 [#224](https://github.com/he18718143986-design/IDE/pull/224) / `a5919d917abf1e7a04e1438a24ca8ec1619e2f1a`。P-192 登记 J16-P1～P4 代码与降级测试已全部合入。本条为 auto。
+> - **J16-P5**：官方试玩 PASS，2026-11-13 22:21 香港时间，运行版本 `main`@`707028b15fe5b9072f52e20d88ded3c707286e5c`（[#241](https://github.com/he18718143986-design/IDE/pull/241) 合入后）。Tina 本机官方 Daemon 对新建业务项目正式试玩，五条可机核项全部 PASS；`confirmation_id` `scheme-confirm-mwf2ep22-o4u1x2h6`，快照 digest `93c8683cab0235878e880aeb99c1aeabe884b0079c8a88b1522db7f342f6a2d7`。文档回写 [#242](https://github.com/he18718143986-design/IDE/pull/242)（P-202）squash 合入 `c22ef7fd00a52f091f1c8bd759ba6c476ea9fb3b`。本次登记口径为确认级整句原话；**条目级高亮按拍板另记，不得视为本次已覆盖（J.22 范畴）**。
+> - **J16-P6**：无封存段官方走查 PASS，2026-11-14 12:21 香港时间，运行版本 `main`@`c22ef7fd00a52f091f1c8bd759ba6c476ea9fb3b`。项目 `/Users/tina/aes-douyin`，合同 `contract_1794481121624_0ymfe`，快照 `scheme-confirm-mwdfm0qn-5mug2rb1`（无 `frozen_quotes`），未重走确认冻结。左栏 `data-seal-status=NOT_SEALED`，徽章「系统没有封存原话」。文档回写 [#243](https://github.com/he18718143986-design/IDE/pull/243)（P-203）于 12:31 香港时间 squash 合入 `369d8f4159283c3c781d22d51b52a99988fd9ea8`。既有事实不改写。
+> - **J16-P7**：官方中栏走查 PASS，2026-11-14 15:12 香港时间，运行版本 `main`@`8e985381d76e32184435a6161b85d9f382bb33a6`（[#244](https://github.com/he18718143986-design/IDE/pull/244) 合入后），操作者 Grok Bot 在 Tina 本机。空台账显示「无呈现记录」；有台账临时副本列出 ITEM-1「首页显示逾期数」、ITEM-2「报表可导出 CSV」。文档回写 [#245](https://github.com/he18718143986-design/IDE/pull/245)（P-204）于 15:38 香港时间 squash 合入 `442e5836fa9c48b8dd997c087bc28747b4f4fbbf`。既有事实不改写。
+
+```yaml task-card
+id: TASK-J.16
+status: COMPLETED
+contract:
+  intent:
+    title: 试玩幕 · 质疑自查续作（surface_log → K-14 归因账本 → K-16 trigger 闭集）
+    description: >-
+      补齐 playtest-self-check.md 中 P-1～P-6 之外仍未落地的部分：GAP-P8 surface_log（随 §15.4 投影写入）、
+      K-14 三分类归因账本（依赖 surface_log 的 (a)/(b) 区分）、K-16 attributions.trigger 闭集与 linked_reason_code。
+      缺 surface_log 时三分类必须退化并标「无呈现记录」，不得伪造分类。P-7 条目级自动点亮按 §3.3 本版不做，不在本卡范围。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J16-P1
+      check: auto
+      text: >-
+        surface_log 随 §15.4 投影写入：每条记录含 item_ref、呈现时间与阶段 phase（pre_confirm 确认前 / post_confirm 确认后）；
+        未呈现过的条目不产生记录；确认前须上报实际展示过的决议区条目（AI 推荐决策与冲突抉择，section=decision，phase=pre_confirm）；
+        确认后的呈现不得记为确认前（Daemon 以确认快照 created_at 校验，冲突 409 不写入）；缺 phase 的旧记录按旧格式读取，不补写。
+    - id: J16-P2
+      check: auto
+      text: >-
+        K-14 三分类账本依赖 surface_log 产出 (a)/(b) 归因，账本只追加；给定 item_ref 与同一 surface_log 时分类可复现。
+    - id: J16-P3
+      check: auto
+      text: >-
+        K-16 attributions.trigger 仅接受闭集三值，写入未知值被拒；旧值迁移为 "user_dispute" 并带 [legacy-trigger:<原值>] 前缀；
+        linked_reason_code 对齐 reasonCodeSchema。
+    - id: J16-P4
+      check: auto
+      text: >-
+        缺 surface_log 时三分类退化，resolution_note 标「无呈现记录」，不伪造 (a)/(b)；测试覆盖该退化路径。
+    - id: J16-P5
+      check: playtest
+      text: >-
+        真实会话 + 真实快照端到端（Tina 本机、官方 Daemon；单测与集成测试不替代本条）：右栏发出需求原话 U，确认方案后发送「这里不对」，须同时满足：
+        ① 合同 scheme_binding 指向的 .stagent/drafts/schemes/<confirmation_id>.json 含 frozen_quotes，其中某条 text 等于 U 且
+        turn_text_sha256 = sha256(utf8(U))（与 intent-compiler/host.ts 口径一致）；② 快照 digest 等于合同 scheme_binding.snapshot_digest；
+        ③ 质疑面板报告卡 data-seal-status=SEALED；④ 左栏每条原话展示文本 t 满足 sha256(utf8(t)) 等于该行 data-turn-text-sha256，
+        且该值属于 frozen_quotes 的 turn_text_sha256 集合；⑤ 至少一行 t 整句等于 U。快照无封存段时本条判失败。
+        条目级高亮不在本条（J.22 之后另记）。
+    - id: J16-P6
+      check: playtest
+      text: >-
+        用户可见文案按 §16.7 在渲染层验收（真实打开质疑自查面板）：不出现「按缺陷修复」「按新需求演进」「实现缺陷」「confidence」
+        等技术术语；左栏为空时有白话说明；无封存段时写明「系统没有封存」且不显示「已降级呈递事实」；左栏状态行取自合同绑定快照
+        （是否找到确认记录、封存原话条数），不再以聊天正则计数「确认 N 次」。服务端字段不算验收。
+    - id: J16-P7
+      check: auto
+      text: >-
+        中栏上半部分（§15.4）渲染台账验收条目：Daemon 以只读路由投影 `SchemeDraftV2.acceptance`（不写盘）；区块只展示确已渲染的条目，`surface_log` 的 `acceptance` 段 `item_ref` 与台账 `id` 一致；台账为空或读取失败时不渲染条目、不伪造，标「无呈现记录」。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/supervisor/dispute/**
+      - src/components/studio/DisputeConsolePane.tsx
+      - src/lib/daemon-api.ts
+      - tests/unit/dispute-*.test.ts
+      - tests/components/DisputeConsolePane.test.tsx
+      - src/components/studio/ScopeAcceptanceBlock.tsx
+      - src/components/studio/SchemeReviewPane.tsx
+      - src/routes/index.tsx
+      - daemon/server.ts
+      - tests/ui/scope-acceptance-surface-log.test.tsx
+      - daemon/supervisor/intent-compiler/compile-loop.ts
+      - tests/integration/intent-compiler-item-id-collision.test.ts
+      - daemon/supervisor/intent-compiler/acceptance-projection.ts
+      - tests/unit/scheme-acceptance-projection.test.ts
+      - src/lib/journey/scheme-patch-types.ts
+      - src/lib/journey/scheme-patch-engine.ts
+      - daemon/supervisor/intent-compiler/scheme-ledger-store.ts
+      - daemon/pipeline/scheme-snapshot-store.ts
+      - tests/unit/scheme-snapshot-frozen-quotes.test.ts
+      - tests/integration/scheme-confirm-http-injection.test.ts
+      - tests/integration/scheme-confirm-scope-drift.test.ts
+      - tests/e2e/golden-slice.test.ts
+      - tests/integration/dispute-anchor-real-session.test.ts
+      - tests/ui/scheme-turn-seal-wiring.test.tsx
+    readonly_paths:
+      - docs/specs/playtest-self-check.md
+      - docs/specs/supervisor.md
+      - daemon/supervisor/intent-compiler/host.ts
+      - daemon/supervisor/intent-compiler/transcript-store.ts
+      - src/lib/journey/confirm-scheme-atomic.ts
+      - src/lib/journey/scheme-draft.ts
+      - src/lib/contract.schema.ts
+      - daemon/guard/dispatch-binding.ts
+      - bin/stagent.ts
+  verification:
+    commands:
+      - { alias: regression-dispute, executable: npx, args: [vitest, run, tests/unit/dispute-triad.test.ts, tests/unit/dispute-self-check-fixes.test.ts, tests/components/DisputeConsolePane.test.tsx] }
+      - { alias: regression-seal, executable: npx, args: [vitest, run, tests/unit/scheme-snapshot-frozen-quotes.test.ts, tests/unit/dispute-seal-quotes.test.ts, tests/unit/dispute-seal-turn-register.test.ts, tests/unit/dispute-surface-log-route.test.ts, tests/integration/dispute-anchor-real-session.test.ts, tests/integration/scheme-confirm-http-injection.test.ts, tests/integration/scheme-confirm-scope-drift.test.ts, tests/e2e/golden-slice.test.ts, tests/ui/scope-acceptance-surface-log.test.tsx, tests/ui/scheme-turn-seal-wiring.test.tsx] }
+      - { alias: regression-j16-core, executable: npx, args: [vitest, run, tests/unit/dispute-surface-log.test.ts, tests/unit/dispute-attribution-ledger.test.ts, tests/unit/dispute-trigger-closed-set.test.ts, tests/unit/dispute-surface-log-degraded.test.ts, tests/unit/scheme-acceptance-projection.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) 先接 surface_log：随 §15.4 投影写入，只记录确已呈现的条目。2) K-14 账本只追加，三分类以 surface_log 为唯一呈现依据。
+    3) K-16 闭集与 linked_reason_code 在写入口校验，旧台账按 legacy 前缀迁移。4) 缺 surface_log 的退化路径单独测试。
+    5) 验收 P5/P6 须真实链路与渲染层，不以 jsdom 或服务端字段替代。6) 验收条目呈现（P-187 · 挂账⑬ 方案 A）：Daemon 新增只读路由投影台账 acceptance，中栏上半部分渲染，上报 `section=acceptance` 的 `item_ref` 为台账 id。施工前按当时代码重核 touches。
+    7) 原话登记与冻结封存（P-201）：右栏消息先经 Daemon 登记 turn_id + sha256(utf8) 再折进方案（登记失败不折进、提示「没记进方案」；schemeSourceTurns 与语料同批更新、新建需求一起清空）；
+    冻结请求只带已登记的 turn_id 与哈希，Daemon 从 transcript 取原文封入快照 frozen_quotes 并计入 digest（不升 schema_version），校验失败 409 不签合同；
+    左栏只读合同绑定快照的封存段，逐条重算哈希，只排序不滤空；surface_log 记录加 phase，确认前上报决议区条目；「确认 N 次」改为快照确认事实。
+  touches:
+    - { path: daemon/supervisor/dispute/evidence-triad.ts, change: modify, why: "按 turn_id 反查 transcript 原话 + 哈希校验；P-201：左栏改读合同绑定快照的 frozen_quotes（逐条重算哈希，只排序不滤空，不依赖 Supervisor 会话）", symbols: [] }
+    - { path: daemon/supervisor/dispute/types.ts, change: modify, why: "surface_log / 归因账本类型与 K-16 闭集；P-201：PromptFact 增封存事实 seal", symbols: [] }
+    - { path: daemon/supervisor/dispute/index.ts, change: modify, why: "三分类退化与 resolution_note 标注；P-201：超时降级报告携带封存事实", symbols: [] }
+    - { path: daemon/supervisor/dispute/surface-log.ts, change: modify, why: "P-201：记录与上报请求增 phase（pre_confirm / post_confirm）；缺 phase 的旧记录照常读取", symbols: [] }
+    - { path: tests/unit/dispute-surface-log-route.test.ts, change: modify, why: "P-201：surface_log 路由校验 phase（确认后冒充 pre_confirm 被拒）", symbols: [] }
+    - { path: daemon/pipeline/scheme-snapshot-store.ts, change: modify, why: "P-201：快照追加 frozen_quotes 与 quotes_digest 并计入 digest（不升 schema_version）；带封存段快照的完整性校验", symbols: [] }
+    - { path: src/components/studio/DisputeConsolePane.tsx, change: modify, why: "P-201：左栏封存原话行（带 data-turn-text-sha256）、快照确认事实行；无封存段写明「系统没有封存」且不挂「已降级呈递事实」", symbols: [] }
+    - { path: src/components/studio/ScopeAcceptanceBlock.tsx, change: modify, why: "§15.4 白话投影渲染后上报实际呈现条目（不得渲染前预写）；P-201：上报带 phase（开工前 pre_confirm，冻结与验收 post_confirm）", symbols: [] }
+    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: "把确认 ID 透传给范围区块；P-201：确认前上报实际展示过的决议区条目（AI 推荐决策与冲突抉择，section=decision，phase=pre_confirm）", symbols: [] }
+    - { path: src/routes/index.tsx, change: modify, why: "确认 ID 生成与 surface_log 上报对齐（键与 §5.3 confirmation_id 一致）；P-201：右栏消息先登记再折进方案（schemeSourceTurns 与语料同批更新、新建需求一起清空），冻结带已登记原话清单，质疑视图映射封存事实", symbols: [] }
+    - { path: daemon/server.ts, change: modify, why: "新增 surface_log 写入路由（沿既有 Bearer 鉴权，不新开写权限）；P-201：新增 POST /api/supervisor/turns 登记原话；journey 复用已登记 turn；冻结校验原话清单并封存 frozen_quotes（失败 409）；surface_log 校验 phase；超时降级报告带封存事实", symbols: [] }
+    - { path: daemon/supervisor/intent-compiler/compile-loop.ts, change: modify, why: ITEM-n 由台账推导分配（挂账⑪，K-14 前置；P-186 授权）, symbols: [] }
+    - { path: tests/integration/intent-compiler-item-id-collision.test.ts, change: modify, why: ITEM-n 撞号复现（同进程 + 模拟重启）与 todo 留痕（挂账⑪⑫）, symbols: [] }
+    - { path: daemon/supervisor/intent-compiler/acceptance-projection.ts, change: modify, why: 台账验收条目只读投影（纯函数，不写盘；挂账⑬ 方案 A，P-187）, symbols: [] }
+    - { path: tests/unit/scheme-acceptance-projection.test.ts, change: modify, why: 投影纯函数与台账为空时的降级（J16-P7）, symbols: [] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: "新增只读获取台账验收条目的客户端函数（J16-P7）；P-201：registerSchemeTurn、冻结 source_turns、journey 已登记 turn 字段、报告封存事实、呈现上报 phase", symbols: [] }
+    - { path: tests/unit/scheme-snapshot-frozen-quotes.test.ts, change: modify, why: "P-201：frozen_quotes 计入 digest、完整性校验、旧快照不受影响", symbols: [] }
+    - { path: tests/unit/dispute-seal-quotes.test.ts, change: modify, why: "P-201：左栏封存事实（未封存 / 篡改 / 只排序不滤空 / 无会话可读）", symbols: [] }
+    - { path: tests/unit/dispute-seal-turn-register.test.ts, change: modify, why: "P-201：登记路由、冻结原话清单校验 409、journey 复用已登记 turn", symbols: [] }
+    - { path: tests/integration/dispute-anchor-real-session.test.ts, change: modify, why: "P-201：进程内全链路（登记→冻结封存→签合同→「这里不对」）与反例", symbols: [] }
+    - { path: tests/ui/scheme-turn-seal-wiring.test.tsx, change: modify, why: "P-201：登记失败不折进方案并提示；语料与原话清单同批更新、同批清空", symbols: [] }
+    - { path: tests/integration/scheme-confirm-http-injection.test.ts, change: modify, why: "P-201：冻结请求先登记原话并带 source_turns", symbols: [] }
+    - { path: tests/integration/scheme-confirm-scope-drift.test.ts, change: modify, why: "P-201：冻结请求先登记原话并带 source_turns", symbols: [] }
+    - { path: tests/e2e/golden-slice.test.ts, change: modify, why: "P-201：冻结请求先登记原话并带 source_turns", symbols: [] }
+    - { path: daemon/supervisor/dispute/attribution.ts, change: modify, why: K-14 三分类；缺日志退化值改为 no_surface_record（P-189，挂账⑭ 裁决）, symbols: [] }
+    - { path: src/lib/journey/scheme-patch-types.ts, change: modify, why: LedgerState 增 attributions（K-14 子账本四，只追加）；category 枚举加 no_surface_record（P-189）, symbols: [] }
+    - { path: src/lib/journey/scheme-patch-engine.ts, change: modify, why: 重建 LedgerState 的各处须保留 attributions（否则补丁后丢失，见 ~L1655）, symbols: [] }
+    - { path: daemon/supervisor/intent-compiler/scheme-ledger-store.ts, change: modify, why: 读取旧台账时 attributions 缺省为空数组；CAS 写入保留 attributions；schema_version 维持 1.0（向后兼容）, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J16-P1, test_path: tests/unit/dispute-surface-log.test.ts, level: unit, case: "新记录写入 phase；缺 phase 的旧记录照常读取，非法 phase 视为损坏" }
+    - { acceptance_id: J16-P2, test_path: tests/unit/dispute-attribution-ledger.test.ts, level: unit, case: "只追加：重复 attribution_id 跳过，既有条目逐字不变" }
+    - { acceptance_id: J16-P3, test_path: tests/unit/dispute-trigger-closed-set.test.ts, level: unit, case: "未知 trigger（如旧值 dispute）被拒，且不写盘" }
+    - { acceptance_id: J16-P4, test_path: tests/unit/dispute-surface-log-degraded.test.ts, level: unit, case: "日志文件不存在：读取返回 null，resolution_note 标「无呈现记录」" }
+    - { acceptance_id: J16-P5, test_path: tests/unit/dispute-triad.test.ts, level: unit, case: "T1/T2 原生键反查：按 ref.turn_id 从 transcript 成功反查原话切片并校验哈希" }
+    - { acceptance_id: J16-P5, test_path: tests/unit/dispute-triad.test.ts, level: unit, case: "失败关闭：turn_text_sha256 不匹配或切片越界时拒绝伪造，返回空原话" }
+    - { acceptance_id: J16-P5, test_path: tests/unit/dispute-triad.test.ts, level: unit, case: "降级兼容：transcript 缺失时按 message_id/turn_id 退化 session.messages（不宽松匹配）" }
+    - { acceptance_id: J16-P5, test_path: tests/integration/dispute-anchor-real-session.test.ts, level: integration, case: "登记原话→冻结封存→「这里不对」：左栏整句与 frozen_quotes 哈希一致" }
+    - { acceptance_id: J16-P5, test_path: tests/unit/dispute-seal-quotes.test.ts, level: unit, case: "未封存快照：左栏为空且状态为未封存" }
+    - { acceptance_id: J16-P5, test_path: tests/unit/dispute-seal-quotes.test.ts, level: unit, case: "「这里不对」不滤空：封存原话全部按相关度排序" }
+    - { acceptance_id: J16-P5, test_path: tests/unit/dispute-seal-quotes.test.ts, level: unit, case: "封存段被改：整段作废" }
+    - { acceptance_id: J16-P5, test_path: tests/unit/dispute-seal-quotes.test.ts, level: unit, case: "无 Supervisor 会话仍能读出封存原话" }
+    - { acceptance_id: J16-P5, test_path: tests/unit/scheme-snapshot-frozen-quotes.test.ts, level: unit, case: "frozen_quotes 计入 digest：删段或改字后重算不一致" }
+    - { acceptance_id: J16-P5, test_path: tests/unit/dispute-seal-turn-register.test.ts, level: unit, case: "登记返回 turn_id 与 sha256(utf8)" }
+    - { acceptance_id: J16-P5, test_path: tests/unit/dispute-seal-turn-register.test.ts, level: unit, case: "冻结原话清单校验失败 409 且不写快照" }
+    - { acceptance_id: J16-P5, test_path: tests/unit/dispute-seal-turn-register.test.ts, level: unit, case: "journey 带已登记 turn 不重复登记" }
+    - { acceptance_id: J16-P5, test_path: tests/ui/scheme-turn-seal-wiring.test.tsx, level: integration, case: "登记失败不折进方案并提示没记进方案" }
+    - { acceptance_id: J16-P5, test_path: tests/ui/scheme-turn-seal-wiring.test.tsx, level: integration, case: "语料与原话清单同批更新：折进同增、新建需求同清" }
+    - { acceptance_id: J16-P1, test_path: tests/unit/dispute-surface-log-route.test.ts, level: unit, case: "phase：确认后上报带 post_confirm，冒充 pre_confirm 被拒" }
+    - { acceptance_id: J16-P1, test_path: tests/ui/scope-acceptance-surface-log.test.tsx, level: integration, case: "确认前上报实际展示的决议区条目：section=decision，phase=pre_confirm" }
+    - { acceptance_id: J16-P6, test_path: tests/components/DisputeConsolePane.test.tsx, level: integration, debt: "jsdom 不替代真实面板人工验收" }
+    - { acceptance_id: J16-P6, test_path: tests/components/DisputeConsolePane.test.tsx, level: integration, case: "无封存段：写明系统没有封存且不显示已降级" }
+    - { acceptance_id: J16-P7, test_path: tests/unit/scheme-acceptance-projection.test.ts, level: unit, case: "没有台账时返回空投影，不伪造条目" }
+    - { acceptance_id: J16-P7, test_path: tests/ui/scope-acceptance-surface-log.test.tsx, level: integration, debt: "jsdom 不替代真实面板人工验收" }
+governance:
+  spec_refs:
+    - docs/specs/playtest-self-check.md
+    - docs/specs/supervisor.md
+    - docs/specs/development-tasks-completed.md#task-s.5
+  depends_on:
+    - { id: TASK-S.5, kind: hard }
+    - { id: TASK-CI.3, kind: soft }
+  code_facts:
+    - { ref: "daemon/supervisor/dispute/evidence-triad.ts::anchoredQuotesFromDraft", note: "P-1～P-6 已合（#188 `859f762`）；左栏锚定原话与 §16.7 文案已合（#189 `f0ca93c`）" }
+    - { ref: "daemon/supervisor/dispute/index.ts::outcomeFromUserChoice", note: "仓库未找到 surface_log 或 attributions 实现（#188 核对结论）；本卡新增" }
+    - { ref: "src/routes/index.tsx::handleJourneyBeforeSend", note: "P-201：非质疑消息在调用 journey 前直接 passthrough（C.18 909198a），需求句从未登记为带 turn_id 的原话" }
+    - { ref: "daemon/server.ts::handleSupervisorJourney", note: "P-201：生产上唯一调用 commitUserTurn 的位置（J.10 97bb0db）" }
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts::writeSchemeSnapshot", note: "P-201：快照无原话段，digest 不含原话" }
+    - { ref: "daemon/supervisor/dispute/evidence-triad.ts::SessionFactSourceImpl", note: "P-201：无 Supervisor 会话即提前返回 CHALLENGE_ONLY，#239 的 turn_id 反查走不到" }
+    - { ref: "daemon/guard/dispatch-binding.ts::snapshotHasGraveyardAuthority", note: "P-201：以 schema_version 等于现行常量判定墓地权威，故 frozen_quotes 以 1.2 追加段落地、不升版本" }
+    - { ref: "src/components/studio/ScopeAcceptanceBlock.tsx::scopeAcceptanceShownItems", note: "P-201：全仓唯一的呈现上报方，只报 acceptance / approval / area，不报决议区" }
+  non_goals:
+    - 不做 P-7 条目级自动点亮（playtest-self-check.md §3.3，本版不做）
+    - 不改 SchemeDraftV2 的验收条目结构
+    - 不以 jsdom 或服务端字段替代 J16-P5 / J16-P6 的真实验收
+    - 不改 P-1～P-6 已定的判定逻辑、类型枚举与 0.7 阈值
+    - 不做条目级高亮（frozen_quotes 不含条目关联，J.22 之后另记）
+    - 不改编译器离线（bin/stagent.ts 不接模型）与台账 scheme_id=scheme-active（留给 J.10 / J.22）
+    - 本修订（P-201）不碰 K-14 归因算法与 dispute/attribution*.ts；surface_log 的 phase 本卡只写入，不改 K-14 取数
+    - 不升快照 schema_version
+    - 不改 readonly_paths 所列文件（playtest-self-check.md、supervisor.md、host.ts、transcript-store.ts、confirm-scheme-atomic.ts、scheme-draft.ts、contract.schema.ts、dispatch-binding.ts、bin/stagent.ts）
+    - 本修订（P-201）不碰 compile-loop.ts
+    - 封存原话不接入归因信号（prompt_matched_messages），中栏关键词匹配不改
+  fail:
+    - 缺 surface_log 时仍产出 (a)/(b) 分类，或不标「无呈现记录」
+    - K-16 trigger 接受闭集外的值，或旧值迁移不带 legacy 前缀
+    - 只以单测通过宣称 J.16 完成，或在 J16-P5 / J16-P6 未通过时标 COMPLETED
+    - 用户可见文案出现 §16.7 禁用的技术分类词
+    - 左栏原话来自聊天记录或方案正文的事后拼凑，或未经 sha256(utf8) 重算校验即展示
+    - 冻结时原话清单校验失败仍写快照或签合同
+    - 登记失败的消息被折进方案，或 schemeSourceTurns 与方案语料不同批更新（出现语料已换而清单仍在的中间态）
+    - 无封存段时左栏未写明「系统没有封存」，或仍显示「已降级呈递事实」
+    - 「这里不对」使左栏因关键词过滤为空
+    - 确认后的 surface_log 记录缺 phase 或记为 pre_confirm；确认前未上报实际展示过的决议区条目
+    - 修改 readonly_paths 所列禁动文件
+  estimate: L
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 244, commit: 8e985381d76e32184435a6161b85d9f382bb33a6 }
+```
+
+### 3.4ag 用户旅程、术语表与固定底线清单规格（J.25 / J.27 · 完工回写 P-207）
+
+<a id="task-j.25"></a>
+
+### 【Task J.25】新增用户旅程与术语表（`user-journey.md` + `glossary.md`）`[COMPLETED · 立卡 P-206 · 施工 #248 · 完工回写 P-207]`
+
+> **立卡说明（2026-11-14 · P-206）**：第一块纯 docs 的薄切片。本卡只新增面向非技术用户的旅程说明与术语表，并在既定入口文件做术语首次出现处的链接；不搬 `scheme.md` / 七环进度列（见 `TASK-J.26`）。**立卡 ≠ 开工**。
+
+> **归档注记（2026-11-14 · P-207）**：本卡已 **COMPLETED**。Tina t1252u 授权施工、t1253u 授权合入。[#248](https://github.com/he18718143986-design/IDE/pull/248) squash `f90c881196f2ab8f8f1e02f7911415f5919e03de` 于 2026-11-14 21:40 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `00b7379a8a9fbd66c255ecca979843888b5b933a`）。交付：`docs/user-journey.md`（七环白话旅程，入口含产品定位、只负责聊天和拍板、质量由 Daemon 门禁与试玩把关、北极星场景当前做不到）与 `docs/glossary.md`（必收术语加 Daemon / 试玩 / 北极星场景，各有一句话定义和出处链接）；`docs/README.md` 分层表第 25–26 行已登记且未新增 L7；`delivery-lifecycle.md` 只在首次出现处加链接，未删「现状 → 卡」列，未改 `scheme.md`。本条将 `touches` 中两份新文件的 `change: create` 改为 `modify`，消除「卡头写新建但文件已存在」的 warn。J.26 仍 `[NEW_TASK]`，待另行授权；不开工 J.22；CI.2 攒样本。
+
+```yaml task-card
+id: TASK-J.25
+status: COMPLETED
+contract:
+  intent:
+    title: 新增用户旅程与术语表，让非技术用户读懂「会看到什么 / 要做什么 / 不必做什么」
+    description: >-
+      非技术用户打开 docs/user-journey.md，能按 delivery-lifecycle.md 七环看到每一环
+      「你会看到什么 / 你需要做什么 / 你不需要做什么」；入口几句话说明产品、用户只负责聊天和拍板、
+      质量由 Daemon 门禁与试玩共同把关，并写明北极星场景（scheme.md goal-2）当前做不到。
+      docs/glossary.md 为密封、合同、卡片流、墓地、挂账、PAB、DesignNote、EvidenceBundle、任务卡
+      各提供一句话白话定义与权威出处链接；本卡 writable_paths 内各文件首次出现这些术语处改为链向术语表。
+      两份新文件在 docs/README.md 分层表登记落点与「谁能改」。
+    risk_level: LOW
+  acceptance:
+    - id: J25-P1
+      check: auto
+      text: >-
+        docs/user-journey.md 已落盘：入口含产品说明、用户只负责聊天和拍板、质量由 Daemon 门禁与试玩共同把关、
+        北极星场景（scheme.md goal-2）当前做不到；并以 delivery-lifecycle.md §2 七环为骨架（S2→Seal 与 S3 子步骤按总表分行，不另开文档层），
+        逐环写「你会看到什么 / 你需要做什么 / 你不需要做什么」。
+    - id: J25-P2
+      check: auto
+      text: >-
+        docs/glossary.md 已落盘：密封、合同、卡片流、墓地、挂账、PAB、DesignNote、EvidenceBundle、任务卡
+        各有一句话白话定义，并链到现行权威出处（规格或 ADR），不另造定义层。
+    - id: J25-P3
+      check: auto
+      text: >-
+        docs/README.md 分层表已登记 user-journey.md 与 glossary.md 的落点与「谁能改」；不新增 L7 或其它文档层。
+    - id: J25-P4
+      check: auto
+      text: >-
+        本卡 writable_paths 内既有文件（docs/README.md、docs/specs/delivery-lifecycle.md）以及两份新文件中，
+        上述术语的首次出现处已改为链向 docs/glossary.md 对应条目；不改七环「现状 → 卡」列，不改 scheme.md 结构。
+  scheme_item_ids: [goal-1, goal-2, goal-5, goal-7]
+  scope:
+    writable_paths:
+      - docs/user-journey.md
+      - docs/glossary.md
+      - docs/README.md
+      - docs/specs/delivery-lifecycle.md
+    readonly_paths:
+      - docs/scheme.md
+      - docs/specs/task-card-standard.md
+      - docs/adr/README.md
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    按 delivery-lifecycle.md §2 七环与 §4 用户触点总表写白话旅程，不重写规格条款。
+    术语表只做一句话定义 + 出处链接。术语链接范围（ai_inferred，为把本卡保持为 S）：
+    仅限本卡新建的两份文件，以及 docs/README.md 与 docs/specs/delivery-lifecycle.md 的首次出现处；
+    不扫 docs/ 全文，不改 scheme.md（结构分家见 TASK-J.26）。新文件在 README 分层表登记。
+    三条铁律、q* 原话溯源、user_said/ai_inferred 标注不动；ADR 只 SUPERSEDE 不删改。
+  touches:
+    - { path: docs/user-journey.md, change: modify, why: "已新增非技术用户旅程说明（施工 #248 落盘后改记为 modify，消除 create-vs-exists warn）", symbols: [] }
+    - { path: docs/glossary.md, change: modify, why: "已新增术语白话定义与权威出处链接（施工 #248 落盘后改记为 modify，消除 create-vs-exists warn）", symbols: [] }
+    - { path: docs/README.md, change: modify, why: 分层表登记新文件落点与谁能改，并做本文件术语首次链接, symbols: [] }
+    - { path: docs/specs/delivery-lifecycle.md, change: modify, why: 仅在首次出现术语处加链接，不删现状→卡列、不改条款, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J25-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #248 交付；门禁仍为 npm run check:docs，本卡未新增 vitest 文件" }
+    - { acceptance_id: J25-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #248 交付；门禁仍为 npm run check:docs" }
+    - { acceptance_id: J25-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #248 交付；门禁仍为 npm run check:docs" }
+    - { acceptance_id: J25-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #248 交付；术语链接的机器核对若需新规则，另修卡后再做，本卡未扩展检查器" }
+governance:
+  spec_refs:
+    - docs/specs/delivery-lifecycle.md
+    - docs/scheme.md
+    - docs/README.md
+    - docs/specs/task-card-standard.md
+  depends_on: []
+  code_facts:
+    - { ref: "docs/specs/delivery-lifecycle.md:36-49", note: "七环总表已存在，含「现状 → 卡」列，但没有面向非技术用户的「会看到什么 / 要做什么 / 不必做什么」旅程文" }
+    - { ref: "docs/README.md:21-39", note: "分层表没有 user-journey.md / glossary.md 登记" }
+    - { ref: "docs/scheme.md:79", note: "goal-2 北极星场景已标明「当前做不到」，旅程入口必须复述，不得改成已交付" }
+  non_goals:
+    - 不删除或改写 delivery-lifecycle.md 的「现状 → 卡」列，不搬 scheme.md 结构（TASK-J.26）
+    - 不扫 docs/ 全文做术语链接（范围仅限本卡 writable_paths）
+    - 不动三条铁律、q* 原话溯源、user_said/ai_inferred 标注；ADR 只 SUPERSEDE 不删改
+    - 不宣称北极星场景（goal-2）或「无人值守连续三张真实任务卡」已交付；不加新文档层
+    - 不暗示条目级高亮已交付（J.22 范围）；不开工 J.22 / CI.2；不改 D.1e / S.3 / 已完工的 TASK-J.16
+    - 不写第二块验收约定，不做密封前意图完整性核对
+  fail:
+    - 旅程入口未写明 goal-2 当前做不到，或把北极星 / 无人值守三连卡写成已交付
+    - 术语定义没有权威出处链接，或另造与规格冲突的定义
+    - 改了「现状 → 卡」列或 scheme.md 结构
+    - 新文件未在 docs/README.md 分层表登记落点与「谁能改」
+  defaults:
+    - 术语链接范围限于本卡 writable_paths（ai_inferred，为保持估算 S；「各文件」不解释为 docs/ 全文）
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 248, commit: f90c881196f2ab8f8f1e02f7911415f5919e03de }
+```
+
+* **背景**：已解锁方案的第一块薄切片；用户入口目前是规格总装图，缺少白话旅程与术语表。
+* **取舍**：不把术语链接做成全库扫荡，避免本卡升为 L / 与 J.26 抢改 scheme.md。
+
+<a id="task-j.27"></a>
+
+### 【Task J.27】固定底线清单写入验证与验收规格（含 LLM 审核软层局限）`[COMPLETED · 立卡 P-206 · 施工 #249 · 完工回写 P-207]`
+
+> **立卡说明（2026-11-14 · P-206）**：第三块可先行的纯 docs 卡，不依赖第一块文档重组。只把固定底线清单与 LLM 软层局限写进规格；Daemon 接线见 `TASK-J.28`，三类检查适配见 `TASK-J.29`。**立卡 ≠ 开工**。
+
+> **归档注记（2026-11-14 · P-207）**：本卡已 **COMPLETED**。Tina t1252u 授权施工、t1253u 授权合入。因 #248 先合入，本卡分支曾变 BEHIND，已 rebase 到当时 main `f90c881196f2ab8f8f1e02f7911415f5919e03de` 后重跑检查再合。[#249](https://github.com/he18718143986-design/IDE/pull/249) squash `a96623c39a71c5d69bde7dfc08ccd16554d60387` 于 2026-11-14 21:42 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `118cee4ccee21a043e0ed01736436ac091e04f87`）。交付：`verification-strategy.md` §2.1（第 43 行起）与 `evidence-and-acceptance-criteria.md` §6（第 83 行起）写入安全 / 回滚 / 关键路径硬门禁；结论只由退出码进入 `can_merge`；类名标 `user_said`、细项标 `ai_inferred`；写明 LLM 审核只是补充软层，不能把 `can_merge` 置 true，人工三态也不替代 Daemon 判卷；北极星场景与「无人值守连续三张真实任务卡」仍标明未交付。未改产品代码。J.28 / J.29 仍 `[NEW_TASK]`，待另行授权；不开工 J.22；CI.2 攒样本。
+
+```yaml task-card
+id: TASK-J.27
+status: COMPLETED
+contract:
+  intent:
+    title: 把固定底线清单与 LLM 审核的非独立性写进验证策略和验收规格
+    description: >-
+      在 verification-strategy.md 与 evidence-and-acceptance-criteria.md 写入「固定底线清单」：
+      安全、回滚、关键路径三类检查必须是 Daemon 可执行的硬门禁，结论只由真实子进程退出码进入现有 can_merge 派生路径；
+      并显式声明 LLM 独立审核 / 测试义务审阅只是补充软层，写清其非独立性局限（不能单独把 can_merge 置真，也不能代替退出码）。
+      北极星场景与「无人值守连续三张真实任务卡」继续标明未交付。
+    risk_level: LOW
+  acceptance:
+    - id: J27-P1
+      check: auto
+      text: >-
+        docs/specs/verification-strategy.md 已增加固定底线清单正文：列出安全、回滚、关键路径三类硬门禁的覆盖范围与不覆盖范围，
+        并写明须参照现有 can_merge 只由退出码派生的机制（ADR-0005 / deriveCanMerge）实现；清单细项须标注 user_said 或 ai_inferred。
+    - id: J27-P2
+      check: auto
+      text: >-
+        docs/specs/evidence-and-acceptance-criteria.md 已同步该清单，并写明人工验收三态不替代 Daemon 判卷。
+    - id: J27-P3
+      check: auto
+      text: >-
+        两份规格都明确：LLM 独立审核测试义务只是补充软层，不具独立性，不能单独放行合入，也不能改写或绕过退出码派生的 can_merge。
+    - id: J27-P4
+      check: auto
+      text: >-
+        两份规格都继续标明北极星场景（goal-2）与「无人值守连续三张真实任务卡」未交付；不加新文档层。本卡不改产品代码。
+  scheme_item_ids: [goal-7, acc-7, acc-9]
+  scope:
+    writable_paths:
+      - docs/specs/verification-strategy.md
+      - docs/specs/evidence-and-acceptance-criteria.md
+    readonly_paths:
+      - docs/specs/delivery-lifecycle.md
+      - docs/specs/release-and-operations.md
+      - docs/scheme.md
+      - src/lib/evidence.schema.ts
+      - daemon/pipeline/orchestrator.ts
+      - docs/adr/0005-deterministic-verification-gate.md
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    先盘点已有退出码门禁（verification_spec 命令、stagent check obligations / test-integrity / knowledge、
+    deriveCanMerge、发布失败回滚）与仍只存在于文档或 LLM 审阅的项，再写成固定底线清单。
+    安全 / 回滚 / 关键路径的细项若超出用户原话「安全、回滚、关键路径检查」，一律标 ai_inferred，
+    供 J.28 / J.29 实施，但不在本卡发明新子系统。LLM 审核局限写进同一节，避免被读成硬门禁。
+  touches:
+    - { path: docs/specs/verification-strategy.md, change: modify, why: 写入固定底线清单与 LLM 软层局限, symbols: [] }
+    - { path: docs/specs/evidence-and-acceptance-criteria.md, change: modify, why: 同步清单，并重申人工三态不替代退出码判卷, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J27-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #249 交付；门禁仍为 npm run check:docs" }
+    - { acceptance_id: J27-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #249 交付；门禁仍为 npm run check:docs" }
+    - { acceptance_id: J27-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #249 交付；门禁仍为 npm run check:docs" }
+    - { acceptance_id: J27-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #249 交付；门禁仍为 npm run check:docs" }
+governance:
+  spec_refs:
+    - docs/specs/verification-strategy.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+    - docs/specs/delivery-lifecycle.md
+    - docs/adr/0005-deterministic-verification-gate.md
+    - docs/scheme.md
+  depends_on: []
+  code_facts:
+    - { ref: "docs/specs/verification-strategy.md:38-46", note: "已规定 can_merge 只由 V0～V3 退出码与 V4 确认派生，但没有名为「固定底线清单」的安全/回滚/关键路径硬门禁专节" }
+    - { ref: "docs/specs/evidence-and-acceptance-criteria.md:1-12", note: "现行规格讲人工三态与必填证据，未声明 LLM 审核的非独立性，也未列出固定底线清单" }
+    - { ref: "src/lib/evidence.schema.ts::deriveCanMerge", note: "can_merge 唯一派生函数已存在；本卡只引用，不改代码" }
+  non_goals:
+    - 不改 src/、daemon/、tests/ 或 bin/stagent.ts（接线是 TASK-J.28，三类检查是 TASK-J.29）
+    - 不把可维护性、架构品味、安全细节包装成已有硬门禁（那是第二块「质量边界」的范围，本批不立）
+    - 不做密封前意图完整性核对（U<seq> 回链）
+    - 不动三条铁律、q* 溯源、user_said/ai_inferred 标注；ADR 只 SUPERSEDE 不删改
+    - 不宣称北极星场景或「无人值守连续三张真实任务卡」已交付；不加新文档层
+    - 不暗示条目级高亮已交付；不开工 J.22 / CI.2
+  fail:
+    - 把 LLM 审核写成可以独立放行合入或改写 can_merge
+    - 清单细项不标 ai_inferred / user_said，或超出「安全、回滚、关键路径」另开产品方向
+    - 本卡直接改产品代码
+    - 把 goal-2 或无人值守三连卡写成已交付
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 249, commit: a96623c39a71c5d69bde7dfc08ccd16554d60387 }
+```
+
+* **背景**：质量安全网要求「固定底线」先有规格口径，再接线。现有 ADR-0005 / deriveCanMerge 已是机制样板，但规格没有把安全 / 回滚 / 关键路径写成固定清单，也未写清 LLM 审核局限。
+* **取舍**：本卡只写规格；不在立卡时发明新的扫描器或回滚子系统。
+
+### 3.4ah 文档结构分家（J.26 · 完工回写 P-208）
+
+<a id="task-j.26"></a>
+
+### 【Task J.26】文档结构分家（生命周期进度、scheme L0、README 空壳与硬编码计数）`[COMPLETED · 立卡 P-206 · 施工 #251 · 完工回写 P-208]`
+
+> **立卡说明（2026-11-14 · P-206）**：第一块的结构迁移切片，风险略高于 J.25，估算 M，不是 L。建议在 J.25 之后施工，以免术语链接与搬迁互相覆盖；无硬依赖。**立卡 ≠ 开工**。
+
+> **归档注记（2026-11-15 · P-208）**：本卡已 **COMPLETED**。Tina t1254u 授权施工、t1257u 授权合入。[#251](https://github.com/he18718143986-design/IDE/pull/251) squash `9852cff93cb28fa033ae22cea937d52c71e35576` 于 2026-11-15 10:41 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `a1d0201f7ea8257ace4b870e50bd1609e4646cde`）。交付：`delivery-lifecycle.md` 七环表已删除「现状 → 卡」列，进度迁入索引「七环进度」；`scheme.md` 只留 L0 意图，§2 / §4～§13 原位只留指针；已新建 `docs/reports/scheme-physical-pointers.md` 与 `docs/ledger/scheme-settled-decisions.md`；`docs/README.md` 已删空壳节、补项目简介、去掉硬编码计数；`check:docs` 新增计数看守并有正负两向单测。施工中因 `scheme.md` 缩短，卡内两条 `code_facts` 行号越界，不改指则 `check:docs` 报 error；该两处改动落在 `readonly_paths` 所列的 `docs/specs/development-tasks-active.md`。Tina t1256u 拍板口径 A，记为既成事实：「`code_facts` 行号因本卡自身迁移失效而改指，属自指性必要修正，非产品改动，经 Tina 裁决记为既成事实」。本条将两份新文件的 `touches.change` 由 `create` 改为 `modify`，并按迁后行号回写 `code_facts`。J.28 / J.29 仍 `[NEW_TASK]`；J.29 等 J.28 合入后再报方案；不开工 J.22；CI.2 攒样本。
+
+```yaml task-card
+id: TASK-J.26
+status: COMPLETED
+contract:
+  intent:
+    title: 文档结构分家：进度进索引、scheme 只留 L0、去掉 README 空壳与硬编码计数
+    description: >-
+      delivery-lifecycle.md 删除「现状 → 卡」列，该列进度迁入 development-tasks-index.md；
+      scheme.md 只留 L0 意图（原话、目标、模块），物理指针快照迁 docs/reports/，已落盘裁决迁 docs/ledger/，
+      作废正文迁出只留指针；docs/README.md 删除「已迁走」空壳节（现 §3 / §8 / §9），顶部加 3～5 句项目简介；
+      索引与卡片状态一致性继续由 check:docs 校验，并消除 docs/ 内除 docs/adr/README.md 以外的硬编码计数。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J26-P1
+      check: auto
+      text: >-
+        docs/specs/delivery-lifecycle.md 七环表已删除「现状 → 卡」列；该列原先记录的进度已迁入 docs/specs/development-tasks-index.md，
+        且迁后索引状态与卡头 / §1.1 矩阵仍被 check:docs 校验为一致。
+    - id: J26-P2
+      check: auto
+      text: >-
+        docs/scheme.md 正文只保留 L0 意图（§0 原话、§1 目标、§3 模块及溯源所需的 source/evidence 列）；
+        物理指针快照已迁至 docs/reports/scheme-physical-pointers.md，已落盘裁决已迁至 docs/ledger/scheme-settled-decisions.md，
+        作废正文迁出后在原位只留指针；user_said 仍能追到 §0 原话（check:docs / acc-4），q* 溯源与 user_said/ai_inferred 标注不丢。
+    - id: J26-P3
+      check: auto
+      text: >-
+        docs/README.md 已删除「已迁走」空壳节（现 §3 / §8 / §9 仅剩「已迁至 …」的空壳），顶部有 3～5 句项目简介；
+        三条铁律仍在；分层表如因 J.25 已登记新文件则保持登记。
+    - id: J26-P4
+      check: auto
+      text: >-
+        docs/ 内除 docs/adr/README.md 以外，不再出现以正文硬编码维护的 ADR / 篇数计数；
+        check:docs 新增规则在此类硬编码出现时判红；历史 changelog 中的过时计数不在本卡清扫范围。
+  scheme_item_ids: [goal-5, goal-6]
+  scope:
+    writable_paths:
+      - docs/specs/delivery-lifecycle.md
+      - docs/specs/development-tasks-index.md
+      - docs/scheme.md
+      - docs/README.md
+      - docs/reports/README.md
+      - docs/reports/scheme-physical-pointers.md
+      - docs/ledger/README.md
+      - docs/ledger/scheme-settled-decisions.md
+      - scripts/docs-check/checks.ts
+      - tests/unit/docs-check.test.ts
+    readonly_paths:
+      - docs/adr/README.md
+      - docs/specs/task-card-standard.md
+      - docs/specs/development-tasks-active.md
+      - docs/specs/development-tasks-completed.md
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/docs-check.test.ts] }
+design:
+  approach: >-
+    先列出 scheme.md 各节迁出清单再搬迁，避免一次改丢溯源。L0 只留原话、目标、模块；
+    物理指针进 reports，已落盘裁决进 ledger（只迁 scheme 正文中的裁决叙述并加指针，不改 ADR 原文）。
+    生命周期进度列整列删除，文字迁入索引（可增注或附列，但不得与卡头/矩阵状态打架）。
+    README 去空壳、补项目简介。硬编码计数清除后，在 scripts/docs-check/checks.ts 加看守规则，
+    并在 tests/unit/docs-check.test.ts 补用例。三条铁律、q* 溯源、标注与 ADR SUPERSEDE 纪律不动。
+  touches:
+    - { path: docs/specs/delivery-lifecycle.md, change: modify, why: 删除「现状 → 卡」列, symbols: [] }
+    - { path: docs/specs/development-tasks-index.md, change: modify, why: 承接七环进度文字，保持与矩阵/卡头状态一致, symbols: [] }
+    - { path: docs/scheme.md, change: modify, why: 只留 L0，其余迁出只留指针, symbols: [] }
+    - { path: docs/reports/scheme-physical-pointers.md, change: modify, why: "已承接 scheme.md 物理指针快照（施工 #251 落盘后改记为 modify，消除 create-vs-exists warn）", symbols: [] }
+    - { path: docs/ledger/scheme-settled-decisions.md, change: modify, why: "已承接 scheme.md 已落盘裁决叙述并指向 ADR/ledger（施工 #251 落盘后改记为 modify，消除 create-vs-exists warn）", symbols: [] }
+    - { path: docs/reports/README.md, change: modify, why: 登记迁入的指针快照, symbols: [] }
+    - { path: docs/ledger/README.md, change: modify, why: 登记迁入的裁决叙述, symbols: [] }
+    - { path: docs/README.md, change: modify, why: 删空壳节、顶部加项目简介、去掉硬编码计数, symbols: [] }
+    - { path: scripts/docs-check/checks.ts, change: modify, why: 新增硬编码计数看守，计数只允许出现在 docs/adr/README.md, symbols: [] }
+    - { path: tests/unit/docs-check.test.ts, change: modify, why: 为硬编码计数规则补用例, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J26-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #251 交付；门禁仍为 npm run check:docs" }
+    - { acceptance_id: J26-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #251 交付；迁后仍通过既有 scheme user_said 溯源检查；门禁仍为 npm run check:docs" }
+    - { acceptance_id: J26-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #251 交付；门禁仍为 npm run check:docs" }
+    - { acceptance_id: J26-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #251 交付；tests/unit/docs-check.test.ts 新增硬编码计数正负向用例" }
+governance:
+  spec_refs:
+    - docs/specs/delivery-lifecycle.md
+    - docs/scheme.md
+    - docs/README.md
+    - docs/adr/README.md
+    - docs/specs/task-card-standard.md
+  depends_on:
+    - { id: TASK-J.25, kind: soft }
+  code_facts:
+    - { ref: "docs/specs/delivery-lifecycle.md:38-51", note: "七环表已删除「现状 → 卡」列；第 51 行指针指向索引「七环进度」（施工 #251 落盘后回写）" }
+    - { ref: "docs/ledger/scheme-settled-decisions.md:9-28", note: "原 scheme.md §6 已落盘裁决已迁至此；scheme.md 对应节只留指针" }
+    - { ref: "docs/reports/scheme-physical-pointers.md:29-90", note: "原 scheme.md 文末物理指针已迁至此；scheme.md 对应节只留指针" }
+    - { ref: "docs/README.md:55", note: "阅读顺序改为「已拍板决策的索引（篇数以该索引为准，此处不维护数字）」，已去掉硬编码计数" }
+    - { ref: "docs/README.md:3-5", note: "文首已补项目简介；原 §3 / §8 / §9 空壳已删，现存 §3 起为 L1 决策（第 64 行）" }
+  non_goals:
+    - 不改 ADR 原文（只可在迁出叙述中加指针；ADR 只 SUPERSEDE 不删改）
+    - 不改写三条铁律、q* 原话、user_said/ai_inferred 标注；迁出后 acc-4 溯源不得破
+    - 不清扫历史 changelog 里的过时计数；不重写已完成任务卡正文
+    - 不宣称北极星场景或「无人值守连续三张真实任务卡」已交付；不加新文档层
+    - 不暗示条目级高亮已交付；不开工 J.22 / CI.2；不改 D.1e / S.3 / 已完工的 TASK-J.16
+    - 不写第二块验收约定，不做密封前意图完整性核对
+  fail:
+    - scheme.md 迁出后 user_said 无法追到 §0 原话，或丢掉 ai_inferred 标注
+    - 删除「现状 → 卡」列后进度丢失，未迁入索引
+    - 改了 ADR 原文，或在 adr/README.md 以外继续用正文维护篇数计数且门禁不报
+    - 把本卡做成产品代码改动，或改 runtime sandbox
+  defaults:
+    - 迁出文件名采用 docs/reports/scheme-physical-pointers.md 与 docs/ledger/scheme-settled-decisions.md（ai_inferred；若需更名须先修卡）
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 251, commit: 9852cff93cb28fa033ae22cea937d52c71e35576 }
+```
+
+* **背景**：scheme.md 与七环表同时承担意图、进度和指针，非技术用户与施工者都难读；README 仍留空壳节与互相矛盾的计数。
+* **取舍**：硬编码计数看守放进既有 `check:docs`，不另做文档层。建议 J.25 先做，以免两边同时改 README / lifecycle。
+
+
+### 3.4ai 固定底线硬门禁接线（J.28 · 完工回写 P-209）
+
+<a id="task-j.28"></a>
+
+### 【Task J.28】固定底线硬门禁接线：清单检查以子进程退出码进入 can_merge`[COMPLETED · 立卡 P-206 · 施工 #254 · 完工回写 P-209]`
+
+> **立卡说明（2026-11-14 · P-206）**：第三块施工的机制卡。把 J.27 清单中的检查登记为必须跑到的真实子进程，沿用现有 `verification_spec` → `executeWithSignal` → `deriveCanMerge` 路径；不手写 `can_merge`。三类检查的具体适配见 `TASK-J.29`。硬依赖 J.27（清单未落盘前不得开工）。**立卡 ≠ 开工**。
+>
+> **修订说明（2026-11-15 · 施工前核对 writable_paths）**：按卡在 `withSystemScope` / `buildScopePlan` 注入固定底线命令后，既有单测会落在原名单之外：`tests/unit/test-obligations.test.ts`（「无 auto 条目且无知识库时不变」现要求返回同一对象与同一 digest）、`tests/unit/scope-plan.test.ts`（绿野 / 无 typecheck·test 脚本场景下 `buildScopePlan` 后 `manual_only===true`）。本修订只把这两份测试补进 `writable_paths` 与 `touches`，不改验收、不改产品代码、不开工。若施工中还需改其它测试文件，必须再修卡，不得越写。
+>
+> **归档注记（2026-11-15 · P-209）**：本卡已 **COMPLETED**。Tina t1263u 授权由我直接施工（当时 Opus 5.5 额度不足以再开一轮）、t1265u 授权按卡施工并合入修卡 [#253](https://github.com/he18718143986-design/IDE/pull/253)、t1266u 授权合入施工 PR。[#253](https://github.com/he18718143986-design/IDE/pull/253) 于 2026-11-15 11:02 香港时间 squash 合入 `dd85eb3ee40295be327f9ece20b7619ffb9d726c`（施工前补 `writable_paths`）。[#254](https://github.com/he18718143986-design/IDE/pull/254) squash `31c69ec5effe432df03a8e060933b4c9af716bfe` 于 2026-11-15 13:05 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `f713f37578be772e56d804e46ca20406129b4067`；合入前必需检查 SUCCESS；`Unit tests (windows-latest)` 为 `continue-on-error` 非必需存量失败，故 `mergeable=MERGEABLE` / `mergeStateStatus=UNSTABLE` 仅由该项导致）。macOS 单测首次红在卡外 `tests/unit/app-preview-runner.test.ts`（用例「不监听端口时 timeoutMs:3000 失败且含 stderr 尾部」，第 199 行期望 `ready===false`、实际 `ready===true`），重跑转绿且未改该文件，已按纪律记入挂账⑨样本池。`ai_inferred` 落点 `daemon/guard/baseline-gates.ts` 未更名。机制接线完成：九项底线桩命令注入、缺项/未跑/非 0 在写证据前 fail-closed，`can_merge` 仍只经 `deriveCanMerge` 派生、未改签名。**安全 / 回滚 / 关键路径检查体未实现（J.29 范畴），当前以桩命令测绿。**
+
+```yaml task-card
+id: TASK-J.28
+status: COMPLETED
+contract:
+  intent:
+    title: 固定底线检查必须作为真实子进程跑完，can_merge 仍只由退出码派生
+    description: >-
+      Daemon 在验证阶段始终注入并执行 J.27 固定底线清单登记的检查命令（真实子进程，退出码 0/1）；
+      任一项缺失、未跑或退出码非 0 时，verdict.status 不得为 PASSED，deriveCanMerge 结果必须为 false。
+      禁止手写 can_merge，禁止用 LLM 审核结果把 can_merge 置真。本卡只做登记表与接线，不实现安全/回滚/关键路径的具体检查体。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J28-P1
+      check: auto
+      text: >-
+        ScopePlan / 合同 verification_spec 会注入 J.27 清单登记的底线检查命令（建议沿用 stagent check <subcommand> 形态，具体子命令名以施工为准并在卡回写中写清）。
+    - id: J28-P2
+      check: auto
+      text: >-
+        这些命令由现有验证循环以真实子进程执行，结果写入 evidence.verification_results（含 exit_code）；passed 只由退出码派生。
+    - id: J28-P3
+      check: auto
+      text: >-
+        清单中任一项缺失、被跳过或退出码非 0 时，writeEvidence 不得得到 can_merge=true；can_merge 仍只经 deriveCanMerge 计算，测试中不存在手写 true 的旁路。
+    - id: J28-P4
+      check: auto
+      text: >-
+        单测或集成测试用桩命令证明：全部退出码 0 时才可能 can_merge=true（其它门禁也通过的前提下）；任一非 0 或缺项则 can_merge=false；LLM / 人工评语不能单独置真。
+  scheme_item_ids: [goal-7, acc-7]
+  scope:
+    writable_paths:
+      - daemon/supervisor/scope-plan-builder.ts
+      - daemon/pipeline/orchestrator.ts
+      - bin/stagent.ts
+      - daemon/guard/baseline-gates.ts
+      - tests/unit/baseline-gates.test.ts
+      - tests/unit/test-obligations.test.ts
+      - tests/unit/scope-plan.test.ts
+      - docs/specs/verification-strategy.md
+      - docs/specs/evidence-and-acceptance-criteria.md
+    readonly_paths:
+      - src/lib/evidence.schema.ts
+      - daemon/pipeline/two-phase-runner.ts
+      - daemon/pipeline/merger.ts
+      - docs/specs/task-card-standard.md
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/baseline-gates.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    参照 withSystemScope 注入 stagent check obligations / test-integrity / knowledge 的既有模式：
+    在 buildScopePlan / withSystemScope 注入底线命令，runCheckCommand 增加对应子命令分发，
+    executeWithSignal 验证循环跑子进程。缺项 fail-closed：在写证据前核对清单别名是否都出现在 verification_results。
+    deriveCanMerge 保持唯一布尔派生器，本卡默认不改其签名（若必须扩展输入，须在 PR 说明且仍禁止手写 can_merge）。
+    具体安全/回滚/关键路径检查体留给 TASK-J.29；本卡可用桩命令把机制测绿。
+    新文件 daemon/guard/baseline-gates.ts 为 ai_inferred 落点，施工前若更名须先修卡。
+  touches:
+    - { path: daemon/supervisor/scope-plan-builder.ts, change: modify, why: 向 verification_spec 注入固定底线检查命令, symbols: [withSystemScope, buildScopePlan] }
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: 验证循环对清单做缺项 fail-closed，仍经 deriveCanMerge 写 can_merge, symbols: [executeWithSignal] }
+    - { path: bin/stagent.ts, change: modify, why: 为底线检查增加 stagent check 子命令分发, symbols: [runCheckCommand] }
+    - { path: daemon/guard/baseline-gates.ts, change: modify, why: "已新增清单登记与缺项判定（ai_inferred 路径未更名；施工 #254 落盘后改记为 modify，消除 create-vs-exists warn）", symbols: [REQUIRED_BASELINE_GATES, evaluateBaselineGateResults, injectBaselineGateCommands] }
+    - { path: tests/unit/baseline-gates.test.ts, change: modify, why: "已用桩命令锁定退出码派生与缺项 fail-closed（施工 #254 落盘后改记为 modify，消除 create-vs-exists warn）", symbols: [] }
+    - { path: tests/unit/test-obligations.test.ts, change: modify, why: 注入底线命令后，「无 auto 且无知识库」不再是 identity；只改该断言以匹配强制注入，不改 L.3 其它验收, symbols: [] }
+    - { path: tests/unit/scope-plan.test.ts, change: modify, why: 注入底线命令后，绿野/无脚本场景的 manual_only 不再为 true；只改该断言以匹配强制注入，不改 J.2 其它验收, symbols: [] }
+    - { path: docs/specs/verification-strategy.md, change: modify, why: 回写接线后的命令别名与 fail-closed 行为, symbols: [] }
+    - { path: docs/specs/evidence-and-acceptance-criteria.md, change: modify, why: 回写证据字段与人工三态仍不替代退出码, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J28-P1, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "已由 #254 交付；withSystemScope 始终注入九项别名" }
+    - { acceptance_id: J28-P2, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "已由 #254 交付；桩命令以真实子进程退出码写入结果" }
+    - { acceptance_id: J28-P3, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "已由 #254 交付；缺项/非 0 fail-closed，deriveCanMerge 签名未改" }
+    - { acceptance_id: J28-P4, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "已由 #254 交付；机制以桩命令测绿，检查体属 J.29" }
+governance:
+  spec_refs:
+    - docs/specs/verification-strategy.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+    - docs/adr/0005-deterministic-verification-gate.md
+    - docs/specs/delivery-lifecycle.md
+  depends_on:
+    - { id: TASK-J.27, kind: hard }
+  code_facts:
+    - { ref: "src/lib/evidence.schema.ts::deriveCanMerge", note: "can_merge 唯一派生函数；本卡只调用，未改签名" }
+    - { ref: "daemon/guard/baseline-gates.ts:21-76", note: "REQUIRED_BASELINE_GATES 登记 J.27 九项别名；ai_inferred 落点未更名" }
+    - { ref: "daemon/guard/baseline-gates.ts:125-139", note: "evaluateBaselineGateResults 对缺项（结果中无别名）或退出码非 0 / passed===false fail-closed" }
+    - { ref: "daemon/pipeline/orchestrator.ts:1048-1061", note: "合同已登记任一条底线别名时，buildRuntime 前补齐缺项；空命令合同保持零命令兜底" }
+    - { ref: "daemon/pipeline/orchestrator.ts:1230-1347", note: "baselineRequired 时写证据前 fail-closed；失败则 status=FAILED、reason_code=UNSAFE_EXECUTION；can_merge 仍经 deriveCanMerge" }
+    - { ref: "daemon/supervisor/scope-plan-builder.ts:885-891", note: "withSystemScope 始终 injectBaselineGateCommands，并将 manual_only 置为 false" }
+    - { ref: "bin/stagent.ts:673-702", note: "runCheckCommand 已分发 stagent check baseline-gate --id <alias>（桩命令，检查体留给 J.29）" }
+  non_goals:
+    - 不实现安全 / 回滚 / 关键路径的具体检查体（TASK-J.29）
+    - 不改 deriveCanMerge 的「禁止手写」纪律，不让 LLM 审核置真 can_merge
+    - 不改 runtime/contract ScopePlan sandbox 语义，不扩网关写范围
+    - 不动三条铁律、q* 溯源、标注；ADR 只 SUPERSEDE 不删改
+    - 不宣称北极星或无人值守三连卡已交付；不加新文档层
+    - 不暗示条目级高亮已交付；不开工 J.22 / CI.2；不改 D.1e / S.3 / 已完工的 TASK-J.16
+  fail:
+    - 手写 can_merge=true，或用 LLM / 人工评语绕过退出码
+    - 清单项缺失或未跑时仍出现 can_merge=true
+    - 在本卡实现三类检查的产品行为（越界到 J.29）
+    - 把本卡估成 L 后直接开工而不拆
+  defaults:
+    - 新模块路径采用 daemon/guard/baseline-gates.ts，测试采用 tests/unit/baseline-gates.test.ts（ai_inferred）
+    - 默认不修改 deriveCanMerge 签名
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 254, commit: 31c69ec5effe432df03a8e060933b4c9af716bfe }
+```
+
+* **背景**：现有 can_merge 已只由退出码与门禁派生，但没有「固定底线清单必须全部跑到，缺项即失败」的接线。
+* **取舍**：先接线与桩测，再让 J.29 把三类真实检查接进同一登记表，避免一张卡跨机制与三个领域而变成 L。
+
+
+### 3.4aj 八项既有检查接入硬门禁（J.29 · 完工回写 P-212）
+
+<a id="task-j.29"></a>
+
+### 【Task J.29】把八项既有检查接到固定底线硬门禁`[COMPLETED · 立卡 P-206 · 修订 P-210 · 施工 #258 · 完工回写 P-212]`
+
+> **立卡说明（2026-11-14 · P-206）**：第三块施工的检查适配卡。只把 J.27 清单里的安全 / 回滚 / 关键路径项接到 J.28 登记表，复用已有代码事实，不新造扫描器、回滚子系统或新的主路径测试框架。若 J.27 落盘后的清单要求新子系统，必须先拆卡再授权（R-11）。硬依赖 J.27 与 J.28。**立卡 ≠ 开工**。
+>
+> **修订说明（2026-11-15 · P-210）**：施工前核对发现「凭据与秘密不得进入对话」没有可调用的退出码检查（`stagent check` 无凭据子命令；`redactSecrets` / `redactText` 是运行时遮蔽；`daemon/vault/` 是存取）。按 Tina t1269u 拆分口径，本卡缩为八项薄适配：写范围、`stagent check test-integrity`、三类回滚、退出码路径、`mainline-regression`、`stagent check knowledge`。该项从本卡验收移出，另立 `TASK-J.30`。J.27 清单里把该项出处写成 `scheme.md` acc-9 的引用一并改为 `conf-6` / q14（settled `acc-9` 是发布失败回到上一个 LIVE）。本卡仍 `[NEW_TASK]`，等本条 docs 合入后再施工。**修订 ≠ 开工**。
+>
+> **归档注记（2026-11-15 · P-212）**：本卡已 **COMPLETED**。Tina t1275u 授权由我施工（非 Opus 5.5）、t1276u 授权先合入 [#257](https://github.com/he18718143986-design/IDE/pull/257)（P-211）再合入本施工 PR。[#257](https://github.com/he18718143986-design/IDE/pull/257) 于 2026-11-15 14:21 香港时间 squash 合入 `554c8f4cd99fcd1dc08d804307d4605005f2be33`。[#258](https://github.com/he18718143986-design/IDE/pull/258) 原基于 `0f6b78d7c0678d99375b99c16ee837cdfacea487`；#257 合入后因两份规格文档重叠，GitHub 报 `dirty`，已变基到 `554c8f4` 并手工合并 `verification-strategy.md` 一处冲突，本地重跑 `tests/unit/baseline-gates.test.ts` 12/12 与 `tsc --noEmit` 退出 0。变基后 head `1a5e779f06d1bd9859daccf15640723be50f3457`，CI run [`43685199644`](https://github.com/he18718143986-design/IDE/actions/runs/43685199644) 必需项（Docs / Knowledge / Perf 与 ubuntu/macos lint、typecheck、unit）全绿；`Unit tests (windows-latest)` 为 `continue-on-error` 非必需存量失败，同 run 中 `baseline-gates.test.ts` 在 Windows 为 12/12，故 `mergeable=MERGEABLE` / `mergeStateStatus=UNSTABLE` 仅由该项导致。macOS 单测首次红在卡外 `tests/unit/app-preview-runner.test.ts`（用例「不监听端口时 timeoutMs:3000 失败且含 stderr 尾部」，期望 `ready===false`、实际 `ready===true`），job [`132724150832`](https://github.com/he18718143986-design/IDE/actions/jobs/132724150832)；`gh run rerun --failed` 后 job [`132725701420`](https://github.com/he18718143986-design/IDE/actions/runs/43685199644/job/132725701420) 转绿，未改该文件，已按纪律记入挂账⑨样本池。[#258](https://github.com/he18718143986-design/IDE/pull/258) squash `fa514dceda00493015be181fc0f68cd9a9e64bab` 于 2026-11-15 14:36 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `1a5e779f06d1bd9859daccf15640723be50f3457`）。**八项薄适配完成，`baseline-safety-secrets` 仍为桩（J.30 范畴）。** 不宣称端到端闭环；北极星与无人值守三连卡仍为未交付。
+
+```yaml task-card
+id: TASK-J.29
+status: COMPLETED
+contract:
+  intent:
+    title: 将八项既有底线检查接到退出码硬门禁
+    description: >-
+      J.27 清单中除「凭据与秘密不得进入对话」外的八项检查，均以真实子进程形式出现在 J.28 登记表中：
+      写范围、测试完整性、自动回滚、手动回滚、无上一个 LIVE 必须失败、V0～V3 退出码路径、主线回归、知识库漂移。
+      退出码 0 表示该条通过，非 0 或未跑则 can_merge 为 false。
+      实现以现有门禁为适配对象，不新造独立扫描器或第二套 can_merge。LLM 审核仍不得置真 can_merge。
+      凭据与秘密不得进入对话的退出码检查见 TASK-J.30，不在本卡实施。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J29-P1
+      check: auto
+      text: >-
+        「安全」类本卡只覆盖写范围与测试完整性两项，并作为真实子进程接入 J.28 登记表（baseline-safety-writable-scope、baseline-safety-test-integrity）；非 0 或缺失时 can_merge 为 false。凭据与秘密不得进入对话不在本卡验收，见 TASK-J.30。
+    - id: J29-P2
+      check: auto
+      text: >-
+        「回滚」类底线检查同样接入；须能体现发布失败回到上一个 LIVE 这一既有口径（acc-9 / release-and-operations.md）的可执行判定，而不是只写文档。没有上一个 LIVE 时必须失败并告知，不得假装成功。
+    - id: J29-P3
+      check: auto
+      text: >-
+        「关键路径」类底线检查同样接入；覆盖 V0～V3 退出码进入 deriveCanMerge、主线回归（mainline-regression）与知识库漂移（stagent check knowledge），复用既有检查，不新开测试框架。
+    - id: J29-P4
+      check: auto
+      text: >-
+        本卡八项检查全部 0 且其它既有门禁通过时，才可能 can_merge=true；任一失败则 false。LLM 审核输出不能单独置真。baseline-safety-secrets 的检查体不在本卡范围，合入前仍为 J.28 桩。
+    - id: J29-P5
+      check: auto
+      text: >-
+        本卡没有新增与现有网关/发布/回归子系统并行的第二套实现；规格回写与修订后的 J.27 清单一致，并继续标明北极星与无人值守三连卡未交付。
+  scheme_item_ids: [goal-7, acc-5, acc-7, acc-9]
+  scope:
+    writable_paths:
+      - daemon/guard/baseline-gates.ts
+      - bin/stagent.ts
+      - tests/unit/baseline-gates.test.ts
+      - docs/specs/verification-strategy.md
+      - docs/specs/evidence-and-acceptance-criteria.md
+    readonly_paths:
+      - src/lib/evidence.schema.ts
+      - daemon/pipeline/orchestrator.ts
+      - daemon/supervisor/scope-plan-builder.ts
+      - daemon/pipeline/merger.ts
+      - docs/specs/release-and-operations.md
+      - daemon/pipeline/mainline-regression.ts
+      - docs/adr/0005-deterministic-verification-gate.md
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/baseline-gates.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    施工以修订后的 J.27 清单为产品口径，只做八项薄适配：
+    安全对既有范围/网关拦截与 stagent check test-integrity；回滚对发布失败自动回到上一个 LIVE 的既有路径（无上一个 LIVE 必须失败）；
+    关键路径对既有退出码派生、mainline-regression 与 stagent check knowledge。
+    只读文件（orchestrator.ts、scope-plan-builder.ts、mainline-regression.ts、release-and-operations.md 等）只能调用不能改；必须改则先修卡。
+    不实施凭据与秘密不得进入对话（TASK-J.30）。不重做 J.28 注入，不改 deriveCanMerge。
+  touches:
+    - { path: daemon/guard/baseline-gates.ts, change: modify, why: 把八项真实检查接到登记表（J.28 已创建该文件，P-209 将 change 改为 modify）, symbols: [] }
+    - { path: bin/stagent.ts, change: modify, why: 为八项检查补齐 check 子命令分发（J.28 已留 baseline-gate 扩展点，只接实现）, symbols: [runCheckCommand] }
+    - { path: tests/unit/baseline-gates.test.ts, change: modify, why: 为八项检查的退出码与 can_merge 派生补用例, symbols: [] }
+    - { path: docs/specs/verification-strategy.md, change: modify, why: 回写八项检查的命令与覆盖范围, symbols: [] }
+    - { path: docs/specs/evidence-and-acceptance-criteria.md, change: modify, why: 回写证据与软层界限, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J29-P1, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "已由 #258 交付；写范围调用 checkWriteAccess，测试完整性调用 detectTestWeakening；固定样本 0 / 非 0" }
+    - { acceptance_id: J29-P2, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "已由 #258 交付；三类回滚调用 canTransition 与上一个 LIVE / E_RELEASE_NO_PREVIOUS 口径，不调用真实发布" }
+    - { acceptance_id: J29-P3, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "已由 #258 交付；退出码路径经 evaluateBaselineGateResults + deriveCanMerge；主线核对 MAINLINE_NODES / REGRESSION_FINGERPRINT；知识库调用 coversPath / hasDependsOnCycle" }
+    - { acceptance_id: J29-P4, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "已由 #258 交付；八项固定样本双向自检；deriveCanMerge 签名未改；baseline-safety-secrets 仍为桩" }
+    - { acceptance_id: J29-P5, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "已由 #258 交付；未新造扫描器或第二套 can_merge；规格已回写八项薄适配与凭据项仍为桩；北极星与三连卡仍标明未交付" }
+governance:
+  spec_refs:
+    - docs/specs/verification-strategy.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+    - docs/specs/release-and-operations.md
+    - docs/adr/0005-deterministic-verification-gate.md
+    - docs/scheme.md
+  depends_on:
+    - { id: TASK-J.27, kind: hard }
+    - { id: TASK-J.28, kind: hard }
+  code_facts:
+    - { ref: "src/lib/evidence.schema.ts::deriveCanMerge", note: "合入门禁仍只经此函数派生；本卡调用、未改签名（#258 对 evidence.schema.ts 无 diff）" }
+    - { ref: "daemon/guard/baseline-gates.ts:256-268", note: "写范围调用 checkWriteAccess；测试完整性调用 detectTestWeakening" }
+    - { ref: "daemon/guard/baseline-gates.ts:270-310", note: "三类回滚调用 canTransition 与上一个 LIVE / E_RELEASE_NO_PREVIOUS 口径，不调用真实发布" }
+    - { ref: "daemon/guard/baseline-gates.ts:312-326", note: "退出码路径经 evaluateBaselineGateResults 后调用 deriveCanMerge" }
+    - { ref: "daemon/guard/baseline-gates.ts:332-361", note: "主线回归核对 MAINLINE_NODES / REGRESSION_FINGERPRINT；知识库漂移调用 hasDependsOnCycle / coversPath" }
+    - { ref: "daemon/guard/baseline-gates.ts:373-381", note: "baseline-safety-secrets 仍返回桩（stub: true，body: TASK-J.30）" }
+    - { ref: "bin/stagent.ts:677-734", note: "runCheckCommand 已分发八项检查体（runBaselineGateBody）；--sample 可选，--exit 仍为测试强制覆盖；未改 deriveCanMerge" }
+  non_goals:
+    - 不实施「凭据与秘密不得进入对话」的退出码检查（已拆至 TASK-J.30）
+    - 不新造安全扫描器、第二套回滚子系统或新的主路径测试框架
+    - 不重做 J.28 的注入与 deriveCanMerge 接线，不改 sandbox / 网关写范围
+    - 不做第二块质量边界、判分表、card-copy-standard，不做密封前意图核对
+    - 不动三条铁律、q* 溯源、标注；ADR 只 SUPERSEDE 不删改
+    - 不宣称北极星或无人值守三连卡已交付；不加新文档层
+    - 不暗示条目级高亮已交付；不开工 J.22 / CI.2；不改 D.1e / S.3 / 已完工的 TASK-J.16
+  fail:
+    - 某类本卡范围内的清单检查只写文档、没有真实子进程退出码
+    - 把凭据与秘密不得进入对话做进本卡，或新造扫描器
+    - LLM 审核或手写布尔把 can_merge 置真
+    - 本卡膨胀为新子系统却不拆卡（R-11）
+    - 改只读文件却不先修卡
+    - 在本条修订（P-210）合入前开工，或在 J.27 / J.28 未完成时开工
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 258, commit: fa514dceda00493015be181fc0f68cd9a9e64bab }
+```
+
+* **背景**：三类检查是原方案点名的硬门禁内容；与接线拆开是为了避免单卡 L。施工前发现凭据项没有可调用退出码检查，故从本卡拆出。
+* **取舍**：只做八项薄适配。凭据项见 `TASK-J.30`（P-211 已拍板 Vault 口径运行时断言并补代码路径；本卡合入后 J.30 可基于新 main 变基开工），不在本卡发明产品方向。
+
+### 3.4ak 凭据不得进入对话的运行时断言（J.30 · 完工回写 P-214）
+
+<a id="task-j.30"></a>
+
+### 【Task J.30】凭据与秘密不得进入对话的退出码检查`[COMPLETED · 立卡 P-210 · 修订 P-211 · 修订 P-213 · 施工 #261 · 完工回写 P-214]`
+
+> **立卡说明（2026-11-15 · P-210）**：从 `TASK-J.29` 拆出的安全类第③项。J.27 清单要求「凭据与秘密不得进入对话」以真实子进程退出码进入 J.28 登记表（别名 `baseline-safety-secrets`），但施工前核对确认：`stagent check` 现有子命令只有 `obligations` / `test-integrity` / `knowledge` / `playtest` 与 J.28 的 `baseline-gate` 桩，没有凭据检查项；`redactSecrets` / `redactText` 是运行时遮蔽，`daemon/vault/` 是存取能力，都不是 0 / 1 门禁。出处应写 [`../ledger/scheme-settled-decisions.md`](../ledger/scheme-settled-decisions.md) 第 79 行 `conf-6`（q14 拍板，受控+Vault，账密严禁进入对话上下文），不是 settled 第 138 行 `acc-9`（发布失败回到上一个 LIVE）。立卡时两种设计方向待定，不预设实现。硬依赖 J.27 清单口径。估算 M（R-11：若方案需要新子系统再拆，不得在未拆时把本卡扩成 L）。**立卡 ≠ 开工**。
+>
+> **修订说明（2026-11-15 · P-211）**：Tina t1271u 拍板采用第二种（Vault 口径运行时断言），t1273u 核实并批准接缝清单。断言函数加在现有 `daemon/vault/vault.ts` 门面，复用 `currentValues()`（第 98 行；只覆盖已加载进缓存且长度 ≥6 的密钥，未 `get()` 过的密钥不在断言范围），不新建 `assert-context.ts`。四处生产发送接缝在发出前调用同一函数：右栏 `daemon/chat/session-manager.ts`（`send` 第 174 行 → `runOne` 第 219 行，失败则不调用第 232 行 `adapter.run`）；L1 补全 `daemon/supervisor/draft-generator.ts` 的 `buildEnrichmentPrompt`（第 136 行）之后、调用 `enrich` 之前；方案编译器 `daemon/supervisor/intent-compiler/compile-loop.ts` 的 `callModel`（第 435 行）在第 451 行 `client.generate` 之前；工人指令 `daemon/worker/session-task-injector.ts` 的 `buildWorkerTaskInstruction`（第 382 行），以及 `daemon/worker/ai-worker.ts` 的 `collectContext`（第 345 行）之后、发起模型调用前（指令 + 已收集文件双重断言）。失败必须非 0 且上下文不发出，不得降级为「脱敏后继续」。`stagent check baseline-gate --id baseline-safety-secrets` 去桩后用同一断言函数跑固定样本（干净上下文退出 0，夹带保险库值非 0），不做全仓库落盘文本扫描。`daemon/supervisor/prompt-builder.ts` 第 248 行「对话上下文」拼装不是活的发送点，不列入必须可写（可选对齐）。本卡仍 `[NEW_TASK]`、估算仍为 M；本条只修卡补 `writable_paths`，代码施工必须等 `TASK-J.29` 合入后基于新 main 变基，避免抢 `baseline-gates.ts` / `bin/stagent.ts` / `tests/unit/baseline-gates.test.ts`。**修订 ≠ 开工**。
+>
+> **修订说明（2026-11-15 · P-213）**：Tina t1281u 拍板。施工前（t1280u）核对发现：若把共享断言函数只放在 `daemon/vault/vault.ts` 并由 Supervisor 接缝（`draft-generator.ts` / `compile-loop.ts`）直接引用，会经 `keychain-backend` 进入 `node:child_process`，触发 `tests/unit/supervisor-zero-tool-lint.test.ts` 的 TASK-S.1 传递闭包禁令；当时 `active.ts` / `types.ts` / `daemon/server.ts` 不在可写范围，又禁止新建 `assert-context.ts`。本条把 `daemon/vault/active.ts` 补入 `writable_paths`。共享断言函数放在 `active.ts` 叶子（Supervisor 与 debug-log 可安全引用），`vault.ts` 门面转出该函数，四处接缝从 `active.ts` 引用、不直接引用 `vault.ts`。仍不新建 `assert-context.ts`，不改 `deriveCanMerge`，不做全仓库扫描。`TASK-J.30` 仍 `[NEW_TASK]`，估算仍为 M；本条只修卡，不写产品代码。代码施工必须等本条合入后基于新 main 变基。**修订 ≠ 开工**。
+>
+> **归档注记（2026-11-15 · P-214）**：本卡已 **COMPLETED**。Tina t1280u 授权由我施工（非 Opus 5.5），t1282u 授权合入 [#260](https://github.com/he18718143986-design/IDE/pull/260)（P-213）后在新 main 变基施工，t1283u 授权合入本施工 PR。[#260](https://github.com/he18718143986-design/IDE/pull/260) 于 2026-11-15 14:59:42 香港时间 squash 合入 `96fe0dcf921104f89230eb0aafebfcf5cda76cf5`。[#261](https://github.com/he18718143986-design/IDE/pull/261) 基于该 main，head `32512719735a717b7857fb48ff52bb4f3c32be69`；CI run [`43688351397`](https://github.com/he18718143986-design/IDE/actions/runs/43688351397) 必需项（Docs / Knowledge / Perf 与 ubuntu/macos lint、typecheck、unit）全绿；`Unit tests (windows-latest)` 为 `continue-on-error` 非必需存量失败（16 文件 / 28 用例），同 run 中本卡相关测试在 Windows 上 `tests/daemon/vault.test.ts` 7/7、`tests/unit/baseline-gates.test.ts` 12/12、`tests/unit/supervisor-zero-tool-lint.test.ts` 5/5 全过（S.1 零工具闭包未被污染）。本地 8 个测试文件 60 用例通过、`tsc --noEmit` 退出 0、`check:docs` error 0。改动 12 个文件均在当时 13 条 `writable_paths` 内（`bin/stagent.ts` 未改），未碰 `prompt-builder.ts` 与只读适配器。[#261](https://github.com/he18718143986-design/IDE/pull/261) squash `27d9c4188617ac90393b2dd78d70626482a5db6e` 于 2026-11-15 15:18:57 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `32512719735a717b7857fb48ff52bb4f3c32be69`；父提交 `96fe0dcf921104f89230eb0aafebfcf5cda76cf5`）。共享断言函数在 `daemon/vault/active.ts` 叶子（零重依赖，不 import `keychain-backend`），`vault.ts` 门面转出；四处接缝从 `active.ts` 引用；`baseline-safety-secrets` 已去桩（固定样本干净 0 / 夹带非 0）。**诚实口径：`prompt-builder.ts` 未对齐（须另修卡）；`currentValues()` 仅覆盖已缓存且长度 ≥6 的密钥，未 `get()` 过的不在断言范围。** 不宣称端到端闭环；北极星与无人值守三连卡仍为未交付。J.22 不开工；CI.2 攒样本；文档计划暂缓。
+
+```yaml task-card
+id: TASK-J.30
+status: COMPLETED
+contract:
+  intent:
+    title: 把凭据与秘密不得进入对话做成退出码硬门禁
+    description: >-
+      将 J.27 清单安全类第③项「凭据与秘密不得进入对话」做成真实子进程，接入 J.28 登记表别名 baseline-safety-secrets：
+      退出码 0 表示该条通过，非 0 或未跑则 can_merge 为 false。
+      口径对齐 conf-6 / q14（账密严禁进入对话上下文），不得把 acc-9（发布回滚）当作本项出处。
+      已拍板采用 Vault 口径运行时断言：共享断言函数放在 daemon/vault/active.ts 叶子（Supervisor 与 debug-log 可安全引用），
+      vault.ts 门面转出该函数，于四处生产发送接缝发出前从 active.ts 引用（不直接引用 vault.ts）；
+      失败必须非 0 且上下文不发出，不得降级为「脱敏后继续」。
+      断言范围以 currentValues() 已缓存且长度 ≥6 的密钥为限；baseline-safety-secrets 去桩后跑固定样本，不做全仓库扫描。
+      不新建 assert-context.ts，不改 deriveCanMerge。LLM 审核仍不得置真 can_merge。
+      代码施工必须等本条（P-213）合入后基于新 main 变基。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J30-P1
+      check: auto
+      text: >-
+        「凭据与秘密不得进入对话」已作为真实子进程接入 J.28 登记表别名 baseline-safety-secrets；
+        stagent check baseline-gate --id baseline-safety-secrets 已去桩，用同一断言函数跑固定样本
+        （干净上下文退出 0，夹带保险库值非 0）；退出码 0 为通过，非 0 或缺失时 can_merge 为 false。测试锁定退出码行为。
+        不做全仓库落盘文本扫描。
+    - id: J30-P2
+      check: auto
+      text: >-
+        检查口径对齐 conf-6 / q14（账密严禁进入对话上下文），并在规格中明确此项出处不是 acc-9；
+        同时写明 currentValues() 只覆盖已缓存且长度 ≥6 的密钥、未 get() 过的密钥不在断言范围。
+    - id: J30-P3
+      check: auto
+      text: >-
+        实现采用已授权的 Vault 口径运行时断言（共享断言函数在 daemon/vault/active.ts 叶子，vault.ts 门面转出；
+        四处接缝从 active.ts 引用，不直接引用 vault.ts；不新建 assert-context.ts），
+        于四处生产发送接缝发出前调用同一函数；失败必须非 0 且上下文不发出，不得降级为「脱敏后继续」；
+        不另造扫描子系统；can_merge 仍只经 deriveCanMerge 派生。
+    - id: J30-P4
+      check: auto
+      text: >-
+        规格回写与修订后的 J.27 清单一致，并继续标明北极星与无人值守三连卡未交付。
+  scheme_item_ids: [conf-6]
+  scope:
+    writable_paths:
+      - daemon/vault/active.ts
+      - daemon/vault/vault.ts
+      - daemon/chat/session-manager.ts
+      - daemon/supervisor/draft-generator.ts
+      - daemon/supervisor/intent-compiler/compile-loop.ts
+      - daemon/worker/session-task-injector.ts
+      - daemon/worker/ai-worker.ts
+      - daemon/guard/baseline-gates.ts
+      - bin/stagent.ts
+      - tests/unit/baseline-gates.test.ts
+      - tests/daemon/vault.test.ts
+      - docs/specs/verification-strategy.md
+      - docs/specs/evidence-and-acceptance-criteria.md
+    readonly_paths:
+      - docs/ledger/scheme-settled-decisions.md
+      - docs/scheme.md
+      - daemon/runner/command-runner.ts
+      - daemon/core/debug-log.ts
+      - src/lib/ipc/redaction.ts
+      - src/lib/evidence.schema.ts
+      - daemon/pipeline/orchestrator.ts
+      - daemon/chat/baseline-adapter.ts
+      - daemon/chat/demo-adapter.ts
+      - daemon/worker/cli-host/claude-code-adapter.ts
+      - daemon/supervisor/enrich-openai.ts
+      - daemon/supervisor/intent-compiler/render-input.ts
+      - daemon/supervisor/intent-compiler/system-prompt.ts
+      - daemon/worker/openai-client.ts
+      - daemon/worker/default-worker-registry.ts
+      - daemon/worker/policy-guard.ts
+      - daemon/supervisor/prompt-builder.ts
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/baseline-gates.test.ts, tests/daemon/vault.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    已拍板采用 Vault 口径运行时断言。共享断言函数放在 daemon/vault/active.ts 叶子
+    （Supervisor 与 debug-log 可安全引用），vault.ts 门面转出该函数，复用 currentValues()。
+    四处生产发送接缝从 active.ts 引用、不直接引用 vault.ts：session-manager.ts、
+    draft-generator.ts、compile-loop.ts、session-task-injector.ts 与 ai-worker.ts（指令 + 已收集文件）。
+    失败必须非 0 且上下文不发出，不得降级为「脱敏后继续」。不新建 assert-context.ts。
+    baseline-safety-secrets 去桩后用同一函数跑固定样本，不做全仓库落盘文本扫描。
+    prompt-builder.ts 第 248 行不是活发送点，不列入必须可写。
+    本条只修卡；代码施工必须等本条（P-213）合入后基于新 main 变基。
+    不重做 J.28 注入，不改 deriveCanMerge。估算维持 M；若施工中发现接缝比定位多或必须改只读适配器，停下来拆卡或再修卡。
+  touches:
+    - { path: daemon/vault/active.ts, change: modify, why: 在叶子模块放置共享断言函数，Supervisor 与 debug-log 可安全引用，不引进 keychain-backend, symbols: [assertContextHasNoVaultSecrets] }
+    - { path: daemon/vault/vault.ts, change: modify, why: 门面转出 active.ts 中的共享断言函数，复用 currentValues()，不新建 assert-context.ts, symbols: [currentValues] }
+    - { path: daemon/chat/session-manager.ts, change: modify, why: 右栏统一拦截点：断言失败则不调用 adapter.run, symbols: [send, runOne] }
+    - { path: daemon/supervisor/draft-generator.ts, change: modify, why: L1 补全提示拼装后、调用 enrich 前断言, symbols: [buildEnrichmentPrompt, generateContractDraft] }
+    - { path: daemon/supervisor/intent-compiler/compile-loop.ts, change: modify, why: callModel 在 client.generate 发出前断言, symbols: [callModel] }
+    - { path: daemon/worker/session-task-injector.ts, change: modify, why: 拼工人 system_prompt 时断言，失败不返回指令, symbols: [buildWorkerTaskInstruction] }
+    - { path: daemon/worker/ai-worker.ts, change: modify, why: collectContext 之后、发起模型调用前对指令和已收集文件再断言, symbols: [collectContext] }
+    - { path: daemon/guard/baseline-gates.ts, change: modify, why: 去桩接线所需的登记/求值配合；与 J.29 共享，施工须等 J.29 合入后变基, symbols: [REQUIRED_BASELINE_GATES] }
+    - { path: bin/stagent.ts, change: modify, why: baseline-safety-secrets 去桩，改为用同一断言函数跑固定样本；与 J.29 共享，施工须等 J.29 合入后变基, symbols: [] }
+    - { path: tests/unit/baseline-gates.test.ts, change: modify, why: 锁定 baseline-safety-secrets 固定样本退出码；与 J.29 共享，施工须等 J.29 合入后变基, symbols: [] }
+    - { path: tests/daemon/vault.test.ts, change: modify, why: 扩展 RO-08：夹带保险库值时必须 fail-closed，不得脱敏后继续, symbols: [] }
+    - { path: docs/specs/verification-strategy.md, change: modify, why: 回写已拍板方案、currentValues 局限、去桩样本与非活发送点, symbols: [] }
+    - { path: docs/specs/evidence-and-acceptance-criteria.md, change: modify, why: 回写本项证据、软层界限与断言局限, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J30-P1, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "已由 #261 交付；baseline-safety-secrets 用同一断言函数跑固定样本，干净 0 / 夹带非 0，stub: true 已移除" }
+    - { acceptance_id: J30-P2, test_path: tests/daemon/vault.test.ts, level: unit, debt: "已由 #261 交付；四处接缝从 active.ts 引用，失败抛 VaultSecretInContextError 且不发出" }
+    - { acceptance_id: J30-P3, test_path: tests/daemon/vault.test.ts, level: unit, debt: "已由 #261 交付；RO-08 延伸：夹带保险库值 fail-closed，错误消息不回带密钥，不得脱敏后继续" }
+    - { acceptance_id: J30-P4, test_path: tests/unit/baseline-gates.test.ts, level: unit, debt: "已由 #261 交付；去桩不扫描仓库；deriveCanMerge 未改；prompt-builder.ts 未对齐（须另修卡）；currentValues() 仅覆盖已缓存密钥" }
+governance:
+  spec_refs:
+    - docs/specs/verification-strategy.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+    - docs/ledger/scheme-settled-decisions.md
+    - docs/scheme.md
+  depends_on:
+    - { id: TASK-J.27, kind: hard }
+  code_facts:
+    - { ref: "docs/ledger/scheme-settled-decisions.md:79", note: "conf-6 / q14：账密严禁进入对话上下文，是本项口径出处" }
+    - { ref: "docs/ledger/scheme-settled-decisions.md:138", note: "settled acc-9 是发布失败回到上一个 LIVE，不是本项出处" }
+    - { ref: "daemon/vault/active.ts:40-52", note: "assertContextHasNoVaultSecrets 在本叶子；仅 type-only import Vault，不引进 keychain-backend；Supervisor 与 debug-log 可安全引用；四处接缝从此引用，不直接引用 vault.ts" }
+    - { ref: "daemon/vault/vault.ts:27-33", note: "门面从 ./active 转出 assertContextHasNoVaultSecrets / VaultSecretInContextError / E_VAULT_SECRET_IN_CONTEXT" }
+    - { ref: "daemon/vault/vault.ts:104", note: "currentValues() 返回缓存中长度 ≥6 的值；未 get() 过的密钥不在断言范围" }
+    - { ref: "daemon/chat/session-manager.ts:175", note: "右栏 send 入口；第 181 行在入队或发出前断言 trimmed" }
+    - { ref: "daemon/chat/session-manager.ts:222", note: "runOne 汇合历史与本条原文；第 230-232 行断言 text 与 history" }
+    - { ref: "daemon/chat/session-manager.ts:239", note: "adapter.run；断言失败不得调用" }
+    - { ref: "daemon/supervisor/draft-generator.ts:137", note: "buildEnrichmentPrompt 把用户原话写入 L1 提示；第 204 行在 enrich 前断言 prompt（本文件活发送点是 enrich，不是 client.generate）" }
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:440", note: "callModel 是编译器发送接缝；第 449-450 行在 try 内、client.generate 前断言 system 与 rendered.prompt" }
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:470", note: "client.generate；断言失败返回 reason: invalid / E_VAULT_SECRET_IN_CONTEXT，不得进入本次 generate" }
+    - { ref: "daemon/worker/session-task-injector.ts:383", note: "buildWorkerTaskInstruction 拼工人 system_prompt；第 531-533 行在 return 前断言 systemPrompt / objective.title / objective.description" }
+    - { ref: "daemon/worker/ai-worker.ts:244", note: "collectContext 之后、generateChanges 之前断言 task.system_prompt 与已收集文件 content；collectContext 定义在第 350 行" }
+    - { ref: "daemon/supervisor/prompt-builder.ts:248", note: "「对话上下文」拼装不是活的发送点，不列入必须可写" }
+    - { ref: "bin/stagent.ts:677-734", note: "runCheckCommand 已分发 baseline-gate（runBaselineGateBody）；本卡去桩在 baseline-gates.ts，本文件无 diff" }
+    - { ref: "daemon/runner/command-runner.ts:100", note: "既有 redactSecrets 为运行时遮蔽，不是 0/1 门禁，不得用来脱敏后继续" }
+    - { ref: "daemon/core/debug-log.ts:156", note: "另一份 redactSecrets，同样是运行时遮蔽" }
+    - { ref: "src/lib/ipc/redaction.ts:105", note: "既有 redactText 为运行时遮蔽，不是 0/1 门禁" }
+    - { ref: "daemon/guard/baseline-gates.ts:396-402", note: "baseline-safety-secrets 已去桩：同一断言函数跑固定样本（干净 0 / 夹带非 0），body: TASK-J.30，无 stub: true" }
+  non_goals:
+    - 本条（P-213）修卡合入 ≠ 开工；代码施工必须等本条合入后基于新 main 变基
+    - 不新建 daemon/vault/assert-context.ts，不新造扫描子系统，不做全仓库落盘文本扫描
+    - 不得把断言失败降级为「脱敏后继续」
+    - 不把 prompt-builder.ts 列为必须可写（非活发送点，可选对齐）
+    - 不改只读适配器与 deriveCanMerge；不重做 J.28 注入；不改 sandbox / 网关写范围
+    - 不做 J.29 的八项薄适配，不开工 J.22 / CI.2
+    - 不宣称北极星或无人值守三连卡已交付；不加新文档层
+    - 不改 D.1e / S.3 / 已完工的 TASK-J.16
+  fail:
+    - 未等本条（P-213）合入就写产品代码，或四处接缝直接引用 vault.ts 以致触发 TASK-S.1 零工具闭包
+    - 把断言失败做成「脱敏后继续」，或做全仓库落盘文本扫描，或新建 assert-context.ts / 扫描器
+    - 把未加载进缓存的密钥假装已在断言范围内
+    - 施工中发现接缝比定位多或必须改只读适配器却不报拆卡 / 再修卡、带病施工
+    - 把 acc-9（发布回滚）当作本项出处
+    - 只写文档、没有真实子进程退出码就把本项标完成
+    - LLM 审核或手写布尔把 can_merge 置真
+    - 本卡膨胀为 L 却不拆卡（R-11）
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 261, commit: 27d9c4188617ac90393b2dd78d70626482a5db6e }
+```
+
+* **背景**：该项是 J.27 清单已点名的硬门禁，但没有可调用的退出码检查，不能塞进 J.29 的薄适配。P-211 已拍板实现方向并补齐代码路径；P-213 因 TASK-S.1 闭包把共享断言函数改放到 `active.ts` 叶子；#261 在 P-213 合入后的 main 上施工并合入。
+* **取舍**：采用 Vault 口径运行时断言，不做落盘扫描、不新建断言文件；共享函数放 `active.ts`，接缝不直接引用 `vault.ts`。诚实口径：`prompt-builder.ts` 未对齐（须另修卡）；`currentValues()` 仅覆盖已缓存且长度 ≥6 的密钥。不在本卡发明产品方向。
+
+### 3.4al 试玩自查升级为非技术用户判分表（J.31 · 完工回写 P-216）
+
+<a id="task-j.31"></a>
+
+### 【Task J.31】把试玩自查升级为非技术用户可执行的判分表`[COMPLETED · 立卡 P-215 · 施工 #264 · 完工回写 P-216]`
+
+> **立卡说明（2026-11-15 · P-215）**：第二块的纯文档切片（估算 S）。把 [`playtest-self-check.md`](./playtest-self-check.md) 升级为非技术用户可执行的判分表：每一步写成「看到 X 即通过 / 看到 Y 即失败」，试玩认可须留证据。不改产品代码，不接线校验器（校验器见 `TASK-J.33`），不实现 [`playtest-self-check.md`](./playtest-self-check.md) §3.3「条目级自动点亮」（该口子仍为「本版不实现」）。**立卡 ≠ 开工**。合入后可先行报本卡施工方案；施工须另授权。
+>
+> **归档注记（2026-11-15 · P-216）**：本卡已 **COMPLETED**。Tina t1288u 授权施工、t1289u 授权合入施工 PR。[#264](https://github.com/he18718143986-design/IDE/pull/264) squash `03acf2a68da80526f0251260bf9716e9a82f3eba` 于 2026-11-15 16:17:29 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `62a348b3bbd9399fe824e12842fd23a9f74bebf8`；父提交 `e10cf25101cec5c319d68ce34cd44c81980ad214`）。合入前 13/13 SUCCESS、`mergeable=MERGEABLE`、`mergeStateStatus=CLEAN`（CI run [`43693275714`](https://github.com/he18718143986-design/IDE/actions/runs/43693275714)），仅改 `docs/specs/playtest-self-check.md`（+58/−1）。交付：§0.1 非技术用户判分表（第 21 行起，九步均用「看到 X 即通过 / 看到 Y 即失败」）与文末「试玩证据」表（第 726–736 行）。§1–§8 未改写、未重编号；§3.3 扩展口子仍在第 184 行，以「这条留作扩展口子，本版不实现。」收束。不暗示条目级高亮已交付。**诚实口径：判分表为文档层交付，非技术用户实际试用验证属后续真实试玩范畴。** 不宣称非技术用户已完成一次计分试玩。门禁为 `npm run check:docs`，本卡未新增 vitest 文件。J.33 / J.32 / J.22 子卡待逐张授权；CI.2 攒样本；文档计划暂缓。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.31
+status: COMPLETED
+contract:
+  intent:
+    title: 把试玩自查升级为非技术用户可执行的判分表
+    description: >-
+      将 playtest-self-check.md 改写成非技术用户可按步执行的判分表：
+      每一步写明「看到 X 即通过 / 看到 Y 即失败」，试玩认可必须留下可核对的证据。
+    risk_level: LOW
+  acceptance:
+    - id: J31-P1
+      check: auto
+      text: >-
+        判分表每一步都写成「看到 X 即通过 / 看到 Y 即失败」，读者不必懂工程术语也能执行。
+    - id: J31-P2
+      check: auto
+      text: >-
+        文中规定试玩认可必须留证据，并写明证据留在何处、至少包含哪些可核对字段。
+    - id: J31-P3
+      check: auto
+      text: >-
+        不把 §3.3 条目级自动点亮写成已交付或本卡范围；该口子仍标明「本版不实现」。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - docs/specs/playtest-self-check.md
+    readonly_paths:
+      - docs/specs/evidence-and-acceptance-criteria.md
+      - docs/glossary.md
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    只改 playtest-self-check.md 的判分表述与证据要求，不新增文档层，不改 Daemon / UI。
+  touches:
+    - { path: docs/specs/playtest-self-check.md, change: modify, why: 升级为非技术用户可执行的逐步判分表并写明证据要求, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J31-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #264 交付；门禁仍为 npm run check:docs，本卡未新增 vitest 文件" }
+    - { acceptance_id: J31-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #264 交付；门禁仍为 npm run check:docs，本卡未新增 vitest 文件" }
+    - { acceptance_id: J31-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #264 交付；门禁仍为 npm run check:docs，本卡未新增 vitest 文件" }
+governance:
+  spec_refs:
+    - docs/specs/playtest-self-check.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+  depends_on: []
+  code_facts:
+    - { ref: "docs/specs/playtest-self-check.md:3", note: "状态行写明判分表已按 TASK-J.31 落地；引擎裁决口径仍以 §1–§8 为准，本卡未改写" }
+    - { ref: "docs/specs/playtest-self-check.md:21-59", note: "§0.1 非技术用户判分表；九步标题在第 25/29/33/37/41/45/49/53/57 行，通过/失败句在第 27/31/35/39/43/47/51/55/59 行，均用「看到 X 即通过 / 看到 Y 即失败」" }
+    - { ref: "docs/specs/playtest-self-check.md:184", note: "§3.3 仍以「这条留作扩展口子，本版不实现。」收束；本卡未把条目级自动点亮写成已交付" }
+    - { ref: "docs/specs/playtest-self-check.md:726-736", note: "「试玩证据」表；第 728 行写明「没有这行，不算试玩认可。」；字段含日期时区（Asia/Hong_Kong）、所试 main SHA、步骤编号、实际看到的原文、通过或失败、操作者" }
+  non_goals:
+    - 本条立卡 ≠ 开工；施工须另授权
+    - 不改产品代码，不接线校验器（见 TASK-J.33）
+    - 不实现 §3.3 条目级自动点亮，不暗示条目级高亮已交付
+    - 不开工 J.22 子卡 / J.32 / J.33 / CI.2；不改 D.1e / S.3
+    - 不宣称北极星或无人值守三连卡已交付；不加新文档层
+  fail:
+    - 判分表仍依赖工程术语，或某步没有「看到 X 即通过 / 看到 Y 即失败」
+    - 试玩认可不要求留证据
+    - 把 §3.3 自动点亮或条目级高亮写成已交付
+    - 本条合入前开工，或把本卡做成 L 却不拆（R-11）
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 264, commit: 03acf2a68da80526f0251260bf9716e9a82f3eba }
+```
+
+* **背景**：第二块要让非技术用户自己能做试玩判定；现规格对实施者友好，对业主逐步判分与证据留存不够直白。#264 已把判分表与「试玩证据」表写入 `playtest-self-check.md`。
+* **取舍**：只改一份已有规格，不做校验器、不做自动点亮；§1–§8 未改写，§3.3 仍为「本版不实现」。诚实口径：判分表为文档层交付，非技术用户实际试用验证属后续真实试玩范畴。
+
+### 3.4am 卡文案规范与文档门禁校验（J.33 · 完工回写 P-217）
+
+<a id="task-j.33"></a>
+
+### 【Task J.33】新增卡文案规范并做成机器可校验项`[COMPLETED · 立卡 P-215 · 施工 #266 · 完工回写 P-217]`
+
+> **立卡说明（2026-11-15 · P-215）**：第二块的文档 + 校验器切片（估算 M）。新增 `docs/specs/card-copy-standard.md`（冲突卡 / 意外卡 / 线上卡文案规范）：术语黑名单以 [`glossary.md`](../glossary.md) 已收录词为限；每选项必须含「推荐项 + 后果一句话」结构化字段。这两项做成 `scripts/docs-check/checks.ts` 或 `src/lib/contract-card.ts` 的机器可校验规则，并补测试。文档必须写明：「用户是否真懂」只能靠非技术用户试用验证，不是门禁，不得做成 `can_merge` 派生输入。本条立卡时该新文件尚不存在，不得在 code_facts 里引用尚未落地的行号。**立卡 ≠ 开工**。施工须另授权，不与 `TASK-J.31` 捆绑开工。
+>
+> **归档注记（2026-11-15 · P-217）**：本卡已 **COMPLETED**。Tina t1292u 授权施工、t1295u 授权合入施工 PR。[#266](https://github.com/he18718143986-design/IDE/pull/266) squash `838d1f44a81a1882fb7dc58ac9d93136efb6d828` 于 2026-11-15 17:15:48 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `450d528777a976a259857d52f45c682d214df0e6`；父提交 `0176c61e2a071bd993d80458483963f88d998c2e`）。合入前必需检查全绿，`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows 非必需单测失败）。CI run [`43695882208`](https://github.com/he18718143986-design/IDE/actions/runs/43695882208)：第一次 macOS 必需单测 job [`132756206555`](https://github.com/he18718143986-design/IDE/actions/runs/43695882208/job/132756206555) 于 16:46:54 香港时间失败（`app-preview-runner.test.ts:163`，`EADDRINUSE:4200`）；第一次重跑 job [`132759408423`](https://github.com/he18718143986-design/IDE/actions/runs/43695882208/job/132759408423) 于 17:00:38 仍失败（`:163` 已过，同文件 `:199` 中 `ready` 应为 `false` 得 `true`）；第二次重跑 job [`132761165913`](https://github.com/he18718143986-design/IDE/actions/runs/43695882208/job/132761165913) 于 17:05:00–17:08:28 转绿。施工只改 3 个 `writable_paths` 内文件：新建 `docs/specs/card-copy-standard.md`，以及 `scripts/docs-check/checks.ts` 与 `tests/unit/docs-check.test.ts`。未改 `contract-card.ts`、`glossary.md`、`deriveCanMerge` 或产品 UI。交付：规范覆盖冲突卡 / 意外卡 / 线上卡；术语黑名单只收 glossary 已有词；每个选项含非空「推荐项」和「后果一句话」；「是否真懂不是门禁」声明已写入并由 `checkCardCopyStandard` 接入 `runAllChecks`；测试含正负两向用例。本条把 `card-copy-standard.md` 的 `touches.change` 由 `create` 改为 `modify`（文件已存在，口径同 J.25 先例）。挂账⑨样本已正式追加（见 ledger）。**诚实口径：规范为文案结构层交付，不表示界面已按两列展示。条目级高亮未交付（J.22b 范畴）。** 不把「是否真懂」做成门禁。J.32 与 J.22 子卡待逐张授权；CI.2 攒样本；文档计划暂缓。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.33
+status: COMPLETED
+contract:
+  intent:
+    title: 新增卡文案规范并做成机器可校验项
+    description: >-
+      新增 docs/specs/card-copy-standard.md，规定冲突卡、意外卡、线上卡的文案：
+      术语黑名单只使用 glossary.md 已收录词；每个选项含「推荐项」和「后果一句话」两个结构化字段。
+      把这两项接到现有文档门禁（checks.ts 或 contract-card.ts）做成机器可校验规则。
+      「是否真懂」只在文档中声明须经非技术用户试用验证，不得做成门禁。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J33-P1
+      check: auto
+      text: >-
+        docs/specs/card-copy-standard.md 已落地，覆盖冲突卡、意外卡、线上卡，并写明「是否真懂」只能靠非技术用户试用验证、不是门禁。
+    - id: J33-P2
+      check: auto
+      text: >-
+        术语黑名单以 glossary.md 已收录词为限，且由文档门禁机器校验；未收录词不得静默进入黑名单。
+    - id: J33-P3
+      check: auto
+      text: >-
+        每个选项的「推荐项」与「后果一句话」为结构化字段，并由文档门禁机器校验缺失或空字段。
+    - id: J33-P4
+      check: auto
+      text: >-
+        校验器接线不改 deriveCanMerge，不把「是否真懂」做成 can_merge 输入或退出码门禁。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - docs/specs/card-copy-standard.md
+      - scripts/docs-check/checks.ts
+      - src/lib/contract-card.ts
+      - tests/unit/docs-check.test.ts
+      - docs/glossary.md
+    readonly_paths:
+      - src/lib/evidence.schema.ts
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    先落规范文档，再把术语黑名单与选项结构化字段接到现有 docs-check（优先 checks.ts；若必须改 contract-card.ts 只加校验、不改 deriveCanMerge）。
+    glossary.md 仅在规范需要引用或增补已授权术语时改动，不借机扩写术语表。
+  touches:
+    - { path: docs/specs/card-copy-standard.md, change: modify, why: "新增冲突卡/意外卡/线上卡文案规范（施工 #266 已创建，完工回写改记 modify）", symbols: [] }
+    - { path: scripts/docs-check/checks.ts, change: modify, why: 把黑名单与选项结构化字段做成机器可校验项, symbols: [] }
+    - { path: tests/unit/docs-check.test.ts, change: modify, why: 锁定新规则的通过/失败样本, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J33-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #266 交付；正负向用例见本文件「卡文案规范（TASK-J.33）」" }
+    - { acceptance_id: J33-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #266 交付；黑名单未收录词报 error、锚点别名可通过" }
+    - { acceptance_id: J33-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #266 交付；缺推荐项或后果一句话报 error" }
+    - { acceptance_id: J33-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #266 交付；runAllChecks 已接入 checkCardCopyStandard；不得把本项接入 deriveCanMerge" }
+governance:
+  spec_refs:
+    - docs/glossary.md
+    - docs/specs/playtest-self-check.md
+  depends_on: []
+  code_facts:
+    - { ref: "docs/specs/card-copy-standard.md:7-13", note: "「是否真懂不是门禁」声明与稳定标记；门禁只查格式与用词来源" }
+    - { ref: "docs/specs/card-copy-standard.md:15-35", note: "术语黑名单只收 glossary 已有词，YAML 块为机器校验唯一名单来源" }
+    - { ref: "docs/specs/card-copy-standard.md:38-91", note: "冲突卡 / 意外卡 / 线上卡选项均含非空「推荐项」和「后果一句话」" }
+    - { ref: "scripts/docs-check/checks.ts:861", note: "checkCardCopyStandard 入口" }
+    - { ref: "scripts/docs-check/checks.ts:1098", note: "runAllChecks 汇总入口；第 1124 行接入 checkCardCopyStandard" }
+    - { ref: "tests/unit/docs-check.test.ts:637", note: "J.33 正负向用例组（黑名单、选项字段、声明、runAllChecks 接线）" }
+    - { ref: "src/lib/contract-card.ts:32-42", note: "本卡未改此文件；不改 deriveCanMerge" }
+    - { ref: "docs/glossary.md:10-16", note: "术语表已收录词是术语黑名单的唯一来源（## 标题起始行）" }
+  non_goals:
+    - 本条立卡 ≠ 开工；施工须另授权
+    - 不把「是否真懂」做成门禁或 can_merge 输入，不改 deriveCanMerge
+    - 不实现条目级自动点亮，不暗示条目级高亮已交付
+    - 不开工 J.31 / J.32 / J.22 子卡 / CI.2；不改 D.1e / S.3
+    - 不宣称北极星或无人值守三连卡已交付
+  fail:
+    - 只写规范、没有机器可校验规则就把本卡标完成
+    - 黑名单使用 glossary 未收录词，或选项缺少「推荐项 / 后果一句话」仍能通过门禁
+    - 把「是否真懂」做成退出码或 can_merge 条件
+    - 本条合入前开工，或本卡膨胀为 L 却不拆（R-11）
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 266, commit: 838d1f44a81a1882fb7dc58ac9d93136efb6d828 }
+```
+
+* **背景**：冲突卡 / 意外卡 / 线上卡如果术语不受控、选项不写后果，非技术用户难以选择；机器只能校验格式与用词来源，不能替用户判断「是否真懂」。
+* **取舍**：规范 + 门禁接线放在同一张 M 卡；「是否真懂」明确排除在门禁之外。诚实口径：规范为文案结构层交付，不表示界面已按两列展示；条目级高亮未交付（J.22b 范畴）。
+
+
+### 3.4an 专修 app-preview-runner 单测端口隔离（CI.5 · 完工回写 P-219）
+
+<a id="task-ci.5"></a>
+
+### 【Task CI.5】专修 app-preview-runner 单测端口隔离 `[COMPLETED · 立卡 P-218 · 施工 #269 · 完工回写 P-219]`
+
+> **立卡说明（2026-11-15 · P-218）**：授权来源为 Tina t1296u「立这张小卡，专修 app-preview-runner.test.ts 的端口隔离」。挂账⑨样本 `:199`（用例「不监听端口时 timeoutMs:3000 失败且含 stderr 尾部」，`expect(ready.ready).toBe(false)` 得到 `true`）已在⑤ [#254](https://github.com/he18718143986-design/IDE/pull/254) run [`43671164676`](https://github.com/he18718143986-design/IDE/actions/runs/43671164676)、⑥ [#258](https://github.com/he18718143986-design/IDE/pull/258) run [`43685199644`](https://github.com/he18718143986-design/IDE/actions/runs/43685199644)、⑦ [#266](https://github.com/he18718143986-design/IDE/pull/266) run [`43695882208`](https://github.com/he18718143986-design/IDE/actions/runs/43695882208) 三次出现；同文件 `:163`（用例「启动后 waitReady 成功，GET 得到 200；端口落在 4200～4210」）在⑦第一次失败中表现为 `EADDRINUSE: address already in use 127.0.0.1:4200`。分类为「反复出现的端口隔离缺陷」，CI.2 攒样本时单独标注，**不计入中位数依据**。该文件不在任何在队卡的 `writable_paths` 内，不能带病在其他卡上修。
+
+> **归档注记（2026-11-15 · P-219）**：本卡已 **COMPLETED**。Tina t1297u 授权施工、t1299u 授权合入施工 PR。[#269](https://github.com/he18718143986-design/IDE/pull/269) squash `e12b7b76641769746901cd73c084242812dbf35b` 于 2026-11-15 17:58:11 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `a6df64fa8d3a0029cfca4618699fde3dc8cd696c`；父提交 `8f6997a9bdcb9094f475a4864dce79683ba7acd8`）。估算仍为 S。交付：用例结束后等待端口释放再进入下一例；`waitReady` / `probeOnce` 增加可选 `expectedHeader`，测试夹具用探测头校验响应来自本用例进程；缺省仍是任意 HTTP 响应（含 3xx / 4xx）即就绪，未改 `daemon/server.ts`；原 `:163` / `:199` 断言未删除、未放宽；新增「不监听时外来 HTTP 监听不得判为 ready」回归。合入前必需检查全绿，含 macOS 单测 job `132771678277` SUCCESS，`:163` / `:199` 未再出现。诚实口径：`:163` / `:199` 端口隔离缺陷已修；Windows `spawn EINVAL`（`startAppPreview` → `spawnManaged`，既有拉起 `npm.cmd` 存量问题）不在本卡范围，不归本卡修；后续样本继续观察。不宣称 macOS 单测永久全绿。不并入、不开工 `TASK-CI.2`。不把本缺陷样本计入 CI.2 中位数依据。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-CI.5
+status: COMPLETED
+contract:
+  intent:
+    title: 专修 app-preview-runner 单测端口隔离
+    description: >-
+      修好 tests/unit/app-preview-runner.test.ts 的端口隔离，使同一文件内前一用例残留的监听
+      不再把后一用例打成 EADDRINUSE:4200，也不再让「不监听」夹具被判为 ready。
+      macOS 必需检查上这两类失败不再因用例间端口污染而复发。
+    risk_level: LOW
+  acceptance:
+    - id: CI5-P1
+      check: auto
+      text: >-
+        用例「启动后 waitReady 成功，GET 得到 200；端口落在 4200～4210」不得因同一文件前一用例未释放端口，
+        而以 EADDRINUSE: address already in use 127.0.0.1:4200 失败。
+    - id: CI5-P2
+      check: auto
+      text: >-
+        用例「不监听端口时 timeoutMs:3000 失败且含 stderr 尾部」在夹具未监听时得到 ready.ready === false，
+        即使 4200～4210 范围内另有残留或外来 HTTP 监听在应答，也不得被判为 ready。
+    - id: CI5-P3
+      check: auto
+      text: >-
+        既有「启动后 waitReady 成功…」「stopAppPreview 后端口可再次绑定」「无脚本时 startAppPreview 抛出白话错误」
+        仍通过；不以删除或放宽 :163 / :199 断言换绿。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - tests/unit/app-preview-runner.test.ts
+      - daemon/supervisor/preview/app-runner.ts
+    readonly_paths:
+      - daemon/core/port-finder.ts
+      - daemon/supervisor/preview/types.ts
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/app-preview-runner.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    先在测试层做用例间端口隔离：前一用例须确认端口已释放再进入下一用例，避免共享 4200～4210 残留监听。
+    若根因是 waitReady / probeOnce 把任意 HTTP 响应都当成就绪（含外来或残留监听），允许只收窄这两处，
+    使探测能区分本夹具与外来应答；不改预览端口默认范围，不改 pickPreviewCommand，不改其他预览文件。
+    为 :163 的 EADDRINUSE 与 :199 的误判 ready 各留回归。
+  touches:
+    - { path: tests/unit/app-preview-runner.test.ts, change: modify, why: "补齐用例间端口隔离，并为 :163 / :199 复发补回归", symbols: [] }
+    - { path: daemon/supervisor/preview/app-runner.ts, change: modify, why: "收窄 waitReady / probeOnce：可选 expectedHeader；缺省仍任意 HTTP 即就绪", symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: CI5-P1, test_path: tests/unit/app-preview-runner.test.ts, level: unit, case: "启动后 waitReady 成功，GET 得到 200；端口落在 4200～4210" }
+    - { acceptance_id: CI5-P2, test_path: tests/unit/app-preview-runner.test.ts, level: unit, case: "不监听端口时 timeoutMs:3000 失败且含 stderr 尾部" }
+    - { acceptance_id: CI5-P2, test_path: tests/unit/app-preview-runner.test.ts, level: unit, case: "不监听时外来 HTTP 监听不得判为 ready" }
+    - { acceptance_id: CI5-P3, test_path: tests/unit/app-preview-runner.test.ts, level: unit, case: "stopAppPreview 后端口可再次绑定" }
+governance:
+  spec_refs:
+    - docs/ledger/README.md
+    - docs/specs/development-tasks-completed.md#task-l.5
+    - docs/specs/development-tasks-active.md#task-ci.2
+  depends_on: []
+  code_facts:
+    - { ref: "tests/unit/app-preview-runner.test.ts:121-135", note: "afterEach：stopAppPreview 后等待 usedPorts 可再次绑定，再进入下一例" }
+    - { ref: "tests/unit/app-preview-runner.test.ts:86-113", note: "waitUntilPortFree / allocatePreviewPort：分配前复验 canBindPort" }
+    - { ref: "tests/unit/app-preview-runner.test.ts:65-83", note: "listeningServerSource 把一次性探测头写进夹具响应，不用 extraEnv" }
+    - { ref: "tests/unit/app-preview-runner.test.ts:191-224", note: "用例「启动后 waitReady 成功…」；第 207 行仍 expect(ready).toEqual({ ready: true })，并带 expectedHeader" }
+    - { ref: "tests/unit/app-preview-runner.test.ts:226-244", note: "用例「不监听端口时 timeoutMs:3000 失败且含 stderr 尾部」；第 237-243 行仍 timeoutMs: 3_000、ready.ready === false、含 fixture-stderr-tail" }
+    - { ref: "tests/unit/app-preview-runner.test.ts:246-279", note: "新增回归：不监听时外来 HTTP 监听不得判为 ready" }
+    - { ref: "daemon/supervisor/preview/app-runner.ts:69-75", note: "WaitReadyOptions 可选 expectedHeader；缺省保持任意 HTTP（含 3xx / 4xx）即就绪" }
+    - { ref: "daemon/supervisor/preview/app-runner.ts:230-259", note: "headerValueEquals 在未传 expectedHeader 时返回 true；probeOnce 仅在传入时校验头" }
+    - { ref: "daemon/supervisor/preview/app-runner.ts:266-289", note: "waitReady 把 options.expectedHeader 传给 probeOnce；缺省口径不变" }
+  non_goals:
+    - 不并入、不开工 TASK-CI.2；不把本缺陷样本计入 CI.2 中位数依据
+    - 不以删除或放宽 :163 / :199 断言换绿
+    - 不改预览端口默认范围、不改 pickPreviewCommand，不改其他预览文件（real-preview-server 等）
+    - 不改 D.1e / S.3；不销 OP-34；不动 J.32 / J.22 子卡
+    - 不宣称 macOS 单测永久全绿，不宣称端到端闭环
+    - 不把 Windows spawn EINVAL（startAppPreview / spawnManaged 存量问题）归本卡修
+  fail:
+    - 把端口隔离修到 CI.2 或其他在队卡上
+    - 以删除或放宽 :163 / :199 断言的方式让测试变绿
+    - 把本样本计入 CI.2 中位数依据
+    - 以一次 CI 转绿宣称 macOS 单测已永久稳定
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 269, commit: e12b7b76641769746901cd73c084242812dbf35b }
+```
+
+* **背景**：该单测属于已完成的 `TASK-L.5`（真实预览 runner）。缺陷已在必需 macOS 单测上三次复发，且文件不在 J.32 / J.22 子卡或 CI.2 的可写范围内。
+* **取舍**：测试隔离优先；仅当「任意 HTTP 即就绪」仍会把外来监听判成功时，才允许收窄 `waitReady` / `probeOnce`。不并入 CI.2，因为 CI.2 只收性能断言口径，本缺陷不计入中位数依据。诚实口径：`:163` / `:199` 端口隔离缺陷已修；Windows `spawn EINVAL` 为存量问题，不在本卡范围；后续样本继续观察。
+
+### 3.4ao 密封前原话回链内核（J.32a · 完工回写 P-222）
+
+<a id="task-j.32a"></a>
+
+### 【Task J.32a】密封前原话回链内核`[COMPLETED · 拆自 J.32 · 修卡 P-221 · 施工 #273 · 完工回写 P-222]`
+
+> **立卡说明（2026-11-15 · P-221）**：拆自 [`TASK-J.32`](./development-tasks-active.md#task-j.32)。负责密封判定里的「方案项 → 已登记原话」回链、项上可选哈希字段、快照信任档存证，以及规格落点。不写对照面 UI。**立卡 ≠ 开工**。
+
+> **归档注记（2026-11-16 · P-222）**：本卡已 **COMPLETED**。Tina t1313u / t1315u 授权由我施工、t1316u 授权合入施工 PR。[#273](https://github.com/he18718143986-design/IDE/pull/273) squash `2d48303ed858b2861161c4b89f4bc06f04744ae3` 于 2026-11-16 00:04:45 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `78cdd343bb90300675a9ecc65537f7311d0f98ea`；父提交 `bc8538f7de2187bc826ec1941b6005ff926e82ca`）。估算仍为 M。交付：可选 `turn_text_sha256` 经 `TurnRef` 透传；冻结时当场计算方案项覆盖；缺登记不得标已覆盖；哈希不一致拒绝落盘（409 `E_SCHEME_SNAPSHOT_MISMATCH`）；信任档以 schema 1.2 追加段写入，不升 `schema_version`，计入 digest，旧快照无此段视为未选档；`supervisor.md`「密封前原话回链」与 `delivery-lifecycle.md` S2→Seal 环已登记。诚实口径：内核已交付，对照面 UI 未交付（J.32b 范畴）、`prompt-builder.ts` 未对齐（另卡）。未改 `compiler-output-schema.ts`。不并入、不开工 `TASK-J.32b` / `TASK-J.22a` / `TASK-J.22b` / `TASK-J.22c`。CI.2 攒样本；文档计划暂缓。不暗示条目级高亮已交付。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.32a
+status: COMPLETED
+contract:
+  intent:
+    title: 密封前原话回链内核
+    description: >-
+      复用 J.16 已有 turn 登记与 frozen_quotes 封存，在密封判定增加「方案项 → 已登记原话」回链：
+      按 evidence[].ref.turn_id 取 user_alias_seq 展示为 U<seq>，并核 sha256(utf8)。
+      硬约束：缺登记或哈希不一致不得标已覆盖；ai_inferred 不得冒充 user_said；
+      轻确认档机械回链仍须用已登记原话，不得接受事后拼凑。
+      信任档口径写入本卡（规格与快照存证）：标准档（默认）出示对照面；重确认档逐项勾选；
+      轻确认快照即可，但回链不降级。对照面 UI 仍由 TASK-J.32b 施工。
+      不另造一套原话存储。
+      登记与核对点写入 supervisor.md 密封判定和 delivery-lifecycle.md 的 S2→Seal 环。
+    risk_level: HIGH
+  acceptance:
+    - id: J32A-P1
+      check: auto
+      text: >-
+        方案卡逐项回链到已登记的用户消息 U<seq> 原话（turn_id + sha256(utf8)），缺登记或哈希不一致则不得当作已覆盖（承接 J32-P1）。
+    - id: J32A-P2
+      check: auto
+      text: >-
+        回链只使用说话时已登记、冻结时已封入 frozen_quotes 的原话；用事后拼凑文本冒充原话必须失败（承接 J32-P3）。
+    - id: J32A-P3
+      check: auto
+      text: >-
+        ai_inferred 项不得标成 user_said 或已覆盖；轻确认档机械回链仍须用已登记原话，不得因档位变轻而接受事后拼凑文本。
+    - id: J32A-P4
+      check: auto
+      text: >-
+        supervisor.md 密封判定与 delivery-lifecycle.md S2→Seal 环已写明该登记点、核对要求、三条硬约束，以及信任档口径：标准档（默认）出示对照面、重确认档逐项勾选、轻确认快照即可但回链不降级（承接 J32-P4）。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - docs/specs/supervisor.md
+      - docs/specs/delivery-lifecycle.md
+      - daemon/pipeline/scheme-snapshot-store.ts
+      - daemon/server.ts
+      - src/lib/daemon-api.ts
+      - src/lib/journey/scheme-patch-types.ts
+      - src/lib/journey/scheme-patch-engine.ts
+      - src/lib/journey/evidence-anchor.ts
+      - tests/unit/scheme-snapshot-frozen-quotes.test.ts
+      - tests/unit/dispute-seal-turn-register.test.ts
+      - tests/unit/evidence-anchor.test.ts
+    readonly_paths:
+      - daemon/supervisor/intent-compiler/host.ts
+      - daemon/supervisor/intent-compiler/transcript-store.ts
+      - daemon/supervisor/prompt-builder.ts
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    复用 commitUserTurn 与 frozen_quotes，不另造原话库。项到 U<seq> 经 turn_id 查 transcript / 封存清单取 user_alias_seq 并核哈希。
+    若需在 TurnRef / SchemeItemMeta 持久化 turn_text_sha256，仅在 scheme-patch-types 增可选字段，engine 与 evidence-anchor 只透传、不改合并语义。
+    信任档口径写入规格与快照存证：标准档（默认）出示对照面，重确认档逐项勾选，轻确认快照即可但回链不降级。对照面 UI 不在本卡。compiler-output-schema 不在可写范围，若必须改则停工先修卡。
+    prompt-builder.ts 不对齐进必须可写，对齐留后续另卡。
+  touches:
+    - { path: docs/specs/supervisor.md, change: modify, why: 在密封判定写入登记点、完整性核对、三条硬约束与信任档口径, symbols: [] }
+    - { path: docs/specs/delivery-lifecycle.md, change: modify, why: 在 S2→Seal 环写入同一登记点、三条硬约束与信任档口径, symbols: [] }
+    - { path: daemon/pipeline/scheme-snapshot-store.ts, change: modify, why: 方案项回链复用 frozen_quotes，写入信任档存证与档位口径，禁止事后拼凑, symbols: [] }
+    - { path: src/lib/journey/scheme-patch-types.ts, change: modify, why: TurnRef / SchemeItemMeta 可补可选 turn_text_sha256, symbols: [TurnRef, SchemeItemMeta] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J32A-P1, test_path: tests/unit/scheme-snapshot-frozen-quotes.test.ts, level: unit, debt: "已由 #273 交付；缺登记不得标已覆盖、哈希不一致拒绝落盘、ai_inferred 不得覆盖、轻确认档回链不降级见本文件与 tests/unit/dispute-seal-turn-register.test.ts" }
+    - { acceptance_id: J32A-P2, test_path: tests/unit/scheme-snapshot-frozen-quotes.test.ts, level: unit, debt: "已由 #273 交付；缺登记不得标已覆盖、哈希不一致拒绝落盘、ai_inferred 不得覆盖、轻确认档回链不降级见本文件与 tests/unit/dispute-seal-turn-register.test.ts" }
+    - { acceptance_id: J32A-P3, test_path: tests/unit/scheme-snapshot-frozen-quotes.test.ts, level: unit, debt: "已由 #273 交付；缺登记不得标已覆盖、哈希不一致拒绝落盘、ai_inferred 不得覆盖、轻确认档回链不降级见本文件与 tests/unit/dispute-seal-turn-register.test.ts" }
+    - { acceptance_id: J32A-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #273 交付；规格落点见 supervisor.md「密封前原话回链」与 delivery-lifecycle.md S2→Seal 段；门禁仍为 npm run check:docs，本卡未扩展检查器" }
+governance:
+  spec_refs:
+    - docs/specs/supervisor.md
+    - docs/specs/delivery-lifecycle.md
+  depends_on:
+    - { id: TASK-J.16, kind: hard }
+  code_facts:
+    - { ref: "docs/specs/delivery-lifecycle.md:42", note: "S2→Seal 环行仍在原位" }
+    - { ref: "docs/specs/delivery-lifecycle.md:53", note: "S2→Seal 环后已登记原话回链、三条硬约束与信任档口径" }
+    - { ref: "docs/specs/supervisor.md:485-497", note: "D3 主按钮密封/开工事务与规划密封子集仍在；登记点写在其后，不另起一套按钮" }
+    - { ref: "docs/specs/supervisor.md:499-507", note: "「密封前原话回链（TASK-J.32a）」三条硬约束与信任档口径；对照面 UI 留 J.32b" }
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:36-56", note: "FrozenQuote 含 turn_id / seq / user_alias_seq / 原文 / turn_text_sha256；SourceTurnRef 只回传 id 与哈希" }
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:234-295", note: "evaluateSchemeItemBacklinks：哈希不一致 fail-closed；缺登记不得标已覆盖；ai_inferred 永不覆盖" }
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:330-339", note: "trust_tier / item_quote_backlinks 为 1.2 追加段，不升 schema_version；旧快照无此段视为未选档" }
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:416-443", note: "schemeSnapshotDigest 仅在提供时计入 trust_tier 与 item_quote_backlinks_digest" }
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:582-615", note: "verifyFrozenQuotes 重算 digest 时透传可选信任档与回链段" }
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:641-686", note: "verifyItemQuoteBacklinks：缺段返回 present: false，不视为失败" }
+    - { ref: "src/lib/journey/scheme-patch-types.ts:42-50", note: "TurnRef 已补可选 turn_text_sha256；不另扩 evidence[] 形态" }
+    - { ref: "src/lib/journey/scheme-patch-types.ts:70-78", note: "SchemeItemMeta 无自有哈希字段；哈希走 evidence[].ref（TurnRef）" }
+    - { ref: "daemon/supervisor/intent-compiler/host.ts:202", note: "commitUserTurn 是说话时登记的既有入口（只读，复用）" }
+    - { ref: "daemon/server.ts:2411-2418", note: "冻结路径：核对失败则 sendQuotesUnverified(turn_hash_mismatch)，拒绝落盘" }
+    - { ref: "daemon/server.ts:4194", note: "登记成功返回 turn_id 与 turn_text_sha256 的既有接口" }
+    - { ref: "daemon/supervisor/prompt-builder.ts:248", note: "「对话上下文」拼装不是活发送点；本卡未对齐，留后续另卡" }
+  non_goals:
+    - 本条修卡 ≠ 开工；施工须在 P-221 合入后另授权
+    - 不写对照面 UI、不改 SchemeReviewPane / 路由接线（见 TASK-J.32b）
+    - 不事后拼凑未登记文本冒充用户原话，不另造一套原话存储
+    - 不把 prompt-builder.ts 列为必须可写；对齐留后续另卡
+    - 不实现 §3.3 条目级自动点亮，不暗示条目级高亮已交付（见 TASK-J.22b）
+    - 不开工 J.32b / J.22 子卡 / CI.2；不改 D.1e / S.3
+    - 不宣称北极星或无人值守三连卡已交付
+  fail:
+    - 回链使用事后拼凑、未登记或哈希不一致的文本仍能通过密封，或被标成已覆盖
+    - ai_inferred 被标成 user_said 或已覆盖
+    - 轻确认档因档位变轻而接受事后拼凑文本
+    - 规格未写入 supervisor.md 密封判定或 delivery-lifecycle.md S2→Seal 环
+    - 越界改对照面 UI 或 prompt-builder.ts
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 273, commit: 2d48303ed858b2861161c4b89f4bc06f04744ae3 }
+```
+
+### 3.4ap 回链对照面与信任档确认形态（J.32b · 完工回写 P-224）
+
+<a id="task-j.32b"></a>
+
+### 【Task J.32b】回链对照面与信任档确认形态`[COMPLETED · 拆自 J.32 · 修卡 P-221 · 修卡 P-223 · 施工 #276 · 完工回写 P-224]`
+
+> **立卡说明（2026-11-15 · P-221）**：拆自 [`TASK-J.32`](./development-tasks-active.md#task-j.32)。在中栏方案审阅页挂上签字前对照面，并按信任档呈现形态差异。硬依赖 [`TASK-J.32a`](#task-j.32a)。**立卡 ≠ 开工**。
+
+> **依赖更新（2026-11-16 · P-222）**：硬依赖 [`TASK-J.32a`](#task-j.32a) 已由 [#273](https://github.com/he18718143986-design/IDE/pull/273) squash `2d48303ed858b2861161c4b89f4bc06f04744ae3` 交付。本卡仍为 `[NEW_TASK]`，未开工；施工须另授权。
+
+> **修卡说明（2026-11-16 · P-223）**：授权来源为 Tina t1318u。施工前核对确认：前端 `SchemeSourceTurn`（`src/lib/daemon-api.ts` 第 2189-2193 行）只持有 `turn_id` 与 `turn_text_sha256`，明确不持有可冒充原文的副本；`SchemeSnapshotView` 的覆盖 / 未覆盖条数（第 2184-2186 行）只在冻结后返回，确认前没有回链预览接口。中栏现有 `SchemeDraft` 为 v1、条目上无 `evidence[]`；封存当下的核对从台账算出。按卡面取舍先修卡。`writable_paths` 增加 `src/lib/daemon-api.ts`、`daemon/server.ts`（仅限新增确认前只读预览接口）。预览接口返回与封存时同一套核对结果（复用 `evaluateSchemeItemBacklinks`，不得另写一套核对逻辑），以及已登记原话的 `U<seq>` 序号与原文。预览接口只读、不产生副作用、不触发封存。边界不变：不改回链规则、不改快照封存、不改质疑面板、不对齐 `prompt-builder.ts`、不另造存储。本条只修卡，不写产品代码，不开工。施工须在本修卡合入后另授权；合入后 `feat/j32b-quote-backlink-ui` 变基到新 main 再施工。`TASK-J.22a` / `TASK-J.22b` / `TASK-J.22c` 不动。CI.2 攒样本；文档计划暂缓。
+
+> **归档注记（2026-11-16 · P-224）**：本卡已 **COMPLETED**。Tina 本回合授权正式试玩与完工回写；施工 PR [#276](https://github.com/he18718143986-design/IDE/pull/276) squash `b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b` 于 2026-11-16 10:37:27 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `04ad5b9a83c02249f11b0acd1a776ddcadf2f5a3`；父提交 `dfcb6e0a23babe7cf5d9d1f05b1068e697349b3e`）。估算仍为 M。交付：确认前只读预览接口（复用 `evaluateSchemeItemBacklinks`；哈希对不上返回 `{ok:false, reason:"hash_mismatch"}` 且不改封存）；`SchemeQuoteBacklinkBlock` 由 `SchemeReviewPane` 在确认区前挂载；`canConfirm` 纳入 `quoteBacklinkBlocksConfirm`；`index.tsx` 只接线对照面数据与档位选择（`trust_tier` 传入既有 `freezeSchemeSnapshot`）；三档形态齐备。正式试玩（官方 Daemon · main `b751b4a`）按 J.31 判分表口径留证据，覆盖对照面可见、未覆盖标出、三档门禁、hash_mismatch 拒落盘、预览无副作用——全部通过。诚实口径：对照面 UI 已交付，`prompt-builder.ts` 未对齐（另卡）、商业层冷静期不在本卡。不并入、不开工 `TASK-J.22a` / `TASK-J.22b` / `TASK-J.22c`。CI.2 攒样本；文档计划暂缓。不暗示条目级高亮已交付。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.32b
+status: COMPLETED
+contract:
+  intent:
+    title: 回链对照面与信任档确认形态
+    description: >-
+      在现有中栏 SchemeReviewPane 挂上签字前对照面（新增 SchemeQuoteBacklinkBlock），
+      让业主看见「说过的每件事都有着落」；未覆盖项必须明确标出，不得静默跳过。
+      展示 U<seq> 须按 evidence[].ref.turn_id 取 user_alias_seq，再核 sha256。
+      信任档确认形态：标准档（默认）出示回链对照；重确认档在对照之上再逐项勾选；
+      轻确认档不把对照面或逐项勾选作为默认确认步骤，但机械回链仍须用已登记原话，不得接受事后拼凑。
+      档位由用户确认时选择，选择写入快照（存证字段由 TASK-J.32a 落地，本卡只做确认形态）。
+      对照面数据由确认前只读预览接口提供：返回与封存时同一套核对结果（复用 evaluateSchemeItemBacklinks，不得另写一套核对逻辑），以及已登记原话的 U<seq> 序号与原文；预览接口只读、不产生副作用、不触发封存。
+      硬约束：缺登记或哈希不一致不得标已覆盖；ai_inferred 不得冒充 user_said；
+      轻确认档机械回链仍须用已登记原话，不得接受事后拼凑。
+    risk_level: HIGH
+  acceptance:
+    - id: J32B-P1
+      check: playtest
+      text: >-
+        业主在签字前可以看到「说过的每件事都有着落」的对照面；未覆盖项被明确标出，不得静默跳过（承接 J32-P2）。jsdom 不替代真实试玩。
+    - id: J32B-P2
+      check: auto
+      text: >-
+        标准档默认出示回链对照；重确认档在对照之上提供逐项勾选；轻确认档不把对照面或逐项勾选作为默认确认步骤。
+    - id: J32B-P3
+      check: auto
+      text: >-
+        对照面展示的已覆盖项均能回链到已登记原话；缺登记或哈希不一致不得标已覆盖；ai_inferred 不得冒充 user_said。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/components/studio/SchemeReviewPane.tsx
+      - src/components/studio/SchemeQuoteBacklinkBlock.tsx
+      - src/routes/index.tsx
+      - tests/ui/scheme-quote-backlink.test.tsx
+      - src/lib/daemon-api.ts
+      - daemon/server.ts
+    readonly_paths:
+      - daemon/pipeline/scheme-snapshot-store.ts
+      - src/lib/journey/scheme-patch-types.ts
+      - docs/specs/supervisor.md
+      - docs/specs/delivery-lifecycle.md
+      - daemon/supervisor/prompt-builder.ts
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    对照面是中栏方案审阅页上的一块，不另开整页，也不改质疑面板（质疑左栏仍属 J.16 已交付范围）。
+    新增 SchemeQuoteBacklinkBlock，由 SchemeReviewPane 在确认按钮前挂载；index.tsx 只接线对照面数据与档位选择，不得改其他旅程。
+    对照面数据经新增的确认前只读预览接口取得（daemon-api.ts 与 daemon/server.ts 仅限该新增，不得改既有封存或登记接口）。
+    预览必须复用 evaluateSchemeItemBacklinks，返回与封存时同一套核对结果，以及已登记原话的 U<seq> 序号与原文；不得另写一套核对逻辑，不得另造存储。
+    预览接口只读、不产生副作用、不触发封存。
+    档位存证与回链内核只读复用 TASK-J.32a；本卡不改快照封存实现、不改回链规则。
+    商业层冷静期时长不在本卡。prompt-builder.ts 不在可写范围。
+  touches:
+    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 在确认前挂载对照面与档位选择，不另开整页, symbols: [] }
+    - { path: src/components/studio/SchemeQuoteBacklinkBlock.tsx, change: modify, why: 新增签字前对照面：覆盖与缺口、U<seq> 展示、重确认逐项勾选, symbols: [] }
+    - { path: src/routes/index.tsx, change: modify, why: 仅接线对照面数据与信任档选择，不得改其他旅程, symbols: [] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: 仅新增确认前只读预览接口的客户端封装，不改既有登记或封存接口, symbols: [] }
+    - { path: daemon/server.ts, change: modify, why: 仅新增确认前只读预览接口；复用 evaluateSchemeItemBacklinks；只读、无副作用、不触发封存, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J32B-P1, test_path: tests/ui/scheme-quote-backlink.test.tsx, level: integration, debt: "正式试玩已在 main b751b4a 官方 Daemon 通过；jsdom 仅辅助" }
+    - { acceptance_id: J32B-P2, test_path: tests/ui/scheme-quote-backlink.test.tsx, level: unit, debt: "施工后 jsdom 用例已落地；正式试玩另见归档注记" }
+    - { acceptance_id: J32B-P3, test_path: tests/ui/scheme-quote-backlink.test.tsx, level: unit, debt: "施工后 jsdom 用例已落地；正式试玩另见归档注记" }
+governance:
+  spec_refs:
+    - docs/specs/supervisor.md
+    - docs/specs/delivery-lifecycle.md
+    - docs/specs/playtest-self-check.md
+  depends_on:
+    - { id: TASK-J.32a, kind: hard }
+    - { id: TASK-J.16, kind: hard }
+  code_facts:
+    - { ref: "src/components/studio/SchemeReviewPane.tsx:601-604", note: "对照面在确认区前挂载 SchemeQuoteBacklinkBlock" }
+    - { ref: "src/lib/journey/scheme-patch-types.ts:42-71", note: "展示 U<seq> 按 evidence[].ref.turn_id 取 user_alias_seq 再核哈希；项上可选哈希已由 TASK-J.32a 落在 TurnRef" }
+    - { ref: "src/lib/daemon-api.ts:2279-2296", note: "previewSchemeItemBacklinks 确认前只读预览客户端封装" }
+    - { ref: "daemon/server.ts:2555-2653", note: "handleSchemeBacklinkPreview 复用 evaluateSchemeItemBacklinks；hash_mismatch 不改封存" }
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:234-296", note: "evaluateSchemeItemBacklinks 为封存时核对入口；预览必须复用，不得另写一套" }
+  non_goals:
+    - 施工已合入；本条为完工回写，不改产品代码
+    - 不改回链内核、快照封存或 TurnRef schema（见 TASK-J.32a）；不得另写一套核对逻辑
+    - 预览接口不得有副作用、不得触发封存；不另造存储
+    - daemon-api.ts 与 daemon/server.ts 仅限新增确认前只读预览接口，不得改既有登记或封存实现
+    - 不改质疑面板左栏（J.16 已交付）；不另开整页对照
+    - 不把 prompt-builder.ts 列为必须可写
+    - 不定商业层冷静期时长；不立托管部署档或商业契约层
+    - 不实现 §3.3 条目级自动点亮，不暗示条目级高亮已交付（见 TASK-J.22b）
+    - 不开工 J.22 子卡 / CI.2；不改 D.1e / S.3
+    - 不宣称北极星或无人值守三连卡已交付
+  fail:
+    - 签字前没有对照面，或缺口被静默跳过
+    - 缺登记或哈希不一致仍标已覆盖，或 ai_inferred 冒充 user_said
+    - 轻确认档接受事后拼凑文本
+    - 越界改快照封存内核、质疑面板或其他旅程
+    - 另写一套核对逻辑，或预览接口触发封存、产生副作用，或另造存储
+    - 以 jsdom 替代真实试玩验收
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 276, commit: b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b }
+```
+
+* **背景**：密封是业主对方案的签字点；没有回链到已登记原话，就无法核对应办事项是否都有着落。J.16 已经把说话登记和冻结封存做完，本卡复用这条链路，不另起炉灶。
+* **取舍**：确认前对照面必须通过只读预览接口取得与封存时同一套核对结果，并展示已登记原话的 U<seq> 与原文；预览复用 evaluateSchemeItemBacklinks，不得另写一套、不得另造存储。本条已把 daemon-api.ts 与 daemon/server.ts 列入可写，但仅限新增该预览接口。prompt-builder 对齐仍不在本卡。
+
+* **正式试玩证据（官方 Daemon · main `b751b4a` · Asia/Hong_Kong · 操作者：Cursor Cloud Agent / Tina 本回合授权）**：
+
+| 日期与时区（Asia/Hong_Kong） | 所试 main SHA | 步骤编号 | 实际看到的原文 | 通过或失败 | 操作者 | 失败时的现象（通过则留空） |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| 2026-11-16T11:42:00+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | U1-对照面在确认前可见 | 签字前对照；选择确认档位。标准档会出示「说过的每件事都有着落」；重确认还要逐项勾选；轻确认不把对照面作为默认确认步骤。；标准档（默认）选中 | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T11:48:00+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | U2-未覆盖项明确标出 | 已覆盖 1 项，未覆盖 2 项。未覆盖的会明确标出，不会被跳过。；还要导出报表 / 未覆盖 · 引用的原话还没登记；推荐加一个日历模块 / 未覆盖 · 这是推断出来的，不是你亲口说的 | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T12:05:00+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | U4-重确认未勾完 | tier=reconfirm；三项勾选均为 false；确认方案 disabled=true | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T12:05:00+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | U5-重确认勾完 | 三项勾选均为 true；确认方案 disabled=false | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T12:05:00+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | U6-轻确认 | surface=false；轻确认不把对照面或逐项勾选作为默认确认步骤；冻结时仍会按已登记原话做机械回链。；确认方案 disabled=false | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T12:05:00+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | U7-标准档再出示 | tier=standard；surface=true；已覆盖 1 项，未覆盖 2 项。未覆盖的会明确标出，不会被跳过。；确认方案 disabled=false | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T11:25:52+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | A3-预览只读无副作用 | preview前快照=[] preview后快照=[] | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T11:25:52+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | A4-预览 hash_mismatch | {"ok":false,"reason":"hash_mismatch","item_id":"G-forged","turn_id":"T1","message":"有一句原话和登记记录对不上，不能标已覆盖。没有改任何封存。"} | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T11:25:52+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | A5-冻结拒落盘 | status=409 code=E_SCHEME_SNAPSHOT_MISMATCH reason=turn_hash_mismatch；快照文件不存在 | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+| 2026-11-16T11:25:52+08:00 | b751b4a85ebdeb7f2263f6aae6eb526afd1d9d6b | A6-轻确认回链不降级 | status=409 reason=turn_hash_mismatch；轻确认伪造哈希仍拒绝 | 通过 | Cursor Cloud Agent（Tina 本回合授权） |  |
+
+### 3.4aq 中栏方案来源改为编译器台账（J.22a · 完工回写 P-226）
+
+<a id="task-j.22a"></a>
+
+### 【Task J.22a】中栏方案来源改为编译器台账（含无台账降级标注）`[COMPLETED · 拆自 J.22 · 立卡 P-215 · 修卡 P-225 · 施工 #279 · 完工回写 P-226]`
+
+> **立卡说明（2026-11-15 · P-215）**：由 `TASK-J.22` 按 R-11 拆出。承接原验收 J22-P1（来源统一）并合理归并 J22-P3（无台账时明确标注「方案尚未生成」，不以启发式拼接冒充台账方案），因为二者是同一数据源切换。估算 M。硬依赖 `TASK-J.21` 与 `TASK-J.16` 均已 `[COMPLETED]`，依赖已满足。条目级高亮见 `TASK-J.22b`，真实试玩见 `TASK-J.22c`。**立卡 ≠ 开工**。施工须另授权。
+
+> **修卡说明（2026-11-16 · P-225）**：授权来源为 Tina 本回合。施工前核对确认：现网中栏默认源仍是 `rebuildSchemeFromCorpus`；台账仅有验收条目只读投影。`writable_paths` 增加 `src/lib/daemon-api.ts`、`daemon/server.ts`（仅限新增或扩展只读投影路由）、`acceptance-projection.ts` 或新建 `scheme-midpane-projection.ts`（择一）、对应单测。卡面硬约束：投影只读、无副作用；无台账降级用验收原文「方案尚未生成」；`rebuildSchemeFromCorpus` 退出默认发送路径；mermaid 不强交 `renderSchemeDiagrams`；`prompt-builder.ts` 不并入。本条只修卡，不写产品代码。
+
+> **归档注记（2026-11-16 · P-226）**：本卡已 **COMPLETED**。Tina 本回合授权施工与合入。[#279](https://github.com/he18718143986-design/IDE/pull/279) squash `d5a994dbc4973a3894cf78a217a1f1ec906017f1` 于 2026-11-16 14:11:48 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `42b3b2a7ec347ab93465859a67326ccc58965a85`；父提交 `a53d1f3d235c8b8d5480c63a9d5cbabf2eb6abef`）。估算仍为 M。交付：新建 `scheme-midpane-projection.ts`（V2→中栏只读映射）；`GET /api/supervisor/scheme-midpane`（`daemon/server.ts` + `daemon-api.ts`，只读、无副作用、不写盘）；`schemeDraftFromMidpane`；`index.tsx` 拆除默认 `rebuildSchemeFromCorpus`，发消息后刷新台账投影；无台账 / 无实质内容时中栏标注验收原文「方案尚未生成」；mermaid 三图留空，不强交 `renderSchemeDiagrams`、不得用语料图冒充。诚实口径：**来源统一与降级已交付，条目级呈现未交付（J.22b 范畴）、真实试玩未做（J.22c 范畴）、`prompt-builder.ts` 未对齐（另卡）**。未改 `scheme-ledger-store.ts`。不并入、不开工 `TASK-J.22b` / `TASK-J.22c`。CI.2 攒样本；文档计划暂缓。不暗示条目级高亮已交付。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.22a
+status: COMPLETED
+contract:
+  intent:
+    title: 中栏方案来源改为编译器台账，无台账时明确降级
+    description: >-
+      中栏方案（标题、目标、验收条目等）改为来自编译器台账 SchemeDraftV2，
+      不再由 rebuildSchemeFromCorpus 从对话语料启发式拼接。
+      无台账时降级态必须明确标注「方案尚未生成」，不得用启发式内容冒充台账方案。
+    risk_level: HIGH
+  acceptance:
+    - id: J22A-P1
+      check: auto
+      text: >-
+        中栏渲染的方案内容与台账 SchemeDraftV2 逐项一致（标题、目标、验收条目）；不再由对话语料拼接（承接 J22-P1）。
+    - id: J22A-P2
+      check: auto
+      text: >-
+        无台账时降级态明确标注「方案尚未生成」，不以启发式拼接内容冒充台账方案（承接 J22-P3）。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/routes/index.tsx
+      - src/lib/journey/scheme-draft.ts
+      - src/components/studio/SchemeReviewPane.tsx
+      - tests/ui/scheme-source-unification.test.tsx
+      - src/lib/daemon-api.ts
+      - daemon/server.ts
+      - daemon/supervisor/intent-compiler/acceptance-projection.ts
+      - daemon/supervisor/intent-compiler/scheme-midpane-projection.ts
+      - tests/unit/scheme-midpane-projection.test.ts
+    readonly_paths:
+      - daemon/supervisor/intent-compiler/scheme-ledger-store.ts
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    把中栏数据源切换到编译器台账：Daemon 只读投影 SchemeDraftV2（新建 scheme-midpane-projection），
+    经 daemon-api 取数，映射为中栏 SchemeDraft；rebuildSchemeFromCorpus 退出默认发送路径。
+    无台账时只出示验收原文「方案尚未生成」。mermaid 三图留空。
+  touches:
+    - { path: src/routes/index.tsx, change: modify, why: 中栏数据源改为台账投影，拆除默认 rebuildSchemeFromCorpus, symbols: [refreshSchemeFromLedger] }
+    - { path: src/lib/journey/scheme-draft.ts, change: modify, why: 台账 V2 到中栏 SchemeDraft 的映射与无台账降级态, symbols: [schemeDraftFromMidpane] }
+    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 无台账时标注「方案尚未生成」；有台账渲染投影, symbols: [] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: 新增中栏只读投影客户端 fetchSchemeMidpane, symbols: [fetchSchemeMidpane] }
+    - { path: daemon/server.ts, change: modify, why: 新增 GET /api/supervisor/scheme-midpane 只读投影路由, symbols: [] }
+    - { path: daemon/supervisor/intent-compiler/scheme-midpane-projection.ts, change: create, why: 中栏只读投影纯函数, symbols: [projectSchemeMidpane] }
+    - { path: tests/unit/scheme-midpane-projection.test.ts, change: create, why: 锁定投影只读与无台账空投影, symbols: [] }
+    - { path: tests/ui/scheme-source-unification.test.tsx, change: create, why: 锁定来源一致与无台账降级标注, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J22A-P1, test_path: tests/ui/scheme-source-unification.test.tsx, level: integration, debt: "已由 #279 交付；unit 见 tests/unit/scheme-midpane-projection.test.ts" }
+    - { acceptance_id: J22A-P2, test_path: tests/ui/scheme-source-unification.test.tsx, level: integration, debt: "已由 #279 交付；降级标注「方案尚未生成」；真实试玩见 TASK-J.22c" }
+governance:
+  spec_refs:
+    - docs/specs/playtest-self-check.md
+    - docs/specs/supervisor.md
+  depends_on:
+    - { id: TASK-J.21, kind: hard }
+    - { id: TASK-J.16, kind: hard }
+  code_facts:
+    - { ref: "daemon/supervisor/intent-compiler/scheme-midpane-projection.ts:87", note: "projectSchemeMidpane 只读投影入口" }
+    - { ref: "daemon/server.ts:5932", note: "GET /api/supervisor/scheme-midpane" }
+    - { ref: "src/lib/daemon-api.ts:2580", note: "fetchSchemeMidpane 客户端" }
+    - { ref: "src/routes/index.tsx:1237", note: "拆除默认 rebuildSchemeFromCorpus；刷新台账投影" }
+    - { ref: "src/lib/journey/scheme-draft.ts:90", note: "NO_SCHEME_YET_LABEL = 方案尚未生成" }
+    - { ref: "src/lib/journey/scheme-draft.ts:126", note: "schemeDraftFromMidpane 映射入口" }
+    - { ref: "src/lib/journey/scheme-draft.ts:204", note: "mermaidArchitecture 留空（Flow/Mindmap 同段）" }
+  non_goals:
+    - 不做条目级高亮（见 TASK-J.22b），不以 jsdom 替代真实试玩（见 TASK-J.22c）
+    - 不对齐 prompt-builder.ts（另卡）
+    - 不暗示条目级高亮已交付；不开工 CI.2；不改 D.1e / S.3
+  fail:
+    - 中栏与台账不一致仍出现而未标注，或无台账时仍用启发式内容冒充台账方案
+    - 投影路由有写盘/封存/副作用
+    - rebuildSchemeFromCorpus 仍为无标注默认源，或用语料 mermaid 冒充台账结构
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 279, commit: d5a994dbc4973a3894cf78a217a1f1ec906017f1 }
+```
+
+* **背景**：挂账⑬ 方案 B。J16-P7 只做了只读投影过渡；本卡把中栏默认来源换成台账。
+* **取舍**：来源统一与无台账降级同卡；高亮与真实试玩另卡。诚实口径见归档注记。
+
+### 3.4ar 中栏验收条目的条目级呈现（J.22b · 完工回写 P-228）
+
+<a id="task-j.22b"></a>
+
+### 【Task J.22b】中栏验收条目的条目级呈现（J.16 延期项）`[COMPLETED · 拆自 J.22 · 立卡 P-215 · 修卡 P-227 · 施工 #282 · 完工回写 P-228]`
+
+> **立卡说明（2026-11-15 · P-215）**：由 `TASK-J.22` 按 R-11 拆出。J.16 已明确「条目级高亮不在本条（J.22 之后另记）」「`frozen_quotes` 不含条目关联」。本卡承接该项呈现，估算 M；若施工前发现必须改冻结快照结构才能做条目关联，先报修卡或再拆，不得带病扩大。硬依赖 [`TASK-J.22a`](./development-tasks-completed.md#task-j.22a)（先有台账来源，再谈条目呈现；P-226 已 COMPLETED）。**不实现** [`playtest-self-check.md`](./playtest-self-check.md) §3.3 的条目级自动点亮（该口子仍为「本版不实现」）。不暗示该项已交付。硬依赖 `TASK-J.21` 与 `TASK-J.16` 均已 `[COMPLETED]`。**立卡 ≠ 开工**。施工须另授权。
+
+> **修卡说明（2026-11-16 · P-227）**：授权来源为 Tina 本回合。施工前核对确认：条目列表实际渲染在 `ScopeAcceptanceBlock.tsx`。`writable_paths` 增加 `src/components/studio/ScopeAcceptanceBlock.tsx`。卡面写明：条目级呈现形态为「逐条 id+文案、空台账不伪造、空态口径明确」；不重做 J.22a 数据源切换。边界不变：不实现 §3.3 条目级自动点亮（J22B-P3）；不以 jsdom 替代 J.22c 真实试玩；不改 `frozen_quotes` 结构；不对齐 `prompt-builder.ts`。本条只修卡，不写产品代码。
+
+> **归档注记（2026-11-16 · P-228）**：本卡已 **COMPLETED**。Tina 本回合授权施工与合入。[#282](https://github.com/he18718143986-design/IDE/pull/282) squash `7677ca79590e708346372fcf01bd9930e5c7ffde` 于 2026-11-16 15:15:53 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `f7a2641b920fb40358d33e7b9601dac415675a42`；父提交 `65c2f06e88f2266444de30aecb6fe68785bd83d2`）。合入前必需检查全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE` 仅由 Windows 非必需 Unit 失败导致（spawn/路径/CRLF 存量；本卡呈现层套件在 Windows 仍通过）；Bugbot NEUTRAL 不挡合入。估算仍为 M。交付：`presentableAcceptanceItems`（`ScopeAcceptanceBlock.tsx`）逐条 id+文案；`acceptanceItemsFromSchemeDraft`（`scheme-draft.ts`）从中栏草稿抽出条目；空台账不伪造、空态沿用「无呈现记录」；`SchemeReviewPane` 接线。诚实口径：**条目级呈现已交付，§3.3 自动点亮未实现、真实试玩未做（J.22c 范畴）、`prompt-builder.ts` 未对齐（另卡）**。未改 `frozen_quotes` / `scheme-snapshot-store.ts`。不并入、不开工 `TASK-J.22c`。蓝图第一批卡暂不立；CI.2 攒样本；文档计划暂缓。不暗示条目级高亮/自动点亮已交付。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.22b
+status: COMPLETED
+contract:
+  intent:
+    title: 中栏按台账条目呈现验收项，并把关联建立在已登记原话上
+    description: >-
+      在中栏按编译器台账逐条呈现验收条目（条目级呈现）。
+      呈现形态：逐条 id+文案、空台账不伪造、空态口径明确。
+      若需要把条目与用户原话关联，必须复用已登记 turn_id + sha256(utf8) / frozen_quotes，
+      不得事后拼凑。不实现 playtest-self-check.md §3.3 的条目级自动点亮。
+      不重做 J.22a 的数据源切换。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J22B-P1
+      check: auto
+      text: >-
+        中栏按台账逐条呈现验收条目（逐条 id+文案）；空台账时沿用已有「无呈现记录」或本卡规定的等价标注，不伪造条目；空态口径明确。
+    - id: J22B-P2
+      check: auto
+      text: >-
+        如本卡实现条目与原话的关联，关联只指向已登记并封存的原话；未登记文本不得被当成条目依据。
+    - id: J22B-P3
+      check: auto
+      text: >-
+        不实现 §3.3 条目级自动点亮；文档与界面均不得把它写成已交付。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/components/studio/SchemeReviewPane.tsx
+      - src/components/studio/ScopeAcceptanceBlock.tsx
+      - src/lib/journey/scheme-draft.ts
+      - tests/ui/scope-acceptance-surface-log.test.tsx
+      - tests/unit/scheme-acceptance-projection.test.ts
+    readonly_paths:
+      - daemon/pipeline/scheme-snapshot-store.ts
+      - docs/specs/playtest-self-check.md
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    在 J.22a 把数据源换成台账之后，补中栏的条目级呈现（逐条 id+文案、空台账不伪造、空态口径明确）。
+    实际列表渲染在 ScopeAcceptanceBlock；SchemeReviewPane 只做接线。
+    本卡未实现条目与原话关联，未改 frozen_quotes。
+  touches:
+    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 接线台账验收条目到 ScopeAcceptanceBlock, symbols: [] }
+    - { path: src/components/studio/ScopeAcceptanceBlock.tsx, change: modify, why: 逐条 id+文案呈现；空台账不伪造；空态口径明确, symbols: [presentableAcceptanceItems, ScopeAcceptanceBlock] }
+    - { path: src/lib/journey/scheme-draft.ts, change: modify, why: 从中栏 SchemeDraft 抽出验收条目 id+文案, symbols: [acceptanceItemsFromSchemeDraft] }
+    - { path: tests/unit/scheme-acceptance-projection.test.ts, change: modify, why: 锁定条目呈现与空台账不伪造, symbols: [] }
+    - { path: tests/ui/scope-acceptance-surface-log.test.tsx, change: modify, why: 锁定条目级呈现与空态口径, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J22B-P1, test_path: tests/unit/scheme-acceptance-projection.test.ts, level: unit, debt: "已由 #282 交付；UI 见 tests/ui/scope-acceptance-surface-log.test.tsx" }
+    - { acceptance_id: J22B-P2, test_path: tests/ui/scope-acceptance-surface-log.test.tsx, level: integration, debt: "本卡未实现条目-原话关联；标为不适用；若后续做关联须先修卡" }
+    - { acceptance_id: J22B-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "归档注记与界面均未把 §3.3 自动点亮写成已交付" }
+governance:
+  spec_refs:
+    - docs/specs/playtest-self-check.md
+    - docs/specs/supervisor.md
+  depends_on:
+    - { id: TASK-J.22a, kind: hard }
+    - { id: TASK-J.21, kind: hard }
+    - { id: TASK-J.16, kind: hard }
+  code_facts:
+    - { ref: "src/components/studio/ScopeAcceptanceBlock.tsx:30", note: "presentableAcceptanceItems；空 id/文案丢弃、重复 id 只留首条" }
+    - { ref: "src/components/studio/ScopeAcceptanceBlock.tsx:258-320", note: "逐条 id+文案渲染；空台账且 settled 时标「无呈现记录」" }
+    - { ref: "src/lib/journey/scheme-draft.ts:96", note: "acceptanceItemsFromSchemeDraft" }
+    - { ref: "src/components/studio/SchemeReviewPane.tsx:472-475", note: "未传入 acceptanceItems 时从中栏草稿接线" }
+    - { ref: "docs/specs/playtest-self-check.md:175-184", note: "§3.3 条目级自动点亮仍为「本版不实现」" }
+  non_goals:
+    - 不实现 §3.3 条目级自动点亮，不暗示该项已交付
+    - 不以 jsdom 替代 TASK-J.22c 的真实试玩
+    - 不改 frozen_quotes / scheme-snapshot-store.ts；不对齐 prompt-builder.ts
+    - 不重做 J.22a 的数据源切换；不开工 CI.2；不改 D.1e / S.3
+  fail:
+    - 伪造验收条目，或把未登记文本当成条目依据
+    - 把 §3.3 自动点亮做成功能或写成已交付
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 282, commit: 7677ca79590e708346372fcf01bd9930e5c7ffde }
+```
+
+* **背景**：J.16 把条目级高亮明确推迟到 J.22 之后；本卡把它从母卡拆出并交付条目级呈现。
+* **取舍**：先呈现台账条目（逐条 id+文案、空态明确）；自动点亮仍不做；条目-原话关联未做（未改 frozen_quotes）。诚实口径见归档注记。
+
+### 3.4as 中栏方案来源统一的真实试玩验收（J.22c · 完工回写 P-229）
+
+<a id="task-j.22c"></a>
+
+### 【Task J.22c】中栏方案来源统一的真实试玩验收`[COMPLETED · 拆自 J.22 · 立卡 P-215 · 完工回写 P-229]`
+
+> **立卡说明（2026-11-15 · P-215）**：由 `TASK-J.22` 按 R-11 拆出，承接原验收 J22-P2。估算 S。硬依赖 [`TASK-J.22a`](./development-tasks-completed.md#task-j.22a)（P-226 已 COMPLETED）。`TASK-J.22b` 为软依赖（P-228 已 COMPLETED）。jsdom 不替代真实打开方案面板。
+
+> **归档注记（2026-11-16 · P-229）**：本卡已 **COMPLETED**。Tina 授权本机官方 Daemon 真实试玩（操作者「Cursor 代打（Tina 授权）」）；Cloud Agent 过目通过后回写。试玩 tip `71fd5b302862347a2f516ac4113f76e297042080`（官方 Daemon `127.0.0.1:3006` · 项目 `/tmp/stagent-j16p7-items-playtest`）。估算仍为 S。J22C-P1 **PASS**：①确认前中栏=台账（标题「走查用方案」；ITEM-1/2）；②确认后冻结快照与中栏仍=台账、无语料冒充；③逐条 id+文案可见；④空台账「方案尚未生成」；⑤空验收「无呈现记录」。证据表见 [`evidence-and-acceptance-criteria.md`](./evidence-and-acceptance-criteria.md)「TASK-J.22c」与 [`playtest-self-check.md`](./playtest-self-check.md) 试玩证据表。附注：脏工作区二次确认撞幂等键、合同 ABORTED——不挡判定。诚实口径：**真实试玩已交付；§3.3 自动点亮未实现、`prompt-builder.ts` 未对齐（另卡）**。未改 J.22a/J.22b 产品代码。母卡 `TASK-J.22` 维持 `[SPLIT]` 追溯归档。蓝图第一批卡暂不立；CI.2 攒样本；文档计划暂缓。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.22c
+status: COMPLETED
+contract:
+  intent:
+    title: 用真实会话验收中栏方案与台账一致
+    description: >-
+      在真实会话中打开方案面板，人工核对编译器台账与中栏方案在确认前后保持一致。
+      jsdom 或集成测试不得替代这次真实试玩。
+    risk_level: LOW
+  acceptance:
+    - id: J22C-P1
+      check: playtest
+      text: >-
+        真实会话中，编译器台账与中栏方案在确认前后保持一致；真实打开方案面板人工核对（承接 J22-P2；jsdom 不替代）。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - tests/ui/scheme-source-unification.test.tsx
+      - docs/specs/evidence-and-acceptance-criteria.md
+      - docs/specs/playtest-self-check.md
+    readonly_paths:
+      - src/components/studio/SchemeReviewPane.tsx
+      - src/routes/index.tsx
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    本卡几乎不改产品代码，只做真实会话试玩并留下证据；集成测试只能作辅助，不能代替人工核对。
+  touches:
+    - { path: docs/specs/evidence-and-acceptance-criteria.md, change: modify, why: 回写真实试玩证据与结论, symbols: [] }
+    - { path: docs/specs/playtest-self-check.md, change: modify, why: J.31 试玩证据表附入 J.22c 五行, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J22C-P1, test_path: tests/ui/scheme-source-unification.test.tsx, level: integration, debt: "真实试玩证据已回写；jsdom 仅辅助不替代；见 evidence-and-acceptance-criteria.md / playtest-self-check.md" }
+governance:
+  spec_refs:
+    - docs/specs/playtest-self-check.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+  depends_on:
+    - { id: TASK-J.22a, kind: hard }
+    - { id: TASK-J.22b, kind: soft }
+    - { id: TASK-J.21, kind: hard }
+    - { id: TASK-J.16, kind: hard }
+  code_facts:
+    - { ref: "src/routes/index.tsx:1237", note: "J.22a 已拆除默认 rebuildSchemeFromCorpus；本卡在真实会话中核对台账投影" }
+    - { ref: "src/components/studio/SchemeReviewPane.tsx:62-64", note: "真实打开的方案面板组件；jsdom 不替代本次验收" }
+  non_goals:
+    - 不以 jsdom 或单测替代真实会话验收
+    - 不重做 J.22a / J.22b 的产品改动；不实现 §3.3 自动点亮
+    - 不对齐 prompt-builder.ts；不开工 CI.2；不改 D.1e / S.3
+  fail:
+    - 只用 jsdom 或书面说明就宣称 J22-P2 通过
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 284, commit: 71fd5b302862347a2f516ac4113f76e297042080 }
+```
+
+* **背景**：原 J.22 把真实试玩写成 J22-P2；拆出后与代码改造分卡。
+* **取舍**：硬依赖来源切换，条目呈现为软依赖。诚实口径见归档注记。
+
+### 3.4at 业主确认与试玩操作规程（J.34 · 完工回写 P-231）
+
+<a id="task-j.34"></a>
+
+### 【Task J.34】业主确认与试玩操作规程（SOP · S2→Seal + 试玩）`[COMPLETED · 立卡 P-230 · 施工 #286 · 完工回写 P-231]`
+
+> **立卡说明（2026-11-16 · P-230）**：纯 docs。把业主在签字前「对照原话 → 选信任档 → 确认密封」与试玩验收的可执行步骤写进旅程与 runbook；不改产品代码、不重写 J.32 硬约束。
+
+> **归档注记（2026-11-16 · P-231）**：本卡已 **COMPLETED**。Tina 授权施工与合入。[#286](https://github.com/he18718143986-design/IDE/pull/286) squash `51c643ede74ec3423f6ed36cb670650cf3272e86` 于 2026-11-16 21:05:15 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `6e0d50c7ac50246e9f96a5077f07d3bf063d6c19`；父提交 `81a8560ad29bcbeec0a2467a5b9beca92e51ed30`）。合入前必需检查全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck/Unit，含 Windows Unit SUCCESS），`mergeable=MERGEABLE`、`mergeStateStatus=CLEAN`；Bugbot NEUTRAL 不挡合入。估算仍为 S。交付：`docs/runbooks/owner-confirm-and-playtest.md` 六节；`user-journey.md` S2→Seal/S6 补步骤；`glossary.md`「信任档」「对照面」；`docs/README.md` 分层表与阅读顺序登记。诚实口径：**SOP 为文档层交付，业主实际按 SOP 走完确认+试玩属后续真实使用验证**；不实现 §3.3 自动点亮；不改产品代码；不开工 J.35。蓝图第一批暂不立；CI.2 攒样本；文档计划暂缓；J.36 待另授权。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.34
+status: COMPLETED
+contract:
+  intent:
+    title: 业主确认与试玩操作规程（SOP · S2→Seal + 试玩）
+    description: >-
+      非技术业主打开 docs/user-journey.md 的 S2→Seal 与试玩相关环，以及
+      docs/runbooks/owner-confirm-and-playtest.md，能按步骤完成：查看对照面、
+      选择信任档（轻确认 / 标准 / 重确认）、确认密封、按判分表试玩并留下证据。
+      glossary 补「信任档」「对照面」白话定义；docs/README.md 登记 runbook 落点。
+      不改产品代码；不重写 J.32a/b 已交付硬约束与 UI。
+    risk_level: LOW
+  acceptance:
+    - id: J34-P1
+      check: auto
+      text: >-
+        docs/user-journey.md 的 S2→Seal 环已写明业主在签字前须对照已登记原话、
+        选择信任档、再点确认；并链到术语表与 runbook；不得把 §3.3 自动点亮写成已交付。
+    - id: J34-P2
+      check: auto
+      text: >-
+        docs/runbooks/owner-confirm-and-playtest.md 已落盘：分步写清对照面、三档含义、
+        确认密封、试玩判分与证据表用法；明确轻确认可跳过对照面 UI 但机械回链不降级。
+    - id: J34-P3
+      check: auto
+      text: >-
+        docs/glossary.md 已为「信任档」「对照面」各提供一句话白话定义与权威出处链接
+        （指向 supervisor.md / J.32a·b 交付面），不另造与规格冲突的定义。
+    - id: J34-P4
+      check: auto
+      text: >-
+        docs/README.md 已登记 runbook 落点与「谁能改」；不新增 L7 或其它文档层。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - docs/user-journey.md
+      - docs/glossary.md
+      - docs/README.md
+      - docs/runbooks/owner-confirm-and-playtest.md
+    readonly_paths:
+      - docs/specs/supervisor.md
+      - docs/specs/delivery-lifecycle.md
+      - docs/specs/playtest-self-check.md
+      - docs/ledger/trust-tier-spec-boundary-brief.md
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    在既有 user-journey S2→Seal / 试玩环补业主操作步骤，不重写七环骨架。
+    新建 owner-confirm-and-playtest runbook 作可打印步骤清单；术语只补两词。
+    信任档语义以 J.32a/b 与划界简报为准，本卡只写「业主怎么做」。
+  touches:
+    - { path: docs/user-journey.md, change: modify, why: S2→Seal/试玩环补对照面与信任档业主步骤, symbols: [] }
+    - { path: docs/glossary.md, change: modify, why: 增补信任档与对照面白话定义, symbols: [] }
+    - { path: docs/README.md, change: modify, why: 登记 runbook 落点与谁能改, symbols: [] }
+    - { path: docs/runbooks/owner-confirm-and-playtest.md, change: modify, why: "已新建业主确认与试玩分步操作规程（施工 #286 落盘后改记为 modify，消除 create-vs-exists warn）", symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J34-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #286 交付；门禁仍为 npm run check:docs，本卡未新增 vitest 文件" }
+    - { acceptance_id: J34-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #286 交付；门禁仍为 npm run check:docs" }
+    - { acceptance_id: J34-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #286 交付；门禁仍为 npm run check:docs" }
+    - { acceptance_id: J34-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #286 交付；门禁仍为 npm run check:docs" }
+governance:
+  spec_refs:
+    - docs/user-journey.md
+    - docs/specs/supervisor.md
+    - docs/specs/playtest-self-check.md
+    - docs/ledger/trust-tier-spec-boundary-brief.md
+  depends_on:
+    - { id: TASK-J.25, kind: soft }
+    - { id: TASK-J.32b, kind: soft }
+    - { id: TASK-J.31, kind: soft }
+    - { id: TASK-J.22c, kind: soft }
+  code_facts:
+    - { ref: "docs/user-journey.md:47-59", note: "施工前 S2→Seal 环已有密封白话，尚未写对照面 / 信任档业主步骤；#286 已补" }
+    - { ref: "docs/glossary.md:108-122", note: "已增「信任档」「对照面」词条" }
+    - { ref: "docs/runbooks/owner-confirm-and-playtest.md:9-74", note: "六节 SOP 已落盘" }
+  non_goals:
+    - 不改产品代码；不重写 J.32a/b 硬约束与对照面 UI
+    - 不立信任档规格卡；不立蓝图第一批卡；不开工 J.35 / CI.2
+    - 不实现 §3.3 自动点亮；不宣称北极星或无人值守三连卡已交付
+    - 不写商业冷静期 / ChangeOrder
+  fail:
+    - 把未交付能力（§3.3 自动点亮、北极星）写成已交付
+    - 另造与 J.32a/b 冲突的信任档定义
+    - 借 SOP 改产品代码或扩 writable_paths 到 daemon/src
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 286, commit: 51c643ede74ec3423f6ed36cb670650cf3272e86 }
+```
+
+* **背景**：J.32b / J.22c / J.31 已交付对照面、真实试玩与判分表，业主侧缺「按键顺序」SOP。
+* **取舍**：不把规格缝写进 SOP；诚实口径见归档注记。
+
+### 3.4au prompt-builder 对齐台账 / 信任档 / 回链（J.35 · 完工回写 P-232）
+
+<a id="task-j.35"></a>
+
+### 【Task J.35】prompt-builder.ts 对齐台账 / 信任档 / 回链事实`[COMPLETED · 立卡 P-230 · 施工 #288 · 完工回写 P-232]`
+
+> **立卡说明（2026-11-16 · P-230）**：承接 J.22 / J.30 / J.32 多次挂账的「prompt-builder 未对齐」。本卡把 `buildSupervisorPrompt` 组装结果对齐台账、信任档与回链事实，并在出口调用 `assertContextHasNoVaultSecrets`。**不**把 builder 接进生产活发送路径（另开接线卡）。
+
+> **归档注记（2026-11-16 · P-232）**：本卡已 **COMPLETED**。Tina 授权施工与合入。[#288](https://github.com/he18718143986-design/IDE/pull/288) squash `306ff11674da7307bb09c12dcd74e17f80e2f52e` 于 2026-11-16 22:09:29 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `a74edc949a3438223eec6c2f08cad97cafad4939`；父提交 `bc3de8983ac022ac53aa8ed0583b407c47c9104e`；含 lint 修复 `78db03aec8d770997f8876a41e69902786db5a26` 与空提交重跑 macOS）。合入前必需面全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit；macOS 3214 passed，含本卡 supervisor-session 23 + vault 8），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非阻断存量失败，`continue-on-error`，本卡两份测试 Windows 均绿，同 #266 先例）；Bugbot NEUTRAL 不挡合入。估算仍为 M。交付：`SupervisorContextBundle` 可选 `scheme_summary`/`trust_tier`/`backlink_summary`；`buildSupervisorPrompt` 有字段才插入「台账方案摘要 / 信任档 / 回链核对摘要」；`return` 前 `assertContextHasNoVaultSecrets(text)` 命中即抛。诚实口径：**`prompt-builder.ts` 已对齐台账/信任档/回链，活发送路径未接（另卡或后续接线范畴）**。不实现 §3.3；不开工 CI.2；不立 J.36 / 蓝图。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.35
+status: COMPLETED
+contract:
+  intent:
+    title: prompt-builder.ts 对齐台账 / 信任档 / 回链事实
+    description: >-
+      buildSupervisorPrompt 的组装结果须反映编译器台账方案摘要、信任档（trust_tier）与
+      原话回链核对结论（缺登记 / 哈希不一致不得标已覆盖；ai_inferred 不得冒充 user_said）；
+      出口对完整 text 调用 assertContextHasNoVaultSecrets（来自 daemon/vault/active.ts 叶子）。
+      当前 builder 仍可为测试/预览纯组装器；本卡不强制接进活发送路径。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J35-P1
+      check: auto
+      text: >-
+        SupervisorContextBundle（或等价输入）可携带台账方案摘要、trust_tier、回链核对摘要；
+        buildSupervisorPrompt 输出分段中可见这些事实，不得静默省略已提供的字段。
+    - id: J35-P2
+      check: auto
+      text: >-
+        当上下文标明缺登记或哈希不一致时，组装文案不得把该项写成「已覆盖」；
+        ai_inferred 来源不得写成用户原话已确认。
+    - id: J35-P3
+      check: auto
+      text: >-
+        buildSupervisorPrompt 在返回前对完整 text 调用 assertContextHasNoVaultSecrets；
+        单测证明含保险库密钥的上下文会抛错且不返回脱敏后继续的结果。
+    - id: J35-P4
+      check: auto
+      text: >-
+        既有 supervisor-session 组装单测仍绿；新增对齐用例覆盖 P1～P3；tsc 通过。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/supervisor/prompt-builder.ts
+      - daemon/supervisor/types.ts
+      - tests/unit/supervisor-session.test.ts
+      - tests/daemon/vault.test.ts
+    readonly_paths:
+      - daemon/vault/active.ts
+      - daemon/pipeline/scheme-snapshot-store.ts
+      - daemon/supervisor/intent-compiler/scheme-ledger-store.ts
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/supervisor-session.test.ts, tests/daemon/vault.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    扩展 SupervisorContextBundle 可选字段（台账摘要 / trust_tier / 回链摘要），
+    在 buildSupervisorPrompt 增加对应分段；出口调用 assertContextHasNoVaultSecrets。
+    保持纯函数、零 I/O。不改活发送路由；接线另卡。
+  touches:
+    - { path: daemon/supervisor/types.ts, change: modify, why: ContextBundle 增台账/信任档/回链可选字段, symbols: [SupervisorContextBundle] }
+    - { path: daemon/supervisor/prompt-builder.ts, change: modify, why: 渲染新分段并在出口断言无保险库密钥, symbols: [buildSupervisorPrompt] }
+    - { path: tests/unit/supervisor-session.test.ts, change: modify, why: 覆盖台账/信任档/回链组装与负例, symbols: [] }
+    - { path: tests/daemon/vault.test.ts, change: modify, why: 锁定 builder 出口调用 assertContextHasNoVaultSecrets, symbols: [] }
+  interfaces:
+    - { kind: type, name: SupervisorContextBundle, signature: "可选 scheme_summary / trust_tier / backlink_summary 字段（施工时定名）", consumers: [] }
+  test_plan:
+    - { acceptance_id: J35-P1, test_path: tests/unit/supervisor-session.test.ts, level: unit, debt: "已由 #288 交付" }
+    - { acceptance_id: J35-P2, test_path: tests/unit/supervisor-session.test.ts, level: unit, debt: "已由 #288 交付" }
+    - { acceptance_id: J35-P3, test_path: tests/daemon/vault.test.ts, level: unit, debt: "已由 #288 交付" }
+    - { acceptance_id: J35-P4, test_path: tests/unit/supervisor-session.test.ts, level: unit, debt: "已由 #288 交付" }
+governance:
+  spec_refs:
+    - docs/specs/supervisor.md
+    - docs/ledger/trust-tier-spec-boundary-brief.md
+    - docs/specs/development-tasks-completed.md#task-j.30
+    - docs/specs/development-tasks-completed.md#task-j.32a
+  depends_on:
+    - { id: TASK-J.30, kind: soft }
+    - { id: TASK-J.32a, kind: soft }
+    - { id: TASK-J.22a, kind: soft }
+  code_facts:
+    - { ref: "daemon/supervisor/prompt-builder.ts:313-343", note: "有字段才插入三段；return 前 assertContextHasNoVaultSecrets" }
+    - { ref: "daemon/supervisor/types.ts:170-180", note: "ContextBundle 已含 scheme_summary/trust_tier/backlink_summary 可选字段" }
+    - { ref: "daemon/vault/active.ts:40", note: "assertContextHasNoVaultSecrets；builder 出口已调用（#288）" }
+  non_goals:
+    - 不把 builder 接进生产活发送路径（另开接线卡）
+    - 不重写 J.32a/b 回链内核或对照面 UI；不升 schema_version
+    - 不实现 §3.3 自动点亮；不开工 CI.2；不立信任档规格卡 / 蓝图第一批
+    - 不改 vault 门面或 Gateway 写范围
+  fail:
+    - 组装文案把缺登记 / 哈希不一致项标成已覆盖，或把 ai_inferred 写成用户已确认原话
+    - 出口跳过 assertContextHasNoVaultSecrets，或密钥命中后脱敏继续返回
+    - 借本卡改对照面 UI / 冻结内核 / 活发送路由
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 288, commit: 306ff11674da7307bb09c12dcd74e17f80e2f52e }
+```
+
+* **背景**：J.22 / J.30 / J.32 多次注明 prompt-builder 未对齐；现行函数仍是 S.1 纯组装器，测试在用、生产发送未接。
+* **取舍**：本卡先对齐组装语义与密钥断言；活路径接线另卡，避免本卡升 L。
+
+
+### 3.4av 信任档规格缝补丁（J.36 · 完工回写 P-234）
+
+<a id="task-j.36"></a>
+
+### 【Task J.36】信任档规格缝补丁（v1/V2 双形 + acceptance.check/notes + 五字段投影 DTO）`[COMPLETED · 立卡 P-233 · 施工 #291 · 完工回写 P-234]`
+
+> **立卡说明（2026-11-16 · P-233）**：按划界简报只补 J.32a/b 未覆盖三缝的契约与失败语义；`writable_paths` 限规格与类型声明。不重写已交付硬约束与对照面 UI。
+
+> **归档注记（2026-11-17 · P-234）**：本卡已 **COMPLETED**。Tina 授权施工与合入。[#291](https://github.com/he18718143986-design/IDE/pull/291) squash `4dc5617ffd89afdce7613cad9edd19158159caed` 于 2026-11-17 12:01:07 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `390314207243547e8038839d15d16961fdf40611`；父提交 `92e89917054bc695caecf494b6fd283db5a25c72`；含 lint 修复 `390314207243547e8038839d15d16961fdf40611`）。合入前必需面全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit；本卡相关 scheme-patch 套件 Windows 亦绿），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非阻断存量失败，`continue-on-error`，同 #266/#288 先例）；Bugbot NEUTRAL 不挡合入。估算仍为 S。交付：`supervisor.md` 三缝契约（v1/V2 双形对照/digest/失败语义、`acceptance.check`/`notes`、五字段投影 DTO）；`scheme-patch-types.ts` 的 `AcceptanceItem`/`notes`/`SchemeItemProjectionDto` 与 `BUSINESS_KEYS.acceptance` 透传 `check`；划界简报施工落点指针。诚实口径：**三缝规格与类型声明已交付，商业冷静期/ChangeOrder 未开（另立不决）、活发送路径未接（builder 生产零调用）**。不实现 §3.3；不开工 CI.2；蓝图第一批暂不立。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.36
+status: COMPLETED
+contract:
+  intent:
+    title: 信任档规格缝补丁（v1/V2 双形 + acceptance.check/notes + 五字段投影 DTO）
+    description: >-
+      在不重写 J.32a/b 已交付信任档硬约束与对照面 UI 的前提下，只补三缝：
+      （1）快照 SchemeSnapshot.scheme 仍为前端 v1 SchemeDraft、回链取自账本 SchemeDraftV2 的双形并存契约与失败语义；
+      （2）supervisor.md §14.2 已有、SchemeDraftV2 / scheme-patch-types 尚缺的 acceptance.check 与 notes 字段契约与投影；
+      （3）蓝图外壳五字段（status / scope / provenance / links / confidence）相对 SchemeItemMeta 的投影 DTO 加层契约（禁止替换 source/evidence、禁止双 SSOT）。
+      可写范围限规格与类型声明；不含对照面 UI / 冻结内核重写 / 视图实现。
+    risk_level: LOW
+  acceptance:
+    - id: J36-P1
+      check: auto
+      text: >-
+        规格已写清：对照与 digest 以哪一侧为准、v1/V2 双形并存时的失败语义；
+        不得借机重做 J.32a 回链三条硬约束。
+    - id: J36-P2
+      check: auto
+      text: >-
+        acceptance.check（auto|playtest|both）与 notes 的字段契约已落入规格，
+        并在 scheme-patch-types（或等价类型声明）中有对应类型；不改 J.32 硬约束。
+    - id: J36-P3
+      check: auto
+      text: >-
+        五字段投影 DTO 契约已写入规格（只作加层投影）；明确禁止替换 source/evidence、禁止双 SSOT；
+        视图实现归细模型实现子卡，本卡不交付 UI。
+    - id: J36-P4
+      check: auto
+      text: >-
+        npm run check:docs 通过；卡面 non_goals / 硬依赖 / 与细模型分界与划界简报一致。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - docs/specs/supervisor.md
+      - src/lib/journey/scheme-patch-types.ts
+      - docs/ledger/trust-tier-spec-boundary-brief.md
+    readonly_paths:
+      - docs/ledger/blueprint-absorption-ruling.md
+      - docs/specs/development-tasks-completed.md
+      - daemon/pipeline/scheme-snapshot-store.ts
+      - src/lib/journey/scheme-draft.ts
+      - docs/ledger/prompt-builder-live-send-path-brief.md
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    以划界简报 §2 三缝为唯一范围：先在 supervisor.md 写清契约与失败语义，
+    再在 scheme-patch-types.ts 补类型声明（acceptance.check / notes / 投影 DTO 类型）。
+    不改 evaluateSchemeItemBacklinks、不改对照面组件、不升 schema_version。
+    五字段只定投影契约，视图实现另卡。
+  touches:
+    - { path: docs/specs/supervisor.md, change: modify, why: 写入三缝契约与失败语义（不重写 J.32 硬约束）, symbols: [] }
+    - { path: src/lib/journey/scheme-patch-types.ts, change: modify, why: acceptance.check/notes 与五字段投影 DTO 类型声明, symbols: [SchemeDraftV2, SchemeItemMeta] }
+    - { path: docs/ledger/trust-tier-spec-boundary-brief.md, change: modify, why: 立卡后指针回写（若需）, symbols: [] }
+  interfaces:
+    - { kind: type, name: SchemeDraftV2.acceptance, signature: "SchemeItemMeta & { text; check: auto|playtest|both }（施工时定稿）", consumers: [] }
+    - { kind: type, name: SchemeItemProjectionDto, signature: "五字段投影加层 DTO（status/scope/provenance/links/confidence）；不替换 source/evidence", consumers: [] }
+  test_plan:
+    - { acceptance_id: J36-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #291 交付；门禁仍为 npm run check:docs，本卡未新增 vitest 文件" }
+    - { acceptance_id: J36-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #291 交付；类型声明以 tsc --noEmit 锁" }
+    - { acceptance_id: J36-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #291 交付" }
+    - { acceptance_id: J36-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #291 交付" }
+governance:
+  spec_refs:
+    - docs/ledger/trust-tier-spec-boundary-brief.md
+    - docs/ledger/blueprint-absorption-ruling.md
+    - docs/specs/supervisor.md
+    - docs/specs/development-tasks-completed.md#task-j.32a
+    - docs/specs/development-tasks-completed.md#task-j.32b
+  depends_on:
+    - { id: TASK-J.32a, kind: hard }
+    - { id: TASK-J.32b, kind: hard }
+  code_facts:
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:308", note: "SchemeSnapshot.scheme 仍为前端 v1 SchemeDraft；回链从 SchemeDraftV2 抽出" }
+    - { ref: "src/lib/journey/scheme-patch-types.ts:130", note: "SchemeDraftV2.acceptance 现为 WithText[]，无 check 字段；draft 级 notes 在前端 SchemeDraft，V2 类型面未对齐 §14.2" }
+    - { ref: "docs/specs/supervisor.md:996-1002", note: "§14.2 已规定 acceptance.check 与 notes；代码类型未全落地" }
+    - { ref: "docs/ledger/blueprint-absorption-ruling.md:1-40", note: "五字段外壳与 SchemeItemMeta 并轨：只允许投影 DTO 加层（P-220 分歧 2+7）" }
+  non_goals:
+    - 不重写 J.32a/b 已交付硬约束与对照面 UI；不升 schema_version
+    - 不开工商业冷静期 / ChangeOrder / 责任归因
+    - 不立双 SSOT；不替换 source / evidence
+    - 不实现细模型视图投影 UI（蓝图第一批另授权）；不接活发送路径（见活发送定位简报）
+    - 不实现 §3.3 自动点亮；不开工 CI.2；不宣称端到端闭环
+  fail:
+    - 借本卡重写回链三条硬约束或对照面 UI
+    - 以五字段替换 source/evidence 或另起第二套信任档语义
+    - 把视图实现 / 活发送接线并入本卡导致升 L 却不拆
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 291, commit: 4dc5617ffd89afdce7613cad9edd19158159caed }
+```
+
+* **背景**：划界简报已确认 J.32a/b 覆盖信任档工程主面；剩余三缝须规格补丁，否则再立「信任档卡」必与已交付内核重复。
+* **取舍**：本卡只定契约与类型声明；视图实现与活发送接线分治另卡。
+
+### 3.4aw 细模型加层 + 视图投影规格（J.37 · 完工回写 P-236）
+
+<a id="task-j.37"></a>
+
+### 【Task J.37】细模型加层 + 视图投影规格卡`[COMPLETED · 立卡 P-235 · 施工 #294 · 完工回写 P-236]`
+
+> **立卡说明（2026-11-17 · P-235）**：按 P-220 分歧 2+7 只定口径：五字段映射、RFC 附录 C 并轨、已知缺口清单；`writable_paths` 限规格与简报。不实现 UI / 细模型运行时。
+
+> **归档注记（2026-11-17 · P-236）**：本卡已 **COMPLETED**。Tina 授权施工与合入。[#294](https://github.com/he18718143986-design/IDE/pull/294) squash `2c6c7b4320920db6970a8974e606936fed936360` 于 2026-11-17 12:57:36 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `1a24014afb11277961b77441081ff2e650f0e9da`；父提交 `3598c054d66e0b55f710f0be8671db52260c5ed8`）。合入前必需检查全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck/Unit，含 Windows Unit SUCCESS），`mergeable=MERGEABLE`、`mergeStateStatus=CLEAN`；Bugbot NEUTRAL（额度未跑）不挡合入。估算仍为 S。交付：`supervisor.md`「细模型加层 + 视图投影」五字段映射表、细模型可选加层、RFC 附录 C 并轨、剩余缺口失败/缺省语义；简报 §5 施工落点指针。诚实口径：**口径已交付，实现未做（L 按 R-11 后拆另立）、ChangeOrder/冷静期另立不决**。活发送路径未接；不实现 §3.3；不开工 CI.2。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.37
+status: COMPLETED
+contract:
+  intent:
+    title: 细模型加层 + 视图投影规格卡（口径 + RFC 附录 C 并轨）
+    description: >-
+      蓝图第一批主体规格卡（P-220 分歧 2+7）：只定口径，不实现。
+      （1）五字段外壳 status/scope/provenance/links/confidence 与现行 SchemeDraftV2 /
+      SchemeItemMeta 的映射口径（复用 J.36 已交付 SchemeItemProjectionDto，禁止替换 source/evidence）；
+      （2）与 RFC 附录 C 三卡并轨、对齐 TASK-C.10q 遗留债（不得另起第二套视图体系）；
+      （3）已知缺口清单：核对 J.36 已补的 v1/V2 双形与 acceptance.check/notes，只记剩余缝；
+      蓝图评审五缺口吸收时须补齐而非照抄（quote 哈希/确认快照/墓地语义已有；测试目标自生成仍开；
+      ChangeOrder 商业层另立不决）。
+      实现（细模型加层 + 视图投影全套）估算 L，按 R-11 后拆另卡；本卡不含实现。
+    risk_level: LOW
+  acceptance:
+    - id: J37-P1
+      check: auto
+      text: >-
+        规格已写清五字段外壳与 SchemeDraftV2/SchemeItemMeta 的映射口径：
+        只作投影加层；禁止替换 source/evidence；禁止双 SSOT；吸收内容标 ai_inferred。
+    - id: J37-P2
+      check: auto
+      text: >-
+        规格已写清与 RFC 附录 C（业务功能脑图 / 用户旅程泳道 / 业务概念图）并轨口径，
+        并标明 TASK-C.10q 遗留债对齐点；不得另起第二套视图体系。
+    - id: J37-P3
+      check: auto
+      text: >-
+        已知缺口清单已落入规格：J.36 已补缝（v1/V2 双形、acceptance.check/notes、
+        五字段 DTO 契约）标为已交付只记指针；剩余缝（细模型加层语义、视图投影并轨、
+        测试目标自生成）与另立不决（ChangeOrder）分列清楚。
+    - id: J37-P4
+      check: auto
+      text: >-
+        npm run check:docs 通过；卡面 non_goals / 硬依赖 / 与实现 L 分界（R-11）一致；
+        不把蓝图原文并入 docs/specs/。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - docs/specs/supervisor.md
+      - docs/ledger/blueprint-fine-layer-spec-brief.md
+      - docs/ledger/trust-tier-spec-boundary-brief.md
+    readonly_paths:
+      - docs/ledger/blueprint-absorption-ruling.md
+      - docs/rfc/v0.2-multi-agent-pipeline.md
+      - docs/specs/development-tasks-completed.md
+      - src/lib/journey/scheme-patch-types.ts
+      - docs/ledger/prompt-builder-live-send-path-brief.md
+  verification:
+    commands:
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    授权施工后写入 supervisor.md「细模型加层 + 视图投影」：五字段映射表、细模型可选加层、
+    附录 C 并轨、剩余缺口失败/缺省语义；简报 §5 回写落点指针。复用 J.36
+    SchemeItemProjectionDto，不重开信任档三缝。视图/细模型实现归后续 L 子卡（R-11）。不写产品代码。
+  touches:
+    - { path: docs/specs/supervisor.md, change: modify, why: 写入五字段映射、附录 C 并轨与剩余缺口失败/缺省语义, symbols: [] }
+    - { path: docs/ledger/blueprint-fine-layer-spec-brief.md, change: modify, why: 施工落点指针 §5, symbols: [] }
+    - { path: docs/ledger/trust-tier-spec-boundary-brief.md, change: modify, why: 分治指针：J.37 规格落点, symbols: [] }
+  interfaces:
+    - { kind: type, name: SchemeItemProjectionDto, signature: "J.36 已交付五字段投影 DTO；本卡定细模型加层与视图投影映射口径，不改类型声明", consumers: [] }
+  test_plan:
+    - { acceptance_id: J37-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #294 交付；门禁仍为 npm run check:docs，本卡未新增 vitest 文件" }
+    - { acceptance_id: J37-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #294 交付" }
+    - { acceptance_id: J37-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #294 交付" }
+    - { acceptance_id: J37-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #294 交付" }
+governance:
+  spec_refs:
+    - docs/ledger/blueprint-absorption-ruling.md
+    - docs/ledger/blueprint-fine-layer-spec-brief.md
+    - docs/rfc/v0.2-multi-agent-pipeline.md
+    - docs/specs/development-tasks-completed.md#task-c.10q
+    - docs/specs/development-tasks-completed.md#task-j.36
+    - docs/specs/supervisor.md
+  depends_on:
+    - { id: TASK-J.36, kind: hard }
+    - { id: TASK-C.10q, kind: soft }
+  code_facts:
+    - { ref: "docs/ledger/blueprint-absorption-ruling.md:61-68", note: "分歧 2：多视图为投影；须与 C.10q 遗留债 + RFC 附录 C 并轨，不得另起第二套视图体系" }
+    - { ref: "docs/ledger/blueprint-absorption-ruling.md:106-113", note: "分歧 7：SchemeDraftV2 唯一 SSOT；细模型可选加层；五字段外壳作底稿；五缺口吸收须补齐非照抄" }
+    - { ref: "src/lib/journey/scheme-patch-types.ts:93-168", note: "J.36 已交付 AcceptanceItem/notes/SchemeItemProjectionDto；本卡不重开该类型缝" }
+    - { ref: "docs/rfc/v0.2-multi-agent-pipeline.md:398-424", note: "附录 C 三卡 DEFERRED；C.10q 只交双视角壳，真图另立项" }
+  non_goals:
+    - 不实现细模型加层或视图投影 UI / 渲染（实现 L 按 R-11 后拆）
+    - 不立双 SSOT；不替换 SchemeDraftV2；不替换 source / evidence
+    - 不把蓝图原文整份并入 docs/specs/；吸收内容规格落地前一律标 ai_inferred
+    - 不开工商业冷静期 / ChangeOrder / 责任归因（另立不决）
+    - 不接活发送路径（builder 生产零调用；暂不立接线卡）
+    - 不重写 J.36 已交付三缝；不实现 §3.3；不开工 CI.2；不宣称端到端闭环
+  fail:
+    - 借本卡实现视图/细模型 UI 或升 L 却不按 R-11 拆卡
+    - 另起第二套视图体系或第二套条目 SSOT
+    - 把 ChangeOrder / 冷静期 / 活发送接线并入本卡
+    - 把蓝图原文整份并入 specs 或把未决项写成已决
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 294, commit: 2c6c7b4320920db6970a8974e606936fed936360 }
+```
+
+* **背景**：P-220 第一批路线「分歧 2+7」；信任档规格缝已由 J.36 清掉；本卡是蓝图第一批**主体**规格卡。
+* **取舍**：只定口径与缺口清单；实现另拆 L；活发送接线暂不立。
+
+### 3.4ax 细模型类型 + V2 派生/回写（J.38a · 完工回写 P-238）
+
+<a id="task-j.38a"></a>
+
+### 【Task J.38a】细模型可选加层：类型与 SSOT 派生/回写`[COMPLETED · 立卡 P-237 · 施工 #298 · 完工回写 P-238]`
+
+> **立卡说明（2026-11-18 · P-237）**：按拆分简报 A 交付六实体类型 + V2 派生/回写纯函数；无 UI。
+
+> **归档注记（2026-11-18 · P-238）**：本卡已 **COMPLETED**。Tina 授权施工与合入（选 A：Windows Unit 非阻断存量，同 #266/#288/#291）。[#298](https://github.com/he18718143986-design/IDE/pull/298) squash `8cabadcdcc43aaf481190a77f63521e4f4611d9a` 于 2026-11-18 17:52:36 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `ad2e470b664a464a94c5b820ba591f4e578569d7`；父提交 `d9b1eefde6ffd8360d373bfbc603e11a50d22e2e`）。合入前必需面全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非阻断存量失败，`continue-on-error`；本卡 `fine-model-derive.test.ts` 7/7 在 Windows 亦绿）；Bugbot NEUTRAL 不挡合入。估算仍为 M。交付：`scheme-patch-types.ts` 六实体 + `FineModelLayer`；`fine-model-derive.ts`（`deriveFineModelFromV2` / `applyFineModelToV2`）；`tests/unit/fine-model-derive.test.ts`。诚实口径：**细模型类型与派生/回写纯函数已交付，中栏投影/附录 C 壳/真图/建议层未做（B–E 待立卡）**。活发送路径未接；不实现 §3.3；不开工 CI.2。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.38a
+status: COMPLETED
+contract:
+  intent:
+    title: 细模型可选加层：类型与 SSOT 派生/回写
+    description: >-
+      按拆分简报 A（L52–62）：交付 Actor / UseCase / Process / Rule / Screen / AC 的类型声明，
+      以及从 SchemeDraftV2 派生 / 回写 SSOT 的纯函数；不一致以 SSOT 为准并标投影版本；
+      默认 ai_inferred。无 UI；无附录 C 真图；无五字段中栏绘制。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J38A-P1
+      check: auto
+      text: >-
+        Actor/UseCase/Process/Rule/Screen/AC 类型可编译（tsc --noEmit）；
+        类型面落在 scheme-patch-types（或 fine-model-types 再导出）且不替换 SchemeItemMeta.source/evidence。
+    - id: J38A-P2
+      check: auto
+      text: >-
+        派生/回写纯函数输入为 SchemeDraftV2；二者不一致以 SSOT 为准；不得平行持久化第二套方案（禁双 SSOT）。
+    - id: J38A-P3
+      check: auto
+      text: >-
+        加层实体默认 ai_inferred，不得冒充 user_said；不重开 J.36 三缝（v1/V2、acceptance.check/notes、SchemeItemProjectionDto 只引用）。
+    - id: J38A-P4
+      check: auto
+      text: >-
+        无 UI 交付；npm run check:docs 与对应 unit 测通过；卡面 non_goals 与拆分简报 A 一致。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/lib/journey/scheme-patch-types.ts
+      - src/lib/journey/fine-model-derive.ts
+      - tests/unit/fine-model-derive.test.ts
+    readonly_paths:
+      - docs/specs/supervisor.md
+      - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+      - docs/specs/development-tasks-completed.md
+      - src/lib/journey/scheme-draft.ts
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+      - { alias: unit-fine-model, executable: npx, args: [vitest, run, tests/unit/fine-model-derive.test.ts] }
+design:
+  approach: >-
+    在 scheme-patch-types 声明六实体 + FineModelLayer；fine-model-derive 实现 V2→加层派生与加层→SSOT 回写；
+    失败/不一致以 SSOT 为准。不改冻结内核、不改对照面。
+  touches:
+    - { path: src/lib/journey/scheme-patch-types.ts, change: modify, why: 细模型六实体 + FineModelLayer, symbols: [FineActor, FineUseCase, FineProcess, FineRule, FineScreen, FineAcceptance, FineModelLayer] }
+    - { path: src/lib/journey/fine-model-derive.ts, change: create, why: V2 派生/回写 SSOT 纯函数, symbols: [deriveFineModelFromV2, applyFineModelToV2] }
+    - { path: tests/unit/fine-model-derive.test.ts, change: create, why: 派生/回写与禁双 SSOT 断言, symbols: [] }
+  interfaces:
+    - { kind: type, name: FineModelLayer, signature: "Actor|UseCase|Process|Rule|Screen|AC 加层 + projection_version/source_scheme_id/source_scheme_revision", consumers: [] }
+    - { kind: type, name: deriveFineModelFromV2, signature: "(draft: SchemeDraftV2) => FineModelLayer（ai_inferred；纯函数）", consumers: [] }
+  test_plan:
+    - { acceptance_id: J38A-P1, test_path: tests/unit/fine-model-derive.test.ts, level: unit, debt: "已由 #298 交付；tsc --noEmit + 本文件类型冒烟" }
+    - { acceptance_id: J38A-P2, test_path: tests/unit/fine-model-derive.test.ts, level: unit, debt: "已由 #298 交付" }
+    - { acceptance_id: J38A-P3, test_path: tests/unit/fine-model-derive.test.ts, level: unit, debt: "已由 #298 交付" }
+    - { acceptance_id: J38A-P4, test_path: tests/unit/fine-model-derive.test.ts, level: unit, debt: "已由 #298 交付；门禁另含 npm run check:docs" }
+governance:
+  spec_refs:
+    - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+    - docs/specs/supervisor.md
+    - docs/specs/development-tasks-completed.md
+  depends_on:
+    - { id: TASK-J.37, kind: hard }
+    - { id: TASK-J.36, kind: hard }
+    - { id: TASK-J.38, kind: soft }
+  code_facts:
+    - { ref: "src/lib/journey/scheme-patch-types.ts:131-186", note: "六实体 + FineModelLayer 已落地" }
+    - { ref: "src/lib/journey/fine-model-derive.ts:70-181", note: "deriveFineModelFromV2 / applyFineModelToV2" }
+    - { ref: "tests/unit/fine-model-derive.test.ts:1-263", note: "7 用例；Windows 亦 7/7 绿" }
+  non_goals:
+    - 无 UI；无附录 C 真图；无五字段中栏绘制（归 J.38b/c/d）
+    - 禁双 SSOT；不替换 source/evidence；吸收标 ai_inferred
+    - 不重开 J.36 三缝；不把蓝图原文并入 docs/specs/
+    - ChangeOrder/冷静期另立不决；活发送暂不立；§3.3 不实现
+    - 不开工 CI.2；不立 J.41 终态规格；不宣称端到端闭环
+  fail:
+    - 平行持久化第二套方案或替换 source/evidence
+    - 借本卡交付 UI / 真图 / 中栏五字段绘制
+    - 派生输入绕过 SchemeDraftV2 或重开 v1/V2 双形缝
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 298, commit: 8cabadcdcc43aaf481190a77f63521e4f4611d9a }
+```
+
+* **背景**：J.37 规格已关闭；实现 L 按拆分简报先立 A。
+* **取舍**：本卡只交类型 + 纯函数；B–E（中栏/附录 C 壳/真图/建议层）待立卡。
+
+### 3.4ay 五字段投影加层接入中栏（J.38b · 完工回写 P-240）
+
+<a id="task-j.38b"></a>
+
+### 【Task J.38b】五字段投影加层接入中栏`[COMPLETED · 立卡 P-239 · 施工 #301 · 完工回写 P-240]`
+
+> **立卡说明（2026-11-18 · P-239）**：按拆分简报 B 交付中栏只读五字段投影；首期仅五字段、细模型实体可选。
+
+> **归档注记（2026-11-18 · P-240）**：本卡已 **COMPLETED**。Tina 授权施工与合入（选 A：Windows Unit 非阻断存量，同 #266/#288/#291/#298）。[#301](https://github.com/he18718143986-design/IDE/pull/301) squash `cb37efefc58eb6dee28a6af1703c0cf307f51134` 于 2026-11-18 18:37:58 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `5b148846b83db1ad76584736fee20c19ade27aff`；父提交 `c1878d49c599c315c290b41d33dced37e83ccd75`）。合入前必需面全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非阻断存量失败，`continue-on-error`；本卡 `scheme-item-projection.test.ts` 8/8、`scheme-midpane-projection.test.ts` 5/5 在 Windows 亦绿）；Bugbot NEUTRAL 不挡合入。估算仍为 M（简报/矩阵 S～M 上界）。交付：`scheme-item-projection.ts`（`projectSchemeItemFiveFields`）；`scheme-midpane-projection.ts` 在 acceptance/goals/modules 挂五字段；`ScopeAcceptanceItemView` + `ScopeAcceptanceBlock` 只读呈现；对应测。修卡未触发：未改 `scheme-draft.ts`/`daemon-api.ts`，UI 以交叉类型承接运行时多余字段。诚实口径：**五字段中栏投影已交付，附录 C 壳/真图/建议层未做（C–E 待立卡）、客户端字面同形未做（另立不决）**。活发送路径未接；不实现 §3.3；不开工 CI.2。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.38b
+status: COMPLETED
+contract:
+  intent:
+    title: 五字段投影加层接入中栏
+    description: >-
+      按拆分简报 B：中栏只读展示 SchemeItemProjectionDto 五字段
+      （status / scope / provenance / links / confidence）。
+      吃 J.36 DTO + J.38a FineModelLayer/deriveFineModelFromV2 已交付物；
+      首期仅五字段，细模型实体可选（不强制渲染 Actor/…/AC）。
+      非法/缺省枚举按 J.37 失败语义丢弃字段、不改 source；复用 J.22a 中栏只读通路；
+      禁止投影写入快照密封权威。无真图；无 §3.3 自动点亮。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J38B-P1
+      check: auto
+      text: >-
+        中栏条目级只读展示五字段投影；缺省或非法枚举按 J.37 丢弃该字段，
+        不得改写 SchemeItemMeta.source / evidence。
+    - id: J38B-P2
+      check: auto
+      text: >-
+        投影复用 J.22a 中栏只读通路（scheme-midpane-projection / 前端同形消费）；
+        投影层无写盘、不触发封存、不写入快照密封权威。
+    - id: J38B-P3
+      check: auto
+      text: >-
+        首期可不渲染细模型六实体；若接线 FineModelLayer 仅作可选加层源，
+        不得平行持久化第二套方案（禁双 SSOT）。
+    - id: J38B-P4
+      check: auto
+      text: >-
+        无真图 / 无附录 C 壳 / 无 §3.3 自动点亮；npm run check:docs 与对应 unit/ui 测通过；
+        卡面 non_goals 与拆分简报 B 一致。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/supervisor/intent-compiler/scheme-midpane-projection.ts
+      - src/lib/journey/scheme-item-projection.ts
+      - src/components/studio/ScopeAcceptanceBlock.tsx
+      - src/components/studio/SchemeReviewPane.tsx
+      - tests/unit/scheme-item-projection.test.ts
+      - tests/unit/scheme-midpane-projection.test.ts
+    readonly_paths:
+      - src/lib/journey/scheme-patch-types.ts
+      - src/lib/journey/fine-model-derive.ts
+      - docs/specs/supervisor.md
+      - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+      - docs/specs/development-tasks-completed.md
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+      - { alias: unit-item-proj, executable: npx, args: [vitest, run, tests/unit/scheme-item-projection.test.ts] }
+      - { alias: unit-midpane, executable: npx, args: [vitest, run, tests/unit/scheme-midpane-projection.test.ts] }
+design:
+  approach: >-
+    新建 scheme-item-projection.ts：DTO→视图纯函数，落实 J.37 丢字段语义；
+    扩展 scheme-midpane-projection（现位 daemon）与 ScopeAcceptanceBlock / SchemeReviewPane
+    只读展示；可选消费 FineModelLayer，不落盘。未改 scheme-draft/daemon-api（交叉类型承接）。
+  touches:
+    - { path: daemon/supervisor/intent-compiler/scheme-midpane-projection.ts, change: modify, why: 中栏只读投影挂五字段（现位核对）, symbols: [projectSchemeMidpane] }
+    - { path: src/lib/journey/scheme-item-projection.ts, change: create, why: 五字段 DTO 只读投影纯函数 + J.37 丢字段, symbols: [projectSchemeItemFiveFields] }
+    - { path: src/components/studio/ScopeAcceptanceBlock.tsx, change: modify, why: 条目级五字段只读呈现 + ScopeAcceptanceItemView, symbols: [ScopeAcceptanceBlock, ScopeAcceptanceItemView] }
+    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 中栏接线五字段投影, symbols: [] }
+    - { path: tests/unit/scheme-item-projection.test.ts, change: create, why: 丢字段/不改 source/禁密封写入断言, symbols: [] }
+    - { path: tests/unit/scheme-midpane-projection.test.ts, change: modify, why: 中栏投影回归含五字段, symbols: [] }
+  interfaces:
+    - { kind: type, name: SchemeItemProjectionDto, signature: "J.36 已交付；本卡只读消费，不改契约", consumers: [] }
+    - { kind: type, name: projectSchemeItemFiveFields, signature: "(item meta + optional DTO) => 视图五字段（非法丢弃）", consumers: [] }
+    - { kind: type, name: ScopeAcceptanceItemView, signature: "SchemeAcceptanceItem & SchemeItemProjectionDto", consumers: [] }
+  test_plan:
+    - { acceptance_id: J38B-P1, test_path: tests/unit/scheme-item-projection.test.ts, level: unit, debt: "已由 #301 交付；8 用例；Windows 亦 8/8 绿" }
+    - { acceptance_id: J38B-P2, test_path: tests/unit/scheme-midpane-projection.test.ts, level: unit, debt: "已由 #301 交付；含五字段回归；Windows 亦 5/5 绿" }
+    - { acceptance_id: J38B-P3, test_path: tests/unit/scheme-item-projection.test.ts, level: unit, debt: "已由 #301 交付；FineModelLayer 仅 provenance" }
+    - { acceptance_id: J38B-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #301 交付；门禁另含 npm run check:docs" }
+governance:
+  spec_refs:
+    - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+    - docs/specs/supervisor.md
+    - docs/specs/development-tasks-completed.md
+  depends_on:
+    - { id: TASK-J.37, kind: hard }
+    - { id: TASK-J.38a, kind: hard }
+    - { id: TASK-J.36, kind: soft }
+    - { id: TASK-J.22a, kind: soft }
+    - { id: TASK-J.38, kind: soft }
+  code_facts:
+    - { ref: "src/lib/journey/scheme-item-projection.ts:122-156", note: "projectSchemeItemFiveFields；非法丢字段；零写 source/evidence" }
+    - { ref: "daemon/supervisor/intent-compiler/scheme-midpane-projection.ts:157-209", note: "goals/modules/acceptance 三处挂五字段；可选 deriveFineModelFromV2" }
+    - { ref: "src/components/studio/ScopeAcceptanceBlock.tsx:24-25", note: "ScopeAcceptanceItemView 交叉类型" }
+    - { ref: "src/components/studio/ScopeAcceptanceBlock.tsx:332-379", note: "验收行旁只读呈现五字段" }
+    - { ref: "tests/unit/scheme-item-projection.test.ts:1-152", note: "8 用例；Windows 亦 8/8 绿" }
+  non_goals:
+    - 无真图；无附录 C 投影壳（归 J.38c）；无 renderSchemeDiagrams（归 J.38d）
+    - 不实现 §3.3 自动点亮；不开工 CI.2；不立 J.41
+    - 禁双 SSOT；不替换 source/evidence；吸收标 ai_inferred
+    - 不重开 J.36 三缝；不把蓝图原文并入 docs/specs/
+    - ChangeOrder/冷静期另立不决；活发送暂不立
+    - 客户端字面同形（daemon-api SchemeAcceptanceItem 扩面）另立不决
+    - 不与 C 并行开卡；不宣称端到端闭环
+  fail:
+    - 投影写入快照密封权威或改写 source/evidence
+    - 借本卡交付真图 / 附录 C 壳 / §3.3 自动点亮
+    - 平行持久化第二套方案或另起中栏视图体系
+    - 擅自扩 writable_paths 而不修卡停工上报
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 301, commit: cb37efefc58eb6dee28a6af1703c0cf307f51134 }
+```
+
+* **背景**：J.38a 已关闭；B 吃五字段 DTO + 可选 FineModelLayer。
+* **取舍**：首期只接五字段中栏只读；C–E 待立卡；客户端字面同形另立不决。
+
+
+### 3.4az 附录 C 投影壳并轨（J.38c · 完工回写 P-242）
+
+<a id="task-j.38c"></a>
+
+### 【Task J.38c】附录 C 投影壳并轨（复用 C.10q 三占位）`[COMPLETED · 立卡 P-241 · 施工 #304 · 完工回写 P-242]`
+
+> **立卡说明（2026-11-18 · P-241）**：按拆分简报 C 在 C.10q 三占位挂附录 C 投影契约；仍可不交真渲染。
+
+> **归档注记（2026-11-18 · P-242）**：本卡已 **COMPLETED**。Tina 授权施工与合入（选 A：Windows Unit 非阻断存量，同 #266/#288/#291/#298/#301）。[#304](https://github.com/he18718143986-design/IDE/pull/304) squash `d2e2b83804946a624a5638b5c125d1891e376227` 于 2026-11-18 19:07:46 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `19b4fdf8dc1bc52b1af7b22c1c7c1ec2e524996a`；父提交 `3c379439dd6f9932c3a5da1a76bc0563d90a40ef`）。合入前必需面全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非阻断存量失败，`continue-on-error`；本卡 `panorama-projection.test.ts` 5/5、`studio-lens-shell.test.tsx` 5/5、`studio-lens-routing.test.ts` 3/3 在 Windows 亦绿）；Bugbot NEUTRAL 不挡合入。估算仍为 M。交付：`panorama-projection.ts`（`projectAppendixCShell`）；`PanoramaPane` 三占位消费契约；`lens-routing` illumination 守卫；对应测。修卡未触发：未扩 `writable_paths`。诚实口径：**附录 C 投影壳已交付（空态合法、无真渲染），真图归 D 硬等 J.9b、建议层归 E 待立卡**。活发送路径未接；不实现 §3.3；不开工 CI.2。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.38c
+status: COMPLETED
+contract:
+  intent:
+    title: 附录 C 投影壳并轨（复用 C.10q 三占位）
+    description: >-
+      按拆分简报 C：在 C.10q PanoramaPane 三占位（业务功能脑图 / 用户旅程 /
+      业务概念图）上挂「附录 C 三卡」投影契约——数据源声明、空态合法、与 SSOT
+      不一致时以 SSOT 为准。仍可不交付真渲染（归 J.38d）。不得另起第二套全景
+      视图体系；全景进度不得冒充施工点亮（假绿禁止）。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J38C-P1
+      check: auto
+      text: >-
+        PanoramaPane 三占位挂附录 C 投影契约（数据源声明 + 空态）；无真图时空态合法，
+        不得伪造施工点亮或假绿。
+    - id: J38C-P2
+      check: auto
+      text: >-
+        投影与 SchemeDraftV2 / 可选 FineModelLayer 不一致时以 SSOT 为准；
+        不得平行持久化第二套全景方案（禁双 SSOT）。
+    - id: J38C-P3
+      check: auto
+      text: >-
+        不交付 mermaid/结构真渲染（归 J.38d）；不另起全景路由体系；
+        lens-routing 全景禁 illumination 口径保持。
+    - id: J38C-P4
+      check: auto
+      text: >-
+        npm run check:docs 与对应 unit/ui 测通过；卡面 non_goals 与拆分简报 C 一致。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/components/studio/PanoramaPane.tsx
+      - src/lib/studio/lens-routing.ts
+      - src/lib/studio/panorama-projection.ts
+      - tests/unit/panorama-projection.test.ts
+      - tests/ui/studio-lens-shell.test.tsx
+    readonly_paths:
+      - src/lib/journey/scheme-patch-types.ts
+      - src/lib/journey/fine-model-derive.ts
+      - docs/specs/supervisor.md
+      - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+      - docs/specs/development-tasks-completed.md
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+      - { alias: unit-panorama, executable: npx, args: [vitest, run, tests/unit/panorama-projection.test.ts] }
+      - { alias: ui-lens, executable: npx, args: [vitest, run, tests/ui/studio-lens-shell.test.tsx] }
+design:
+  approach: >-
+    新建 panorama-projection.ts：附录 C 三卡投影契约纯函数（数据源声明、空态、
+    SSOT 优先）；接线 PanoramaPane 既有 panorama-v02-placeholders 三卡；
+    lens-routing 增加 PANORAMA_LENS_FORBIDS_ILLUMINATION / assertPanoramaLensContract。
+    不渲染真图。未扩 writable_paths。
+  touches:
+    - { path: src/components/studio/PanoramaPane.tsx, change: modify, why: 三占位挂附录 C 投影契约/空态, symbols: [PanoramaPane] }
+    - { path: src/lib/studio/lens-routing.ts, change: modify, why: 保持全景禁 illumination；守卫常量+断言, symbols: [assertPanoramaLensContract, resolveDefaultLens, resolveActiveLens] }
+    - { path: src/lib/studio/panorama-projection.ts, change: create, why: 附录 C 三卡投影契约纯函数, symbols: [projectAppendixCShell] }
+    - { path: tests/unit/panorama-projection.test.ts, change: create, why: 空态/SSOT优先/禁假绿断言, symbols: [] }
+    - { path: tests/ui/studio-lens-shell.test.tsx, change: modify, why: 三占位投影契约 UI 回归, symbols: [] }
+  interfaces:
+    - { kind: type, name: AppendixCProjectionShell, signature: "三卡数据源声明 + 空态；无可独立编辑图存储", consumers: [] }
+    - { kind: type, name: projectAppendixCShell, signature: "(draft V2 + optional FineModelLayer) => 三卡投影视图（可空）", consumers: [] }
+  test_plan:
+    - { acceptance_id: J38C-P1, test_path: tests/unit/panorama-projection.test.ts, level: unit, debt: "已由 #304 交付；5 用例；Windows 亦 5/5 绿" }
+    - { acceptance_id: J38C-P2, test_path: tests/unit/panorama-projection.test.ts, level: unit, debt: "已由 #304 交付；SSOT 优先 / 不对齐加层忽略" }
+    - { acceptance_id: J38C-P3, test_path: tests/ui/studio-lens-shell.test.tsx, level: unit, debt: "已由 #304 交付；5 用例含空态+SSOT UI；Windows 亦 5/5 绿" }
+    - { acceptance_id: J38C-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "已由 #304 交付；门禁另含 npm run check:docs" }
+governance:
+  spec_refs:
+    - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+    - docs/specs/supervisor.md
+    - docs/specs/development-tasks-completed.md
+  depends_on:
+    - { id: TASK-C.10q, kind: hard }
+    - { id: TASK-J.37, kind: hard }
+    - { id: TASK-J.38a, kind: soft }
+    - { id: TASK-J.38, kind: soft }
+  code_facts:
+    - { ref: "src/lib/studio/panorama-projection.ts:93-152", note: "projectAppendixCShell；SSOT modules/flows/entities；禁 illumination" }
+    - { ref: "src/components/studio/PanoramaPane.tsx:155-172", note: "三 PlaceholderCard 消费投影契约" }
+    - { ref: "src/lib/studio/lens-routing.ts:19-40", note: "PANORAMA_LENS_FORBIDS_ILLUMINATION + assertPanoramaLensContract" }
+    - { ref: "tests/unit/panorama-projection.test.ts:31-151", note: "空态/SSOT优先/禁假绿；Windows 亦 5/5 绿" }
+    - { ref: "tests/ui/studio-lens-shell.test.tsx:81-191", note: "三占位契约 UI 回归；Windows 亦 5/5 绿" }
+  non_goals:
+    - 无 mermaid/结构真渲染（归 J.38d / renderSchemeDiagrams）
+    - 不另起第二套全景路由或视图体系；不假绿 / 不冒充施工点亮
+    - 不实现 §3.3 自动点亮；不开工 CI.2；不立 J.41
+    - 禁双 SSOT；不替换 source/evidence；吸收标 ai_inferred
+    - 不重开 J.36 三缝；不把蓝图原文并入 docs/specs/
+    - ChangeOrder/冷静期另立不决；活发送暂不立
+    - 不与 E 并行开卡；不宣称端到端闭环
+  fail:
+    - 借本卡交付真图或另起第二套全景体系
+    - 全景进度冒充施工点亮（假绿）
+    - 平行持久化第二套方案或改写 source/evidence
+    - 擅自扩 writable_paths 而不修卡停工上报
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 304, commit: d2e2b83804946a624a5638b5c125d1891e376227 }
+```
+
+* **背景**：J.38b 已关闭；C 在 C.10q 三占位上挂附录 C 投影契约，仍可不交真图。
+* **取舍**：投影壳已交付；真图归 D 硬等 J.9b；建议层归 E 待立卡。
+
+
+### 3.4ba 测试目标建议层（J.38e · 完工回写 P-244）
+
+<a id="task-j.38e"></a>
+
+### 【Task J.38e】测试目标建议层（`ai_inferred`）`[COMPLETED · 立卡 P-243 · 施工 #307 · 完工回写 P-244]`
+
+> **立卡说明（2026-11-18 · P-243）**：按拆分简报 E 建议测试目标；一律 `ai_inferred`；缺省不生成；不进 `can_merge`。
+
+> **归档注记（2026-11-18 · P-244）**：本卡已 **COMPLETED**。Tina 授权施工与合入（选 A：Windows Unit 非阻断存量，同 #266/#288/#291/#298/#301/#304）。[#307](https://github.com/he18718143986-design/IDE/pull/307) squash `6d7faca20890bf8421942808c91d3b072dbac41d` 于 2026-11-18 20:01:48 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `672404d4cb8d7819ceab7873d798486c3a67dce6`；父提交 `e4d4f2f32b4303a172c4d4584c61da2bbaf83bd3`）。合入前必需面全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非阻断存量失败，`continue-on-error`；本卡 `test-target-suggest.test.ts` 6/6 在 Windows 亦绿）；Bugbot NEUTRAL 不挡合入。估算仍为 S。交付：`test-target-suggest.ts`（`suggestTestTargets`）；`ScopeAcceptanceBlock` / `SchemeReviewPane` 可选只读「AI 建议·非验收」块；对应测。修卡未触发：未扩 `writable_paths`。诚实口径：**测试目标建议层已交付（一律 `ai_inferred`、缺省不生成、不进 `can_merge`），真图归 D 硬等 J.9b**。母卡 `TASK-J.38` 维持 `[SPLIT]`，标「子卡除 D 外全交付」；J.9b 仍 Hold 暂不立卡。活发送路径未接；不实现 §3.3；不开工 CI.2。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.38e
+status: COMPLETED
+contract:
+  intent:
+    title: 测试目标建议层（ai_inferred）
+    description: >-
+      按拆分简报 E：由细模型加层 / 投影建议测试目标；一律标 ai_inferred；
+      缺省 = 不生成；不得自动写入硬门禁或冒充用户验收；不得改写 can_merge 派生。
+      可选中栏只读展示「建议」块；不落第二套 SSOT。
+    risk_level: LOW
+  acceptance:
+    - id: J38E-P1
+      check: auto
+      text: >-
+        建议层纯函数产出测试目标时一律 source=ai_inferred；缺省输入返回空列表（不生成）。
+    - id: J38E-P2
+      check: auto
+      text: >-
+        建议不得写入 can_merge / Evidence 硬门禁 / 用户验收条目权威；禁双 SSOT。
+    - id: J38E-P3
+      check: auto
+      text: >-
+        可选中栏只读展示建议；不冒充 user_said / user_confirmed；不实现 §3.3 自动点亮。
+    - id: J38E-P4
+      check: auto
+      text: >-
+        npm run check:docs 与对应 unit 测通过；卡面 non_goals 与拆分简报 E 一致。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/lib/journey/test-target-suggest.ts
+      - src/components/studio/ScopeAcceptanceBlock.tsx
+      - src/components/studio/SchemeReviewPane.tsx
+      - tests/unit/test-target-suggest.test.ts
+    readonly_paths:
+      - src/lib/journey/scheme-patch-types.ts
+      - src/lib/journey/fine-model-derive.ts
+      - src/lib/evidence.schema.ts
+      - docs/specs/supervisor.md
+      - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+      - docs/specs/development-tasks-completed.md
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+      - { alias: unit-suggest, executable: npx, args: [vitest, run, tests/unit/test-target-suggest.test.ts] }
+design:
+  approach: >-
+    新建 test-target-suggest.ts：从 SchemeDraftV2 / 可选 FineModelLayer 建议测试目标
+    （纯函数；缺省空；一律 ai_inferred）。可选接线 ScopeAcceptanceBlock /
+    SchemeReviewPane 只读展示。禁止触碰 evidence.schema can_merge 派生。
+    未扩 writable_paths。
+  touches:
+    - { path: src/lib/journey/test-target-suggest.ts, change: create, why: 测试目标建议纯函数, symbols: [suggestTestTargets] }
+    - { path: src/components/studio/ScopeAcceptanceBlock.tsx, change: modify, why: 可选只读展示建议块, symbols: [ScopeAcceptanceBlock] }
+    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 中栏可选接线建议层, symbols: [] }
+    - { path: tests/unit/test-target-suggest.test.ts, change: create, why: 缺省空/ai_inferred/禁门禁写入断言, symbols: [] }
+  interfaces:
+    - { kind: type, name: TestTargetSuggestion, signature: "{ text; source: 'ai_inferred'; derived_from[] }", consumers: [] }
+    - { kind: type, name: suggestTestTargets, signature: "(draft V2 + optional FineModelLayer) => TestTargetSuggestion[]", consumers: [] }
+  test_plan:
+    - { acceptance_id: J38E-P1, test_path: tests/unit/test-target-suggest.test.ts, level: unit, debt: "已由 #307 交付；缺省空 + 一律 ai_inferred；Windows 亦 6/6 绿" }
+    - { acceptance_id: J38E-P2, test_path: tests/unit/test-target-suggest.test.ts, level: unit, debt: "已由 #307 交付；不含 can_merge/evidence；不写回 acceptance" }
+    - { acceptance_id: J38E-P3, test_path: tests/unit/test-target-suggest.test.ts, level: unit, debt: "已由 #307 交付；UI 可折叠「AI 建议·非验收」" }
+    - { acceptance_id: J38E-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "门禁 npm run check:docs；完工回写阶段" }
+governance:
+  spec_refs:
+    - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+    - docs/specs/supervisor.md
+    - docs/specs/development-tasks-completed.md
+  depends_on:
+    - { id: TASK-J.37, kind: hard }
+    - { id: TASK-J.38a, kind: soft }
+    - { id: TASK-J.38, kind: soft }
+  code_facts:
+    - { ref: "src/lib/journey/test-target-suggest.ts:46-99", note: "suggestTestTargets；ai_inferred；derived_from；缺省 []" }
+    - { ref: "src/components/studio/ScopeAcceptanceBlock.tsx:405-449", note: "可折叠 AI 建议·非验收块" }
+    - { ref: "src/components/studio/SchemeReviewPane.tsx:482", note: "透传 testTargetSuggestions" }
+    - { ref: "tests/unit/test-target-suggest.test.ts:51-141", note: "缺省空/ai_inferred/禁门禁；Windows 亦 6/6 绿" }
+    - { ref: "src/lib/evidence.schema.ts:146-261", note: "can_merge 派生只读；本卡未改" }
+  non_goals:
+    - 不改 can_merge / Evidence 硬门禁 / 底线验收权威
+    - 不实现 §3.3 自动点亮；不开工 CI.2；不立 J.41
+    - 禁双 SSOT；不替换 source/evidence；吸收标 ai_inferred
+    - 不重开 J.36 三缝；不把蓝图原文并入 docs/specs/
+    - ChangeOrder/冷静期另立不决；活发送暂不立
+    - 不立 D（硬等 J.9b）；不宣称端到端闭环
+  fail:
+    - 建议自动写入硬门禁或冒充用户验收
+    - 改写 can_merge 派生或平行持久化第二套方案
+    - 擅自扩 writable_paths 而不修卡停工上报
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 307, commit: 6d7faca20890bf8421942808c91d3b072dbac41d }
+```
+
+* **背景**：J.38c 已关闭；E 兑现 J.37 缺口「测试目标自生成仍开」。
+* **取舍**：建议层已交付；真图归 D 硬等 J.9b；母卡子卡除 D 外全交付。
+
+
+### 3.4bb 真图渲染 renderSchemeDiagrams（J.38d · 完工回写 P-248）
+
+<a id="task-j.38d"></a>
+
+### 【Task J.38d】真图渲染 `renderSchemeDiagrams`（吸收 J.9b / V-07）`[COMPLETED · 立卡 P-246 · 修卡 P-247 · 施工 #312 · 完工回写 P-248]`
+
+> **立卡说明（2026-11-18 · P-246）**：授权来源为 Tina「立卡 J.38d（吸收 J.9b）」。按拆分简报 D：由 SSOT / 细模型**确定性**生成可展示图，挂到 J.38c 已交付的附录 C 投影壳。**吸收口径**：吸收 J.9b / V-07（`renderSchemeDiagrams`）范围；J.9b 从未有卡面，无可继承验收 / `writable_paths`，**不另立 J.9b、禁双开**，合并避免双 SSOT 表述。
+
+> **修卡说明（2026-11-19 · P-247）**：施工中发现挂真图后 J.38c 壳测 `tests/unit/panorama-projection.test.ts` 断言需对齐，将该文件补进 `writable_paths`（modify）；验收口径不变。
+
+> **归档注记（2026-11-19 · P-248）**：本卡已 **COMPLETED**。Tina 授权施工与合入（选 A：Windows Unit 非阻断存量，同 #266/#288/#291/#298/#301/#304/#307）。[#312](https://github.com/he18718143986-design/IDE/pull/312) squash `7efb1f7ec1bc05968b330c166c81d0bf19422b41` 于 2026-11-19 21:10:01 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `d9bbee4611320a9a239ff48016135f21f100d0e3`；父提交 `8a11356eab572d99a7cef6859daee0e986a1e041`）。合入前必需面全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非阻断存量失败，`continue-on-error`；本卡 `scheme-diagrams.test.ts` 5/5、`panorama-projection.test.ts` 5/5、`studio-lens-shell.test.tsx` 5/5 在 Windows 亦绿）；Bugbot NEUTRAL 不挡合入。估算仍为 M。修卡 P-247（#311/`8a11356`）已扩 `writable_paths`。交付：`render-scheme-diagrams.ts`（`renderSchemeDiagrams`）；`panorama-projection` / `PanoramaPane` 挂真图；对应测。诚实口径：**真图渲染已交付（确定性三图挂 C 壳），J.9b/V-07 债清**；母卡 `TASK-J.38` 维持 `[SPLIT]`，标「**子卡全交付**」（A–E 均 COMPLETED）；**母卡是否闭合（SPLIT→COMPLETED）另报 Tina 拍板，本条不改母卡 status**。活发送路径未接；不实现 §3.3；不开工 CI.2。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.38d
+status: COMPLETED
+contract:
+  intent:
+    title: 真图渲染 renderSchemeDiagrams（吸收 J.9b / V-07）
+    description: >-
+      按拆分简报 D：由 SchemeDraftV2 / 细模型确定性生成可展示图（业务功能脑图 /
+      用户旅程泳道 / 业务概念图，或 supervisor 既有三 mermaid 目标），挂到
+      J.38c 附录 C 投影壳。吸收历史 J.9b / V-07 范围；J.9b 不另立卡、禁双开。
+      渲染输入用 V2；不得为渲染改写快照 v1 权威。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J38D-P1
+      check: auto
+      text: >-
+        renderSchemeDiagrams（或等价）以 SchemeDraftV2（可选 FineModelLayer）为输入，
+        确定性产出三图（或空态）；不得读取/改写快照内 v1 scheme 作渲染权威。
+    - id: J38D-P2
+      check: auto
+      text: >-
+        图挂到 J.38c 附录 C 投影壳（PanoramaPane 三卡）；空态合法；不得另起第二套视图体系；不得假绿 / 冒充施工点亮。
+    - id: J38D-P3
+      check: auto
+      text: >-
+        无可独立编辑的图存储；图上批注不得直写旁路 SSOT（批注须回写 SSOT 后重投影）；禁双 SSOT；不替换 source/evidence。
+    - id: J38D-P4
+      check: auto
+      text: >-
+        npm run check:docs 与对应 unit/ui 测通过；卡面写明吸收 J.9b/V-07 且不另立 J.9b。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/lib/journey/render-scheme-diagrams.ts
+      - src/lib/studio/panorama-projection.ts
+      - src/components/studio/PanoramaPane.tsx
+      - tests/unit/scheme-diagrams.test.ts
+      - tests/ui/studio-lens-shell.test.tsx
+      - tests/unit/panorama-projection.test.ts
+    readonly_paths:
+      - src/lib/journey/scheme-patch-types.ts
+      - src/lib/journey/fine-model-derive.ts
+      - src/lib/studio/lens-routing.ts
+      - docs/specs/supervisor.md
+      - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+      - docs/specs/development-tasks-completed.md
+  verification:
+    commands:
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+      - { alias: unit-diagrams, executable: npx, args: [vitest, run, tests/unit/scheme-diagrams.test.ts] }
+      - { alias: unit-panorama, executable: npx, args: [vitest, run, tests/unit/panorama-projection.test.ts] }
+      - { alias: ui-lens, executable: npx, args: [vitest, run, tests/ui/studio-lens-shell.test.tsx] }
+design:
+  approach: >-
+    新建 render-scheme-diagrams.ts：由 V2（可选细模型）确定性生成三图字符串/结构；
+    扩展 panorama-projection / PanoramaPane 将真图挂到附录 C 三卡；空态保留合法。
+    吸收 J.9b/V-07；不另立 J.9b。修卡 P-247 扩 panorama-projection.test.ts。
+  touches:
+    - { path: src/lib/journey/render-scheme-diagrams.ts, change: create, why: 确定性三图渲染纯函数（V-07）, symbols: [renderSchemeDiagrams] }
+    - { path: src/lib/studio/panorama-projection.ts, change: modify, why: 投影壳承接真图/空态字段, symbols: [projectAppendixCShell] }
+    - { path: src/components/studio/PanoramaPane.tsx, change: modify, why: 三卡挂真图展示, symbols: [PanoramaPane] }
+    - { path: tests/unit/scheme-diagrams.test.ts, change: create, why: V-07 三图与 SSOT 对应断言, symbols: [] }
+    - { path: tests/ui/studio-lens-shell.test.tsx, change: modify, why: 真图挂壳 UI 回归, symbols: [] }
+    - { path: tests/unit/panorama-projection.test.ts, change: modify, why: J.38c 壳测对齐 has_diagram/diagram（P-247 修卡）, symbols: [] }
+  interfaces:
+    - { kind: type, name: renderSchemeDiagrams, signature: "(draft: SchemeDraftV2, fine?: FineModelLayer) => { mindmap, swimlane, concept } | 空态", consumers: [] }
+  test_plan:
+    - { acceptance_id: J38D-P1, test_path: tests/unit/scheme-diagrams.test.ts, level: unit, debt: "已由 #312 交付；空态/三图/不对齐 fine 忽略/确定性；Windows 亦 5/5 绿" }
+    - { acceptance_id: J38D-P2, test_path: tests/ui/studio-lens-shell.test.tsx, level: unit, debt: "已由 #312 交付；挂壳/空态/禁假绿；Windows 亦 5/5 绿" }
+    - { acceptance_id: J38D-P2, test_path: tests/unit/panorama-projection.test.ts, level: unit, debt: "已由 #312 交付；壳测 has_diagram/diagram 对齐；Windows 亦 5/5 绿" }
+    - { acceptance_id: J38D-P3, test_path: tests/unit/scheme-diagrams.test.ts, level: unit, debt: "已由 #312 交付；无独立图存储；fine 仅提示" }
+    - { acceptance_id: J38D-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "门禁 npm run check:docs；完工回写阶段" }
+governance:
+  spec_refs:
+    - docs/ledger/blueprint-fine-layer-impl-split-brief.md
+    - docs/specs/supervisor.md
+    - docs/specs/development-tasks-completed.md
+  depends_on:
+    - { id: TASK-J.38c, kind: hard }
+    - { id: TASK-J.37, kind: hard }
+    - { id: TASK-J.38a, kind: soft }
+    - { id: TASK-J.38, kind: soft }
+  code_facts:
+    - { ref: "src/lib/journey/render-scheme-diagrams.ts:66-199", note: "modules→mindmap / flows→swimlane / entities→concept；无 I/O" }
+    - { ref: "src/lib/studio/panorama-projection.ts:43-56", note: "has_diagram/diagram/has_any_diagram；forbid_illumination" }
+    - { ref: "src/lib/studio/panorama-projection.ts:145-189", note: "projectAppendixCShell 调 renderSchemeDiagrams" }
+    - { ref: "src/components/studio/PanoramaPane.tsx:155-177", note: "data-has-diagram 随真实有无；forbid illumination" }
+    - { ref: "src/components/studio/PanoramaPane.tsx:406-413", note: "真图 pre 或空态" }
+    - { ref: "tests/unit/scheme-diagrams.test.ts:28-180", note: "J38D-P1/P3；Windows 亦 5/5 绿" }
+    - { ref: "tests/unit/panorama-projection.test.ts:32-85", note: "空态/真图/禁假绿；Windows 亦 5/5 绿" }
+    - { ref: "tests/ui/studio-lens-shell.test.tsx:81-202", note: "挂壳 UI；Windows 亦 5/5 绿" }
+  non_goals:
+    - 不另立 TASK-J.9b；不与 J.9b 双开同范围
+    - 无可独立编辑的图存储；批注不得旁路 SSOT 直写
+    - 不为渲染改写快照 v1 权威；不重开 J.36 三缝
+    - 禁双 SSOT；不替换 source/evidence；吸收标 ai_inferred
+    - 不并入蓝图原文；ChangeOrder/冷静期另立不决
+    - 活发送暂不立；§3.3 不实现；不开工 CI.2；不立 J.41
+    - 本条不擅自把母卡标 COMPLETED（闭合另拍板）；不宣称端到端闭环
+  fail:
+    - 另立 J.9b 或与本卡范围重叠双开
+    - 另起第二套全景/图体系；假绿 / 冒充施工点亮
+    - 平行持久化图存储或批注旁路 SSOT
+    - 为渲染改写快照 v1 或替换 source/evidence
+    - 擅自扩 writable_paths 而不修卡停工上报
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 312, commit: 7efb1f7ec1bc05968b330c166c81d0bf19422b41 }
+```
+
+* **背景**：J.38c 投影壳已交付；历史 J.9b / V-07 从未立卡面，与 D 同范围；P-246 吸收；P-247 修卡扩壳测。
+* **取舍**：真图渲染已交付（确定性三图挂 C 壳），J.9b/V-07 债清；母卡子卡全交付，闭合另拍板。
+
+### 3.4bc 目标态可反哺项第一批（J.41b · 完工回写 P-252）
+
+<a id="task-j.41b"></a>
+
+### 【Task J.41b】目标态可反哺项第一批（文档口径 + 两条存证）`[COMPLETED · 立卡 P-251 · 施工 #318 · 完工回写 P-252]`
+
+> **立卡说明（2026-11-20 · P-251）**：Tina 审过卡面后授权立卡。范围八条：文档口径五条、白话正文哈希计入冻结快照 digest、`escalation_missed` 记录、五类↔八类对照表。R23 / R18 写入卡面不施工。
+
+> **拍板注记（2026-11-21 · P-254）**：R18 已拍板：不反哺。超时 `parked` 停放归「仅目标态保留」；现行 D-3 看门狗推回 `PREPARING` 的方向维持不变。R23 仍未施工，单独评估。
+
+> **归档注记（2026-11-21 · P-252）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266/#288/#291/#298/#301/#304/#307/#312）。[#318](https://github.com/he18718143986-design/IDE/pull/318) squash `6f2ec657101983d0f263f0a80f8d0225244fa4c6` 于 2026-11-21 00:11:28 香港时间合入（由我执行；gh 为 `he18718143986-design`；pre-merge head `390429e34f3c9a62cf47b3dd06d60eba144a6858`；父提交 `fc44b98cf65ee75f27fd21f3eec8aaf14db4622d`）。合入前必需面全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit；macOS Unit SUCCESS，本卡改过的冻结 / digest / `design-note` 路径在 macOS 与 ubuntu 均通过），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非阻断存量失败，`continue-on-error`；`spawn EINVAL` / `EFTYPE` 落在 `app-preview-runner` / `cli-host-claude-code` / `deps-reuse` / `diff-files` / `merger` / `worktree-manager` / `golden-slice` / `ipc-stream` / `playtest-gate-execution`；本卡 `shown-text-digest` / `design-note` / `docs-check` / `scheme-snapshot-frozen-quotes` 不在失败名单）；Bugbot NEUTRAL 不挡合入。估算仍为 M。修卡未触发：未扩 `writable_paths`。诚实口径：**可反哺项第一批已交付（文档口径五条 + 白话哈希存证 + escalation_missed 记录 + 五类↔八类对照表），R23/R18 拍板项未施工**。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。GAP-R22 与 GAP-STRESS 仍待原文。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.41b
+status: COMPLETED
+contract:
+  intent:
+    title: 目标态可反哺项第一批（文档口径 + 两条存证）
+    description: >-
+      从已存档的目标态蓝图里吸收八条，不替换现行合同单位。
+      文档五条：样板与工厂分开、台账 README 只留开放项、规格索引改成指针、
+      术语表写明方案与合同的差别、已完成卡标成档案。
+      两条存证：确认前展示的白话正文哈希计入冻结快照 digest；
+      escalation_missed 落一条记录。
+      另落五类与八类的对照表，不改现行五类。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J41B-P1
+      check: auto
+      text: >-
+        docs/README.md 写明样板只有 scheme.md、user-journey.md、glossary.md；
+        adr/、specs/ 与任务卡是造这个产品的工厂，不是用户合同。
+    - id: J41B-P2
+      check: auto
+      text: >-
+        docs/ledger/README.md 正文只留开放项。历史 P-流水留在 development-tasks-changelog.md，
+        不从 changelog 删除原文。
+    - id: J41B-P3
+      check: auto
+      text: >-
+        docs/specs/README.md 第 18 行不再写「设计定稿 · 待施工」。
+        改成指针：能力以任务卡状态和证据为准，总装图以 delivery-lifecycle.md 为准。
+    - id: J41B-P4
+      check: auto
+      text: >-
+        glossary.md 的「合同」条写明：方案是用户看见的整件事，合同是系统里单独验收的一段。
+        user-journey.md 仍按每份工作各点一次开工、一次合入来写，按钮文案不改。
+    - id: J41B-P5
+      check: auto
+      text: >-
+        development-tasks-index.md 的阅读说明写明 development-tasks-completed.md 是档案，
+        不参与「现行条款以谁为准」。
+    - id: J41B-P6
+      check: auto
+      text: >-
+        确认前实际展示的白话正文做 sha256，写入冻结快照并计入 schemeSnapshotDigest。
+        缺这段的旧快照仍可校验。不新增顾问 Agent。右栏不设系统提示。
+        surface_log 仍在 .stagent/records/surface-log。
+    - id: J41B-P7
+      check: auto
+      text: >-
+        escalation_missed 非空时落一条记录，字段为合同、决策、发现时间、是否已停在 PENDING_RESUME。
+        不上 R19 的回滚、披露、追认。
+    - id: J41B-P8
+      check: auto
+      text: >-
+        docs/ledger/decision-class-crosswalk.md 对照现行五类与目标态八类。
+        technical-design-and-knowledge.md §3 的五类原文不改，八类不写入规格正文。
+    - id: J41B-P9
+      check: auto
+      text: >-
+        施工 diff 不改 scheme-patch-engine 的 user_said / user_confirmed 不降级规则，
+        不改 deadlock-resilience.ts 里 D-3 把 PENDING_RESUME 推回 PREPARING 的方向。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - docs/README.md
+      - docs/ledger/README.md
+      - docs/specs/README.md
+      - docs/glossary.md
+      - docs/specs/development-tasks-index.md
+      - docs/ledger/decision-class-crosswalk.md
+      - daemon/pipeline/scheme-snapshot-store.ts
+      - daemon/server.ts
+      - src/lib/daemon-api.ts
+      - src/routes/index.tsx
+      - src/components/studio/SchemeReviewPane.tsx
+      - src/components/studio/ScopeAcceptanceBlock.tsx
+      - daemon/supervisor/design/design-step.ts
+      - tests/unit/scheme-snapshot-frozen-quotes.test.ts
+      - tests/unit/design-note.test.ts
+      - tests/unit/shown-text-digest.test.ts
+      - tests/unit/docs-check.test.ts
+    readonly_paths:
+      - docs/user-journey.md
+      - docs/specs/technical-design-and-knowledge.md
+      - docs/ledger/target-doc-system-spec.md
+      - docs/ledger/target-vs-current-gap-brief.md
+      - docs/specs/scheme-patch-engine.md
+      - daemon/state/deadlock-resilience.ts
+  verification:
+    commands:
+      - { alias: unit, executable: npx, args: [vitest, run, tests/unit/scheme-snapshot-frozen-quotes.test.ts, tests/unit/shown-text-digest.test.ts, tests/unit/design-note.test.ts, tests/unit/docs-check.test.ts] }
+      - { alias: docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    文档五条只改口径，不改 ADR。白话哈希接在 schemeSnapshotDigest 与 handleSchemeSnapshot：
+    确认请求带上已展示正文的 sha256，缺省的旧快照不参与 digest。
+    escalation_missed 由 runDesignStep 在现有检测之后写记录，不新增回滚流程。
+    对照表新建 decision-class-crosswalk.md。
+    daemon/server.ts 与 src/routes/index.tsx 只许改冻结入参这一处，不许拆路由或拆 Console。
+    路径不够时停工，按修卡上报，不自行扩面。
+  touches:
+    - { path: docs/README.md, change: modify, why: 样板与工厂分开, symbols: [] }
+    - { path: docs/ledger/README.md, change: modify, why: 正文只留开放项，历史流水不从 changelog 删除, symbols: [] }
+    - { path: docs/specs/README.md, change: modify, why: 第 18 行改成任务卡与总装图指针, symbols: [] }
+    - { path: docs/glossary.md, change: modify, why: 合同条写明方案与合同的差别, symbols: [] }
+    - { path: docs/specs/development-tasks-index.md, change: modify, why: 阅读说明标已完成卡为档案, symbols: [] }
+    - { path: docs/ledger/decision-class-crosswalk.md, change: create, why: 五类与八类对照，不改现行五类, symbols: [] }
+    - { path: daemon/pipeline/scheme-snapshot-store.ts, change: modify, why: schemeSnapshotDigest 计入已展示白话正文哈希, symbols: [schemeSnapshotDigest] }
+    - { path: daemon/server.ts, change: modify, why: handleSchemeSnapshot 接收并封存该哈希，不拆路由, symbols: [handleSchemeSnapshot] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: freezeSchemeSnapshot 增加已展示正文哈希字段, symbols: [freezeSchemeSnapshot] }
+    - { path: src/routes/index.tsx, change: modify, why: 确认调用传入已展示正文，不拆 Console, symbols: [] }
+    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 确认前决议区白话正文可被哈希, symbols: [SCHEME_DECISIONS_PLAIN_TEXT_VERSION] }
+    - { path: src/components/studio/ScopeAcceptanceBlock.tsx, change: modify, why: 确认前范围白话正文可被哈希, symbols: [SCOPE_ACCEPTANCE_PLAIN_TEXT_VERSION] }
+    - { path: daemon/supervisor/design/design-step.ts, change: modify, why: escalation_missed 落记录, symbols: [runDesignStep] }
+    - { path: tests/unit/scheme-snapshot-frozen-quotes.test.ts, change: modify, why: 旧快照无白话哈希段仍可校验, symbols: [] }
+    - { path: tests/unit/shown-text-digest.test.ts, change: create, why: 白话正文哈希计入 digest, symbols: [] }
+    - { path: tests/unit/design-note.test.ts, change: modify, why: 漏标记录含合同、决策、时间、是否停在 PENDING_RESUME, symbols: [] }
+    - { path: tests/unit/docs-check.test.ts, change: modify, why: 文档五条与对照表的门禁, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J41B-P1, test_path: tests/unit/docs-check.test.ts, level: unit, case: "样板与工厂分开" }
+    - { acceptance_id: J41B-P2, test_path: tests/unit/docs-check.test.ts, level: unit, case: "ledger 只留开放项" }
+    - { acceptance_id: J41B-P3, test_path: tests/unit/docs-check.test.ts, level: unit, case: "规格索引不再写待施工" }
+    - { acceptance_id: J41B-P4, test_path: tests/unit/docs-check.test.ts, level: unit, case: "术语与档案说明在" }
+    - { acceptance_id: J41B-P5, test_path: tests/unit/docs-check.test.ts, level: unit, case: "术语与档案说明在" }
+    - { acceptance_id: J41B-P6, test_path: tests/unit/shown-text-digest.test.ts, level: unit, case: "字段缺省时 digest" }
+    - { acceptance_id: J41B-P6, test_path: tests/unit/scheme-snapshot-frozen-quotes.test.ts, level: unit, debt: "旧快照缺省由 shown-text-digest 断言；本文件保持既有旧快照用例" }
+    - { acceptance_id: J41B-P7, test_path: tests/unit/design-note.test.ts, level: unit, case: "J41B-P7" }
+    - { acceptance_id: J41B-P8, test_path: tests/unit/docs-check.test.ts, level: unit, case: "对照表不改五类正文" }
+    - { acceptance_id: J41B-P9, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "以 #318 施工 diff 核对不改引擎与 D-3；无单独用例标题" }
+governance:
+  spec_refs:
+    - docs/ledger/target-doc-system-spec.md
+    - docs/ledger/target-vs-current-gap-brief.md
+    - docs/specs/technical-design-and-knowledge.md
+    - docs/specs/delivery-lifecycle.md
+  depends_on:
+    - { id: TASK-J.41a, kind: hard }
+    - { id: TASK-J.32a, kind: soft }
+  code_facts:
+    - { ref: "docs/README.md:5-5", note: "样板只有 scheme.md、user-journey.md、glossary.md；adr/specs/任务卡是工厂" }
+    - { ref: "docs/ledger/README.md:47-49", note: "正文只留开放项；历史流水留在 changelog，不删原文" }
+    - { ref: "docs/specs/README.md:18-18", note: "能力以任务卡状态和证据为准，总装图以 delivery-lifecycle.md 为准" }
+    - { ref: "docs/glossary.md:20-20", note: "方案是用户看见的整件事，合同是系统里单独验收的一段" }
+    - { ref: "docs/specs/development-tasks-index.md:3-3", note: "阅读说明已把 development-tasks-completed.md 标成档案" }
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:450-452", note: "shown_plain_text_sha256 存在才计入 digest；schema_version 仍为 1.2" }
+    - { ref: "src/routes/index.tsx:1585-1587", note: "freezeSchemeSnapshot 入参带确认前已展示正文哈希" }
+    - { ref: "daemon/server.ts:2461-2504", note: "handleSchemeSnapshot 合法才写入；省略则不写该段" }
+    - { ref: "daemon/supervisor/design/design-step.ts:257-273", note: "escalation-missed.json 含 contract_id、decisions、discovered_at、pending_resume" }
+    - { ref: "src/lib/design/design-note.ts::detectEscalations", note: "仍只负责发现漏标，不负责落记录" }
+  non_goals:
+    - 不拆 daemon/server.ts 的路由，不拆 src/routes/index.tsx 的 Console；这两项单列，不进本卡施工
+    - 不改 ADR-0015，不把合入改成方案级自动合入，不落 brief.md 那棵文件树
+    - 不补 GAP-R22 与 GAP-STRESS 的原文
+    - R23（带 rl 的批量确认无效则回落 ai_inferred）标「需引擎规则变更，单独评估」。本卡不改 user_said / user_confirmed 不降级
+    - R18（parked 停放）与 D-3 看门狗推回 PREPARING 方向相反。已拍板：不反哺（P-254）；本卡不改看门狗
+    - 不新增顾问 Agent，不给右栏加系统提示
+    - 不上 R19 的回滚、披露、追认
+    - 不把八类决策写进 technical-design-and-knowledge.md
+  fail:
+    - 拆分 server.ts 路由或 index.tsx 的 Console
+    - 修改 ADR-0015，或把每份合同的合入点击改成方案级自动合入
+    - 在用户项目根目录新增 brief.md、dialogue.md、gate.md 或 final.md
+    - 把 GAP-R22 或 T-1～T-7 情节写进本卡 diff
+    - 改写 scheme-patch-engine 的不降级规则，或改写 D-3 的自愈方向
+    - 给右栏注入系统提示，或新增一种顾问 Agent
+    - 修改 technical-design-and-knowledge.md §3 的五类清单
+    - 从 development-tasks-changelog.md 删除历史流水
+  adr_revisions: []
+  defaults: []
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 318, commit: 6f2ec657101983d0f263f0a80f8d0225244fa4c6 }
+```
+
+* **背景**：J.41a 已把目标态蓝图存档为未激活；本卡吸收第一批可反哺项。
+* **取舍**：可反哺项第一批已交付（文档口径五条 + 白话哈希存证 + escalation_missed 记录 + 五类↔八类对照表）。R18 已拍板：不反哺（P-254）。R23 仍未施工，单独评估。
+
+### 3.4bd daemon 路由拆分第一批（J.42 · 完工回写 P-258）
+
+<a id="task-j.42"></a>
+
+### 【Task J.42】daemon 路由拆分第一批：合同内联段抽出 `[COMPLETED · 立卡 P-256 · 修卡 P-257 · 施工 #324 · 完工回写 P-258]`
+
+> **归档注记（2026-11-21 · P-258）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266/#288/#291/#298/#301/#304/#307/#312/#318）。[#324](https://github.com/he18718143986-design/IDE/pull/324) squash `b331cd42efc7332b482ee57b692cfb47f9c40f85` 于 2026-11-21 14:09 香港时间合入（由我执行；GitHub mergedBy 为 `app/cursor`；pre-merge head `3389cad83c2b5f63427e5aca6121f471eb95db97`；父提交 `395964113ac6ed20c7520d5034df63d484cc4553`）。合入前必需面 12 项全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit 实跑通过；ubuntu/macOS 上原三处本卡红已转绿，无搬迁段行为、正则顺序或字段读写时机失败），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非阻断存量失败，`continue-on-error`；17 文件 30 项，对照 #318 基线 16 文件 29 项。`spawn-whitelist` 已转绿。`cli-host` 静态禁令在 main 上已是 18 条反斜杠对不上正斜杠白名单，本卡多出 `daemon\http\contract-routes.ts` 这一条，同因，不是新的缺陷类型。`multi-worktree-cross-talk` 期望 `STALE` 实际 `PASSED`，本卡未改该文件。其余 `spawn EINVAL` / `EFTYPE` / CRLF / 性能超时为存量）。Bugbot NEUTRAL 不挡合入。修卡为 P-257。估算仍为 M。诚实口径：**合同内联段已抽出至 `daemon/http/contract-routes.ts`，行为不变（状态码/错误码/正则顺序/字段读写时机保持），Console/第二批/front-door 未动**。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。R23 暂缓。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.42
+status: COMPLETED
+contract:
+  intent:
+    title: daemon 路由拆分第一批：合同内联段抽出
+    description: >-
+      把 handleHttpRequest 里仍内联的合同生命周期分支抽到
+      daemon/http/contract-routes.ts，前门留一行转交。
+      纯移动：不改状态码、错误码、正则顺序，不改实例字段的读写时机。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J42-P1
+      check: auto
+      text: >-
+        创建、scope-revision、gateway-violation、rework、admit、approve、
+        run-worker、merge、merge-decision、diff、diff-files、open-editor、
+        resume、return-to-pending、abort、execute 从 handleHttpRequest 抽到
+        daemon/http/contract-routes.ts。前门对该前缀只留一行转交。
+    - id: J42-P2
+      check: auto
+      text: >-
+        正则顺序不变：scope-revision，然后 gateway-violation，然后 rework，
+        然后通用 admit|approve|execute|run-worker|open-editor|diff-files|diff|merge-decision|merge|evidence|resume|abort|return-to-pending。
+        改了顺序即失败。
+    - id: J42-P3
+      check: auto
+      text: >-
+        状态码与错误码不变。判断条件不顺手改写。改了任一即失败。
+    - id: J42-P4
+      check: auto
+      text: >-
+        activeContracts、targetAdvancedContracts、证据监听、真预览进程、
+        deadlock、stoppingContracts、vault、orchestrator 的读写时机不变。
+        改了任一即失败。
+    - id: J42-P5
+      check: auto
+      text: >-
+        新文件接收窄上下文：repoRoot、orchestrator、sendJson、readJsonBody、
+        sendActionError，以及合同更新与证据监听的开关。
+        接口太宽时可以暂传 server，文件头必须注明这是过渡。
+    - id: J42-P6
+      check: auto
+      text: >-
+        合入前跑过 merge-decision-d4、resume-abort、scheme-confirm-http-injection、
+        scheme-confirm-scope-drift、scope-revision-api、diff-endpoint-security、
+        golden-slice。这些测试仍打在 Daemon 的 HTTP 上。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/http/contract-routes.ts
+      - daemon/server.ts
+      - tests/integration/merge-decision-d4.test.ts
+      - tests/integration/resume-abort.test.ts
+      - tests/integration/scheme-confirm-http-injection.test.ts
+      - tests/integration/scheme-confirm-scope-drift.test.ts
+      - tests/daemon/scope-revision-api.test.ts
+      - tests/daemon/diff-endpoint-security.test.ts
+      - tests/e2e/golden-slice.test.ts
+      - tests/unit/audited-return-to-pending-wiring.test.ts
+      - tests/unit/cli-host-claude-code.test.ts
+      - tests/unit/spawn-whitelist.test.ts
+    readonly_paths:
+      - src/routes/index.tsx
+      - docs/ledger/route-split-assessment-brief.md
+  verification:
+    commands:
+      - { alias: contract-http, executable: npx, args: [vitest, run, tests/integration/merge-decision-d4.test.ts, tests/integration/resume-abort.test.ts, tests/integration/scheme-confirm-http-injection.test.ts, tests/integration/scheme-confirm-scope-drift.test.ts, tests/daemon/scope-revision-api.test.ts, tests/daemon/diff-endpoint-security.test.ts, tests/e2e/golden-slice.test.ts] }
+design:
+  approach: >-
+    只搬合同内联段。前门在 /api/contracts 鉴权之后调用新文件的一个函数。
+    优先传窄上下文。若参数太多，暂传 server，并在 contract-routes.ts 文件头写明过渡。
+    测试文件只在导入路径不得不改时才改，不改断言。
+    P-257：三份静态对齐测试允许改读取目标与白名单登记，不放宽 return-to-pending 必须走 orchestrator，不改产品行为。
+    execFileSync 留在搬家段内，把新文件登记进既有白名单，登记理由沿用「Diff API 的 git diff」。
+    要抽 front-door、要搬已有 handle*、或要动 Console，先停工按修卡上报。
+  touches:
+    - { path: daemon/http/contract-routes.ts, change: modify, why: 已存在（施工分支已引入），承接合同生命周期内联分支, symbols: [handleContractRoutes] }
+    - { path: daemon/server.ts, change: modify, why: handleHttpRequest 对 /api/contracts 改为一行转交, symbols: [handleHttpRequest] }
+    - { path: tests/integration/merge-decision-d4.test.ts, change: modify, why: 仅当导入路径不得不改, symbols: [] }
+    - { path: tests/integration/resume-abort.test.ts, change: modify, why: 仅当导入路径不得不改, symbols: [] }
+    - { path: tests/integration/scheme-confirm-http-injection.test.ts, change: modify, why: 仅当导入路径不得不改, symbols: [] }
+    - { path: tests/integration/scheme-confirm-scope-drift.test.ts, change: modify, why: 仅当导入路径不得不改, symbols: [] }
+    - { path: tests/daemon/scope-revision-api.test.ts, change: modify, why: 仅当导入路径不得不改, symbols: [] }
+    - { path: tests/daemon/diff-endpoint-security.test.ts, change: modify, why: 仅当导入路径不得不改, symbols: [] }
+    - { path: tests/e2e/golden-slice.test.ts, change: modify, why: 仅当导入路径不得不改, symbols: [] }
+    - { path: tests/unit/audited-return-to-pending-wiring.test.ts, change: modify, why: P-257 读取目标改到 contract-routes.ts，断言仍要求 return-to-pending 走 orchestrator, symbols: [] }
+    - { path: tests/unit/cli-host-claude-code.test.ts, change: modify, why: P-257 白名单登记 contract-routes.ts，理由沿用 Diff API 的 git diff, symbols: [] }
+    - { path: tests/unit/spawn-whitelist.test.ts, change: modify, why: P-257 白名单登记 contract-routes.ts，理由沿用 Diff API 的 git diff, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J42-P1, test_path: tests/e2e/golden-slice.test.ts, level: e2e, debt: 既有 HTTP 路径；本卡未新增用例 }
+    - { acceptance_id: J42-P2, test_path: tests/daemon/scope-revision-api.test.ts, level: unit, debt: 既有范围修订路径；顺序约束靠 diff 核对 }
+    - { acceptance_id: J42-P3, test_path: tests/integration/merge-decision-d4.test.ts, level: integration, debt: 既有合入与 409 路径 }
+    - { acceptance_id: J42-P4, test_path: tests/integration/resume-abort.test.ts, level: integration, debt: 既有恢复与中止路径 }
+    - { acceptance_id: J42-P5, test_path: tests/integration/scheme-confirm-http-injection.test.ts, level: integration, debt: 既有确认后建合同路径 }
+    - { acceptance_id: J42-P6, test_path: tests/daemon/diff-endpoint-security.test.ts, level: unit, debt: 既有 diff 路径；施工跑卡面列出的七个文件 }
+governance:
+  spec_refs:
+    - docs/ledger/route-split-assessment-brief.md
+  depends_on: []
+  code_facts:
+    - { ref: "daemon/server.ts::handleHttpRequest", note: 前门在 /api/contracts 鉴权之后转交 handleContractRoutes }
+    - { ref: "daemon/http/contract-routes.ts:63-991", note: 搬家后的合同路由整段，含未命中路径的 404 }
+    - { ref: "daemon/http/contract-routes.ts:234-466", note: 正则顺序仍是 scope-revision（235）、gateway-violation（304）、rework（340）、通用动作正则（465-466） }
+    - { ref: "daemon/http/contract-routes.ts:990-991", note: 未命中合同路径的 404 在本文件末尾 }
+    - { ref: "docs/ledger/route-split-assessment-brief.md:163-177", note: 正则顺序与实例字段清单是只读约束 }
+  non_goals:
+    - 不拆 src/routes/index.tsx 的 Console
+    - 不把已经独立的 handle* 前缀再搬文件
+    - 不拆 /api/repo、/api/knowledge、/api/arch/graph、/api/client-events
+    - 不抽 front-door；若施工发现必须抽，停工上报，不写进本卡 diff
+    - 不改状态码、错误码、正则顺序、实例字段读写时机
+    - 不改产品行为，不评估功能改动
+  fail:
+    - 改状态码、错误码或判断条件
+    - 调换 scope-revision、gateway-violation、rework 与通用动作正则的顺序
+    - 改变 activeContracts、targetAdvancedContracts、证据监听、真预览进程、deadlock、stoppingContracts、vault、orchestrator 的读写时机
+    - 修改 Console 或把第二批前缀写进本卡 diff
+    - 未跑卡面列出的七个测试就声称可合入
+  adr_revisions: []
+  defaults: []
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 324, commit: b331cd42efc7332b482ee57b692cfb47f9c40f85 }
+```
+
+
+* **背景**：路由拆分只读评估（P-255）建议暂缓整拆，只立合同内联段第一批。
+* **取舍**：合同内联段已抽出至 `daemon/http/contract-routes.ts`，行为不变（状态码/错误码/正则顺序/字段读写时机保持）。Console、第二批 `handle*`、front-door 未动。Windows 路径分隔符导致的 cli-host 白名单失配是存量，记入 ledger 开放项，不在本卡修。
+
+### 3.4be Windows 白名单路径分隔符归一化（J.43 · 完工回写 P-260）
+
+<a id="task-j.43"></a>
+
+### 【Task J.43】Windows 白名单路径分隔符归一化 `[COMPLETED · 立卡 P-259 · 施工 #329 · 完工回写 P-260]`
+
+> **归档注记（2026-11-21 · P-260）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266/#288/#291/#298/#301/#304/#307/#312/#318/#324）。[#329](https://github.com/he18718143986-design/IDE/pull/329) squash `32bdab937c24d0420fd0487d802aab328a9f3eef` 于 2026-11-21 15:18 香港时间合入（由我执行；pre-merge head `a2cbee6aa4c46fea6af69bc06aed04d0a43265c0`；父提交 `13a6bb14b5124a10d37c69843682cc1380537987`）。合入前必需面 12 项全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit 实跑通过，无本卡回归），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非阻断存量失败，`continue-on-error`）。Windows Unit 由 #324 基线 17 文件 30 项变为 16 文件 28 项。cli-host 静态禁令不再出现，日志无 `静态禁令` 与 `daemon\http\contract-routes.ts`。少掉的另一项是 `multi-worktree-cross-talk`（期望 `STALE`、实际 `PASSED`），本次未复现，不是本卡修的。其余 `spawn EINVAL` / `EFTYPE` / CRLF / 性能超时未动。Bugbot NEUTRAL 不挡合入。估算仍为 S。`spawn-whitelist.test.ts` 未改。诚实口径：**Windows 白名单路径分隔符已归一化（`split(path.sep).join("/")`），cli-host 静态禁令 19 条反斜杠红消除（Windows Unit 17 文件 30 项 → 16 文件 28 项），其余 Windows 存量失败未动**。ledger 第 60 行挂账已销，注明已修 J.43。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。R23 暂缓。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.43
+status: COMPLETED
+contract:
+  intent:
+    title: Windows 白名单路径分隔符归一化
+    description: >-
+      白名单匹配处把 path.relative 的结果收成正斜杠，
+      使 Windows 上的反斜杠路径能对上既有白名单。
+      只动匹配，不改白名单条目，不改产品行为。
+    risk_level: LOW
+  acceptance:
+    - id: J43-P1
+      check: auto
+      text: >-
+        cli-host 静态禁令在比较前把路径分隔符收成正斜杠。
+        Windows 上那 19 条反斜杠路径不再因为分隔符对不上而报红。
+        以 #324 的 Windows Unit 17 文件 30 项为对照，这条断言转绿。
+    - id: J43-P2
+      check: auto
+      text: >-
+        ubuntu 与 macOS 上 spawn-whitelist 和 cli-host-claude-code 这两份测试保持绿。
+    - id: J43-P3
+      check: auto
+      text: >-
+        不改白名单条目内容，不改「未登记即红」的断言口径，不改产品代码行为。
+        spawn EINVAL、EFTYPE、CRLF、性能门禁超时不在本卡范围。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - tests/unit/cli-host-claude-code.test.ts
+      - tests/unit/spawn-whitelist.test.ts
+    readonly_paths:
+      - docs/ledger/README.md
+      - daemon/http/contract-routes.ts
+  verification:
+    commands:
+      - { alias: whitelist-sep, executable: npx, args: [vitest, run, tests/unit/cli-host-claude-code.test.ts, tests/unit/spawn-whitelist.test.ts] }
+design:
+  approach: >-
+    匹配在测试里。cli-host-claude-code.test.ts 第 743 行把 path.relative 的结果直接拿去和第 749 行的正斜杠集合比较。
+    在这一处把反斜杠收成正斜杠，再用同一字符串做 has 和 startsWith。
+    spawn-whitelist.test.ts 第 294 行的 relOf 已经 split(path.sep).join("/")。
+    该行已归一化则不改它。无必要不制造 diff。
+    若发现必须改产品代码才能归一化，停工按修卡上报，不写进本卡 diff。
+  touches:
+    - { path: tests/unit/cli-host-claude-code.test.ts, change: modify, why: 静态禁令的 path.relative 结果收成正斜杠, symbols: [] }
+    - { path: tests/unit/spawn-whitelist.test.ts, change: modify, why: 仅当 relOf 的既有归一化不够时才改, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J43-P1, test_path: tests/unit/cli-host-claude-code.test.ts, level: unit, debt: 既有静态禁令；本卡只归一化路径再比较 }
+    - { acceptance_id: J43-P2, test_path: tests/unit/spawn-whitelist.test.ts, level: unit, debt: 既有白名单扫描；ubuntu 与 macOS 保持绿 }
+    - { acceptance_id: J43-P3, test_path: tests/unit/cli-host-claude-code.test.ts, level: unit, debt: 不改白名单条目与断言口径；产品代码不在 writable_paths }
+governance:
+  spec_refs:
+    - docs/ledger/README.md
+  depends_on: []
+  code_facts:
+    - { ref: "tests/unit/cli-host-claude-code.test.ts:743-749", note: 第 743 行已 split(path.sep).join("/")，再与正斜杠白名单比较 }
+    - { ref: "tests/unit/spawn-whitelist.test.ts:293-294", note: relOf 已把 path.sep 收成正斜杠 }
+    - { ref: "docs/ledger/README.md:60-60", note: 原挂账已销，注明已修 J.43 }
+  non_goals:
+    - 不修 spawn EINVAL、EFTYPE、CRLF、性能门禁超时
+    - 不改白名单条目内容
+    - 不改「未登记即红」的断言口径
+    - 不改产品代码行为
+  fail:
+    - 改动产品代码行为
+    - 增删白名单条目来消掉这 19 条红
+    - 放宽断言，让未登记路径也能通过
+    - 把 EINVAL、EFTYPE、CRLF 或性能超时写进本卡 diff
+  adr_revisions: []
+  defaults: []
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 329, commit: 32bdab937c24d0420fd0487d802aab328a9f3eef }
+```
+
+
+* **背景**：白名单写正斜杠，Windows 的 `path.relative` 返回反斜杠。
+* **取舍**：只在 cli-host 静态禁令比较前把路径收成正斜杠。19 条反斜杠红消除。其余 Windows 存量失败未动。
+
+### 3.4bf 有钥匙就注入意图编译器模型客户端（J.45 · 完工回写 P-264）
+
+<a id="task-j.45"></a>
+
+### 【Task J.45】有钥匙就注入意图编译器模型客户端 `[COMPLETED · 立卡 P-263 · 施工 #334 · 完工回写 P-264]`
+
+> **归档注记（2026-11-21 · P-264）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266/#288/#291/#298/#301/#304/#307/#312/#318/#324/#329；Bugbot 未跑成不挡）。[#334](https://github.com/he18718143986-design/IDE/pull/334) squash `92e5a63c43ed4d174a65efc4b12264c974aef258` 于 2026-11-21 22:14 香港时间合入（由我执行；pre-merge head `0de1131f5006d938003879736ae2e74077da3050`；父提交 `4bcc9965bc795deae1b1282af1c8b38a03c36de8`）。合入前必需面 12 项全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit 实跑通过，无本卡相关红），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit，16 文件 28 项，`continue-on-error`）。Windows 上 `intent-compiler-openai-client` 4 项与 `intent-compiler-journey-wiring` 2 项为绿。Bugbot 合入时仍 `IN_PROGRESS`（用量上限，request `644552fa-7c8c-4eb5-9e6c-f708d7c6ef71`）。没有 `TASK-J.44`。估算仍为 M。诚实口径：**有钥匙时注入意图编译器模型客户端已交付（常驻客户端 + 显式 hasModelKey + generate 内重读钥匙），无钥匙保持离线不产方案；端到端浏览器验证未做**。ledger 第 62 行挂账已销，注明已修 J.45。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。R23 暂缓。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.45
+status: COMPLETED
+contract:
+  intent:
+    title: 有钥匙就注入意图编译器模型客户端
+    description: >-
+      生产 Daemon 常驻一个 IntentCompilerModelClient。
+      有钥匙时一句需求写成可审阅的 SchemeDraftV2；
+      无钥匙仍走离线，不写台账。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J45-P1
+      check: auto
+      text: >-
+        有钥匙时，右栏一句需求经编译循环把 SchemeDraftV2 写入台账，
+        条目带 user_said 证据。中栏可审阅，确认方案出现。
+    - id: J45-P2
+      check: auto
+      text: >-
+        无钥匙时仍走 runOffline，只打横幅，不写台账，不产方案。
+    - id: J45-P3
+      check: auto
+      text: >-
+        客户端对象常驻。ensureIntentCompilerHost 显式传
+        hasModelKey: () => getRuntimeKey() != null。
+        generate 内再读一次 getRuntimeKey()。
+        启动之后用 setRuntimeKey 写入的钥匙，不重启进程也能被编译循环用到。
+        不得用「客户端非空」代替有钥匙。
+    - id: J45-P4
+      check: auto
+      text: >-
+        不接 onOfflineFallback 把 buildOfflineSchemeDraft 写入台账。
+        不改右栏逐字节相同，不把编译结果写进右栏。
+        不接 buildSupervisorPrompt。不改 ADR-0015。不激活蓝图。
+        不做重试、超时、降级策略增强。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/supervisor/intent-compiler/openai-compiler-client.ts
+      - daemon/server.ts
+      - bin/stagent.ts
+      - tests/unit/intent-compiler-openai-client.test.ts
+      - tests/integration/intent-compiler-journey-wiring.test.ts
+    readonly_paths:
+      - daemon/supervisor/intent-compiler/compile-loop.ts
+      - src/lib/journey/compiler-output-schema.ts
+      - daemon/worker/key-store.ts
+      - daemon/worker/openai-client.ts
+      - src/routes/index.tsx
+      - docs/ledger/adr0015-breakpoint-fix-assessment.md
+  verification:
+    commands:
+      - { alias: compiler-client, executable: npx, args: [vitest, run, tests/unit/intent-compiler-openai-client.test.ts, tests/integration/intent-compiler-journey-wiring.test.ts] }
+design:
+  approach: >-
+    新建 daemon/supervisor/intent-compiler/openai-compiler-client.ts。
+    generate 收到 system、prompt、enums、signal、temperature 0。
+    用 buildCompilerOutputSchema(enums) 作 schema，走 generateObject，
+    把 object 放进 IntentCompilerModelResult.ok=true 的 raw。
+    用量映射为 input_tokens / output_tokens，model_id 用 getRuntimeModel()。
+    调用前再读 getRuntimeKey()；没有钥匙返回 ok:false reason invalid，不发请求。
+    不复用 OpenAiWorkerClient。不加重试。循环里已有的超时中止保持不动。
+    ensureIntentCompilerHost 在没有显式测试客户端时，传入这个常驻客户端，
+    并传 hasModelKey: () => getRuntimeKey() != null。
+    测试若传入 intentCompilerModelClient，仍用该桩，并传 hasModelKey: () => true，
+    以免桩被钥匙判断挡掉。
+    bin/stagent.ts 在 writable_paths 里。客户端改在 Daemon 内构造时，这个文件不改。
+    评估报告第 24 行的启动时一次性构造，以本卡为准，不照做。
+  touches:
+    - { path: daemon/supervisor/intent-compiler/openai-compiler-client.ts, change: create, why: 生产用 IntentCompilerModelClient, symbols: [] }
+    - { path: daemon/server.ts, change: modify, why: ensureIntentCompilerHost 接常驻客户端与 hasModelKey, symbols: [ensureIntentCompilerHost] }
+    - { path: bin/stagent.ts, change: modify, why: 仅当必须从进程入口传入客户端, symbols: [] }
+    - { path: tests/unit/intent-compiler-openai-client.test.ts, change: create, why: 无钥匙不请求；setRuntimeKey 之后 generate 读到新钥匙, symbols: [] }
+    - { path: tests/integration/intent-compiler-journey-wiring.test.ts, change: modify, why: 仅当现有桩或离线用例必须跟着接线调整, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J45-P1, test_path: tests/unit/intent-compiler-openai-client.test.ts, level: unit, case: 写出可审阅方案 }
+    - { acceptance_id: J45-P2, test_path: tests/integration/intent-compiler-journey-wiring.test.ts, level: integration, case: 无模型钥匙时走离线兜底 }
+    - { acceptance_id: J45-P3, test_path: tests/unit/intent-compiler-openai-client.test.ts, level: unit, case: 无钥匙不发请求 }
+    - { acceptance_id: J45-P4, test_path: tests/unit/intent-compiler-openai-client.test.ts, level: unit, case: 此前无钥匙不写台账 }
+governance:
+  spec_refs:
+    - docs/ledger/adr0015-mainline-breakpoint.md
+    - docs/ledger/adr0015-breakpoint-fix-assessment.md
+  depends_on: []
+  code_facts:
+    - { ref: "daemon/supervisor/intent-compiler/openai-compiler-client.ts:25-28", note: generate 内 getRuntimeKey() == null 则 ok false、reason invalid，不发请求 }
+    - { ref: "daemon/supervisor/intent-compiler/openai-compiler-client.ts:44-60", note: generateObject 用 buildCompilerOutputSchema，maxRetries 0，raw 为 object，model_id 为 getRuntimeModel() }
+    - { ref: "daemon/server.ts:651-657", note: 选项缺省时构造常驻生产客户端，不看启动时有没有钥匙 }
+    - { ref: "daemon/server.ts:990-992", note: 生产路径 hasModelKey 为 getRuntimeKey() != null；显式桩为 () => true }
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:318-321", note: hasModelKey 为假或 modelClient 为 null 都走 runOffline }
+    - { ref: "daemon/worker/key-store.ts:68-69", note: getRuntimeKey 读进程内钥匙，否则 OPENAI_API_KEY }
+    - { ref: "tests/unit/intent-compiler-openai-client.test.ts:196-269", note: 无钥匙不写台账；setRuntimeKey 后写出 user_said，中栏 available 为真 }
+    - { ref: "bin/stagent.ts:344-351", note: createDaemon 仍不传 intentCompilerModelClient }
+  non_goals:
+    - 不接 onOfflineFallback，不把 buildOfflineSchemeDraft 写入台账
+    - 不改右栏逐字节相同，不把编译结果写进右栏
+    - 不接 buildSupervisorPrompt
+    - 不改 ADR-0015，不激活蓝图
+    - 不做重试、超时、降级策略增强
+  fail:
+    - 用「客户端非空」代替 hasModelKey
+    - 无钥匙时调用模型或写入台账
+    - 复用 OpenAiWorkerClient 的文件补丁协议
+    - 把离线启发式写入台账
+    - 修改右栏发送正文或 ADR-0015
+  adr_revisions: []
+  defaults: []
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 334, commit: 92e5a63c43ed4d174a65efc4b12264c974aef258 }
+```
+
+* **背景**：官方 Daemon 不注入意图编译器模型客户端，一句需求写不出可审阅方案。
+* **取舍**：客户端常驻，显式 `hasModelKey`，`generate` 内再读钥匙。无钥匙仍离线、不写台账。端到端浏览器验证未做。
+
+### 3.4bg 编译器模型失败留下原因原文（J.46 · 完工回写 P-266）
+
+<a id="task-j.46"></a>
+
+### 【Task J.46】编译器模型失败留下原因原文 `[COMPLETED · 立卡 P-265 · 施工 #337 · 完工回写 P-266]`
+
+> **归档注记（2026-11-22 · P-266）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266–#334）。[#337](https://github.com/he18718143986-design/IDE/pull/337) squash `0ff3419aa4729e183c0cfb9ce070fb4daa97c77c` 于 2026-11-22 13:29 香港时间合入（由我执行；pre-merge head `fcce8eafc14337c85c8eb92d03a1f704ccca5d71`；父提交 `664ba71fff95461a4bb4ffb227ab5264386b393a`）。合入前必需面 12 项全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit 实跑通过，无本卡相关红），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit，17 文件 30 项，`continue-on-error`）。Windows 上 `intent-compiler-model-failure-log.test.ts` 1 项为绿。多出的 `multi-worktree-cross-talk` 2 项期望 `STALE`、实际 `PASSED`（第 190 行），#324 出现、#329 未复现、#337 复现，与本卡无关、未修。Bugbot NEUTRAL 不挡。估算仍为 S。诚实口径：**编译器模型失败已透出原因原文（`client_detail`，钥匙抹为 `[REDACTED]`），原因码保留在 `detail`；失败仍不写台账；端点选择/重试/baseURL 未动；`multi-worktree-cross-talk` 间歇性失败（STALE/PASSED）与本卡无关、未修**。端到端浏览器验证仍未做。`network` 根因待 `client_detail` 透出后复测定位。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。R23 暂缓。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.46
+status: COMPLETED
+contract:
+  intent:
+    title: 编译器模型失败留下原因原文
+    description: >-
+      有钥匙时模型调用失败，intent_compiler 日志要同时留下原因码和客户端 detail。
+      detail 里的钥匙必须抹掉。失败仍然不写台账。
+    risk_level: LOW
+  acceptance:
+    - id: J46-P1
+      check: auto
+      text: >-
+        模型结果 ok 为 false 时，intent_compiler 的 compiler_failure 仍写原因码
+        （例如 network），并另写 client_detail，内容来自客户端的 detail。
+        不再只有一个 network。
+    - id: J46-P2
+      check: auto
+      text: >-
+        client_detail 若含当前 getRuntimeKey() 或 sk- 开头的长钥匙样式，日志里换成
+        [REDACTED]。日志不得出现钥匙原文。
+    - id: J46-P3
+      check: auto
+      text: >-
+        失败仍不写 SchemeDraftV2。不加重试，不加超时，不改 baseURL 选择。
+        不把编译结果写进右栏。不改 ADR-0015。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/supervisor/intent-compiler/compile-loop.ts
+      - tests/unit/intent-compiler-model-failure-log.test.ts
+    readonly_paths:
+      - daemon/supervisor/intent-compiler/openai-compiler-client.ts
+      - daemon/worker/key-store.ts
+      - src/routes/index.tsx
+      - docs/ledger/README.md
+  verification:
+    commands:
+      - { alias: compiler-failure-log, executable: npx, args: [vitest, run, tests/unit/intent-compiler-model-failure-log.test.ts] }
+design:
+  approach: >-
+    真钥匙核对（main 61fc529，试玩目录 stagent-j45-key-playtest）：
+    POST /api/supervisor/turns「我要一个登录页」返回 201。
+    约 1.6s 后日志为 compiler_failure、stage=model、detail=network、elapsed_ms=436。
+    没有 active.json。436ms 不是 30s 超时。
+    客户端已把异常原文放进 result.detail，循环在 compile-loop.ts 第 392 行只把
+    modelResult.reason 交给 noteFailure，原文被丢掉。
+    施工只改这一处记录：原因码仍放 detail，另加 client_detail。
+    写入前去掉 getRuntimeKey() 和 sk- 长串。
+    不改 openai-compiler-client 的端点选择。调用时的 provider / baseURL 没有记在那次现象里，
+    本卡不把它当成已证实的原因。若施工发现客户端丢掉了已经保存的 baseURL，停工修卡。
+    不重试。失败仍不写台账，不改右栏。
+  touches:
+    - { path: daemon/supervisor/intent-compiler/compile-loop.ts, change: modify, why: 模型失败日志补上抹掉钥匙后的 client_detail, symbols: [noteFailure] }
+    - { path: tests/unit/intent-compiler-model-failure-log.test.ts, change: create, why: 桩客户端返回 network 与含钥匙的 detail，断言日志, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J46-P1, test_path: tests/unit/intent-compiler-model-failure-log.test.ts, level: unit, case: 原因码仍是 network }
+    - { acceptance_id: J46-P2, test_path: tests/unit/intent-compiler-model-failure-log.test.ts, level: unit, case: 钥匙已抹掉 }
+    - { acceptance_id: J46-P3, test_path: tests/unit/intent-compiler-model-failure-log.test.ts, level: unit, case: 不写台账 }
+governance:
+  spec_refs:
+    - docs/ledger/adr0015-mainline-breakpoint.md
+  depends_on: []
+  code_facts:
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:392-396", note: 原因码仍传 noteFailure 第二参；client_detail 放进 extra }
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:615-615", note: extra 展开进 compiler_failure }
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:655-665", note: "getRuntimeKey 非空整段替换；sk- 后 8 位以上替换为 [REDACTED]" }
+    - { ref: "tests/unit/intent-compiler-model-failure-log.test.ts:106-115", note: detail 仍为 network；client_detail 为抹钥匙后的原文；casWrite 为 0 }
+  non_goals:
+    - 不重试，不加第二套超时，不做降级
+    - 不改 baseURL 或供应商选择
+    - 失败时不写 SchemeDraftV2
+    - 不把编译结果写进右栏
+    - 不改 ADR-0015
+    - 不把端到端浏览器验证算进本卡
+  fail:
+    - 日志里出现钥匙原文
+    - 失败时写入台账
+    - client_detail 仍然只有 network，没有客户端原文
+    - 改动右栏或 ADR-0015
+  adr_revisions: []
+  defaults: []
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 337, commit: 0ff3419aa4729e183c0cfb9ce070fb4daa97c77c }
+```
+
+* **背景**：有钥匙时模型调用失败，日志只有原因码 `network`，客户端原文被丢掉。
+* **取舍**：原因码留在 `detail`，另写抹掉钥匙后的 `client_detail`。失败仍不写台账。端点选择、重试、baseURL 未动。
+
+### 3.4bh 确认门禁标题不足：诊断与修复（J.47 · 完工回写 P-269）
+
+<a id="task-j.47"></a>
+
+### 【Task J.47】确认门禁标题不足：诊断与修复 `[COMPLETED · 立卡 P-268 · 施工 #342 · 完工回写 P-269]`
+
+> **归档注记（2026-11-22 · P-269）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266–#339）。[#342](https://github.com/he18718143986-design/IDE/pull/342) squash `1dfac26986eb13c9a48817d9818788fbc0f13ab5` 于 2026-11-22 18:58 香港时间合入（由我执行；pre-merge head `ea4f9da596f53cc455a525a19f431c5571751795`；父提交 `8ac0bcaa02eab92a86d36d96c085d72ba32fda27`）。合入前必需面 12 项全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit 实跑通过，本卡用例通过），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit，16 文件 28 项，`continue-on-error`）。`compiler-title-fallback.test.ts` 不在失败名单。`multi-worktree-cross-talk` 本轮未复现。Bugbot NEUTRAL 不挡。估算仍为 S。诚实口径：**组装兜底注入 `set_title` 已交付（模块名优先、quotes 兜底、已有不重复），门禁阈值未动；J47-P4 已销（P-274）：真钥匙实测 HEAD `bcf8b08`，`scheme-confirm` 的 `disabled` 为 `false`；判定用生产同一套逻辑（无同源静态页，非 DOM 点击）；未点按钮、未冻结**。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。R23 暂缓。Console 拆分与第二批未立卡。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.47
+status: COMPLETED
+contract:
+  intent:
+    title: 确认门禁标题不足：诊断与修复
+    description: >-
+      真钥匙下一句「我要一个登录页」落账后，方案 title 至少 2 字，
+      中栏「确认方案」按钮可点（不再因标题空被禁用）。
+    risk_level: LOW
+  acceptance:
+    - id: J47-P1
+      check: auto
+      text: >-
+        组装输入仅含 upsert_module（无 set_title）、模块 name 长度≥2 时，
+        assembleCompilerOutput 产出的 ops 含一条 set_title，value 长度≥2，
+        evidence 非空。
+    - id: J47-P2
+      check: auto
+      text: >-
+        组装输入已含 set_title 时，不额外再注入第二条 set_title。
+    - id: J47-P3
+      check: auto
+      text: >-
+        isReviewableScheme / evaluateSchemeConfirmation 的标题≥2 字阈值与
+        「方案摘要不足…」文案未改；单测或静态对照证明门禁文件未改阈值行。
+    - id: J47-P4
+      check: playtest
+      text: >-
+        真钥匙同一句「我要一个登录页」后，active.json 的 draft.title trim 长度≥2；
+        浏览器打开方案审阅，data-testid=scheme-confirm 的 disabled 为 false。
+        本条验证「可点」即可，不要求点下去冻结开工。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/lib/journey/compiler-output-schema.ts
+      - docs/specs/intent-compiler-prompt.md
+      - tests/unit/compiler-title-fallback.test.ts
+      - docs/ledger/j47-title-gate-diagnosis-brief.md
+    readonly_paths:
+      - src/lib/journey/scheme-draft.ts
+      - daemon/supervisor/intent-compiler/scheme-midpane-projection.ts
+      - src/components/studio/SchemeReviewPane.tsx
+  verification:
+    commands:
+      - { alias: title-fallback, executable: npx, args: [vitest, run, tests/unit/compiler-title-fallback.test.ts] }
+      - { alias: compiler-schema, executable: npx, args: [vitest, run, tests/unit/compiler-output-schema.test.ts] }
+design:
+  approach: >-
+    诊断（P-268 已做，见 docs/ledger/j47-title-gate-diagnosis-brief.md）：
+    试玩台账 title/summary 均为空字符串；last_journal 仅 upsert_module 一条；
+    midpane title 亦空——模型未输出 set_title，非组装/投影丢字段。
+    门禁 isReviewableScheme 读 draft.title 正确；模块=1 已过摘要/模块支路，卡在标题≥2。
+    施工：assembleCompilerOutput 在无 set_title 时优先用首个模块 name 注入 set_title 并带证据。
+    模块名不够时只用 raw.quotes 里已有的文字。不把 transcript 传进函数，不改签名。
+    可选 prompt 一句提醒。不改门禁阈值与文案。
+    不改右栏、不改 ADR-0015。真钥匙浏览器只验按钮可点，不强制冻结。
+  touches:
+    - { path: src/lib/journey/compiler-output-schema.ts, change: modify, why: 组装收口注入缺失的 set_title 兜底, symbols: [assembleCompilerOutput] }
+    - { path: docs/specs/intent-compiler-prompt.md, change: modify, why: 可选一句提醒首轮须 set_title, symbols: [] }
+    - { path: tests/unit/compiler-title-fallback.test.ts, change: create, why: 兜底与不重复注入断言, symbols: [] }
+    - { path: docs/ledger/j47-title-gate-diagnosis-brief.md, change: modify, why: 诊断与方案简报（立卡已建）, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J47-P1, test_path: tests/unit/compiler-title-fallback.test.ts, level: unit, case: 无 set_title 时注入 }
+    - { acceptance_id: J47-P2, test_path: tests/unit/compiler-title-fallback.test.ts, level: unit, case: 已有 set_title 不重复 }
+    - { acceptance_id: J47-P3, test_path: tests/unit/compiler-title-fallback.test.ts, level: unit, case: 门禁阈值未改 }
+    - { acceptance_id: J47-P4, test_path: tests/unit/compiler-title-fallback.test.ts, level: e2e, debt: "真钥匙手工看 scheme-confirm 的 disabled 为 false；不点按钮、不冻结。完工以实测记录销账，不写成 CI 的 it()" }
+governance:
+  spec_refs:
+    - docs/specs/intent-compiler-prompt.md
+  depends_on:
+    - { id: TASK-J.45, kind: hard }
+    - { id: TASK-J.46, kind: soft }
+  code_facts:
+    - { ref: "src/lib/journey/scheme-draft.ts:524-528", note: isReviewableScheme 要求 title≥2 且 summary≥8 或 modules≥1；本次卡在 title }
+    - { ref: "src/lib/journey/scheme-draft.ts:638-639", note: 不可审时推入「方案摘要不足，至少需要可读标题与摘要/模块」 }
+    - { ref: "docs/ledger/j47-title-gate-diagnosis-brief.md:12-28", note: 台账 title 空、journal 仅 upsert_module、根因=模型缺 set_title }
+  non_goals:
+    - 不改 isReviewableScheme / evaluateSchemeConfirmation 阈值与挡句文案
+    - 不改右栏逐字节
+    - 不改 ADR-0015
+    - 不做门禁文案优化
+    - 不要求本卡 CI 真点「确认方案」冻结开工（那是下一环）
+    - 不把 #339 schema nullable 必填算作本卡（那是无正式卡号的 schema 修）
+  fail:
+    - 放宽标题≥2 字阈值，或改挡句糊弄过关
+    - 台账 title 仍空却宣称可点
+    - 改右栏或 ADR-0015
+    - 已有 set_title 时重复注入冲突标题
+  adr_revisions: []
+  defaults:
+    - 兜底标题优先用首个 upsert_module.name；模块名不够时只用 raw.quotes 里已有文字
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 342, commit: 1dfac26986eb13c9a48817d9818788fbc0f13ab5 }
+```
+
+* **背景**：数据链已通（`available=true`、有 `user_said` 模块），但确认按钮因标题空被禁用。浏览器补验挡句与门禁一致。
+* **取舍**：组装兜底为主。优先模块名；模块名不够时只用 `raw.quotes` 里已有文字。不改函数签名，不传入 transcript。门禁阈值未动。
+* **完工说明（2026-11-22 · P-269）**：施工 [#342](https://github.com/he18718143986-design/IDE/pull/342) squash `1dfac26986eb13c9a48817d9818788fbc0f13ab5`。J47-P4 已销（P-274）：真钥匙实测（HEAD `bcf8b08`）`scheme-confirm` 的 `disabled` 为 `false`；判定用生产同一套逻辑（无同源静态页，非 DOM 点击）；未点按钮、未冻结。
+
+### 3.4bi 第二轮生成 schema 嵌套 anyOf 缺 type（J.48 · 完工回写 P-271）
+
+<a id="task-j.48"></a>
+
+### 【Task J.48】第二轮生成 schema 嵌套 anyOf 缺 type 修复 `[COMPLETED · 立卡 P-270 · 施工 #346 · 完工回写 P-271]`
+
+> **归档注记（2026-11-23 · P-271）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266–#342）。[#346](https://github.com/he18718143986-design/IDE/pull/346) squash `3a68a813b8a0e703a1687db51b125abe9139b6e4` 于 2026-11-23 01:20 香港时间合入（由我执行；pre-merge head `d4a1d6b288be625848d53c82983a9e899a51459f`；父提交 `6c90d927bab85a69340b5ef6ac25279b9c7d67f3`）。合入前必需面 12 项全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit 实跑通过，本卡三条 `it()` 通过），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit，16 文件 28 项，`continue-on-error`）。`compiler-nested-anyof-type.test.ts` 不在失败名单。`multi-worktree-cross-talk` 本轮未复现。Bugbot NEUTRAL 不挡。估算仍为 S。诚实口径：**嵌套 `anyOf` 缺 `type` 已修（一层联合三支带 `type`，接受值不变：现有 id/`new:` id/`null`），`enumOrNever` 对外契约未动；真钥匙复测不在本卡，J47-P4 已销（P-274）**。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。R23 暂缓。Console 拆分与第二批未立卡。不宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.48
+status: COMPLETED
+contract:
+  intent:
+    title: 第二轮生成 schema 嵌套 anyOf 缺 type 修复
+    description: >-
+      ids 非空时生成端 JSON Schema 不再出现「anyOf 套 anyOf 且内层包装缺 type」，
+      DeepSeek 可接受该 schema（由 asSchema 单测锁住；真钥匙复测不在本卡）。
+    risk_level: LOW
+  acceptance:
+    - id: J48-P1
+      check: auto
+      text: >-
+        enums.ids 含 ITEM-1 时，asSchema(buildCompilerOutputSchema(...)).jsonSchema
+        （与 generateObject 同一转换路径）中，不存在「节点仅有 anyOf/oneOf 且无 type」
+        的嵌套包装（module_id 路径不得再复现 J47-P4 的 nested anyOf）。
+    - id: J48-P2
+      check: auto
+      text: >-
+        接受值不变：ids 非空时 module_id 仍接受现有 id、new: id、null（zod safeParse
+        正例覆盖三者）。
+    - id: J48-P3
+      check: auto
+      text: >-
+        未改 assembleCompilerOutput 形参个数；未改标题兜底顺序；未改
+        isReviewableScheme / evaluateSchemeConfirmation 阈值。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/lib/journey/compiler-output-schema.ts
+      - tests/unit/compiler-nested-anyof-type.test.ts
+      - docs/ledger/j48-nested-anyof-diagnosis-brief.md
+    readonly_paths:
+      - tests/unit/compiler-output-schema.test.ts
+      - tests/unit/compiler-title-fallback.test.ts
+      - src/lib/journey/scheme-draft.ts
+  verification:
+    commands:
+      - { alias: nested-anyof, executable: npx, args: [vitest, run, tests/unit/compiler-nested-anyof-type.test.ts] }
+      - { alias: compiler-schema, executable: npx, args: [vitest, run, tests/unit/compiler-output-schema.test.ts] }
+design:
+  approach: >-
+    诊断见 docs/ledger/j48-nested-anyof-diagnosis-brief.md：
+    flowItemSchema L126-128 在 ids 非空时 z.union([...]).nullable() 转 JSON Schema
+    为 anyOf[{anyOf:[...]}, {type:null}]，内层包装缺 type；DeepSeek 拒。
+    全量排查：本文件仅此一处 union+nullable 同根因；其它 nullable 为 string/object。
+    修法：改为每分支带 type 的联合（例如 union 含 z.null()），接受值不变。
+    若须改 enumOrNever 对外契约 → 停工上报。真钥匙不在本卡验收。
+  touches:
+    - { path: src/lib/journey/compiler-output-schema.ts, change: modify, why: 去掉 module_id 嵌套 anyOf 缺 type, symbols: [flowItemSchema] }
+    - { path: tests/unit/compiler-nested-anyof-type.test.ts, change: create, why: asSchema 路径断言无 nested missing type, symbols: [] }
+    - { path: docs/ledger/j48-nested-anyof-diagnosis-brief.md, change: modify, why: 诊断与方案简报（立卡已建）, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J48-P1, test_path: tests/unit/compiler-nested-anyof-type.test.ts, level: unit, case: ids 含 ITEM-1 无 nested missing type }
+    - { acceptance_id: J48-P2, test_path: tests/unit/compiler-nested-anyof-type.test.ts, level: unit, case: module_id 接受 id/new/null }
+    - { acceptance_id: J48-P3, test_path: tests/unit/compiler-nested-anyof-type.test.ts, level: unit, case: 组装签名与门禁/标题兜底未改 }
+governance:
+  spec_refs:
+    - docs/specs/intent-compiler-prompt.md
+  depends_on:
+    - { id: TASK-J.47, kind: soft }
+  code_facts:
+    - { ref: "src/lib/journey/compiler-output-schema.ts:125-128", note: ids 非空时 module_id=union(...).nullable() → nested anyOf 缺 type }
+    - { ref: "docs/ledger/j48-nested-anyof-diagnosis-brief.md:12-40", note: J47-P4 client_detail 与 asSchema 复现；排查清单 }
+  non_goals:
+    - 不改门禁阈值
+    - 不动 assembleCompilerOutput 六参签名
+    - 不动标题兜底顺序（约 L743-772）
+    - 不点「确认方案」、不做真钥匙验收
+    - 不改右栏逐字节
+    - 不改 ADR-0015
+  fail:
+    - ids 含 ITEM-1 时 schema 仍有 nested anyOf 缺 type
+    - "module_id 不再接受 null 或 new: id"
+    - 改动 enumOrNever 对外契约却未停工上报
+    - 改门禁 / 标题兜底 / 右栏 / ADR-0015
+  adr_revisions: []
+  defaults:
+    - 优先用 z.union([..., z.null()]) 替代 union.nullable()；不改 enumOrNever 签名
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 346, commit: 3a68a813b8a0e703a1687db51b125abe9139b6e4 }
+```
+
+* **背景**：有台账第二轮时 DeepSeek 拒 schema（嵌套 anyOf 缺 type）。空台账首轮无此层。
+* **取舍**：修 JSON Schema 形态，不放宽接受值。`enumOrNever` 对外契约未动。
+* **完工说明（2026-11-23 · P-271）**：施工 [#346](https://github.com/he18718143986-design/IDE/pull/346) squash `3a68a813b8a0e703a1687db51b125abe9139b6e4`。真钥匙复测不在本卡。J47-P4 已销（P-274）。
+
+### 3.4bj 空补丁时用台账里已有模块名补 set_title（J.49 · 完工回写 P-273）
+
+<a id="task-j.49"></a>
+
+### 【Task J.49】空补丁时用台账里已有模块名补 set_title `[COMPLETED · 立卡 P-272 · 施工 #349 · 完工回写 P-273]`
+
+> **归档注记（2026-11-23 · P-273）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266–#346）。[#349](https://github.com/he18718143986-design/IDE/pull/349) squash `b4fecdc09396c1b3654a0fcb8e9d7354d51b8a11` 于 2026-11-23 02:56:27 香港时间合入（由我执行；pre-merge head `60767b9ce2746a6a08436cfa7f3814248b4c201e`；父提交 `1522c38995d9cec230c9c2c68a940fcba8096d63`）。诚实口径：**空补丁时台账已有合格模块但标题空则补 `set_title` 已交付（编译循环层读 `state.draft`，六参签名未动）；真钥匙复测不在本卡，J47-P4 已销（P-274）**。
+
+```yaml task-card
+id: TASK-J.49
+status: COMPLETED
+contract:
+  intent:
+    title: 空补丁时用台账里已有模块名补 set_title
+    description: >-
+      assembleCompilerOutput 成功之后若本批 patch.ops.length === 0，且当前
+      draft.title 的 trim 长度 < 2，且台账里已有合格模块，则只补一条 set_title，
+      value 取台账里第一条合格模块名（截到 200 字），evidence 原样抄该模块已有的
+      TurnRef。全部被 DROP 才变成 noop 的批次不补。真钥匙复测不在本卡验收。
+    risk_level: LOW
+  acceptance:
+    - id: J49-P1
+      check: auto
+      text: >-
+        空补丁且标题不足 2 字时补上已有模块名。组装成功且 patch.ops.length === 0，
+        当前 draft.title trim 长度 < 2，台账有合格模块时，恰好补一条 set_title；
+        value 为按 modules 现有顺序第一条 name.trim() >= 2 且 evidence.length > 0
+        的模块名，截到 200 字；evidence 原样抄该模块已有 TurnRef，不新造摘录，
+        不写空 evidence。全部被 DROP 才变成 noop 的批次不补。
+    - id: J49-P2
+      check: auto
+      text: 标题已够 2 字则不补。
+    - id: J49-P3
+      check: auto
+      text: 没有合格模块则不补。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/supervisor/intent-compiler/compile-loop.ts
+      - tests/unit/compiler-empty-patch-title.test.ts
+    readonly_paths:
+      - src/lib/journey/compiler-output-schema.ts
+      - src/lib/journey/scheme-draft.ts
+      - src/lib/journey/scheme-patch-engine.ts
+  verification:
+    commands:
+      - { alias: empty-patch-title, executable: npx, args: [vitest, run, tests/unit/compiler-empty-patch-title.test.ts] }
+design:
+  approach: >-
+    落点用 compile-loop.ts 第 334 行已经读到的 state.draft。在 assembleCompilerOutput
+    成功之后、mergeSchemePatch（约第 420 行）之前插入：仅当 assembled.patch.ops.length
+    === 0，且 state.draft.title.trim().length < 2，且台账 modules 按现有顺序存在第一条
+    name.trim().length >= 2 且 evidence.length > 0 的模块时，向该空补丁追加恰好一条
+    set_title（value 用该名字截到 200 字，evidence 原样抄这条模块上已有的 TurnRef）。
+    不新造摘录，不写空 evidence。title 已够 2 字、没有合格模块、或本批并非「组装后
+    ops 为空」（包括全部被 DROP 才变成 noop）则不补。assembleCompilerOutput 六参签名
+    保持封口；要改签名就停工上报，施工里不许直接改。不改 compiler-output-schema.ts
+    第 743–772 行对本批 upsert_module / data.quotes 的取词顺序，不改
+    scheme-patch-engine.ts 第 1658–1666 行的 noop 定义。要动 writable_paths 以外的
+    文件，停工修卡，不扩面。单测三条 it 标题必须逐字为：「空补丁且标题不足 2 字时补上已有模块名」
+    「标题已够 2 字则不补」「没有合格模块则不补」。真钥匙复测不进本卡验收，不写成 it()，
+    也不写成会让 check:docs 要求出现在 it() 里的 case。先审施工方案再动代码。
+  touches:
+    - { path: daemon/supervisor/intent-compiler/compile-loop.ts, change: modify, why: 组装成功且空补丁时按台账合格模块补一条 set_title, symbols: [] }
+    - { path: tests/unit/compiler-empty-patch-title.test.ts, change: create, why: 三条 CI 单测锁住补与不补, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J49-P1, test_path: tests/unit/compiler-empty-patch-title.test.ts, level: unit, case: 空补丁且标题不足 2 字时补上已有模块名 }
+    - { acceptance_id: J49-P2, test_path: tests/unit/compiler-empty-patch-title.test.ts, level: unit, case: 标题已够 2 字则不补 }
+    - { acceptance_id: J49-P3, test_path: tests/unit/compiler-empty-patch-title.test.ts, level: unit, case: 没有合格模块则不补 }
+governance:
+  spec_refs:
+    - docs/specs/intent-compiler-prompt.md
+  depends_on:
+    - { id: TASK-J.48, kind: soft }
+    - { id: TASK-J.47, kind: soft }
+  code_facts:
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:377", note: runOnce 已读 state（含 draft），本卡复用、不另读 }
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:448-465", note: 组装成功之后、mergeSchemePatch 之前调用 maybeFillEmptyPatchTitle }
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:214-238", note: maybeFillEmptyPatchTitle：ops 非空/标题已够/无合格模块不补；value 截 200 字，evidence 抄已有 TurnRef }
+    - { ref: "src/lib/journey/compiler-output-schema.ts:743-772", note: 本批 upsert_module / data.quotes 取词顺序，本卡未改 }
+    - { ref: "src/lib/journey/scheme-patch-engine.ts:1658-1666", note: ops 全无 APPLY 时 noop，本卡未改 }
+  non_goals:
+    - 不改门禁阈值
+    - 不改 J.47 对本批材料的取词顺序（compiler-output-schema.ts 第 743–772 行）
+    - 不强制模型交出非空补丁
+    - 不改右栏逐字节
+    - 不改 ADR-0015
+    - 不点「确认方案」
+    - 不动 assembleCompilerOutput 六参签名
+    - 不改 scheme-patch-engine.ts 第 1658–1666 行的 noop 定义
+    - 真钥匙复测不进本卡验收
+  fail:
+    - 空补丁且标题不足 2 字且有合格模块时未补上一条 set_title
+    - title.trim() 已够 2 字或没有合格模块时仍补
+    - 全部被 DROP 才变成 noop 的批次被补了
+    - 改动 assembleCompilerOutput 六参签名却未停工上报
+    - 改门禁阈值 / J.47 取词顺序 / noop 定义 / 右栏 / ADR-0015
+    - 把真钥匙复测写成 it() 或写成会让 check:docs 要求出现在 it() 里的 case
+    - 改动 writable_paths 以外的文件却未停工修卡
+  adr_revisions: []
+  defaults:
+    - 插在组装成功之后、merge 之前；只补一条 set_title；要改 assembleCompilerOutput 六参签名则停工上报
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 349, commit: b4fecdc09396c1b3654a0fcb8e9d7354d51b8a11 }
+```
+
+* **背景**：J.48 之后 DeepSeek 已收下 schema。真钥匙复测 HEAD `301aec2`：发句前台账已有 `ITEM-1`、`frozen=false`、`title=""`。再发「我要一个登录页」得到 `compiler_applied` / `status=noop` / `ops=0` / `elapsed_ms=1001`，无 `client_detail`。发句后 `title` 仍是 `""`，`last_journal.verdicts` 为 `[]`，没有 `set_title`。`scheme-confirm` 存在且 `disabled=true`，挡句「方案摘要不足，至少需要可读标题与摘要/模块」。未点按钮，未冻结。
+* **取舍**：只补空补丁上的一条 `set_title`，不改门禁、不改本批取词顺序、不改 noop 定义、不强制模型交出非空补丁。真钥匙复测另案，不进本卡 PASS。
+* **立卡说明（2026-11-23 · P-272）**：Tina 授权立卡（t1321u）。基线 `301aec2fa347225fd8fdaf7abe91965b9451afbd`（[#347](https://github.com/he18718143986-design/IDE/pull/347) P-271）；其上产品提交 [#346](https://github.com/he18718143986-design/IDE/pull/346)/`3a68a813b8a0e703a1687db51b125abe9139b6e4`。**立卡 ≠ 开工**；先审施工方案再授权动代码。
+* **完工说明（2026-11-23 · P-273）**：施工 [#349](https://github.com/he18718143986-design/IDE/pull/349) squash `b4fecdc09396c1b3654a0fcb8e9d7354d51b8a11`。真钥匙复测不在本卡。J47-P4 已销（P-274）。
+
+### 3.4bk PAB 落盘与读取（J.50a-1 · 完工回写 P-279）
+
+<a id="task-j.50a-1"></a>
+
+### 【Task J.50a-1】PAB 落盘与读取 `[COMPLETED · 立卡 P-278 · 施工 #356 · 完工回写 P-279]`
+
+> **归档注记（2026-11-23 · P-279）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266–#349）。[#356](https://github.com/he18718143986-design/IDE/pull/356) squash `21237298c48d4327d396d8b36b999b656f5e76c1` 于 2026-11-23 19:56:34 香港时间合入（由我执行；pre-merge head `587c92fba87a1ad1e246c3e12b5bf9b76d072836`；父提交 `d5e68c561087ead4c213a94e2f8edafd0eb0715d`）。诚实口径：**PAB 落盘/归档/读取 store 已交付（格式锚定现有 PAB 规格，`ReadyPabView` 类型直接复用 `decompose.ts`，digest 由调用方写入本卡原样落盘不发明哈希，`E_PAB_REVISION_EXISTS` 失败关闭不覆盖）；资格判定/生成/`decompose` 接线在 J.50a-2**。
+
+```yaml task-card
+id: TASK-J.50a-1
+status: COMPLETED
+contract:
+  intent:
+    title: PAB 落盘与读取
+    description: >-
+      新建 architecture-baseline-store.ts：把当前 PAB 写入
+      .stagent/project/architecture-baseline.json，旧修订归档到
+      architecture-baseline.revisions/<revision>.json，不得改写已落盘
+      文件；提供读取接口供 decompose / J.50a-2 在 body.pab 为空时加载。
+      落盘格式必须按现有 PAB 规格（ReadyPabView 所需字段、status、digest
+      语义），不得自造格式。本卡不含资格判定、生成逻辑或 decompose / HTTP
+      接线。
+    risk_level: LOW
+  acceptance:
+    - id: J50a1-P1
+      check: auto
+      text: >-
+        当前 PAB 写入与读取。store 把当前 PAB 写入
+        .stagent/project/architecture-baseline.json，并提供读取接口，
+        供 J.50a-2 / decompose 在请求未传入 pab 时加载。本卡本身不接线
+        HTTP，也不改 decompose 入口。
+    - id: J50a1-P2
+      check: auto
+      text: >-
+        修订归档且不可改写。写入新的当前 PAB 时，先把上一份当前文件归档到
+        .stagent/project/architecture-baseline.revisions/<revision>.json，
+        再写新的当前文件；不得直接改写已落盘文件。归档完成后，这些修订文件
+        保持不可变，不得再被改写。
+    - id: J50a1-P3
+      check: auto
+      text: >-
+        落盘格式可被现有 PAB 类型 / ReadyPabView 投影消费。持久化格式必须
+        按现有 PAB 规格，至少包含 ReadyPabView 所需字段（baseline_id、
+        baseline_revision、baseline_digest、status 为 draft 或 ready 或
+        stale、可选 open_decisions）及 status / digest 语义，不得自造平行
+        类型或新 Schema。验收须断言：读出的落盘文件能被 decompose.ts 里现有
+        ReadyPabView 类型消费，而不是测试里另写的假类型。完整 PAB Schema
+        仍属后续，本卡不一次做完。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/project/architecture-baseline-store.ts
+      - tests/daemon/architecture-baseline-store.test.ts
+    readonly_paths:
+      - daemon/supervisor/decomposer/decompose.ts
+      - docs/specs/project-architecture-baseline.md
+      - docs/adr/0019-project-architecture-baseline.md
+  verification:
+    commands:
+      - { alias: pab-store, executable: npx, args: [vitest, run, tests/daemon/architecture-baseline-store.test.ts] }
+design:
+  approach: >-
+    只做持久化与读取，不判定资格，不生成 PAB，不接线 HTTP。写入新的当前
+    PAB 时先归档上一份当前文件，再写新文件；已归档的修订文件不可变。读取
+    接口给 J.50a-2 / decompose 在未传入 pab 时用，但本卡不改 server.ts
+    或 decompose.ts。落盘必须能被现有 ReadyPabView（decompose.ts 导出的
+    类型）消费：字段与 status / digest 语义跟现有 PAB 规格走，不另起一套
+    平行 Schema。digest 由调用方按既有语义写入，本卡负责原样落盘与读出，
+    不发明新的哈希算法。要动 writable_paths 以外的文件，停工修卡，不扩面。
+  touches:
+    - { path: daemon/project/architecture-baseline-store.ts, change: create, why: 当前 PAB 落盘、修订归档与读取, symbols: [] }
+    - { path: tests/daemon/architecture-baseline-store.test.ts, change: create, why: 锁住落盘、归档不可变、读取，以及落盘可被 ReadyPabView 消费, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J50a1-P1, test_path: tests/daemon/architecture-baseline-store.test.ts, level: unit, case: 当前 PAB 写入后读回等值，digest 原样保留 }
+    - { acceptance_id: J50a1-P2, test_path: tests/daemon/architecture-baseline-store.test.ts, level: unit, case: 写入新当前 PAB 时先归档上一份，已归档修订不可改写 }
+    - { acceptance_id: J50a1-P2, test_path: tests/daemon/architecture-baseline-store.test.ts, level: unit, case: 归档目标已存在时失败关闭，不覆盖归档也不改写当前文件 }
+    - { acceptance_id: J50a1-P3, test_path: tests/daemon/architecture-baseline-store.test.ts, level: unit, case: 读出的落盘文件能被 decompose.ts 现有 ReadyPabView 类型消费 }
+governance:
+  spec_refs:
+    - docs/specs/project-architecture-baseline.md
+    - docs/adr/0019-project-architecture-baseline.md
+  depends_on:
+    - { id: TASK-L.8, kind: soft }
+  code_facts:
+    - { ref: "docs/specs/project-architecture-baseline.md:45-45", note: "当前文件路径与 revisions/<revision>.json 归档目录；旧版不可覆盖" }
+    - { ref: "docs/specs/project-architecture-baseline.md:86-86", note: "必需语义可不一次照搬同名类型，但不得建立平行架构 SSOT" }
+    - { ref: "daemon/supervisor/decomposer/decompose.ts:26-32", note: "现有 ReadyPabView 类型；本卡只 import 消费，未改此文件" }
+    - { ref: "daemon/project/architecture-baseline-store.ts:12-16", note: "当前文件 .stagent/project/architecture-baseline.json，归档目录 architecture-baseline.revisions" }
+    - { ref: "daemon/project/architecture-baseline-store.ts:31-45", note: "architectureBaselinePath / architectureBaselineRevisionPath" }
+    - { ref: "daemon/project/architecture-baseline-store.ts:51-55", note: "readCurrentArchitectureBaseline；缺文件返回 null" }
+    - { ref: "daemon/project/architecture-baseline-store.ts:60-65", note: "readArchitectureBaselineRevision" }
+    - { ref: "daemon/project/architecture-baseline-store.ts:71-71", note: "digest 原样落盘，不重新计算" }
+    - { ref: "daemon/project/architecture-baseline-store.ts:73-114", note: "writeCurrentArchitectureBaseline：先归档上一份再写新当前；已存在归档失败关闭 E_PAB_REVISION_EXISTS；同修订不得改写当前" }
+    - { ref: "daemon/project/architecture-baseline-store.ts:178-181", note: "normalize 原样抄 baseline_digest，不计算哈希" }
+  non_goals:
+    - 不做资格判定，不实现 minimal / full / large 生成器
+    - 不投影生产路径上的 ReadyPabView（属 J.50a-2），也不接线 decompose 或 HTTP
+    - 不改 decompose.ts，不改 ReadyPabView 字段集合或 assertPabReady 判定形状
+    - 不改 /api/baseline 参考基线语义
+    - 不接线「确认方案」按钮，不拆 C.22（属 J.50b）
+    - 不改 ADR-0015 / ADR-0019 正文
+    - 不宣称完整 PAB Schema 或规格 §7 十条验收矩阵已全部落地
+  fail:
+    - 自造平行 PAB / ReadyPabView 类型，或落盘文件不能被现有 ReadyPabView 消费
+    - 直接覆盖已落盘的当前文件或已归档修订，而不先归档上一份当前文件
+    - 在本卡做资格判定、生成逻辑或 decompose / HTTP 接线
+    - 改动 decompose.ts 或 ReadyPabView / assertPabReady 的形状
+    - 改动 writable_paths 以外的文件却未停工修卡
+  adr_revisions: []
+  defaults:
+    - 先归档再写当前文件；已落盘文件不可改写；读取接口只给后续卡用，本卡不接线
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 356, commit: 21237298c48d4327d396d8b36b999b656f5e76c1 }
+```
+
+* **背景**：从原 J.50a 拆出的低风险持久化卡。落盘路径与归档目录已在 PAB 规格写明；完整 Schema 仍属后续，但本卡不能另造格式。
+* **取舍**：只做 store 的写、归档、读；资格判定与生产接线留给 J.50a-2。
+* **立卡说明（2026-11-23 · P-278）**：Tina 授权按 R-11 拆立（t1359u）。基线 `546bf80df82190a0a538157ec6d74baa93e2f4db`（[#354](https://github.com/he18718143986-design/IDE/pull/354) P-277）。**立卡 ≠ 开工**；先审施工方案再授权动代码。
+* **完工说明（2026-11-23 · P-279）**：施工 [#356](https://github.com/he18718143986-design/IDE/pull/356) squash `21237298c48d4327d396d8b36b999b656f5e76c1`。PAB 落盘/归档/读取 store 已交付（格式锚定现有 PAB 规格，`ReadyPabView` 类型直接复用 `decompose.ts`，digest 由调用方写入本卡原样落盘不发明哈希，`E_PAB_REVISION_EXISTS` 失败关闭不覆盖）；资格判定/生成/`decompose` 接线在 J.50a-2。
+
+### 3.4bl 资格判定 + 生成 + 投影 + 接线（J.50a-2 · 完工回写 P-281）
+
+<a id="task-j.50a-2"></a>
+
+### 【Task J.50a-2】资格判定 + 生成 + 投影 + 接线 `[COMPLETED · 立卡 P-278 · 修卡 P-280 · 施工 #359 · 完工回写 P-281]`
+
+> **归档注记（2026-11-23 · P-281）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266–#356）。[#359](https://github.com/he18718143986-design/IDE/pull/359) squash `13c29a97be9d0e0d242e10c39db05283ce7da207` 于 2026-11-23 23:54:23 香港时间合入（由我执行；pre-merge head `0ad1b30a784ca3c63fb8855e7c6f976d5936272a`；父提交 `809bf131b7c99d57d463bc7d083bc784f0b8a456`）。诚实口径：**资格判定 + minimal ready PAB 完整落盘 + decompose 回退接线已交付（digest 可对落盘内容复算、`/api/baseline` 契约未动、`E_PAB_NOT_READY` 带白话原因、`ensure-minimal` 入口需鉴权）；『确认方案』拆分与地图确认开工在 J.50b；端到端闭环未宣称**。store 采用扩展保留字段，仍写入同一 `.stagent/project/architecture-baseline.json`，不另起文件。digest 用 `src/lib/journey/scheme-patch-types.ts` 的 `stableStringify` 省略 `baseline_digest` 后 `createHash("sha256")` 做小写 hex，可对落盘文件同规则复算。`ReadyPabView` 只从落盘结果投影。新入口 `POST /api/project/architecture-baseline/ensure-minimal` 需鉴权。未接「确认方案」，未拆 C.22。
+
+```yaml task-card
+id: TASK-J.50a-2
+status: COMPLETED
+contract:
+  intent:
+    title: 资格判定 + 生成 + 投影 + 接线
+    description: >-
+      新建 minimal-ready-pab.ts：密封之后判定资格（size_hint 为 standard、
+      恰好一个用户可见模块、无跨模块接口变化、无数据边界变化），对具备资格
+      的需求用零模型生成 mode=minimal 且 status=ready 的 PAB，并经 J.50a-1
+      落盘后投影为 ReadyPabView。落盘文件须含完整 PAB 文档字段（ReadyPabView
+      是投影而非全部）；digest 须可对落盘内容复算。本卡被授权扩展
+      architecture-baseline-store 的保留字段或并存落盘，但不改已交付的
+      读取/归档/不可改写语义，E_PAB_REVISION_EXISTS 行为不变。server.ts
+      只加薄接线：密封后的 PAB 生产入口，以及 decompose 在未传入 pab 时经
+      J.50a-1 读取仓库。ReadyPabView 只能来自落盘结果；不得让 /api/baseline
+      充当，也不得改其契约。不具备资格则白话失败关闭。本卡不实现 full /
+      large 生成器，不接「确认方案」按钮。硬依赖 J.50a-1。立卡 ≠ 开工。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J50a2-P1
+      check: auto
+      text: >-
+        具备资格则零模型生成 minimal ready PAB。方案已密封，且同时满足
+        size_hint 为 standard、恰好一个用户可见模块、无跨模块接口变化、
+        无数据边界变化时，生产入口生成 mode=minimal、status=ready 的 PAB，
+        经 J.50a-1 写入仓库。须绑定 scheme_ref 与 repository_ref，来源诚实
+        标注，open_decisions 无阻断项，digest 对规范化内容做确定性哈希。
+        当前「登录页」按 standard 处理，不得按 tiny 绕过。
+    - id: J50a2-P2
+      check: auto
+      text: >-
+        ReadyPabView 只能来自落盘结果。投影函数从 J.50a-1 读出的落盘文件
+        得到 ReadyPabView（baseline_id、baseline_revision、baseline_digest、
+        status=ready，且 open_decisions 无 blocking），不得由 UI 或测试临时
+        拼一个 status=ready 的对象充当生产路径，也不得借用 /api/baseline。
+    - id: J50a2-P3
+      check: auto
+      text: >-
+        分解器能用上这份 ReadyPabView。把该视图交给 decompose，或在
+        POST /api/project/plan/decompose 未传入 pab 时经 J.50a-1 从仓库
+        读取，具备资格的 standard 单模块不再因缺 PAB 而返回 E_PAB_NOT_READY。
+    - id: J50a2-P4
+      check: auto
+      text: >-
+        现有 /api/baseline 仍是参考基线。GET/POST /api/baseline 语义不变，
+        grants_construction 仍为 false，不得把该参考基线当作 ReadyPabView，
+        也不得改写其契约来冒充架构基线。
+    - id: J50a2-P5
+      check: auto
+      text: >-
+        不具备 minimal 资格则失败关闭。出现跨模块接口、数据边界变化，
+        或 size_hint 为 large 时，不生成可签署合同桩，返回白话失败，
+        不在本卡实现 full 或 large 的 PAB 生成器。
+    - id: J50a2-P6
+      check: auto
+      text: >-
+        落盘文件含完整 PAB 文档字段且 digest 可对落盘内容复算。
+        architecture-baseline.json 必须保留完整 PAB 文档字段（至少包括
+        mode、scheme_ref、repository_ref、覆盖目标、来源标注，以及
+        ReadyPabView 所需字段）；baseline_digest 用 Node
+        createHash("sha256") 对落盘的规范化内容做小写 hex，任何人拿到
+        落盘文件都能复算验证；不得再出现「digest 对完整文档计算、磁盘只留
+        ReadyPabView 五个字段」的不可验证口径。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/supervisor/pab/minimal-ready-pab.ts
+      - daemon/server.ts
+      - daemon/project/architecture-baseline-store.ts
+      - tests/daemon/plan-decompose-pab-fallback.test.ts
+    readonly_paths:
+      - daemon/supervisor/decomposer/decompose.ts
+      - daemon/supervisor/decomposer/index.ts
+      - docs/specs/project-architecture-baseline.md
+      - docs/adr/0019-project-architecture-baseline.md
+      - docs/ledger/adr0015-plan-step-fix-assessment.md
+  verification:
+    commands:
+      - { alias: pab-decompose-fallback, executable: npx, args: [vitest, run, tests/daemon/plan-decompose-pab-fallback.test.ts] }
+design:
+  approach: >-
+    硬依赖 J.50a-1：本卡经其 store 落盘与读取。Tina 2026-11-23 拍板选完整
+    文档落盘：mode / scheme_ref / repository_ref / 覆盖目标 / 来源标注等都应
+    留在磁盘上，ReadyPabView 是这份文档的投影而非全部。J.50a-1 store 当前
+    只保留视图字段（baseline_id / baseline_revision / baseline_digest /
+    status / 可选 open_decisions）是历史事实；本卡被授权扩展保留字段或
+    文档与视图并存落盘，但不改已交付的读取/归档/不可改写语义，
+    E_PAB_REVISION_EXISTS 行为不变。实现细节由修卡合入后的施工方案定。
+    ReadyPabView 必须从 readCurrentArchitectureBaseline 的返回值投影，不得
+    由 UI 或测试临时拼一个 status=ready 的对象了事，也不得复用 GET/POST
+    /api/baseline（那是扫描/认可参考基线，grants_construction 为 false，
+    不是分解器要的 ReadyPabView）。
+    密封之后，对本卡认定的「具备资格」情形（size_hint 为 standard、恰好一个
+    用户可见模块、无跨模块接口、无数据边界变化）用零模型生成规格允许的
+    minimal PAB：绑定 scheme_ref 与 repository_ref，覆盖目标与用户可见模块，
+    来源诚实标注，open_decisions 无阻断项，status=ready；baseline_digest 用
+    Node createHash("sha256") 对落盘的规范化内容做小写 hex。然后经 J.50a-1
+    落盘，再从落盘结果投影 ReadyPabView。
+    daemon/server.ts 只允许加 PAB 生产入口薄接线，以及 decompose 入口在
+    未传入 pab 时经 J.50a-1 读仓库；仍没有 ready PAB 则继续 E_PAB_NOT_READY。
+    assertPabReady 与 ReadyPabView 字段集合保持原样，本卡不改 decompose.ts
+    的门禁形状。不具备 minimal 资格（跨模块接口、数据边界变化、或 size_hint
+    为 large）失败关闭，只给白话原因，不在本卡做 full/large 生成器。不接线
+    「确认方案」按钮，不拆 C.22（属 J.50b）。当前「登录页」按 standard 处理；
+    tiny 不绕过。要动 writable_paths 以外的文件，停工修卡，不扩面。
+    须有 Daemon/集成级测试覆盖生产入口，不能只证明模块存在。资格判定、生成
+    与完整落盘/digest 复算验收的测试，放在本卡已列的
+    plan-decompose-pab-fallback 测试文件，不另开产品文件。先审施工方案再动代码。
+  touches:
+    - { path: daemon/supervisor/pab/minimal-ready-pab.ts, change: create, why: 资格判定、零模型生成 minimal ready PAB，并从落盘结果投影 ReadyPabView, symbols: [] }
+    - { path: daemon/server.ts, change: modify, why: 增加密封后 PAB 生产入口，并在 decompose 未传 pab 时经 J.50a-1 读仓库, symbols: [] }
+    - { path: daemon/project/architecture-baseline-store.ts, change: modify, why: 扩展保留字段或并存落盘以写入完整 PAB 文档；不改已交付的读取/归档/不可改写语义，E_PAB_REVISION_EXISTS 行为不变, symbols: [] }
+    - { path: tests/daemon/plan-decompose-pab-fallback.test.ts, change: create, why: 锁住资格判定、生成、完整文档落盘与 digest 复算、从落盘投影、decompose 回退读取，且不误用 /api/baseline, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J50a2-P1, test_path: tests/daemon/plan-decompose-pab-fallback.test.ts, level: integration, case: 具备资格则零模型生成 minimal ready PAB }
+    - { acceptance_id: J50a2-P2, test_path: tests/daemon/plan-decompose-pab-fallback.test.ts, level: integration, case: ReadyPabView 只能来自落盘结果 }
+    - { acceptance_id: J50a2-P3, test_path: tests/daemon/plan-decompose-pab-fallback.test.ts, level: integration, case: decompose HTTP 未传 pab 时能用上这份 ReadyPabView }
+    - { acceptance_id: J50a2-P4, test_path: tests/daemon/plan-decompose-pab-fallback.test.ts, level: integration, case: 现有 /api/baseline 仍是参考基线 }
+    - { acceptance_id: J50a2-P5, test_path: tests/daemon/plan-decompose-pab-fallback.test.ts, level: integration, case: 不具备资格则失败关闭、不写盘 }
+    - { acceptance_id: J50a2-P6, test_path: tests/daemon/plan-decompose-pab-fallback.test.ts, level: integration, case: 落盘文件含完整 PAB 文档字段且 digest 可对落盘内容复算 }
+governance:
+  spec_refs:
+    - docs/specs/project-architecture-baseline.md
+    - docs/adr/0019-project-architecture-baseline.md
+    - docs/ledger/adr0015-plan-step-fix-assessment.md
+    - docs/specs/project-decomposition.md
+  depends_on:
+    - { id: TASK-J.50a-1, kind: hard }
+    - { id: TASK-L.8, kind: soft }
+    - { id: TASK-J.49, kind: soft }
+  code_facts:
+    - { ref: "daemon/supervisor/decomposer/decompose.ts:26-32", note: "ReadyPabView 最小字段；完整 PAB Schema 本卡也不一次做完；本卡未改此文件" }
+    - { ref: "daemon/supervisor/decomposer/decompose.ts:165-192", note: "assertPabReady；缺、非 ready、或有阻断 open_decisions 即 E_PAB_NOT_READY；本卡未改判定形状" }
+    - { ref: "daemon/supervisor/pab/minimal-ready-pab.ts:44-86", note: "资格判定：密封、size_hint=standard、用户可见模块恰 1 个、模块总数 1、flows 无外部 module_id、唯一模块 kind=new；否则白话失败关闭不写盘" }
+    - { ref: "daemon/supervisor/pab/minimal-ready-pab.ts:94-147", note: "ensureMinimalReadyPab：合格则零模型生成完整文档、digest 后经 store 落盘，再从 readCurrentArchitectureBaseline 投影 ReadyPabView" }
+    - { ref: "daemon/supervisor/pab/minimal-ready-pab.ts:153-173", note: "resolvePabForDecompose：未传 pab 先读 store，仍空且密封合格则生产落盘再读，否则带白话原因" }
+    - { ref: "daemon/supervisor/pab/minimal-ready-pab.ts:179-183", note: "digest：stableStringify 省略 baseline_digest 后 createHash(\"sha256\") 小写 hex" }
+    - { ref: "daemon/project/architecture-baseline-store.ts:50-54", note: "扩展保留完整 PAB 文档字段（含 mode / scheme_ref / repository_ref / baseline_digest）；同一 architecture-baseline.json，不另起文件" }
+    - { ref: "daemon/project/architecture-baseline-store.ts:225-245", note: "readCurrentArchitectureBaseline 仍返回 ReadyPabView 投影；新增 readCurrentArchitectureBaselineDocument 读完整文档" }
+    - { ref: "daemon/project/architecture-baseline-store.ts:276-309", note: "writeCurrentArchitectureBaseline：先归档完整上一份文档再写新当前；E_PAB_REVISION_EXISTS 行为不变" }
+    - { ref: "daemon/server.ts:5537-5572", note: "POST /api/project/architecture-baseline/ensure-minimal：需鉴权，走 ensureMinimalReadyPab；不碰 /api/baseline 契约" }
+    - { ref: "daemon/server.ts:5574-5604", note: "POST /api/project/plan/decompose：未传 pab 时经 resolvePabForDecompose 回退；失败 422 E_PAB_NOT_READY 带白话原因" }
+    - { ref: "daemon/server.ts:6322-6423", note: "现有 /api/baseline 是扫描/认可参考基线，grants_construction 为 false，本卡未改其契约" }
+    - { ref: "docs/specs/project-architecture-baseline.md:26-27", note: "standard 单模块且无跨模块接口/数据边界时可用 minimal，仍须结构与来源校验" }
+  non_goals:
+    - 不实现 full 或 large 的 PAB 生成器，也不接模型做架构分析
+    - 不改已交付的读取/归档/不可改写语义，不改 E_PAB_REVISION_EXISTS 行为；允许扩展保留字段或文档与视图并存落盘，但不另起一套无关的落盘格式
+    - 不改 ReadyPabView 字段集合，不改 assertPabReady 的判定形状
+    - 不改 /api/baseline 参考基线语义
+    - 不接线「确认方案」按钮，不拆 C.22（属 J.50b）
+    - 不把当前「登录页」按 tiny 绕过 PAB
+    - 不改 ADR-0015 / ADR-0019 正文
+    - 不宣称完整 PAB Schema 或规格 §7 十条验收矩阵已全部落地
+  fail:
+    - 只接线分解却没有经 J.50a-1 落盘的生产路径产出 ReadyPabView
+    - 把 /api/baseline 参考基线当作 ReadyPabView，或改写其契约来冒充
+    - ReadyPabView 不是来自落盘结果，而是临时拼出来的对象
+    - 具备资格的 standard 单模块仍因缺 PAB 返回 E_PAB_NOT_READY
+    - 不具备 minimal 资格时仍生成可签署合同桩，或在本卡实现 full/large 生成器
+    - 改动 ReadyPabView 字段集合或 assertPabReady 判定形状
+    - 改已交付的读取/归档/不可改写语义或 E_PAB_REVISION_EXISTS 行为，或改动 writable_paths 以外的文件却未停工修卡
+    - 落盘文件缺少完整 PAB 文档字段，或 digest 无法对落盘的规范化内容复算验证（包括「digest 对完整文档计算、磁盘只留 ReadyPabView 五个字段」）
+  adr_revisions: []
+  defaults:
+    - ReadyPabView 只能来自经 J.50a-1 落盘的 ready PAB，不能临时拼对象，也不能借用 /api/baseline
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 359, commit: 13c29a97be9d0e0d242e10c39db05283ce7da207 }
+```
+
+* **背景**：从原 J.50a 拆出的判定、生成、投影与接线卡。必须先有 J.50a-1 的落盘与读取。
+* **取舍**：只做 `minimal` 资格内的零模型路径与投影/接线；full/large 与完整 Schema 另案。不把参考基线改造成架构基线。不接「确认方案」按钮。
+* **立卡说明（2026-11-23 · P-278）**：Tina 授权按 R-11 拆立（t1359u）。基线 `546bf80df82190a0a538157ec6d74baa93e2f4db`（[#354](https://github.com/he18718143986-design/IDE/pull/354) P-277）。硬依赖 J.50a-1。**立卡 ≠ 开工**；先审施工方案再授权动代码。
+* **修卡说明（2026-11-23 · P-280）**：Tina 拍板先修卡再开工（t1368u），选完整文档落盘。`writable_paths` 增加 `daemon/project/architecture-baseline-store.ts`；验收新增 J50a2-P6。J.50a-1 store 当前只保留视图字段是历史事实，本卡被授权扩展落盘保留，但不改已交付读取/归档/不可改写语义与 `E_PAB_REVISION_EXISTS`。卡状态仍为 `[NEW_TASK]`，**修卡 ≠ 开工**。实现细节（扩展保留字段 vs 文档与视图并存）由修卡合入后的施工方案定。
+* **完工说明（2026-11-23 · P-281）**：施工 [#359](https://github.com/he18718143986-design/IDE/pull/359) squash `13c29a97be9d0e0d242e10c39db05283ce7da207`。资格判定 + minimal ready PAB 完整落盘 + decompose 回退接线已交付（digest 可对落盘内容复算、`/api/baseline` 契约未动、`E_PAB_NOT_READY` 带白话原因、`ensure-minimal` 入口需鉴权）；『确认方案』拆分与地图确认开工在 J.50b；端到端闭环未宣称。
+
+### 3.4bm 确认方案只冻结并开始规划，再按合同确认开工（J.50b · 完工回写 P-282）
+
+<a id="task-j.50b"></a>
+
+### 【Task J.50b】确认方案只冻结并开始规划，再按合同确认开工 `[COMPLETED · 立卡 P-277 · 施工 #361 · 完工回写 P-282]`
+
+> **归档注记（2026-11-24 · P-282）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266–#359）。[#361](https://github.com/he18718143986-design/IDE/pull/361) squash `f69d026427792db3376da77dd089db09aa072947` 于 2026-11-24 06:05:29 香港时间合入（由我执行；pre-merge head `de9507f091b9f6d82ceb4a462bda9252d68d8160`；父提交 `6f954357c55348486196adc3eda0438522a291e9`）。诚实口径：**『确认方案』已拆分为冻结+规划（C.22 到 `FREEZE_SNAPSHOT` 后接 PAB 生产与分解刷新地图，不签署不 `runWorker`），地图『确认开工』按合同桩签署开工；不具备资格白话失败关闭；端到端闭环未宣称，试玩与合入不在本卡**。
+
+```yaml task-card
+id: TASK-J.50b
+status: COMPLETED
+contract:
+  intent:
+    title: 确认方案只冻结并开始规划，再按合同确认开工
+    description: >-
+      按 P-276 评估候选 i，把底部「确认方案」改成只冻结并开始规划：走 C.22
+      到 FREEZE_SNAPSHOT，再调用 J.50a-2 的 PAB 路径与分解，刷新项目地图；
+      此路径不签署合同、不 runWorker。地图「确认开工」再按合同桩走签署与
+      施工准备，成功后才 runWorker。按钮与说明改为与 ADR-0019 一致的
+      「确认方案，开始规划」。必须有覆盖生产用户路径的集成测试。硬依赖
+      J.50a-2，不再挂 J.50a。立卡 ≠ 开工。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J50b-P1
+      check: auto
+      text: >-
+        确认方案只冻结并开始规划。底部「确认方案」走 C.22 的
+        CLAIM_AND_QUIESCE、VALIDATE_CONFIRMATION、FREEZE_SNAPSHOT，随后
+        走 J.50a-2 的 PAB 路径并调用 decompose 与 refreshProjectPlan；不签署
+        合同，不 runWorker。按钮与说明改为「确认方案，开始规划」，不再写
+        「确认后冻结 Spec 并直接开工写代码」。
+    - id: J50b-P2
+      check: auto
+      text: >-
+        地图确认开工仍按合同桩签署并开工。项目地图「确认开工」预检该合同
+        桩后，走 SIGN_AND_PREPARE，成功后 runWorker。C.22 五阶段不删除。
+    - id: J50b-P3
+      check: auto
+      text: >-
+        规划提交与开工提交可区分。confirmation_id 能区分「规划提交」和
+        「开工提交」；原先把「确认方案」写成「冻结并开工中」「正在准备开工」
+        的交接文案与测试改为与拆开后语义一致。
+    - id: J50b-P4
+      check: auto
+      text: >-
+        生产用户路径集成测试。覆盖正常用户路径，而不是只证明模块存在：
+        确认方案之后能看到项目计划/地图，且此时尚未签署、尚未 runWorker。
+    - id: J50b-P5
+      check: auto
+      text: >-
+        不把当前登录页按 tiny 绕过。本卡按 standard 处理该需求，不得用
+        tiny Fast Path 跳过计划环节；large 的模型分解不在本卡。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/routes/index.tsx
+      - src/components/studio/SchemeReviewPane.tsx
+      - src/lib/journey/confirm-scheme-atomic.ts
+      - src/lib/daemon-api.ts
+      - tests/ui/task-c22-confirm-wiring.test.tsx
+      - tests/ui/confirm-scheme-starts-planning.test.tsx
+    readonly_paths:
+      - src/components/project/ProjectMapPane.tsx
+      - daemon/supervisor/decomposer/decompose.ts
+      - docs/adr/0015-contract-as-unit-of-delivery.md
+      - docs/adr/0019-project-architecture-baseline.md
+      - docs/ledger/adr0015-plan-step-fix-assessment.md
+  verification:
+    commands:
+      - { alias: confirm-wiring-regression, executable: npx, args: [vitest, run, tests/ui/task-c22-confirm-wiring.test.tsx] }
+      - { alias: starts-planning, executable: npx, args: [vitest, run, tests/ui/confirm-scheme-starts-planning.test.tsx] }
+design:
+  approach: >-
+    硬依赖 J.50a-2：本卡不得在没有 ready PAB 生产路径的情况下只把 UI 接到
+    decompose。底部按钮不再一次跑完「冻结 + 签署 + 开工」；C.22 五阶段
+    保留，签署与施工准备改到地图「确认开工」。handleConfirmScheme（或拆出
+    的开始规划路径）在 FREEZE_SNAPSHOT 成功后进入 PROJECT_MAPPING，中栏
+    写「正在整理项目地图…」，右栏不锁，然后调用 J.50a-2 入口与
+    decomposeProjectPlan，再 refreshProjectPlan。成功后不 runWorker。
+    handleProjectMapConfirmStart 继续预检 stub_id，再走签署并在成功后
+    runWorker。按钮与 SchemeReviewPane 说明改为「确认方案，开始规划」。
+    confirmation_id 区分规划提交与开工提交。更新既有把确认方案绑定为
+    「冻结并开工」的文案与测试。要动 writable_paths 以外的文件，停工修卡。
+    先审施工方案再动代码。
+  touches:
+    - { path: src/routes/index.tsx, change: modify, why: 拆开确认方案与确认开工两条路径, symbols: [handleConfirmScheme, handleProjectMapConfirmStart] }
+    - { path: src/components/studio/SchemeReviewPane.tsx, change: modify, why: 按钮与说明改为开始规划, symbols: [] }
+    - { path: src/lib/journey/confirm-scheme-atomic.ts, change: modify, why: 规划路径只跑到冻结，签署留在确认开工, symbols: [] }
+    - { path: src/lib/daemon-api.ts, change: modify, why: 如需补 PAB/规划客户端调用，不改分解器语义, symbols: [] }
+    - { path: tests/ui/task-c22-confirm-wiring.test.tsx, change: modify, why: 回归不再把确认方案等同于开工, symbols: [] }
+    - { path: tests/ui/confirm-scheme-starts-planning.test.tsx, change: create, why: 生产路径：确认方案后可见计划且尚未开工, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J50b-P1, test_path: tests/ui/confirm-scheme-starts-planning.test.tsx, level: integration, case: J50b-P1 确认方案只冻结并开始规划 }
+    - { acceptance_id: J50b-P2, test_path: tests/ui/confirm-scheme-starts-planning.test.tsx, level: integration, case: J50b-P2 地图确认开工仍按合同桩签署并开工 }
+    - { acceptance_id: J50b-P3, test_path: tests/ui/task-c22-confirm-wiring.test.tsx, level: unit, case: 规划提交与开工提交可区分 }
+    - { acceptance_id: J50b-P4, test_path: tests/ui/confirm-scheme-starts-planning.test.tsx, level: integration, case: J50b-P4 生产用户路径集成测试 }
+    - { acceptance_id: J50b-P5, test_path: tests/ui/confirm-scheme-starts-planning.test.tsx, level: integration, case: J50b-P5 不把当前登录页按 tiny 绕过 }
+governance:
+  spec_refs:
+    - docs/adr/0015-contract-as-unit-of-delivery.md
+    - docs/adr/0018-intent-to-executable-seal.md
+    - docs/adr/0019-project-architecture-baseline.md
+    - docs/ledger/adr0015-plan-step-fix-assessment.md
+    - docs/specs/supervisor.md
+  depends_on:
+    - { id: TASK-J.50a-2, kind: hard }
+  code_facts:
+    - { ref: "src/routes/index.tsx:1512-1667", note: "handleConfirmScheme：runConfirmSchemeAtomic 只到 FREEZE_SNAPSHOT，再 decomposeProjectPlan(pab: null) 与 refreshProjectPlan；不签署、不 runWorker" }
+    - { ref: "src/routes/index.tsx:1763-1974", note: "handleProjectMapConfirmStart：预检合同桩后从已冻结快照走 SIGN_AND_PREPARE → COMMIT，成功后 runWorker；不走规划路径" }
+    - { ref: "src/lib/journey/confirm-scheme-atomic.ts:177-189", note: "规划 confirmation_id 前缀 scheme-plan-，开工前缀 scheme-start-" }
+    - { ref: "src/lib/journey/confirm-scheme-atomic.ts:381", note: "stopAfter=FREEZE_SNAPSHOT 时冻结成功即返回，不调用 signAndPrepare" }
+    - { ref: "src/lib/daemon-api.ts:1322-1347", note: "decomposeProjectPlan 的 pab 可为 null，走 J.50a-2 服务端 resolvePabForDecompose 回退；不改分解器语义" }
+    - { ref: "src/components/studio/SchemeReviewPane.tsx:638", note: "不具备资格时把白话原因写入 confirmPrototypeError，显示在 scheme-error；方案保持已冻结" }
+    - { ref: "src/components/studio/SchemeReviewPane.tsx:840-862", note: "按钮与说明为「确认方案，开始规划」；规划中显示「正在整理项目地图…」" }
+    - { ref: "docs/adr/0019-project-architecture-baseline.md:18-36", note: "开始规划不等于确认开工，这一下不授权 Worker；本卡未改 ADR 正文" }
+  non_goals:
+    - 不删 C.22 五阶段，不改成「确认即开工后再补计划」（评估候选 ii）
+    - 不在确认方案之前分解（与 ADR-0019 冲突）
+    - 不把当前「登录页」按 tiny 绕过
+    - 不实现 large 的模型分解
+    - 不改 ADR 正文
+    - 不在本卡重做 J.50a-2 的 PAB 生成器或 J.50a-1 的落盘
+    - 不把试玩或合入写入本卡验收
+  fail:
+    - 确认方案后仍直接签署或 runWorker
+    - 只接线分解却未走 J.50a-2 的 ReadyPabView 生产路径
+    - 地图确认开工不再签署或不拉 Worker
+    - 没有覆盖「确认后可见计划且尚未开工」的生产路径集成测试
+    - 把当前「登录页」按 tiny 绕过计划环节
+    - 改动 writable_paths 以外的文件却未停工修卡
+  adr_revisions: []
+  defaults:
+    - 底部按钮只冻结并开始规划；签署与开工留在地图确认开工；必须先有 J.50a-2
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 361, commit: f69d026427792db3376da77dd089db09aa072947 }
+```
+
+* **背景**：P-275 定性是主链顺序与 ADR-0015 不符：现行「确认方案 = 冻结 + 直接开工」，计划/里程碑被绕过。P-276 建议候选 i，并写明落地必须同时面对 PAB。
+* **取舍**：采用评估 i，不默认走 ii。`tiny` 分流不是本卡主修法；当前「登录页」按 `standard` 处理。
+* **立卡说明（2026-11-23 · P-277）**：Tina 授权立卡（t1349u）。基线 `86128d241e1c5dab616a1a37871f0ba126ec0e3e`（[#353](https://github.com/he18718143986-design/IDE/pull/353) P-276）。当时硬依赖 J.50a。**立卡 ≠ 开工**；先审施工方案再授权动代码。
+* **依赖改挂（2026-11-23 · P-278）**：硬依赖改挂 `TASK-J.50a-2`，不再挂 J.50a。J.50a 已 `[SPLIT]`，不再作为施工依据。
+* **完工说明（2026-11-24 · P-282）**：施工 [#361](https://github.com/he18718143986-design/IDE/pull/361) squash `f69d026427792db3376da77dd089db09aa072947`。『确认方案』已拆分为冻结+规划（C.22 到 `FREEZE_SNAPSHOT` 后接 PAB 生产与分解刷新地图，不签署不 `runWorker`），地图『确认开工』按合同桩签署开工；不具备资格白话失败关闭；端到端闭环未宣称，试玩与合入不在本卡。
+
+### 3.4bn 资格判定读错方案来源（J.51 · 完工回写 P-284）
+
+<a id="task-j.51"></a>
+
+### 【Task J.51】资格判定读错方案来源 `[COMPLETED · 立卡 P-283 · 施工 #364 · 完工回写 P-284]`
+
+> **归档注记（2026-11-24 · P-284）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266–#361）。[#364](https://github.com/he18718143986-design/IDE/pull/364) squash `fa1ee4578ba1d50b788a33d3baad7d016202e4e6` 于 2026-11-24 19:09:15 香港时间合入（由我执行；pre-merge head `dc9045c8d7661ec35ad03c960a710b7d86a1e86f`；父提交 `b942b5459b67c96a59eaacca5739cccea8ae00ce`）。诚实口径：**资格判定改读台账与密封快照已交付（内容读 `state.draft`、密封证明用匹配已冻结快照或台账 `frozen=true`、请求体投影忽略、判定表一行未改）；真钥匙复测不在本卡，端到端闭环未宣称**。
+
+```yaml task-card
+id: TASK-J.51
+status: COMPLETED
+contract:
+  intent:
+    title: 资格判定读错方案来源
+    description: >-
+      资格判定与 ensureMinimalReadyPab 的输入改为冻结后的台账方案（state.draft /
+      已密封证明），不读请求体投影。新增共用加载函数，供 ensureMinimalReadyPab、
+      decompose 回退 resolvePabForDecompose、以及 POST
+      /api/project/architecture-baseline/ensure-minimal 三处共用：内容读台账
+      state.draft，密封证明用同一 scheme_id + 修订号、状态已冻结的快照；台账自身
+      frozen=true 也承认。请求体投影忽略，不再作为资格来源。判定表一行不改。
+      真钥匙复测不在本卡验收。
+    risk_level: LOW
+  acceptance:
+    - id: J51-P1
+      check: auto
+      text: >-
+        投影缺 size_hint 但台账 size_hint=standard 且有匹配快照时具备资格并落盘。
+        请求体（或传入的 scheme 参数）为中栏投影形态：模块只剩名称、无 size_hint；
+        台账 state.draft 为 size_hint=standard、单用户可见新模块，且存在同一
+        scheme_id + 修订号、状态已冻结的快照。此时应判定具备资格并写入 minimal
+        ready PAB，不得因投影缺 size_hint 失败关闭。
+    - id: J51-P2
+      check: auto
+      text: >-
+        台账 size_hint=large 时白话失败且不写盘，即使请求体写成 standard。
+        失败须走现有白话，不得落盘。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/supervisor/pab/minimal-ready-pab.ts
+      - daemon/server.ts
+      - tests/daemon/plan-decompose-pab-fallback.test.ts
+    readonly_paths:
+      - daemon/supervisor/intent-compiler/scheme-ledger-store.ts
+      - daemon/pipeline/scheme-snapshot-store.ts
+      - daemon/supervisor/intent-compiler/scheme-midpane-projection.ts
+      - src/lib/journey/scheme-patch-types.ts
+      - src/routes/index.tsx
+  verification:
+    commands:
+      - { alias: pab-fallback, executable: npx, args: [vitest, run, tests/daemon/plan-decompose-pab-fallback.test.ts] }
+design:
+  approach: >-
+    J.50b 规划冻结之后，账本内容是完整的（size_hint=standard、模块结构还在），
+    但 frozen 仍是 false；密封快照已标冻结，里面却只有中栏投影。所以资格判定必须
+    「内容读台账 state.draft，密封证明读匹配的已冻结快照」，单读任一边都会错。
+    在 daemon/supervisor/pab/minimal-ready-pab.ts 新增同一套加载函数（建议名
+    loadSealedLedgerSchemeForMinimalPab），给 ensureMinimalReadyPab、
+    resolvePabForDecompose 与 POST /api/project/architecture-baseline/ensure-minimal
+    三处共用。先读 readSchemeLedger(projectRoot)?.state.draft；若存在同一
+    scheme_id + 修订号、且 readSchemeSnapshot 能读出的已冻结快照，则按已密封做判定，
+    内容仍用台账，不用快照里的投影。查找快照可在本文件内遍历
+    SCHEME_SNAPSHOT_DIR 再调用现有 readSchemeSnapshot，不改
+    scheme-snapshot-store.ts（该文件不在 writable_paths）。台账自身
+    draft.frozen===true（现有 J.50a-2 单测夹具）也承认。两样都没有，仍用现成白话
+    「方案还没密封，还不能生成架构基线。」请求体里的投影忽略，不再作为资格来源；
+    ensure-minimal 不再强求请求体带 scheme。判定表
+    assessMinimalReadyPabEligibility 一行不改（standard、单模块、无跨模块接口、
+    无数据边界变化、kind 合格）。因为判定表仍读 scheme.frozen === true，加载函数
+    在确认密封证明之后，把台账内容交给判定时须带上已密封标记（例如展开台账草稿并设
+    frozen: true），不得把 frozen=false 的台账原文直接丢进未改的判定表，否则会误报
+    「方案还没密封」。ensureMinimalReadyPab / resolvePabForDecompose 即使保留
+    scheme 参数，也不得再用它做资格判定。原有 J.50a-2 用例改为先写入台账（及按需
+    写入匹配快照），判定逻辑保持原样。要动 writable_paths 以外的文件，停工修卡，
+    不扩面。先审施工方案再动代码。本卡验收只含 CI 单测；真钥匙复测不进本卡验收，
+    不写成 it()，也不写成会让 check:docs 要求出现在 it() 里的 case。
+  touches:
+    - { path: daemon/supervisor/pab/minimal-ready-pab.ts, change: modify, why: 新增共用加载函数并让 ensureMinimalReadyPab / resolvePabForDecompose 用台账内容加密封证明做资格判定, symbols: [loadSealedLedgerSchemeForMinimalPab] }
+    - { path: daemon/server.ts, change: modify, why: ensure-minimal 与 decompose 回退改走共用加载函数，不再把请求体投影当作资格来源，ensure-minimal 不再强求请求体带 scheme, symbols: [] }
+    - { path: tests/daemon/plan-decompose-pab-fallback.test.ts, change: modify, why: 新增 J51-P1 / J51-P2，并把原有 J.50a-2 用例改为先写台账, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J51-P1, test_path: tests/daemon/plan-decompose-pab-fallback.test.ts, level: unit, case: "J51-P1: 投影缺 size_hint 但台账 size_hint=standard 且有匹配快照时具备资格并落盘" }
+    - { acceptance_id: J51-P2, test_path: tests/daemon/plan-decompose-pab-fallback.test.ts, level: unit, case: "J51-P2: 台账 size_hint=large 时白话失败且不写盘，即使请求体写 standard" }
+governance:
+  spec_refs:
+    - docs/specs/project-architecture-baseline.md
+    - docs/adr/0019-project-architecture-baseline.md
+    - docs/specs/project-decomposition.md
+  depends_on:
+    - { id: TASK-J.50b, kind: hard }
+  code_facts:
+    - { ref: "daemon/supervisor/pab/minimal-ready-pab.ts:44", note: assessMinimalReadyPabEligibility 入口；判定表本卡一行不改 }
+    - { ref: "daemon/supervisor/pab/minimal-ready-pab.ts:47-60", note: "先查 frozen，再查 size_hint；缺 size_hint 会落到「这个需求的规模档不适合用精简架构基线。」" }
+    - { ref: "daemon/supervisor/pab/minimal-ready-pab.ts:94-99", note: ensureMinimalReadyPab 目前把 input.scheme 直接送进判定 }
+    - { ref: "daemon/supervisor/pab/minimal-ready-pab.ts:153-168", note: resolvePabForDecompose 回退同样把 input.scheme 交给 ensureMinimalReadyPab }
+    - { ref: "daemon/server.ts:5547-5553", note: ensure-minimal 强求请求体 scheme 并把它当作资格来源 }
+    - { ref: "daemon/server.ts:5586-5599", note: decompose 回退把 body.scheme 传给 resolvePabForDecompose }
+    - { ref: "daemon/supervisor/intent-compiler/scheme-ledger-store.ts:72", note: 本卡内容来源 readSchemeLedger(repoRoot).state.draft }
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:761-776", note: readSchemeSnapshot 只返回 status 为 FROZEN 的快照，用作密封证明 }
+    - { ref: "daemon/supervisor/intent-compiler/scheme-midpane-projection.ts:64-76", note: 中栏投影无 size_hint，模块只剩名称；本卡不改投影结构 }
+  non_goals:
+    - 不改判定表阈值（standard、单模块、无跨模块、无数据边界变化、kind 合格）
+    - 不改 J.50b 已交付的冻结+规划拆分
+    - 不改中栏投影结构（投影瘦身是另一回事）
+    - 不点「确认开工」、不走确认开工路径
+    - 不改右栏逐字节
+    - 不动 ADR-0015 / ADR-0019
+    - 真钥匙复测不进本卡验收
+  fail:
+    - 仍用请求体投影做资格判定，导致缺 size_hint 的投影被判不合格、而台账 standard 且已有匹配快照时本应具备资格
+    - 只读密封快照里的投影当内容，或只看台账 frozen 标记当密封证明
+    - 把 frozen=false 的台账原文直接送进未改的判定表，误报「方案还没密封」
+    - 改了 assessMinimalReadyPabEligibility 的判定表或阈值
+    - 台账 size_hint=large 时因请求体写成 standard 而落盘或判为具备资格
+    - 两样密封证明都没有时，没有沿用现成白话「方案还没密封，还不能生成架构基线。」
+    - 改动 writable_paths 以外的文件却未停工修卡
+    - 把真钥匙复测写成 it() 或写成会让 check:docs 要求出现在 it() 里的 case
+  adr_revisions: []
+  defaults:
+    - 内容读台账，密封证明读匹配快照；判定表一行不改；请求体投影忽略
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 364, commit: fa1ee4578ba1d50b788a33d3baad7d016202e4e6 }
+```
+
+* **背景**：J.50b 之后，真钥匙「确认方案，开始规划」已写冻结快照 `scheme-plan-mwujofon-p66842ot`，合同 0、未开工——J.50b 拆分本身工作正常。随后 decompose 返回 422「这个需求的规模档不适合用精简架构基线。」根因：控制台送出中栏投影（模块只剩名称，无 `size_hint`），`assessMinimalReadyPabEligibility` 对投影判定 `size_hint` 缺失 → 不合格。账本 `state.draft` 仍是 `size_hint=standard`、单用户可见新模块「登录页」，按台账原样具备资格。
+* **取舍**：J.50b 冻结后账本内容完整但 `frozen=false`，密封快照已冻结但只有投影，所以「内容读台账、密封证明读快照」是唯一正确的组合。判定表一行不改；请求体投影忽略。真钥匙复测另案，不进本卡 PASS。
+* **立卡说明（2026-11-24 · P-283）**：Tina 授权立卡（t1388u）。基线 `baf23834add1ee2512d25daa359b91537886c225`（[#362](https://github.com/he18718143986-design/IDE/pull/362) P-282）；其上产品提交 [#361](https://github.com/he18718143986-design/IDE/pull/361)/`f69d026427792db3376da77dd089db09aa072947`。**立卡 ≠ 开工**；先合入本 docs PR，再开独立代码 PR。代码 PR 必需检查全绿后报授权；Windows 存量失败按先例报 UNSTABLE（#266–#361 选 A）。
+* **真钥匙复测路径（锁定，不在本卡验收，尚未实测，待 Tina 点名）**：本回写 PR 合入并重启 Daemon 后（不是仅 #364 合入后），同一试玩目录再点「确认方案，开始规划」→ 看分解是否出计划/地图 → 再测「确认开工」。实测记录落 ledger。
+* **完工说明（2026-11-24 · P-284）**：施工 [#364](https://github.com/he18718143986-design/IDE/pull/364) squash `fa1ee4578ba1d50b788a33d3baad7d016202e4e6`。资格判定改读台账与密封快照已交付（内容读 `state.draft`、密封证明用匹配已冻结快照或台账 `frozen=true`、请求体投影忽略、判定表一行未改）；真钥匙复测不在本卡，端到端闭环未宣称。
+
+### 3.4bo decompose 方案来源未统一（J.52 · 完工回写 P-288）
+
+<a id="task-j.52"></a>
+
+### 【Task J.52】decompose 方案来源未统一 `[COMPLETED · 立卡 P-286 · 修卡 P-287 · 施工 #367 · 完工回写 P-288]`
+
+> **归档注记（2026-11-24 · P-288）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266–#364）。[#367](https://github.com/he18718143986-design/IDE/pull/367) squash `1d022acaca5e653650b0968074dd0a5266800be7` 于 2026-11-24 23:03:50 香港时间合入（由我执行；pre-merge head `ff44f817e05f4a50a5264d66d5f483090b860ecf`；父提交 `81811b802bf7eae41288e9f24710e95dd88d08d3`）。诚实口径：**decompose 入口改读密封台账方案已交付（与资格判定同一 `loadSealedLedgerSchemeForMinimalPab` 来源、请求体投影忽略、`decompose()` 内部分支与判定表未改）；真钥匙复测不在本卡，端到端闭环未宣称**。
+
+```yaml task-card
+id: TASK-J.52
+status: COMPLETED
+contract:
+  intent:
+    title: decompose 方案来源未统一
+    description: >-
+      POST /api/project/plan/decompose 的方案输入改为与资格判定同一来源：
+      用 J.51 已交付的 loadSealedLedgerSchemeForMinimalPab 加载方案（内容读
+      台账 state.draft，密封证明用同一 scheme_id + 修订号的已冻结快照，或
+      台账 draft.frozen===true），把加载结果交给 decompose()。请求体中栏投影
+      忽略，不再作为分解输入，也不再强求请求体带 scheme。不改 decompose()
+      内部 size_hint 分支，不改判定表，不给 HTTP 入口接模型。真钥匙复测不在
+      本卡验收。
+    risk_level: LOW
+  acceptance:
+    - id: J52-P1
+      check: auto
+      text: >-
+        请求体投影无 size_hint，但台账 size_hint=standard 且有匹配已冻结快照时，
+        分解走 standard 路径，返回成功且 model_calls=0，并写出计划。不得再因
+        没传模型而 model_calls=0 即败。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/server.ts
+      - tests/daemon/plan-decompose-pab-fallback.test.ts
+      - tests/daemon/plan-patch-api.test.ts
+    readonly_paths:
+      - daemon/supervisor/decomposer/decompose.ts
+      - daemon/supervisor/pab/minimal-ready-pab.ts
+      - daemon/supervisor/intent-compiler/scheme-ledger-store.ts
+      - daemon/pipeline/scheme-snapshot-store.ts
+      - daemon/supervisor/intent-compiler/scheme-midpane-projection.ts
+      - src/routes/index.tsx
+  verification:
+    commands:
+      - { alias: pab-fallback, executable: npx, args: [vitest, run, tests/daemon/plan-decompose-pab-fallback.test.ts] }
+      - { alias: plan-patch-api, executable: npx, args: [vitest, run, tests/daemon/plan-patch-api.test.ts] }
+design:
+  approach: >-
+    J.51 之后资格判定已改读台账与密封快照，PAB 可以落盘 minimal/ready；但
+    POST /api/project/plan/decompose 仍把请求体中栏投影交给 decompose()。
+    投影没有 size_hint，被当成非 standard/tiny，走需要模型的路径；服务端入口
+    不传 model，于是立即返回 422 E_DECOMPOSE_FAILED「这个需求我还没拆好」，
+    model_calls=0。台账 state.draft 的 size_hint=standard 本可走零模型
+    buildStandardPlanPatch。standard / tiny 分解本身是确定性路径，不需要模型，
+    本卡不改这条语义。只改分解 HTTP 入口的方案来源，复用
+    loadSealedLedgerSchemeForMinimalPab：内容读台账 state.draft，密封证明用
+    同一 scheme_id + 修订号、状态已冻结的快照，或台账 draft.frozen===true。
+    加载结果交给 decompose()。请求体投影忽略，不再作为分解输入；也不再强求
+    请求体带 scheme（与 J.51 的 ensure-minimal 一致）。加载失败仍用现成白话
+    「方案还没密封，还不能生成架构基线。」不改 decompose() 内部 size_hint
+    分支，不改判定表，不给 HTTP 入口接模型。台账若是 large，仍走需要模型的
+    路径，现有失败语义保持不变，本卡不扩面。buildStandardPlanPatch 需要台账
+    模块对象（user_visible、id）；改读台账后，standard 路径才能按设计工作。
+    控制台可以继续发送投影，服务端不再用它做分解输入；不改 index.tsx 请求
+    形态，不改中栏投影结构。单测可复用 plan-decompose-pab-fallback.test.ts
+    里已有的写台账、写快照和中栏投影助手。P-287 修卡把 writable_paths 扩为三条，
+    新增 tests/daemon/plan-patch-api.test.ts：该测试断言 decompose 入口旧的请求体
+    方案来源，J.52 改读台账后需同步更新断言；属行为变化的预期适配，非范围蔓延。
+    更新口径限定：只改该测试中与方案来源相关的断言/夹具（改为先写台账与匹配快照），
+    不得借机改其他断言或扩到别的文件。要动 writable_paths 以外的文件，
+    停工修卡，不扩面。先审施工方案再动代码。本卡验收只含 CI 单测；真钥匙复测
+    不进本卡验收，不写成 it()，也不写成会让 check:docs 要求出现在 it() 里的
+    case。
+  touches:
+    - { path: daemon/server.ts, change: modify, why: decompose 入口改用 loadSealedLedgerSchemeForMinimalPab 加载方案并交给 decompose()，忽略请求体投影，不再强求请求体带 scheme, symbols: [] }
+    - { path: tests/daemon/plan-decompose-pab-fallback.test.ts, change: modify, why: 新增 J52-P1：请求体投影无 size_hint 但台账 standard 且有匹配快照时，分解走 standard 路径成功且 model_calls=0 并写出计划, symbols: [] }
+    - { path: tests/daemon/plan-patch-api.test.ts, change: modify, why: 同步更新与方案来源相关的断言/夹具（改为先写台账与匹配快照）；不得借机改其他断言, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J52-P1, test_path: tests/daemon/plan-decompose-pab-fallback.test.ts, level: unit, case: "J52-P1: 请求体投影无 size_hint 但台账 size_hint=standard 且有匹配快照时，分解走 standard 路径成功且 model_calls=0 并写出计划" }
+governance:
+  spec_refs:
+    - docs/specs/project-decomposition.md
+    - docs/specs/project-architecture-baseline.md
+    - docs/adr/0019-project-architecture-baseline.md
+  depends_on:
+    - { id: TASK-J.51, kind: hard }
+  code_facts:
+    - { ref: "daemon/supervisor/decomposer/decompose.ts:5", note: size_hint 为 standard 时走零模型确定性路径 }
+    - { ref: "daemon/supervisor/decomposer/decompose.ts:70", note: 模型调用可选；standard 路径不会调用 }
+    - { ref: "daemon/supervisor/decomposer/decompose.ts:310-329", note: size_hint 为 standard 或 tiny 时走 buildStandardPlanPatch，model_calls=0，不调用模型 }
+    - { ref: "daemon/supervisor/decomposer/decompose.ts:332-339", note: "其余情况（包括没有 size_hint）要走模型；没传 model 就返回 E_DECOMPOSE_FAILED「这个需求我还没拆好」，model_calls=0" }
+    - { ref: "daemon/supervisor/decomposer/decompose.ts:195-198", note: buildStandardPlanPatch 需要台账模块对象的 user_visible 与 id；中栏投影没有这些字段 }
+    - { ref: "daemon/server.ts:5604-5612", note: "当前 decompose({ scheme: body.scheme, ... }) 且不传 model" }
+    - { ref: "src/routes/index.tsx:1649", note: "控制台发送 { scheme: frozen, pab: null }，该 frozen 是中栏投影；本卡不改请求形态" }
+    - { ref: "daemon/supervisor/pab/minimal-ready-pab.ts:99-111", note: 复用 J.51 已交付的 loadSealedLedgerSchemeForMinimalPab；本卡只在 decompose HTTP 入口改用，不改该函数 }
+  non_goals:
+    - 不改 decompose() 内部 size_hint 分支（standard / tiny 仍走零模型 buildStandardPlanPatch）
+    - 不改判定表
+    - 不给 HTTP 入口接模型
+    - 不把台账 large 的需模型路径改成零模型，也不改其现有失败语义
+    - 不改中栏投影结构，不改 index.tsx 请求形态
+    - 不改 J.50b 已交付的冻结+规划拆分
+    - 不点「确认开工」、不走确认开工路径
+    - 不改右栏
+    - 不动 ADR-0015 / ADR-0019
+    - 真钥匙复测不进本卡验收
+  fail:
+    - 仍用请求体投影做分解输入，导致无 size_hint 的投影走模型路径、因没传模型而以 E_DECOMPOSE_FAILED / model_calls=0 失败，而台账 standard 且已有匹配快照时本应走 standard 路径成功并写出计划
+    - 改了 decompose() 内部 size_hint 分支，或给 HTTP 入口擅自接模型
+    - 改了判定表
+    - 加载失败时没有沿用现成白话「方案还没密封，还不能生成架构基线。」
+    - 改了中栏投影结构或 index.tsx 请求形态
+    - 改动 writable_paths 以外的文件却未停工修卡
+    - 把真钥匙复测写成 it() 或写成会让 check:docs 要求出现在 it() 里的 case
+  adr_revisions: []
+  defaults:
+    - 分解入口与资格判定同一套加载函数；请求体投影忽略；不改 decompose() 内部分支，不接模型
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 367, commit: 1d022acaca5e653650b0968074dd0a5266800be7 }
+```
+
+* **背景**：J.51 之后，真钥匙下「确认方案，开始规划」可使 PAB 落盘 minimal/ready，但 `POST /api/project/plan/decompose` 返回 422 `E_DECOMPOSE_FAILED`「这个需求我还没拆好」，`model_calls=0`。根因：分解入口读请求体中栏投影（无 `size_hint`）→ 非 standard/tiny 走模型路径 → 服务端未传模型即失败。台账 `state.draft` 的 `size_hint=standard` 本可走零模型 `buildStandardPlanPatch`；`buildStandardPlanPatch` 还需要台账模块对象（`user_visible`、`id`），中栏投影没有这些字段。
+* **取舍**：`standard` / `tiny` 分解本身是零模型确定性路径，不需要模型，本卡不改这条语义。只改分解入口的方案来源，与资格判定共用 `loadSealedLedgerSchemeForMinimalPab`。不改 `decompose()` 内部分支，不给 HTTP 入口接模型。台账 `large` 仍走需模型路径，现有失败语义不变。真钥匙复测另案，不进本卡 PASS。
+* **立卡说明（2026-11-24 · P-286）**：Tina 授权立卡（t1398u）。基线 `0980ff7bec04991a77b97319518833c5811d024a`（[#365](https://github.com/he18718143986-design/IDE/pull/365) P-284）；其上产品提交 [#364](https://github.com/he18718143986-design/IDE/pull/364)/`fa1ee4578ba1d50b788a33d3baad7d016202e4e6`。编号按授权使用 P-286；P-285 号未占用，不擅自改号。**立卡 ≠ 开工**；先合入本 docs PR，再开独立代码 PR。代码 PR 必需检查全绿后报授权；Windows 存量失败按先例报 UNSTABLE（#266–#361 选 A）。
+* **修卡说明（2026-11-24 · P-287）**：Tina 授权修卡（t1404u）。#367 因范围外 `tests/daemon/plan-patch-api.test.ts` 受行为变化影响而停工——按流程正确，不擅自扩面。该测试断言 decompose 入口旧的请求体方案来源，J.52 改读台账后需同步更新断言；属行为变化的预期适配，非范围蔓延。`writable_paths` 由两条扩为三条，新增 `tests/daemon/plan-patch-api.test.ts`。更新口径限定：只改该测试中与方案来源相关的断言/夹具（改为先写台账与匹配快照），不得借机改其他断言或扩到别的文件。其余卡面（验收 J52-P1、排除项、判定表不动、`decompose()` 内部分支不改）不变。卡状态仍为 `[NEW_TASK]`，估算仍为 S；**修卡 ≠ 开工**。本修卡合入后再按三条路径继续 #367 施工。
+* **真钥匙复测路径（锁定，不在本卡验收，尚未实测，待 Tina 点名）**：本回写 PR 合入并重启 Daemon 后（不是仅 #367 合入后），同一试玩目录再点「确认方案，开始规划」→ 看分解是否出计划/地图 → 再测「确认开工」。实测记录落 ledger。
+* **完工说明（2026-11-24 · P-288）**：施工 [#367](https://github.com/he18718143986-design/IDE/pull/367) squash `1d022acaca5e653650b0968074dd0a5266800be7`。decompose 入口改读密封台账方案已交付（与资格判定同一 `loadSealedLedgerSchemeForMinimalPab` 来源、请求体投影忽略、`decompose()` 内部分支与判定表未改）；真钥匙复测不在本卡，端到端闭环未宣称。
+
+### 3.4bp 生成器补写验收（J.53 · 完工回写 P-291）
+
+<a id="task-j.53"></a>
+
+### 【Task J.53】生成器补写验收（few-shot + 编译循环窄兜底 + 人工补录） `[COMPLETED · 立卡 P-290 · 施工 #372 · 完工回写 P-291]`
+
+> **归档注记（2026-11-25 · P-291）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266–#367）。[#372](https://github.com/he18718143986-design/IDE/pull/372) squash `6c0a2fbc22bd3b7bfde62c27ce702cc75bddd820` 于 2026-11-25 03:04:37 香港时间合入（由我执行；pre-merge head `2ea16e1e21ae7e6908dd5fd7ec3e5d8347484658`；父提交 `fe050373bf28d7871d04873cd9cd3d1376250bbf`）。诚实口径：**few-shot 与编译循环补写验收已交付（例 1 补可检查验收、空验收窄兜底 `ai_inferred`、已冻结不注入）；冻结前校验非空在 J.54；端到端闭环未宣称**。
+
+```yaml task-card
+id: TASK-J.53
+status: COMPLETED
+contract:
+  intent:
+    title: 生成器补写验收（few-shot + 编译循环窄兜底 + 人工补录）
+    description: >-
+      让最小需求也会在方案里留下至少一条可检查验收：官方 few-shot
+      「登陆页」示例同时写出 upsert_acceptance；编译循环在「已有可见模块
+      或目标、但 acceptance 仍空」时，以 source:"ai_inferred" 窄兜底补一条；
+      已有空验收台账可在未冻草案上经右栏自然语言 + 已有 upsert_acceptance
+      补录并升修订，再冻出带真实验收 id 的新快照。不改 buildStandardPlanPatch
+      的 acc-missing 占位，不放宽 D-2。真钥匙复测不在本卡验收。
+    risk_level: LOW
+  acceptance:
+    - id: J53-P1
+      check: auto
+      text: >-
+        官方 few-shot 例 1（U3「就搞个登陆页吧，手机号就行」）在写出
+        upsert_module 的同时，至少写出一条 upsert_acceptance，其 item.id 与
+        item.text 去空白后均非空，且可检查（含 check）。
+        docs/specs/intent-compiler-prompt.md 对应示例同步，不得只改代码提示词。
+    - id: J53-P2
+      check: auto
+      text: >-
+        草案未冻结、已有可见模块（或目标）但 acceptance 仍空时，编译循环
+        在 assemble 成功之后、merge 之前注入一条 source 为 ai_inferred 的
+        upsert_acceptance；合并后方案 acceptance[] 至少有一条 id 与 text
+        去空白后均非空的条目。不得在已有合格验收时再发明一条，也不得在
+        既无可见模块也无目标时凭空补。
+    - id: J53-P3
+      check: auto
+      text: >-
+        草案已冻结（deps.isFrozen()===true 或 draft.frozen）时不注入验收兜底，
+        也不经补丁改写已密封快照。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/supervisor/intent-compiler/system-prompt.ts
+      - docs/specs/intent-compiler-prompt.md
+      - daemon/supervisor/intent-compiler/compile-loop.ts
+      - tests/unit/compiler-empty-acceptance-fallback.test.ts
+    readonly_paths:
+      - src/lib/journey/compiler-output-schema.ts
+      - src/lib/journey/scheme-patch-engine.ts
+      - daemon/supervisor/decomposer/decompose.ts
+      - src/lib/project/project-plan.ts
+      - docs/specs/project-decomposition.md
+      - tests/unit/compiler-empty-patch-title.test.ts
+  verification:
+    commands:
+      - { alias: acceptance-fallback, executable: npx, args: [vitest, run, tests/unit/compiler-empty-acceptance-fallback.test.ts] }
+design:
+  approach: >-
+    根因是生成器与门禁的常径：官方 few-shot 例 1 对「登陆页」只发
+    upsert_module，不写验收；空草案默认 acceptance=[]；确认/冻结不查验收
+    非空。本卡先补「验收从哪来」，不拦冻结（拦冻结是 J.54，硬依赖本卡）。
+    1) 改 daemon/supervisor/intent-compiler/system-prompt.ts 例 1，使最小需求
+    也写出至少一条可检查验收；docs/specs/intent-compiler-prompt.md 对应示例
+    必须同步（该文件是提示词实施口径）。摘录规则不变：条目名可写「登录页」，
+    摘录必须是用户原样「登陆页」。2) 编译循环加与 J.49 maybeFillEmptyPatchTitle
+    同类的窄兜底：在 assemble 成功之后、merge 之前注入；source 固定
+    "ai_inferred"；只覆盖「已有可见模块或目标，但 acceptance 仍空」；id 用
+    new: 前缀，text 从已有模块名或目标生成一条可观察、可检查的最小验收
+    （check 用 playtest 或 both），证据抄已有模块/目标的 TurnRef（与 J.49
+    同类）；不得凭空编造模块里没有的能力，不得在已有合格验收时再补。
+    编译循环已对 isFrozen / draft.frozen 短路，冻结草案不得进入补丁。
+    3) 人工补录走右栏自然语言 + 已有 upsert_acceptance，不把全新中栏验收
+    编辑器当作本卡必做。4) 已有空验收台账怎么补（必须执行，不可削弱）：
+    第一个实例是试玩目录 /Users/tina/Downloads/stagent-j45-key-playtest，
+    台账 scheme-active 修订号 2、goals=[]、acceptance=[]、size_hint=standard、
+    标题/模块「登录页」。已写出的冻结快照不得改写（含 P-289 冻出的
+    scheme-plan-mwuuzd92-2pmvzk8v）。在未冻草案上补验收并升修订，再冻出
+    带真实验收 id 的新快照后才能分解。P-289 / J.51 观测：写冻结快照后台账
+    draft 仍可能 frozen=false，补录默认走这条未冻草案路径。若施工时磁盘
+    frozen=true 挡住编译补丁（E_PATCH_FROZEN 或编译循环短路），必须在施工
+    方案里写明显式解冻或「另开未冻修订再补录」的写路径，先报审再动代码；
+    禁止静默改已密封快照，也不把完整解冻产品当作本卡默认必做。补录完成后，
+    方案 acceptance[] 必须有至少一条 id 与 text 去空白后均非空的条目（空白
+    / 空 id 不算）。不改 buildStandardPlanPatch 的 acc-missing 占位，不放宽
+    D-2。要动 writable_paths 以外的文件，停工修卡，不扩面。先审施工方案再
+    动代码。本卡验收只含 CI 单测；真钥匙复测不进本卡验收，不写成 it()，
+    也不写成会让 check:docs 要求出现在 it() 里的 case。
+  touches:
+    - { path: daemon/supervisor/intent-compiler/system-prompt.ts, change: modify, why: 官方 few-shot 例 1 为最小需求同时写出至少一条可检查 upsert_acceptance, symbols: [] }
+    - { path: docs/specs/intent-compiler-prompt.md, change: modify, why: 与 system-prompt.ts 例 1 同步，避免规格与实施口径分叉, symbols: [] }
+    - { path: daemon/supervisor/intent-compiler/compile-loop.ts, change: modify, why: 增加与 J.49 同类的空验收窄兜底，并在 assemble 之后、merge 之前调用, symbols: [] }
+    - { path: tests/unit/compiler-empty-acceptance-fallback.test.ts, change: create, why: 覆盖 J53-P1～P3（few-shot 例 1、未冻空验收兜底、已有验收/无模块不补、冻结不注入）, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J53-P1, test_path: tests/unit/compiler-empty-acceptance-fallback.test.ts, level: unit, case: "J53-P1: 官方 few-shot 例 1 在 upsert_module 同时写出至少一条 id 与 text 非空的可检查 upsert_acceptance，且 intent-compiler-prompt.md 对应示例同步" }
+    - { acceptance_id: J53-P2, test_path: tests/unit/compiler-empty-acceptance-fallback.test.ts, level: unit, case: "J53-P2: 未冻草案已有可见模块但 acceptance 为空时注入 source=ai_inferred 的 upsert_acceptance；已有合格验收或无模块无目标时不补" }
+    - { acceptance_id: J53-P3, test_path: tests/unit/compiler-empty-acceptance-fallback.test.ts, level: unit, case: "J53-P3: 草案已冻结时不注入验收兜底，也不改写已密封快照" }
+governance:
+  spec_refs:
+    - docs/ledger/j52-retest-acceptance-source.md
+    - docs/specs/intent-compiler-prompt.md
+    - docs/specs/scheme-patch-engine.md
+  depends_on:
+    - { id: TASK-J.52, kind: hard }
+  code_facts:
+    - { ref: "daemon/supervisor/intent-compiler/system-prompt.ts:41-47", note: 官方 few-shot 例 1 对「登陆页」只发 upsert_module，不写 upsert_acceptance }
+    - { ref: "docs/specs/intent-compiler-prompt.md:602-607", note: 规格侧同一示例，目前同样只发模块 }
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:214-238", note: J.49 maybeFillEmptyPatchTitle 是本卡窄兜底的对标实现 }
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:356-360", note: isFrozen 或 draft.frozen 时编译循环直接短路，不写补丁 }
+    - { ref: "daemon/supervisor/intent-compiler/compile-loop.ts:463", note: 标题兜底在 assemble 成功之后、merge 之前调用；本卡验收兜底应落在同一位置 }
+    - { ref: "src/lib/journey/compiler-output-schema.ts:306-313", note: upsert_acceptance 已支持 source 为 user_said 或 ai_inferred；本卡不改该 schema }
+    - { ref: "src/lib/journey/scheme-patch-engine.ts:1707", note: draft.frozen 时合并返回 E_PATCH_FROZEN；已密封快照不得静默改写 }
+  non_goals:
+    - 不改 buildStandardPlanPatch 的 acc-missing 占位，不放宽 D-2
+    - 不把全新中栏验收编辑器当作本卡必做
+    - 不改确认/冻结门禁（那是 J.54；J.54 在本卡施工合入前不开工）
+    - 不改写已写出的冻结快照
+    - 不把完整解冻产品当作本卡默认必做（仅当施工时 frozen=true 挡住补录时，才在施工方案里写明显式解冻或另开未冻修订的写路径并先报审）
+    - 不改 J.49 已交付的标题兜底语义，不改 tests/unit/compiler-empty-patch-title.test.ts
+    - 不点「确认开工」、不走确认开工路径
+    - 真钥匙复测不进本卡验收
+  fail:
+    - few-shot 例 1 或对应规格示例仍只发 upsert_module、不写可检查验收
+    - 只改了 system-prompt.ts、未同步 intent-compiler-prompt.md，或只改了规格未改提示词
+    - 未冻且已有可见模块（或目标）但验收仍空时，编译循环不补，或 source 不是 ai_inferred
+    - 在已有合格验收时仍再发明一条，或既无可见模块也无目标时凭空补
+    - 冻结草案仍被注入验收补丁，或已密封快照被静默改写
+    - 改了 acc-missing 占位或放宽了 D-2
+    - 改动 writable_paths 以外的文件却未停工修卡
+    - 把真钥匙复测写成 it() 或写成会让 check:docs 要求出现在 it() 里的 case
+  adr_revisions: []
+  defaults:
+    - 窄兜底只覆盖「已有可见模块或目标但验收仍空」；source 固定 ai_inferred；人工补录走右栏 + 已有 upsert_acceptance
+    - 已冻结快照不改写；未冻草案上补验收并升修订，再冻新快照
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 372, commit: 6c0a2fbc22bd3b7bfde62c27ce702cc75bddd820 }
+```
+
+* **背景**：P-289 真钥匙复测（2026-11-24 23:37 香港时间）证实 J.52 入口修复已生效，分解走台账 `standard` 零模型路径后得到 422 `E_PLAN_INVALID`，违规 D-2 / `cs-1:acc-missing`。根因不是分解器坏了，是密封台账 `acceptance=[]`（且 `goals=[]`）。只读评估（`ai_inferred`）认定空验收是当前生成器与门禁的常径：官方 few-shot 对「登陆页」只发模块、空草案默认空验收、冻结与确认都不查验收非空。Tina t1417u 拍板采用「冻结前校验非空 + 生成器补写验收」：本卡先补写与补录路径，避免只上 J.54 把已有空验收台账卡死。
+* **取舍**：不把「只在分解里造验收」当作修法——D-2 要求方案来源的验收 id 必须真实存在于方案 `acceptance[]`，`acc-missing` 占位过不了。不把全新中栏编辑器当必做。J.54 的冻结门禁必须等本卡施工合入后才能开工。
+* **已有空验收台账怎么补（卡面锁定）**：第一个实例是 `/Users/tina/Downloads/stagent-j45-key-playtest` 的 `scheme-active` 修订号 2（`goals=[]`、`acceptance=[]`、`size_hint=standard`、标题/模块「登录页」）。已写出的冻结快照不得改写。在未冻草案上补验收并升修订，再冻出带真实验收 id 的新快照后才能分解。若磁盘 `frozen=true` 挡住编译补丁，施工方案须写明显式解冻或另开未冻修订的补录写路径，先报审；禁止静默改已密封快照。
+* **立卡说明（2026-11-25 · P-290）**：Tina 授权立卡（t1417u）。基线 `6baf812d1ad2294b2038c7e0d2f3c2492e3d19a7`（[#370](https://github.com/he18718143986-design/IDE/pull/370) P-289）；产品代码仍为 [#367](https://github.com/he18718143986-design/IDE/pull/367)/`1d022acaca5e653650b0968074dd0a5266800be7`。编号按授权使用 P-290；P-285 号未占用，不擅自改号。**立卡 ≠ 开工**；先合入本 docs PR，再先报 J.53 施工方案，授权后再开独立代码 PR。J.54 在本卡施工合入前不开工。
+* **施工顺序（锁定）**：本立卡 PR 合入后，先报 J.53 施工方案（先审再动代码）→ J.53 施工 → 再报 J.54 施工方案 → J.54 施工。
+* **真钥匙复测路径（锁定，不在本卡验收）**：J.53+J.54 施工均合入并重启 Daemon 后，同一试玩目录先补验收并升修订 → 再点「确认方案，开始规划」→ 看分解是否出计划/地图 → 再测「确认开工」。实测记录落 ledger。未测「确认开工」，未宣称端到端闭环。
+* **完工说明（2026-11-25 · P-291）**：施工 [#372](https://github.com/he18718143986-design/IDE/pull/372) squash `6c0a2fbc22bd3b7bfde62c27ce702cc75bddd820`。few-shot 与编译循环补写验收已交付（例 1 补可检查验收、空验收窄兜底 `ai_inferred`、已冻结不注入）；冻结前校验非空在 J.54；端到端闭环未宣称。
+
+### 3.4bq 冻结前校验验收非空（J.54 · 完工回写 P-294）
+
+<a id="task-j.54"></a>
+
+### 【Task J.54】冻结前校验验收非空（确认谓词 + 冻结入口再拦） `[COMPLETED · 立卡 P-290 · 修卡 P-292 · 修卡 P-293 · 施工 #375 · 完工回写 P-294]`
+
+> **归档注记（2026-11-25 · P-294）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266–#372）。[#375](https://github.com/he18718143986-design/IDE/pull/375) squash `6ea454c6fe535dc1272900989b699b54e7b3a51f` 于 2026-11-25 05:18:33 香港时间合入（由我执行；pre-merge head `a4a982edeb78ceda804b598f25e3607534ef5017`；父提交 `baae5c2e51719f1bca26caf4ac718b443b7c691f`）。诚实口径：**冻结前校验验收非空已交付（确认谓词与冻结入口双拦、白话『方案还没有验收标准，先补一条再冻结』、空验收 4xx 不写快照不给 201、按钮禁用同白话）；端到端闭环未宣称**。
+
+
+```yaml task-card
+id: TASK-J.54
+status: COMPLETED
+contract:
+  intent:
+    title: 冻结前校验验收非空（确认谓词 + 冻结入口再拦）
+    description: >-
+      确认/冻结门禁要求方案至少有一条合格验收（id 与 text 去空白后均非空），
+      缺了用白话「方案还没有验收标准，先补一条再冻结」拦住，不复用
+      「这个需求我还没拆好」。POST /api/supervisor/scheme/freeze 的
+      handleSchemeSnapshot 必须再拦一次：空验收返回 4xx，不写快照，不给
+      201。中栏只读验收块、确认按钮禁用态与错误提示与谓词保持同步。
+      不改 acc-missing 占位，不放宽 D-2。必须等 J.53 施工合入后才开工。
+      真钥匙复测不在本卡验收。
+    risk_level: LOW
+  acceptance:
+    - id: J54-P1
+      check: auto
+      text: >-
+        evaluateSchemeConfirmation（及确认路径上同一谓词）在缺少合格验收时
+        ok=false，白话为「方案还没有验收标准，先补一条再冻结」（可略作润色，
+        但不得改成别的意思），不得复用「这个需求我还没拆好」。合格验收指
+        至少一条 id 与 text 去空白后均非空的条目；goals 为空不挡；「AI 建议·
+        非验收」测试目标建议块不算。
+    - id: J54-P2
+      check: auto
+      text: >-
+        POST /api/supervisor/scheme/freeze 在即将写入快照的方案缺少合格验收时
+        返回 4xx，不写新快照，不返回 201。已存在的冻结快照不得被本卡改写。
+    - id: J54-P3
+      check: auto
+      text: >-
+        至少一条合格验收时，本门禁不单独阻止确认/冻结（其他既有门禁仍生效）。
+        仅空白 id、仅空白 text、或只有测试目标建议的，不得当作合格验收通过。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/lib/journey/scheme-draft.ts
+      - daemon/server.ts
+      - tests/unit/scheme-confirmation-gate.test.ts
+      - tests/unit/confirm-scheme-atomic.test.ts
+      - tests/integration/scheme-confirm-http-injection.test.ts
+      - tests/integration/scheme-confirm-scope-drift.test.ts
+      - tests/ui/task-c22-confirm-wiring.test.tsx
+      - tests/unit/authorization-allowlist.test.ts
+      - tests/unit/dispute-seal-turn-register.test.ts
+      - tests/ui/scheme-quote-backlink.test.tsx
+      - tests/ui/scope-acceptance-block.test.tsx
+      - tests/ui/journey-handoff.test.tsx
+      - tests/integration/dispute-anchor-real-session.test.ts
+      - tests/ui/task-c18-scheme-single-pane.test.tsx
+    readonly_paths:
+      - src/lib/journey/confirm-scheme-atomic.ts
+      - src/components/studio/SchemeReviewPane.tsx
+      - src/components/studio/ScopeAcceptanceBlock.tsx
+      - daemon/supervisor/decomposer/decompose.ts
+      - src/lib/project/project-plan.ts
+      - docs/specs/project-decomposition.md
+  verification:
+    commands:
+      - { alias: confirm-gate, executable: npx, args: [vitest, run, tests/unit/scheme-confirmation-gate.test.ts] }
+      - { alias: freeze-http, executable: npx, args: [vitest, run, tests/integration/scheme-confirm-http-injection.test.ts] }
+      - { alias: midpane-wiring, executable: npx, args: [vitest, run, tests/ui/task-c22-confirm-wiring.test.tsx] }
+design:
+  approach: >-
+    空验收的方案本来就不该密封。J.53 先提供补写与补录路径；本卡再在门禁
+    处拦住，避免分解在下游撞 D-2。硬依赖 J.53：只上本卡会把本试玩这类已有
+    空验收台账卡死，且没有补录路径。1) 在 evaluateSchemeConfirmation 或
+    其调用的确认谓词里查验收非空（建议复用或对齐
+    acceptanceItemsFromSchemeDraft 已有的「空白 id/文案丢弃」口径）。缺了
+    用白话「方案还没有验收标准，先补一条再冻结」拦住；可略作润色，但意图
+    锁定；不得复用「这个需求我还没拆好」。goals 不必非空。「AI 建议·非验收」
+    测试目标建议块不算验收。2) handleSchemeSnapshot（POST
+    /api/supervisor/scheme/freeze）必须再拦一次：校验即将写入快照的
+    scheme.acceptance，空则 4xx，不写快照，不给 201。中栏投影已含
+    acceptance 字段；再拦对象是即将密封的那份方案正文，避免再出现只信错误
+    来源。已存在的冻结快照不得改写；既有幂等 200（同一 confirmation_id
+    重放已有快照）由施工方案写清，不得借机改快照正文。3) 中栏
+    SchemeReviewPane 已展示 confirmation.message，按钮随 canConfirm 禁用；
+    confirm-scheme-atomic 已调用 evaluateSchemeConfirmation。生产代码默认
+    不改这两处，只要禁用态与错误提示自动跟上。本卡把
+    tests/ui/task-c22-confirm-wiring.test.tsx 列入可写，用以锁同步并改编因
+    空验收门禁而失败的夹具/断言。若必须改 SchemeReviewPane.tsx 或
+    confirm-scheme-atomic.ts 才能让文案/禁用态同步，停工修卡，不扩面。
+    既有「空验收仍可确认/冻结」测试夹具，只允许在本卡已列测试文件里补一条
+    合格验收，或改写成空验收应被拦住的负例。不改 acc-missing，不放宽 D-2。
+    要动 writable_paths 以外的文件，停工修卡。先审施工方案再动代码。本卡
+    验收只含 CI 测试；真钥匙复测不进本卡验收，不写成 it()，也不写成会让
+    check:docs 要求出现在 it() 里的 case。J.53 施工合入前本卡不开工。
+    P-292 修卡：writable_paths 由七条扩为十三条，追加六个因空验收正例夹具
+    必红的测试文件；这些测试正例夹具无合格验收却断言确认通过或冻结 201，J.54 门禁生效后需同步适配；属行为变化的预期适配，非范围蔓延。适配口径：正例夹具补一条去空白后 id 与 text 都非空的验收，或改写成空验收应被拦住的负例；不得借机改其他断言、不得扩到别的文件、不扩生产文件。
+    只读复核 tests/e2e/golden-slice.test.ts：该切片编译桩发出 upsert_acceptance（L209–217，id 为 new:ac、text 为「页面源码含问候语」，去空白后均非空），flush 后由 ledgerToFreezeScheme（L327–331）把账本 draft.acceptance 拷进冻结请求；L385 已用 scheme.acceptance![0]!.id 取第一条验收 id——若验收为空，本测试在现行 main 上也会在 L385 失败。结论：切片编译后已有合格验收，J.54 门禁生效后预期仍绿，不列入 writable_paths。若施工时该文件意外变红，停工再修卡追加。
+    P-293 第二次修卡：writable_paths 由十三条扩为十四条，追加 tests/ui/task-c18-scheme-single-pane.test.tsx（用例「方案够完整才出现生成 Demo；最底只有确认方案」，L110–138：rebuildSchemeFromCorpus 无合格验收却点 scheme-confirm 并断言 onConfirm）。扩面原因与适配口径沿用 P-292：这些测试正例夹具无合格验收却断言确认通过或冻结 201，J.54 门禁生效后需同步适配；属行为变化的预期适配，非范围蔓延。适配口径：正例夹具补一条去空白后 id 与 text 都非空的验收，或改写成空验收应被拦住的负例；不得借机改其他断言、不得扩到别的文件、不扩生产文件。收敛要求：施工前先把名单内外的相关测试夹具整体扫一遍，确认没有下一批同类必红文件再动手。全量排查（当前 main 6ea5329e60bc0e206a488a2f10a56ead00612652，不依赖未合入的 #375 代码）：在 tests/ 与 src/tests/ 共 367 个测试文件中检索 evaluateSchemeConfirmation、scheme-confirm、runConfirmSchemeAtomic、handleConfirmScheme、POST /api/supervisor/scheme/freeze、emptySchemeDraft、makeScheme()、makeDraft()、rebuildSchemeFromCorpus、acceptance: [] 等，得 59 个候选后再按断言实读。结论：除本文件外无其他同类必红夹具。P-292 已列入的六个追加测试不算新发现。golden-slice 复核仍为编译后已有合格验收、预期仍绿，不列入。system-map-pane.test.tsx（L132–148）与 project-map-pane.test.tsx（L155–171）会调谓词并挂载 SchemeReviewPane，但只断言地图嵌套、不断言 confirmation.ok / 按钮可点 / onConfirm / freeze 201，排除。confirm-scheme-starts-planning.test.tsx 夹具 L132 已有合格验收，L314 可点断言预期仍绿，排除。其余候选或只直接调用 writeSchemeSnapshot（不经 handleSchemeSnapshot）、或只渲染中栏/表面上报/试玩按钮、或为负例/已冻结，不构成「无合格验收却断言确认通过或冻结 201」。施工 PR #375 已开，因本范围外文件停工，等待本修卡；修卡 ≠ 开工，状态仍为 NEW_TASK。
+  touches:
+    - { path: src/lib/journey/scheme-draft.ts, change: modify, why: evaluateSchemeConfirmation / 确认谓词增加验收非空校验与锁定白话, symbols: [evaluateSchemeConfirmation] }
+    - { path: daemon/server.ts, change: modify, why: handleSchemeSnapshot 对空验收返回 4xx，不写快照，不给 201, symbols: [handleSchemeSnapshot] }
+    - { path: tests/unit/scheme-confirmation-gate.test.ts, change: modify, why: 新增空验收拦截与合格验收可通过的断言，并适配既有夹具, symbols: [] }
+    - { path: tests/unit/confirm-scheme-atomic.test.ts, change: modify, why: 仅适配因验收非空门禁而失败的夹具/断言，不改生产编排, symbols: [] }
+    - { path: tests/integration/scheme-confirm-http-injection.test.ts, change: modify, why: 断言空验收 freeze 返回 4xx 且不落新快照，并适配既有夹具, symbols: [] }
+    - { path: tests/integration/scheme-confirm-scope-drift.test.ts, change: modify, why: 仅适配因验收非空门禁而失败的冻结夹具/断言, symbols: [] }
+    - { path: tests/ui/task-c22-confirm-wiring.test.tsx, change: modify, why: 锁中栏按钮禁用态与错误提示跟谓词白话同步，并适配既有夹具, symbols: [] }
+    - { path: tests/unit/authorization-allowlist.test.ts, change: modify, why: 仅适配因验收非空门禁而失败的正例夹具/断言，不改其他断言, symbols: [] }
+    - { path: tests/unit/dispute-seal-turn-register.test.ts, change: modify, why: 仅适配因验收非空门禁而失败的冻结夹具/断言，不改其他断言, symbols: [] }
+    - { path: tests/ui/scheme-quote-backlink.test.tsx, change: modify, why: 仅适配因验收非空门禁而失败的正例夹具/断言，不改其他断言, symbols: [] }
+    - { path: tests/ui/scope-acceptance-block.test.tsx, change: modify, why: 仅适配因验收非空门禁而失败的正例夹具/断言，不改其他断言, symbols: [] }
+    - { path: tests/ui/journey-handoff.test.tsx, change: modify, why: 仅适配因验收非空门禁而失败的正例夹具/断言，不改其他断言, symbols: [] }
+    - { path: tests/integration/dispute-anchor-real-session.test.ts, change: modify, why: 仅适配因验收非空门禁而失败的冻结夹具/断言，不改其他断言, symbols: [] }
+    - { path: tests/ui/task-c18-scheme-single-pane.test.tsx, change: modify, why: 仅适配因验收非空门禁而失败的正例夹具/断言，不改其他断言, symbols: [] }
+  interfaces:
+    - { kind: http, name: "POST /api/supervisor/scheme/freeze", signature: "空验收 → 4xx（不写快照、不返回 201）；有合格验收时既有成功语义不变", consumers: [] }
+  test_plan:
+    - { acceptance_id: J54-P1, test_path: tests/unit/scheme-confirmation-gate.test.ts, level: unit, case: "J54-P1: 缺少合格验收时 evaluateSchemeConfirmation 为 ok=false，白话为「方案还没有验收标准，先补一条再冻结」，不复用「这个需求我还没拆好」" }
+    - { acceptance_id: J54-P2, test_path: tests/integration/scheme-confirm-http-injection.test.ts, level: integration, case: "J54-P2: POST /api/supervisor/scheme/freeze 在空验收时返回 4xx，不写新快照，不返回 201" }
+    - { acceptance_id: J54-P3, test_path: tests/unit/scheme-confirmation-gate.test.ts, level: unit, case: "J54-P3: 至少一条合格验收可通过本门禁；空白 id/text 或仅测试目标建议不算" }
+    - { acceptance_id: J54-P1, test_path: tests/ui/task-c22-confirm-wiring.test.tsx, level: unit, case: "空验收时 scheme-confirm 禁用，scheme-confirm-blocked 展示「方案还没有验收标准，先补一条再冻结」" }
+governance:
+  spec_refs:
+    - docs/ledger/j52-retest-acceptance-source.md
+    - docs/specs/project-decomposition.md
+  depends_on:
+    - { id: TASK-J.53, kind: hard }
+  code_facts:
+    - { ref: "src/lib/journey/scheme-draft.ts:524-529", note: isReviewableScheme 只查标题与摘要/模块，不查验收 }
+    - { ref: "src/lib/journey/scheme-draft.ts:615-715", note: evaluateSchemeConfirmation 目前不查 acceptance 非空 }
+    - { ref: "src/lib/journey/scheme-draft.ts:96-109", note: acceptanceItemsFromSchemeDraft 已丢弃空白 id/文案，可作非空口径对齐 }
+    - { ref: "daemon/server.ts:2342-2534", note: handleSchemeSnapshot 写快照前不查验收非空，空验收可返回 201 }
+    - { ref: "src/components/studio/SchemeReviewPane.tsx:779-847", note: 中栏已展示 confirmation.message，按钮随 canConfirm 禁用；默认指望自动跟上，不改生产代码，除非修卡 }
+    - { ref: "src/lib/journey/confirm-scheme-atomic.ts:328-346", note: 确认路径已调用 evaluateSchemeConfirmation；默认不改此文件 }
+    - { ref: "src/components/studio/ScopeAcceptanceBlock.tsx:531", note: 「AI 建议·非验收」是测试目标建议，本卡不算验收 }
+  non_goals:
+    - 不改 buildStandardPlanPatch 的 acc-missing 占位，不放宽 D-2
+    - 不在本卡做生成器补写或人工补录路径（那是 J.53）
+    - 不复用「这个需求我还没拆好」
+    - 不改写已写出的冻结快照
+    - 默认不改 SchemeReviewPane.tsx / confirm-scheme-atomic.ts 生产代码；若必须改才能同步文案或禁用态，停工修卡
+    - J.53 施工合入前不开工
+    - 不点「确认开工」、不走确认开工路径
+    - 真钥匙复测不进本卡验收
+  fail:
+    - 空验收仍能确认，或 freeze 仍返回 201 并写出新快照
+    - 拦截白话复用「这个需求我还没拆好」，或偏离「方案还没有验收标准，先补一条再冻结」的意图
+    - 空白 id、空白 text、或仅「AI 建议·非验收」被当作合格验收通过
+    - goals 为空却被本门禁单独拦住
+    - 中栏按钮禁用态或错误提示与谓词白话不同步
+    - 改了 acc-missing 占位或放宽了 D-2
+    - 改写了已存在的冻结快照
+    - J.53 施工合入前即开工本卡
+    - 改动 writable_paths 以外的文件却未停工修卡
+    - 把真钥匙复测写成 it() 或写成会让 check:docs 要求出现在 it() 里的 case
+  adr_revisions: []
+  defaults:
+    - 非空口径：至少一条 id 与 text 去空白后均非空；goals 不必非空；测试目标建议不算
+    - 冻结入口再拦即将写入快照的方案正文；空验收 4xx、不写快照、不给 201
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 375, commit: 6ea454c6fe535dc1272900989b699b54e7b3a51f }
+```
+
+* **背景**：若只改冻结门禁、不先补生成器与补录路径，本试玩 `scheme-active` 修订号 2 这类空验收台账会被卡死。Tina t1417u 拍板先 J.53、后本卡；本卡硬依赖 J.53。服务端必须再拦一次，不能只信前端谓词。
+* **取舍**：不选「只在分解里造验收」。不复用「这个需求我还没拆好」。中栏生产代码默认不改，靠已有 `confirmation.message` / `canConfirm` 同步；要把 `SchemeReviewPane.tsx` 或 `confirm-scheme-atomic.ts` 列入施工，须先修卡。
+* **立卡说明（2026-11-25 · P-290）**：Tina 授权立卡（t1417u）。基线 `6baf812d1ad2294b2038c7e0d2f3c2492e3d19a7`（[#370](https://github.com/he18718143986-design/IDE/pull/370) P-289）。编号按授权使用 P-290；P-285 号未占用，不擅自改号。**立卡 ≠ 开工**。J.54 在 J.53 施工 PR 合入前不开工。
+* **施工顺序（锁定）**：本立卡 PR 合入后，先 J.53 施工方案与施工；J.53 合入后再报 J.54 施工方案，授权后再动代码。
+* **修卡说明（2026-11-25 · P-292）**：Tina 授权修卡（t1424u）。J.54 按已审方案开工前，因范围外六个测试文件正例夹具无合格验收却断言确认通过或冻结 201 而停工——按流程正确，不擅自扩面。这些测试正例夹具无合格验收却断言确认通过或冻结 201，J.54 门禁生效后需同步适配；属行为变化的预期适配，非范围蔓延。修订 `TASK-J.54`：`writable_paths` 由七条扩为十三条，新增 `tests/unit/authorization-allowlist.test.ts`、`tests/unit/dispute-seal-turn-register.test.ts`、`tests/ui/scheme-quote-backlink.test.tsx`、`tests/ui/scope-acceptance-block.test.tsx`、`tests/ui/journey-handoff.test.tsx`、`tests/integration/dispute-anchor-real-session.test.ts`。更新口径限定：正例夹具补一条去空白后 id 与 text 都非空的验收，或改写成空验收应被拦住的负例；不得借机改其他断言、不得扩到别的文件、不扩生产文件。只读复核 tests/e2e/golden-slice.test.ts：该切片编译桩发出 upsert_acceptance（L209–217，id 为 new:ac、text 为「页面源码含问候语」，去空白后均非空），flush 后由 ledgerToFreezeScheme（L327–331）把账本 draft.acceptance 拷进冻结请求；L385 已用 scheme.acceptance![0]!.id 取第一条验收 id——若验收为空，本测试在现行 main 上也会在 L385 失败。结论：切片编译后已有合格验收，J.54 门禁生效后预期仍绿，不列入 writable_paths。若施工时该文件意外变红，停工再修卡追加。 其余卡面（验收 J54-P1～P3、白话锁定「方案还没有验收标准，先补一条再冻结」、空验收 4xx 不写快照不给 201、不对 freeze 请求调完整确认谓词、不改分解器 / `acc-missing` / D-2 / 中栏生产代码、已有快照仍幂等 200/409、真钥匙复测不写成自动测试）不变。卡状态仍为 `[NEW_TASK]`，估算仍为 S，硬依赖仍为已完成的 J.53；**修卡 ≠ 开工**。本修卡合入后再按十三条路径重新开工，分支名仍用 `feat/j54-acceptance-nonempty-gate`，基线为当时 `origin/main`。
+* **修卡说明（2026-11-25 · P-293）**：Tina 授权第二次修卡（t1427u）。纯 docs，不改产品代码，不继续改 #375。基线 `main` `6ea5329e60bc0e206a488a2f10a56ead00612652`（[#374](https://github.com/he18718143986-design/IDE/pull/374) P-292）。编号按流水使用 **P-293**（版本头第 277 条）；**P-285 号未占用，不擅自改号**。施工 PR [#375](https://github.com/he18718143986-design/IDE/pull/375) 已开，因范围外 `tests/ui/task-c18-scheme-single-pane.test.tsx` 正例夹具无合格验收却断言确认可过而停工——按流程正确，不擅自扩面、未改该文件、未自行合入。这些测试正例夹具无合格验收却断言确认通过或冻结 201，J.54 门禁生效后需同步适配；属行为变化的预期适配，非范围蔓延。适配口径：正例夹具补一条去空白后 id 与 text 都非空的验收，或改写成空验收应被拦住的负例；不得借机改其他断言、不得扩到别的文件、不扩生产文件。这是第二次扩面（P-292 七→十三、本次十三→十四）。修订 `TASK-J.54`：`writable_paths` 由十三条扩为十四条，追加 `tests/ui/task-c18-scheme-single-pane.test.tsx`。收敛要求：施工前先把名单内外的相关测试夹具整体扫一遍，确认没有下一批同类必红文件再动手。全量排查结论：除本文件外无其他同类必红夹具（检索 tests/ 与 src/tests/ 367 个文件、59 个候选后再按断言实读；P-292 已列入的六个追加测试不算新发现；golden-slice 复核仍绿不列入；system-map-pane / project-map-pane 只调谓词不断言成功路径，排除；confirm-scheme-starts-planning 夹具已有合格验收，排除）。其余卡面（验收 J54-P1～P3、白话锁定「方案还没有验收标准，先补一条再冻结」、空验收 4xx 不写快照不给 201、不对 freeze 请求调完整确认谓词、不改分解器 / `acc-missing` / D-2 / 中栏生产代码、已有快照仍幂等 200/409、真钥匙复测不写成自动测试）不变。卡状态仍为 `[NEW_TASK]`，估算仍为 S，硬依赖仍为已完成的 J.53；**修卡 ≠ 开工**。本修卡合入后，按十四条路径继续 #375 施工（适配该测试文件，不改产品代码范围），必需检查全绿后报授权，不自行合入。
+* **真钥匙复测路径（锁定，不在本卡验收）**：J.53+J.54 施工均合入并重启 Daemon 后，同一试玩目录先补验收并升修订 → 再点「确认方案，开始规划」→ 看分解是否出计划/地图 → 再测「确认开工」。实测记录落 ledger。未测「确认开工」，未宣称端到端闭环。
+
+* **完工说明（2026-11-25 · P-294）**：施工 [#375](https://github.com/he18718143986-design/IDE/pull/375) squash `6ea454c6fe535dc1272900989b699b54e7b3a51f`。冻结前校验验收非空已交付（确认谓词与冻结入口双拦、白话『方案还没有验收标准，先补一条再冻结』、空验收 4xx 不写快照不给 201、按钮禁用同白话）；端到端闭环未宣称。相对父提交只改十四条 writable_paths、+368/−8，无 docs、无范围外文件。c18 只在正例「方案够完整才出现生成 Demo；最底只有确认方案」里于折方案并解决冲突后补一条合格验收。分解器 / `acc-missing` / D-2 / 中栏生产代码相对父提交零 diff。真钥匙复测路径已锁定、待 Tina 点名。未测「确认开工」。
+
+### 3.4br 开工确认读快照的编号错位（J.55 · 完工回写 P-297）
+
+<a id="task-j.55"></a>
+
+### 【Task J.55】开工确认读快照的编号错位 `[COMPLETED · 立卡 P-296 · 施工 #380 · 完工回写 P-297]`
+
+> **归档注记（2026-11-25 · P-297）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266–#375）。[#380](https://github.com/he18718143986-design/IDE/pull/380) squash `05e6f4e7909b0cf721c684a0b66b681daca794a9` 于 2026-11-25 14:05:07 香港时间合入（由我执行；pre-merge head `865abb8798a83fba47109b9e04f9f9bb9cc4c8c0`；父提交 `4ee4c039c4de6545828f11db69c95ddcdc8f8945`；squash 提交日期 2026-11-25 14:05:06 香港时间）。合入前必需面全绿（Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit 实跑通过；CI run 45502599843 workflow conclusion=success，cancelled=0），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非必需存量失败：16 失败文件 / 345 通过、28 失败测试 / 3281 通过；失败形态为路径分隔符 / CRLF / spawn EINVAL / EPERM fsync / ENOENT / `golden-slice` 生命周期断言等存量名单，与本卡门禁无关；四条名单内两个新测试在 Windows 上均通过；同 #266～#375 先例）。无 CANCELLED。Bugbot NEUTRAL 不挡。基线 `main` 原为 `4ee4c039c4de6545828f11db69c95ddcdc8f8945`（[#379](https://github.com/he18718143986-design/IDE/pull/379) P-296）。编号按流水使用 **P-297**（版本头第 281 条）；**P-285 号未占用，不擅自改号**。诚实口径：**开工确认按 `scheme_id`+修订号定位已冻结快照已交付（合同绑定写规划编号、多份内容不同仍 409 不自动挑、快照不可改写语义未改）；端到端闭环未宣称**。相对父提交只改四条 `writable_paths`、+624/−5，无 docs、无范围外文件。`minimal-ready-pab.ts`、快照写入函数体、J.50b 两个编号生成函数、`confirm-scheme-atomic.ts`、右栏与相关 UI 相对父提交零 diff。真钥匙复测路径已锁定、待 Tina 点名。本回写未启动实测，未宣称端到端闭环。
+
+
+```yaml task-card
+id: TASK-J.55
+status: COMPLETED
+contract:
+  intent:
+    title: 开工确认读快照的编号错位
+    description: >-
+      创建与批准合同路径改为按 scheme_id + 修订号在快照目录定位规划阶段已冻结
+      快照（与 J.51 loadSealedLedgerSchemeForMinimalPab /
+      hasMatchingFrozenSnapshot 同键，以台账草案的 scheme_id+修订为准），
+      不用开工编号当文件名。开工编号仍只作开工自己的幂等键，不改 J.50b
+      拆分，不把创建合同的 confirmation_id 改成规划编号。找到后仍检查合同
+      与快照范围一致；找不到仍 409，白话不变。不另写快照，不改已有文件。
+      合同绑定 scheme_binding 写找到的那份快照自己的规划编号，不写开工编号。
+      真钥匙复测不在本卡验收。
+    risk_level: LOW
+  acceptance:
+    - id: J55-P1
+      check: auto
+      text: >-
+        规划编号下先写一份合格冻结快照，再用开工编号调用创建合同，应找到该快照
+        并创建成功；scheme_binding 指向规划编号与该快照 digest，不得指向开工编号。
+    - id: J55-P2
+      check: auto
+      text: >-
+        目录中没有匹配的 scheme_id+修订号冻结快照时，创建合同仍返回 409
+        E_SCHEME_SNAPSHOT_NOT_FOUND，白话仍是「确认快照不存在或已损坏，拒绝创建可签署合同」。
+    - id: J55-P3
+      check: auto
+      text: >-
+        批准路径使用同一查找键：按开工编号读不到文件时，改按 scheme_id+修订号定位；
+        找到则批准可继续，scheme_binding 仍指向规划编号；找不到仍 409，白话仍是
+        「确认快照不存在或已损坏，拒绝签署」。
+    - id: J55-P4
+      check: auto
+      text: >-
+        同一 scheme_id+修订号存在多份冻结快照且内容/digest 不同时，视为定位不到，
+        创建合同仍 409，白话仍是「确认快照不存在或已损坏，拒绝创建可签署合同」，不自动挑一份。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/pipeline/scheme-snapshot-store.ts
+      - daemon/http/contract-routes.ts
+      - tests/unit/scheme-snapshot-find-by-revision.test.ts
+      - tests/daemon/scheme-start-snapshot-lookup.test.ts
+    readonly_paths:
+      - daemon/supervisor/pab/minimal-ready-pab.ts
+      - daemon/supervisor/scope-preflight.ts
+      - daemon/supervisor/intent-compiler/scheme-ledger-store.ts
+      - src/lib/journey/confirm-scheme-atomic.ts
+      - src/lib/daemon-api.ts
+      - src/routes/index.tsx
+      - tests/ui/confirm-scheme-starts-planning.test.tsx
+  verification:
+    commands:
+      - { alias: snapshot-lookup, executable: npx, args: [vitest, run, tests/unit/scheme-snapshot-find-by-revision.test.ts] }
+      - { alias: start-contract, executable: npx, args: [vitest, run, tests/daemon/scheme-start-snapshot-lookup.test.ts] }
+design:
+  approach: >-
+    J.50b 把「确认方案」与「确认开工」拆成两个 confirmation id，但快照存储/读取
+    仍按单一编号假设：冻结把文件写成 .stagent/drafts/schemes/<confirmation_id>.json，
+    POST /api/contracts 与批准都用请求里的 confirmation_id 调用 readSchemeSnapshot。
+    真钥匙复测（P-295）规划冻结 201，快照在 scheme-plan-1a20f8774e5-1f1e1f97；
+    开工用 scheme-start-mwv89tnb-uomvzpdv 创建合同，返回 409
+    E_SCHEME_SNAPSHOT_NOT_FOUND，「确认快照不存在或已损坏，拒绝创建可签署合同」
+    （2026-11-25 05:49:51 香港时间）。前端原子函数同一会话里已有规划快照引用，
+    但传给 Daemon 的仍是开工编号。现有 J.50b 界面测试已锁：创建合同的编号必须
+    以 scheme-start- 开头，且不得等于规划编号，故不能靠改传编号绕过拆分。
+    Tina t1434u 审过施工方案并选方向 A：创建与批准在按开工编号读不到文件时，
+    改按 scheme_id+修订号在快照目录定位规划阶段已冻结快照。查找键与 J.51
+    hasMatchingFrozenSnapshot 相同，以台账草案的 scheme_id+修订为准，不另信
+    请求体投影。在 scheme-snapshot-store.ts 新增导出函数（只读查找，不改
+    writeSchemeSnapshot 与不可改写规则）。合同路由两处读取改走该查找。
+    多份快照规则已拍板：同一 scheme_id+修订号只有一份匹配 → 用之；多份但
+    digest/内容相同 → 取 created_at 最新（再相同按 confirmation_id 排序）；
+    多份且内容不同 → 视为定位不到仍 409，不自动挑。找到后仍走
+    assertSignedContractMatchesSnapshot，不放宽签署校验。scheme_binding
+    写找到的那份快照自己的规划编号与 digest，不写开工编号，以免批准仍按
+    无文件编号去读。不另写快照、不改已有文件、不改写不删除历史空验收快照。
+    不把方向 B（开工请求显式引用规划编号）塞进本卡。不改冻结入口、不改右栏、
+    不改 J.50b 两个编号生成函数、不改 docs/ 产品正文、不改 index.tsx 请求形态。
+    本卡不抽换 minimal-ready-pab.ts 里的已有扫描（不进 writable_paths），
+    J.51 行为不变；新导出函数可供日后共用，但不在本卡改该文件。不顺手修
+    「冻结后台账/中栏仍显示未冻结」，不回写 draft.frozen。要动 writable_paths
+    以外的文件，停工修卡，不扩面。本卡验收只含 CI 单测；真钥匙复测不进本卡
+    验收，不写成 it()，也不写成会让 check:docs 要求出现在 it() 里的 case。
+    现有 J.50b 界面测试（规划编号冻结、开工编号创建合同、二者不得相同）应
+    继续通过，本卡不改该测试文件。
+  touches:
+    - { path: daemon/pipeline/scheme-snapshot-store.ts, change: modify, why: 新增按 scheme_id+修订号找出已冻结快照的导出函数；不改写入与不可改写规则, symbols: [] }
+    - { path: daemon/http/contract-routes.ts, change: modify, why: 创建与批准合同在按开工编号读不到文件时，改走按 scheme_id+修订号的查找；scheme_binding 写找到的规划编号, symbols: [] }
+    - { path: tests/unit/scheme-snapshot-find-by-revision.test.ts, change: create, why: 覆盖查找函数与多份快照规则（单份用之、相同 digest 取最新、内容不同 409）, symbols: [] }
+    - { path: tests/daemon/scheme-start-snapshot-lookup.test.ts, change: create, why: 覆盖规划编号下先写合格冻结快照、开工编号创建合同成功且 scheme_binding 指向规划编号；找不到仍 409 白话不变；批准路径同键补一条, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J55-P1, test_path: tests/daemon/scheme-start-snapshot-lookup.test.ts, level: unit, case: "J55-P1: 规划编号下先写合格冻结快照、开工编号创建合同 → 找到并创建成功，scheme_binding 指向规划编号与该快照 digest" }
+    - { acceptance_id: J55-P2, test_path: tests/daemon/scheme-start-snapshot-lookup.test.ts, level: unit, case: "J55-P2: 找不到匹配冻结快照时创建合同仍 409，白话「确认快照不存在或已损坏，拒绝创建可签署合同」" }
+    - { acceptance_id: J55-P3, test_path: tests/daemon/scheme-start-snapshot-lookup.test.ts, level: unit, case: "J55-P3: 批准路径同键：按开工编号读不到时改按 scheme_id+修订号定位，找到可继续，找不到 409「确认快照不存在或已损坏，拒绝签署」" }
+    - { acceptance_id: J55-P4, test_path: tests/unit/scheme-snapshot-find-by-revision.test.ts, level: unit, case: "J55-P4: 同一 scheme_id+修订号多份内容不同的冻结快照 → 视为定位不到" }
+governance:
+  spec_refs:
+    - docs/ledger/j54-key-retest.md
+    - docs/adr/0015-contract-as-unit-of-delivery.md
+  depends_on:
+    - { id: TASK-J.50b, kind: hard }
+    - { id: TASK-J.51, kind: hard }
+    - { id: TASK-J.54, kind: hard }
+  code_facts:
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:716-721", note: 快照路径为 .stagent/drafts/schemes/<confirmation_id>.json }
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:761-823", note: readSchemeSnapshot 只按 confirmation_id 读文件，不按 scheme_id+修订号查找 }
+    - { ref: "daemon/pipeline/scheme-snapshot-store.ts:825-903", note: writeSchemeSnapshot 以 confirmation_id 为文件名写入；同编号同摘要幂等，不同摘要拒绝覆盖 }
+    - { ref: "daemon/server.ts:2526-2527", note: 冻结入口 handleSchemeSnapshot 用请求体 confirmation_id 调用 writeSchemeSnapshot；本卡不改冻结入口 }
+    - { ref: "daemon/http/contract-routes.ts:101-113", note: "POST /api/contracts 用 body.confirmation_id 调用 readSchemeSnapshot；读不到则 409 E_SCHEME_SNAPSHOT_NOT_FOUND「确认快照不存在或已损坏，拒绝创建可签署合同」" }
+    - { ref: "daemon/http/contract-routes.ts:159-165", note: 校验通过后 scheme_binding 现用请求里的 confirmation_id；本卡改为写找到的那份快照自己的规划编号 }
+    - { ref: "daemon/http/contract-routes.ts:537-548", note: "批准路径同样按 body.confirmation_id 读文件；读不到则 409，白话「确认快照不存在或已损坏，拒绝签署」" }
+    - { ref: "daemon/supervisor/scope-preflight.ts:141-172", note: assertSignedContractMatchesSnapshot 检查快照含范围计划且合同范围与之一字不差；本卡找到后仍走此检查，不放宽 }
+    - { ref: "daemon/supervisor/pab/minimal-ready-pab.ts:113-134", note: hasMatchingFrozenSnapshot 已按 scheme_id+修订号扫描快照目录（只返回是/否）；本卡同键，但不改该文件、不改 J.51 行为 }
+    - { ref: "src/lib/journey/confirm-scheme-atomic.ts:177-189", note: newSchemePlanConfirmationId 与 newSchemeStartConfirmationId 分工；本卡不改这两个生成函数 }
+    - { ref: "src/routes/index.tsx:1810-1854", note: 地图确认开工生成 scheme-start- 编号并把它传给 createContractWithAdmission；本卡不改请求形态 }
+    - { ref: "tests/ui/confirm-scheme-starts-planning.test.tsx:404-413", note: 现有测试锁死创建合同编号以 scheme-start- 开头且不得等于规划编号；本卡不改该文件，该测试应继续通过 }
+  non_goals:
+    - 不改快照不可改写语义（不另写快照、不改已有文件、不改写不删除历史空验收快照）
+    - 不改 J.50b 拆分（仍是：方案 → 项目计划/里程碑 → 一份合同单独确认开工）
+    - 不把创建合同的 confirmation_id 改成规划编号；开工编号仍只作开工自己的幂等键
+    - 不放宽合同签署校验；找到后仍走 assertSignedContractMatchesSnapshot
+    - 不动右栏
+    - 不改冻结入口，不改 J.50b 两个编号生成函数
+    - 不改 index.tsx 请求形态，不改 daemon-api 为方向 B 增加规划编号字段
+    - 不把方向 B 塞进本卡
+    - 不改 daemon/supervisor/pab/minimal-ready-pab.ts，不改 J.51 行为
+    - 不顺手修「冻结后台账/中栏仍显示未冻结」，不回写 draft.frozen
+    - 真钥匙复测不进本卡验收
+    - 不改 docs/ 规范正文（立卡文档除外，施工 PR 不改 docs/）
+  fail:
+    - 创建合同时仍只用开工编号当文件名去读快照，导致规划编号下已有合格冻结快照时仍 409
+    - 找到快照后 scheme_binding 写成开工编号，导致批准仍按无文件编号去读
+    - 多份内容不同的快照被自动挑中一份，而不是 409
+    - 找不到时改了 409 或改了白话「确认快照不存在或已损坏，拒绝创建可签署合同」/「确认快照不存在或已损坏，拒绝签署」
+    - 放宽了 assertSignedContractMatchesSnapshot，或另写/改写了快照文件
+    - 改了 J.50b 拆分或两个编号生成函数，或把创建合同的 confirmation_id 改成规划编号
+    - 改动 writable_paths 以外的文件却未停工修卡
+    - 把真钥匙复测写成 it() 或写成会让 check:docs 要求出现在 it() 里的 case
+  adr_revisions: []
+  defaults:
+    - 开工按台账草案的 scheme_id+修订号定位规划阶段已冻结快照；开工编号只作幂等键；找不到仍 409 白话不变
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 380, commit: 05e6f4e7909b0cf721c684a0b66b681daca794a9 }
+
+```
+
+* **背景**：J.50b 拆分后，「确认方案」用 `scheme-plan-*` 编号写冻结快照，「确认开工」用 `scheme-start-*` 编号，但创建/批准合同仍按请求里的这一个编号读文件。真钥匙实测（P-295，2026-11-25 05:49:51 香港时间）：开工编号 `scheme-start-mwv89tnb-uomvzpdv`，快照写在 `scheme-plan-1a20f8774e5-1f1e1f97`，`POST /api/contracts` 返回 409 `E_SCHEME_SNAPSHOT_NOT_FOUND`，文案「确认快照不存在或已损坏，拒绝创建可签署合同」。这是编号语义错位，不是快照丢失。
+* **取舍**：Tina t1434u 审过施工方案并选方向 A（按 `scheme_id`+修订号定位），不选方向 B（开工确认显式引用规划编号）。理由：与 J.51 同键；方向 B 修不了官方仍只传开工编号的现状；界面测试已锁创建合同编号必须是 `scheme-start-*` 且不得等于规划编号。多份快照规则已拍板（单份用之；内容相同取最新；内容不同仍 409）。不把方向 B 塞进本卡。真钥匙复测另案，不进本卡 PASS。
+* **立卡说明（2026-11-25 · P-296）**：Tina 授权立卡（t1434u）。基线 `main` `6a0a3217a9af7c99bb29d799b53cb546f17367c3`（[#378](https://github.com/he18718143986-design/IDE/pull/378) P-295）；产品代码尖仍为 [#375](https://github.com/he18718143986-design/IDE/pull/375) squash `6ea454c6fe535dc1272900989b699b54e7b3a51f`。现场核对 changelog 最新原为 P-295、版本头最新原为第 279 条（P-295 落账已占用第 279 条），按流水取下一号 **P-296**（版本头第 280 条）。**P-285 号未占用，不擅自改号**。**立卡 ≠ 开工**；先合入本 docs PR，再开独立代码 PR。代码 PR 必需检查全绿后报授权；Windows 存量失败按先例报 UNSTABLE（#266–#375 选 A）。范围外文件要动就停工修卡。
+* **真钥匙复测路径（锁定，待 Tina 点名）**：本回写合入并重启 Daemon 后，同一试玩目录直接点「确认开工」（计划与快照已就位）→ 看合同是否签成、`runWorker` 是否启动。实测记录落 ledger。本回写未启动实测，未宣称端到端闭环。
+
+* **完工说明（2026-11-25 · P-297）**：施工 [#380](https://github.com/he18718143986-design/IDE/pull/380) squash `05e6f4e7909b0cf721c684a0b66b681daca794a9`。**开工确认按 `scheme_id`+修订号定位已冻结快照已交付（合同绑定写规划编号、多份内容不同仍 409 不自动挑、快照不可改写语义未改）；端到端闭环未宣称**。相对父提交只改四条 writable_paths、+624/−5，无 docs、无范围外文件。真钥匙复测路径已锁定、待 Tina 点名。本回写未启动实测。
+
+### 3.4bs Worker 解析失败落盘原文特征（J.56 · 完工回写 P-301）
+
+<a id="task-j.56"></a>
+
+### 【Task J.56】Worker 解析失败落盘原文特征 `[COMPLETED · 立卡 P-300 · 施工 #385 · 完工回写 P-301]`
+
+> **归档注记（2026-11-25 · P-301）**：本卡已 **COMPLETED**。Tina 授权合入选 A（Windows Unit 非阻断存量，同 #266–#385）。[#385](https://github.com/he18718143986-design/IDE/pull/385) squash `3529009b1f51fdc6adf207762f9838698185e502` 于 2026-11-25 16:02:45 香港时间合入（由我执行；pre-merge head `b28a43e02519d550296a9416349984ee6c26b48e`；父提交 `44eef8e4545f2d226015364cf282b00e98257861`；squash 提交日期 2026-11-25 16:02:44 香港时间）。合入前必需面全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit 实跑通过，含 macOS Lint；CI run 45569414250 workflow conclusion=success，cancelled=0），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非必需存量失败：路径分隔符 / CRLF / spawn EINVAL / 权限 / `golden-slice` 生命周期等存量名单，不涉及 `tests/unit/worker-parse-failure-features.test.ts`；同 #266～#380 先例）。无 CANCELLED。Bugbot NEUTRAL 不挡。基线 `main` 原为 `44eef8e4545f2d226015364cf282b00e98257861`（[#384](https://github.com/he18718143986-design/IDE/pull/384) P-300）。编号按流水使用 **P-301**（版本头第 285 条）；**P-285 号未占用，不擅自改号**（changelog 号 P-285 与版本头顺序第 285 条不是同一个「285」）。诚实口径：**Worker 解析失败落盘原文特征已交付（纯函数特征抽取、失败先记日志再原样抛出、禁完整原文与密钥）；只做可观测性未修解析，端到端闭环未宣称**。相对父提交只改三条 `writable_paths`、+521/−8，无 docs、无范围外文件。`parseWorkerPatch` 函数本体、提示词相关文件、`tests/unit/task-h1-worker-parse-retry.test.ts`、`debug-log.ts` 相对父提交零 diff。后续路径已锁定、待 Tina 点名：本回写合入并重启 Daemon 后再考虑重试 run-worker 拿原文特征，再按特征定下一张卡。本回写未启动实测，未重试 run-worker，未宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.56
+status: COMPLETED
+contract:
+  intent:
+    title: Worker 解析失败落盘原文特征
+    description: >-
+      只做可观测性，不修解析。generateObject 失败时，把 SDK 错误对象里
+      text 的结构特征写入 daemon 日志：是否有原文、长度、是否以 markdown
+      围栏或 { 开头/结尾、失败原因（json_parse / schema / other）、
+      attempt、模型 id；原文长度大于 80 时才写前后各最多 40 个字符的
+      head/tail，长度小于等于 80 时不写片段，以免短回复被整段拼回。
+      写入前经过 redactSecrets。不落密钥，不落完整原文。禁止出现名为
+      text、raw、full 的字段，不把原文写入 message。首次调用与本地重试
+      各记一条，带 attempt。现有 withParseRetry 与 E_WORKER_PARSE 包装
+      不动，失败仍原样抛出。不改解析成功路径，不改提示词，不回退
+      parseWorkerPatch，不给 generateObject 配 repairText。不重试已签成
+      合同 contract_1795588309763_cy8zx。不把「解析器有 bug」写成已证实
+      结论。真钥匙复测与按特征再立卡不在本卡验收。
+    risk_level: LOW
+  acceptance:
+    - id: J56-P1
+      check: auto
+      text: >-
+        超长围栏 JSON 导致 generateObject 失败时，daemon 日志含必记特征
+        （text_present、text_length、starts_with_fence、失败原因、attempt、
+        模型 id）；因长度大于 80，可有各不超过 40 字符的 head/tail；原文中段
+        一段唯一长串不得出现在日志里；不得出现名为 text、raw、full 的字段，
+        也不得把完整原文写入 message。
+    - id: J56-P2
+      check: auto
+      text: >-
+        写入日志的片段里，sk-、Bearer、api_key= 形态的密钥被脱敏；日志中
+        不得出现未脱敏的这些原文。
+    - id: J56-P3
+      check: auto
+      text: >-
+        原文长度小于等于 80 时，日志不写 head/tail 片段，仍须写长度与围栏/
+        花括号起止等布尔特征。
+    - id: J56-P4
+      check: auto
+      text: >-
+        成功路径行为不回归：解析成功时既有 Worker 校验/重试行为保持不变；
+        generateObject 失败仍原样抛出，仍由 withParseRetry 包成
+        E_WORKER_PARSE，不得在本卡改为回退 parseWorkerPatch 或配 repairText。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/worker/parse-worker-output.ts
+      - daemon/worker/openai-client.ts
+      - tests/unit/worker-parse-failure-features.test.ts
+    readonly_paths:
+      - daemon/core/debug-log.ts
+      - daemon/worker/ai-worker.ts
+      - daemon/http/contract-routes.ts
+      - daemon/pipeline/orchestrator.ts
+      - tests/unit/task-h1-worker-parse-retry.test.ts
+      - docs/ledger/j55-key-retest.md
+  verification:
+    commands:
+      - { alias: parse-failure-features, executable: npx, args: [vitest, run, tests/unit/worker-parse-failure-features.test.ts] }
+      - { alias: parse-retry-regression, executable: npx, args: [vitest, run, tests/unit/task-h1-worker-parse-retry.test.ts] }
+design:
+  approach: >-
+    真钥匙复测（P-298）合同已签成，runWorker 已启动，14:33:05 香港时间返回
+    400：[E_WORKER_PARSE] No object generated: could not parse the response。
+    排查（P-299，标 ai_inferred）确认该句是 AI SDK 在 JSON 解析失败（不是
+    schema 校验失败）时的固定文案；现场无模型原文；NoObjectGeneratedError.text
+    未被读取或落盘；stripMarkdownFence 进不到 generateObject 抛错路径。
+    不把「解析器有 bug」当已证实结论。Tina t1443u 审过施工方案并授权立卡：
+    本卡只补可观测性。在 openai-client.ts 的 generateChanges（相对立卡基线
+    main L69-150）里，仅给 generateObject（L102-108）外加 try/catch：失败
+    时先把特征写入 .stagent/logs/daemon.jsonl（appendDaemonLog；写入前过
+    redactSecrets），再原样抛出，让现有 withParseRetry（parse-worker-output.ts
+    L123-151）重试与 E_WORKER_PARSE 包装不变。首次与重试各记一条，带
+    attempt。特征抽取做成纯函数，放在 parse-worker-output.ts。必记字段：
+    是否有原文、长度、是否以围栏或 { 开头/结尾、失败原因（json_parse /
+    schema / other）、attempt、模型 id。片段上限 40 字符，且仅原文长度大于
+    80 时写 head/tail（小于等于 80 不写片段）。禁止名为 text、raw、full
+    的字段，不把原文写入 message。测试锁死「有特征、无完整原文、无密钥」。
+    不改解析成功路径，不改提示词，不回退 parseWorkerPatch，不给
+    generateObject 配 repairText，不重试已签成合同
+    contract_1795588309763_cy8zx，施工 PR 不改 docs/。要动 writable_paths
+    以外的文件，停工修卡，不扩面。本卡验收只含 CI 单测；J.56 合入并重启
+    Daemon 后再考虑重试 run-worker 拿原文特征、再按特征定下一张卡，不进
+    本卡 PASS，不写成 it()。
+  touches:
+    - { path: daemon/worker/parse-worker-output.ts, change: modify, why: 新增从 SDK 错误对象抽取日志特征的纯函数（不改 withParseRetry 控制流，不在此回退 parseWorkerPatch）, symbols: [] }
+    - { path: daemon/worker/openai-client.ts, change: modify, why: 仅在 generateObject 外加 try/catch，失败先写特征日志再原样抛出；首次与重试各记一条带 attempt, symbols: [] }
+    - { path: tests/unit/worker-parse-failure-features.test.ts, change: create, why: 锁死有特征、无完整原文、无密钥（超长围栏 JSON 中段不出现在日志、sk-/Bearer/api_key= 被脱敏；短原文不写 head/tail）, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J56-P1, test_path: tests/unit/worker-parse-failure-features.test.ts, level: unit, case: "J56-P1: 超长围栏 JSON 含必记特征，中段不出现，无 text/raw/full，≤40 的 head/tail" }
+    - { acceptance_id: J56-P2, test_path: tests/unit/worker-parse-failure-features.test.ts, level: unit, case: "J56-P2: 片段中的 sk- / Bearer / api_key= 被脱敏" }
+    - { acceptance_id: J56-P3, test_path: tests/unit/worker-parse-failure-features.test.ts, level: unit, case: "J56-P3: 原文长度等于 80 时不写 head/tail；81 才写各最多 40 字符" }
+    - { acceptance_id: J56-P4, test_path: tests/unit/worker-parse-failure-features.test.ts, level: unit, case: "J56-P4: 成功路径不写失败特征日志，行为不回归" }
+governance:
+  spec_refs:
+    - docs/ledger/j55-key-retest.md
+  depends_on:
+    - { id: TASK-J.55, kind: hard }
+  code_facts:
+    - { ref: "daemon/worker/openai-client.ts:69-150", note: OpenAiWorkerClient.generateChanges 是生产路径组装 system/prompt 并调用 generateObject 的入口 }
+    - { ref: "daemon/worker/openai-client.ts:102-108", note: generateObject 当前无 catch，读不到 NoObjectGeneratedError.text；本卡只在此外加 try/catch，失败先写特征再原样抛出 }
+    - { ref: "daemon/worker/openai-client.ts:99-132", note: generateObject 包在 withParseRetry 的 producer 里；成功后才把 result.object 交给 parseWorkerPatch；本卡不改成功路径 }
+    - { ref: "daemon/worker/parse-worker-output.ts:123-151", note: withParseRetry 在 looksLikeParseFailure 时最多再试一次，然后包成 E_WORKER_PARSE；本卡不改该控制流 }
+    - { ref: "daemon/worker/parse-worker-output.ts:34-40", note: stripMarkdownFence 只在 parseWorkerPatch 收到字符串时运行，进不到 generateObject 抛错路径；本卡不在此回退解析 }
+    - { ref: "daemon/http/contract-routes.ts:670-702", note: POST /api/contracts/:id/run-worker 失败只回 error.message，不落 SDK text；本卡不改该 HTTP 入口 }
+    - { ref: "daemon/core/debug-log.ts:156-177", note: 已有 redactSecrets；appendDaemonLog 不会自动脱敏 detail，写入前必须先过 redactSecrets }
+    - { ref: "daemon/core/debug-log.ts:184-212", note: 日志写入现有 .stagent/logs/daemon.jsonl；kind 已是 string，本卡不改 debug-log.ts }
+  non_goals:
+    - 不改解析成功路径
+    - 不改系统提示或用户提示词（含重试后缀）
+    - 不在失败路径回退 parseWorkerPatch，不给 generateObject 配 repairText
+    - 不重试已签成合同 contract_1795588309763_cy8zx 的 run-worker
+    - 不把「解析器有 bug」写成已证实结论
+    - 不改 withParseRetry 的重试次数与 E_WORKER_PARSE 包装
+    - 不改 HTTP 错误响应体，不改 docs/ 规范正文（立卡文档除外，施工 PR 不改 docs/）
+    - J.56 合入并重启 Daemon 后再考虑重试 run-worker、再按特征定下一张卡，不进本卡验收
+  fail:
+    - generateObject 失败后仍不写特征日志，或把完整原文 / text、raw、full 字段写入日志
+    - 原文长度小于等于 80 时仍写了 head/tail，或片段超过 40 字符
+    - 日志里出现未脱敏的 sk-、Bearer、api_key= 原文
+    - 改了解析成功路径，或在本卡回退 parseWorkerPatch / 配了 repairText / 改了提示词
+    - 失败不再原样抛出，或不再由 withParseRetry 包成 E_WORKER_PARSE
+    - 改动 writable_paths 以外的文件却未停工修卡
+    - 把按特征再立卡或重试已签成合同写成 it()，或写成会让 check:docs 要求出现在 it() 里的 case
+  adr_revisions: []
+  defaults:
+    - generateObject 失败时只落盘结构特征，不落完整原文、不落密钥；现有重试与错误包装不变
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 385, commit: 3529009b1f51fdc6adf207762f9838698185e502 }
+
+```
+
+* **背景**：J.55 真钥匙复测（P-298）已签成开工合同并启动 `runWorker`，随即 400 `[E_WORKER_PARSE] No object generated: could not parse the response.` 排查（P-299，标 `ai_inferred`）确认这是 AI SDK JSON 解析失败的固定文案（不是 schema 校验失败），但现场没有模型原文，本地 `stripMarkdownFence` 也进不到 `generateObject` 抛错路径。不把「解析器有 bug」当已证实结论。
+* **取舍**：Tina t1443u 审过施工方案并授权立卡。本卡只做可观测性，不修解析。后续「模型真跑偏 → 修提示词/约束；合法 JSON 被包住 → 失败后回退已有 `parseWorkerPatch` 或给 `generateObject` 配同等修复」不纳入本卡施工范围与验收。不重开 J.55。
+* **立卡说明（2026-11-25 · P-300）**：Tina 授权立卡（t1443u）。基线 `main` `24e2de716341bd5f8eed7e97847fab4e866d738b`（[#383](https://github.com/he18718143986-design/IDE/pull/383) P-299）；产品代码尖仍为 [#380](https://github.com/he18718143986-design/IDE/pull/380) squash `05e6f4e7909b0cf721c684a0b66b681daca794a9`。现场核对 changelog 最新原为 P-299、版本头最新原为第 283 条，按流水取下一号 **P-300**（版本头第 284 条）。**P-285 号未占用，不擅自改号**。**立卡 ≠ 开工**；先合入本 docs PR，再开独立代码 PR。代码 PR 必需检查全绿后报授权；Windows 存量失败按先例报 UNSTABLE（#266–#380 选 A）。范围外文件要动就停工修卡。
+* **后续路径（锁定，待 Tina 点名）**：本回写合入并重启 Daemon 后，再考虑重试 `run-worker` 拿原文特征 → 按特征定「模型跑偏修提示词」还是「合法 JSON 被包住修容错」→ 那时再立卡。实测记录落 ledger。本回写未启动实测，未重试 run-worker，未宣称端到端闭环。
+
+* **完工说明（2026-11-25 · P-301）**：施工 [#385](https://github.com/he18718143986-design/IDE/pull/385) squash `3529009b1f51fdc6adf207762f9838698185e502`。**Worker 解析失败落盘原文特征已交付（纯函数特征抽取、失败先记日志再原样抛出、禁完整原文与密钥）；只做可观测性未修解析，端到端闭环未宣称**。相对父提交只改三条 writable_paths、+521/−8，无 docs、无范围外文件。后续路径已锁定、待 Tina 点名。本回写未启动实测。
+
+### 3.4bt Worker 提示词约束只输出 JSON、禁止工具调用标记（J.57 · 完工回写 P-304）
+
+<a id="task-j.57"></a>
+
+### 【Task J.57】Worker 提示词约束只输出 JSON、禁止工具调用标记 `[COMPLETED · 立卡 P-303 · 施工 #389 · 完工回写 P-304]`
+
+> **归档注记（2026-11-25 · P-304）**：本卡已 **COMPLETED**。Tina 选 A，按先例授权合并 #389（t1452u；Windows Unit 非阻断存量，同 #266–#385）。[#389](https://github.com/he18718143986-design/IDE/pull/389) squash `fed205a5805f41bc3516249be16d12bbfefaeb08` 于 2026-11-25 17:31:54 香港时间合入（由我执行；pre-merge head `d0ab5da745d835336a3e0e8aff9b92cce2335544`；父提交 `87647f836d171b80c51d1b775eba6296d5ca53ac`；squash 提交日期 2026-11-25 17:31:52 香港时间）。合入前必需面全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit 实跑通过，含 macOS Lint；CI run 45584178499 workflow conclusion=success，cancelled=0），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非必需存量失败：spawn EINVAL / playtest-gate / ipc-stream / golden-slice 生命周期 / worktree 路径分隔 / merger CRLF / diff-files 路径 / deps-reuse 等存量名单，无一落在本 PR 的 4 个文件；同 #266～#385 先例）。无 CANCELLED。Bugbot NEUTRAL 不挡。基线 `main` 原为 `87647f836d171b80c51d1b775eba6296d5ca53ac`（[#388](https://github.com/he18718143986-design/IDE/pull/388) P-303）。编号按流水使用 **P-304**（版本头第 288 条）；**P-285 号未占用，不擅自改号**（changelog 号 P-285 与版本头顺序第 285 条不是同一个「285」）。诚实口径：**Worker 提示词约束只输出 JSON、禁止工具调用标记已交付（输出契约与首轮/重试提示锁 JSON-only、角色与边界/可用工具/known_limitations 改写、generateObject 形状与模型 id 未改）；真钥匙复测不在本卡，端到端闭环未宣称**。相对父提交只改四条 `writable_paths`（三处产品提示词文件 + 新建 `tests/unit/worker-prompt-json-only.test.ts`）、+176/−8，无 docs、无范围外文件。`generateObject` 调用形状、schema、`withParseRetry` 控制流、`E_WORKER_PARSE` 包装、模型 id、`parse-worker-output.ts`、`ai-worker.ts`、`key-store.ts` 相对父提交零 diff（`openai-client.ts` 仅增加首轮/重试提示词常量并将它们拼进 `basePrompt` / `strictSuffix`，`generateObject` 调用语句本身未改）。后续路径已锁定、待 Tina 点名：本回写合入并重启 Daemon 后，再重试 `run-worker` 验证提示词约束是否生效（仍出工具标记则按卡面风险另议换模型或更大改法），实测记录落 ledger。本回写未启动实测，未重试 run-worker，未宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.57
+status: COMPLETED
+contract:
+  intent:
+    title: Worker 提示词约束只输出 JSON、禁止工具调用标记
+    description: >-
+      只改提示词，不修解析。根因：generateObject 未传 tools（openai-client.ts
+      L133-141），模型看见提示词里的工具清单后自己发明了 <tool_call>/DSML；
+      系统提示自相矛盾（「角色与边界」L434-441「你必须通过受管工具读写」+
+      「可用工具」L497-502 列 stagent_* + known_limitations L290「仅能调用
+      stagent_* 受管工具」，而「输出契约」L517-522 没说「只输出 JSON」也没禁
+      工具标记；首轮用户提示 L116-123 无禁令，只有 strictSuffix L125-130
+      才说「要 JSON」仍不点名工具标记）。本卡锁定：输出契约写明本轮必须是
+      {changes, log} JSON，禁止自然语言开场、围栏和任何工具调用标记，写入
+      由 Daemon 落地；改写「角色与边界」，不再写「你必须通过受管工具读写」；
+      「可用工具」段首标明这是授权范围说明、不是要模型在回复里发工具调用；
+      同卡必改 known_limitations 那条，能力事实可保留为「写入与执行只经
+      Daemon 侧 stagent_*，模型不得输出工具调用标记」；首轮用户提示写上
+      JSON-only 与禁工具标记，strictSuffix 同步点名禁止 DSML/<tool_call>。
+      不改 generateObject 调用形状、schema、重试次数、E_WORKER_PARSE 包装、
+      模型 id；不换 generateText、不回退 parseWorkerPatch、不修解析器。
+      模型保留现场 deepseek-flash（非产品默认 deepseek-chat），只用提示词
+      约束验证，不叠换模型变量。真钥匙复测不在本卡验收。不把「解析器有
+      bug」写成已证实结论。立卡不等于开工。
+    risk_level: LOW
+  acceptance:
+    - id: J57-P1
+      check: auto
+      text: >-
+        系统提示「输出契约」写明本轮必须是 {changes, log} JSON 对象，禁止
+        自然语言开场、markdown 围栏和任何工具调用标记（含 DSML、
+        <tool_call>），并写明写入由 Daemon 落地。
+    - id: J57-P2
+      check: auto
+      text: >-
+        「角色与边界」不再出现「你必须通过受管工具读写」，也不要求模型在
+        回复里发出工具调用。
+    - id: J57-P3
+      check: auto
+      text: >-
+        「可用工具」段首标明这是授权范围说明，不是要模型在回复里发工具调用。
+    - id: J57-P4
+      check: auto
+      text: >-
+        known_limitations 不再写「仅能调用 stagent_* 受管工具」；改为写入与
+        执行只经 Daemon 侧 stagent_*，模型不得输出工具调用标记。
+    - id: J57-P5
+      check: auto
+      text: >-
+        首轮用户提示含 JSON-only 与禁工具标记；strictSuffix 同步点名禁止
+        DSML / <tool_call>。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/worker/session-task-injector.ts
+      - daemon/worker/openai-client.ts
+      - daemon/worker/worker-adapter.interface.ts
+      - tests/unit/worker-instruction-checks.test.ts
+      - tests/unit/worker-prompt-json-only.test.ts
+    readonly_paths:
+      - daemon/worker/parse-worker-output.ts
+      - daemon/worker/ai-worker.ts
+      - daemon/worker/key-store.ts
+      - tests/unit/worker-parse-failure-features.test.ts
+      - tests/unit/task-h1-worker-parse-retry.test.ts
+      - docs/ledger/j56-worker-retry.md
+  verification:
+    commands:
+      - { alias: prompt-json-only, executable: npx, args: [vitest, run, tests/unit/worker-prompt-json-only.test.ts] }
+      - { alias: instruction-checks, executable: npx, args: [vitest, run, tests/unit/worker-instruction-checks.test.ts] }
+design:
+  approach: >-
+    J.56 落盘验证已通过（P-302）。对已签成合同 contract_1795588309763_cy8zx
+    官方重试一次 run-worker 仍 400 [E_WORKER_PARSE]（16:22:43–16:22:46
+    香港时间，duration_ms=2450，requestId=ca47f349cc29）。特征日志首次与
+    重试各一条：attempt 0 为中文开场加 DSML 工具标记（261 字符），attempt 1
+    为 <tool_call> 包裹的 stagent_list_dir（108 字符）；两轮 reason=json_parse，
+    围栏与大括号起止均为 false。Tina 确认断点为「模型跑偏修提示词」，不立
+    「解析器有 bug」。只读结论（main 55b3134 / 产品代码尖 3529009b）：
+    generateObject（openai-client.ts L133-141）未传 tools；工具清单只出现在
+    提示词里；模型自行发明协议。系统提示「角色与边界」（session-task-injector.ts
+    L434-441）要求「通过受管工具读写」，「可用工具」（L497-502）列出
+    stagent_*（含 stagent_list_dir），known_limitations（worker-adapter.interface.ts
+    L290）写「仅能调用 stagent_* 受管工具」，而「输出契约」（L517-522）没有
+    「只输出 JSON」也没禁工具标记；首轮用户提示（openai-client.ts L116-123）
+    无禁令，只有 strictSuffix（L125-130）才说「只返回合法 JSON 对象，不要
+    markdown 围栏」，仍不点名 DSML/<tool_call>。Tina t1450u 审过施工方案并
+    授权立卡：本卡只改提示词。不改 generateObject 调用形状、schema、重试
+    次数、E_WORKER_PARSE 包装、模型 id；不换 generateText、不回退
+    parseWorkerPatch、不修解析器。模型保留现场 deepseek-flash（仓库
+    deepseek 默认是 deepseek-chat，见 key-store.ts L72-77），只用提示词
+    约束验证，不叠换模型变量。风险：提示词约束对 deepseek-flash 不一定
+    一次够，复测仍出工具标记再另议换模型或更大改法，不预先塞进本卡必做项。
+    要动 writable_paths 以外的文件，停工修卡，不扩面。本卡验收只含 CI 单测；
+    真钥匙复测不在本卡。后续路径只作锁定说明：J.57 代码合入并重启 Daemon
+    后，再重试 run-worker 验证提示词约束，实测记录落 ledger，不进本卡 PASS，
+    不写成 it()。
+  touches:
+    - { path: daemon/worker/session-task-injector.ts, change: modify, why: 改写输出契约、角色与边界、可用工具段首，消除「去调用受管工具」的矛盾指令, symbols: [buildWorkerTaskInstruction] }
+    - { path: daemon/worker/openai-client.ts, change: modify, why: 首轮 basePrompt 写上 JSON-only 与禁工具标记；strictSuffix 同步点名禁止 DSML/<tool_call>；不改 generateObject 调用形状, symbols: [generateChanges] }
+    - { path: daemon/worker/worker-adapter.interface.ts, change: modify, why: 同卡改写 known_limitations 中「仅能调用 stagent_* 受管工具」那条, symbols: [MANAGED_AI_CAPABILITY] }
+    - { path: tests/unit/worker-instruction-checks.test.ts, change: modify, why: 扩展既有指令装配单测以锁新文句（若本文件能覆盖则用之）, symbols: [] }
+    - { path: tests/unit/worker-prompt-json-only.test.ts, change: create, why: 新建提示词单测，锁系统提示与首轮/重试用户提示的 JSON-only 与禁工具标记（若扩展既有文件已覆盖，可不再新建，但本路径仍在可写名单内）, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J57-P1, test_path: tests/unit/worker-prompt-json-only.test.ts, level: unit, case: "J57-P1: 系统提示输出契约要求本轮只输出 {changes, log} JSON，禁止自然语言开场、围栏和 DSML/<tool_call> 等工具调用标记，并写明写入由 Daemon 落地" }
+    - { acceptance_id: J57-P2, test_path: tests/unit/worker-prompt-json-only.test.ts, level: unit, case: "J57-P2: 角色与边界不再出现「你必须通过受管工具读写」，也不要求模型在回复里发出工具调用" }
+    - { acceptance_id: J57-P3, test_path: tests/unit/worker-prompt-json-only.test.ts, level: unit, case: "J57-P3: 可用工具段首标明这是授权范围说明，不是要模型在回复里发工具调用" }
+    - { acceptance_id: J57-P4, test_path: tests/unit/worker-prompt-json-only.test.ts, level: unit, case: "J57-P4: known_limitations 不再写「仅能调用 stagent_* 受管工具」，改为写入与执行只经 Daemon 侧 stagent_*、模型不得输出工具调用标记" }
+    - { acceptance_id: J57-P5, test_path: tests/unit/worker-prompt-json-only.test.ts, level: unit, case: "J57-P5: 首轮用户提示含 JSON-only 与禁工具标记，strictSuffix 同步点名禁止 DSML/<tool_call>" }
+governance:
+  spec_refs:
+    - docs/ledger/j56-worker-retry.md
+  depends_on:
+    - { id: TASK-J.56, kind: hard }
+  code_facts:
+    - { ref: "daemon/worker/openai-client.ts:133-141", note: generateObject 只传 model、schema、system、prompt 与可选 abortSignal，未传 tools }
+    - { ref: "daemon/worker/openai-client.ts:116-123", note: 首轮 basePrompt 只要求按输出契约返回 changes 数组，无 JSON-only、无禁工具标记 }
+    - { ref: "daemon/worker/openai-client.ts:125-130", note: strictSuffix 仅在重试时追加「只返回合法 JSON 对象，不要 markdown 围栏」，仍不点名 DSML/<tool_call> }
+    - { ref: "daemon/worker/session-task-injector.ts:434-441", note: 「角色与边界」现写「你必须通过受管工具读写文件与执行命令」；本卡改写，不再这样要求模型 }
+    - { ref: "daemon/worker/session-task-injector.ts:497-502", note: 「可用工具」列出 resolveExposedTools() 的 stagent_*（默认含 stagent_list_dir）；本卡在段首标明这是授权范围说明 }
+    - { ref: "daemon/worker/session-task-injector.ts:517-522", note: 「输出契约」现只要求返回 changes 数组、不要 diff；没有「只输出 JSON」、没有禁止工具标记 }
+    - { ref: "daemon/worker/worker-adapter.interface.ts:290", note: MANAGED_AI_CAPABILITY.known_limitations 现有「仅能调用 stagent_* 受管工具，无原生 Shell 与直接文件系统访问能力」；本卡同改此条 }
+    - { ref: "daemon/worker/ai-worker.ts:299-300", note: 模型返回 changes 后由 Daemon 经 toolset.writeFile 落地；本卡不改该执行路径 }
+    - { ref: "daemon/worker/parse-worker-output.ts:123-151", note: withParseRetry（WORKER_PARSE_MAX_RETRIES=1，见同文件 L9）最多额外重试 1 次并包装 E_WORKER_PARSE；本卡不改控制流与包装 }
+    - { ref: "daemon/worker/key-store.ts:72-77", note: deepseek 未设 STAGENT_MODEL 时产品默认 deepseek-chat；本卡不改模型 id，复测仍用现场 deepseek-flash }
+  non_goals:
+    - 不改解析成功路径
+    - 不换模型，不改模型 id；保留现场 deepseek-flash，不叠换模型变量
+    - 不给 generateObject 传 tools
+    - 不换 generateText 加自解析，不回退 parseWorkerPatch，不修解析器
+    - 不改 generateObject 调用形状、schema、重试次数、E_WORKER_PARSE 包装
+    - 不重试 run-worker（含已签成合同 contract_1795588309763_cy8zx）
+    - 施工 PR 不改 docs/
+    - 不把「解析器有 bug」写成已证实结论
+    - 立卡不等于开工
+    - 真钥匙复测与 J.57 合入并重启 Daemon 后再重试 run-worker 验证提示词约束，不进本卡验收
+  fail:
+    - 系统提示或首轮/重试用户提示仍未锁「只输出 JSON」与禁止工具调用标记
+    - 「角色与边界」仍出现「你必须通过受管工具读写」，或仍要求模型在回复里发工具调用
+    - 「可用工具」段首未标明这是授权范围说明
+    - known_limitations 仍写「仅能调用 stagent_* 受管工具」
+    - 改了 generateObject 调用形状、schema、重试次数、E_WORKER_PARSE 包装或模型 id
+    - 换了 generateText、回退了 parseWorkerPatch，或改了解析器 / 解析成功路径
+    - 给 generateObject 传了 tools
+    - 改动 writable_paths 以外的文件却未停工修卡
+    - 把真钥匙复测或重试 run-worker 写成 it()，或写成会让 check:docs 要求出现在 it() 里的 case
+  adr_revisions: []
+  defaults:
+    - 本卡只改提示词约束，不修解析、不换模型、不给 generateObject 传 tools
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 389, commit: fed205a5805f41bc3516249be16d12bbfefaeb08 }
+```
+
+* **背景**：J.56 已交付可观测性并在 P-302 真钥匙重试中验证落盘能力。`run-worker` 仍 400 `[E_WORKER_PARSE]`。特征为 attempt 0 中文开场 + DSML、attempt 1 `<tool_call>` 包裹 `stagent_list_dir`，两轮均非围栏或 `{...}` 包装的 Worker 对象。Tina 确认断点为「模型跑偏修提示词」，不立「解析器有 bug」。只读表明 `generateObject` 未传 tools，模型是看见提示词里的工具清单后自己发明了协议；系统提示自相矛盾。
+* **取舍**：Tina t1450u 审过施工方案并授权立卡。本卡只改提示词，不修解析，不换模型，不给 `generateObject` 传 tools。风险写进卡面：提示词约束对 `deepseek-flash` 不一定一次够，复测仍出工具标记再另议换模型或更大改法。不重开 J.53 / J.54 / J.55 / J.56。
+* **立卡说明（2026-11-25 · P-303）**：Tina 授权立卡（t1450u）。基线 `main` `55b3134d805e9e9299e2bb43bbff9f36ed4d4134`（[#387](https://github.com/he18718143986-design/IDE/pull/387) P-302）；产品代码尖仍为 [#385](https://github.com/he18718143986-design/IDE/pull/385) squash `3529009b1f51fdc6adf207762f9838698185e502`。现场核对 changelog 最新原为 P-302、版本头最新原为第 286 条，按流水取下一号 **P-303**（版本头第 287 条）。**P-285 号未占用，不擅自改号**。**立卡 ≠ 开工**；先合入本 docs PR，再开独立代码 PR。代码 PR 必需检查全绿后报授权；Windows 存量失败按先例报 UNSTABLE（#266–#385 选 A）。范围外文件要动就停工修卡。
+* **后续路径（锁定，待 Tina 点名）**：本回写合入并重启 Daemon 后，再重试 `run-worker` 验证提示词约束是否生效（仍出工具标记则按卡面风险另议换模型或更大改法）→ 实测记录落 ledger。本回写未启动实测，未重试 run-worker，未宣称端到端闭环。
+
+* **完工说明（2026-11-25 · P-304）**：施工 [#389](https://github.com/he18718143986-design/IDE/pull/389) squash `fed205a5805f41bc3516249be16d12bbfefaeb08`。**Worker 提示词约束只输出 JSON、禁止工具调用标记已交付（输出契约与首轮/重试提示锁 JSON-only、角色与边界/可用工具/known_limitations 改写、generateObject 形状与模型 id 未改）；真钥匙复测不在本卡，端到端闭环未宣称**。相对父提交只改四条 `writable_paths`、+176/−8，无 docs、无范围外文件。`generateObject` 调用形状与模型 id 未改。后续路径已锁定、待 Tina 点名。本回写未启动实测。
+
+### 3.4bu 核销展开 target_files 通配符（J.58 · 完工回写 P-308）
+
+<a id="task-j.58"></a>
+
+### 【Task J.58】核销展开 target_files 通配符，匹配文件存在时不得因字面 glob 报尚未写入 `[COMPLETED · 立卡 P-307 · 施工 #394 · 完工回写 P-308]`
+
+> **归档注记（2026-11-25 · P-308）**：本卡已 **COMPLETED**。Tina 选 A，按先例授权合并 #394（t1460u；Windows Unit 非阻断存量，同 #266–#389）。[#394](https://github.com/he18718143986-design/IDE/pull/394) squash `025cdb01e62f81e7ef86e46595c49f5873f383f7` 于 2026-11-25 19:16:17 香港时间合入（由我执行；pre-merge head `ea2ef152ee780597db0f151162cdcb150a7a40e2`；父提交 `776e95db6341a3244ee732f6da26ba2819aa7996`；squash 提交日期 2026-11-25 19:16:16 香港时间）。合入前必需面全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit 实跑通过，含 macOS Lint；CI run 45600382396 workflow conclusion=success，cancelled=0），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非必需存量失败：16 个既有文件 / 28 例，CRLF / 路径分隔 / EPERM fsync / golden-slice 等存量名单，`tests/unit/target-file-match.test.ts` 与 `tests/unit/graph-engine-invariants.test.ts` 不在失败名单；同 #266～#389 先例）。无 CANCELLED。Bugbot NEUTRAL 不挡。基线 `main` 原为 `776e95db6341a3244ee732f6da26ba2819aa7996`（[#393](https://github.com/he18718143986-design/IDE/pull/393) P-307）。编号按流水使用 **P-308**（版本头第 292 条）；**P-285 号未占用，不擅自改号**（changelog 号 P-285 与版本头顺序第 285 条不是同一个「285」）。诚实口径：**核销展开 `target_files` 通配符已交付（判定侧纯函数 + 采证侧磁盘遍历展开、字面路径行为不变、`E_FILES_NOT_WRITTEN` 白话不变、范围检查未改）；真钥匙复测不在本卡，端到端闭环未宣称**。相对父提交只改五条 `writable_paths`、+399/−12，无 docs、无范围外文件。`daemon/server.ts`、`src/lib/journey/proposal-from-contract.ts`、`src/lib/scope.ts`、`daemon/graph/graph-engine.ts`（含 `markStale`）、`daemon/worker/openai-client.ts`、`daemon/worker/parse-worker-output.ts` 相对父提交零 diff；`nodeTouchesPaths` 函数体未改。后续路径已锁定、待 Tina 点名：本回写合入并重启 Daemon 后，再对 n1 官方重试 start/verify 验证通配符采证，实测记录落 ledger；n12 扩展名不匹配与 `markStale` / `nodeTouchesPaths` 是否另立卡，届时再定。本回写未启动实测，未重试 n1，未宣称端到端闭环。
+```yaml task-card
+id: TASK-J.58
+status: COMPLETED
+contract:
+  intent:
+    title: 核销展开 target_files 通配符，匹配文件存在时不得因字面 glob 报尚未写入
+    description: >-
+      Worker/任务图官方核销必须把 target_files 里的 glob（如 src/**）在隔离施工树里
+      展开成真实匹配文件，再判定点亮；不得把 src/** 当字面相对路径，在匹配文件
+      已存在时仍报 E_FILES_NOT_WRITTEN「节点 n1 的目标文件尚未写入: src/**」。
+      根因：collectWorktreeEvidence（daemon/graph/evidence-collector.ts）对
+      target_files 逐条当相对路径读盘算哈希、不展开通配符；evaluateIllumination
+      （daemon/graph/illumination-verifier.ts）把 files_written 与 target_files
+      做集合精确包含，同样不展开。src/** 来自计划生成的确定性拆解
+      （proposal-from-contract 把合同 writable_paths 前 12 项各做成一个节点），
+      不是意外。修法：匹配规则只放一处，新增小模块两类能力——判定侧纯函数不读盘
+      （看已采集路径是否满足模式）、采证侧在施工树根目录把 glob 展开成真实文件
+      再算哈希（键用真实相对路径）。展开走磁盘遍历（跳过 .git / .stagent /
+      node_modules 等），不改成只看 git ls-files，不加「先提交才能被看见」门槛；
+      复用仓内已有 picomatch 与合同范围的 matchesAnyPattern，不新引入依赖。
+      同一次修一起改指纹取径（buildFingerprints）；只改采证会在指纹步再报
+      E_FINGERPRINT_MISSING。字面路径行为不变。一个都匹配不到仍报同一句
+      「节点 n1 的目标文件尚未写入: src/**」，缺项处仍写原模式，错误码与白话
+      不变。合同范围 / scope_violations 不改（已认识通配符，核的是变更路径是否
+      在合同 writable_paths，与节点目标展开是两条线）。不改 start/verify 请求
+      处理。立卡不等于开工。
+    risk_level: LOW
+  acceptance:
+    - id: J58-P1
+      check: auto
+      text: >-
+        glob 在施工树能匹配到实文件（含未跟踪文件）时，该模式不报
+        E_FILES_NOT_WRITTEN；files_written 与 file_hashes 列出真实相对路径
+        （如 src/auth.js），不含字面 src/**。
+    - id: J58-P2
+      check: auto
+      text: >-
+        glob 一个都匹配不到时，仍报 E_FILES_NOT_WRITTEN，白话仍为
+        「节点 <id> 的目标文件尚未写入: <原始模式>」（例如含 src/**），
+        错误码与用词不变，缺项列表仍写原模式。
+    - id: J58-P3
+      check: auto
+      text: >-
+        无通配符的字面路径：文件在或不在，行为与现在相同。
+    - id: J58-P4
+      check: auto
+      text: >-
+        范围越界仍走现有 scope_valid / E_SCOPE_VIOLATION，失败点在范围步；
+        不因本次展开而改成按节点目标展开集合来判。
+    - id: J58-P5
+      check: auto
+      text: >-
+        glob 点亮时，fingerprints 按真实文件路径记录，而不是字面 src/**
+        这种键。
+    - id: J58-P6
+      check: auto
+      text: >-
+        现有字面路径单测（含 tests/unit/graph-engine-invariants.test.ts
+        「目标文件未写入 / Scope 越界均不得点亮」）继续通过。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/graph/target-file-match.ts
+      - daemon/graph/evidence-collector.ts
+      - daemon/graph/illumination-verifier.ts
+      - tests/unit/graph-engine-invariants.test.ts
+      - tests/unit/target-file-match.test.ts
+    readonly_paths:
+      - daemon/server.ts
+      - src/lib/journey/proposal-from-contract.ts
+      - src/lib/scope.ts
+      - daemon/editor/worktree-files.ts
+      - docs/ledger/j57-graph-n1-walk.md
+  verification:
+    commands:
+      - { alias: target-file-match, executable: npx, args: [vitest, run, tests/unit/target-file-match.test.ts] }
+      - { alias: graph-engine-invariants, executable: npx, args: [vitest, run, tests/unit/graph-engine-invariants.test.ts] }
+design:
+  approach: >-
+    官方走查（P-306 / #392）对 n1 先 POST /api/graph/nodes/start 得 200
+    （PENDING→RUNNING，revision 1→2），再 POST /api/graph/verify 得 200
+    但 illuminated=false，E_FILES_NOT_WRITTEN「节点 n1 的目标文件尚未写入:
+    src/**」，n1→FAILED，n2–n12 级联 BLOCKED（revision 2→3）。施工树 src/*
+    文件物理存在且为未跟踪，HEAD 仍为 init。Tina 审过施工方案（t1458u）并
+    授权立卡：这是真缺口，不是请求体写错、不是权限挡住、与自动钩子无关，
+    也不是「先提交再核销」能绕过的。匹配规则只放一处（新建
+    daemon/graph/target-file-match.ts）：判定侧纯函数不读盘；采证侧磁盘展开
+    后算哈希。复用 picomatch 与 src/lib/scope.ts 的 matchesAnyPattern，不新
+    引入依赖；展开可对标 daemon/editor/worktree-files.ts 的磁盘遍历与忽略
+    目录，但本卡不改该文件与 daemon/server.ts 请求处理。同一次改
+    buildFingerprints 的取径。要动 writable_paths 以外的文件，停工修卡。
+    本卡验收只含 CI 单测；合入并重启 Daemon 后再对 n1 重试 start/verify、
+    以及 n12 扩展名不匹配与 markStale / nodeTouchesPaths 是否另立卡，不进
+    本卡 PASS，不写成 it()。观察项（ai_inferred）：修好存在性后本试玩仍可能
+    在命令退出码等后续步骤失败；n12 目标是 **/*.test.ts，Worker 写出的是
+    tests/*.test.js，即便通配符展开修好仍可能因扩展名不匹配报尚未写入。
+  touches:
+    - { path: daemon/graph/target-file-match.ts, change: create, why: 匹配规则只放一处：判定侧纯函数（已采集路径是否满足模式）与采证侧磁盘展开, symbols: [] }
+    - { path: daemon/graph/evidence-collector.ts, change: modify, why: 采证侧用共享匹配模块把 glob 展开成真实文件再算哈希，键用真实相对路径；字面路径行为不变；仍走磁盘而不是 git ls-files, symbols: [collectWorktreeEvidence] }
+    - { path: daemon/graph/illumination-verifier.ts, change: modify, why: 判定侧用同一匹配规则判断模式是否被 files_written 满足；零匹配缺项仍写原模式、错误码与白话不变；同一次改 buildFingerprints 取真实路径, symbols: [evaluateIllumination, buildFingerprints] }
+    - { path: tests/unit/target-file-match.test.ts, change: create, why: 新建匹配/展开单测，覆盖 glob 命中含未跟踪文件、零匹配白话、字面路径, symbols: [] }
+    - { path: tests/unit/graph-engine-invariants.test.ts, change: modify, why: 补充 glob 点亮指纹按真实路径记录、范围越界仍走现有范围步等门禁，并保住现有字面路径 invariant, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J58-P1, test_path: tests/unit/target-file-match.test.ts, level: unit, case: "J58-P1: glob 匹配到施工树实文件（含未跟踪）不报 E_FILES_NOT_WRITTEN，files_written 与哈希是真实路径而非字面 src/**" }
+    - { acceptance_id: J58-P2, test_path: tests/unit/target-file-match.test.ts, level: unit, case: "J58-P2: glob 零匹配仍 E_FILES_NOT_WRITTEN，白话含原始模式且错误码与用词不变" }
+    - { acceptance_id: J58-P3, test_path: tests/unit/graph-engine-invariants.test.ts, level: unit, case: "目标文件未写入 / Scope 越界均不得点亮" }
+    - { acceptance_id: J58-P4, test_path: tests/unit/graph-engine-invariants.test.ts, level: unit, case: "J58-P4: 范围越界仍走现有 scope_valid / E_SCOPE_VIOLATION，不按节点目标展开集合改判" }
+    - { acceptance_id: J58-P5, test_path: tests/unit/graph-engine-invariants.test.ts, level: unit, case: "J58-P5: glob 点亮时 fingerprints 按真实文件路径记录" }
+    - { acceptance_id: J58-P6, test_path: tests/unit/graph-engine-invariants.test.ts, level: unit, case: "目标文件未写入 / Scope 越界均不得点亮" }
+governance:
+  spec_refs:
+    - docs/ledger/j57-graph-n1-walk.md
+  depends_on:
+    - { id: TASK-J.57, kind: hard }
+  code_facts:
+    - { ref: "daemon/graph/evidence-collector.ts:116-123", note: collectWorktreeEvidence 对 targetFiles 逐条当相对路径 path.join 后 sha256File，不展开 glob }
+    - { ref: "daemon/graph/illumination-verifier.ts:241-250", note: evaluateIllumination 第 4 步对 files_written 与 target_files 做集合精确包含，缺项进白话「节点 … 尚未写入:」 }
+    - { ref: "daemon/graph/illumination-verifier.ts:158-175", note: buildFingerprints 按 target_files 字面路径取 file_hashes；只改采证不改此步会 E_FINGERPRINT_MISSING }
+    - { ref: "daemon/graph/illumination-verifier.ts:334-339", note: 指纹取不到时返回 E_FINGERPRINT_MISSING }
+    - { ref: "daemon/server.ts:3595-3600", note: POST /api/graph/verify 把 node.target_files 交给 collectWorktreeEvidence；本卡不改该请求处理 }
+    - { ref: "src/lib/journey/proposal-from-contract.ts:57-62", note: 计划生成把合同 writable_paths 前 12 项各做成一个节点的 target_files，故出现 src/** 等 glob }
+    - { ref: "src/lib/scope.ts:40-62", note: matchesAnyPattern 已用 picomatch 识别合同范围 glob；本卡复用，不新引入依赖 }
+    - { ref: "src/lib/scope.ts:113-140", note: checkWriteAccess 已按合同 writable_paths glob 判定；scope_violations 走这条线，本卡不改 }
+    - { ref: "daemon/graph/evidence-collector.ts:133-156", note: 范围检查用 git status --porcelain -uall（含未跟踪）再 checkWriteAccess，不按节点 target_files 展开集合来判 }
+    - { ref: "daemon/editor/worktree-files.ts:126-138", note: TREE_IGNORED_DIRS 已列出 .git / .stagent / node_modules 等；展开可对标，本卡不改此文件 }
+  non_goals:
+    - 自动钩子（Worker 完成 → 自动 start/verify）仍只作 backlog 候选，不立卡、不在本卡施工
+    - 本卡施工不重试 FAILED 的 n1，不对 n2–n12 发 start/verify
+    - 不改 start/verify 的 HTTP 请求体或 daemon/server.ts 的请求处理
+    - 不改 generateObject、解析器或计划拆解策略（proposal-from-contract）
+    - 不把「先提交才能被看见」写成修法，不把展开改成只看 git ls-files
+    - 不把合同范围 / scope_violations 改成按节点目标展开集合来判
+    - 不改 markStale / nodeTouchesPaths（前缀/相等比对留本卡外，是否另立卡由 Tina 定）
+    - 施工 PR 不改 docs/
+    - 立卡不等于开工
+    - J.58 代码合入并重启 Daemon 后对 n1 重试 start/verify，以及 n12 扩展名不匹配与过期标记 glob 化是否另立卡，不进本卡验收
+  fail:
+    - glob 已匹配到施工树实文件（含未跟踪）仍因字面 src/** 报 E_FILES_NOT_WRITTEN
+    - files_written / file_hashes / fingerprints 仍用字面 glob 当路径键，而不是真实相对路径
+    - 零匹配时改了错误码，或白话不再是「节点 … 尚未写入:」加原始模式
+    - 字面路径在或不在的行为被改掉，或现有字面路径 invariant 单测不再通过
+    - 范围检查被改成按节点目标展开集合来判，或范围越界不再走现有 scope 步
+    - 展开改成只看 git ls-files，或加了「先提交才能被看见」门槛
+    - 新引入了依赖，或未复用仓内 picomatch / matchesAnyPattern
+    - 只改了采证、未改 buildFingerprints 取径
+    - 改了 start/verify 请求处理、解析器、计划拆解，或改动 writable_paths 以外的文件却未停工修卡
+    - 把 n1 重试、n2–n12 start/verify、自动钩子、n12 扩展名或 markStale glob 化写成 it()，或写成会让 check:docs 要求出现在 it() 里的 case
+  adr_revisions: []
+  defaults:
+    - 本卡只修核销路径对 target_files glob 的展开与判定/指纹取径，不改范围检查、请求格式与计划拆解
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 394, commit: 025cdb01e62f81e7ef86e46595c49f5873f383f7 }
+```
+
+* **背景**：J.57 提示词约束已交付并完成官方 `run-worker` 复测（P-305，HTTP 200，施工树写出 11 个文件）。随后官方控制面走查（P-306）：`n1` start 200（`PENDING`→`RUNNING`），verify 200 但因 `E_FILES_NOT_WRITTEN`「节点 n1 的目标文件尚未写入: src/**」转为 `FAILED`，`n2`–`n12` 级联 `BLOCKED`。采证与点亮判定把 `src/**` 当字面路径、不展开通配符；文件已在施工树且为未跟踪。Tina 定性为真缺口：计划生成的 glob 目标若核销器不展开，这类节点会一直 `FAILED`，不是「先提交再核销」能绕过的。
+* **取舍**：Tina t1458u 审过施工方案并授权立卡。匹配规则只放一处；展开走磁盘；同一次改指纹取径；字面路径与错误白话不变；合同范围检查不改。不重开 J.53 / J.54 / J.55 / J.56 / J.57。自动钩子仍 backlog 候选，不立卡。观察项标 `ai_inferred`：修好存在性后本试玩仍可能在命令退出码等后续步骤失败；`n12` 目标 `**/*.test.ts` 而 Worker 写出 `tests/*.test.js`，即便展开修好仍可能因扩展名不匹配报尚未写入。
+* **立卡说明（2026-11-25 · P-307）**：Tina 授权立卡（t1458u）。基线 `main` `5ba3eae6f6adeafc4abc990850adc486f97d85b9`（[#392](https://github.com/he18718143986-design/IDE/pull/392) P-306）；产品代码尖仍为 [#389](https://github.com/he18718143986-design/IDE/pull/389) squash `fed205a5805f41bc3516249be16d12bbfefaeb08`。现场核对 changelog 最新原为 P-306、版本头最新原为第 290 条，按流水取下一号 **P-307**（版本头第 291 条）。**P-285 号未占用，不擅自改号**。**立卡 ≠ 开工**；先合入本 docs PR，再开独立代码 PR。代码 PR 必需检查全绿后报授权；Windows 存量失败按先例报 UNSTABLE（#266–#389 选 A）。范围外文件要动就停工修卡。
+* **后续路径（锁定，不在本卡验收）**：J.58 代码合入并重启 Daemon 后，再对 `n1` 官方重试 start/verify，验证通配符采证 → 实测记录落 ledger。`n12` 扩展名不匹配与 `markStale` / `nodeTouchesPaths` 是否另立卡，届时由 Tina 定。本卡施工不重试 `n1`，不对 `n2`–`n12` 发 start/verify。
+* **完工说明（2026-11-25 · P-308）**：施工 [#394](https://github.com/he18718143986-design/IDE/pull/394) squash `025cdb01e62f81e7ef86e46595c49f5873f383f7`。**核销展开 `target_files` 通配符已交付（判定侧纯函数 + 采证侧磁盘遍历展开、字面路径行为不变、`E_FILES_NOT_WRITTEN` 白话不变、范围检查未改）；真钥匙复测不在本卡，端到端闭环未宣称**。相对父提交只改五条 `writable_paths`、+399/−12，无 docs、无范围外文件。请求格式 / 解析器 / 计划拆解 / 范围检查 / 过期标记相对父提交零 diff。后续路径已锁定、待 Tina 点名。本回写未启动实测。
+
+### 3.4bw 官方核销解析产品 CLI 并按 J.56 口径记录命令片段（J.59 · 完工回写 P-311）
+
+<a id="task-j.59"></a>
+
+### 【Task J.59】官方核销把产品 CLI `stagent` 解析到当前 Daemon 入口，并按 J.56 口径记录命令片段与独立启动错误 `[COMPLETED · 立卡 P-310 · 施工 #398 · 完工回写 P-311]`
+
+> **归档注记（2026-11-25 · P-311）**：本卡已 **COMPLETED**。Tina 选 A，按先例授权合并 #398（t1467u；Windows Unit 非阻断存量，同 #266–#394）。[#398](https://github.com/he18718143986-design/IDE/pull/398) squash `e7e5ca673b2fdf98eceed8c40c09dfe0e68b4787` 于 2026-11-25 20:56:40 香港时间合入（由我执行；pre-merge head `5105f99a3851a8fb575b4867489a1f778efa9960`；父提交 `d027a7c95661dfc8976f50ddb3ddf992d9697a5d`；squash 提交日期 2026-11-25 20:56:39 香港时间）。合入前必需面全绿（Detect/Docs/Knowledge/Perf + 三平台 Lint/Typecheck + ubuntu/macOS Unit 实跑通过，含 macOS Lint；CI run 45614087544 workflow conclusion=success，cancelled=0），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE`（仅 Windows Unit 非必需存量失败：16 个既有文件 / 28 例，CRLF / 路径分隔 / spawn EINVAL / 0600 / golden-slice 等存量名单，`tests/unit/j59-verify-command-resolve-observe.test.ts` 与 `tests/unit/graph-engine-invariants.test.ts` 与 `tests/daemon/server-task-graph-verify.test.ts` 不在失败名单；同 #266～#394 先例）。无 CANCELLED。Bugbot NEUTRAL 不挡。基线 `main` 原为 `d027a7c95661dfc8976f50ddb3ddf992d9697a5d`（[#397](https://github.com/he18718143986-design/IDE/pull/397) P-310）。编号按流水使用 **P-311**（版本头第 295 条）；**P-285 号未占用，不擅自改号**（changelog 号 P-285 与版本头顺序第 285 条不是同一个「285」）。诚实口径：**官方核销把产品 CLI `stagent` 解析到当前 Daemon 入口已交付（`E_COMMAND_NOT_RESOLVED`/`E_COMMAND_SPAWN_FAILED` 独立错误码、片段按 J.56 口径落 `daemon.jsonl`、注入三文件零 diff）；真钥匙复测不在本卡，端到端闭环未宣称**。相对父提交只改五条 `writable_paths`、+780/−18，无 docs、无范围外文件。文件名以卡面 `daemon/graph/verify-command-snippet.ts` 为准，未创建 `command-output-capture.ts`。注入三文件、`command-runner.ts`、`graph-engine.ts`、`task-graph.ts`、J.56 三文件相对父提交零 diff。`E_COMMAND_FAILED` 检查体白话与官方 verify `timeoutMs` 30_000 未改。后续路径已锁定、待 Tina 点名：本回写合入并重启 Daemon 后，再对 n1 官方重试 start/verify——这次应能区分「命令没找到/无法启动/检查体返回 1」，实测记录落 ledger；设计层挂账、n12 扩展名不匹配与 `markStale` glob 化、自动钩子均不在本卡。本回写未启动实测，未重试 n1，未重启 Daemon，未宣称端到端闭环。
+
+```yaml task-card
+id: TASK-J.59
+status: COMPLETED
+contract:
+  intent:
+    title: 官方核销把产品 CLI stagent 解析到当前 Daemon 入口，并按 J.56 口径记录命令片段与独立启动错误
+    description: >-
+      官方 POST /api/graph/verify 不得再对产品 CLI 裸名 stagent 走 PATH spawn。
+      仅当 executable === "stagent" 时，改写为 process.execPath + 包内 tsx +
+      bin/stagent.ts + 原 args；其他可执行文件仍原样交给 runCommand。包根用
+      import.meta.url 自算，与 baseline-gates.ts 未导出的 stagentPackageRoot()
+      同源，但不改 baseline-gates.ts。已解析命令串必须同步加入该别名的
+      allowedCommands 白名单，否则 runCommand 会报 E_UNAUTHORIZED_COMMAND。
+      合同仍存储 executable: "stagent"，注入逻辑不变。解析不到时不 spawn、
+      不记假的 exit_code 1，错误码 E_COMMAND_NOT_RESOLVED，白话为「节点
+      ${node_id} 的验证命令无法解析到当前 Daemon 入口: ${alias}（${reason}）」，
+      reason 为 missing_exec_path / missing_tsx / missing_bin 等短码。已尝试
+      spawn 但进程未启动（ENOENT、EACCES 等）用 E_COMMAND_SPAWN_FAILED，
+      白话为「节点 ${node_id} 的验证命令无法启动: ${alias}(${spawn_code})」。
+      检查体已启动且退出码非 0 仍用现有 E_COMMAND_FAILED，illumination-verifier.ts
+      L288–292 白话「节点 … 的验证命令未通过: …」逐字不动。判定顺序：先未解析，
+      再启动失败，最后才是检查体非零；三类原因必须能在 graph.issues[].code
+      上区分。可观测性：按 J.56 口径（长度大于 80 才写各最多 40 字符的
+      head/tail，长度小于等于 80 不写片段；复用 redactSecrets；禁止 text / raw
+      / full 字段；不把原文写入 message）。不改已关闭的 J.56 三文件。片段只落
+      .stagent/logs/daemon.jsonl（appendDaemonLog，kind 如 graph_verify_command）；
+      失败与启动/解析失败必写片段（在长度规则允许时）；成功路径只写长度和退出码、
+      不写片段。不扩展 task-graph.ts 或 graph-engine.ts，不把片段写入
+      issue.detail；HTTP 体形状保持 { illuminated, code, message, graph }。
+      立卡不等于开工。
+    risk_level: LOW
+  acceptance:
+    - id: J59-P1
+      check: auto
+      text: >-
+        官方 verify 对 executable === "stagent" 的命令使用已解析的 Daemon
+        入口（process.execPath + 包内 tsx + bin/stagent.ts + 原 args），
+        不再 PATH 裸 spawn stagent。
+    - id: J59-P2
+      check: auto
+      text: >-
+        已解析命令串已加入该别名的 allowedCommands 白名单，改写本身不得触发
+        E_UNAUTHORIZED_COMMAND。
+    - id: J59-P3
+      check: auto
+      text: >-
+        入口无法解析时记录 E_COMMAND_NOT_RESOLVED，白话为「节点 … 的验证命令无法解析到当前 Daemon 入口: …」，
+        不记 exit_code 1，也不走「验证命令未通过」白话。
+    - id: J59-P4
+      check: auto
+      text: >-
+        spawn 启动失败（如 ENOENT、EACCES）记录 E_COMMAND_SPAWN_FAILED，白话为「节点 … 的验证命令无法启动: …」，
+        与检查体非零的 E_COMMAND_FAILED 在 graph.issues[].code 上可区分。
+    - id: J59-P5
+      check: auto
+      text: >-
+        命令片段遵循 J.56 口径（常量与 J.56 的 40/80 相等；先 redactSecrets；
+        长度大于 80 才写各最多 40 字符的 head/tail，小于等于 80 不写片段；
+        无 text/raw/full 字段；不把原文写入 message）；只落 daemon.jsonl；
+        成功路径只写长度和退出码、不写片段。
+    - id: J59-P6
+      check: auto
+      text: >-
+        注入三文件（baseline-gates.ts、scope-plan-builder.ts、proposal-from-contract.ts）
+        相对父提交零 diff；E_COMMAND_FAILED 检查体路径白话逐字未改；官方 verify
+        timeoutMs 30_000 未改。本条用施工时 diff/grep 自证，不写成 it()。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/cli-host/resolve-stagent-cli.ts
+      - daemon/graph/verify-command-snippet.ts
+      - tests/unit/j59-verify-command-resolve-observe.test.ts
+      - daemon/server.ts
+      - daemon/graph/illumination-verifier.ts
+    readonly_paths:
+      - daemon/guard/baseline-gates.ts
+      - daemon/supervisor/scope-plan-builder.ts
+      - src/lib/journey/proposal-from-contract.ts
+      - daemon/runner/command-runner.ts
+      - daemon/graph/graph-engine.ts
+      - src/lib/graph/task-graph.ts
+      - daemon/worker/parse-worker-output.ts
+      - daemon/worker/openai-client.ts
+      - daemon/core/debug-log.ts
+      - tests/daemon/server-task-graph-verify.test.ts
+      - tests/unit/graph-engine-invariants.test.ts
+      - docs/ledger/j58-glob-n1-retry.md
+  verification:
+    commands:
+      - { alias: j59-resolve-observe, executable: npx, args: [vitest, run, tests/unit/j59-verify-command-resolve-observe.test.ts] }
+design:
+  approach: >-
+    官方 n1 重试（P-309 / #396）在 J.58 通配符采证生效后，verify 200 但
+    illuminated=false，错误码从 E_FILES_NOT_WRITTEN 变为 E_COMMAND_FAILED，
+    九条 baseline 全部 exit 1。排查确认直接原因是 spawn("stagent") 找不到
+    可执行文件：stagent 不在 Daemon PATH、不在施工树、不在试玩根，
+    node_modules/.bin/stagent 也缺失；官方 catch 把无 exitCode 的 spawn
+    失败记成 exit 1；43ms 跑完九条与「进程没启动就失败」相容。用
+    tsx bin/stagent.ts check baseline-gate 对照跑九条全部 exit 0，说明
+    不是检查体对施工树判红。Tina t1465u 审过施工方案并授权立卡：命令解析
+    与可观测性是同一断点的两面，一张卡一起做（估算 M）。新模块
+    daemon/cli-host/resolve-stagent-cli.ts 只在官方 verify 命令循环
+    （daemon/server.ts 约 L3533–3590）调用；仅 executable === "stagent"
+    时改写；已解析 argv 必须进白名单。新模块
+    daemon/graph/verify-command-snippet.ts 复用 J.56 的 80/40 与
+    redactSecrets（只读，不改 parse-worker-output.ts / openai-client.ts /
+    debug-log.ts）。片段只落 daemon.jsonl；成功路径只写长度和退出码。
+    illumination-verifier.ts 扩展结果类型并增加独立错误码分支，
+    E_COMMAND_FAILED 检查体白话逐字不动。判定顺序：未解析 → 启动失败 →
+    检查体非零。不改注入三文件、command-runner.ts、图 schema 两文件、
+    既有 verify/invariants 测试；要动就停工修卡。不改官方 verify
+    timeoutMs 30_000。设计层「产品固定底线自检该不该挂到试玩节点核销」
+    挂账并标 ai_inferred，等 n1 能跑通后再看是否另立卡，不进本卡验收。
+    本卡验收以 CI 单测为主；J59-P6 用施工时 diff/grep 自证，不写成 it()。
+    立卡不等于开工。
+  touches:
+    - { path: daemon/cli-host/resolve-stagent-cli.ts, change: create, why: "把产品 CLI 裸名 stagent 解析为当前 Daemon 入口（process.execPath + 包内 tsx + bin/stagent.ts）；解析失败返回明确原因、不给出可 spawn 的 argv", symbols: [] }
+    - { path: daemon/graph/verify-command-snippet.ts, change: create, why: "按 J.56 的 80/40 与 redactSecrets 生成可落盘片段；禁止 text/raw/full；成功路径不写片段", symbols: [] }
+    - { path: daemon/server.ts, change: modify, why: "仅官方 verify 采证循环：解析 stagent、把已解析命令串加入白名单、启动失败不记假 exit 1、按条 appendDaemonLog", symbols: [] }
+    - { path: daemon/graph/illumination-verifier.ts, change: modify, why: "扩展 command_results 类型；先未解析、再启动失败、最后检查体非零；E_COMMAND_FAILED 检查体白话逐字不动", symbols: [evaluateIllumination] }
+    - { path: tests/unit/j59-verify-command-resolve-observe.test.ts, change: create, why: "锁死解析成功/失败、非 stagent 不改写、白名单、独立错误码、J.56 片段口径与脱敏", symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J59-P1, test_path: tests/unit/j59-verify-command-resolve-observe.test.ts, level: unit, case: "J59-R1: executable 为 stagent 时解析为 process.execPath + tsx + 包内 bin/stagent.ts，args 保持 check baseline-gate --id …" }
+    - { acceptance_id: J59-P2, test_path: tests/unit/j59-verify-command-resolve-observe.test.ts, level: unit, case: "J59-P2: 已解析命令串加入该别名白名单，改写本身不触发 E_UNAUTHORIZED_COMMAND" }
+    - { acceptance_id: J59-P3, test_path: tests/unit/j59-verify-command-resolve-observe.test.ts, level: unit, case: "J59-R2: 缺 bin/stagent.ts 时返回 missing_bin，不给出可 spawn 的 argv" }
+    - { acceptance_id: J59-P3, test_path: tests/unit/j59-verify-command-resolve-observe.test.ts, level: unit, case: "J59-R2: 缺 tsx 时返回 missing_tsx，不给出可 spawn 的 argv" }
+    - { acceptance_id: J59-P3, test_path: tests/unit/j59-verify-command-resolve-observe.test.ts, level: unit, case: "J59-R2: 缺 execPath 时返回 missing_exec_path，不给出可 spawn 的 argv" }
+    - { acceptance_id: J59-P4, test_path: tests/unit/j59-verify-command-resolve-observe.test.ts, level: unit, case: "J59-O4: 解析失败记为 E_COMMAND_NOT_RESOLVED，不记成 exit 1，白话锁定" }
+    - { acceptance_id: J59-P4, test_path: tests/unit/j59-verify-command-resolve-observe.test.ts, level: unit, case: "J59-O4: spawn ENOENT 记为 E_COMMAND_SPAWN_FAILED，与检查体 exit 1 的 E_COMMAND_FAILED（白话不变）可区分" }
+    - { acceptance_id: J59-P5, test_path: tests/unit/j59-verify-command-resolve-observe.test.ts, level: unit, case: "J59-O1: 长度大于 80 的 stdout/stderr 各写最多 40 字符的 head/tail，中段不出现，无 text/raw/full，不把原文写入 message" }
+    - { acceptance_id: J59-P5, test_path: tests/unit/j59-verify-command-resolve-observe.test.ts, level: unit, case: "J59-O2: 片段中的 sk- / Bearer / api_key= 被脱敏" }
+    - { acceptance_id: J59-P5, test_path: tests/unit/j59-verify-command-resolve-observe.test.ts, level: unit, case: "J59-O3: 原文长度等于 80 时不写 head/tail；81 才写各最多 40 字符" }
+    - { acceptance_id: J59-P1, test_path: tests/unit/j59-verify-command-resolve-observe.test.ts, level: unit, case: "J59-R3: executable 不是 stagent 时原样返回，不改写" }
+    - { acceptance_id: J59-P6, test_path: tests/unit/j59-verify-command-resolve-observe.test.ts, level: unit, debt: "注入三文件相对父提交零 diff，E_COMMAND_FAILED 检查体白话逐字未改，timeoutMs 30_000 未改。施工时 diff/grep 自证，不写成产品行为 it()。挂账：本条不以 CI it() 兑现，完工以合入 diff 自证销账" }
+governance:
+  spec_refs:
+    - docs/ledger/j58-glob-n1-retry.md
+  depends_on:
+    - { id: TASK-J.58, kind: hard }
+  code_facts:
+    - { ref: "daemon/server.ts:3533-3590", note: "官方 POST /api/graph/verify 按节点 verification_commands 在合同白名单取 spec 后 runCommand；成功只留 alias+exit_code；catch 把无 exitCode 的 spawn 失败记成 exit 1 "}
+    - { ref: "daemon/server.ts:3508-3510", note: "allowedCommands 按合同原文 executable+args 精确拼接；改写 argv 后若不把已解析命令串加入白名单，会变成 E_UNAUTHORIZED_COMMAND "}
+    - { ref: "daemon/server.ts:3568", note: "官方 verify 写死 timeoutMs 30_000；本卡不改 "}
+    - { ref: "daemon/runner/command-runner.ts:393-404", note: "runCommand 白名单要求 trimmedCmd 全等；本卡不改此文件，在 server 侧加入已解析命令串 "}
+    - { ref: "daemon/runner/command-runner.ts:454-458", note: "spawn(executable, args) 使用 cwd 与 shell: false，裸名 stagent 走 PATH" }
+    - { ref: "daemon/runner/command-runner.ts:568-575", note: "spawn 失败（ENOENT 等）reject(err)，本身不把错误写成 exit 1 "}
+    - { ref: "daemon/graph/illumination-verifier.ts:43-47", note: "VerificationCommandResult 目前只有 alias 与 exit_code "}
+    - { ref: "daemon/graph/illumination-verifier.ts:288-292", note: "检查体非零路径 E_COMMAND_FAILED 白话「节点 … 的验证命令未通过: …」；本卡此句逐字不动 "}
+    - { ref: "daemon/guard/baseline-gates.ts:111-118", note: "baselineGateCommand 的 executable 为 stagent，args 为 check baseline-gate --id alias；本卡不改注入 "}
+    - { ref: "daemon/guard/baseline-gates.ts:335-337", note: "stagentPackageRoot 用 import.meta.url 算包根且未 export；新模块自算同源公式，不改此文件 "}
+    - { ref: "daemon/supervisor/scope-plan-builder.ts:886-889", note: "固定底线清单始终注入；本卡不改 "}
+    - { ref: "src/lib/journey/proposal-from-contract.ts:50-106", note: "把合同命令别名复制到每个生成节点；本卡不改 "}
+    - { ref: "daemon/worker/parse-worker-output.ts:154-157", note: "J.56 片段常量 SNIPPET_MAX=40、SNIPPET_MIN_LENGTH=80；本卡只读复用数字，不改此文件 "}
+    - { ref: "daemon/core/debug-log.ts:156-177", note: "redactSecrets 与 appendDaemonLog；本卡只读复用，不改此文件 "}
+    - { ref: "src/lib/graph/task-graph.ts:164-170", note: "TaskGraphIssue 只有 node_id/code/message/severity/recorded_at；本卡不扩展，片段不进 issue.detail "}
+  non_goals:
+    - 不改九条 baseline 的注入逻辑（ScopePlan 始终注入 + 复制到每个生成节点）
+    - 不改 E_COMMAND_FAILED 在检查体已启动且退出码非 0 路径上的白话
+    - 不改官方 verify timeoutMs 30_000 与合同 timeout_seconds 60 的差异
+    - 不扩展 task-graph.ts / graph-engine.ts，不把片段写入 issue.detail
+    - 不改 HTTP 体形状（保持 illuminated / code / message / graph）
+    - 不改已关闭的 J.56 三文件（parse-worker-output.ts、openai-client.ts、debug-log.ts）
+    - 不改 command-runner.ts
+    - 不预先改 tests/daemon/server-task-graph-verify.test.ts 与 tests/unit/graph-engine-invariants.test.ts；要动就停工修卡
+    - 施工 PR 不改 docs/
+    - 立卡不等于开工
+    - 本卡施工不重试 n1，不对 n2–n12 发 start/verify
+    - 「产品固定底线自检该不该挂到试玩节点核销」挂账并标 ai_inferred，等 n1 能跑通后再看是否另立卡，不进本卡验收
+    - n12 扩展名不匹配与 markStale / nodeTouchesPaths glob 化不在本卡；自动钩子仍 backlog 候选，不立卡
+  fail:
+    - 官方 verify 对 executable === "stagent" 仍 PATH 裸 spawn stagent
+    - 已解析 argv 未加入白名单，改写本身触发 E_UNAUTHORIZED_COMMAND
+    - 解析失败或 spawn 启动失败仍被记成 exit_code 1，或误走「验证命令未通过」白话
+    - 三类失败在 graph.issues[].code 上不可区分
+    - 片段未遵循 J.56 的 80/40，或出现未脱敏的 sk- / Bearer / api_key=，或出现 text/raw/full 字段，或把原文写入 message
+    - 成功路径写了 head/tail 片段，或片段写进了 issue.detail / 改了 HTTP 体形状
+    - 改了注入三文件、E_COMMAND_FAILED 检查体白话、timeoutMs 30_000，或改动 writable_paths 以外的文件却未停工修卡
+    - 把 n1 重试、n2–n12 start/verify、自动钩子、设计层挂账、n12 扩展名、markStale glob 化或 J59-P6 的 diff/grep 自证写成 it()，或写成会让 check:docs 要求出现在 it() 里的 case
+  adr_revisions: []
+  defaults:
+    - 本卡只修官方 verify 对产品 CLI 的解析与命令输出可观测性；注入、检查体白话与 30s 超时不动
+  open_questions: []
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 398, commit: e7e5ca673b2fdf98eceed8c40c09dfe0e68b4787 }
+```
+
+* **背景**：J.58 通配符采证已交付并完成官方 n1 重试（P-309 / #396）：`start` 200（`FAILED`→`RUNNING`），`verify` 200 但 `illuminated=false`，错误码从 `E_FILES_NOT_WRITTEN` 变为 `E_COMMAND_FAILED`，九条 baseline 全部 exit 1。排查确认直接原因是 `spawn("stagent")` 找不到可执行文件，官方 catch 把无 `exitCode` 的启动失败记成 exit 1；对照用 `tsx bin/stagent.ts check baseline-gate` 跑九条全部 exit 0。不是施工树缺依赖导致检查体判红。端到端闭环未宣称。
+* **取舍**：Tina t1465u 审过施工方案并四点拍板后授权立卡。独立错误码 `E_COMMAND_NOT_RESOLVED` 与 `E_COMMAND_SPAWN_FAILED` 都立；判定顺序为先未解析、再启动失败、最后检查体非零。片段只落 `daemon.jsonl`，不扩展图 schema；失败与启动/解析失败必写片段，成功路径只写长度和退出码。不改注入、不改检查体白话、不改 30s 超时。不重开 J.53–J.58。设计层「产品固定底线自检该不该挂到试玩节点核销」挂账并标 `ai_inferred`，本轮不写 ledger。自动钩子仍 backlog 候选，不立卡。n12 扩展名不匹配与过期标记 glob 化届时再定。
+* **立卡说明（2026-11-25 · P-310）**：Tina 授权立卡（t1465u）。操作者由我执行。基线 `main` `1caaf52839f43499edbfb2377172050ad65eb20b`（[#396](https://github.com/he18718143986-design/IDE/pull/396) P-309）；产品代码尖仍为 [#394](https://github.com/he18718143986-design/IDE/pull/394) squash `025cdb01e62f81e7ef86e46595c49f5873f383f7`。现场核对 changelog 最新原为 P-309、版本头最新原为第 293 条，按流水取下一号 **P-310**（版本头第 294 条）。**P-285 号未占用，不擅自改号**。**立卡 ≠ 开工**；先合入本 docs PR，再开独立代码 PR。代码 PR 必需检查全绿后报授权；Windows 存量失败按先例报 UNSTABLE（#266–#394 选 A）。范围外文件要动就停工修卡。
+* **后续路径（锁定，不在本卡验收）**：立卡 PR 合入后开代码 PR；全绿报授权；Windows 存量失败按先例报 UNSTABLE；范围外文件要动就停工修卡。本卡施工不重试 `n1`，不对 `n2`–`n12` 发 start/verify。代码合入并重启 Daemon 后再对 `n1` 官方重试 start/verify，由 Tina 点名，实测记录落 ledger。设计层挂账、n12 扩展名不匹配与 `markStale` glob 化是否另立卡，届时再定。
+* **完工说明（2026-11-25 · P-311）**：施工 [#398](https://github.com/he18718143986-design/IDE/pull/398) squash `e7e5ca673b2fdf98eceed8c40c09dfe0e68b4787`。**官方核销把产品 CLI `stagent` 解析到当前 Daemon 入口已交付（`E_COMMAND_NOT_RESOLVED`/`E_COMMAND_SPAWN_FAILED` 独立错误码、片段按 J.56 口径落 `daemon.jsonl`、注入三文件零 diff）；真钥匙复测不在本卡，端到端闭环未宣称**。相对父提交只改五条 `writable_paths`、+780/−18，无 docs、无范围外文件。注入三文件 / `command-runner.ts` / 图 schema 两文件 / J.56 三文件相对父提交零 diff。后续路径已锁定、待 Tina 点名。本回写未启动实测，未重试 n1，未重启 Daemon。
+
+---
+
+### 3.4bx 计划节点目标与 Worker 实际产出对齐（J.60 · 完工回写 P-315）
+
+<a id="task-j.60"></a>
+
+#### 【Task J.60】计划节点目标与 Worker 实际产出对齐 `[COMPLETED]`
+
+```yaml task-card
+id: TASK-J.60
+status: COMPLETED
+contract:
+  intent:
+    title: 计划节点目标与 Worker 实际产出对齐
+    description: >-
+      提案不再把 writable_paths（权限上界）1:1 变成核销节点：纯脚手架/配置类目标
+      在验收命令不要求时不出节点；真实产物节点（src/**、tests/**、package.json、
+      index.html）全部保留。核销 fail-closed 语义零改动。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J60-P1
+      check: auto
+      text: >-
+        验收命令为九条 baseline-*（无 npm typecheck / npm test）时，
+        buildProposalFromContract 生成的节点不含 tsconfig.json、tsconfig.*.json、
+        vite.config.*、vitest.config.*、*.config.ts、*.config.mjs、*.config.js、
+        **/*.test.ts、**/*.test.tsx、**/*.spec.ts 这些目标；且 src/**、tests/**、
+        package.json、index.html 仍各成节点。
+    - id: J60-P2
+      check: auto
+      text: >-
+        验收命令含 npm run typecheck 时 tsconfig.json 仍成节点；含 npm test 时
+        vitest.config.* 与 vite.config.* 仍成节点（不误删能力）。
+    - id: J60-P3
+      check: auto
+      text: >-
+        核销侧零改动：目标文件未写入仍报 E_FILES_NOT_WRITTEN，判定顺序
+        （命令 → 存在性 → 指纹）与 patternIsSatisfied 语义未改；未放宽 fail-closed。
+    - id: J60-P4
+      check: auto
+      text: >-
+        未改 J.58 glob 展开、J.59 命令解析、门禁阈值、标题兜底、右栏；未宣称端到端闭环。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/lib/journey/proposal-from-contract.ts
+      - tests/unit/proposal-scope-align.test.ts
+      - docs/ledger/j60-plan-output-mismatch-brief.md
+    readonly_paths:
+      - daemon/graph/illumination-verifier.ts
+      - daemon/graph/target-file-match.ts
+      - daemon/supervisor/rules-l0.ts
+      - daemon/cli-host/resolve-stagent-cli.ts
+  verification:
+    commands:
+      - { alias: proposal-scope-align, executable: npx, args: [vitest, run, tests/unit/proposal-scope-align.test.ts] }
+      - { alias: proposal-from-contract, executable: npx, args: [vitest, run, tests/unit/journey-proposal-from-contract.test.ts] }
+      - { alias: graph-verify, executable: npx, args: [vitest, run, tests/daemon/server-task-graph-verify.test.ts] }
+design:
+  approach: >-
+    诊断见 docs/ledger/j60-plan-output-mismatch-brief.md：writable_paths 同时承担
+    「允许写」与「必须写」两种语义；proposal-from-contract.ts:56-66 把可写路径
+    slice(0,12) 一对一派生节点，模板里的 tsconfig* / *.config.* / **/*.test.ts
+    变成必失败节点（n3 起 E_FILES_NOT_WRITTEN，九条命令仍全 exit 0）。
+    修法（方案 A，ai_inferred）：提案侧过滤「纯脚手架/配置类」目标，仅当验收命令
+    不要求相应能力时（复用 commandsNeedNpmVerification 语义）——有 typecheck 保留
+    tsconfig*，有 npm test 保留 vitest/vite config；这些路径仍留在 writable_paths
+    作写权限。核销侧与 fail-closed 一字不改。备选 B（合同新增 deliverables 字段）
+    属 M 级 schema 变更，另案；C（Worker 补齐配置）会为过核销造无意义文件，不采用。
+  touches:
+    - { path: src/lib/journey/proposal-from-contract.ts, change: modify, why: 过滤脚手架目标节点（守卫：验收命令能力）, symbols: [buildProposalFromContract] }
+    - { path: tests/unit/proposal-scope-align.test.ts, change: modify, why: "本卡新建；落库后按 modify 记录（J60-P1/P2 断言）", symbols: [] }
+    - { path: docs/ledger/j60-plan-output-mismatch-brief.md, change: modify, why: 诊断与方案简报（立卡已建）, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J60-P1, test_path: tests/unit/proposal-scope-align.test.ts, level: unit, case: "baseline 验收命令下不产出脚手架节点" }
+    - { acceptance_id: J60-P2, test_path: tests/unit/proposal-scope-align.test.ts, level: unit, case: "npm test 要求测试能力，vitest/vite 配置仍成节点" }
+    - { acceptance_id: J60-P3, test_path: tests/daemon/server-task-graph-verify.test.ts, level: unit, debt: "核销侧零改动以施工 diff 自证：四文件相对父提交零 diff，fail-closed 与判定顺序未改；既有用例保持绿，不另写 it()" }
+    - { acceptance_id: J60-P4, test_path: tests/unit/proposal-scope-align.test.ts, level: unit, debt: "施工 diff 自证未触碰 J.58/J.59/门禁面与右栏，不写成产品行为 it()" }
+governance:
+  spec_refs:
+    - docs/specs/intent-compiler-prompt.md
+    - docs/specs/supervisor.md
+  depends_on:
+    - { id: TASK-J.58, kind: soft }
+    - { id: TASK-J.59, kind: soft }
+  code_facts:
+    - { ref: "src/lib/journey/proposal-from-contract.ts:56-66", note: "writable.slice(0,12) 每条可写路径 1:1 生成一个节点" }
+    - { ref: "daemon/supervisor/rules-l0.ts:84-98", note: "GREENFIELD_NPM_WRITABLE_DEFAULTS 14 条，与合同 writable_paths 同序同值" }
+    - { ref: "daemon/graph/illumination-verifier.ts:276-287", note: "target_files 逐条要求被 files_written 满足，否则 E_FILES_NOT_WRITTEN" }
+  non_goals:
+    - 不改门禁阈值
+    - 不放宽 E_FILES_NOT_WRITTEN 或判定顺序
+    - 不改 J.58 glob 展开与 J.59 命令解析
+    - 不改合同 schema 版本（方案 B 另案）
+    - 不伪造施工树文件、不点「确认开工」、不做真钥匙验收
+    - 不改右栏逐字节、不改 ADR-0015
+    - 不改 markStale / nodeTouchesPaths glob 化
+  fail:
+    - 为过核销删掉真实产物节点（src/**、tests/**、package.json、index.html）或改成不检查
+    - 放宽 E_FILES_NOT_WRITTEN、改写判定顺序或 patternIsSatisfied 语义
+    - 改合同 schema 版本或把 writable_paths 的写入权限语义缩掉
+    - 在施工树伪造文件让节点点亮
+    - 改门禁 / 标题兜底 / 右栏 / ADR-0015，或宣称端到端闭环
+  adr_revisions: []
+  defaults:
+    - 复用 rules-l0 的 commandsNeedNpmVerification 语义判断能力，不改其对外契约
+    - 优先在提案构建侧解决，不改核销侧
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 403, commit: 5173e8ece9e0391c0b893ba61284094ae04ed0b5 }
+```
+
+* **背景**：P-312/P-313 实测——`n1`、`n2` 已点亮；`n3` 起九条命令全 `exit 0` 但停在目标文件存在性检查（`E_FILES_NOT_WRITTEN`「节点 n3 的目标文件尚未写入: tsconfig.json」），`n12` 另预埋 `**/*.test.ts` 与 `tests/*.test.js` 扩展名不匹配。
+* **取舍**：修「权限上界被当成必须产物」这一层，不碰核销 fail-closed，不为过核销造文件。
+* **立卡说明（2026-11-25 · P-314）**：Tina 拍板立卡、先出方案、不动代码。方案 A 为默认（`ai_inferred`），备选 B 另案、C 不采用；**立卡 ≠ 开工**。
+* **完工说明（2026-11-25 · P-315）**：Tina 本轮授权开工（按卡面方案 A，只动三条 `writable_paths`，范围外停工修卡）；施工 PR [#403](https://github.com/he18718143986-design/IDE/pull/403) squash `5173e8ece9e0391c0b893ba61284094ae04ed0b5` 于 2026-11-26 01:09 香港时间合入（由我执行）。**提案按验收命令能力过滤纯脚手架/配置类目标已交付**：14 条绿野模板 + 九条 `baseline-*` → 节点目标恰为 `["src/**","package.json","index.html","tests/**"]`；`npm run typecheck` 保留 `tsconfig*`、`npm test` 保留 `vitest.config.*` / `vite.config.*` / 配置与测试 glob（`*.config.ts|mjs|js`、`**/*.test.ts|tsx`、`**/*.spec.ts`），互不误删；过滤在 `slice(0, 12)` 之前，空结果回退原列表不产零节点图。实现用本地纯函数复刻 `commandsNeedNpmVerification` 语义，**不 import `daemon/`**（保持 `src/lib` 共享契约层）。相对父提交 3 文件 +272/−7（产品 1 文件 +77/−3、新增测试 1 文件 181 行、简报 +21/−4）；`readonly_paths` 四文件零 diff，核销侧 fail-closed / 判定顺序 / `patternIsSatisfied` 一字未改。本地：新用例 5/5、相关 41/41、`tests/unit` + `tests/daemon` 269 文件 2795 例全绿、`tsc` 0、eslint 0。CI 必需面全绿，Windows Unit 为存量 16 文件 / 28 例（`continue-on-error`，本卡用例在 Windows 上 5/5 绿），`mergeStateStatus=UNSTABLE` 按先例不挡；Bugbot `skipping`。**真钥匙复测不在本卡验收口径内**；合入后按锁定路径对 `n3` 复测，但既有图在 J.60 之前生成、节点目标仍为旧形态，重启 Daemon 不会重建图，结果仍是 `E_FILES_NOT_WRITTEN`（详见 [`../ledger/j60-n3-retest-after-merge.md`](../ledger/j60-n3-retest-after-merge.md)）。J.60 只对新提案生效，旧图需重新提案才体现。端到端闭环未宣称。
+
+---
+
+### 3.4by 既有任务图目标迁移：重新派生 + 空目标节点退役 + 依赖重接（J.61 · 完工回写 P-318）
+
+<a id="task-j.61"></a>
+
+#### 【Task J.61】既有任务图目标迁移 `[COMPLETED]`
+
+```yaml task-card
+id: TASK-J.61
+status: COMPLETED
+contract:
+  intent:
+    title: 既有任务图目标迁移：重新派生 + 空目标节点退役 + 依赖重接
+    description: >-
+      对 J.60 之前生成的既有图，按 J.60 同一判定重新派生每个节点的
+      target_files；派生为空的节点退役，下游 depends_on 跳过它指向其上游；
+      保留节点维持 id、状态与 executed_at/commit_sha；一次迁移 revision 只 +1。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J61-P1
+      check: auto
+      text: >-
+        旧形态图（12 节点、合同为九条 baseline-*）dry_run 返回 retired 8 / kept 4
+        且不落盘；实跑后 nodes.length=4，n1/n2 的 state/executed_at/commit_sha
+        与迁移前逐字相同，revision 恰好 +1，issues 含 8 条 E_TARGET_SUPERSEDED。
+    - id: J61-P2
+      check: auto
+      text: >-
+        幂等：已迁移图再次调用返回 migrated=false，revision 不变且不新增 issue。
+    - id: J61-P3
+      check: auto
+      text: >-
+        合同含 npm run typecheck 时 tsconfig.json / tsconfig.*.json 不被退役；
+        含 npm test 时 vitest.config.* / vite.config.* / *.config.* / **/*.test.*
+        不被退役（与 J.60 同一判定，不另写第二套规则）。
+    - id: J61-P4
+      check: auto
+      text: >-
+        退役候选处于 RUNNING/REPAIRING 返回 E_GRAPH_TARGETS_IN_FLIGHT；
+        退役候选处于 ILLUMINATED 返回 E_GRAPH_ILLUMINATED_TARGET_NOT_DELIVERABLE
+        且图零改动（已点亮节点不得擅自删除）；合同不存在 404；graph_id 不符 409。
+    - id: J61-P5
+      check: auto
+      text: >-
+        多目标节点只剔除脚手架模式并保留其余目标、状态不变；连续退役节点时
+        下游 depends_on 递归跳过，迁移后无悬空依赖与环（拓扑序可重算）。
+    - id: J61-P6
+      check: auto
+      text: >-
+        readonly_paths 四个文件相对父提交零 diff；核销侧 E_FILES_NOT_WRITTEN、
+        判定顺序与 patternIsSatisfied 语义未改；未改 J.60 判定口径。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/lib/journey/proposal-from-contract.ts
+      - daemon/graph/graph-engine.ts
+      - daemon/server.ts
+      - tests/unit/graph-targets-migration.test.ts
+      - docs/ledger/j61-graph-targets-migration.md
+    readonly_paths:
+      - daemon/graph/illumination-verifier.ts
+      - daemon/graph/target-file-match.ts
+      - src/lib/graph/task-graph.ts
+      - daemon/supervisor/rules-l0.ts
+  verification:
+    commands:
+      - { alias: targets-migration, executable: npx, args: [vitest, run, tests/unit/graph-targets-migration.test.ts] }
+      - { alias: proposal-scope-align, executable: npx, args: [vitest, run, tests/unit/proposal-scope-align.test.ts] }
+      - { alias: graph-verify, executable: npx, args: [vitest, run, tests/daemon/server-task-graph-verify.test.ts] }
+design:
+  approach: >-
+    方案见 docs/ledger/j61-graph-targets-migration-plan.md（P-316，Tina 已拍板）。
+    触发点：显式 POST /api/graph/targets/migrate（dry_run 幂等），不做启动静默迁移、
+    不做绕过 TaskGraphEngine 的独立脚本。派生规则：从 proposal-from-contract.ts
+    导出 verificationCapabilities / isDeliverableTarget 供迁移复用，禁止第二套判定；
+    能力来源为图所属合同的 verification_spec.commands。退役与重接：派生为空的节点
+    移出 nodes，下游 depends_on 递归跳过它指向其上游；保留节点 id/state/executed_at/
+    commit_sha 原样；一次迁移 commit() 一次 → revision +1；退役逐条写 issues
+    （WARNING / E_TARGET_SUPERSEDED）。保护：退役候选为 ILLUMINATED → 409 停工上报；
+    RUNNING/REPAIRING → 409；dry_run 不落盘不递增。
+  touches:
+    - { path: src/lib/journey/proposal-from-contract.ts, change: modify, why: 导出两个纯函数供迁移复用（J.60 行为不变）, symbols: [verificationCapabilities, isDeliverableTarget, buildProposalFromContract] }
+    - { path: daemon/graph/graph-engine.ts, change: modify, why: 新增 migrateTargets（校验→派生→退役→重接→commit）, symbols: [TaskGraphEngine] }
+    - { path: daemon/server.ts, change: modify, why: 新增 /api/graph/targets/migrate 路由与 404/409 映射, symbols: [handleTaskGraph] }
+    - { path: tests/unit/graph-targets-migration.test.ts, change: modify, why: "本卡新建；落库后按 modify 记录（J61-P1～P5 断言）", symbols: [] }
+    - { path: docs/ledger/j61-graph-targets-migration.md, change: modify, why: "本卡新建；落库后按 modify 记录（迁移实测记录）", symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J61-P1, test_path: tests/unit/graph-targets-migration.test.ts, level: unit, case: "旧形态图迁移后节点数 4、存活节点状态与 commit_sha 原样、revision +1" }
+    - { acceptance_id: J61-P2, test_path: tests/unit/graph-targets-migration.test.ts, level: unit, case: "迁移幂等，再次调用不递增 revision" }
+    - { acceptance_id: J61-P3, test_path: tests/unit/graph-targets-migration.test.ts, level: unit, case: "typecheck 保留 tsconfig、npm test 保留 vitest/vite config" }
+    - { acceptance_id: J61-P4, test_path: tests/unit/graph-targets-migration.test.ts, level: unit, case: "已点亮节点落入空目标" }
+    - { acceptance_id: J61-P5, test_path: tests/unit/graph-targets-migration.test.ts, level: unit, case: "多目标节点只剔除脚手架模式并保留其余目标与状态" }
+    - { acceptance_id: J61-P6, test_path: tests/daemon/server-task-graph-verify.test.ts, level: unit, debt: "核销侧零改动以施工 diff 自证：四个 readonly 文件相对父提交零 diff；既有用例保持绿，不另写 it()" }
+governance:
+  spec_refs:
+    - docs/specs/intent-compiler-prompt.md
+    - docs/specs/supervisor.md
+    - docs/ledger/j61-graph-targets-migration-plan.md
+  depends_on:
+    - { id: TASK-J.60, kind: hard }
+  code_facts:
+    - { ref: "daemon/graph/graph-engine.ts:639-655", note: "commit() 是唯一写入口：revision += 1、updated_at 刷新、progress 重算、publish" }
+    - { ref: "daemon/graph/illumination-verifier.ts:255-265", note: "CODE_MODIFICATION 必须声明 target_files，空目标直接 E_TARGET_FILES_MISSING" }
+    - { ref: "src/lib/journey/proposal-from-contract.ts:45-100", note: "J.60 的 SCAFFOLDING_TARGETS 与 verificationCapabilities 私有实现，迁移须复用" }
+  non_goals:
+    - 不允许空 target_files 通关（不给核销器开无证据点亮的口子）
+    - 不重定向目标伪造证据
+    - 不重建图、不重置已点亮节点
+    - 不改 J.60 判定口径、不改核销 error code 与判定顺序
+    - 不改门禁阈值、标题兜底、右栏、ADR-0015
+    - 不改 markStale / nodeTouchesPaths glob 化
+    - 不做启动静默迁移、不做绕开引擎的独立写盘脚本
+  fail:
+    - 删除或重置 ILLUMINATED 节点，或让其目标被清空后仍点亮
+    - 允许空 target_files 通过核销，或放宽 E_FILES_NOT_WRITTEN
+    - 重定向目标与标题不符（造假证据）
+    - 另写第二套 target_files 判定与 J.60 漂移
+    - 迁移后出现悬空依赖或环
+    - 一次迁移 revision 递增多次，或 dry_run 落盘
+    - 改 readonly 四文件、门禁、标题兜底、右栏、ADR-0015
+  adr_revisions: []
+  defaults:
+    - 复用 rules-l0 / proposal-from-contract 的既有判定语义，不新造模式表
+    - 迁移在同一 commit() 内一次落盘
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 407, commit: cd28cc078e3f78381907039b853ca5c22f4b28c4 }
+```
+
+* **背景**：P-315 复测证明 J.60 只对新提案生效——既有图 `graph_1795588362553_e4fbb0f1` 的 `n3.target_files` 持久化为 `["tsconfig.json"]`，重启 Daemon 只重读不重建，仍报 `E_FILES_NOT_WRITTEN`（图 `revision=13`，12 节点点亮 2 个）。
+* **取舍**：Tina 拍板「重新派生 + 空目标节点删除 + 依赖重接」；不选「允许空 `target_files`」（等于给核销器开无证据点亮的口子）、不选「保留旧目标」（等于不迁移）、不选「重定向目标」（造假证据）、不选「新增 `SUPERSEDED` 状态」（升 M）。已点亮节点保护写进 J61-P4。
+* **立卡说明（2026-11-26 · P-317）**：Tina 审过方案（P-316 / #405）后拍板走本方案并授权立卡。**立卡 ≠ 开工**；方案简报与拍板理由见 [`../ledger/j61-graph-targets-migration-plan.md`](../ledger/j61-graph-targets-migration-plan.md)
+* **完工说明（2026-11-26 · P-318）**：Tina 授权开工并合并 [#407](https://github.com/he18718143986-design/IDE/pull/407)（由我执行）。施工 squash `cd28cc078e3f78381907039b853ca5c22f4b28c4`。**既有图节点目标按 J.60 规则迁移已交付**：显式 `POST /api/graph/targets/migrate`（`dry_run` 预览 + `graph_id` 乐观并发 + `contract_id` 缺省取图所属合同），复用 J.60 同一判定 `isDeliverableTarget(pattern, verificationCapabilities(commands))`（从 `proposal-from-contract.ts` 导出，禁止第二套规则）；派生为空的节点退役、下游 `depends_on` 递归跳过它指向其上游（去重 + 环保护）；保留节点 `node_id`/`state`/`executed_at`/`commit_sha` 原样；一次 `commit()` → `revision` 恰好 +1；`dry_run` 不落盘；退役逐条写 `issues`（`WARNING` / `E_TARGET_SUPERSEDED`）。已点亮保护：退役候选 `ILLUMINATED` → 409 `E_GRAPH_ILLUMINATED_TARGET_NOT_DELIVERABLE`、`RUNNING`/`REPAIRING` → 409 `E_GRAPH_TARGETS_IN_FLIGHT`，均图零改动。迁移错误码收在引擎侧 `TargetMigrationError`，不扩 readonly 的 `GraphInvariantCode`。相对父提交 5 文件 +758/−7；`readonly_paths` 四文件零 diff。CI 必需面全绿，Windows Unit 为存量 17 文件 / 28 例（`continue-on-error`，本卡用例在 Windows 上 8/8 与 5/5 全绿），`mergeStateStatus=UNSTABLE` 按先例不挡；Bugbot skipping。**真机迁移结果另记**（[`../ledger/j61-graph-targets-migration.md`](../ledger/j61-graph-targets-migration.md) §5）：`dry_run` retired 8 / kept 4 → 实跑 `revision` 13→14、节点 12→4、`n1`/`n2` 已点亮状态与 `commit_sha` 原样、`n10`→`PENDING`；随后 `n10`、`n11` 先后官方 start/verify 均 **`illuminated=true`**（两组九条 baseline 全 `exit 0`、`stderr_length=0`），`revision` 14→16→18，**图 4/4 全亮（100%）**。任务图首次全亮；**端到端闭环仍未宣称**（合同仍 `EXECUTING`/`APPROVED`，未合入、未试玩、未点确认开工）。
+
+---
+
+### 3.4ca execute 路径解析产品 CLI（J.62 · 完工回写 P-322）
+
+<a id="task-j.62"></a>
+
+#### 【Task J.62】`execute` 命令路径解析产品 CLI `[COMPLETED]`
+
+```yaml task-card
+id: TASK-J.62
+status: COMPLETED
+contract:
+  intent:
+    title: execute 命令路径解析产品 CLI
+    description: >-
+      合同 execute 的验收命令若声明 executable=stagent，网关在威胁守卫之后、
+      runCommand 之前把它解析为当前 Daemon 入口（process.execPath + 包内 tsx +
+      bin/stagent.ts + 原 args），并把已解析命令串加入本轮白名单；非 stagent
+      命令逐字透传。检查体非零仍报 E_VERIFICATION_FAILED，白名单外仍
+      E_UNAUTHORIZED_COMMAND，语义零漂移。
+    risk_level: MEDIUM
+  acceptance:
+    - id: J62-P1
+      check: auto
+      text: >-
+        executable=stagent 且合同白名单含原始串时，runCommand 收到的
+        argv.executable 为 process.execPath、argv.args 以包内 tsx 与
+        bin/stagent.ts 开头并原样接合同 args；已解析命令串在白名单内
+        （否则会被精确匹配拒成 E_UNAUTHORIZED_COMMAND）。
+    - id: J62-P2
+      check: auto
+      text: >-
+        executable 非 stagent（npm / node / 其它）时 argv 与白名单逐字不变，
+        零改写。
+    - id: J62-P3
+      check: auto
+      text: >-
+        missing_exec_path / missing_tsx / missing_bin 时返回
+        E_COMMAND_NOT_RESOLVED 且 details.reason 为对应短码，不产生子进程
+        （onSpawn 未触发）。
+    - id: J62-P4
+      check: auto
+      text: >-
+        解析成功但 spawn 抛 ENOENT / EACCES 时返回 E_COMMAND_SPAWN_FAILED
+        且 details.spawn_code 为原始系统码，不再归为 EXEC_ERROR。
+    - id: J62-P5
+      check: auto
+      text: >-
+        检查体返回非零仍是 E_VERIFICATION_FAILED、data.exitCode 原样；
+        白名单外命令仍是 E_UNAUTHORIZED_COMMAND（既有语义零漂移）。
+    - id: J62-P6
+      check: auto
+      text: >-
+        readonly 五个文件（command-runner.ts / illumination-verifier.ts /
+        orchestrator.ts / contract.schema.ts / target-file-match.ts）相对父提交
+        零 diff；威胁守卫仍在解析之前（越界绝对路径样本仍被拒）。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/mcp/gateway.ts
+      - daemon/cli-host/resolve-stagent-cli.ts
+      - tests/unit/j62-execute-stagent-resolve.test.ts
+      - docs/ledger/j62-execute-resolve.md
+    readonly_paths:
+      - daemon/runner/command-runner.ts
+      - daemon/graph/illumination-verifier.ts
+      - daemon/pipeline/orchestrator.ts
+      - src/lib/contract.schema.ts
+      - daemon/graph/target-file-match.ts
+  verification:
+    commands:
+      - { alias: j62-execute-resolve, executable: npx, args: [vitest, run, tests/unit/j62-execute-stagent-resolve.test.ts] }
+      - { alias: gateway-suites, executable: npx, args: [vitest, run, tests/unit/worker-mcp-tools.test.ts, tests/unit/command-runner.test.ts] }
+      - { alias: j59-resolve, executable: npx, args: [vitest, run, tests/unit/j59-verify-command-resolve-observe.test.ts] }
+design:
+  approach: >-
+    方案见 docs/ledger/j62-execute-resolve-plan.md（P-320，Tina 已审）。
+    根因：execute 走 orchestrator → gateway.callTool("stagent_exec_command")
+    → runCommand(command, {argv}) → spawn(executable)（gateway.ts:1911、
+    command-runner.ts:454），无任何 CLI 解析；J.59 的 resolveStagentCli 只接在
+    图核销路径（daemon/server.ts:3663-3664），本机无全局 stagent，故九条验收
+    命令必然失败。落点 A：gateway.handleExecCommand 内、威胁守卫之后、
+    runCommand 之前解析（解析结果含 Worktree 外绝对路径，先解析会被守卫拒），
+    已解析串用 ensureAllowedCommand 追加本轮 allowedCommands。不推荐改
+    runCommand（通用执行器被多处复用，静默改写+自动放行等于全局削弱白名单）；
+    不改已签发合同。错误码复用 J.59 的 E_COMMAND_NOT_RESOLVED /
+    E_COMMAND_SPAWN_FAILED，常量从 resolve-stagent-cli.ts 导出；
+    illumination-verifier.ts 的同名字面量保持不动。不新增
+    verificationResults.error_code（需改 orchestrator 与 evidence schema，
+    超 S 估算）。非 stagent 命令由 resolveStagentCli 原样返回。
+  touches:
+    - { path: daemon/mcp/gateway.ts, change: modify, why: handleExecCommand 内解析 + 追加白名单 + argv 用解析值 + catch 区分两码, symbols: [ScopedWorktreeGateway] }
+    - { path: daemon/cli-host/resolve-stagent-cli.ts, change: modify, why: 导出 E_COMMAND_NOT_RESOLVED / E_COMMAND_SPAWN_FAILED 常量（解析逻辑不动）, symbols: [resolveStagentCli] }
+    - { path: tests/unit/j62-execute-stagent-resolve.test.ts, change: modify, why: "本卡新建；落库后按 modify 记录（J62-P1～P6 断言）", symbols: [] }
+    - { path: docs/ledger/j62-execute-resolve.md, change: modify, why: "本卡新建；落库后按 modify 记录（施工与实测记录）", symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: J62-P1, test_path: tests/unit/j62-execute-stagent-resolve.test.ts, level: unit, case: "stagent 解析为 process.execPath 与包内 tsx/bin，白名单含已解析串" }
+    - { acceptance_id: J62-P2, test_path: tests/unit/j62-execute-stagent-resolve.test.ts, level: unit, case: "非 stagent 命令 argv 与白名单逐字不变" }
+    - { acceptance_id: J62-P3, test_path: tests/unit/j62-execute-stagent-resolve.test.ts, level: unit, case: "解析失败返回 E_COMMAND_NOT_RESOLVED 且不产生子进程" }
+    - { acceptance_id: J62-P4, test_path: tests/unit/j62-execute-stagent-resolve.test.ts, level: unit, case: "spawn ENOENT 返回 E_COMMAND_SPAWN_FAILED 并带 spawn_code" }
+    - { acceptance_id: J62-P5, test_path: tests/unit/j62-execute-stagent-resolve.test.ts, level: unit, case: "检查体非零仍是 E_VERIFICATION_FAILED、白名单外仍是 E_UNAUTHORIZED_COMMAND" }
+    - { acceptance_id: J62-P6, test_path: tests/unit/j59-verify-command-resolve-observe.test.ts, level: unit, debt: "readonly 五文件零改动与威胁守卫顺序以施工 diff + 既有 J.59 用例自证，不另写 it()" }
+governance:
+  spec_refs:
+    - docs/specs/intent-compiler-prompt.md
+    - docs/ledger/j62-execute-resolve-plan.md
+  depends_on:
+    - { id: TASK-J.59, kind: soft }
+  code_facts:
+    - { ref: "daemon/mcp/gateway.ts:1908-1912", note: "handleExecCommand 在威胁守卫与环境装配之后直接 runCommand(command, {argv: structured})" }
+    - { ref: "daemon/runner/command-runner.ts:452-462", note: "spawn(executable, args, {shell:false})；ENOENT 走 error 事件 reject" }
+    - { ref: "daemon/cli-host/resolve-stagent-cli.ts:68-100", note: "J.59 解析器：非 stagent 原样返回，stagent 解析为 execPath + tsx + bin" }
+    - { ref: "daemon/server.ts:3633-3665", note: "J.59 仅在 /api/graph/verify 路径接线，execute 路径没有" }
+  non_goals:
+    - 不改已签发合同内容
+    - 不在 runCommand 内做全局改写或自动放行
+    - 不放宽威胁守卫或白名单精确匹配语义
+    - 不改图核销路径与 evidence schema
+    - 不新增第四个命令错误码
+    - 不改门禁阈值、标题兜底、右栏、ADR-0015
+    - 不做本卡的 resume / execute / merge 收尾调用
+  fail:
+    - 在 runCommand 内全局改写可执行文件或自动放行白名单
+    - 解析放在威胁守卫之前，导致守卫按 Worktree 外绝对路径拒掉内部验证命令
+    - 把解析失败 / spawn 失败仍归为 EXEC_ERROR 或 E_VERIFICATION_FAILED
+    - 非 stagent 命令被改写，或新增 verificationResults.error_code
+    - 改 readonly 五文件、门禁、标题兜底、右栏、ADR-0015
+  adr_revisions: []
+  defaults:
+    - 复用 resolveStagentCli 与 ensureAllowedCommand，不新造解析器或白名单逻辑
+    - 解析顺序固定：威胁守卫（原始 argv）→ 解析 → 追加白名单 → runCommand
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 412, commit: a05b5bf6b96b53e77325ea07e8cd9b17cb967881 }
+```
+
+* **背景**：P-319 收尾排查发现 `execute` 路径无 CLI 解析。合同九条命令均为 `executable: "stagent"`，本机无全局 `stagent`，J.59 只接在图核销路径——九条必 spawn 失败 → `verdict=FAILED` → `can_merge=false` → 合同回 `EXECUTING`，合入不可达。
+* **取舍**：在网关层解析并追加白名单（方案 A），不动通用执行器 `runCommand`，不改已签发合同。错误码复用 J.59 两个，语义零漂移。
+* **立卡说明（2026-11-26 · P-321）**：Tina 审过方案（P-320 / #410）后授权立卡。**立卡 ≠ 开工**；施工顺序：立卡 PR 合入 → 代码 PR → 全绿报授权 → 重启 Daemon → `resume`→`execute`→`merge` 三步收尾。
+* **完工说明（2026-11-26 · P-322）**：Tina 选 A 按先例授权合并 [#412](https://github.com/he18718143986-design/IDE/pull/412)（由我执行）。施工 squash `a05b5bf6b96b53e77325ea07e8cd9b17cb967881`。**execute 命令路径解析产品 CLI 已交付**：`gateway.handleExecCommand` 内「2. Whitelist compilation」之后新增 2.5 段（`gateway.ts:1873-1927`），位置**晚于**威胁守卫、**早于** `runCommand`；解析结果含 Worktree 外绝对路径，先解析会被守卫按越界拒。**白名单前置**（Tina 拍板采纳的加固）：仅当原始命令串已在合同 `allowedCommands` 内才解析（`gateway.ts:1891`），否则 `stagent <任意参数>` 会借「已解析串自动入白名单」绕过合同授权；未授权命令原样交给 `runCommand` 精确匹配拒成 `E_UNAUTHORIZED_COMMAND`。改写仅限 `executable === "stagent"` 且已授权：`{executable: process.execPath, args: [包内 tsx, bin/stagent.ts, ...原 args]}`，`command`（审计/超时查表）保持原始串；已解析串 `ensureAllowedCommand` 入白名单（`:1926`）。解析失败 `E_COMMAND_NOT_RESOLVED` + `details.reason` 并在 `runCommand` 之前 return（不产生子进程）；`catch` 里 `ENOENT`/`EACCES` → `E_COMMAND_SPAWN_FAILED` + `details.spawn_code`（`:2072-2106`），不再埋进 `EXEC_ERROR`；常量从 `resolve-stagent-cli.ts:20-21` 导出。零漂移：`CommandSecurityError` → `E_UNAUTHORIZED_COMMAND`、检查体非零 → `E_VERIFICATION_FAILED` + `data.exitCode` 原样、非 `stagent` 逐字透传、未新增 `verificationResults.error_code`。相对父提交 4 文件 +418/−3（`gateway.ts` +86/−3、`resolve-stagent-cli.ts` +9 仅导出常量、新建测试 270 行/6 例、新建 ledger 56 行）；**readonly 五文件零 diff**（`command-runner.ts` / `illumination-verifier.ts` / `orchestrator.ts` / `contract.schema.ts` / `target-file-match.ts`）。本地：J.62 用例 6/6、相关三文件 50/50、`tests/unit` + `tests/daemon` 271 文件 2809 例全绿、`tsc` 0、eslint 0。CI 必需面全绿，Windows Unit 为存量 15 文件 / 24 例（`continue-on-error`，本卡用例在 Windows 上 6/6、`worker-mcp-tools` 29/29 全绿），`mergeStateStatus=UNSTABLE` 按先例不挡；Bugbot skipping。**真钥匙复测不在本卡验收**（`resume`→`execute`→`merge` 收尾待 Tina 点名）；端到端闭环未宣称。
+
+---
+
+### 3.4cc Evidence / Merge 失败关闭（P0.1 · 完工回写 P-325）
+
+> 立卡说明、卡号说明（审批 P0-1 ↔ `TASK-P0.1`）与两卡共用的审批边界原文留在 [`development-tasks-active.md`](./development-tasks-active.md#task-p0.2) §3.4cb（`TASK-P0.2` 仍在施工队列）。
+
+<a id="task-p0.1"></a>
+
+#### 【Task P0.1】Evidence / Merge Fail-Closed（控制模式 + 合同版本双重封锁）`[COMPLETED]`
+
+> **断点（main `a2fa9497df70785f6e4c9d939b74695181e19c44` 直读，审批方确认属实）**：
+> 1. `deriveCanMerge()` 无控制模式入参（`src/lib/evidence.schema.ts:264-300`），只看 `status` / `scopePassed` / `budgetExhausted` / `forbiddenViolationCount` / 人工确认；
+> 2. merger 只校验 `verdict.status` 与 `verdict.can_merge`（`daemon/pipeline/merger.ts:509-514`），不重核控制模式与 Evidence 合同版本；
+> 3. `orchestrator.ts:2400-2403` 写入 `worker_control_mode` 后，`orchestrator.ts:2432` 调 `deriveCanMerge` 时未传控制模式。
+>
+> **补充事实（直读，供施工参考，不扩卡）**：Evidence Schema 中 `contract_revision`（`evidence.schema.ts:173`）与 `worker_control_mode`（`evidence.schema.ts:184-186`）均为可选；`orchestrator.ts` 证据构造段（2392 起）**未写** `contract_revision`（全文件该字段只出现在 556 / 563 / 1261 / 1999 / 2008 行，均非证据写入），即现有证据普遍缺合同版本，落地后须由 orchestrator 写入、旧证据重验后方可合并。`deriveCanMerge` 另有调用点 `daemon/guard/baseline-gates.ts:327`。
+>
+> **错误契约直读结论（DoD 第 4 条）**：已直读 [`runtime-contract-and-safety.md`](./runtime-contract-and-safety.md) §2.3（拒绝码闭集与 Daemon 专属码表）与 §8.1（L3 执行期码闭集），并核对 `src/lib/error-codes.ts` 的 `ERROR_CODES`：**`E_EVIDENCE_REVISION_MISMATCH` 均未登记**（全仓仅有 `E_SCHEME_REVISION_MISMATCH` 与已删除的 `E_APPROVAL_REVISION_MISMATCH`，语义不同，不复用）。结论：**本卡新增该码，不是复用**；登记位置为 §8.1（与 `E_GATE_SCAN_FAILED` 同属合并前失败关闭码），§8.1 新增码须同步测试。merger 现有 `E_EVIDENCE_MISSING` / `E_EVIDENCE_MISMATCH` / `E_EVIDENCE_STALE` / `E_CANNOT_MERGE` 为 `MergeGateError` 字面量（`merger.ts:489-511`），亦未入 §8.1 表。**字段缺失（`contract_revision` 缺）是否复用 `E_EVIDENCE_REVISION_MISMATCH`、控制模式拒绝用哪个码，由施工 PR 在 §8.1 同一处写明，作为审查项；本卡不预判。**
+>
+> **候选提交绑定（DoD 第 6 条 · 卡内核实项）**：复用 `worktree_snapshot.head_sha`（`evidence.schema.ts:96`）/ `git_info.task_commit_sha` / `git_info.patch_fingerprint`（`evidence.schema.ts:132-137`），不重复造字段。施工中核实「Merge 候选提交与 Evidence 绑定提交是否一致、证据生成后分支是否再变、现有指纹是否覆盖」：已覆盖 → 施工记录写明并以测试证明；未覆盖 → 在本卡 `writable_paths` 内补重核，超出则记录具体缺口停工报审，不擅自扩大实现。
+>
+> **DoD（九条 · 审批方 2026-11-26 重述原文，逐字）**：
+> 1. `deriveCanMerge()` 对 `worker_control_mode === "UNCONTROLLED_EXTERNAL"` 一律 `can_merge=false`；对字段缺失同样 `can_merge=false`（fail-closed，缺失不视为受控）。
+> 2. `GATEWAY_ENFORCED`/`SANDBOX_ENFORCED` 进入正常验收逻辑；卡面注明该字符串不构成执行受控的真实性证明，SandboxWitness 深层验证列入 P0-3 不在本卡。
+> 3. `contract_revision` 采 merger 缺失即拒（不改 Schema 必填）：旧证据可读、可展示、不可合并；新证据必填合同版本；Merge 时重新比对，不依赖生成时判断。
+> 4. `E_EVIDENCE_REVISION_MISMATCH` 可用于版本不符；字段缺失是否复用该码在错误契约文档中写明（先直读 `runtime-contract-and-safety.md` 再定，不预判）。
+> 5. 双重封锁：`deriveCanMerge`（生成时）与 merger（合并时）两处独立校验控制模式与合同版本，任一缺失即拒。
+> 6. 候选提交绑定列为卡内核实项：`head_sha`/`task_commit_sha`/`patch_fingerprint` 是否覆盖「证据生成后分支再变」的场景，核实结论写进施工记录，若缺则在卡面范围内补重核。
+> 7. 负向测试：`UNCONTROLLED_EXTERNAL` 证据不可合并；缺失 `worker_control_mode` 不可合并；缺失/不符 `contract_revision` 不可合并。
+> 8. 既有受控证据（`GATEWAY_ENFORCED` + 版本齐全）合并路径零回归。
+> 9. 合同 revision 递增语义不变；不改 Schema 兼容面；不接容器、不动 Gateway。
+>
+> **审批时一并采纳的修订要点（上一轮审批原话归纳，与 DoD 并列生效）**：验收测试须证明**构造 `PASSED + can_merge=true` 的异常 Evidence 也不能绕过 Merger**；合同 revision 缺失或不可确认走明确异常路径，不得默认放行；Sandbox 放行不被误认为容器级合同权限审计已完成。
+
+```yaml task-card
+id: TASK-P0.1
+status: COMPLETED
+contract:
+  intent:
+    title: Evidence / Merge Fail-Closed（控制模式 + 合同版本双重封锁）
+    description: >-
+      做完后，不受控（UNCONTROLLED_EXTERNAL）或缺控制模式的证据、缺合同版本或版本不符的证据都不能合并：
+      生成证据时 deriveCanMerge 拒绝，合并时 merger 读真实 Evidence Snapshot 再独立重核一次，任一缺失即拒；
+      构造的 PASSED + can_merge=true 异常证据也绕不过 merger。旧证据可读、可展示、不可合并。
+      既有受控证据（GATEWAY_ENFORCED + 版本齐全）合并路径零回归。不改 Schema 兼容面，不接容器，不动 Gateway。
+    risk_level: HIGH
+  acceptance:
+    - id: P01-P1
+      check: auto
+      text: >-
+        deriveCanMerge() 对 worker_control_mode === "UNCONTROLLED_EXTERNAL" 一律 can_merge=false；
+        对字段缺失同样 can_merge=false（fail-closed，缺失不视为受控）。
+    - id: P01-P2
+      check: auto
+      text: >-
+        GATEWAY_ENFORCED/SANDBOX_ENFORCED 进入正常验收逻辑；卡面注明该字符串不构成执行受控的真实性证明，
+        SandboxWitness 深层验证列入 P0-3 不在本卡。
+    - id: P01-P3
+      check: auto
+      text: >-
+        contract_revision 采 merger 缺失即拒（不改 Schema 必填）：旧证据可读、可展示、不可合并；新证据必填合同版本；
+        Merge 时重新比对，不依赖生成时判断。
+    - id: P01-P4
+      check: auto
+      text: >-
+        E_EVIDENCE_REVISION_MISMATCH 可用于版本不符；字段缺失是否复用该码在错误契约文档中写明
+        （先直读 runtime-contract-and-safety.md 再定，不预判）。
+    - id: P01-P5
+      check: auto
+      text: >-
+        双重封锁：deriveCanMerge（生成时）与 merger（合并时）两处独立校验控制模式与合同版本，任一缺失即拒。
+    - id: P01-P6
+      check: auto
+      text: >-
+        候选提交绑定列为卡内核实项：head_sha/task_commit_sha/patch_fingerprint 是否覆盖「证据生成后分支再变」的场景，
+        核实结论写进施工记录，若缺则在卡面范围内补重核。
+    - id: P01-P7
+      check: auto
+      text: >-
+        负向测试：UNCONTROLLED_EXTERNAL 证据不可合并；缺失 worker_control_mode 不可合并；缺失/不符 contract_revision 不可合并。
+    - id: P01-P8
+      check: auto
+      text: >-
+        既有受控证据（GATEWAY_ENFORCED + 版本齐全）合并路径零回归。
+    - id: P01-P9
+      check: auto
+      text: >-
+        合同 revision 递增语义不变；不改 Schema 兼容面；不接容器、不动 Gateway。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/lib/evidence.schema.ts
+      - daemon/pipeline/orchestrator.ts
+      - daemon/pipeline/merger.ts
+      - daemon/guard/baseline-gates.ts
+      - src/lib/error-codes.ts
+      - docs/specs/runtime-contract-and-safety.md
+      - tests/daemon/p0-1-evidence-merge-fail-closed.test.ts
+      - tests/unit/evidence-schema-v11.test.ts
+      - tests/unit/baseline-gates.test.ts
+      - tests/unit/error-codes-mapping.test.ts
+      - tests/daemon/merger.test.ts
+      - tests/daemon/merger-d2b-gates.test.ts
+      - docs/ledger/p0-1-evidence-merge-fail-closed.md
+    readonly_paths:
+      - src/lib/contract.schema.ts
+      - daemon/worker/worker-adapter.interface.ts
+      - daemon/guard/evidence-integrity.ts
+      - daemon/mcp/gateway.ts
+      - docs/specs/evidence-and-acceptance-criteria.md
+  verification:
+    commands:
+      - { alias: p01-unit, executable: npx, args: [vitest, run, tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, tests/unit/evidence-schema-v11.test.ts, tests/unit/baseline-gates.test.ts, tests/unit/error-codes-mapping.test.ts, tests/daemon/merger.test.ts, tests/daemon/merger-d2b-gates.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) deriveCanMerge 增控制模式与合同版本入参：UNCONTROLLED_EXTERNAL 或缺失 → false；GATEWAY_ENFORCED/SANDBOX_ENFORCED 进正常逻辑（字符串不构成受控证明）。
+    2) orchestrator 写证据时写入 contract_revision 并把控制模式传给 deriveCanMerge；baseline-gates 调用点同步。
+    3) merger 在 E_CANNOT_MERGE 判定前后读真实 Evidence Snapshot，独立重核控制模式与 contract_revision（缺失即拒、与当前合同 revision 比对），不信任快照里的 can_merge。
+    4) 在 runtime-contract-and-safety.md §8.1 登记 E_EVIDENCE_REVISION_MISMATCH，并写明字段缺失与控制模式拒绝用码。
+    5) 候选提交绑定核实写入 docs/ledger/p0-1-evidence-merge-fail-closed.md；已覆盖以测试证明，未覆盖在卡内补重核，超卡停工报审。
+    6) 负向测试含构造 PASSED + can_merge=true 的异常证据被 merger 拒绝。Schema 字段可选性不变。
+  touches:
+    - { path: src/lib/evidence.schema.ts, change: modify, why: deriveCanMerge 增控制模式与合同版本入参并失败关闭；Schema 字段可选性不变, symbols: [deriveCanMerge] }
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: 证据写入 contract_revision；deriveCanMerge 调用传控制模式与合同版本, symbols: [] }
+    - { path: daemon/pipeline/merger.ts, change: modify, why: 合并时读真实 Evidence Snapshot 独立重核控制模式与合同版本（第二道封锁）, symbols: [] }
+    - { path: daemon/guard/baseline-gates.ts, change: modify, why: deriveCanMerge 第二调用点随签名同步, symbols: [] }
+    - { path: src/lib/error-codes.ts, change: modify, why: 新增码如需入目录则登记；不入目录则零 diff 并在施工记录说明, symbols: [] }
+    - { path: docs/specs/runtime-contract-and-safety.md, change: modify, why: §8.1 登记 E_EVIDENCE_REVISION_MISMATCH，写明字段缺失与控制模式拒绝用码, symbols: [] }
+    - { path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, change: modify, why: 负向测试与双重封锁绕过测试, symbols: [] }
+    - { path: tests/unit/evidence-schema-v11.test.ts, change: modify, why: deriveCanMerge 新入参用例与 Schema 兼容面不变, symbols: [] }
+    - { path: tests/unit/baseline-gates.test.ts, change: modify, why: 调用点签名同步后回归, symbols: [] }
+    - { path: tests/unit/error-codes-mapping.test.ts, change: modify, why: 新增码入目录时同步映射断言, symbols: [] }
+    - { path: tests/daemon/merger.test.ts, change: modify, why: 既有受控证据合并路径零回归（夹具补 contract_revision 与控制模式）, symbols: [] }
+    - { path: tests/daemon/merger-d2b-gates.test.ts, change: modify, why: 夹具随新门禁同步，语义不变, symbols: [] }
+    - { path: docs/ledger/p0-1-evidence-merge-fail-closed.md, change: modify, why: 施工记录：候选提交绑定核实结论、用码结论、负向测试实跑记录, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: P01-P1, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: unit, case: "P01-P1：UNCONTROLLED_EXTERNAL 与控制模式缺失均 can_merge=false" }
+    - { acceptance_id: P01-P1, test_path: tests/unit/evidence-schema-v11.test.ts, level: unit, case: "P01-P1：控制模式缺失同样 can_merge=false" }
+    - { acceptance_id: P01-P2, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: unit, case: "P01-P2：GATEWAY_ENFORCED / SANDBOX_ENFORCED 进入正常验收逻辑" }
+    - { acceptance_id: P01-P3, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: unit, case: "P01-P3：合同版本缺失时 can_merge=false" }
+    - { acceptance_id: P01-P4, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: unit, case: "P01-P4：新证据写入合同版本与受控档位" }
+    - { acceptance_id: P01-P5, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: unit, case: "P01-P5：contract_revision 缺失或不符" }
+    - { acceptance_id: P01-P6, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: unit, case: "P01-P6：构造 UNCONTROLLED_EXTERNAL + PASSED + can_merge=true 的异常证据，绕不过 merger" }
+    - { acceptance_id: P01-P7, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: unit, case: "P01-P7：旧证据缺 contract_revision" }
+    - { acceptance_id: P01-P8, test_path: tests/daemon/merger.test.ts, level: unit, case: "AUDITED + PASSED 时执行 squash merge" }
+    - { acceptance_id: P01-P8, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: unit, case: "P01-P8：受控证据（GATEWAY_ENFORCED + 版本齐全）合并路径零回归" }
+    - { acceptance_id: P01-P9, test_path: tests/unit/evidence-schema-v11.test.ts, level: unit, case: "P01-P9：Schema 兼容面不变" }
+governance:
+  spec_refs:
+    - docs/specs/runtime-contract-and-safety.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+  depends_on: []
+  code_facts:
+    - { ref: "src/lib/evidence.schema.ts:264-300", note: "deriveCanMerge 入参无控制模式与合同版本" }
+    - { ref: "src/lib/evidence.schema.ts:173", note: "Evidence contract_revision 为可选字段" }
+    - { ref: "src/lib/evidence.schema.ts:184-186", note: "Evidence worker_control_mode 为可选三值枚举" }
+    - { ref: "src/lib/evidence.schema.ts:132-137", note: "git_info：base_commit_sha / task_commit_sha / patch_fingerprint（候选提交绑定复用）" }
+    - { ref: "src/lib/evidence.schema.ts:96", note: "worktree_snapshot.head_sha" }
+    - { ref: "daemon/pipeline/merger.ts:509-514", note: "merger 只校验 verdict.status 与 can_merge，不重核控制模式与合同版本" }
+    - { ref: "daemon/pipeline/orchestrator.ts:2400-2403", note: "证据写入 worker_control_mode（resolveEvidenceControlMode 降记）" }
+    - { ref: "daemon/pipeline/orchestrator.ts:2432-2440", note: "deriveCanMerge 调用未传控制模式；证据构造段未写 contract_revision" }
+    - { ref: "daemon/guard/baseline-gates.ts:327-332", note: "deriveCanMerge 第二调用点" }
+    - { ref: "docs/specs/runtime-contract-and-safety.md:249-270", note: "§8.1 L3 闭集未登记 E_EVIDENCE_REVISION_MISMATCH" }
+    - { ref: "src/lib/error-codes.ts:20-50", note: "ERROR_CODES 未含 E_EVIDENCE_REVISION_MISMATCH" }
+  non_goals:
+    - 不改 Evidence Schema 必填与兼容面（contract_revision / worker_control_mode 仍为可选，缺失由门禁拒绝）
+    - 不做 SandboxWitness 深层验证、不接容器（P0-3，本轮不立卡）
+    - 不动 Gateway 逐文件校验
+    - 不做全量候选 Scope 审计（TASK-P0.2）
+    - 不做独立验收（P0-4，本轮不立卡）
+    - 不改合同 revision 递增语义
+    - 候选提交绑定未覆盖时不擅自扩大实现到卡外
+  fail:
+    - 控制模式缺失或合同版本缺失时默认放行
+    - 只改生成时一道门、merger 仍只信快照里的 can_merge
+    - 构造 PASSED + can_merge=true 的异常证据能绕过 merger
+    - 把 GATEWAY_ENFORCED / SANDBOX_ENFORCED 字符串当作执行受控已证明，或把 Sandbox 放行说成容器级合同权限审计已完成
+    - 改 Schema 必填或兼容面
+    - 既有受控证据合并路径回归
+    - 未登记即使用新错误码，或未写明字段缺失用码
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 418, commit: dc225a051d2ca9bdeed575fd2b242ad177b6ea26 }
+```
+
+* **完工说明（2026-11-26 · P-325）**：Tina 选 A 按先例授权合并 [#418](https://github.com/he18718143986-design/IDE/pull/418)（由我执行）。施工 squash `dc225a051d2ca9bdeed575fd2b242ad177b6ea26`（2026-11-26 15:58 香港时间合入，父提交 `f83d001181a95aadeb559ecab97c02b9bd843bd2`）。**第一道封锁（生成时）**：`deriveCanMerge` 新增 `workerControlMode` / `contractRevision` 入参（`src/lib/evidence.schema.ts:265-311`）：控制模式非 `GATEWAY_ENFORCED`/`SANDBOX_ENFORCED`（含 `UNCONTROLLED_EXTERNAL` 与缺失）→ `false`；合同版本缺失 / 非正整数 → `false`。orchestrator 把 `contract_revision` 写进证据（`orchestrator.ts:2406`），并把写入证据的同一控制模式值传给派生门（`:2396-2399`、`:2446-2447`）；`baseline-gates.ts:330` 调用点补受控合成输入（该函数只隔离评估退出码贡献）。**第二道封锁（合并时）**：merger 在 `PASSED`/`can_merge` 基本判定之后调 `assertEvidenceControlAndRevision`（`merger.ts:106-131`，调用点 `:590`），读磁盘 Evidence Snapshot 独立重核控制模式与合同版本，不信任快照里的 `can_merge`。**用码**（`runtime-contract-and-safety.md` §8.1 `:267`、`:271-274` 同一处写明）：版本不符与字段缺失用新增 `E_EVIDENCE_REVISION_MISMATCH`（登记 `ERROR_CODES`，归 `EVIDENCE_STALE`）；控制模式拒绝用既有 `E_CANNOT_MERGE`；候选提交不一致用既有 `E_EVIDENCE_STALE`。**Schema 兼容面不变**：两字段仍可选、superRefine 未改；旧证据可读、可展示、不可合并。**候选提交绑定核实（DoD 第 6 条）**：现有指纹覆盖 Worktree HEAD，但 merger squash 的是任务分支 ref；Worktree detach 后移动分支 ref 时指纹仍一致而合并对象已换——**缺口属实**，按卡内授权在 `merger.ts` 补 `assertCandidateCommitBound`（`:138-158`，调用点 `:665`）：分支 tip 必须同时等于 `worktree_snapshot.head_sha` 与 `git_info.task_commit_sha`，读不到 tip 也拒；未新增证据字段。结论见 [`../ledger/p0-1-evidence-merge-fail-closed.md`](../ledger/p0-1-evidence-merge-fail-closed.md)。**负向测试实跑**：新建 `tests/daemon/p0-1-evidence-merge-fail-closed.test.ts` 13 例全过；端到端篡改磁盘快照构造 `PASSED + can_merge=true` 异常证据（伪造 `UNCONTROLLED_EXTERNAL` / 控制模式缺失 / 版本缺失 / 版本不符 / 分支被移走）全部被拒，主干 HEAD 不动、合同仍 `AUDITED`；**反证**：临时去掉 merger 两处新调用后 5 条端到端负向用例全部失败，证明改动前这些路径确实能绕过 merger。相对父提交 11 文件 +710/−15；13 条 `writable_paths` 实动 11 个（`tests/daemon/merger.test.ts` / `tests/daemon/merger-d2b-gates.test.ts` 未改即通过，作零回归证据）；**readonly 五文件零 diff**。本地：卡面 `p01-unit` 六文件 114 例全绿、`tsc --noEmit` 0、lint 0 error / 18 warn（与基线一致）、check:docs error 0。CI 必需面全绿（三平台 Lint/Typecheck、ubuntu/macOS Unit、Docs/Knowledge/Perf/Detect）；Windows Unit 为存量 15 文件 / 26 例（`continue-on-error`，与 #412 失败清单逐条一致、无新增；merger 两条为 CRLF 存量环境问题；本卡用例在 Windows 上 13/13 全绿），`mergeable_state=unstable` 按先例不挡；Cursor Bugbot neutral。诚实口径：**Evidence/Merge 失败关闭已交付（控制模式与合同版本双重封锁、候选提交绑定重核、负向测试实跑含反证）；独立审查验收已完成，P0 风险未宣称解除**。`GATEWAY_ENFORCED`/`SANDBOX_ENFORCED` 字符串仍不构成执行受控的真实性证明（SandboxWitness 深层验证属 P0-3，本轮不立卡）；Sandbox 放行不被误认为容器级合同权限审计已完成。
+---
+
+### 3.4cd 全量候选变更 Scope 审计（P0.2 · 完工回写 P-326）
+
+> 两卡共用立卡说明与审批边界保留在 [`development-tasks-active.md`](./development-tasks-active.md#task-p0.2) §3.4cb。
+
+<a id="task-p0.2"></a>
+
+#### 【Task P0.2】Full Git Candidate Scope Audit（全量候选变更 Scope 审计）`[COMPLETED]`
+
+> **断点（main `a2fa9497df70785f6e4c9d939b74695181e19c44` 直读）**：现有 Scope 守卫只审未跟踪文件：`parseUntrackedPaths` 只取 `git status --porcelain` 的 `??` 行（`daemon/pipeline/untracked-scope-guard.ts:144`）；三检测点 `PRE_EXECUTION` / `POST_VERIFICATION` / `PRE_MERGE` 的 phase 类型已在（`untracked-scope-guard.ts:33-38`），但 `PRE_MERGE` 的 `assertWorktreeUntrackedScope`（`daemon/pipeline/merger.ts:382-400`）同样只看未跟踪；已跟踪文件的修改、删除、重命名与已提交进分支的越权改动不在审计内。白名单 `node_modules/`、`.stagent/`（`untracked-scope-guard.ts:63-66`）。`daemon/diff/diff-files.ts:133-150` 已有 `git diff --name-status` + porcelain 读取（只读参考，非审计）。
+>
+> **审计基线核实项（施工前必做）**：合同 Schema 只有 `authorization.git.base_branch`（`src/lib/contract.schema.ts:416`），**未见独立 Base SHA 字段**；Evidence 有 `git_info.base_commit_sha`（`evidence.schema.ts:133`）。审批要求「用合同绑定的 Base SHA，不用动态 `HEAD`，审计中不可替换；合同已有字段/机制则复用不重复建模」。施工前须核实现有机制（如 Worktree 创建时的基点、证据 `base_commit_sha` 的取值时机）能否稳定代表合同绑定基线：能 → 复用并在施工记录写明；**须新增合同字段或改合同 Schema → 停工修卡报审，不擅自建模**。
+>
+> **三检测点职责（审批原文归纳）**：`PRE_EXECUTION`（施工环境初始状态 / 合同基线 / 前置条件）、`POST_VERIFICATION`（执行后 Worktree 变更集 vs 合同 Scope）、`PRE_MERGE`（候选提交 vs 合同 Base SHA 的完整差异为最终审计对象 + 必要工作区检查）——**branch diff 复核必须保留**。Git 状态解析器须正确处理带空格与特殊字符文件名及 rename 双路径语义，**禁止普通空格拆分 `git status --porcelain`**；审计结果规范化为内部变更对象（原路径 / 新路径 / 变更类型 / 特殊类型标记 / Scope 判定）；Delete 审原路径。用码优先复用 §8.1 既有码，新增须同步 [`runtime-contract-and-safety.md`](./runtime-contract-and-safety.md) §8.1。
+>
+> **DoD（十条 · 审批方 2026-11-26 重述原文，逐字）**：
+> 1. 审计基线为合同 Base SHA 起的全量候选变更，覆盖已跟踪文件的修改、删除、重命名，不只 `??` 未跟踪文件。
+> 2. 重命名按「目标路径」判定 Scope；rename 出 Scope 即拒。
+> 3. symlink、submodule 等特殊条目单独标记并纳入审计。
+> 4. 三检测点 `PRE_EXECUTION`/`POST_VERIFICATION`/`PRE_MERGE` 使用同一审计函数、同一判定规则。
+> 5. `PRE_MERGE` 必须保留分支 diff 复核（`git diff --name-status base...HEAD`），覆盖已提交进分支的越权改动——Worktree 审计不能替代已提交分支审计。
+> 6. `node_modules/`、`.stagent/` 白名单保持既有语义不变。
+> 7. 审计失败时不能继续 Merge（负向测试证明）。
+> 8. 既有 `??` 未跟踪文件守卫行为零回归。
+> 9. 不改 Scope 语义、不动 Gateway 逐文件校验、不接容器。
+> 10. 审计结果（越权路径清单）写入 Evidence 或 graph issue，白话可读。
+>
+> **注**：DoD 第 2 条写「重命名按目标路径判定 Scope」；上一轮审批另有「Rename 新旧路径均审」。两者如在施工中出现取舍冲突（例如源路径在 Scope 外、目标在 Scope 内），停工报审，不自行择一。
+
+```yaml task-card
+id: TASK-P0.2
+status: COMPLETED
+contract:
+  intent:
+    title: Full Git Candidate Scope Audit（全量候选变更 Scope 审计）
+    description: >-
+      做完后，Scope 审计从「只看 ?? 未跟踪文件」扩为合同 Base SHA 起的全量候选变更：已跟踪文件的修改、删除、重命名，
+      symlink 与 submodule 单独标记；三检测点用同一审计函数、同一判定规则；PRE_MERGE 保留分支 diff 复核，
+      已提交进分支的越权改动也拦得住。审计失败不能继续 Merge；越权路径清单白话写进 Evidence 或 graph issue。
+      白名单与既有 ?? 守卫行为不变；不改 Scope 语义、不动 Gateway、不接容器。
+    risk_level: HIGH
+  acceptance:
+    - id: P02-P1
+      check: auto
+      text: >-
+        审计基线为合同 Base SHA 起的全量候选变更，覆盖已跟踪文件的修改、删除、重命名，不只 ?? 未跟踪文件。
+    - id: P02-P2
+      check: auto
+      text: >-
+        重命名按「目标路径」判定 Scope；rename 出 Scope 即拒。
+    - id: P02-P3
+      check: auto
+      text: >-
+        symlink、submodule 等特殊条目单独标记并纳入审计。
+    - id: P02-P4
+      check: auto
+      text: >-
+        三检测点 PRE_EXECUTION/POST_VERIFICATION/PRE_MERGE 使用同一审计函数、同一判定规则。
+    - id: P02-P5
+      check: auto
+      text: >-
+        PRE_MERGE 必须保留分支 diff 复核（git diff --name-status base...HEAD），覆盖已提交进分支的越权改动——
+        Worktree 审计不能替代已提交分支审计。
+    - id: P02-P6
+      check: auto
+      text: >-
+        node_modules/、.stagent/ 白名单保持既有语义不变。
+    - id: P02-P7
+      check: auto
+      text: >-
+        审计失败时不能继续 Merge（负向测试证明）。
+    - id: P02-P8
+      check: auto
+      text: >-
+        既有 ?? 未跟踪文件守卫行为零回归。
+    - id: P02-P9
+      check: auto
+      text: >-
+        不改 Scope 语义、不动 Gateway 逐文件校验、不接容器。
+    - id: P02-P10
+      check: auto
+      text: >-
+        审计结果（越权路径清单）写入 Evidence 或 graph issue，白话可读。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/pipeline/candidate-scope-audit.ts
+      - daemon/pipeline/untracked-scope-guard.ts
+      - daemon/pipeline/orchestrator.ts
+      - daemon/pipeline/merger.ts
+      - docs/specs/runtime-contract-and-safety.md
+      - tests/unit/candidate-scope-audit.test.ts
+      - tests/daemon/p0-2-pre-merge-branch-audit.test.ts
+      - docs/ledger/p0-2-candidate-scope-audit.md
+    readonly_paths:
+      - tests/unit/untracked-scope-guard.test.ts
+      - src/lib/contract.schema.ts
+      - src/lib/evidence.schema.ts
+      - daemon/diff/diff-files.ts
+      - daemon/mcp/gateway.ts
+      - daemon/guard/evidence-integrity.ts
+  verification:
+    commands:
+      - { alias: p02-unit, executable: npx, args: [vitest, run, tests/unit/candidate-scope-audit.test.ts, tests/daemon/p0-2-pre-merge-branch-audit.test.ts, tests/unit/untracked-scope-guard.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) 新建 candidate-scope-audit.ts：以合同绑定基线（施工前核实来源，须新增合同字段则停工修卡）起读全量变更，
+    解析器按 NUL 分隔 / rename 双路径处理特殊字符文件名，禁止普通空格拆分 porcelain；规范化为内部变更对象（原路径 / 新路径 / 类型 / 特殊标记 / Scope 判定）。
+    2) rename 按目标路径判 Scope、出 Scope 即拒；Delete 审原路径；symlink / submodule 单独标记纳入审计。
+    3) 三检测点接同一函数；既有 untracked-scope-guard 的 ?? 行为与白名单语义保持，tests/unit/untracked-scope-guard.test.ts 只读且必须仍绿。
+    4) PRE_MERGE 保留 git diff --name-status base...HEAD 分支复核，审计失败即抛 MergeGateError 不进合并。
+    5) 越权路径清单白话写入 Evidence（复用 scope_audit 既有字段，不改 Schema）或 graph issue；用码优先复用 §8.1，新增须登记。
+  touches:
+    - { path: daemon/pipeline/candidate-scope-audit.ts, change: modify, why: 全量候选变更审计函数（三检测点共用）与 Git 状态解析器, symbols: [] }
+    - { path: daemon/pipeline/untracked-scope-guard.ts, change: modify, why: 接入同一审计函数，?? 行为与白名单语义零回归, symbols: [] }
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: PRE_EXECUTION / POST_VERIFICATION 接入全量审计并把越权清单写入证据, symbols: [] }
+    - { path: daemon/pipeline/merger.ts, change: modify, why: PRE_MERGE 全量审计 + 分支 diff 复核，失败不进合并, symbols: [] }
+    - { path: docs/specs/runtime-contract-and-safety.md, change: modify, why: 如新增码则在 §8.1 登记；复用既有码则写明, symbols: [] }
+    - { path: tests/unit/candidate-scope-audit.test.ts, change: modify, why: 变更类型、rename、特殊条目、特殊字符文件名、白名单用例, symbols: [] }
+    - { path: tests/daemon/p0-2-pre-merge-branch-audit.test.ts, change: modify, why: 已提交进分支的越权改动被 PRE_MERGE 拦截；审计失败不能 Merge 的负向测试, symbols: [] }
+    - { path: docs/ledger/p0-2-candidate-scope-audit.md, change: modify, why: 施工记录：审计基线来源核实结论、用码结论、负向测试实跑记录, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: P02-P1, test_path: tests/unit/candidate-scope-audit.test.ts, level: unit, case: "全量覆盖 M/A/D/R/C/T/U/?? 各种状态码" }
+    - { acceptance_id: P02-P2, test_path: tests/unit/candidate-scope-audit.test.ts, level: unit, case: "正确解析标准转义符" }
+    - { acceptance_id: P02-P3, test_path: tests/unit/candidate-scope-audit.test.ts, level: unit, case: "修改已跟踪文件超出 Scope：判定越界" }
+    - { acceptance_id: P02-P4, test_path: tests/unit/candidate-scope-audit.test.ts, level: unit, case: "重命名判定（选 A 裁决）：源路径与目标路径均必须在 writable_paths 内" }
+    - { acceptance_id: P02-P5, test_path: tests/daemon/p0-2-pre-merge-branch-audit.test.ts, level: integration, case: "分支已提交了对只读文件（package.json）的修改：Worktree 干净仍阻断合并" }
+    - { acceptance_id: P02-P6, test_path: tests/unit/candidate-scope-audit.test.ts, level: unit, case: "正确放行 node_modules/ 与 .stagent/ 目录及子路径" }
+    - { acceptance_id: P02-P7, test_path: tests/daemon/p0-2-pre-merge-branch-audit.test.ts, level: integration, case: "PRE_EXECUTION 阶段：工作区预先存在已跟踪文件的修改即时阻断并产出 BLOCKED 证据" }
+    - { acceptance_id: P02-P8, test_path: tests/unit/untracked-scope-guard.test.ts, level: unit, case: "只取 ?? 行，忽略已跟踪的修改/暂存/删除" }
+    - { acceptance_id: P02-P9, test_path: tests/unit/candidate-scope-audit.test.ts, level: unit, case: "未跟踪文件使用 E_OUT_OF_SCOPE_UNTRACKED，跟踪文件变更使用 E_OUT_OF_SCOPE" }
+    - { acceptance_id: P02-P10, test_path: tests/daemon/p0-2-pre-merge-branch-audit.test.ts, level: integration, case: "重命名判定（选 A 裁决）：将 Scope 外文件 rename 进 Scope 内已 commit 仍阻断" }
+governance:
+  delivered: { pr: 420, commit: bf8d3b9ca1fd1247fe861953e14618b3c969de2c }
+  spec_refs:
+    - docs/specs/runtime-contract-and-safety.md
+  depends_on:
+    - { id: TASK-P0.1, kind: hard }
+  code_facts:
+    - { ref: "daemon/pipeline/untracked-scope-guard.ts:144", note: "parseUntrackedPaths 只解析 porcelain 的 ?? 行" }
+    - { ref: "daemon/pipeline/untracked-scope-guard.ts:33-38", note: "三检测点 phase 类型已存在" }
+    - { ref: "daemon/pipeline/untracked-scope-guard.ts:63-66", note: "白名单 node_modules/、.stagent/" }
+    - { ref: "daemon/pipeline/merger.ts:382-400", note: "PRE_MERGE assertWorktreeUntrackedScope 只审未跟踪文件" }
+    - { ref: "daemon/pipeline/orchestrator.ts:2090-2100", note: "POST_VERIFICATION 越界处置顺序（先写 BLOCKED 证据、回退 EXECUTING、再抛错）" }
+    - { ref: "daemon/diff/diff-files.ts:133-150", note: "已有 git diff --name-status + porcelain 读取（只读参考）" }
+    - { ref: "src/lib/contract.schema.ts:416", note: "合同只有 base_branch，未见独立 Base SHA 字段" }
+    - { ref: "src/lib/evidence.schema.ts:133", note: "Evidence git_info.base_commit_sha" }
+  non_goals:
+    - 不改 Scope 语义（writable_paths / 通配符分级不变）
+    - 不动 Gateway 逐文件校验
+    - 不接容器（P0-3，本轮不立卡）
+    - 不改 node_modules/、.stagent/ 白名单语义
+    - 不擅自新增合同字段或改合同 Schema（基线来源须新建模则停工修卡）
+    - 不改 Evidence Schema（越权清单复用既有字段或写 graph issue）
+  fail:
+    - 用动态 HEAD 作审计基线，或审计中途替换基线
+    - 用普通空格拆分 git status --porcelain，特殊字符文件名或 rename 双路径解析错误
+    - PRE_MERGE 只做 Worktree 审计、去掉分支 diff 复核
+    - 审计失败仍能继续 Merge
+    - 既有 ?? 未跟踪文件守卫行为回归，或修改其只读测试让其变绿
+    - 三检测点使用不同函数或不同判定规则
+    - 越权清单不可读或未落 Evidence / graph issue
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+
+#### 归档注记（P-326 · 2026-11-26）
+
+- **交付 PR**：[#420](https://github.com/he18718143986-design/IDE/pull/420)（head `2ff0d0677765ee82b264f68abbdc10da7f2c3fc2`，squash `bf8d3b9ca1fd1247fe861953e14618b3c969de2c`，操作者由我执行）。
+- **范围与检查**：仅 8 个 `writable_paths`，+1615/−141；readonly 六文件零 diff。17 个单元用例、6 个集成用例、只读 `untracked-scope-guard` 21 个用例均通过。必需 CI 全绿；Windows Unit 的 10 项为已知存量环境差异，本卡三个相关测试文件全通过；Cursor Bugbot neutral。
+- **P02-P1～P3**：统一审计函数覆盖 `git status --porcelain -uall` 状态解析、特殊字符路径及变更分类；PRE_EXECUTION / POST_VERIFICATION / PRE_MERGE 共用；PRE_MERGE 另复核 `git diff --name-status -M base...HEAD`。
+- **P02-P4～P6**：rename 按选 A 同时审新旧路径，删除审原路径，识别 mode-only / symlink / submodule；`node_modules/`、`.stagent/` 白名单不变。
+- **P02-P7～P10**：执行前 / 验证后违规阻断并留证；未跟踪兼容守卫保持原接口；越界按既有码拒绝；分支已提交的越权 rename 在 PRE_MERGE 阻断。
+- **诚实口径**：**全量候选变更 Scope 审计已交付（统一审计函数、三检测点、PRE_MERGE 分支 diff 复核、rename 新旧路径均审）；P0 风险未宣称解除**。
+
+### 3.4ce 生产 Daemon 容器装配与 SandboxWitness 深层断言（P0.3a · 完工回写 P-329）
+
+> 两卡共用立卡说明与审批边界保留在 [`development-tasks-active.md`](./development-tasks-active.md#task-p0.3a) §3.4cc。
+
+<a id="task-p0.3a"></a>
+
+#### 【Task P0.3a】生产 Daemon 装配接线 + SandboxWitness 落盘与深层断言 `[COMPLETED]`
+
+```yaml task-card
+id: TASK-P0.3a
+status: COMPLETED
+contract:
+  intent:
+    title: 生产 Daemon 装配接线 + SandboxWitness 落盘与深层断言
+    description: >-
+      做完后，生产 Daemon 在 server.ts 构造 ContractOrchestrator 时显式注入 DockerContainerHost，
+      解开 SANDBOX_ENFORCED 派工被 E_ADAPTER_SANDBOX_LOCKED 拒绝的死结；提供 STAGENT_DISABLE_CONTAINER=1 显式运维逃生门，
+      设置时在 daemon.jsonl 记 WARNING 并在 Evidence 如实记档、不得冒认 SANDBOX_ENFORCED；
+      EvidenceBundle 新增可选 sandbox_witness 字段并原子落盘；verifySandboxWitness 严格断言 via === "exit"、
+      worktree_root 规范化后与合同工作树严格相等、host_kind 为有效已知类型，exit_code 只记录不断言；
+      SANDBOX_ENFORCED 证据在生成与合并阶段双重强制校验 witness，缺失或不合规一律 fail-closed 阻断合并。
+    risk_level: HIGH
+  acceptance:
+    - id: P03A-P1
+      check: auto
+      text: >-
+        DaemonServerOptions 与装配接线支持注入 containerHost；server.ts 构造 ContractOrchestrator 时
+        默认注入 DockerContainerHost（环境可用时）；支持 STAGENT_DISABLE_CONTAINER=1 显式运维逃生门，
+        启用时在 daemon.jsonl 记录 WARNING 级别日志（含来源）。
+    - id: P03A-P2
+      check: auto
+      text: >-
+        运维逃生门启用或容器宿主不可用时，SANDBOX_ENFORCED 派工 fail-closed 抛 E_ADAPTER_SANDBOX_LOCKED；
+        Evidence 的 worker_control_mode 如实记录（如 UNCONTROLLED_EXTERNAL），严禁冒认 SANDBOX_ENFORCED。
+    - id: P03A-P3
+      check: auto
+      text: >-
+        EvidenceBundle 新增可选 sandbox_witness 字段（向后兼容旧证据），记录 host_kind、via、exit_code、
+        duration_ms、worktree_root；orchestrator 在任务执行完毕后从 containerHost 采集并落盘进证据。
+    - id: P03A-P4
+      check: auto
+      text: >-
+        verifySandboxWitness 严格断言：via === "exit"（排除 rejected/timeout/SIGKILL 冒认受控）、
+        worktree_root 规范化后等于合同工作树、host_kind 非 unknown/unavailable；exit_code 只记录不断言
+        （见证证明确实在沙箱运行过，Worker 执行失败由 verdict 阻断，不否定见证真实性）。
+    - id: P03A-P5
+      check: auto
+      text: >-
+        worker_control_mode === "SANDBOX_ENFORCED" 时，deriveCanMerge（生成时）与
+        merger.assertEvidenceControlAndRevision（合并时）双重校验 sandbox_witness，缺失或断言失败一律 fail-closed 阻断合并。
+    - id: P03A-P6
+      check: auto
+      text: >-
+        负向测试覆盖：witness 缺失、via 非 "exit"（timeout/rejected/SIGKILL）、worktree_root 不匹配、
+        host_kind 非法等场景均被拦截并阻断合并；合规 witness 正常放行。
+    - id: P03A-P7
+      check: auto
+      text: >-
+        既有 GATEWAY_ENFORCED 合并与派工路径零回归，不受 sandbox_witness 校验影响。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/server.ts
+      - src/lib/evidence.schema.ts
+      - daemon/worker/sandbox/container-host.ts
+      - daemon/worker/worker-adapter.interface.ts
+      - daemon/pipeline/orchestrator.ts
+      - daemon/pipeline/merger.ts
+      - tests/unit/container-witness-verify.test.ts
+      - tests/daemon/p0-3a-container-wiring-and-witness.test.ts
+      - tests/unit/evidence-schema-v11.test.ts
+      - tests/daemon/p0-1-evidence-merge-fail-closed.test.ts
+    readonly_paths:
+      - src/lib/contract.schema.ts
+      - daemon/guard/evidence-integrity.ts
+      - daemon/worker/cli-host/docker-container-host.ts
+      - docs/specs/runtime-contract-and-safety.md
+      - daemon/mcp/gateway.ts
+  verification:
+    commands:
+      - { alias: p03a-unit, executable: npx, args: [vitest, run, tests/unit/container-witness-verify.test.ts, tests/daemon/p0-3a-container-wiring-and-witness.test.ts, tests/unit/container-host.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) DaemonServerOptions 增加 containerHost?: ContainerHostPort | null 可选配置；server.ts 在构造 ContractOrchestrator 时，
+    根据 STAGENT_DISABLE_CONTAINER 环境变量与 options.containerHost 决定是否注入 DockerContainerHost；
+    若设置 STAGENT_DISABLE_CONTAINER=1，在 daemon.jsonl 输出 WARNING 日志记录设置来源。
+    2) 扩展 EvidenceBundle schema，加入可选 sandbox_witness 字段；定义 verifySandboxWitness 纯函数，
+    断言 via === "exit"、worktree_root 与合同工作树一致、host_kind 非 unknown/unavailable，exit_code 只记录不断言。
+    3) orchestrator 在任务执行完毕写 Evidence 时，若执行模式为 SANDBOX_ENFORCED 则从 containerHost 获取见证写入证据，
+    并在 deriveCanMerge 中校验 witness 合规性。
+    4) merger 在 assertEvidenceControlAndRevision 阶段，若 worker_control_mode === "SANDBOX_ENFORCED"，
+    从磁盘快照读取 sandbox_witness 执行 verifySandboxWitness，缺失或非法抛出 E_CANNOT_MERGE。
+    5) 编写单元测试与集成负向测试，验证断言覆盖及 GATEWAY_ENFORCED 零回归。
+  touches:
+    - { path: daemon/server.ts, change: modify, why: DaemonServerOptions 扩充 containerHost 注入；支持 STAGENT_DISABLE_CONTAINER=1 逃生门与 WARNING 日志, symbols: [DaemonServerOptions] }
+    - { path: src/lib/evidence.schema.ts, change: modify, why: 扩展 EvidenceBundle 新增可选 sandbox_witness 字段；deriveCanMerge 接入沙箱见证校验, symbols: [deriveCanMerge] }
+    - { path: daemon/worker/sandbox/container-host.ts, change: modify, why: 导出 verifySandboxWitness 校验函数，实现深层见证判定, symbols: [] }
+    - { path: daemon/worker/worker-adapter.interface.ts, change: modify, why: resolveEvidenceControlMode 对接见证有效性判定, symbols: [resolveEvidenceControlMode] }
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: 证据写入采集 sandbox_witness 并调用深层校验, symbols: [] }
+    - { path: daemon/pipeline/merger.ts, change: modify, why: PRE_MERGE 阶段对 SANDBOX_ENFORCED 独立核验证据内的 sandbox_witness, symbols: [] }
+    - { path: tests/unit/container-witness-verify.test.ts, change: modify, why: verifySandboxWitness 纯函数断言与边界单元测试, symbols: [] }
+    - { path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, change: modify, why: 生产装配、逃生门日志、负向拦截与合并阻断端到端测试, symbols: [] }
+    - { path: tests/unit/evidence-schema-v11.test.ts, change: modify, why: 对齐 P0.3a fail-closed 见证强制校验，更新 SANDBOX_ENFORCED 验收逻辑测试夹具, symbols: [] }
+    - { path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, change: modify, why: 对齐 P0.3a fail-closed 见证强制校验，更新 SANDBOX_ENFORCED 见证校验与合并断言夹具, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: P03A-P1, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, case: "P03A-P1: server 构造注入 containerHost 与逃生门 WARNING 日志" }
+    - { acceptance_id: P03A-P2, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, case: "P03A-P2: 宿主不可用时派工被拒 (E_ADAPTER_SANDBOX_LOCKED)" }
+    - { acceptance_id: P03A-P3, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, case: "P03A-P3 & P03A-P5: 真实入箱执行见证落盘，有合法见证放行合并，缺见证阻断合并" }
+    - { acceptance_id: P03A-P4, test_path: tests/unit/container-witness-verify.test.ts, level: unit, case: "合法有效见证：校验通过返回原见证对象" }
+    - { acceptance_id: P03A-P5, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, case: "P03A-P3 & P03A-P5: 真实入箱执行见证落盘，有合法见证放行合并，缺见证阻断合并" }
+    - { acceptance_id: P03A-P6, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, case: "P03A-P5 & P03A-P6: 负向测试拦截异常/伪造见证 (fail-closed)" }
+    - { acceptance_id: P03A-P7, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, case: "P03A-P7: GATEWAY_ENFORCED 路径零回归" }
+governance:
+  delivered: { pr: 424, commit: 5de16ebe326f7e8614ceb3fefd3494cba35400a6 }
+  spec_refs:
+    - docs/specs/runtime-contract-and-safety.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+  depends_on: []
+  code_facts:
+    - { ref: "daemon/server.ts:639-665", note: "构造 ContractOrchestrator 时未注入 containerHost" }
+    - { ref: "daemon/pipeline/orchestrator.ts:335-344", note: "OrchestratorOptions 已支持接收 containerHost" }
+    - { ref: "daemon/worker/sandbox/container-host.ts:164-172", note: "SandboxWitness 仅包含 5 字段且仅在内存 Map 驻留未落盘" }
+    - { ref: "daemon/worker/worker-adapter.interface.ts:168-185", note: "resolveEvidenceControlMode 仅检查 witness 是否存在" }
+    - { ref: "daemon/pipeline/merger.ts:580-605", note: "assertEvidenceControlAndRevision 仅校验 worker_control_mode 枚举值" }
+    - { ref: "daemon/worker/cli-host/docker-container-host.ts:290-310", note: "DockerContainerHost 实现类与挂载参数" }
+  non_goals:
+    - 不做容器文件系统细粒度 Scope 强制挂载（P0-3b，保持挂账）
+    - 不改动既有 GATEWAY_ENFORCED 的网络与写范围校验
+    - 不改动旧证据 schema 的向后兼容性（sandbox_witness 仍为可选）
+    - 不在此卡实现独立验收与基线重跑（TASK-P0.4）
+  fail:
+    - STAGENT_DISABLE_CONTAINER=1 启用时在 Evidence 冒认 SANDBOX_ENFORCED 或未记录 WARNING 日志
+    - verifySandboxWitness 错误断言 exit_code === 0 导致有效但失败的 Worker 见证被判定为假见证
+    - 允许 via 为 timeout/rejected/SIGKILL 的见证通过 SANDBOX_ENFORCED 合并校验
+    - 缺少 sandbox_witness 的 SANDBOX_ENFORCED 证据成功合并
+    - 破坏既有 GATEWAY_ENFORCED 任务的派工与合并
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+#### 归档注记（P-329 · 2026-11-26）
+
+- **交付 PR**：[#424](https://github.com/he18718143986-design/IDE/pull/424)（head `96796fe435d8b1f4b5f262fe40ba69b459e14c1f`，squash `5de16ebe326f7e8614ceb3fefd3494cba35400a6`，操作者由我执行）。
+- **范围与检查**：仅 10 个授权 `writable_paths`（+1011/−34），5 个 `readonly_paths` 保持零 diff。相关单元与集成测试（10 tests in `container-witness-verify.test.ts`、5 tests in `p0-3a-container-wiring-and-witness.test.ts`、18 tests in `evidence-schema-v11.test.ts`、13 tests in `p0-1-evidence-merge-fail-closed.test.ts`）全部通过。必需 CI 全绿（三平台 Lint/Typecheck + ubuntu/macOS Unit + Docs/Knowledge/Perf/Detect；无 CANCELLED），Windows Unit 失败为既有环境存量且本卡用例在 Windows 上全绿，Cursor Bugbot neutral。
+- **P03A-P1～P2（生产 Daemon 装配与逃生门）**：`daemon/server.ts` 构造装配 `containerHost`（支持注入，缺省为 `DockerContainerHost` 并注入 `orchestrator`）；支持 `STAGENT_DISABLE_CONTAINER=1` 运维逃生门且如实记录 WARNING 日志（`code: "STAGENT_DISABLE_CONTAINER"`, `kind: "container_escape_hatch"`），开启逃生门或宿主不可用时派工被拒（`E_ADAPTER_SANDBOX_LOCKED`），Evidence 如实记档（`UNCONTROLLED_EXTERNAL`）不冒认。
+- **P03A-P3～P4（见证落盘与深层断言）**：`src/lib/evidence.schema.ts` 增加可选 `sandbox_witness`；`daemon/worker/sandbox/container-host.ts` 导出 `verifySandboxWitness` 与 `isSandboxWitnessValid`，严格校验 `via === "exit"`（排除 timeout/rejected/SIGKILL 冒认受控）、工作树规范化匹配、`host_kind` 非空且不为 unknown/unavailable；`exit_code` 只记不断言（Worker 执行失败由 verdict 阻断，不否定见证真实性）。
+- **P03A-P5～P6（双重封锁与负向拦截）**：第一道门（`src/lib/evidence.schema.ts:deriveCanMerge`）在 `SANDBOX_ENFORCED` 时校验见证合法性，缺失或非法 fail-closed 返回 false；第二道门（`daemon/pipeline/merger.ts:assertEvidenceControlAndRevision`）在合并时独立从磁盘快照核验 `sandbox_witness`，非法或缺失抛 `E_CANNOT_MERGE` 阻断合并。负向用例覆盖见证缺失、非法 via、非法 host_kind、工作树不匹配等场景均成功阻断。
+- **P03A-P7（零回归）**：既有 `GATEWAY_ENFORCED` 路径零回归（Evidence 不带 witness，正常放行合并）。
+- **旧测试对齐**：对齐 P0.3a fail-closed 规则更新了 P0.1 两处旧夹具（`evidence-schema-v11.test.ts` 与 `p0-1-evidence-merge-fail-closed.test.ts`），断言方向均对齐为「SANDBOX_ENFORCED 需合法见证才放行」，未削弱拦截断言。
+- **诚实口径**：**生产 Daemon 容器装配与 SandboxWitness 落盘/深层断言已交付（双重校验 fail-closed、逃生门如实记档）；P0 风险未宣称解除**。
+
+### 3.4cf 独立验收与测试完整性防护（P0.4 · 完工回写 P-330）
+
+> 两卡共用立卡说明与审批边界保留在 [`development-tasks-active.md`](./development-tasks-active.md#task-p0.3a) §3.4cc。
+
+<a id="task-p0.4"></a>
+
+#### 【Task P0.4】独立验收与测试完整性防护 `[COMPLETED]`
+
+```yaml task-card
+id: TASK-P0.4
+status: COMPLETED
+contract:
+  intent:
+    title: 独立验收与测试完整性防护
+    description: >-
+      做完后，防范 Worker 篡改或删除既有测试文件以产生 False Green：
+      复用并扩展既有 daemon/guard/test-integrity.ts 与 Evidence tests_modified 字段，
+      在 POST_VERIFICATION 检测到既有测试被修改或删除且合同未显式豁免时，触发受影响测试的基线隔离重跑；
+      重跑仅还原被修改/删除的既有测试文件（新增测试文件不参与基线重跑），重跑失败抛 E_TEST_BASELINE_REGRESSION，
+      重跑环境不可用抛 E_TEST_BASELINE_UNAVAILABLE 并 fail-closed 阻断合并；
+      合同 Schema 新增可选显式豁免字段 allow_baseline_test_mutation，豁免时在 Evidence test_integrity 留痕可审计；
+      merger 在 PRE_MERGE 阶段独立核验证据中的测试完整性。
+    risk_level: HIGH
+  acceptance:
+    - id: P04-P1
+      check: auto
+      text: >-
+        复用并扩展 daemon/guard/test-integrity.ts（既有 isTestPath / detectTestWeakening），
+        能够准确识别 Worker 修改与删除既有测试文件的行为。
+    - id: P04-P2
+      check: auto
+      text: >-
+        POST_VERIFICATION 阶段，当既有测试文件被修改或删除且合同未显式豁免时，
+        触发基线隔离重跑：仅将受影响的被修改/被删除既有测试文件还原至 base 版本（Worker 新增的测试文件不参与基线重跑）。
+    - id: P04-P3
+      check: auto
+      text: >-
+        Worker 删除既有测试文件时，还原至 base 版本的测试重跑必须包含该被删除文件。
+    - id: P04-P4
+      check: auto
+      text: >-
+        基线重跑环境故障（命令超时、node_modules 缺失等无法执行）时，fail-closed 抛出 E_TEST_BASELINE_UNAVAILABLE 阻断合并。
+    - id: P04-P5
+      check: auto
+      text: >-
+        基线重跑执行失败（改码破坏了基线测试）时，fail-closed 抛出 E_TEST_BASELINE_REGRESSION 阻断合并。
+    - id: P04-P6
+      check: auto
+      text: >-
+        合同 Schema（contract.schema.ts）新增可选显式豁免字段 allow_baseline_test_mutation: boolean；
+        声明豁免时跳过基线重跑阻断，但必须在 Evidence test_integrity 中明确记录 exemption: true 留痕。
+    - id: P04-P7
+      check: auto
+      text: >-
+        EvidenceBundle 扩展既有 tests_modified 字段，新增 test_integrity 对象记录修改/删除路径、
+        基线重跑结果与豁免状态；merger 在 PRE_MERGE 阶段从磁盘快照独立核验，未授权修改且重跑未通过拒绝生成 squash 提交。
+    - id: P04-P8
+      check: auto
+      text: >-
+        负向测试覆盖：篡改既有测试删断言/加 skip、删除既有测试、基线执行故障、显式豁免留痕等全部场景；常规无修改测试用例零回归。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/lib/evidence.schema.ts
+      - src/lib/contract.schema.ts
+      - src/lib/error-codes.ts
+      - docs/specs/runtime-contract-and-safety.md
+      - daemon/guard/test-integrity.ts
+      - daemon/pipeline/orchestrator.ts
+      - daemon/pipeline/merger.ts
+      - tests/unit/test-integrity-guard.test.ts
+      - tests/daemon/p0-4-test-integrity-fail-closed.test.ts
+    readonly_paths:
+      - daemon/worker/sandbox/container-host.ts
+      - daemon/worker/worker-adapter.interface.ts
+      - daemon/guard/evidence-integrity.ts
+      - docs/specs/evidence-and-acceptance-criteria.md
+      - daemon/mcp/gateway.ts
+  verification:
+    commands:
+      - { alias: p04-unit, executable: npx, args: [vitest, run, tests/unit/test-integrity-guard.test.ts, tests/daemon/p0-4-test-integrity-fail-closed.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) 扩展 daemon/guard/test-integrity.ts，实现基线测试比对与重跑准备逻辑，
+    精确区分新增测试（不参与基线重跑）与被修改/被删除的既有测试（从 base 还原重跑）。
+    2) contract.schema.ts 新增 allow_baseline_test_mutation?: boolean 可选豁免字段；
+    error-codes.ts 与 runtime-contract-and-safety.md 登记 E_TEST_BASELINE_REGRESSION 与 E_TEST_BASELINE_UNAVAILABLE。
+    3) orchestrator 在 POST_VERIFICATION 阶段，检测到 tests_modified 时若未获合同豁免，
+    执行隔离重跑；执行异常抛 E_TEST_BASELINE_UNAVAILABLE，测试失败抛 E_TEST_BASELINE_REGRESSION。
+    4) EvidenceBundle 扩展 tests_modified 并补充 test_integrity 结构体，记录路径列表、重跑状态与豁免留痕；
+    deriveCanMerge 要求在既有测试被动过且未豁免时 baseline_rerun_passed === true。
+    5) merger 在 PRE_MERGE 阶段读 Evidence Snapshot 独立重核 test_integrity，不满足直接拒绝合并。
+    6) 编写单元与集成负向测试，验证断言弱化拦截、删除拦截、超时/环境异常 fail-closed 及豁免审计。
+  touches:
+    - { path: src/lib/evidence.schema.ts, change: modify, why: 扩展 tests_modified 与新增 test_integrity schema，支持基线重跑结果与豁免记录, symbols: [deriveCanMerge] }
+    - { path: src/lib/contract.schema.ts, change: modify, why: 合同 Schema 新增 allow_baseline_test_mutation 显式豁免字段, symbols: [] }
+    - { path: src/lib/error-codes.ts, change: modify, why: 登记 E_TEST_BASELINE_REGRESSION 与 E_TEST_BASELINE_UNAVAILABLE, symbols: [] }
+    - { path: docs/specs/runtime-contract-and-safety.md, change: modify, why: §8.1 登记两项基线测试回归拒绝码与语义说明, symbols: [] }
+    - { path: daemon/guard/test-integrity.ts, change: modify, why: 复用已有函数，增加既有测试修改/删除识别与基线还原重跑逻辑, symbols: [isTestPath, detectTestWeakening] }
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: POST_VERIFICATION 触发基线隔离重跑并注入 test_integrity 到 Evidence, symbols: [] }
+    - { path: daemon/pipeline/merger.ts, change: modify, why: PRE_MERGE 阶段独立校验 test_integrity 快照, symbols: [] }
+    - { path: tests/unit/test-integrity-guard.test.ts, change: modify, why: 测试文件分类、既有/新增区分、基线还原判定单元测试, symbols: [] }
+    - { path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, change: modify, why: 弱化断言拦截、删除拦截、不可用阻断、豁免留痕与合并门禁端到端测试, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: P04-P1, test_path: tests/unit/test-integrity-guard.test.ts, level: unit, case: "P04-U4: classifyTouchedTestPaths identifies modified, deleted, and added tests" }
+    - { acceptance_id: P04-P2, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, case: "P04-I1: Worker 修改既有测试掩盖回归 -> 基线还原重跑捕获回归 -> fail-closed E_TEST_BASELINE_REGRESSION" }
+    - { acceptance_id: P04-P3, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, case: "P04-I2: Worker 删除既有测试 -> 还原被删除测试参与基线重跑 -> fail-closed 阻断" }
+    - { acceptance_id: P04-P4, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, case: "P04-I3: 基线重跑环境故障（命令超时或缺失） -> fail-closed E_TEST_BASELINE_UNAVAILABLE" }
+    - { acceptance_id: P04-P5, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, case: "P04-I1: Worker 修改既有测试掩盖回归 -> 基线还原重跑捕获回归 -> fail-closed E_TEST_BASELINE_REGRESSION" }
+    - { acceptance_id: P04-P6, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, case: "P04-I4: 合同显式声明 allow_baseline_test_mutation -> 豁免基线重跑阻断并留痕" }
+    - { acceptance_id: P04-P7, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, case: "P04-I5: merger PRE_MERGE 阶段独立核验证据快照与合同豁免" }
+    - { acceptance_id: P04-P8, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, case: "P04-I6: Worker 仅新增测试与修改源码，未改动既有测试 -> 零阻断零回归放行" }
+governance:
+  delivered: { pr: 426, commit: 191779e06e47097bf644a22f376042066197ae97 }
+  spec_refs:
+    - docs/specs/runtime-contract-and-safety.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+  depends_on: []
+  code_facts:
+    - { ref: "daemon/guard/test-integrity.ts:26-40", note: "isTestPath 测试路径判定" }
+    - { ref: "daemon/guard/test-integrity.ts:128-155", note: "detectTestWeakening 测试断言弱化与 skip 检测" }
+    - { ref: "src/lib/evidence.schema.ts:196-205", note: "tests_modified 可选布尔字段已存在" }
+    - { ref: "daemon/pipeline/orchestrator.ts:1235-1236", note: "POST_VERIFICATION 阶段 testsModified 判定" }
+    - { ref: "daemon/pipeline/merger.ts:310-312", note: "merger.ts 仅写 Stagent-Tests-Modified trailer 不阻断合并" }
+    - { ref: "src/lib/contract.schema.ts:320-350", note: "execution_permissions 现有字段集合，尚无 allow_baseline_test_mutation" }
+  non_goals:
+    - 不引入复杂的 Red-Green 双阶段状态机
+    - 不修改非测试文件的既有验证命令执行流程
+    - 不把新增测试文件纳入 base 还原重跑范围
+    - 不默认允许篡改测试且不静默放行
+  fail:
+    - 修改既有测试被篡改通过却未跑基线重跑直接合并（False Green 逃逸）
+    - 基线重跑环境故障（超时、依赖缺失）时静默放行
+    - 将 Worker 新增的测试当成既有测试在基线还原中报错或误删
+    - 显式豁免未在 Evidence test_integrity 留痕
+    - merger 未独立校验磁盘 Evidence Snapshot 中的 test_integrity
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+
+#### 归档注记（P-330 · 2026-11-26）
+
+- **交付 PR**：[#426](https://github.com/he18718143986-design/IDE/pull/426)（head `cde432706623b7b900f8dac138ff50faa50c371b`，squash `191779e06e47097bf644a22f376042066197ae97`，操作者由我执行）。
+- **范围与检查**：仅 9 个授权 `writable_paths`（+1491/−28），5 个 `readonly_paths` 保持零 diff。相关单元与集成测试（15 tests in `test-integrity-guard.test.ts`、6 tests in `p0-4-test-integrity-fail-closed.test.ts`）全部通过。必需 CI 全绿（三平台 Lint/Typecheck + ubuntu/macOS Unit + Docs/Knowledge/Perf/Detect；无 CANCELLED），Windows Unit 失败为既有环境存量（与 #424/#420 逐条一致），Cursor Bugbot neutral。
+- **P04-P1（既有测试改/删识别）**：`daemon/guard/test-integrity.ts` 实现 `classifyTouchedTestPaths` 与 `classifySingleTestPath`，准确将工作树中的测试文件划分为 `modifiedExistingTests`、`deletedExistingTests` 与 `workerAddedTests`；纯函数化设计，依赖注入 `GitRunner`（`execGit` 窄封装）。
+- **P04-P2～P3（基线隔离重跑三边界）**：(a) `restoreBaselineTestFiles` 仅将被修改与被删除的既有测试文件从 base 检出还原，`hideWorkerAddedTests` 临时隔离（重命名为 `.stagent-p04-added.bak`）Worker 新增的测试文件，确保新增测试不参与基线重跑；(b) Worker 删除既有测试文件时，还原至 base 版本的测试重跑必包含该被删除文件；(c) 重跑结束后在 `finally` 块中严格恢复工作树修改态并复原新增测试文件。
+- **P04-P4～P5（Fail-Closed 双错误码）**：基线重跑命令执行故障（超时、依赖缺失、执行器不可用等）时，fail-closed 抛出 `E_TEST_BASELINE_UNAVAILABLE`；基线重跑失败（Worker 改码导致既有测试红）时，fail-closed 抛出 `E_TEST_BASELINE_REGRESSION`；两错误码均在 `src/lib/error-codes.ts` 与 `docs/specs/runtime-contract-and-safety.md` §8.1 完整登记。
+- **P04-P6（合同豁免留痕）**：`src/lib/contract.schema.ts` 在 `execution_permissions` 新增可选 `allow_baseline_test_mutation: boolean` 豁免字段；当合同显式声明豁免时放行基线修改，但 `orchestrator.ts` 必须在 Evidence 的 `test_integrity` 中明确记录 `exemption: true` 及受影响路径与参数留痕可审计。
+- **P04-P7（Merger 独立核验）**：`daemon/pipeline/merger.ts` 在 `PRE_MERGE` 阶段增加 `assertEvidenceTestIntegrity`，直接从磁盘快照独立核验 `test_integrity` 与合同授权：未经合同豁免修改既有测试且重跑未通过时拒绝合并（抛出 `MergeGateError(E_CANNOT_MERGE)`）。
+- **P04-P8（负向测试覆盖与零回归）**：新建 `tests/unit/test-integrity-guard.test.ts`（15 例）与 `tests/daemon/p0-4-test-integrity-fail-closed.test.ts`（6 组全链路端到端场景），覆盖弱化断言拦截、删除测试还原重跑拦截、超时与环境故障 fail-closed、合同显式豁免审计放行、merger PRE_MERGE 独立拦截及仅新增测试不阻断放行等场景；既有验证流水线零回归。
+- **诚实口径**：**测试篡改拦截与基线独立重跑已交付（默认 fail-closed、三边界、豁免留痕、merger 独立核验）；P0 风险未宣称解除**。
+
+---
+
+### 3.4cg 容器文件系统 Scope 挂载规格生成纯函数、合法性校验与宿主占位（P0.3b-1 · 完工回写 P-334）
+
+> 两卡共用立卡说明与审批边界保留在 [`development-tasks-active.md`](./development-tasks-active.md#task-p0.3b-1) §3.4cd。
+
+<a id="task-p0.3b-1"></a>
+
+#### 【Task P0.3b-1】容器文件系统 Scope 挂载规格生成纯函数、合法性校验与宿主占位 `[COMPLETED]`
+
+```yaml task-card
+id: TASK-P0.3b-1
+status: COMPLETED
+contract:
+  intent:
+    title: 容器文件系统 Scope 挂载规格生成纯函数、合法性校验与宿主占位
+    description: >-
+      做完后，提供纯函数 resolveScopedMounts 将合同 scope.writable_paths 转换为细粒度挂载规格：
+      Worktree 根目录置为只读（:ro），writable_paths 逐个生成独立读写绑定挂载（:rw），
+      /work/.git 目录挂载 tmpfs 遮蔽隔离；若 writable_paths 包含尚未存在的新文件路径，提供宿主侧预创建空占位文件机制；
+      挂载规格进行路径逃逸、越出工作树、重复或嵌套冲突严格校验，失败 fail-closed 抛出新错误码 MOUNT_SCOPE_INVALID；
+      纯函数单测 100% 覆盖规格生成与校验异常拦截（无需 Docker 环境）。
+    risk_level: MEDIUM
+  acceptance:
+    - id: P03B1-P1
+      check: auto
+      text: >-
+        纯函数 resolveScopedMounts 准确将 worktreeRoot 与 writable_paths 计算为细粒度挂载规格：
+        容器内 worktree 根目录挂载为只读（:ro），writable_paths 列表逐项生成独立读写 bind mount（:rw）。
+    - id: P03B1-P2
+      check: auto
+      text: >-
+        .git 元数据隔离遮蔽：挂载规格中为 /work/.git 生成 tmpfs 挂载或只读隔离，断绝容器内读写宿主 Worktree Git 内部结构与指针。
+    - id: P03B1-P3
+      check: auto
+      text: >-
+        宿主侧占位文件预置机制：若 writable_paths 中包含尚未存在的目标文件路径，提供宿主侧预创建 0 字节空占位文件规格与辅助逻辑，
+        防止 Docker daemon 自动创建为目录导致文件挂载失败。
+    - id: P03B1-P4
+      check: auto
+      text: >-
+        挂载规格合法性校验与 fail-closed 错误码：对路径逃逸（.. 遍历）、越出 Worktree 根、非法字符、重复挂载或嵌套读写冲突进行前置校验，
+        校验失败抛出新错误码 MOUNT_SCOPE_INVALID 并拒绝生成挂载规格。
+    - id: P03B1-P5
+      check: auto
+      text: >-
+        无 Docker 环境的纯函数单测全面覆盖：规格生成（根只读 + 读写白名单 + .git 遮蔽）、路径校验异常（逃逸/越界/冲突等 fail-closed 抛 MOUNT_SCOPE_INVALID）
+        及占位文件计算；既有测试与门禁零回归。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/worker/sandbox/container-host.ts
+      - tests/unit/container-mount-scope.test.ts
+    readonly_paths:
+      - daemon/worker/cli-host/docker-container-host.ts
+      - daemon/pipeline/orchestrator.ts
+      - src/lib/contract.schema.ts
+      - daemon/pipeline/merger.ts
+      - daemon/pipeline/candidate-scope-audit.ts
+      - daemon/guard/test-integrity.ts
+      - daemon/worker/worker-adapter.interface.ts
+  verification:
+    commands:
+      - { alias: mount-scope-unit, executable: npx, args: [vitest, run, tests/unit/container-mount-scope.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) 在 container-host.ts 定义 ScopedMountSpec、MountEntry 接口与 MountMode（"scoped" | "readonly_enforced"）枚举，
+    扩充 SandboxRejectionCode 支持 "MOUNT_SCOPE_INVALID"。
+    2) 实现 resolveScopedMounts 纯函数：接收 worktreeRoot 与 writablePaths，对路径进行规范化与越界校验（禁止 ..、绝对路径越出 worktreeRoot、嵌套读写冲突）；
+    生成 worktreeRoot -> /work:ro 只读根挂载、tmpfs -> /work/.git 遮蔽挂载、以及各 writable_paths -> /work/<path>:rw 读写挂载。
+    3) 实现 prepareHostPlaceholders 辅助函数，在宿主文件系统上对不存在的 writable_paths 预建空文件。
+    4) 编写 tests/unit/container-mount-scope.test.ts，覆盖所有正向规格生成与负向路径校验拦截场景，不依赖 Docker 环境。
+  touches:
+    - { path: daemon/worker/sandbox/container-host.ts, change: modify, why: 导出 ScopedMountSpec、resolveScopedMounts 挂载计算纯函数与合法性校验，定义 MOUNT_SCOPE_INVALID, symbols: [resolveScopedMounts, prepareHostPlaceholders] }
+    - { path: tests/unit/container-mount-scope.test.ts, change: create, why: 挂载规格生成、.git 遮蔽、宿主占位、路径逃逸/越界/嵌套冲突异常拦截单测, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: P03B1-P1, test_path: tests/unit/container-mount-scope.test.ts, level: unit, case: "正确生成 scoped 模式挂载规格：根目录 :ro + 授权路径逐项 :rw + .git 遮蔽" }
+    - { acceptance_id: P03B1-P2, test_path: tests/unit/container-mount-scope.test.ts, level: unit, case: ".git tmpfs 挂载项始终位于根挂载之后、授权读写项之前" }
+    - { acceptance_id: P03B1-P3, test_path: tests/unit/container-mount-scope.test.ts, level: unit, case: "prepareHostPlaceholders 在真实文件系统上预置空文件并递归创建目录" }
+    - { acceptance_id: P03B1-P4, test_path: tests/unit/container-mount-scope.test.ts, level: unit, case: "路径逃逸（.. 穿越）严格拦截" }
+    - { acceptance_id: P03B1-P5, test_path: tests/unit/container-mount-scope.test.ts, level: unit, case: "整个测试套件在纯内存/本地临时文件下极速完成，无任何真实 Docker 依赖" }
+governance:
+  delivered: { pr: 432, commit: dec17e1947f0948ee4cbd8f0a7c5a476464554d1 }
+  spec_refs:
+    - docs/specs/runtime-contract-and-safety.md
+    - docs/ledger/p0-3b-container-filesystem-scope-proposal.md
+  depends_on: []
+  code_facts:
+    - { ref: "daemon/worker/cli-host/docker-container-host.ts:306-310", note: "现状为单一 worktree 根目录 bind mount 读写挂载（无 :ro）" }
+    - { ref: "daemon/worker/sandbox/container-host.ts:428-448", note: "runInSandbox 有 cwd 与 mount 白名单校验" }
+    - { ref: "daemon/worker/sandbox/container-host.ts:19-21", note: "SandboxRejectionCode 已有 MOUNT_OUTSIDE_WORKTREE / MOUNT_PROTECTED_PATH / MOUNT_PATH_TRAVERSAL" }
+  non_goals:
+    - 不在 P0.3b-1 接入 DockerContainerHost.run 执行（由 P0.3b-2 承接）
+    - 不在 P0.3b-1 改动 orchestrator / OpenHands adapter / CLI executor
+    - 不依赖 Docker daemon 运行环境（保持纯函数单测可跑）
+    - 不宣称容器硬件级安全或 P0 风险解除
+  fail:
+    - 允许包含 .. 或越出 worktreeRoot 的路径生成挂载规格
+    - 路径逃逸或嵌套冲突校验失败时未抛出 MOUNT_SCOPE_INVALID
+    - 挂载规格未将 worktree 根目录设为 :ro
+    - 挂载规格遗漏 /work/.git 的 tmpfs 遮蔽
+    - 单测依赖 Docker 环境导致无 Docker 机器报错
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+
+#### 归档注记（P-334 · 2026-11-26）
+
+- **交付 PR**：[#432](https://github.com/he18718143986-design/IDE/pull/432)（head `37df121813f5acdad51d676789850d4531b4429f`，squash `dec17e1947f0948ee4cbd8f0a7c5a476464554d1`，操作者由我执行）。
+- **范围与检查**：仅 2 个授权 `writable_paths`（`daemon/worker/sandbox/container-host.ts`、`tests/unit/container-mount-scope.test.ts`，+807/−1），7 个 `readonly_paths` 保持零 diff。独立单元测试套件（17 tests in `tests/unit/container-mount-scope.test.ts`）全部通过（22ms 纯函数执行，无 Docker 依赖）。必需 CI 全绿（三平台 Lint/Typecheck + ubuntu/macOS Unit + Docs/Knowledge/Perf/Detect；无 CANCELLED），Windows Unit 失败为既有环境存量（15 项与 #424/#426 一致，新增 17 用例在 Windows 100% 通过），Cursor Bugbot neutral。
+- **P03B1-P1（细粒度挂载规格生成纯函数）**：`daemon/worker/sandbox/container-host.ts` 导出 `resolveScopedMounts` 纯函数；接收 `worktreeRoot` 与 `writablePaths`，生成 `ScopedMountSpec`；scoped 模式下生成根目录只读（`-v hostRoot:containerWorkRoot:ro`）、`/work/.git` tmpfs 遮蔽以及各授权路径独立读写挂载（`-v hostFile:containerFile:rw`）；支持 `readonly_enforced` 模式严格仅生成根目录 `:ro` 与 tmpfs 遮蔽，坚决不生成任何 `:rw` 挂载；支持自定义 `containerWorkRoot`（如 `/workspace`）。
+- **P03B1-P2（.git 元数据隔离遮蔽）**：挂载规格中始终在根目录只读挂载之后、授权读写项之前注入 `/work/.git` 的 tmpfs 挂载项（`--tmpfs /work/.git:rw,noexec,nosuid`）；同时在前置校验中将 `.git` 与 `.stagent` 纳入受保护路径段 `PROTECTED_SEGMENTS`，严禁直接或间接将 `.git` 加入 `writablePaths`，违规 fail-closed 抛出 `MOUNT_SCOPE_INVALID`。
+- **P03B1-P3（宿主侧 0 字节空占位文件预置辅助）**：`container-host.ts` 导出 `prepareHostPlaceholders` 辅助函数；对 `writablePaths` 中尚未存在的文件在宿主文件系统预建 0 字节空占位文件并递归建立父目录，防止 Docker daemon 自动创建为目录导致文件挂载失败；对已存在的文件或目录保持原样不覆盖；纯函数 `resolveScopedMounts` 支持注入 `fileExists` 函数在内存中计算需要预占位的路径清单（`placeholderPaths`）。
+- **P03B1-P4（挂载合法性校验与 fail-closed 拦截）**：对路径逃逸（`..` 穿越）、越出 Worktree 根目录的绝对路径、试图将 Worktree 根目录设为可写、非法字符（控制字符、冒号 `:`、反斜杠 `\` 等）、重复挂载路径、以及父子目录嵌套读写冲突进行严格前置校验；任何违规一律 fail-closed 抛出 `SandboxRejectedError("MOUNT_SCOPE_INVALID", ...)` 并拒绝生成规格。
+- **P03B1-P5（纯函数无 Docker 单测全面覆盖）**：新建 `tests/unit/container-mount-scope.test.ts`，17 个用例全面覆盖 P03B1-P1～P5 每一项验收条件，运行耗时约 20ms，完全无 Docker daemon 环境依赖；既有 314+ 测试套件与门禁零回归。
+- **诚实口径**：**容器挂载规格纯函数与宿主占位已交付（根只读+逐路径读写+`.git` 遮蔽+fail-closed 校验）；执行接入属 P0.3b-2 未做，P0 风险未宣称解除**。
 
 ---
 
@@ -132,7 +13555,6 @@ governance:
     illumination: unchanged
     gateway_write_scope: unchanged
 ```
-
 
 #### 归档注记（P-335 · 2026-11-26）
 
