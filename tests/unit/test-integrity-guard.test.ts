@@ -21,6 +21,57 @@ function git(cwd: string, args: string[]): string {
   });
 }
 
+const testGitRunner = async (args: string[], cwd: string) => {
+  try {
+    const stdout = git(cwd, args);
+    return { stdout, stderr: "", exitCode: 0 };
+  } catch (err: unknown) {
+    const e = err as { stdout?: string; stderr?: string; status?: number };
+    return {
+      stdout: e.stdout ? String(e.stdout) : "",
+      stderr: e.stderr ? String(e.stderr) : String(err),
+      exitCode: typeof e.status === "number" ? e.status : 1,
+    };
+  }
+};
+
+const testCommandRunner = async (cmd: {
+  executable: string;
+  args: string[];
+  timeoutSeconds?: number;
+}) => {
+  try {
+    const stdout = execFileSync(cmd.executable, cmd.args, {
+      encoding: "utf-8",
+      timeout: (cmd.timeoutSeconds ?? 30) * 1000,
+      env: { ...process.env },
+    });
+    return { exitCode: 0, stdout, stderr: "", timedOut: false };
+  } catch (err: unknown) {
+    const errorObj = err as {
+      status?: number;
+      stdout?: string;
+      stderr?: string;
+      message?: string;
+      code?: string | number;
+    };
+    const isEnoent = errorObj.code === "ENOENT";
+    return {
+      exitCode:
+        typeof errorObj.status === "number"
+          ? errorObj.status
+          : isEnoent
+            ? 127
+            : 1,
+      stdout: errorObj.stdout ? String(errorObj.stdout) : "",
+      stderr: errorObj.stderr
+        ? String(errorObj.stderr)
+        : errorObj.message || "",
+      timedOut: false,
+    };
+  }
+};
+
 function initTempGitRepo(): { dir: string; cleanup: () => void } {
   const dir = fs.mkdtempSync(
     path.join(os.tmpdir(), "stagent-unit-test-integrity-"),
@@ -135,6 +186,7 @@ describe("TASK-P0.4: test-integrity-guard unit tests", () => {
       const classification = await classifyTouchedTestPaths({
         worktreePath: dir,
         baseRef: "main",
+        gitRunner: testGitRunner,
       });
 
       expect(classification.modifiedExistingTests).toEqual([
@@ -168,6 +220,7 @@ describe("TASK-P0.4: test-integrity-guard unit tests", () => {
         worktreePath: dir,
         baseRef: "main",
         pathsToRestore: ["tests/unit/a.test.ts", "tests/unit/b.test.ts"],
+        gitRunner: testGitRunner,
       });
 
       // 验证已还原
@@ -225,6 +278,7 @@ describe("TASK-P0.4: test-integrity-guard unit tests", () => {
       const classification = await classifyTouchedTestPaths({
         worktreePath: dir,
         baseRef: "main",
+        gitRunner: testGitRunner,
       });
 
       const rerun = await executeBaselineRerun({
@@ -240,6 +294,8 @@ describe("TASK-P0.4: test-integrity-guard unit tests", () => {
             timeout_seconds: 5,
           },
         ],
+        gitRunner: testGitRunner,
+        runCommand: testCommandRunner,
       });
 
       expect(rerun.triggered).toBe(true);
@@ -266,6 +322,7 @@ describe("TASK-P0.4: test-integrity-guard unit tests", () => {
       const classification = await classifyTouchedTestPaths({
         worktreePath: dir,
         baseRef: "main",
+        gitRunner: testGitRunner,
       });
 
       const rerun = await executeBaselineRerun({
@@ -281,6 +338,8 @@ describe("TASK-P0.4: test-integrity-guard unit tests", () => {
             timeout_seconds: 5,
           },
         ],
+        gitRunner: testGitRunner,
+        runCommand: testCommandRunner,
       });
 
       expect(rerun.triggered).toBe(true);
@@ -303,6 +362,7 @@ describe("TASK-P0.4: test-integrity-guard unit tests", () => {
       const classification = await classifyTouchedTestPaths({
         worktreePath: dir,
         baseRef: "main",
+        gitRunner: testGitRunner,
       });
 
       // 模拟超时
@@ -319,6 +379,7 @@ describe("TASK-P0.4: test-integrity-guard unit tests", () => {
             timeout_seconds: 1,
           },
         ],
+        gitRunner: testGitRunner,
         runCommand: async () => ({
           exitCode: 124,
           stdout: "",
@@ -345,6 +406,8 @@ describe("TASK-P0.4: test-integrity-guard unit tests", () => {
             timeout_seconds: 5,
           },
         ],
+        gitRunner: testGitRunner,
+        runCommand: testCommandRunner,
       });
 
       expect(rerunMissing.triggered).toBe(true);

@@ -1,10 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import type { VerificationCommand } from "../../src/lib/contract.schema";
-
-const execFileAsync = promisify(execFile);
 
 /**
  * 测试文件防篡改（Test Integrity Guard）。
@@ -169,34 +165,26 @@ export function detectTestWeakening(
 }
 
 // ============================================================================
-// TASK-P0.4: 测试分类、基线还原、隔离重跑核心实现
+// TASK-P0.4: 测试分类、基线还原、隔离重跑核心实现（纯函数 / 依赖注入）
 // ============================================================================
 
-async function runGit(
+export type GitRunner = (
   args: string[],
   cwd: string,
-): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-  try {
-    const { stdout, stderr } = await execFileAsync("git", args, {
-      cwd,
-      encoding: "utf-8",
-      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
-    });
-    return { stdout, stderr, exitCode: 0 };
-  } catch (err: unknown) {
-    const errorObj = err as {
-      stdout?: string;
-      stderr?: string;
-      message?: string;
-      code?: number;
-    };
-    return {
-      stdout: errorObj.stdout ?? "",
-      stderr: errorObj.stderr ?? errorObj.message ?? String(err),
-      exitCode: typeof errorObj.code === "number" ? errorObj.code : 1,
-    };
-  }
+) => Promise<{ stdout: string; stderr: string; exitCode: number }>;
+
+export interface NarrowCommandResult {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  timedOut?: boolean;
 }
+
+export type BaselineCommandRunner = (cmd: {
+  executable: string;
+  args: string[];
+  timeoutSeconds?: number;
+}) => Promise<NarrowCommandResult>;
 
 export interface TestPathClassification {
   modifiedExistingTests: string[];
@@ -218,8 +206,9 @@ export async function classifyTouchedTestPaths(options: {
   worktreePath: string;
   baseRef: string;
   candidatePaths?: string[];
+  gitRunner: GitRunner;
 }): Promise<TestPathClassification> {
-  const { worktreePath, baseRef } = options;
+  const { worktreePath, baseRef, gitRunner } = options;
   const pathsSet = new Set<string>();
 
   // 若传入了 candidatePaths，先过滤
@@ -232,7 +221,7 @@ export async function classifyTouchedTestPaths(options: {
   }
 
   // 1. 从 git status 捕获变更
-  const statusRes = await runGit(
+  const statusRes = await gitRunner(
     ["status", "--porcelain", "-uall"],
     worktreePath,
   );
@@ -254,12 +243,12 @@ export async function classifyTouchedTestPaths(options: {
   }
 
   // 2. 从 git diff 捕获分支相对于 baseRef 的变更
-  let diffRes = await runGit(
+  let diffRes = await gitRunner(
     ["diff", "--name-status", "-M", `${baseRef}...HEAD`],
     worktreePath,
   );
   if (diffRes.exitCode !== 0) {
-    diffRes = await runGit(
+    diffRes = await gitRunner(
       ["diff", "--name-status", "-M", baseRef, "HEAD"],
       worktreePath,
     );
@@ -283,7 +272,7 @@ export async function classifyTouchedTestPaths(options: {
 
   for (const relPath of pathsSet) {
     // 检查文件在 baseRef 是否存在
-    const catRes = await runGit(
+    const catRes = await gitRunner(
       ["cat-file", "-e", `${baseRef}:${relPath}`],
       worktreePath,
     );
@@ -296,7 +285,7 @@ export async function classifyTouchedTestPaths(options: {
       if (!existsOnDisk) {
         deletedExistingTests.push(relPath);
       } else {
-        const baseContentRes = await runGit(
+        const baseContentRes = await gitRunner(
           ["show", `${baseRef}:${relPath}`],
           worktreePath,
         );
@@ -356,8 +345,9 @@ export async function restoreBaselineTestFiles(options: {
   worktreePath: string;
   baseRef: string;
   pathsToRestore: string[];
+  gitRunner: GitRunner;
 }): Promise<RestoredBaselineState> {
-  const { worktreePath, baseRef, pathsToRestore } = options;
+  const { worktreePath, baseRef, pathsToRestore, gitRunner } = options;
   const originalStates: Array<{
     relPath: string;
     existed: boolean;
@@ -373,7 +363,7 @@ export async function restoreBaselineTestFiles(options: {
       ...(existed ? { content: fs.readFileSync(fullPath, "utf-8") } : {}),
     });
 
-    const showRes = await runGit(
+    const showRes = await gitRunner(
       ["show", `${baseRef}:${relPath}`],
       worktreePath,
     );
@@ -463,22 +453,15 @@ export async function executeBaselineRerun(options: {
   baseRef: string;
   classification: TestPathClassification;
   verificationCommands: VerificationCommand[];
-  runCommand?: (cmd: {
-    executable: string;
-    args: string[];
-    timeoutSeconds?: number;
-  }) => Promise<{
-    exitCode: number;
-    stdout: string;
-    stderr: string;
-    timedOut?: boolean;
-  }>;
+  gitRunner: GitRunner;
+  runCommand: BaselineCommandRunner;
 }): Promise<BaselineRerunResult> {
   const {
     worktreePath,
     baseRef,
     classification,
     verificationCommands,
+    gitRunner,
     runCommand,
   } = options;
 
@@ -499,6 +482,7 @@ export async function executeBaselineRerun(options: {
     worktreePath,
     baseRef,
     pathsToRestore: affectedPaths,
+    gitRunner,
   });
 
   const hiddenState = await hideWorkerAddedTests({
@@ -532,55 +516,6 @@ export async function executeBaselineRerun(options: {
       testCommands = [...verificationCommands];
     }
 
-    const defaultRunner = async (cmd: {
-      executable: string;
-      args: string[];
-      timeoutSeconds?: number;
-    }) => {
-      const timeoutMs = (cmd.timeoutSeconds ?? 30) * 1000;
-      try {
-        const { stdout, stderr } = await execFileAsync(
-          cmd.executable,
-          cmd.args,
-          {
-            cwd: worktreePath,
-            encoding: "utf-8",
-            timeout: timeoutMs,
-            env: { ...process.env },
-          },
-        );
-        return { exitCode: 0, stdout, stderr, timedOut: false };
-      } catch (err: unknown) {
-        const errorObj = err as {
-          killed?: boolean;
-          signal?: string;
-          code?: number | string;
-          stdout?: string;
-          stderr?: string;
-          message?: string;
-        };
-        const timedOut = Boolean(
-          errorObj.killed && errorObj.signal === "SIGTERM",
-        );
-        const isEnoent = errorObj.code === "ENOENT";
-        return {
-          exitCode:
-            typeof errorObj.code === "number"
-              ? errorObj.code
-              : timedOut
-                ? 124
-                : isEnoent
-                  ? 127
-                  : 1,
-          stdout: errorObj.stdout || "",
-          stderr: errorObj.stderr || errorObj.message || "",
-          timedOut,
-        };
-      }
-    };
-
-    const runner = runCommand ?? defaultRunner;
-
     for (const cmd of testCommands) {
       const filteredArgs = cmd.args.filter((arg) => {
         const norm = normalizeTestRelPath(arg);
@@ -589,7 +524,7 @@ export async function executeBaselineRerun(options: {
 
       let outcome;
       try {
-        outcome = await runner({
+        outcome = await runCommand({
           executable: cmd.executable,
           args: filteredArgs,
           timeoutSeconds: cmd.timeout_seconds ?? 30,

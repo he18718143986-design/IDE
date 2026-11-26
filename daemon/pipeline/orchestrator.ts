@@ -69,6 +69,7 @@ import {
   InvalidStateTransitionError,
 } from "../core/contract-mutex";
 import { killProcessTree } from "../runner/process-tree";
+import { runCommand } from "../runner/command-runner";
 import type { DeadlockResilience } from "../state/deadlock-resilience";
 import { writeStateFile } from "../guard/state-store";
 import {
@@ -1242,10 +1243,15 @@ export class ContractOrchestrator {
 
     // TASK-P0.4: 测试分类与基线隔离重跑
     const baseRef = current.authorization.git.base_branch || "main";
+    const gitRunner = async (args: string[], cwd: string) => {
+      return await execGit(args, cwd);
+    };
+
     const testClassification = await classifyTouchedTestPaths({
       worktreePath,
       baseRef,
       candidatePaths: [...worktreeChanged, ...modifiedFiles],
+      gitRunner,
     });
 
     const allowTestMutation =
@@ -1277,27 +1283,40 @@ export class ContractOrchestrator {
         baseRef,
         classification: testClassification,
         verificationCommands: current.verification_spec.commands,
+        gitRunner,
         runCommand: async (cmd) => {
-          const res = await gateway.callTool(
-            "stagent_exec_command",
-            {
-              executable: cmd.executable,
-              args: cmd.args,
-            },
-            { internal: true },
-          );
-          const data = (res.data ?? {}) as {
-            exitCode?: number;
-            stdout?: string;
-            stderr?: string;
-            durationMs?: number;
-          };
-          return {
-            exitCode: data.exitCode ?? (res.isError ? 1 : 0),
-            stdout: data.stdout ?? "",
-            stderr: data.stderr ?? (res.error?.message || ""),
-            timedOut: res.error?.code === "E_COMMAND_TIMEOUT",
-          };
+          try {
+            const res = await runCommand(cmd.executable, {
+              cwd: worktreePath,
+              argv: { executable: cmd.executable, args: cmd.args },
+              timeoutMs: (cmd.timeoutSeconds ?? 30) * 1000,
+            });
+            return {
+              exitCode: res.exitCode,
+              stdout: res.stdout,
+              stderr: res.stderr,
+              timedOut: res.timedOut,
+            };
+          } catch (err: unknown) {
+            const errorObj = err as {
+              code?: number | string;
+              message?: string;
+              stdout?: string;
+              stderr?: string;
+            };
+            const isEnoent = errorObj.code === "ENOENT";
+            return {
+              exitCode:
+                typeof errorObj.code === "number"
+                  ? errorObj.code
+                  : isEnoent
+                    ? 127
+                    : 1,
+              stdout: errorObj.stdout ?? "",
+              stderr: errorObj.stderr ?? errorObj.message ?? String(err),
+              timedOut: false,
+            };
+          }
         },
       });
 
