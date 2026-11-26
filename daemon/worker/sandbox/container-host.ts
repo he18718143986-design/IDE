@@ -11,6 +11,7 @@
  *   自身只读/断网），不是执行沙箱，边界不同、不混用。
  */
 
+import fs from "node:fs";
 import path from "node:path";
 import type { NetworkPolicy } from "../../../src/lib/contract.schema";
 
@@ -34,7 +35,12 @@ export type SandboxRejectionCode =
    */
   | "SECRET_IN_PLAIN_ENV"
   /** TASK-W.9f：secret 挂载目标非法（非绝对路径 / 覆盖 Worktree 挂载点） */
-  | "SECRET_MOUNT_INVALID";
+  | "SECRET_MOUNT_INVALID"
+  /**
+   * TASK-P0.3b-1: 挂载作用域合法性校验失败（路径逃逸、越出根、非法字符、重复或嵌套冲突）。
+   * 坚决拒绝生成细粒度挂载规格并阻止容器启动（fail-closed 门禁）。
+   */
+  | "MOUNT_SCOPE_INVALID";
 
 export class SandboxRejectedError extends Error {
   readonly code: SandboxRejectionCode;
@@ -445,4 +451,388 @@ export async function runInSandbox(
 
   const outcome = await host.run(safe, signal);
   return { ...outcome, durationMs: outcome.durationMs ?? Date.now() - started };
+}
+
+// ============================================================================
+// TASK-P0.3b-1: 容器文件系统 Scope 强制挂载纯函数与宿主占位辅助
+// ============================================================================
+
+/**
+ * P0-3b-1: 挂载模式枚举。
+ * - `scoped`: 细粒度只读根 + 授权路径独立读写绑定（施工阶段默认）；
+ * - `readonly_enforced`: 全量只读挂载，严禁任何 :rw 挂载（验收阶段）。
+ */
+export type MountMode = "scoped" | "readonly_enforced";
+
+/**
+ * 挂载项条目规格。
+ */
+export interface MountEntry {
+  type: "bind" | "tmpfs";
+  /** 宿主绝对路径（bind 挂载必填；tmpfs 无宿主源路径） */
+  source?: string;
+  /** 容器内绝对路径（如 `/work` 或 `/work/.git` 或 `/work/src/foo.ts`） */
+  target: string;
+  /** 是否只读挂载（true 对应 `:ro`，false 对应 `:rw`） */
+  readonly: boolean;
+}
+
+/**
+ * 细粒度挂载计算结果规格。
+ */
+export interface ScopedMountSpec {
+  /** 挂载模式 */
+  readonly mode: MountMode;
+  /** 宿主任务工作树根目录绝对路径 */
+  readonly worktreeRoot: string;
+  /** 容器内工作树根目录（缺省 `/work`） */
+  readonly containerWorkRoot: string;
+  /** 规范化后的授权可写相对路径列表（仅 scoped 模式有值；readonly_enforced 模式为空） */
+  readonly writablePaths: readonly string[];
+  /** 挂载项清单（顺序保真：根只读 -> .git tmpfs 遮蔽 -> 各 writable_paths 读写） */
+  readonly entries: readonly MountEntry[];
+  /** 需要在宿主侧预创建 0 字节空占位文件的相对路径清单 */
+  readonly placeholderPaths: readonly string[];
+  /** 预生成的 docker run 挂载参数片段（`-v` 与 `--tmpfs` 参数列表） */
+  readonly dockerArgs: readonly string[];
+}
+
+export interface ResolveScopedMountsOptions {
+  /** 容器内工作区根路径，缺省 `/work` */
+  containerWorkRoot?: string;
+  /** 挂载模式，缺省 `scoped` */
+  mode?: MountMode;
+  /**
+   * 可选的文件存在性检测函数（用于纯函数单测计算占位路径，不依赖真实磁盘 I/O）。
+   * 接受相对路径 relPath，返回 boolean 表示宿主是否存在该文件。
+   * 若未传入，默认在宿主文件系统上通过 fs.existsSync 进行检测。
+   */
+  fileExists?: (relPath: string) => boolean;
+}
+
+export interface PreparePlaceholdersResult {
+  /** 宿主侧成功创建的空占位文件绝对路径列表 */
+  created: string[];
+  /** 宿主侧已存在的路径绝对路径列表 */
+  existing: string[];
+}
+
+/** 非法字符校验正则（禁止空字节、冒号、回车换行等控制字符、反斜杠） */
+function hasForbiddenPathChars(str: string): boolean {
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    if (code <= 31 || str[i] === ":" || str[i] === "\\") {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * 纯函数：将 worktreeRoot 与 writable_paths 计算为细粒度容器挂载规格。
+ *
+ * 核心安全规则（fail-closed，任何违规抛出 `MOUNT_SCOPE_INVALID`）：
+ * 1. 禁止 `..` 路径遍历逃逸；
+ * 2. 禁止绝对路径越出 worktreeRoot；
+ * 3. 禁止非法字符（空字符、冒号、控制字符、反斜杠）；
+ * 4. 禁止将 Worktree 根目录直接作为 writable 挂载；
+ * 5. 禁止包含受保护目录段（如 `.git`、`.stagent`）；
+ * 6. 禁止重复挂载路径；
+ * 7. 禁止嵌套读写冲突（如父子目录/文件同为可写）。
+ *
+ * 生成规格：
+ * - 根挂载：worktreeRoot -> containerWorkRoot:ro
+ * - .git 遮蔽：tmpfs -> containerWorkRoot/.git (rw,noexec,nosuid)
+ * - 授权路径：worktreeRoot/path -> containerWorkRoot/path:rw (仅 scoped 模式)
+ *
+ * @throws SandboxRejectedError (code: MOUNT_SCOPE_INVALID) 当且仅当校验失败时
+ */
+export function resolveScopedMounts(
+  worktreeRoot: string,
+  writablePaths: readonly string[] = [],
+  options?: ResolveScopedMountsOptions,
+): ScopedMountSpec {
+  if (
+    !worktreeRoot ||
+    typeof worktreeRoot !== "string" ||
+    worktreeRoot.trim() === ""
+  ) {
+    throw new SandboxRejectedError(
+      "MOUNT_SCOPE_INVALID",
+      "worktreeRoot must be a non-empty string",
+    );
+  }
+
+  const normalizedRoot = path.resolve(worktreeRoot);
+
+  const containerWorkRoot = options?.containerWorkRoot ?? "/work";
+  if (
+    typeof containerWorkRoot !== "string" ||
+    !containerWorkRoot.startsWith("/") ||
+    containerWorkRoot === "/" ||
+    path.posix.normalize(containerWorkRoot) !== containerWorkRoot
+  ) {
+    throw new SandboxRejectedError(
+      "MOUNT_SCOPE_INVALID",
+      `containerWorkRoot must be a normalized absolute path and not root: ${String(containerWorkRoot)}`,
+    );
+  }
+
+  const mode = options?.mode ?? "scoped";
+  if (mode !== "scoped" && mode !== "readonly_enforced") {
+    throw new SandboxRejectedError(
+      "MOUNT_SCOPE_INVALID",
+      `Unsupported mount mode: ${String(mode)}`,
+    );
+  }
+
+  if (!Array.isArray(writablePaths)) {
+    throw new SandboxRejectedError(
+      "MOUNT_SCOPE_INVALID",
+      "writablePaths must be an array",
+    );
+  }
+
+  const normalizedWritables: string[] = [];
+  const seenPaths = new Set<string>();
+
+  for (const raw of writablePaths) {
+    if (typeof raw !== "string" || raw.trim() === "") {
+      throw new SandboxRejectedError(
+        "MOUNT_SCOPE_INVALID",
+        `Invalid path in writablePaths: ${String(raw)}`,
+      );
+    }
+
+    if (hasForbiddenPathChars(raw)) {
+      throw new SandboxRejectedError(
+        "MOUNT_SCOPE_INVALID",
+        `Path contains forbidden characters: ${raw}`,
+      );
+    }
+
+    // 严禁 .. 路径穿越
+    if (raw.split("/").includes("..") || raw.includes("..")) {
+      throw new SandboxRejectedError(
+        "MOUNT_SCOPE_INVALID",
+        `Path traversal ('..') is strictly forbidden: ${raw}`,
+      );
+    }
+
+    // 处理绝对路径或相对路径
+    let rel: string;
+    if (path.isAbsolute(raw)) {
+      const resolved = path.resolve(raw);
+      const relFromRoot = path.relative(normalizedRoot, resolved);
+      if (
+        relFromRoot.startsWith("..") ||
+        path.isAbsolute(relFromRoot) ||
+        relFromRoot === ""
+      ) {
+        throw new SandboxRejectedError(
+          "MOUNT_SCOPE_INVALID",
+          `Absolute path escapes worktree root (${normalizedRoot}): ${raw}`,
+        );
+      }
+      rel = relFromRoot.split(path.sep).join("/");
+    } else {
+      // 规范化相对路径
+      const segments = raw.split("/").filter((s) => s.length > 0 && s !== ".");
+      if (segments.length === 0) {
+        throw new SandboxRejectedError(
+          "MOUNT_SCOPE_INVALID",
+          `Cannot mount worktree root as writable: ${raw}`,
+        );
+      }
+      rel = segments.join("/");
+    }
+
+    // 再次检验规范化后的相对路径是否为空或根
+    if (rel === "" || rel === ".") {
+      throw new SandboxRejectedError(
+        "MOUNT_SCOPE_INVALID",
+        `Cannot mount worktree root as writable: ${raw}`,
+      );
+    }
+
+    // 严禁包含受保护路径段
+    const segs = rel.split("/");
+    for (const seg of segs) {
+      if (PROTECTED_SEGMENTS.includes(seg)) {
+        throw new SandboxRejectedError(
+          "MOUNT_SCOPE_INVALID",
+          `Cannot mount protected segment '${seg}' as writable: ${raw}`,
+        );
+      }
+    }
+
+    // 重复挂载校验
+    if (seenPaths.has(rel)) {
+      throw new SandboxRejectedError(
+        "MOUNT_SCOPE_INVALID",
+        `Duplicate mount path in writablePaths: ${rel}`,
+      );
+    }
+
+    // 嵌套读写冲突校验（前缀冲突）
+    for (const existing of seenPaths) {
+      if (rel.startsWith(existing + "/")) {
+        throw new SandboxRejectedError(
+          "MOUNT_SCOPE_INVALID",
+          `Nested mount conflict detected: '${existing}' is an ancestor of '${rel}'`,
+        );
+      }
+      if (existing.startsWith(rel + "/")) {
+        throw new SandboxRejectedError(
+          "MOUNT_SCOPE_INVALID",
+          `Nested mount conflict detected: '${rel}' is an ancestor of '${existing}'`,
+        );
+      }
+    }
+
+    seenPaths.add(rel);
+    normalizedWritables.push(rel);
+  }
+
+  // 1. 根目录只读挂载
+  const rootEntry: MountEntry = {
+    type: "bind",
+    source: normalizedRoot,
+    target: containerWorkRoot,
+    readonly: true,
+  };
+
+  // 2. /work/.git tmpfs 隔离遮蔽
+  const gitTmpfsTarget = path.posix.join(containerWorkRoot, ".git");
+  const gitTmpfsEntry: MountEntry = {
+    type: "tmpfs",
+    target: gitTmpfsTarget,
+    readonly: false,
+  };
+
+  // 挂载项与 dockerArgs 初始化
+  const entries: MountEntry[] = [rootEntry, gitTmpfsEntry];
+  const dockerArgs: string[] = [
+    "-v",
+    `${normalizedRoot}:${containerWorkRoot}:ro`,
+    "--tmpfs",
+    `${gitTmpfsTarget}:rw,noexec,nosuid`,
+  ];
+
+  // 验收只读模式：严禁生成任何 :rw 挂载
+  if (mode === "readonly_enforced") {
+    return {
+      mode: "readonly_enforced",
+      worktreeRoot: normalizedRoot,
+      containerWorkRoot,
+      writablePaths: [],
+      entries,
+      placeholderPaths: [],
+      dockerArgs,
+    };
+  }
+
+  // scoped 模式：生成各授权路径的独立读写挂载
+  const placeholderPaths: string[] = [];
+  const fileExistsFn =
+    options?.fileExists ??
+    ((relPath: string) => {
+      try {
+        return fs.existsSync(path.resolve(normalizedRoot, relPath));
+      } catch {
+        return false;
+      }
+    });
+
+  for (const rel of normalizedWritables) {
+    const hostSource = path.resolve(normalizedRoot, rel);
+    const containerTarget = path.posix.join(containerWorkRoot, rel);
+
+    entries.push({
+      type: "bind",
+      source: hostSource,
+      target: containerTarget,
+      readonly: false,
+    });
+
+    dockerArgs.push("-v", `${hostSource}:${containerTarget}:rw`);
+
+    if (!fileExistsFn(rel)) {
+      placeholderPaths.push(rel);
+    }
+  }
+
+  return {
+    mode: "scoped",
+    worktreeRoot: normalizedRoot,
+    containerWorkRoot,
+    writablePaths: normalizedWritables,
+    entries,
+    placeholderPaths,
+    dockerArgs,
+  };
+}
+
+/**
+ * 宿主侧占位文件预置辅助函数（P03B1-P3）。
+ *
+ * 若 writable_paths 包含尚未存在的目标文件路径，在宿主文件系统预创建 0 字节空占位文件，
+ * 防止 Docker daemon 自动创建为目录导致文件挂载失败。
+ * 针对已存在的文件或目录则予以保留并不覆盖。
+ */
+export function prepareHostPlaceholders(
+  specOrRoot:
+    | ScopedMountSpec
+    | {
+        worktreeRoot: string;
+        writablePaths?: readonly string[];
+        placeholderPaths?: readonly string[];
+      }
+    | string,
+  paths?: readonly string[],
+): PreparePlaceholdersResult {
+  let root: string;
+  let targetPaths: readonly string[];
+
+  if (typeof specOrRoot === "string") {
+    root = path.resolve(specOrRoot);
+    targetPaths = paths ?? [];
+  } else if (
+    "writablePaths" in specOrRoot &&
+    Array.isArray(specOrRoot.writablePaths) &&
+    specOrRoot.writablePaths.length > 0
+  ) {
+    root = path.resolve(specOrRoot.worktreeRoot);
+    targetPaths = specOrRoot.writablePaths;
+  } else if (
+    "placeholderPaths" in specOrRoot &&
+    Array.isArray(specOrRoot.placeholderPaths)
+  ) {
+    root = path.resolve(specOrRoot.worktreeRoot);
+    targetPaths = specOrRoot.placeholderPaths;
+  } else {
+    root = path.resolve(specOrRoot.worktreeRoot);
+    targetPaths = specOrRoot.writablePaths ?? [];
+  }
+
+  const created: string[] = [];
+  const existing: string[] = [];
+
+  for (const rel of targetPaths) {
+    const fullPath = path.resolve(root, rel);
+    if (fs.existsSync(fullPath)) {
+      existing.push(fullPath);
+    } else {
+      const parentDir = path.dirname(fullPath);
+      if (!fs.existsSync(parentDir)) {
+        fs.mkdirSync(parentDir, { recursive: true });
+      }
+      // 创建 0 字节空占位文件
+      const fd = fs.openSync(fullPath, "w");
+      fs.closeSync(fd);
+      created.push(fullPath);
+    }
+  }
+
+  return { created, existing };
 }
