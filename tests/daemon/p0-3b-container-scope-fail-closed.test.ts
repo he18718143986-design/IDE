@@ -102,12 +102,12 @@ describe("TASK-P0.3b-2: Container Scope Fail-Closed 负向集成测试", () => {
   }
 
   const testImage =
-    process.env.STAGENT_TEST_CONTAINER_IMAGE ??
+    process.env["STAGENT_TEST_CONTAINER_IMAGE"] ??
     "ghcr.io/all-hands-ai/openhands:latest";
   const liveHost = new DockerContainerHost({ image: testImage });
   const isLiveReady =
     liveHost.isAvailable() &&
-    (process.env.STAGENT_LIVE_DOCKER_TEST === "1" ||
+    (process.env["STAGENT_LIVE_DOCKER_TEST"] === "1" ||
       isDockerImageReady(testImage));
   const describeLive = isLiveReady ? describe : describe.skip;
 
