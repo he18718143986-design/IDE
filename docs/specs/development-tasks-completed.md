@@ -13299,3 +13299,126 @@ governance:
 - **P04-P8（负向测试覆盖与零回归）**：新建 `tests/unit/test-integrity-guard.test.ts`（15 例）与 `tests/daemon/p0-4-test-integrity-fail-closed.test.ts`（6 组全链路端到端场景），覆盖弱化断言拦截、删除测试还原重跑拦截、超时与环境故障 fail-closed、合同显式豁免审计放行、merger PRE_MERGE 独立拦截及仅新增测试不阻断放行等场景；既有验证流水线零回归。
 - **诚实口径**：**测试篡改拦截与基线独立重跑已交付（默认 fail-closed、三边界、豁免留痕、merger 独立核验）；P0 风险未宣称解除**。
 
+---
+
+### 3.4cg 容器文件系统 Scope 挂载规格生成纯函数、合法性校验与宿主占位（P0.3b-1 · 完工回写 P-334）
+
+> 两卡共用立卡说明与审批边界保留在 [`development-tasks-active.md`](./development-tasks-active.md#task-p0.3b-1) §3.4cd。
+
+<a id="task-p0.3b-1"></a>
+
+#### 【Task P0.3b-1】容器文件系统 Scope 挂载规格生成纯函数、合法性校验与宿主占位 `[COMPLETED]`
+
+```yaml task-card
+id: TASK-P0.3b-1
+status: COMPLETED
+contract:
+  intent:
+    title: 容器文件系统 Scope 挂载规格生成纯函数、合法性校验与宿主占位
+    description: >-
+      做完后，提供纯函数 resolveScopedMounts 将合同 scope.writable_paths 转换为细粒度挂载规格：
+      Worktree 根目录置为只读（:ro），writable_paths 逐个生成独立读写绑定挂载（:rw），
+      /work/.git 目录挂载 tmpfs 遮蔽隔离；若 writable_paths 包含尚未存在的新文件路径，提供宿主侧预创建空占位文件机制；
+      挂载规格进行路径逃逸、越出工作树、重复或嵌套冲突严格校验，失败 fail-closed 抛出新错误码 MOUNT_SCOPE_INVALID；
+      纯函数单测 100% 覆盖规格生成与校验异常拦截（无需 Docker 环境）。
+    risk_level: MEDIUM
+  acceptance:
+    - id: P03B1-P1
+      check: auto
+      text: >-
+        纯函数 resolveScopedMounts 准确将 worktreeRoot 与 writable_paths 计算为细粒度挂载规格：
+        容器内 worktree 根目录挂载为只读（:ro），writable_paths 列表逐项生成独立读写 bind mount（:rw）。
+    - id: P03B1-P2
+      check: auto
+      text: >-
+        .git 元数据隔离遮蔽：挂载规格中为 /work/.git 生成 tmpfs 挂载或只读隔离，断绝容器内读写宿主 Worktree Git 内部结构与指针。
+    - id: P03B1-P3
+      check: auto
+      text: >-
+        宿主侧占位文件预置机制：若 writable_paths 中包含尚未存在的目标文件路径，提供宿主侧预创建 0 字节空占位文件规格与辅助逻辑，
+        防止 Docker daemon 自动创建为目录导致文件挂载失败。
+    - id: P03B1-P4
+      check: auto
+      text: >-
+        挂载规格合法性校验与 fail-closed 错误码：对路径逃逸（.. 遍历）、越出 Worktree 根、非法字符、重复挂载或嵌套读写冲突进行前置校验，
+        校验失败抛出新错误码 MOUNT_SCOPE_INVALID 并拒绝生成挂载规格。
+    - id: P03B1-P5
+      check: auto
+      text: >-
+        无 Docker 环境的纯函数单测全面覆盖：规格生成（根只读 + 读写白名单 + .git 遮蔽）、路径校验异常（逃逸/越界/冲突等 fail-closed 抛 MOUNT_SCOPE_INVALID）
+        及占位文件计算；既有测试与门禁零回归。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/worker/sandbox/container-host.ts
+      - tests/unit/container-mount-scope.test.ts
+    readonly_paths:
+      - daemon/worker/cli-host/docker-container-host.ts
+      - daemon/pipeline/orchestrator.ts
+      - src/lib/contract.schema.ts
+      - daemon/pipeline/merger.ts
+      - daemon/pipeline/candidate-scope-audit.ts
+      - daemon/guard/test-integrity.ts
+      - daemon/worker/worker-adapter.interface.ts
+  verification:
+    commands:
+      - { alias: mount-scope-unit, executable: npx, args: [vitest, run, tests/unit/container-mount-scope.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) 在 container-host.ts 定义 ScopedMountSpec、MountEntry 接口与 MountMode（"scoped" | "readonly_enforced"）枚举，
+    扩充 SandboxRejectionCode 支持 "MOUNT_SCOPE_INVALID"。
+    2) 实现 resolveScopedMounts 纯函数：接收 worktreeRoot 与 writablePaths，对路径进行规范化与越界校验（禁止 ..、绝对路径越出 worktreeRoot、嵌套读写冲突）；
+    生成 worktreeRoot -> /work:ro 只读根挂载、tmpfs -> /work/.git 遮蔽挂载、以及各 writable_paths -> /work/<path>:rw 读写挂载。
+    3) 实现 prepareHostPlaceholders 辅助函数，在宿主文件系统上对不存在的 writable_paths 预建空文件。
+    4) 编写 tests/unit/container-mount-scope.test.ts，覆盖所有正向规格生成与负向路径校验拦截场景，不依赖 Docker 环境。
+  touches:
+    - { path: daemon/worker/sandbox/container-host.ts, change: modify, why: 导出 ScopedMountSpec、resolveScopedMounts 挂载计算纯函数与合法性校验，定义 MOUNT_SCOPE_INVALID, symbols: [resolveScopedMounts, prepareHostPlaceholders] }
+    - { path: tests/unit/container-mount-scope.test.ts, change: create, why: 挂载规格生成、.git 遮蔽、宿主占位、路径逃逸/越界/嵌套冲突异常拦截单测, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: P03B1-P1, test_path: tests/unit/container-mount-scope.test.ts, level: unit, case: "正确生成 scoped 模式挂载规格：根目录 :ro + 授权路径逐项 :rw + .git 遮蔽" }
+    - { acceptance_id: P03B1-P2, test_path: tests/unit/container-mount-scope.test.ts, level: unit, case: ".git tmpfs 挂载项始终位于根挂载之后、授权读写项之前" }
+    - { acceptance_id: P03B1-P3, test_path: tests/unit/container-mount-scope.test.ts, level: unit, case: "prepareHostPlaceholders 在真实文件系统上预置空文件并递归创建目录" }
+    - { acceptance_id: P03B1-P4, test_path: tests/unit/container-mount-scope.test.ts, level: unit, case: "路径逃逸（.. 穿越）严格拦截" }
+    - { acceptance_id: P03B1-P5, test_path: tests/unit/container-mount-scope.test.ts, level: unit, case: "整个测试套件在纯内存/本地临时文件下极速完成，无任何真实 Docker 依赖" }
+governance:
+  delivered: { pr: 432, commit: dec17e1947f0948ee4cbd8f0a7c5a476464554d1 }
+  spec_refs:
+    - docs/specs/runtime-contract-and-safety.md
+    - docs/ledger/p0-3b-container-filesystem-scope-proposal.md
+  depends_on: []
+  code_facts:
+    - { ref: "daemon/worker/cli-host/docker-container-host.ts:306-310", note: "现状为单一 worktree 根目录 bind mount 读写挂载（无 :ro）" }
+    - { ref: "daemon/worker/sandbox/container-host.ts:428-448", note: "runInSandbox 有 cwd 与 mount 白名单校验" }
+    - { ref: "daemon/worker/sandbox/container-host.ts:19-21", note: "SandboxRejectionCode 已有 MOUNT_OUTSIDE_WORKTREE / MOUNT_PROTECTED_PATH / MOUNT_PATH_TRAVERSAL" }
+  non_goals:
+    - 不在 P0.3b-1 接入 DockerContainerHost.run 执行（由 P0.3b-2 承接）
+    - 不在 P0.3b-1 改动 orchestrator / OpenHands adapter / CLI executor
+    - 不依赖 Docker daemon 运行环境（保持纯函数单测可跑）
+    - 不宣称容器硬件级安全或 P0 风险解除
+  fail:
+    - 允许包含 .. 或越出 worktreeRoot 的路径生成挂载规格
+    - 路径逃逸或嵌套冲突校验失败时未抛出 MOUNT_SCOPE_INVALID
+    - 挂载规格未将 worktree 根目录设为 :ro
+    - 挂载规格遗漏 /work/.git 的 tmpfs 遮蔽
+    - 单测依赖 Docker 环境导致无 Docker 机器报错
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+
+#### 归档注记（P-334 · 2026-11-26）
+
+- **交付 PR**：[#432](https://github.com/he18718143986-design/IDE/pull/432)（head `37df121813f5acdad51d676789850d4531b4429f`，squash `dec17e1947f0948ee4cbd8f0a7c5a476464554d1`，操作者由我执行）。
+- **范围与检查**：仅 2 个授权 `writable_paths`（`daemon/worker/sandbox/container-host.ts`、`tests/unit/container-mount-scope.test.ts`，+807/−1），7 个 `readonly_paths` 保持零 diff。独立单元测试套件（17 tests in `tests/unit/container-mount-scope.test.ts`）全部通过（22ms 纯函数执行，无 Docker 依赖）。必需 CI 全绿（三平台 Lint/Typecheck + ubuntu/macOS Unit + Docs/Knowledge/Perf/Detect；无 CANCELLED），Windows Unit 失败为既有环境存量（15 项与 #424/#426 一致，新增 17 用例在 Windows 100% 通过），Cursor Bugbot neutral。
+- **P03B1-P1（细粒度挂载规格生成纯函数）**：`daemon/worker/sandbox/container-host.ts` 导出 `resolveScopedMounts` 纯函数；接收 `worktreeRoot` 与 `writablePaths`，生成 `ScopedMountSpec`；scoped 模式下生成根目录只读（`-v hostRoot:containerWorkRoot:ro`）、`/work/.git` tmpfs 遮蔽以及各授权路径独立读写挂载（`-v hostFile:containerFile:rw`）；支持 `readonly_enforced` 模式严格仅生成根目录 `:ro` 与 tmpfs 遮蔽，坚决不生成任何 `:rw` 挂载；支持自定义 `containerWorkRoot`（如 `/workspace`）。
+- **P03B1-P2（.git 元数据隔离遮蔽）**：挂载规格中始终在根目录只读挂载之后、授权读写项之前注入 `/work/.git` 的 tmpfs 挂载项（`--tmpfs /work/.git:rw,noexec,nosuid`）；同时在前置校验中将 `.git` 与 `.stagent` 纳入受保护路径段 `PROTECTED_SEGMENTS`，严禁直接或间接将 `.git` 加入 `writablePaths`，违规 fail-closed 抛出 `MOUNT_SCOPE_INVALID`。
+- **P03B1-P3（宿主侧 0 字节空占位文件预置辅助）**：`container-host.ts` 导出 `prepareHostPlaceholders` 辅助函数；对 `writablePaths` 中尚未存在的文件在宿主文件系统预建 0 字节空占位文件并递归建立父目录，防止 Docker daemon 自动创建为目录导致文件挂载失败；对已存在的文件或目录保持原样不覆盖；纯函数 `resolveScopedMounts` 支持注入 `fileExists` 函数在内存中计算需要预占位的路径清单（`placeholderPaths`）。
+- **P03B1-P4（挂载合法性校验与 fail-closed 拦截）**：对路径逃逸（`..` 穿越）、越出 Worktree 根目录的绝对路径、试图将 Worktree 根目录设为可写、非法字符（控制字符、冒号 `:`、反斜杠 `\` 等）、重复挂载路径、以及父子目录嵌套读写冲突进行严格前置校验；任何违规一律 fail-closed 抛出 `SandboxRejectedError("MOUNT_SCOPE_INVALID", ...)` 并拒绝生成规格。
+- **P03B1-P5（纯函数无 Docker 单测全面覆盖）**：新建 `tests/unit/container-mount-scope.test.ts`，17 个用例全面覆盖 P03B1-P1～P5 每一项验收条件，运行耗时约 20ms，完全无 Docker daemon 环境依赖；既有 314+ 测试套件与门禁零回归。
+- **诚实口径**：**容器挂载规格纯函数与宿主占位已交付（根只读+逐路径读写+`.git` 遮蔽+fail-closed 校验）；执行接入属 P0.3b-2 未做，P0 风险未宣称解除**。
