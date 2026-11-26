@@ -348,6 +348,8 @@ import { ensureGitInit, inspectGitRepo } from "./git/ensure-git-repo";
 import type { ChatAdapter } from "./chat/types";
 import { BaselineChatAdapter } from "./chat/baseline-adapter";
 import { McpHttpServer } from "./mcp/http-server";
+import { DockerContainerHost } from "./worker/cli-host/docker-container-host";
+import type { ContainerHostPort } from "./worker/sandbox/container-host";
 import { DemoChatAdapter } from "./chat/demo-adapter";
 import {
   CLAUDE_CODE_VERIFIED_ON,
@@ -397,6 +399,12 @@ export interface DaemonServerOptions extends PortFinderOptions {
    * Claude Code worker 仅登记为 UNCONTROLLED_EXTERNAL）；测试可注入自定义 registry。
    */
   workerRegistry?: AdapterRegistry;
+  /**
+   * TASK-P0.3a：容器宿主端口注入（SANDBOX_ENFORCED 派工与执行用）。
+   * 缺省构造 new DockerContainerHost()（环境可用时）；测试可注入 mock / stub。
+   * 设置 STAGENT_DISABLE_CONTAINER=1 时强制置为 undefined 并在 daemon.jsonl 输出 WARNING 日志。
+   */
+  containerHost?: ContainerHostPort | null;
   /**
    * 草案的 L1 白话补全器（可选）。
    * 不注入时 `/api/supervisor/draft` 走**纯 L0**：零模型调用、零费用，
@@ -636,10 +644,32 @@ export class StagentDaemon {
     });
     this.workerRegistry =
       options.workerRegistry ?? createDefaultWorkerRegistry();
+
+    let containerHost: ContainerHostPort | undefined;
+    if (process.env["STAGENT_DISABLE_CONTAINER"] === "1") {
+      appendDaemonLog(this.repoRoot, {
+        level: "warn",
+        kind: "container_escape_hatch",
+        code: "STAGENT_DISABLE_CONTAINER",
+        detail: {
+          source: "env:STAGENT_DISABLE_CONTAINER=1",
+          message:
+            "STAGENT_DISABLE_CONTAINER=1 is set; container isolation disabled via escape hatch",
+        },
+      });
+      containerHost = undefined;
+    } else if (options.containerHost !== undefined) {
+      containerHost = options.containerHost ?? undefined;
+    } else {
+      containerHost = new DockerContainerHost();
+    }
+
     this.orchestrator = new ContractOrchestrator({
       repoRoot: this.repoRoot,
       // TASK-W.6：注入默认受控 Worker 注册表（可被 options.workerRegistry 覆盖）
       registry: this.workerRegistry,
+      // TASK-P0.3a：注入容器宿主端口
+      containerHost,
       // TASK-C.5：验证命令的逐行输出实时推给页面（脱敏在 runner 内完成）
       onTerminalLine: (contractId, stream, line) => {
         this.broadcast("TERMINAL_STREAM", {

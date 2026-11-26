@@ -1,5 +1,8 @@
 import type { SoftwareContract } from "../../src/lib/contract.schema";
-import type { SandboxWitness } from "./sandbox/container-host";
+import {
+  isSandboxWitnessValid,
+  type SandboxWitness,
+} from "./sandbox/container-host";
 
 /**
  * Coding Worker 适配器能力契约（TASK-W.1 / 规范 A §2.7 / B G-10）。
@@ -170,9 +173,12 @@ export function resolveEvidenceControlMode(
   sandboxWitness: SandboxWitness | undefined,
 ): AdapterControlMode {
   if (declaredControlMode !== "SANDBOX_ENFORCED") return declaredControlMode;
-  return sandboxWitness === undefined
-    ? "UNCONTROLLED_EXTERNAL"
-    : "SANDBOX_ENFORCED";
+  if (sandboxWitness === undefined) return "UNCONTROLLED_EXTERNAL";
+  // TASK-P0.3a: 对接见证有效性判定（无效/冒认降级为 UNCONTROLLED_EXTERNAL）
+  if (!isSandboxWitnessValid(sandboxWitness)) {
+    return "UNCONTROLLED_EXTERNAL";
+  }
+  return "SANDBOX_ENFORCED";
 }
 
 /**

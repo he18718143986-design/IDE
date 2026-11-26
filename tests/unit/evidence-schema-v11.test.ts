@@ -5,6 +5,7 @@ import {
   reasonCodeSchema,
   usageSchema,
   type EvidenceBundleV11,
+  type SandboxWitness,
 } from "../../src/lib/evidence.schema";
 
 /**
@@ -387,25 +388,60 @@ describe("TASK-P0.1 控制模式与合同版本失败关闭", () => {
     ).toBe(false);
   });
 
-  it("P01-P1：GATEWAY_ENFORCED / SANDBOX_ENFORCED 进入正常验收逻辑", () => {
-    for (const mode of ["GATEWAY_ENFORCED", "SANDBOX_ENFORCED"] as const) {
-      expect(
-        deriveCanMerge({
-          ...gatesPass,
-          workerControlMode: mode,
-          contractRevision: 2,
-        }),
-      ).toBe(true);
-      // 受控档位也不能越过原有门禁
-      expect(
-        deriveCanMerge({
-          ...gatesPass,
-          scopePassed: false,
-          workerControlMode: mode,
-          contractRevision: 2,
-        }),
-      ).toBe(false);
-    }
+  it("P01-P1：GATEWAY_ENFORCED / SANDBOX_ENFORCED 进入正常验收逻辑（SANDBOX_ENFORCED 需合法见证才放行）", () => {
+    // 1. GATEWAY_ENFORCED: 正常放行，受原有门禁约束
+    expect(
+      deriveCanMerge({
+        ...gatesPass,
+        workerControlMode: "GATEWAY_ENFORCED",
+        contractRevision: 2,
+      }),
+    ).toBe(true);
+    expect(
+      deriveCanMerge({
+        ...gatesPass,
+        scopePassed: false,
+        workerControlMode: "GATEWAY_ENFORCED",
+        contractRevision: 2,
+      }),
+    ).toBe(false);
+
+    // 2. SANDBOX_ENFORCED: 无合法见证 fail-closed (P03A-P5)
+    expect(
+      deriveCanMerge({
+        ...gatesPass,
+        workerControlMode: "SANDBOX_ENFORCED",
+        contractRevision: 2,
+      }),
+    ).toBe(false);
+
+    // 3. SANDBOX_ENFORCED: 补合法见证才放行，且同样受原有门禁约束
+    const validWitness: SandboxWitness = {
+      host_kind: "docker/29.6.1",
+      via: "exit",
+      exit_code: 0,
+      duration_ms: 100,
+      worktree_root: "/path/to/worktree",
+    };
+    expect(
+      deriveCanMerge({
+        ...gatesPass,
+        workerControlMode: "SANDBOX_ENFORCED",
+        contractRevision: 2,
+        sandboxWitness: validWitness,
+        worktreeRoot: "/path/to/worktree",
+      }),
+    ).toBe(true);
+    expect(
+      deriveCanMerge({
+        ...gatesPass,
+        scopePassed: false,
+        workerControlMode: "SANDBOX_ENFORCED",
+        contractRevision: 2,
+        sandboxWitness: validWitness,
+        worktreeRoot: "/path/to/worktree",
+      }),
+    ).toBe(false);
   });
 
   it("合同版本缺失或不可确认 → can_merge=false", () => {

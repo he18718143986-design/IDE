@@ -2447,9 +2447,11 @@ export class ContractOrchestrator {
     // 证据只认执行面实况：本轮派工没带 `SandboxWitness`（即没走 runInSandbox）
     // 就降记为 `UNCONTROLLED_EXTERNAL`，不允许「标了沙箱档」本身充当受控证据。
     // TASK-P0.1：同一个值既写入证据、也传给 deriveCanMerge（失败关闭）。
+    // TASK-P0.3a：对接见证有效性深度判定（挂载工作树对齐、via=exit 等）。
+    const rawWitness = this.sandboxWitnesses.get(contract.contract_id);
     const evidenceControlMode = resolveEvidenceControlMode(
       input.workerControlMode ?? contract.worker_spec.control_mode,
-      this.sandboxWitnesses.get(contract.contract_id),
+      rawWitness,
     );
 
     const bundle: EvidenceBundle = {
@@ -2459,6 +2461,8 @@ export class ContractOrchestrator {
       contract_revision: contract.contract_revision,
       generated_at: new Date().toISOString(),
       worker_control_mode: evidenceControlMode,
+      // TASK-P0.3a：采集沙箱见证原子落盘进 Evidence
+      ...(rawWitness !== undefined ? { sandbox_witness: rawWitness } : {}),
       usage:
         totals && totals.totalTokens > 0
           ? {
@@ -2498,6 +2502,9 @@ export class ContractOrchestrator {
           // TASK-P0.1：控制模式与合同版本进入派生门（缺失 / 不受控即 false）
           workerControlMode: evidenceControlMode,
           contractRevision: contract.contract_revision,
+          // TASK-P0.3a：沙箱见证与工作树路径进入派生门（SANDBOX_ENFORCED 必须有效）
+          sandboxWitness: rawWitness,
+          worktreeRoot: worktreePath,
         }),
         summary: input.summary,
         ...(input.reasonCode === undefined

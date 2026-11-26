@@ -156,6 +156,15 @@ export type Verdict = z.infer<typeof verdictSchema>;
 /** 外部写入证据时使用的 verdict 类型：剥离派生字段 */
 export type DraftVerdict = Omit<Verdict, "can_merge">;
 
+export const sandboxWitnessSchema = z.object({
+  host_kind: z.string().min(1),
+  via: z.enum(["exit", "timeout", "SIGKILL", "rejected"]),
+  exit_code: z.number().int().nullable(),
+  duration_ms: z.number().nonnegative(),
+  worktree_root: z.string().min(1),
+});
+export type SandboxWitness = z.infer<typeof sandboxWitnessSchema>;
+
 export const manualConfirmationRecordSchema = z.object({
   actor: z.string().min(1),
   confirmed_at: z.string().min(1),
@@ -184,6 +193,11 @@ export const evidenceBundleSchema = z
     worker_control_mode: z
       .enum(["GATEWAY_ENFORCED", "SANDBOX_ENFORCED", "UNCONTROLLED_EXTERNAL"])
       .optional(),
+    /**
+     * TASK-P0.3a: 沙箱执行见证（向后兼容旧证据；可选字段）。
+     * 当 worker_control_mode 为 SANDBOX_ENFORCED 时，必须提供合法有效见证才允许合并。
+     */
+    sandbox_witness: sandboxWitnessSchema.optional(),
     generated_at: z.string(),
     usage: usageSchema,
     worktree_snapshot: worktreeSnapshotSchema,
@@ -243,6 +257,21 @@ export const evidenceBundleSchema = z
         blocking.push("scope_audit.budget_exhausted");
       if (bundle.scope_audit.forbidden_violations.length > 0)
         blocking.push("scope_audit.forbidden_violations");
+      if (bundle.worker_control_mode === "SANDBOX_ENFORCED") {
+        if (!bundle.sandbox_witness) {
+          blocking.push("sandbox_witness.missing");
+        } else if (bundle.sandbox_witness.via !== "exit") {
+          blocking.push(`sandbox_witness.via(${bundle.sandbox_witness.via})`);
+        } else if (
+          !bundle.sandbox_witness.host_kind ||
+          bundle.sandbox_witness.host_kind === "unknown" ||
+          bundle.sandbox_witness.host_kind.toLowerCase().includes("unavailable")
+        ) {
+          blocking.push(
+            `sandbox_witness.host_kind(${bundle.sandbox_witness.host_kind})`,
+          );
+        }
+      }
       if (blocking.length > 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -296,6 +325,13 @@ export function deriveCanMerge(input: {
    * 在合并时独立重做（第二道封锁），本处只拒绝「版本不可确认」。
    */
   contractRevision?: number | undefined;
+  /**
+   * TASK-P0.3a：沙箱执行见证（`sandbox_witness`）。
+   * workerControlMode 为 SANDBOX_ENFORCED 时必填且必须合法有效，否则 fail-closed 返回 false。
+   */
+  sandboxWitness?: SandboxWitness | undefined | null;
+  /** TASK-P0.3a：任务工作树路径（用于校验 sandboxWitness 挂载路径） */
+  worktreeRoot?: string | undefined;
 }): boolean {
   // TASK-P0.1 第一道封锁（生成时）：控制模式缺失或不受控 → 不可合并
   if (
@@ -311,6 +347,43 @@ export function deriveCanMerge(input: {
     input.contractRevision < 1
   ) {
     return false;
+  }
+
+  // TASK-P0.3a 第一道封锁（生成时）：SANDBOX_ENFORCED 必须提供合法有效的 sandbox_witness
+  if (input.workerControlMode === "SANDBOX_ENFORCED") {
+    const sw = input.sandboxWitness;
+    if (!sw || typeof sw !== "object") {
+      return false;
+    }
+    if (sw.via !== "exit") {
+      return false;
+    }
+    const hk = sw.host_kind;
+    if (
+      !hk ||
+      typeof hk !== "string" ||
+      hk.trim() === "" ||
+      hk === "unknown" ||
+      hk.toLowerCase().includes("unavailable")
+    ) {
+      return false;
+    }
+    if (
+      !sw.worktree_root ||
+      typeof sw.worktree_root !== "string" ||
+      sw.worktree_root.trim() === ""
+    ) {
+      return false;
+    }
+    if (input.worktreeRoot !== undefined) {
+      const normW = sw.worktree_root.replace(/[\\/]+/g, "/").replace(/\/$/, "");
+      const normE = input.worktreeRoot
+        .replace(/[\\/]+/g, "/")
+        .replace(/\/$/, "");
+      if (normW !== normE && normW.toLowerCase() !== normE.toLowerCase()) {
+        return false;
+      }
+    }
   }
 
   if (input.manualConfirmationDeclared) {
