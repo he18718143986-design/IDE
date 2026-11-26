@@ -56,3 +56,9 @@ readonly 六文件（`tests/unit/untracked-scope-guard.test.ts`、`src/lib/contr
   - `npm run lint`：exit 0（0 errors）。
   - `npm run check:docs`：error 0。
   - `npm run check:knowledge`：`{"ok":true,"failures":[]}`。
+
+
+## 六、完工说明（P-326）
+
+- 施工 PR [#420](https://github.com/he18718143986-design/IDE/pull/420) squash `bf8d3b9ca1fd1247fe861953e14618b3c969de2c` 合入，由我执行。
+- 全量候选变更 Scope 审计已交付（统一审计函数、三检测点、PRE_MERGE 分支 diff 复核、rename 新旧路径均审）；P0 风险未宣称解除。
