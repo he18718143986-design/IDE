@@ -12607,3 +12607,196 @@ governance:
 * **取舍**：在网关层解析并追加白名单（方案 A），不动通用执行器 `runCommand`，不改已签发合同。错误码复用 J.59 两个，语义零漂移。
 * **立卡说明（2026-11-26 · P-321）**：Tina 审过方案（P-320 / #410）后授权立卡。**立卡 ≠ 开工**；施工顺序：立卡 PR 合入 → 代码 PR → 全绿报授权 → 重启 Daemon → `resume`→`execute`→`merge` 三步收尾。
 * **完工说明（2026-11-26 · P-322）**：Tina 选 A 按先例授权合并 [#412](https://github.com/he18718143986-design/IDE/pull/412)（由我执行）。施工 squash `a05b5bf6b96b53e77325ea07e8cd9b17cb967881`。**execute 命令路径解析产品 CLI 已交付**：`gateway.handleExecCommand` 内「2. Whitelist compilation」之后新增 2.5 段（`gateway.ts:1873-1927`），位置**晚于**威胁守卫、**早于** `runCommand`；解析结果含 Worktree 外绝对路径，先解析会被守卫按越界拒。**白名单前置**（Tina 拍板采纳的加固）：仅当原始命令串已在合同 `allowedCommands` 内才解析（`gateway.ts:1891`），否则 `stagent <任意参数>` 会借「已解析串自动入白名单」绕过合同授权；未授权命令原样交给 `runCommand` 精确匹配拒成 `E_UNAUTHORIZED_COMMAND`。改写仅限 `executable === "stagent"` 且已授权：`{executable: process.execPath, args: [包内 tsx, bin/stagent.ts, ...原 args]}`，`command`（审计/超时查表）保持原始串；已解析串 `ensureAllowedCommand` 入白名单（`:1926`）。解析失败 `E_COMMAND_NOT_RESOLVED` + `details.reason` 并在 `runCommand` 之前 return（不产生子进程）；`catch` 里 `ENOENT`/`EACCES` → `E_COMMAND_SPAWN_FAILED` + `details.spawn_code`（`:2072-2106`），不再埋进 `EXEC_ERROR`；常量从 `resolve-stagent-cli.ts:20-21` 导出。零漂移：`CommandSecurityError` → `E_UNAUTHORIZED_COMMAND`、检查体非零 → `E_VERIFICATION_FAILED` + `data.exitCode` 原样、非 `stagent` 逐字透传、未新增 `verificationResults.error_code`。相对父提交 4 文件 +418/−3（`gateway.ts` +86/−3、`resolve-stagent-cli.ts` +9 仅导出常量、新建测试 270 行/6 例、新建 ledger 56 行）；**readonly 五文件零 diff**（`command-runner.ts` / `illumination-verifier.ts` / `orchestrator.ts` / `contract.schema.ts` / `target-file-match.ts`）。本地：J.62 用例 6/6、相关三文件 50/50、`tests/unit` + `tests/daemon` 271 文件 2809 例全绿、`tsc` 0、eslint 0。CI 必需面全绿，Windows Unit 为存量 15 文件 / 24 例（`continue-on-error`，本卡用例在 Windows 上 6/6、`worker-mcp-tools` 29/29 全绿），`mergeStateStatus=UNSTABLE` 按先例不挡；Bugbot skipping。**真钥匙复测不在本卡验收**（`resume`→`execute`→`merge` 收尾待 Tina 点名）；端到端闭环未宣称。
+
+---
+
+### 3.4cc Evidence / Merge 失败关闭（P0.1 · 完工回写 P-325）
+
+> 立卡说明、卡号说明（审批 P0-1 ↔ `TASK-P0.1`）与两卡共用的审批边界原文留在 [`development-tasks-active.md`](./development-tasks-active.md#task-p0.2) §3.4cb（`TASK-P0.2` 仍在施工队列）。
+
+<a id="task-p0.1"></a>
+
+#### 【Task P0.1】Evidence / Merge Fail-Closed（控制模式 + 合同版本双重封锁）`[COMPLETED]`
+
+> **断点（main `a2fa9497df70785f6e4c9d939b74695181e19c44` 直读，审批方确认属实）**：
+> 1. `deriveCanMerge()` 无控制模式入参（`src/lib/evidence.schema.ts:264-300`），只看 `status` / `scopePassed` / `budgetExhausted` / `forbiddenViolationCount` / 人工确认；
+> 2. merger 只校验 `verdict.status` 与 `verdict.can_merge`（`daemon/pipeline/merger.ts:509-514`），不重核控制模式与 Evidence 合同版本；
+> 3. `orchestrator.ts:2400-2403` 写入 `worker_control_mode` 后，`orchestrator.ts:2432` 调 `deriveCanMerge` 时未传控制模式。
+>
+> **补充事实（直读，供施工参考，不扩卡）**：Evidence Schema 中 `contract_revision`（`evidence.schema.ts:173`）与 `worker_control_mode`（`evidence.schema.ts:184-186`）均为可选；`orchestrator.ts` 证据构造段（2392 起）**未写** `contract_revision`（全文件该字段只出现在 556 / 563 / 1261 / 1999 / 2008 行，均非证据写入），即现有证据普遍缺合同版本，落地后须由 orchestrator 写入、旧证据重验后方可合并。`deriveCanMerge` 另有调用点 `daemon/guard/baseline-gates.ts:327`。
+>
+> **错误契约直读结论（DoD 第 4 条）**：已直读 [`runtime-contract-and-safety.md`](./runtime-contract-and-safety.md) §2.3（拒绝码闭集与 Daemon 专属码表）与 §8.1（L3 执行期码闭集），并核对 `src/lib/error-codes.ts` 的 `ERROR_CODES`：**`E_EVIDENCE_REVISION_MISMATCH` 均未登记**（全仓仅有 `E_SCHEME_REVISION_MISMATCH` 与已删除的 `E_APPROVAL_REVISION_MISMATCH`，语义不同，不复用）。结论：**本卡新增该码，不是复用**；登记位置为 §8.1（与 `E_GATE_SCAN_FAILED` 同属合并前失败关闭码），§8.1 新增码须同步测试。merger 现有 `E_EVIDENCE_MISSING` / `E_EVIDENCE_MISMATCH` / `E_EVIDENCE_STALE` / `E_CANNOT_MERGE` 为 `MergeGateError` 字面量（`merger.ts:489-511`），亦未入 §8.1 表。**字段缺失（`contract_revision` 缺）是否复用 `E_EVIDENCE_REVISION_MISMATCH`、控制模式拒绝用哪个码，由施工 PR 在 §8.1 同一处写明，作为审查项；本卡不预判。**
+>
+> **候选提交绑定（DoD 第 6 条 · 卡内核实项）**：复用 `worktree_snapshot.head_sha`（`evidence.schema.ts:96`）/ `git_info.task_commit_sha` / `git_info.patch_fingerprint`（`evidence.schema.ts:132-137`），不重复造字段。施工中核实「Merge 候选提交与 Evidence 绑定提交是否一致、证据生成后分支是否再变、现有指纹是否覆盖」：已覆盖 → 施工记录写明并以测试证明；未覆盖 → 在本卡 `writable_paths` 内补重核，超出则记录具体缺口停工报审，不擅自扩大实现。
+>
+> **DoD（九条 · 审批方 2026-11-26 重述原文，逐字）**：
+> 1. `deriveCanMerge()` 对 `worker_control_mode === "UNCONTROLLED_EXTERNAL"` 一律 `can_merge=false`；对字段缺失同样 `can_merge=false`（fail-closed，缺失不视为受控）。
+> 2. `GATEWAY_ENFORCED`/`SANDBOX_ENFORCED` 进入正常验收逻辑；卡面注明该字符串不构成执行受控的真实性证明，SandboxWitness 深层验证列入 P0-3 不在本卡。
+> 3. `contract_revision` 采 merger 缺失即拒（不改 Schema 必填）：旧证据可读、可展示、不可合并；新证据必填合同版本；Merge 时重新比对，不依赖生成时判断。
+> 4. `E_EVIDENCE_REVISION_MISMATCH` 可用于版本不符；字段缺失是否复用该码在错误契约文档中写明（先直读 `runtime-contract-and-safety.md` 再定，不预判）。
+> 5. 双重封锁：`deriveCanMerge`（生成时）与 merger（合并时）两处独立校验控制模式与合同版本，任一缺失即拒。
+> 6. 候选提交绑定列为卡内核实项：`head_sha`/`task_commit_sha`/`patch_fingerprint` 是否覆盖「证据生成后分支再变」的场景，核实结论写进施工记录，若缺则在卡面范围内补重核。
+> 7. 负向测试：`UNCONTROLLED_EXTERNAL` 证据不可合并；缺失 `worker_control_mode` 不可合并；缺失/不符 `contract_revision` 不可合并。
+> 8. 既有受控证据（`GATEWAY_ENFORCED` + 版本齐全）合并路径零回归。
+> 9. 合同 revision 递增语义不变；不改 Schema 兼容面；不接容器、不动 Gateway。
+>
+> **审批时一并采纳的修订要点（上一轮审批原话归纳，与 DoD 并列生效）**：验收测试须证明**构造 `PASSED + can_merge=true` 的异常 Evidence 也不能绕过 Merger**；合同 revision 缺失或不可确认走明确异常路径，不得默认放行；Sandbox 放行不被误认为容器级合同权限审计已完成。
+
+```yaml task-card
+id: TASK-P0.1
+status: COMPLETED
+contract:
+  intent:
+    title: Evidence / Merge Fail-Closed（控制模式 + 合同版本双重封锁）
+    description: >-
+      做完后，不受控（UNCONTROLLED_EXTERNAL）或缺控制模式的证据、缺合同版本或版本不符的证据都不能合并：
+      生成证据时 deriveCanMerge 拒绝，合并时 merger 读真实 Evidence Snapshot 再独立重核一次，任一缺失即拒；
+      构造的 PASSED + can_merge=true 异常证据也绕不过 merger。旧证据可读、可展示、不可合并。
+      既有受控证据（GATEWAY_ENFORCED + 版本齐全）合并路径零回归。不改 Schema 兼容面，不接容器，不动 Gateway。
+    risk_level: HIGH
+  acceptance:
+    - id: P01-P1
+      check: auto
+      text: >-
+        deriveCanMerge() 对 worker_control_mode === "UNCONTROLLED_EXTERNAL" 一律 can_merge=false；
+        对字段缺失同样 can_merge=false（fail-closed，缺失不视为受控）。
+    - id: P01-P2
+      check: auto
+      text: >-
+        GATEWAY_ENFORCED/SANDBOX_ENFORCED 进入正常验收逻辑；卡面注明该字符串不构成执行受控的真实性证明，
+        SandboxWitness 深层验证列入 P0-3 不在本卡。
+    - id: P01-P3
+      check: auto
+      text: >-
+        contract_revision 采 merger 缺失即拒（不改 Schema 必填）：旧证据可读、可展示、不可合并；新证据必填合同版本；
+        Merge 时重新比对，不依赖生成时判断。
+    - id: P01-P4
+      check: auto
+      text: >-
+        E_EVIDENCE_REVISION_MISMATCH 可用于版本不符；字段缺失是否复用该码在错误契约文档中写明
+        （先直读 runtime-contract-and-safety.md 再定，不预判）。
+    - id: P01-P5
+      check: auto
+      text: >-
+        双重封锁：deriveCanMerge（生成时）与 merger（合并时）两处独立校验控制模式与合同版本，任一缺失即拒。
+    - id: P01-P6
+      check: auto
+      text: >-
+        候选提交绑定列为卡内核实项：head_sha/task_commit_sha/patch_fingerprint 是否覆盖「证据生成后分支再变」的场景，
+        核实结论写进施工记录，若缺则在卡面范围内补重核。
+    - id: P01-P7
+      check: auto
+      text: >-
+        负向测试：UNCONTROLLED_EXTERNAL 证据不可合并；缺失 worker_control_mode 不可合并；缺失/不符 contract_revision 不可合并。
+    - id: P01-P8
+      check: auto
+      text: >-
+        既有受控证据（GATEWAY_ENFORCED + 版本齐全）合并路径零回归。
+    - id: P01-P9
+      check: auto
+      text: >-
+        合同 revision 递增语义不变；不改 Schema 兼容面；不接容器、不动 Gateway。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/lib/evidence.schema.ts
+      - daemon/pipeline/orchestrator.ts
+      - daemon/pipeline/merger.ts
+      - daemon/guard/baseline-gates.ts
+      - src/lib/error-codes.ts
+      - docs/specs/runtime-contract-and-safety.md
+      - tests/daemon/p0-1-evidence-merge-fail-closed.test.ts
+      - tests/unit/evidence-schema-v11.test.ts
+      - tests/unit/baseline-gates.test.ts
+      - tests/unit/error-codes-mapping.test.ts
+      - tests/daemon/merger.test.ts
+      - tests/daemon/merger-d2b-gates.test.ts
+      - docs/ledger/p0-1-evidence-merge-fail-closed.md
+    readonly_paths:
+      - src/lib/contract.schema.ts
+      - daemon/worker/worker-adapter.interface.ts
+      - daemon/guard/evidence-integrity.ts
+      - daemon/mcp/gateway.ts
+      - docs/specs/evidence-and-acceptance-criteria.md
+  verification:
+    commands:
+      - { alias: p01-unit, executable: npx, args: [vitest, run, tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, tests/unit/evidence-schema-v11.test.ts, tests/unit/baseline-gates.test.ts, tests/unit/error-codes-mapping.test.ts, tests/daemon/merger.test.ts, tests/daemon/merger-d2b-gates.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) deriveCanMerge 增控制模式与合同版本入参：UNCONTROLLED_EXTERNAL 或缺失 → false；GATEWAY_ENFORCED/SANDBOX_ENFORCED 进正常逻辑（字符串不构成受控证明）。
+    2) orchestrator 写证据时写入 contract_revision 并把控制模式传给 deriveCanMerge；baseline-gates 调用点同步。
+    3) merger 在 E_CANNOT_MERGE 判定前后读真实 Evidence Snapshot，独立重核控制模式与 contract_revision（缺失即拒、与当前合同 revision 比对），不信任快照里的 can_merge。
+    4) 在 runtime-contract-and-safety.md §8.1 登记 E_EVIDENCE_REVISION_MISMATCH，并写明字段缺失与控制模式拒绝用码。
+    5) 候选提交绑定核实写入 docs/ledger/p0-1-evidence-merge-fail-closed.md；已覆盖以测试证明，未覆盖在卡内补重核，超卡停工报审。
+    6) 负向测试含构造 PASSED + can_merge=true 的异常证据被 merger 拒绝。Schema 字段可选性不变。
+  touches:
+    - { path: src/lib/evidence.schema.ts, change: modify, why: deriveCanMerge 增控制模式与合同版本入参并失败关闭；Schema 字段可选性不变, symbols: [deriveCanMerge] }
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: 证据写入 contract_revision；deriveCanMerge 调用传控制模式与合同版本, symbols: [] }
+    - { path: daemon/pipeline/merger.ts, change: modify, why: 合并时读真实 Evidence Snapshot 独立重核控制模式与合同版本（第二道封锁）, symbols: [] }
+    - { path: daemon/guard/baseline-gates.ts, change: modify, why: deriveCanMerge 第二调用点随签名同步, symbols: [] }
+    - { path: src/lib/error-codes.ts, change: modify, why: 新增码如需入目录则登记；不入目录则零 diff 并在施工记录说明, symbols: [] }
+    - { path: docs/specs/runtime-contract-and-safety.md, change: modify, why: §8.1 登记 E_EVIDENCE_REVISION_MISMATCH，写明字段缺失与控制模式拒绝用码, symbols: [] }
+    - { path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, change: modify, why: 负向测试与双重封锁绕过测试, symbols: [] }
+    - { path: tests/unit/evidence-schema-v11.test.ts, change: modify, why: deriveCanMerge 新入参用例与 Schema 兼容面不变, symbols: [] }
+    - { path: tests/unit/baseline-gates.test.ts, change: modify, why: 调用点签名同步后回归, symbols: [] }
+    - { path: tests/unit/error-codes-mapping.test.ts, change: modify, why: 新增码入目录时同步映射断言, symbols: [] }
+    - { path: tests/daemon/merger.test.ts, change: modify, why: 既有受控证据合并路径零回归（夹具补 contract_revision 与控制模式）, symbols: [] }
+    - { path: tests/daemon/merger-d2b-gates.test.ts, change: modify, why: 夹具随新门禁同步，语义不变, symbols: [] }
+    - { path: docs/ledger/p0-1-evidence-merge-fail-closed.md, change: modify, why: 施工记录：候选提交绑定核实结论、用码结论、负向测试实跑记录, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: P01-P1, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: unit, case: "P01-P1：UNCONTROLLED_EXTERNAL 与控制模式缺失均 can_merge=false" }
+    - { acceptance_id: P01-P1, test_path: tests/unit/evidence-schema-v11.test.ts, level: unit, case: "P01-P1：控制模式缺失同样 can_merge=false" }
+    - { acceptance_id: P01-P2, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: unit, case: "P01-P2：GATEWAY_ENFORCED / SANDBOX_ENFORCED 进入正常验收逻辑" }
+    - { acceptance_id: P01-P3, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: unit, case: "P01-P3：合同版本缺失时 can_merge=false" }
+    - { acceptance_id: P01-P4, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: unit, case: "P01-P4：新证据写入合同版本与受控档位" }
+    - { acceptance_id: P01-P5, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: unit, case: "P01-P5：contract_revision 缺失或不符" }
+    - { acceptance_id: P01-P6, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: unit, case: "P01-P6：构造 UNCONTROLLED_EXTERNAL + PASSED + can_merge=true 的异常证据，绕不过 merger" }
+    - { acceptance_id: P01-P7, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: unit, case: "P01-P7：旧证据缺 contract_revision" }
+    - { acceptance_id: P01-P8, test_path: tests/daemon/merger.test.ts, level: unit, case: "AUDITED + PASSED 时执行 squash merge" }
+    - { acceptance_id: P01-P8, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: unit, case: "P01-P8：受控证据（GATEWAY_ENFORCED + 版本齐全）合并路径零回归" }
+    - { acceptance_id: P01-P9, test_path: tests/unit/evidence-schema-v11.test.ts, level: unit, case: "P01-P9：Schema 兼容面不变" }
+governance:
+  spec_refs:
+    - docs/specs/runtime-contract-and-safety.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+  depends_on: []
+  code_facts:
+    - { ref: "src/lib/evidence.schema.ts:264-300", note: "deriveCanMerge 入参无控制模式与合同版本" }
+    - { ref: "src/lib/evidence.schema.ts:173", note: "Evidence contract_revision 为可选字段" }
+    - { ref: "src/lib/evidence.schema.ts:184-186", note: "Evidence worker_control_mode 为可选三值枚举" }
+    - { ref: "src/lib/evidence.schema.ts:132-137", note: "git_info：base_commit_sha / task_commit_sha / patch_fingerprint（候选提交绑定复用）" }
+    - { ref: "src/lib/evidence.schema.ts:96", note: "worktree_snapshot.head_sha" }
+    - { ref: "daemon/pipeline/merger.ts:509-514", note: "merger 只校验 verdict.status 与 can_merge，不重核控制模式与合同版本" }
+    - { ref: "daemon/pipeline/orchestrator.ts:2400-2403", note: "证据写入 worker_control_mode（resolveEvidenceControlMode 降记）" }
+    - { ref: "daemon/pipeline/orchestrator.ts:2432-2440", note: "deriveCanMerge 调用未传控制模式；证据构造段未写 contract_revision" }
+    - { ref: "daemon/guard/baseline-gates.ts:327-332", note: "deriveCanMerge 第二调用点" }
+    - { ref: "docs/specs/runtime-contract-and-safety.md:249-270", note: "§8.1 L3 闭集未登记 E_EVIDENCE_REVISION_MISMATCH" }
+    - { ref: "src/lib/error-codes.ts:20-50", note: "ERROR_CODES 未含 E_EVIDENCE_REVISION_MISMATCH" }
+  non_goals:
+    - 不改 Evidence Schema 必填与兼容面（contract_revision / worker_control_mode 仍为可选，缺失由门禁拒绝）
+    - 不做 SandboxWitness 深层验证、不接容器（P0-3，本轮不立卡）
+    - 不动 Gateway 逐文件校验
+    - 不做全量候选 Scope 审计（TASK-P0.2）
+    - 不做独立验收（P0-4，本轮不立卡）
+    - 不改合同 revision 递增语义
+    - 候选提交绑定未覆盖时不擅自扩大实现到卡外
+  fail:
+    - 控制模式缺失或合同版本缺失时默认放行
+    - 只改生成时一道门、merger 仍只信快照里的 can_merge
+    - 构造 PASSED + can_merge=true 的异常证据能绕过 merger
+    - 把 GATEWAY_ENFORCED / SANDBOX_ENFORCED 字符串当作执行受控已证明，或把 Sandbox 放行说成容器级合同权限审计已完成
+    - 改 Schema 必填或兼容面
+    - 既有受控证据合并路径回归
+    - 未登记即使用新错误码，或未写明字段缺失用码
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 418, commit: dc225a051d2ca9bdeed575fd2b242ad177b6ea26 }
+```
+
+* **完工说明（2026-11-26 · P-325）**：Tina 选 A 按先例授权合并 [#418](https://github.com/he18718143986-design/IDE/pull/418)（由我执行）。施工 squash `dc225a051d2ca9bdeed575fd2b242ad177b6ea26`（2026-11-26 15:58 香港时间合入，父提交 `f83d001181a95aadeb559ecab97c02b9bd843bd2`）。**第一道封锁（生成时）**：`deriveCanMerge` 新增 `workerControlMode` / `contractRevision` 入参（`src/lib/evidence.schema.ts:265-311`）：控制模式非 `GATEWAY_ENFORCED`/`SANDBOX_ENFORCED`（含 `UNCONTROLLED_EXTERNAL` 与缺失）→ `false`；合同版本缺失 / 非正整数 → `false`。orchestrator 把 `contract_revision` 写进证据（`orchestrator.ts:2406`），并把写入证据的同一控制模式值传给派生门（`:2396-2399`、`:2446-2447`）；`baseline-gates.ts:330` 调用点补受控合成输入（该函数只隔离评估退出码贡献）。**第二道封锁（合并时）**：merger 在 `PASSED`/`can_merge` 基本判定之后调 `assertEvidenceControlAndRevision`（`merger.ts:106-131`，调用点 `:590`），读磁盘 Evidence Snapshot 独立重核控制模式与合同版本，不信任快照里的 `can_merge`。**用码**（`runtime-contract-and-safety.md` §8.1 `:267`、`:271-274` 同一处写明）：版本不符与字段缺失用新增 `E_EVIDENCE_REVISION_MISMATCH`（登记 `ERROR_CODES`，归 `EVIDENCE_STALE`）；控制模式拒绝用既有 `E_CANNOT_MERGE`；候选提交不一致用既有 `E_EVIDENCE_STALE`。**Schema 兼容面不变**：两字段仍可选、superRefine 未改；旧证据可读、可展示、不可合并。**候选提交绑定核实（DoD 第 6 条）**：现有指纹覆盖 Worktree HEAD，但 merger squash 的是任务分支 ref；Worktree detach 后移动分支 ref 时指纹仍一致而合并对象已换——**缺口属实**，按卡内授权在 `merger.ts` 补 `assertCandidateCommitBound`（`:138-158`，调用点 `:665`）：分支 tip 必须同时等于 `worktree_snapshot.head_sha` 与 `git_info.task_commit_sha`，读不到 tip 也拒；未新增证据字段。结论见 [`../ledger/p0-1-evidence-merge-fail-closed.md`](../ledger/p0-1-evidence-merge-fail-closed.md)。**负向测试实跑**：新建 `tests/daemon/p0-1-evidence-merge-fail-closed.test.ts` 13 例全过；端到端篡改磁盘快照构造 `PASSED + can_merge=true` 异常证据（伪造 `UNCONTROLLED_EXTERNAL` / 控制模式缺失 / 版本缺失 / 版本不符 / 分支被移走）全部被拒，主干 HEAD 不动、合同仍 `AUDITED`；**反证**：临时去掉 merger 两处新调用后 5 条端到端负向用例全部失败，证明改动前这些路径确实能绕过 merger。相对父提交 11 文件 +710/−15；13 条 `writable_paths` 实动 11 个（`tests/daemon/merger.test.ts` / `tests/daemon/merger-d2b-gates.test.ts` 未改即通过，作零回归证据）；**readonly 五文件零 diff**。本地：卡面 `p01-unit` 六文件 114 例全绿、`tsc --noEmit` 0、lint 0 error / 18 warn（与基线一致）、check:docs error 0。CI 必需面全绿（三平台 Lint/Typecheck、ubuntu/macOS Unit、Docs/Knowledge/Perf/Detect）；Windows Unit 为存量 15 文件 / 26 例（`continue-on-error`，与 #412 失败清单逐条一致、无新增；merger 两条为 CRLF 存量环境问题；本卡用例在 Windows 上 13/13 全绿），`mergeable_state=unstable` 按先例不挡；Cursor Bugbot neutral。诚实口径：**Evidence/Merge 失败关闭已交付（控制模式与合同版本双重封锁、候选提交绑定重核、负向测试实跑含反证）；独立审查验收已完成，P0 风险未宣称解除**。`GATEWAY_ENFORCED`/`SANDBOX_ENFORCED` 字符串仍不构成执行受控的真实性证明（SandboxWitness 深层验证属 P0-3，本轮不立卡）；Sandbox 放行不被误认为容器级合同权限审计已完成。
