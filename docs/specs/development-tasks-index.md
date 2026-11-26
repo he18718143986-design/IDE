@@ -238,6 +238,7 @@
 | `TASK-P0.3b-1` | `COMPLETED` | 容器文件系统 Scope 挂载规格生成纯函数、合法性校验与宿主占位（立卡 P-333；施工 #432 `dec17e1`；完工回写 P-334；估算 M；Worktree 根只读、`writable_paths` 独立 rw 挂载、tmpfs 遮蔽 `.git`、宿主侧占位文件、`MOUNT_SCOPE_INVALID` 错误码；17 个纯函数单测覆盖；执行接入属 P0.3b-2 未做，P0 风险未宣称解除） | [正文](./development-tasks-completed.md#task-p0.3b-1) · [方案讨论稿](../ledger/p0-3b-container-filesystem-scope-proposal.md) |
 | `TASK-P0.3b-2` | `COMPLETED` | DockerContainerHost 接入 Scope 挂载规格、集成负向测试与见证增强（立卡 P-333；施工 #434 `0a92eb7`；完工回写 P-335；估算 M；DockerContainerHost 接入挂载执行、两阶段挂载、真实容器负向测试写被拒 EACCES、见证记录 `mount_mode`/`mount_count` 与有效性断言；11 个无 Docker 单测覆盖；P0-3b 已交付核销，P0 风险未宣称解除） | [正文](./development-tasks-completed.md#task-p0.3b-2) · [方案讨论稿](../ledger/p0-3b-container-filesystem-scope-proposal.md) |
 | `TASK-P1.1` | `COMPLETED` | P0 独立验收与 Evidence 可信链专项复核（专项评估 · TASK-P1-EVAL · 立卡 P-336 · 交付 P-337；#437/`caadfbf`；纯文档评估型非施工型；六项交付物评审通过，后续三卡建议 P1.2/P1.3/P1.4 挂账待立；评估产出非施工交付，P0 风险未宣称解除） | [正文](./development-tasks-completed.md#task-p1.1) · [评估报告](../ledger/p1-eval-evidence-trust-chain-and-p0-acceptance.md) |
+| `TASK-P1.2` | `NEW_TASK` | Evidence Ed25519 签名与防篡改验签门禁（立卡 P-338 · 估算 M · P1-Highest · 原评估建议 P1-1；零外部运行时依赖原生 crypto、私钥权限 0400 独立存放、writeEvidence 规范化落盘即签名、merger PRE_MERGE 验签 fail-closed、Git Trailer 哈希与签名绑定、单元与负向集成测试；立卡 ≠ 开工，P0 风险未宣称解除；P1.3/P1.4 挂账待立硬依赖 P1.2） | [正文](./development-tasks-active.md#task-p1.2) · [评估报告](../ledger/p1-eval-evidence-trust-chain-and-p0-acceptance.md) |
 
 ---
 
