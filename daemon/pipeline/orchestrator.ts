@@ -11,6 +11,7 @@ import {
   deriveCanMerge,
   type ManualConfirmationRecord,
   type EvidenceBundle,
+  type TestIntegrityEvidence,
 } from "../../src/lib/evidence.schema";
 import { ContractStore } from "./contract-store";
 import { ScopedWorktreeGateway } from "../mcp/gateway";
@@ -51,7 +52,11 @@ import {
 } from "../guard/assertion-identity";
 import { CostMonitor } from "../guard/cost-monitor";
 import { LoopGuard } from "../guard/loop-guard";
-import { isTestPath } from "../guard/test-integrity";
+import {
+  isTestPath,
+  classifyTouchedTestPaths,
+  executeBaselineRerun,
+} from "../guard/test-integrity";
 import {
   evaluateBaselineGateResults,
   injectBaselineGateCommands,
@@ -64,6 +69,7 @@ import {
   InvalidStateTransitionError,
 } from "../core/contract-mutex";
 import { killProcessTree } from "../runner/process-tree";
+import { runCommand } from "../runner/command-runner";
 import type { DeadlockResilience } from "../state/deadlock-resilience";
 import { writeStateFile } from "../guard/state-store";
 import {
@@ -1234,6 +1240,96 @@ export class ContractOrchestrator {
     const modifiedFiles = [...gateway.getModifiedFiles()];
     const testsModified =
       gateway.wasTestsModified() || worktreeChanged.some(isTestPath);
+
+    // TASK-P0.4: 测试分类与基线隔离重跑
+    const baseRef = current.authorization.git.base_branch || "main";
+    const gitRunner = async (args: string[], cwd: string) => {
+      return await execGit(args, cwd);
+    };
+
+    const testClassification = await classifyTouchedTestPaths({
+      worktreePath,
+      baseRef,
+      candidatePaths: [...worktreeChanged, ...modifiedFiles],
+      gitRunner,
+    });
+
+    const allowTestMutation =
+      current.authorization.execution_permissions
+        ?.allow_baseline_test_mutation === true;
+
+    const testIntegrityEvidence: TestIntegrityEvidence = {
+      tests_modified:
+        testsModified ||
+        testClassification.hasExistingTestMutation ||
+        testClassification.addedTests.length > 0,
+      modified_existing_tests: testClassification.modifiedExistingTests,
+      deleted_existing_tests: testClassification.deletedExistingTests,
+      added_tests: testClassification.addedTests,
+      exemption: allowTestMutation,
+      baseline_rerun_triggered: false,
+      baseline_rerun_passed: true,
+      restored_paths: [],
+      weakened_tests: testClassification.weakenedTests,
+    };
+
+    let testBaselineFailureCode:
+      "E_TEST_BASELINE_REGRESSION" | "E_TEST_BASELINE_UNAVAILABLE" | undefined;
+    let testBaselineFailureReason: string | undefined;
+
+    if (testClassification.hasExistingTestMutation && !allowTestMutation) {
+      const rerunRes = await executeBaselineRerun({
+        worktreePath,
+        baseRef,
+        classification: testClassification,
+        verificationCommands: current.verification_spec.commands,
+        gitRunner,
+        runCommand: async (cmd) => {
+          try {
+            const res = await runCommand(cmd.executable, {
+              cwd: worktreePath,
+              argv: { executable: cmd.executable, args: cmd.args },
+              timeoutMs: (cmd.timeoutSeconds ?? 30) * 1000,
+            });
+            return {
+              exitCode: res.exitCode,
+              stdout: res.stdout,
+              stderr: res.stderr,
+              timedOut: res.timedOut,
+            };
+          } catch (err: unknown) {
+            const errorObj = err as {
+              code?: number | string;
+              message?: string;
+              stdout?: string;
+              stderr?: string;
+            };
+            const isEnoent = errorObj.code === "ENOENT";
+            return {
+              exitCode:
+                typeof errorObj.code === "number"
+                  ? errorObj.code
+                  : isEnoent
+                    ? 127
+                    : 1,
+              stdout: errorObj.stdout ?? "",
+              stderr: errorObj.stderr ?? errorObj.message ?? String(err),
+              timedOut: false,
+            };
+          }
+        },
+      });
+
+      testIntegrityEvidence.baseline_rerun_triggered = rerunRes.triggered;
+      testIntegrityEvidence.baseline_rerun_passed = rerunRes.passed;
+      testIntegrityEvidence.restored_paths = rerunRes.restored_paths;
+      if (!rerunRes.passed) {
+        testIntegrityEvidence.failure_code = rerunRes.failure_code;
+        testIntegrityEvidence.failure_reason = rerunRes.failure_reason;
+        testBaselineFailureCode = rerunRes.failure_code;
+        testBaselineFailureReason = rerunRes.failure_reason;
+      }
+    }
     const zeroCommands = verificationResults.length === 0;
     const baselineRequired = current.verification_spec.commands.some(
       (command) => isBaselineGateAlias(command.alias),
@@ -1275,6 +1371,7 @@ export class ContractOrchestrator {
 
     // 端口冲突属于环境问题，不按断言失败处理：BLOCKED + E_PORT_CONFLICT，
     // 由用户清理端口后重跑，而不是让 Worker 误以为用例写错去改代码。
+    const testBaselineBlocked = Boolean(testBaselineFailureCode);
     const status = interceptorBlocked
       ? "BLOCKED"
       : threatBlocked
@@ -1283,13 +1380,17 @@ export class ContractOrchestrator {
           ? "BLOCKED"
           : zeroCommandsBlocked
             ? "BLOCKED"
-            : baselineBlocked
-              ? "FAILED"
-              : allPassed
-                ? "PASSED"
-                : tripped
-                  ? "BLOCKED"
-                  : "FAILED";
+            : testBaselineBlocked
+              ? testBaselineFailureCode === "E_TEST_BASELINE_UNAVAILABLE"
+                ? "BLOCKED"
+                : "FAILED"
+              : baselineBlocked
+                ? "FAILED"
+                : allPassed
+                  ? "PASSED"
+                  : tripped
+                    ? "BLOCKED"
+                    : "FAILED";
     const knowledgeFailed = verificationResults.some(
       (r) => !r.passed && r.alias === "check-knowledge",
     );
@@ -1301,17 +1402,21 @@ export class ContractOrchestrator {
           ? ("UNSAFE_EXECUTION" as const)
           : zeroCommandsBlocked
             ? undefined
-            : baselineBlocked
-              ? ("UNSAFE_EXECUTION" as const)
-              : allPassed
-                ? undefined
-                : costMonitor.isTripped()
-                  ? ("BUDGET_EXHAUSTED" as const)
-                  : loopGuard.isTripped()
-                    ? ("VERIFICATION_RETRY_LIMIT" as const)
-                    : knowledgeFailed
-                      ? ("KNOWLEDGE_DRIFT" as const)
-                      : ("UNSAFE_EXECUTION" as const);
+            : testBaselineBlocked
+              ? testBaselineFailureCode === "E_TEST_BASELINE_REGRESSION"
+                ? ("TEST_WEAKENED" as const)
+                : ("UNSAFE_EXECUTION" as const)
+              : baselineBlocked
+                ? ("UNSAFE_EXECUTION" as const)
+                : allPassed
+                  ? undefined
+                  : costMonitor.isTripped()
+                    ? ("BUDGET_EXHAUSTED" as const)
+                    : loopGuard.isTripped()
+                      ? ("VERIFICATION_RETRY_LIMIT" as const)
+                      : knowledgeFailed
+                        ? ("KNOWLEDGE_DRIFT" as const)
+                        : ("UNSAFE_EXECUTION" as const);
 
     const evidence = await this.writeEvidence(
       current,
@@ -1333,17 +1438,20 @@ export class ContractOrchestrator {
               ? `验证被端口占用阻断（${portConflictAliases.join(", ")}）：这是环境冲突，不是断言失败。请停止占用端口的进程后重试`
               : zeroCommandsBlocked
                 ? "零命令合同处于兜底等待人工确认状态，未执行自动化验证"
-                : baselineBlocked
-                  ? `固定底线清单 fail-closed（${!baselineGate.ok ? baselineGate.reason : "unknown"}: ${!baselineGate.ok ? baselineGate.alias : "n/a"}）：缺项、未跑或退出码非 0，verdict 不得为 PASSED`
-                  : allPassed
-                    ? `All ${verificationResults.length} verification command(s) passed`
-                    : `Verification failed (${verificationResults.filter((r) => !r.passed).length} command(s))`,
+                : testBaselineBlocked
+                  ? `基线测试隔离重跑阻断（${testBaselineFailureCode}: ${testBaselineFailureReason}）`
+                  : baselineBlocked
+                    ? `固定底线清单 fail-closed（${!baselineGate.ok ? baselineGate.reason : "unknown"}: ${!baselineGate.ok ? baselineGate.alias : "n/a"}）：缺项、未跑或退出码非 0，verdict 不得为 PASSED`
+                    : allPassed
+                      ? `All ${verificationResults.length} verification command(s) passed`
+                      : `Verification failed (${verificationResults.filter((r) => !r.passed).length} command(s))`,
         verificationResults,
         // 由 TASK-W.2b 的未跟踪文件审计派生，不再写死 true
         scopePassed: postVerifyScope.passed,
         forbiddenViolations: [],
         modifiedFiles,
         testsModified,
+        testIntegrity: testIntegrityEvidence,
         ...(this.graveyardGates.has(contractId)
           ? {
               graveyardCheck: this.graveyardGates.get(contractId)!.availability,
@@ -2412,6 +2520,8 @@ export class ContractOrchestrator {
       modifiedFiles: string[];
       /** 本任务是否修改过测试文件（写入 Evidence 供核销人预警复核） */
       testsModified?: boolean;
+      /** TASK-P0.4: 测试完整性快照与基线重跑结果 */
+      testIntegrity?: TestIntegrityEvidence;
       manualConfirmationRecord?: ManualConfirmationRecord;
       /**
        * TASK-W.4：运行时降级后 Evidence 记录实际控制模式。
@@ -2505,6 +2615,8 @@ export class ContractOrchestrator {
           // TASK-P0.3a：沙箱见证与工作树路径进入派生门（SANDBOX_ENFORCED 必须有效）
           sandboxWitness: rawWitness,
           worktreeRoot: worktreePath,
+          // TASK-P0.4: 测试完整性快照
+          testIntegrity: input.testIntegrity,
         }),
         summary: input.summary,
         ...(input.reasonCode === undefined
@@ -2539,6 +2651,9 @@ export class ContractOrchestrator {
           passed: r.passed,
         })),
       tests_modified: input.testsModified ?? false,
+      ...(input.testIntegrity !== undefined
+        ? { test_integrity: input.testIntegrity }
+        : {}),
       ...(input.manualConfirmationRecord === undefined
         ? {}
         : { manual_confirmation: input.manualConfirmationRecord }),

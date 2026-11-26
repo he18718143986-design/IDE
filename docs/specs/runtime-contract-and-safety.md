@@ -265,6 +265,8 @@
 | `E_PROPOSAL_PREVIOUSLY_REJECTED` | 派工门禁 / 全量扫描 / CLI hook | §5.2 | 墓地卡（§5.1） | ✓（DEC-1） | `SCOPE_VIOLATION` |
 | `E_GATE_SCAN_FAILED` | 全量扫描无法读取完整 diff | 失败关闭：不进合并 | 「自动检查没跑完」 | ✓ | `PREPARATION_INTERRUPTED` |
 | `E_EVIDENCE_REVISION_MISMATCH`（TASK-P0.1） | merger 合并时重核 Evidence `contract_revision`：字段缺失（旧证据 / 版本不可确认）或与当前合同版本不符 | 失败关闭：不进合并；旧证据可读、可展示 | 「这份验收结论不是当前这版合同的，请重新验收」 | ✓ | `EVIDENCE_STALE` |
+| `E_TEST_BASELINE_REGRESSION`（TASK-P0.4） | POST_VERIFICATION / merger 基线隔离重跑失败（改码破坏既有基线测试） | 失败关闭：不进合并 | 「既有测试基线重跑失败，存在回归风险」 | 门禁码 | `TEST_WEAKENED` |
+| `E_TEST_BASELINE_UNAVAILABLE`（TASK-P0.4） | POST_VERIFICATION / merger 基线重跑环境故障（超时、依赖缺失等无法执行） | 失败关闭：不进合并 | 「基线测试重跑环境不可用」 | 门禁码 | `UNSAFE_EXECUTION` |
 | `E_SCHEME_SNAPSHOT_NOT_FOUND` / `E_SCHEME_SNAPSHOT_MISMATCH` | 派工绑定（复用 L2 Daemon 专属码） | 不签发 `exec_token` | 「方案快照对不上，需要重新确认」 | L2 表 | （签署/派工归因，不写入执行期 evidence 主码） |
 | `E_DISPUTE_TIMEOUT` | 质询看门狗 | 熔断 | 见 playtest-self-check | ✓ | `BUDGET_EXHAUSTED` |
 
@@ -272,6 +274,12 @@
 - **`contract_revision` 字段缺失复用 `E_EVIDENCE_REVISION_MISMATCH`**（缺失即「无法确认与当前合同一致」，与版本不符同一处理）；不另立码。
 - **控制模式拒绝（`worker_control_mode` 缺失、`UNCONTROLLED_EXTERNAL` 或未知值）用 `E_CANNOT_MERGE`**——沿用 merger 既有「证据不可合并」字面量（与 `E_EVIDENCE_MISSING` / `E_EVIDENCE_MISMATCH` 同属 `MergeGateError` 字面量，不入 `ERROR_CODES`），不新增码。`GATEWAY_ENFORCED` / `SANDBOX_ENFORCED` 字符串只是证据记档，**不构成执行受控的真实性证明**；SandboxWitness 深层验证属 P0-3。
 - **候选提交绑定不一致（任务分支 tip ≠ 证据 `worktree_snapshot.head_sha` / `git_info.task_commit_sha`，或读不到分支 tip）用 `E_EVIDENCE_STALE`**（既有码）。
+
+**测试完整性门禁用码（TASK-P0.4，防范 Worker 篡改/删除既有测试）**：
+- **`E_TEST_BASELINE_REGRESSION`**：Worker 修改或删除既有测试文件，在仅还原被改/删既有测试文件的基线隔离重跑中执行失败（退出码非 0 或断言失败），fail-closed 阻断合并。
+- **`E_TEST_BASELINE_UNAVAILABLE`**：基线重跑环境故障（命令超时、node_modules 缺失、找不到可执行程序等无法执行），fail-closed 阻断合并。
+- 两码在 `src/lib/error-codes.ts` 登记为门禁专用错误码 `TEST_BASELINE_ERROR_CODES`，与既有 `MergeGateError` 协同，不改变 A §9.3 的 30 项通用执行期目录基数，保持 `tests/unit/error-codes-mapping.test.ts` 零回归。
+- 合同可通过 `execution_permissions.allow_baseline_test_mutation: true` 显式豁免；豁免时必须在 Evidence `test_integrity` 留痕（`exemption: true`），merger 在 `PRE_MERGE` 阶段从磁盘快照独立核验。
 
 **全量候选变更审计用码（TASK-P0.2，审批方 2026-11-26 拍板 · 选 A 新旧路径均审）**：
 - **未跟踪文件越界**：沿用既有 **`E_OUT_OF_SCOPE_UNTRACKED`** 码（§8.1 + `ERROR_CODES`），保留 `tests/unit/untracked-scope-guard.test.ts` 零回归。

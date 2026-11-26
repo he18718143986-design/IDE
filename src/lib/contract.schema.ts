@@ -191,6 +191,8 @@ export const executionPermissionsSchema = z.object({
   editor_command_template: z.string().optional(), // 参数化模板，禁止 shell 拼接
   env_file_grants: z.array(envFileGrantSchema).optional(),
   port_policy: portPolicySchema.optional(),
+  // TASK-P0.4: 显式豁免允许修改/删除基线测试文件
+  allow_baseline_test_mutation: z.boolean().optional(),
 });
 export type ExecutionPermissions = z.infer<typeof executionPermissionsSchema>;
 
@@ -766,6 +768,7 @@ export function createContractDraft(params: {
   currency?: string | undefined;
   pricingVersion?: string | undefined;
   accountingMode?: ContractAccountingMode | undefined;
+  allowBaselineTestMutation?: boolean | undefined;
   creator?: Creator | undefined;
   workerSpec?: Partial<WorkerSpec> | undefined;
   conversationRef?: ConversationRef | undefined;
@@ -843,6 +846,9 @@ export function createContractDraft(params: {
         allowed_environment_variable_names: [],
         network_policy: "DENY" as const,
         dependency_changes_allowed: false,
+        ...(params.allowBaselineTestMutation !== undefined
+          ? { allow_baseline_test_mutation: params.allowBaselineTestMutation }
+          : {}),
       },
     },
     verification_spec: {

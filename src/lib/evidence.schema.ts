@@ -174,6 +174,38 @@ export type ManualConfirmationRecord = z.infer<
   typeof manualConfirmationRecordSchema
 >;
 
+/**
+ * TASK-P0.4：测试完整性防护与基线重跑留痕（Test Integrity）。
+ * 记录修改/删除的既有测试路径、Worker 新增测试路径、基线隔离重跑结果与合同显式豁免留痕。
+ */
+export const testIntegrityEvidenceSchema = z.object({
+  /** 是否存在测试文件变动（修改、删除或新增） */
+  tests_modified: z.boolean(),
+  /** 被修改的既有测试文件列表 */
+  modified_existing_tests: z.array(z.string()).default([]),
+  /** 被删除的既有测试文件列表 */
+  deleted_existing_tests: z.array(z.string()).default([]),
+  /** Worker 新增的测试文件列表（不参与基线重跑） */
+  added_tests: z.array(z.string()).default([]),
+  /** 合同显式豁免 allow_baseline_test_mutation 状态 */
+  exemption: z.boolean().default(false),
+  /** 是否触发了基线隔离重跑 */
+  baseline_rerun_triggered: z.boolean().default(false),
+  /** 基线重跑是否通过（若无需重跑或重跑成功为 true；测试破坏或环境不可用为 false） */
+  baseline_rerun_passed: z.boolean(),
+  /** 失败拒绝码（E_TEST_BASELINE_REGRESSION 或 E_TEST_BASELINE_UNAVAILABLE） */
+  failure_code: z
+    .enum(["E_TEST_BASELINE_REGRESSION", "E_TEST_BASELINE_UNAVAILABLE"])
+    .optional(),
+  /** 失败或不可用原因说明 */
+  failure_reason: z.string().optional(),
+  /** 还原参与基线重跑的测试文件列表 */
+  restored_paths: z.array(z.string()).default([]),
+  /** 检测到被弱化的测试列表（断言减少或增加 skip） */
+  weakened_tests: z.array(z.string()).default([]),
+});
+export type TestIntegrityEvidence = z.infer<typeof testIntegrityEvidenceSchema>;
+
 export const evidenceBundleSchema = z
   .object({
     evidence_id: z.string().min(1),
@@ -212,6 +244,8 @@ export const evidenceBundleSchema = z
      * 属已登记的规格外扩展（待 A 文档回写后转正）。
      */
     tests_modified: z.boolean().optional(),
+    /** TASK-P0.4: 测试完整性快照与基线重跑证据 */
+    test_integrity: testIntegrityEvidenceSchema.optional(),
     /**
      * 【非 §9.2 字段】人工确认留痕记录（G2 守卫条款 / 兜底语义）：
      * 零命令合同在完成人工确认记录（actor / confirmed_at / reason 齐全）后方可放行。
@@ -332,6 +366,11 @@ export function deriveCanMerge(input: {
   sandboxWitness?: SandboxWitness | undefined | null;
   /** TASK-P0.3a：任务工作树路径（用于校验 sandboxWitness 挂载路径） */
   worktreeRoot?: string | undefined;
+  /**
+   * TASK-P0.4：测试完整性防护（test_integrity）。
+   * 若修改或删除了既有测试文件且未获豁免，必须基线隔离重跑通过（baseline_rerun_passed === true）。
+   */
+  testIntegrity?: TestIntegrityEvidence | undefined | null;
 }): boolean {
   // TASK-P0.1 第一道封锁（生成时）：控制模式缺失或不受控 → 不可合并
   if (
@@ -381,6 +420,19 @@ export function deriveCanMerge(input: {
         .replace(/[\\/]+/g, "/")
         .replace(/\/$/, "");
       if (normW !== normE && normW.toLowerCase() !== normE.toLowerCase()) {
+        return false;
+      }
+    }
+  }
+
+  // TASK-P0.4 第一道封锁（生成时）：测试完整性检查
+  if (input.testIntegrity) {
+    const ti = input.testIntegrity;
+    const hasExistingMutation =
+      (ti.modified_existing_tests && ti.modified_existing_tests.length > 0) ||
+      (ti.deleted_existing_tests && ti.deleted_existing_tests.length > 0);
+    if (hasExistingMutation && !ti.exemption) {
+      if (!ti.baseline_rerun_passed) {
         return false;
       }
     }
