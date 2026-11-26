@@ -1861,3 +1861,251 @@ governance:
 <a id="task-p0.4"></a>
 
 > `TASK-P0.4` 已 **COMPLETED**（施工 [#426](https://github.com/he18718143986-design/IDE/pull/426) squash `191779e06e47097bf644a22f376042066197ae97`；立卡 P-327；完工回写 P-330）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-p0.4) §3.4cf。诚实口径：**测试篡改拦截与基线独立重跑已交付（默认 fail-closed、三边界、豁免留痕、merger 独立核验）；P0 风险未宣称解除**。此处保留两卡共用立卡说明与审批边界；P0-3b 容器文件系统 Scope 强制挂载（估算 L）继续挂账待评估。
+
+
+---
+
+### 3.4cd 容器文件系统 Scope 强制挂载：纯函数计算与执行接入（P0-3b-1 / P0-3b-2 · 立卡 P-333）
+
+> **立卡说明（2026-11-26 · P-333）**：授权来源为 Tina 拍板立卡拆分（方案拍板：两阶段挂载 + 宿主侧占位文件 + `.git` tmpfs 遮蔽；拆两张卡 `TASK-P0.3b-1` 与 `TASK-P0.3b-2`，估算均 M，硬依赖 P0.3b-1 → P0.3b-2；DoD 按方案八条 + 拍板写入；审批边界逐字写入；`writable_paths`/`readonly_paths` 按预估清单落卡，施工中超范围即停工修卡）。操作者由我执行。纯 docs 立卡，**立卡 ≠ 开工**，不改产品代码。两卡同一份 docs PR。
+>
+> **施工顺序锁定**：硬依赖 `TASK-P0.3b-1` → `TASK-P0.3b-2`。必须先完成 P0.3b-1 挂载规格生成纯函数、校验、宿主侧占位与单测，经审查验收合入后，再开工 P0.3b-2 执行接入。
+>
+> **审批边界（两卡共用，逐字写入）**：本审批不是代码合并批准，也不是 P0 风险解除声明。施工完成后仍需：独立审查实现与测试、负向测试实跑、全量回归、新增绕过路径检查、Evidence 与 Merge 实际裁决行为确认。施工 PR 全绿报授权，Windows 存量失败按先例报 UNSTABLE；范围外文件要动就停工修卡。
+
+<a id="task-p0.3b-1"></a>
+
+#### 【Task P0.3b-1】容器文件系统 Scope 挂载规格生成纯函数、合法性校验与宿主占位 `[NEW_TASK]`
+
+```yaml task-card
+id: TASK-P0.3b-1
+status: NEW_TASK
+contract:
+  intent:
+    title: 容器文件系统 Scope 挂载规格生成纯函数、合法性校验与宿主占位
+    description: >-
+      做完后，提供纯函数 resolveScopedMounts 将合同 scope.writable_paths 转换为细粒度挂载规格：
+      Worktree 根目录置为只读（:ro），writable_paths 逐个生成独立读写绑定挂载（:rw），
+      /work/.git 目录挂载 tmpfs 遮蔽隔离；若 writable_paths 包含尚未存在的新文件路径，提供宿主侧预创建空占位文件机制；
+      挂载规格进行路径逃逸、越出工作树、重复或嵌套冲突严格校验，失败 fail-closed 抛出新错误码 MOUNT_SCOPE_INVALID；
+      纯函数单测 100% 覆盖规格生成与校验异常拦截（无需 Docker 环境）。
+    risk_level: MEDIUM
+  acceptance:
+    - id: P03B1-P1
+      check: auto
+      text: >-
+        纯函数 resolveScopedMounts 准确将 worktreeRoot 与 writable_paths 计算为细粒度挂载规格：
+        容器内 worktree 根目录挂载为只读（:ro），writable_paths 列表逐项生成独立读写 bind mount（:rw）。
+    - id: P03B1-P2
+      check: auto
+      text: >-
+        .git 元数据隔离遮蔽：挂载规格中为 /work/.git 生成 tmpfs 挂载或只读隔离，断绝容器内读写宿主 Worktree Git 内部结构与指针。
+    - id: P03B1-P3
+      check: auto
+      text: >-
+        宿主侧占位文件预置机制：若 writable_paths 中包含尚未存在的目标文件路径，提供宿主侧预创建 0 字节空占位文件规格与辅助逻辑，
+        防止 Docker daemon 自动创建为目录导致文件挂载失败。
+    - id: P03B1-P4
+      check: auto
+      text: >-
+        挂载规格合法性校验与 fail-closed 错误码：对路径逃逸（.. 遍历）、越出 Worktree 根、非法字符、重复挂载或嵌套读写冲突进行前置校验，
+        校验失败抛出新错误码 MOUNT_SCOPE_INVALID 并拒绝生成挂载规格。
+    - id: P03B1-P5
+      check: auto
+      text: >-
+        无 Docker 环境的纯函数单测全面覆盖：规格生成（根只读 + 读写白名单 + .git 遮蔽）、路径校验异常（逃逸/越界/冲突等 fail-closed 抛 MOUNT_SCOPE_INVALID）
+        及占位文件计算；既有测试与门禁零回归。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/worker/sandbox/container-host.ts
+      - tests/unit/container-mount-scope.test.ts
+    readonly_paths:
+      - daemon/worker/cli-host/docker-container-host.ts
+      - daemon/pipeline/orchestrator.ts
+      - src/lib/contract.schema.ts
+      - daemon/pipeline/merger.ts
+      - daemon/pipeline/candidate-scope-audit.ts
+      - daemon/guard/test-integrity.ts
+      - daemon/worker/worker-adapter.interface.ts
+  verification:
+    commands:
+      - { alias: mount-scope-unit, executable: npx, args: [vitest, run, tests/unit/container-mount-scope.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) 在 container-host.ts 定义 ScopedMountSpec、MountEntry 接口与 MountMode（"scoped" | "readonly_enforced"）枚举，
+    扩充 SandboxRejectionCode 支持 "MOUNT_SCOPE_INVALID"。
+    2) 实现 resolveScopedMounts 纯函数：接收 worktreeRoot 与 writablePaths，对路径进行规范化与越界校验（禁止 ..、绝对路径越出 worktreeRoot、嵌套读写冲突）；
+    生成 worktreeRoot -> /work:ro 只读根挂载、tmpfs -> /work/.git 遮蔽挂载、以及各 writable_paths -> /work/<path>:rw 读写挂载。
+    3) 实现 prepareHostPlaceholders 辅助函数，在宿主文件系统上对不存在的 writable_paths 预建空文件。
+    4) 编写 tests/unit/container-mount-scope.test.ts，覆盖所有正向规格生成与负向路径校验拦截场景，不依赖 Docker 环境。
+  touches:
+    - { path: daemon/worker/sandbox/container-host.ts, change: modify, why: 导出 ScopedMountSpec、resolveScopedMounts 挂载计算纯函数与合法性校验，定义 MOUNT_SCOPE_INVALID, symbols: [resolveScopedMounts, prepareHostPlaceholders] }
+    - { path: tests/unit/container-mount-scope.test.ts, change: create, why: 挂载规格生成、.git 遮蔽、宿主占位、路径逃逸/越界/嵌套冲突异常拦截单测, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: P03B1-P1, test_path: tests/unit/container-mount-scope.test.ts, level: unit, debt: "未施工；纯函数单测待编写" }
+    - { acceptance_id: P03B1-P2, test_path: tests/unit/container-mount-scope.test.ts, level: unit, debt: "未施工；.git 遮蔽规格单测待编写" }
+    - { acceptance_id: P03B1-P3, test_path: tests/unit/container-mount-scope.test.ts, level: unit, debt: "未施工；宿主占位文件辅助单测待编写" }
+    - { acceptance_id: P03B1-P4, test_path: tests/unit/container-mount-scope.test.ts, level: unit, debt: "未施工；MOUNT_SCOPE_INVALID 异常校验单测待编写" }
+    - { acceptance_id: P03B1-P5, test_path: tests/unit/container-mount-scope.test.ts, level: unit, debt: "未施工；综合单测覆盖待执行" }
+governance:
+  spec_refs:
+    - docs/specs/runtime-contract-and-safety.md
+    - docs/ledger/p0-3b-container-filesystem-scope-proposal.md
+  depends_on: []
+  code_facts:
+    - { ref: "daemon/worker/cli-host/docker-container-host.ts:306-310", note: "现状为单一 worktree 根目录 bind mount 读写挂载（无 :ro）" }
+    - { ref: "daemon/worker/sandbox/container-host.ts:428-448", note: "runInSandbox 有 cwd 与 mount 白名单校验" }
+    - { ref: "daemon/worker/sandbox/container-host.ts:19-21", note: "SandboxRejectionCode 已有 MOUNT_OUTSIDE_WORKTREE / MOUNT_PROTECTED_PATH / MOUNT_PATH_TRAVERSAL" }
+  non_goals:
+    - 不在 P0.3b-1 接入 DockerContainerHost.run 执行（由 P0.3b-2 承接）
+    - 不在 P0.3b-1 改动 orchestrator / OpenHands adapter / CLI executor
+    - 不依赖 Docker daemon 运行环境（保持纯函数单测可跑）
+    - 不宣称容器硬件级安全或 P0 风险解除
+  fail:
+    - 允许包含 .. 或越出 worktreeRoot 的路径生成挂载规格
+    - 路径逃逸或嵌套冲突校验失败时未抛出 MOUNT_SCOPE_INVALID
+    - 挂载规格未将 worktree 根目录设为 :ro
+    - 挂载规格遗漏 /work/.git 的 tmpfs 遮蔽
+    - 单测依赖 Docker 环境导致无 Docker 机器报错
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **诚实口径**：**立卡 ≠ 开工 ≠ 交付**；本卡为纯函数与规格校验层设计，不宣称已具备容器内操作系统级只读隔离，不宣称 P0 风险解除。
+
+---
+
+<a id="task-p0.3b-2"></a>
+
+#### 【Task P0.3b-2】DockerContainerHost 接入 Scope 挂载规格、集成负向测试与见证增强 `[NEW_TASK]`
+
+```yaml task-card
+id: TASK-P0.3b-2
+status: NEW_TASK
+contract:
+  intent:
+    title: DockerContainerHost 接入 Scope 挂载规格、集成负向测试与见证增强
+    description: >-
+      做完后，DockerContainerHost.run 完整接入 P0.3b-1 的 resolveScopedMounts 挂载规格：
+      支持施工期细粒度 scoped 模式与验收期全量只读 readonly_enforced 模式；
+      集成负向测试在有 Docker 环境下验证容器写 Scope 外路径及 .git 均被操作系统物理拒绝（EACCES），写授权路径成功；
+      SandboxWitness 扩充记录实际生效的 mount_mode 与 mount_count，并在 verifySandboxWitness 中断言有效性；
+      STAGENT_DISABLE_CONTAINER 运维逃生门语义不变，既有 GATEWAY_ENFORCED 路径零回归。
+    risk_level: HIGH
+  acceptance:
+    - id: P03B2-P1
+      check: auto
+      text: >-
+        DockerContainerHost.run 接入挂载规格执行：施工阶段以 scoped 模式按授权路径挂载读写点；
+        验收阶段（mountMode === "readonly_enforced"）严格仅生成宿主根目录只读挂载（-v hostRoot:/work:ro）且无任何 :rw 挂载。
+    - id: P03B2-P2
+      check: auto
+      text: >-
+        集成负向阻断测试（有 Docker 环境）：容器内进程写 Scope 外只读路径物理失败抛 EACCES；
+        写 /work/.git 物理失败抛 EACCES 或只读被拒；写 writable_paths 内授权文件正常成功；
+        无 Docker 环境如实跳过并显式标注，严禁虚假断言。
+    - id: P03B2-P3
+      check: auto
+      text: >-
+        见证链记录挂载姿态：SandboxWitness 扩充 mount_mode（"scoped" | "readonly_enforced" | "legacy_full_rw"）
+        与 mount_count 字段，真实反映容器启动参数，并随 EvidenceBundle 原子落盘。
+    - id: P03B2-P4
+      check: auto
+      text: >-
+        verifySandboxWitness 增加模式有效性断言：校验 mount_mode 必须为受控已知模式，严禁伪造或非法姿态通过校验；
+        双重门禁（生成与合并阶段）持续 fail-closed 拦截。
+    - id: P03B2-P5
+      check: auto
+      text: >-
+        STAGENT_DISABLE_CONTAINER 运维逃生门语义不变：启用时记录 WARNING 并以 UNCONTROLLED_EXTERNAL 留痕，严禁冒认受控姿态。
+    - id: P03B2-P6
+      check: auto
+      text: >-
+        既有 GATEWAY_ENFORCED、生产 Daemon 装配及全部既有测试套件零回归；
+        诚实口径记录容器 OS 级只读能力边界，不宣称硬件级安全防护，不宣称 P0 风险解除。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/worker/cli-host/docker-container-host.ts
+      - daemon/worker/sandbox/container-host.ts
+      - daemon/pipeline/orchestrator.ts
+      - daemon/worker/cli-host/openhands-adapter.ts
+      - daemon/worker/sandbox/container-cli-executor.ts
+      - src/lib/evidence.schema.ts
+      - tests/unit/docker-container-host-mounts.test.ts
+      - tests/daemon/p0-3b-container-scope-fail-closed.test.ts
+    readonly_paths:
+      - src/lib/contract.schema.ts
+      - daemon/pipeline/merger.ts
+      - daemon/pipeline/candidate-scope-audit.ts
+      - daemon/guard/test-integrity.ts
+      - daemon/worker/worker-adapter.interface.ts
+  verification:
+    commands:
+      - { alias: docker-mounts-unit, executable: npx, args: [vitest, run, tests/unit/docker-container-host-mounts.test.ts] }
+      - { alias: p03b-daemon-test, executable: npx, args: [vitest, run, tests/daemon/p0-3b-container-scope-fail-closed.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) 扩展 SandboxRunInput 与 OpenHands/CLI adapter，支持传入 scope: { writable_paths: string[] } 与 mount_mode。
+    2) 修改 DockerContainerHost.run，调用 P0.3b-1 的 resolveScopedMounts 生成 docker 参数，在容器启动前执行 prepareHostPlaceholders；
+    生成 -v hostRoot:/work:ro、-v tmpfs 遮蔽以及各 writablePath 的 :rw 挂载参数。
+    3) 扩展 EvidenceBundle.sandbox_witness 及 SandboxWitness 接口，增加 mount_mode 与 mount_count；
+    container-host.ts 中 verifySandboxWitness 加入 mount_mode 有效性断言。
+    4) 编写 tests/unit/docker-container-host-mounts.test.ts 验证参数构建；
+    编写 tests/daemon/p0-3b-container-scope-fail-closed.test.ts 验证真实/集成容器下的写阻断、.git 阻断及合法写入。
+  touches:
+    - { path: daemon/worker/cli-host/docker-container-host.ts, change: modify, why: 接入 resolveScopedMounts 构建 scoped 与 readonly docker run 挂载参数，调用宿主占位, symbols: [DockerContainerHost] }
+    - { path: daemon/worker/sandbox/container-host.ts, change: modify, why: SandboxWitness 增加 mount_mode/mount_count，verifySandboxWitness 加断言, symbols: [verifySandboxWitness] }
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: 将合同 scope 传递给 worker adapter，验收阶段指定 readonly_enforced 模式, symbols: [] }
+    - { path: daemon/worker/cli-host/openhands-adapter.ts, change: modify, why: 适配器接线透传 scope 挂载参数, symbols: [] }
+    - { path: daemon/worker/sandbox/container-cli-executor.ts, change: modify, why: CLI 执行器透传 scope 挂载参数, symbols: [] }
+    - { path: src/lib/evidence.schema.ts, change: modify, why: 扩展 sandbox_witness 兼容存储 mount_mode 与 mount_count, symbols: [] }
+    - { path: tests/unit/docker-container-host-mounts.test.ts, change: create, why: docker run 挂载命令行参数生成单元测试, symbols: [] }
+    - { path: tests/daemon/p0-3b-container-scope-fail-closed.test.ts, change: create, why: 容器内文件系统 Scope 负向阻断、.git 保护与合法写入集成测试, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: P03B2-P1, test_path: tests/unit/docker-container-host-mounts.test.ts, level: unit, debt: "未施工；参数构建单测待编写" }
+    - { acceptance_id: P03B2-P2, test_path: tests/daemon/p0-3b-container-scope-fail-closed.test.ts, level: integration, debt: "未施工；容器端到端集成负向测试待编写（需 Docker 环境）" }
+    - { acceptance_id: P03B2-P3, test_path: tests/unit/docker-container-host-mounts.test.ts, level: unit, debt: "未施工；见证记录单元测试待编写" }
+    - { acceptance_id: P03B2-P4, test_path: tests/unit/container-witness-verify.test.ts, level: unit, debt: "未施工；verifySandboxWitness 模式断言测试待编写" }
+    - { acceptance_id: P03B2-P5, test_path: tests/daemon/p0-3b-container-scope-fail-closed.test.ts, level: integration, debt: "未施工；逃生门语义测试待编写" }
+    - { acceptance_id: P03B2-P6, test_path: tests/daemon/p0-3b-container-scope-fail-closed.test.ts, level: integration, debt: "未施工；GATEWAY 零回归与全量套件验证待执行" }
+governance:
+  spec_refs:
+    - docs/specs/runtime-contract-and-safety.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+    - docs/ledger/p0-3b-container-filesystem-scope-proposal.md
+  depends_on:
+    - { id: TASK-P0.3b-1, kind: hard }
+  code_facts:
+    - { ref: "daemon/worker/cli-host/docker-container-host.ts:306-310", note: "run 方法仅做单一 worktreeRoot rw 挂载" }
+    - { ref: "daemon/worker/sandbox/container-host.ts:168-175", note: "SandboxWitness 目前记录 host_kind、via、exit_code、duration_ms、worktree_root" }
+    - { ref: "daemon/pipeline/orchestrator.ts:1818", note: "orchestrator 在任务执行完毕后从 containerHost 采集 witness" }
+    - { ref: "daemon/pipeline/orchestrator.ts:2575", note: "writeEvidence 将 witness 写入 EvidenceBundle.sandbox_witness" }
+  non_goals:
+    - 不替代 merger.ts 与 candidate-scope-audit.ts 的合并前提交审计
+    - 不宣称硬件虚拟化安全或完全免疫内核提权漏洞
+    - 不改动既有 GATEWAY_ENFORCED 任务链路
+    - 不废弃 STAGENT_DISABLE_CONTAINER 逃生门
+  fail:
+    - 在 Docker 环境下容器写 Scope 外文件或 .git 成功且未抛 EACCES
+    - 验收阶段未将容器工作树设为全量只读（出现任何 :rw 挂载）
+    - 见证链遗漏 mount_mode 或允许非法 mount_mode 通过验证
+    - 破坏既有 GATEWAY_ENFORCED 任务合并或破坏生产装配
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **诚实口径**：**立卡 ≠ 开工 ≠ 交付**；硬依赖 `TASK-P0.3b-1`；本卡完成后仍需经过独立审查、真实 Docker 负向测试实跑及全量回归。不宣称硬件级安全，不宣称 P0 风险解除。
