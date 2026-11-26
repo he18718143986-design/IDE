@@ -56,7 +56,8 @@ describe("TASK-P0.1 第一道封锁：deriveCanMerge（生成时）", () => {
     );
   });
 
-  it("P01-P2：GATEWAY_ENFORCED / SANDBOX_ENFORCED 进入正常验收逻辑", () => {
+  it("P01-P2：GATEWAY_ENFORCED / SANDBOX_ENFORCED 进入正常验收逻辑（SANDBOX_ENFORCED 需合法见证才放行）", () => {
+    // GATEWAY_ENFORCED 正常放行
     expect(
       deriveCanMerge({
         ...PASSING_GATES,
@@ -64,11 +65,28 @@ describe("TASK-P0.1 第一道封锁：deriveCanMerge（生成时）", () => {
         contractRevision: 1,
       }),
     ).toBe(true);
+    // SANDBOX_ENFORCED 缺见证 fail-closed (P03A-P5)
     expect(
       deriveCanMerge({
         ...PASSING_GATES,
         workerControlMode: "SANDBOX_ENFORCED",
         contractRevision: 1,
+      }),
+    ).toBe(false);
+    // SANDBOX_ENFORCED 补合法见证才放行
+    expect(
+      deriveCanMerge({
+        ...PASSING_GATES,
+        workerControlMode: "SANDBOX_ENFORCED",
+        contractRevision: 1,
+        sandboxWitness: {
+          host_kind: "docker/29.6.1",
+          via: "exit",
+          exit_code: 0,
+          duration_ms: 100,
+          worktree_root: "/test/worktree",
+        },
+        worktreeRoot: "/test/worktree",
       }),
     ).toBe(true);
   });
@@ -144,17 +162,38 @@ describe("TASK-P0.1 第二道封锁：assertEvidenceControlAndRevision（合并�
     );
   });
 
-  it("受控档位且版本一致时放行（不抛）", () => {
+  it("受控档位且版本一致时放行（SANDBOX_ENFORCED 需合法见证才放行）", () => {
     expect(() =>
       assertEvidenceControlAndRevision(
         { worker_control_mode: "GATEWAY_ENFORCED", contract_revision: 2 },
         2,
       ),
     ).not.toThrow();
+    // TASK-P0.3a: SANDBOX_ENFORCED 缺见证拦截拒绝
+    expectCode(
+      () =>
+        assertEvidenceControlAndRevision(
+          { worker_control_mode: "SANDBOX_ENFORCED", contract_revision: 2 },
+          2,
+        ),
+      "E_CANNOT_MERGE",
+    );
+    // 补合法见证放行
     expect(() =>
       assertEvidenceControlAndRevision(
-        { worker_control_mode: "SANDBOX_ENFORCED", contract_revision: 2 },
+        {
+          worker_control_mode: "SANDBOX_ENFORCED",
+          contract_revision: 2,
+          sandbox_witness: {
+            host_kind: "docker/29.6.1",
+            via: "exit",
+            exit_code: 0,
+            duration_ms: 100,
+            worktree_root: "/test/worktree",
+          },
+        },
         2,
+        "/test/worktree",
       ),
     ).not.toThrow();
   });

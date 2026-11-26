@@ -17,6 +17,7 @@ import {
   removeTaskWorktree,
 } from "../git/worktree-manager";
 import { assertEvidenceIntegrity } from "../guard/evidence-integrity";
+import { verifySandboxWitness } from "../worker/sandbox/container-host";
 import {
   E_OUT_OF_SCOPE,
   E_OUT_OF_SCOPE_UNTRACKED,
@@ -110,8 +111,12 @@ const MERGEABLE_CONTROL_MODES: ReadonlySet<string> = new Set([
  * 旧证据仍可被 Schema 读取与展示，只是在这里不可合并。
  */
 export function assertEvidenceControlAndRevision(
-  snapshot: Pick<EvidenceBundle, "worker_control_mode" | "contract_revision">,
+  snapshot: Pick<
+    EvidenceBundle,
+    "worker_control_mode" | "contract_revision" | "sandbox_witness"
+  >,
   currentContractRevision: number,
+  expectedWorktreeRoot?: string,
 ): void {
   const mode = snapshot.worker_control_mode;
   if (mode === undefined || !MERGEABLE_CONTROL_MODES.has(mode)) {
@@ -134,6 +139,24 @@ export function assertEvidenceControlAndRevision(
       E_EVIDENCE_REVISION_MISMATCH,
       `这份验收证据对应合同版本 ${revision}，当前合同已是版本 ${currentContractRevision}，请按当前合同重新验收后再合并`,
     );
+  }
+
+  // TASK-P0.3a：SANDBOX_ENFORCED 独立核验证据内的 sandbox_witness
+  if (mode === "SANDBOX_ENFORCED") {
+    if (!snapshot.sandbox_witness) {
+      throw new MergeGateError(
+        "E_CANNOT_MERGE",
+        "这份验收证据记录的控制模式是 SANDBOX_ENFORCED，但缺少沙箱执行见证（sandbox_witness），无法确认真实入箱，不能合并",
+      );
+    }
+    try {
+      verifySandboxWitness(snapshot.sandbox_witness, expectedWorktreeRoot);
+    } catch (err) {
+      throw new MergeGateError(
+        "E_CANNOT_MERGE",
+        `这份验收证据的沙箱见证无效（${err instanceof Error ? err.message : String(err)}），不能合并`,
+      );
+    }
   }
 }
 
@@ -611,9 +634,16 @@ async function mergeInternal(
     );
   }
 
-  // 2b. TASK-P0.1 第二道封锁（合并时）：不信任快照里的 can_merge，
-  // 直接读真实 Evidence Snapshot 独立重核控制模式与合同版本，任一缺失即拒。
-  assertEvidenceControlAndRevision(snapshot, contract.contract_revision);
+  // 3. Worktree 与分支必须存在
+  const worktreePath = getWorktreePath(repoRoot, contract.contract_id);
+
+  // 2b. TASK-P0.1 / TASK-P0.3a 第二道封锁（合并时）：不信任快照里的 can_merge，
+  // 直接读真实 Evidence Snapshot 独立重核控制模式、合同版本与沙箱见证，任一缺失即拒。
+  assertEvidenceControlAndRevision(
+    snapshot,
+    contract.contract_revision,
+    worktreePath,
+  );
 
   // G2 / G3 守卫条款：若合同声明了 manual_confirmation，追加「确认记录齐全否则拒绝合并」闸门
   if (contract.verification_spec.manual_confirmation !== undefined) {
@@ -633,9 +663,6 @@ async function mergeInternal(
       );
     }
   }
-
-  // 3. Worktree 与分支必须存在
-  const worktreePath = getWorktreePath(repoRoot, contract.contract_id);
   if (!fs.existsSync(worktreePath)) {
     throw new MergeGateError(
       "E_WORKTREE_LOST",

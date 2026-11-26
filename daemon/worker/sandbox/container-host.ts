@@ -186,6 +186,103 @@ export function sandboxWitness(
   };
 }
 
+export class SandboxWitnessValidationError extends Error {
+  readonly code: string;
+  constructor(code: string, message: string) {
+    super(`[${code}] ${message}`);
+    this.name = "SandboxWitnessValidationError";
+    this.code = code;
+  }
+}
+
+/**
+ * TASK-P0.3a: 深度核验沙箱见证（P03A-P4）。
+ *
+ * 严格断言：
+ * 1. witness 必须存在且为对象；
+ * 2. via 必须严格等于 "exit"（排除 timeout, rejected, SIGKILL 冒认受控）；
+ * 3. host_kind 必须非空且不能为 "unknown" 或包含 "unavailable"（如 "docker/unavailable"）；
+ * 4. worktree_root 规范化后与合同工作树严格相等（当提供 expectedWorktreeRoot 时）；
+ * 5. exit_code 只记录不断言（见证证明确实在沙箱运行过，Worker 执行失败由 verdict 阻断，不否定见证真实性）。
+ *
+ * 校验失败抛出 SandboxWitnessValidationError（带错误码）；通过返回合法见证。
+ */
+export function verifySandboxWitness(
+  witness: SandboxWitness | undefined | null,
+  expectedWorktreeRoot?: string,
+): SandboxWitness {
+  if (!witness || typeof witness !== "object") {
+    throw new SandboxWitnessValidationError(
+      "WITNESS_MISSING",
+      "缺少沙箱执行见证（sandbox_witness）",
+    );
+  }
+
+  if (witness.via !== "exit") {
+    throw new SandboxWitnessValidationError(
+      "WITNESS_VIA_INVALID",
+      `沙箱见证终止方式非法: ${String(witness.via)}，仅允许 "exit"（排除 timeout/rejected/SIGKILL 冒认受控）`,
+    );
+  }
+
+  const hostKind = witness.host_kind;
+  if (
+    !hostKind ||
+    typeof hostKind !== "string" ||
+    hostKind.trim() === "" ||
+    hostKind === "unknown" ||
+    hostKind.toLowerCase().includes("unavailable")
+  ) {
+    throw new SandboxWitnessValidationError(
+      "WITNESS_HOST_KIND_INVALID",
+      `沙箱宿主类型非法: ${String(hostKind)}（不得为 unknown 或 unavailable）`,
+    );
+  }
+
+  if (
+    !witness.worktree_root ||
+    typeof witness.worktree_root !== "string" ||
+    witness.worktree_root.trim() === ""
+  ) {
+    throw new SandboxWitnessValidationError(
+      "WITNESS_WORKTREE_INVALID",
+      "沙箱见证工作树路径非法",
+    );
+  }
+
+  if (expectedWorktreeRoot !== undefined) {
+    const normWitness = path.resolve(witness.worktree_root);
+    const normExpected = path.resolve(expectedWorktreeRoot);
+    const match =
+      process.platform === "win32"
+        ? normWitness.toLowerCase() === normExpected.toLowerCase()
+        : normWitness === normExpected;
+    if (!match) {
+      throw new SandboxWitnessValidationError(
+        "WITNESS_WORKTREE_MISMATCH",
+        `沙箱见证工作树不匹配: 见证挂载=${normWitness}, 预期=${normExpected}`,
+      );
+    }
+  }
+
+  return witness;
+}
+
+/**
+ * 判定沙箱见证是否合法有效（纯布尔判定，不抛错）。
+ */
+export function isSandboxWitnessValid(
+  witness: SandboxWitness | undefined | null,
+  expectedWorktreeRoot?: string,
+): boolean {
+  try {
+    verifySandboxWitness(witness, expectedWorktreeRoot);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** 保护区：宿主这些路径一律不得挂载进容器 */
 const PROTECTED_SEGMENTS = [".git", ".stagent"];
 
