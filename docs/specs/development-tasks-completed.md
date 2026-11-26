@@ -13567,3 +13567,143 @@ governance:
 - **P03B2-P5（运维逃生门语义不变）**：保留 `STAGENT_DISABLE_CONTAINER=1` 运维逃生门机制，启用时如实降级为 `UNCONTROLLED_EXTERNAL` 并记录 WARNING 日志，严禁冒认受控姿态。
 - **P03B2-P6（测试与既有功能零回归）**：既有 `GATEWAY_ENFORCED` 链路、生产 Daemon 装配以及 314+ 测试套件零回归。
 - **诚实口径**：**容器文件系统 Scope 强制挂载执行接入已交付（两阶段挂载、见证记档与断言、负向集成测试）；P0 风险未宣称解除**。
+---
+
+### 3.4ci P0 独立验收与 Evidence 可信链专项复核（专项评估 · TASK-P1.1 / TASK-P1-EVAL · P-336 / P-337）
+
+> **立卡与归档说明（2026-11-26 · P-336 / P-337）**：授权来源为 Tina 授权立卡并合并评估报告「下一阶段定为『P0 独立验收与 Evidence 可信链专项复核』，评估型卡、不改代码——批准」「评估报告已审，授权合并 #437 并拍板后续卡序，执行 TASK-P1.1 完工回写」。操作者由我执行。纯 docs 评估型卡，**评估型非施工型，零产品代码修改、零测试代码修改、零新增运行时依赖**。卡号按 docs 门禁正则定为 **`TASK-P1.1`**（对应卡面与讨论中的 `TASK-P1-EVAL`）。
+>
+> **卡片性质与目标**：对现有 P0 安全门禁做独立验收设计，评估 Evidence 可信链加固选型，明确下一阶段安全工程工作范围。
+>
+> **限制（逐字写入卡面，红线约束）**：不修改代码、不新增运行时依赖、不调整现有 Merge 逻辑、不重复修补已交付 P0 卡、不将源码交付认定为安全验收通过。
+>
+> **执行顺序锁定**：专项评估方案 → 评审批准 → Evidence 可信链选型 + P0 独立验收矩阵 → 形成后续施工卡 → 独立验收执行 → 后续安全加固 → 验收结论与风险台账。**本卡只产出方案与矩阵，验收执行与加固施工另立卡**。
+>
+> **审批边界（逐字写入）**：本审批**不是代码合并批准**，也**不是 P0 风险解除声明**。本卡为纯文档评估，不修改产品代码；评估报告方案提出后仍需经专项评审裁决，方可立项后续实施卡。
+>
+> **诚实口径**：**P0 独立验收与 Evidence 可信链专项评估已交付（威胁模型、Ed25519 选型、十大负向验收矩阵、信任边界契约草案、三卡建议、更新后风险台账）；评估产出非施工交付，P0 风险未宣称解除**。
+
+<a id="task-p1.1"></a>
+
+#### 【Task P1.1】P0 独立验收与 Evidence 可信链专项复核（专项评估 · TASK-P1-EVAL） `[COMPLETED]`
+
+```yaml task-card
+id: TASK-P1.1
+status: COMPLETED
+contract:
+  intent:
+    title: P0 独立验收与 Evidence 可信链专项复核（专项评估 · TASK-P1-EVAL）
+    description: >-
+      对现有 P0 安全门禁做独立验收设计，评估 Evidence 可信链加固选型，明确下一阶段安全工程工作范围。
+      限制：不修改代码、不新增运行时依赖、不调整现有 Merge 逻辑、不重复修补已交付 P0 卡、不将源码交付认定为安全验收通过。
+    risk_level: MEDIUM
+  acceptance:
+    - id: P1EVAL-P1
+      check: playtest
+      text: >-
+        交付物 1：Evidence 可信链威胁模型与选型报告（签名/HMAC/不可变存储/独立审计记录比较 +
+        密钥管理与可信主体假设 + 复杂度/成本/安全收益）。
+    - id: P1EVAL-P2
+      check: playtest
+      text: >-
+        交付物 2：P0 独立动态验收测试矩阵（覆盖 P0-1 拒绝条件、P0-2 变更审计与基线覆盖、
+        P0-3b 容器挂载 Scope 强制、P0-4 测试完整性）。
+    - id: P1EVAL-P3
+      check: playtest
+      text: >-
+        交付物 3：跨平台验收范围及判据（Linux / macOS Docker Desktop / Windows WSL2）。
+    - id: P1EVAL-P4
+      check: playtest
+      text: >-
+        交付物 4：Gateway/Sandbox/Witness 信任边界契约草案（含 Mount Scope 与 OS/Kernel 级隔离的区别、
+        硬件级 Attestation 不在现有安全承诺范围内）。
+    - id: P1EVAL-P5
+      check: playtest
+      text: >-
+        交付物 5：后续施工卡建议及优先级。
+    - id: P1EVAL-P6
+      check: playtest
+      text: >-
+        交付物 6：更新后的风险台账（落实「代码交付 ≠ 安全验证通过」诚实口径）。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - docs/ledger/p1-eval-evidence-trust-chain-and-p0-acceptance.md
+      - docs/ledger/README.md
+    readonly_paths:
+      - daemon/worker/cli-host/docker-container-host.ts
+      - daemon/worker/sandbox/container-host.ts
+      - daemon/pipeline/orchestrator.ts
+      - daemon/pipeline/merger.ts
+      - daemon/pipeline/candidate-scope-audit.ts
+      - daemon/guard/test-integrity.ts
+      - src/lib/evidence.schema.ts
+      - src/lib/contract.schema.ts
+  verification:
+    commands:
+      - { alias: docs-check, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    纯文档专项评估设计（按 A/B/C 三块推进）：
+    块 A：Evidence 可信链专项评估（先出方案不改代码，分析威胁模型与签名/HMAC/存储选型）；
+    块 B：P0 独立动态验收设计（合并原 P1-2 与跨平台验证，构建覆盖 P0-1~P0-4 的独立动态验证矩阵与跨平台判据）；
+    块 C：信任边界架构契约（合并 Gateway 与 Witness 文档工作，梳理 Mount Scope 与 OS/Kernel 隔离差异及 Attestation 边界）。
+    产出独立评估报告 docs/ledger/p1-eval-evidence-trust-chain-and-p0-acceptance.md。
+  touches:
+    - { path: docs/ledger/p1-eval-evidence-trust-chain-and-p0-acceptance.md, change: create, why: "P0 独立验收与 Evidence 可信链专项复核评估报告", symbols: [] }
+    - { path: docs/ledger/README.md, change: modify, why: "更新风险台账与评估方案索引", symbols: [] }
+  interfaces: []
+  data_changes: []
+  dependencies: []
+  decisions: []
+  test_plan: []
+  knowledge_delta:
+    modules_upsert: []
+    decisions_add: []
+    overview_changed: false
+governance:
+  delivered: { pr: 437, commit: caadfbf8799a2e4ecb74d8cec3df58d79dfd9d6d }
+  spec_refs:
+    - docs/ledger/p0-line-comprehensive-review.md
+    - docs/ledger/p0-3b-container-filesystem-scope-proposal.md
+    - docs/specs/runtime-contract-and-safety.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+  depends_on:
+    - { id: TASK-P0.3b-2, kind: hard }
+  code_facts:
+    - { ref: "daemon/pipeline/orchestrator.ts:2575", note: "writeEvidence 将 witness 写入 EvidenceBundle 证据包" }
+    - { ref: "daemon/pipeline/merger.ts:316", note: "merger 在 PRE_MERGE 阶段核验 evidenceBundle" }
+    - { ref: "daemon/worker/cli-host/docker-container-host.ts:414", note: "run 方法调用 resolveScopedMounts 接入容器文件系统 Scope 挂载" }
+    - { ref: "daemon/guard/test-integrity.ts:162", note: "test-integrity 防护测试篡改与基线独立重跑" }
+  non_goals:
+    - 不修改任何产品与测试代码
+    - 不新增任何运行时依赖
+    - 不调整现有 Merge 门禁与审计逻辑
+    - 不重复修补已交付 P0 卡
+    - 不将源码交付认定为安全验收通过
+    - 不在评估阶段执行独立验收测试实跑（另立卡实施）
+    - 不在评估阶段进行代码加固施工（另立卡实施）
+  fail:
+    - 产生任何非文档类源码变更
+    - 评估报告遗漏六项核心交付物
+    - 遗漏五项限制中的任意一项
+    - 宣称 P0 风险已解除或安全验收已通过
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+#### 归档注记（P-337 · 2026-11-26）
+
+- **交付 PR**：[#437](https://github.com/he18718143986-design/IDE/pull/437)（head `0fc240ab1ba6b34bb44b4826fec0247bda22ce8d`，squash `caadfbf8799a2e4ecb74d8cec3df58d79dfd9d6d`，操作者由我执行）。
+- **范围与检查**：仅改动 2 个授权 docs 文件（新增 `docs/ledger/p1-eval-evidence-trust-chain-and-p0-acceptance.md` 与更新 `docs/ledger/README.md`，+179/−1），零产品代码/零测试代码/零新增运行时依赖。必需 CI 全绿（三平台 Lint/Typecheck + ubuntu/macOS Unit + Windows Unit + Docs/Knowledge/Perf/Detect；无失败无取消），Cursor Bugbot neutral。
+- **P1EVAL-P1（Evidence 可信链威胁模型与选型报告）**：深入梳理三处关键残余面——`orchestrator.ts:2565` `writeEvidence` 落盘明文 JSON 可被篡改、`merger.ts:149` 仅 Schema 校验无法发现落盘后替换、`verifySandboxWitness` 只验结构不验来源、`worker_control_mode` 枚举字符串无数学证明；四种防护方案横向评估排除 HMAC（共享密钥泄密伪造）与不可变存储/WORM（跨平台权限映射失效、同用户可解锁），确立以 Ed25519 非对称签名为主防线（Node.js 原生 `crypto` 零依赖、签名验证职责分离、支持脱机审计）+ Git Trailer 哈希绑定 + `chmod 0400` 纵深防御。
+- **P1EVAL-P2（P0 独立动态验收测试矩阵）**：设计覆盖 P0-1~P0-4 拒绝条件的十大动态负向用例套件（TC-P0-1A/B 伪造模式与版本不一致拒绝、TC-P0-2A/B Scope 越界与幽灵提交拦截、TC-P0-3A/B/C Scope 外写被拒/`.git` 写被拒/全量只读拦截、TC-P0-4A/B 测试篡改拦截与基线还原），全部具备自动化可执行性。
+- **P1EVAL-P3（跨平台验收范围及判据）**：确立 Linux 原生容器环境、macOS Docker Desktop / OrbStack（VirtioFS 权限映射）与 Windows WSL2 容器层三平台判据与豁免边界。
+- **P1EVAL-P4（信任边界架构契约草案）**：明确界定 Mount Namespace Scope 隔离 ≠ 硬件级虚拟化安全隔离，系统不具备硬件级 Attestation；明确 Gateway 仅约束流经自身的网络/进程调用，Merger 不重跑全量业务测试。
+- **P1EVAL-P5（后续施工卡建议及优先级）**：建议三卡拆分并锁定顺延卡号：`TASK-P1.2`（Evidence Ed25519 签名与防篡改验签，M，P1-Highest）→ `TASK-P1.3`（独立动态渗透与跨平台验收套件，L，硬依赖 P1.2）→ `TASK-P1.4`（Gateway 凭据脱敏与见证 Nonce 绑定，M，P2-Medium，硬依赖 P1.2），本轮不立施工卡，挂账待立。
+- **P1EVAL-P6（更新后的风险台账）**：全面落实「代码交付 ≠ 安全验证通过」诚实口径，P0-1~P0-4 标记为待独立动态验证，新增 RISK-P1-1 Evidence 可信链风险，完整保留三项架构边界。
+- **诚实口径**：**P0 独立验收与 Evidence 可信链专项评估已交付（威胁模型、Ed25519 选型、十大负向验收矩阵、信任边界契约草案、三卡建议、更新后风险台账）；评估产出非施工交付，P0 风险未宣称解除**。
