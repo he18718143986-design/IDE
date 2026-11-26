@@ -1,3 +1,4 @@
+import { signEvidencePayload } from "./evidence-signer";
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync, spawn } from "node:child_process";
@@ -2723,16 +2724,28 @@ export class ContractOrchestrator {
       },
     };
 
+    // TASK-P1.2: RFC 8785 规范化与 Ed25519 签名生成
+    const sigRecord = signEvidencePayload(bundle, { repoRoot: this.repoRoot });
+    bundle.signature = sigRecord;
+
     const validated = evidenceBundleSchema.parse(clampEvidenceSize(bundle));
     const evidenceDir = path.join(this.repoRoot, ".stagent", "evidence");
     fs.mkdirSync(evidenceDir, { recursive: true });
-    writeStateFile(
-      path.join(
-        evidenceDir,
-        `${contract.contract_id}-${validated.evidence_id}.json`,
-      ),
-      validated,
+    const jsonPath = path.join(
+      evidenceDir,
+      `${contract.contract_id}-${validated.evidence_id}.json`,
     );
+    writeStateFile(jsonPath, validated);
+
+    // TASK-P1.2: 同步写入独立 .sig 签名凭据文件（放置于 .stagent/signatures 目录以防干扰通用快照列举）
+    const sigDir = path.join(this.repoRoot, ".stagent", "signatures");
+    fs.mkdirSync(sigDir, { recursive: true });
+    const sigPath = path.join(
+      sigDir,
+      `${contract.contract_id}-${validated.evidence_id}.sig`,
+    );
+    fs.writeFileSync(sigPath, JSON.stringify(sigRecord, null, 2), "utf8");
+
     return validated;
   }
 

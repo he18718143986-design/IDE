@@ -1,3 +1,7 @@
+import {
+  verifyEvidenceSignature,
+  type EvidenceSignatureRecord,
+} from "./evidence-signer";
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -98,6 +102,14 @@ export class MergeGateError extends Error {
  */
 export const E_EVIDENCE_REVISION_MISMATCH = "E_EVIDENCE_REVISION_MISMATCH";
 
+/**
+ * TASK-P1.2: Evidence Ed25519 签名与防篡改门禁错误码
+ * - EVIDENCE_SIGNATURE_MISSING: 缺失签名文件与内嵌凭据
+ * - EVIDENCE_SIGNATURE_INVALID: 签名损坏、公钥不匹配或内容遭篡改
+ */
+export const EVIDENCE_SIGNATURE_MISSING = "EVIDENCE_SIGNATURE_MISSING";
+export const EVIDENCE_SIGNATURE_INVALID = "EVIDENCE_SIGNATURE_INVALID";
+
 /** TASK-P0.1：合并时承认的受控档位（字符串不构成执行受控的真实性证明，见 P0-3） */
 const MERGEABLE_CONTROL_MODES: ReadonlySet<string> = new Set([
   "GATEWAY_ENFORCED",
@@ -117,6 +129,72 @@ const MERGEABLE_CONTROL_MODES: ReadonlySet<string> = new Set([
  * 2. 若修改或删除了既有测试文件且未获豁免，必须满足 baseline_rerun_passed === true。
  * 3. 否则按 failure_code (E_TEST_BASELINE_REGRESSION / E_TEST_BASELINE_UNAVAILABLE) 抛出 MergeGateError 阻断合并。
  */
+/**
+ * TASK-P1.2: PRE_MERGE 阶段强核验 Evidence Ed25519 签名与防篡改可信链。
+ * 若缺失签名、签名损坏、公钥不匹配或载荷遭篡改，一律抛出 MergeGateError 阻断合流。
+ */
+export function assertEvidenceSignatureGate(
+  evidencePath: string,
+  snapshot: EvidenceBundle,
+  expectedPublicKey?: string | undefined,
+): { signatureRecord: EvidenceSignatureRecord; canonicalHash: string } {
+  const baseName = path.basename(evidencePath, ".json");
+  const parentStagent = path.dirname(path.dirname(evidencePath));
+  const stagentSigPath = path.join(
+    parentStagent,
+    "signatures",
+    `${baseName}.sig`,
+  );
+  const subSigPath = path.join(
+    path.dirname(evidencePath),
+    "signatures",
+    `${baseName}.sig`,
+  );
+  const siblingSigPath = evidencePath.replace(/\.json$/, ".sig");
+  const sigPath = fs.existsSync(stagentSigPath)
+    ? stagentSigPath
+    : fs.existsSync(subSigPath)
+      ? subSigPath
+      : siblingSigPath;
+  let sigRecord: EvidenceSignatureRecord | undefined;
+
+  if (fs.existsSync(sigPath)) {
+    try {
+      sigRecord = JSON.parse(fs.readFileSync(sigPath, "utf8"));
+    } catch {
+      throw new MergeGateError(
+        EVIDENCE_SIGNATURE_INVALID,
+        `Evidence signature file corrupted or invalid JSON: ${sigPath}`,
+      );
+    }
+  } else if (snapshot.signature) {
+    sigRecord = snapshot.signature as EvidenceSignatureRecord;
+  }
+
+  if (!sigRecord || !sigRecord.signature) {
+    throw new MergeGateError(
+      EVIDENCE_SIGNATURE_MISSING,
+      `Evidence signature missing: neither independent .sig file nor embedded signature found for ${evidencePath}`,
+    );
+  }
+
+  const result = verifyEvidenceSignature(snapshot, sigRecord, {
+    expectedPublicKeyPem: expectedPublicKey,
+  });
+
+  if (!result.valid) {
+    throw new MergeGateError(
+      EVIDENCE_SIGNATURE_INVALID,
+      `Evidence signature invalid: ${result.reason}`,
+    );
+  }
+
+  return {
+    signatureRecord: sigRecord,
+    canonicalHash: result.canonical_hash || sigRecord.canonical_hash,
+  };
+}
+
 export function assertEvidenceTestIntegrity(
   snapshot: EvidenceBundle,
   contract: SoftwareContract,
@@ -336,12 +414,12 @@ export async function assertMainTreeClean(repoRoot: string): Promise<void> {
 export interface MergeCommitMessageOptions {
   /**
    * 证据文件**字节**的 SHA-256（与 `shasum -a 256 <evidence>.json` 同源）。
-   *
-   * TASK-E.2：提供时写入 `Stagent-Evidence-Hash`，让审计方可以独立复算并发现
-   * 「合并后用另一份证据替换磁盘文件」这类事后调包——Evidence-ID 只是名字，
-   * 名字不防篡改，哈希才防。
    */
   evidenceHash?: string | undefined;
+  /** TASK-P1.2: Evidence RFC 8785 规范化载荷 SHA-256 哈希 */
+  evidenceSha256?: string | undefined;
+  /** TASK-P1.2: Evidence Ed25519 签名密文 */
+  evidenceSignature?: string | undefined;
 }
 
 export function buildMergeCommitMessage(
@@ -361,6 +439,12 @@ export function buildMergeCommitMessage(
     trailers.push(`Stagent-Scheme-Items: ${schemeItems.value}`);
   }
   trailers.push(`Stagent-Evidence-ID: ${evidence.evidence_id}`);
+  if (options.evidenceSha256) {
+    trailers.push(`Evidence-Sha256: ${options.evidenceSha256}`);
+  }
+  if (options.evidenceSignature) {
+    trailers.push(`Evidence-Signature: ${options.evidenceSignature}`);
+  }
   if (options.evidenceHash) {
     trailers.push(`Stagent-Evidence-Hash: ${options.evidenceHash}`);
   }
@@ -708,6 +792,13 @@ async function mergeInternal(
       );
     }
   }
+
+  // 2d. TASK-P1.2: Evidence Ed25519 签名与防篡改门禁（fail-closed 强校验）
+  const { signatureRecord, canonicalHash } = assertEvidenceSignatureGate(
+    evidencePath,
+    snapshot,
+  );
+
   if (!fs.existsSync(worktreePath)) {
     throw new MergeGateError(
       "E_WORKTREE_LOST",
@@ -869,7 +960,11 @@ async function mergeInternal(
     snapshot,
     options.reviewer,
     conflictResolution,
-    { evidenceHash },
+    {
+      evidenceHash,
+      evidenceSha256: canonicalHash,
+      evidenceSignature: signatureRecord.signature,
+    },
   );
   // TASK-D.2b：Trailer 尺寸红线；Scheme-Items 已在上方按规格截断，其余键仍禁止静默截断
   assertTrailerBounds(message);
@@ -1007,3 +1102,6 @@ export function loadEvidenceSnapshot(
     return null;
   }
 }
+
+/** TASK-P1.2 卡面设计符号对齐：executeMerge 导出别名 */
+export const executeMerge = squashMerge;
