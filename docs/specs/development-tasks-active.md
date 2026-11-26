@@ -1826,3 +1826,360 @@ governance:
 <a id="task-j.62"></a>
 
 > 本卡已 **COMPLETED**（施工 [#412](https://github.com/he18718143986-design/IDE/pull/412) squash `a05b5bf6b96b53e77325ea07e8cd9b17cb967881`；立卡 P-321；完工回写 P-322）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.62) §3.4ca。诚实口径：**execute 命令路径解析产品 CLI 已交付（白名单前置 + 威胁守卫后解析、复用 J.59 错误码、零漂移）；真钥匙复测不在本卡，端到端闭环未宣称**。
+
+### 3.4cb Evidence / Merge 失败关闭与全量候选 Scope 审计（P0-1 / P0-2 · 立卡 P-324 · 未开工）
+
+> **立卡说明（2026-11-26 · P-324）**：授权来源为 Tina 本轮审批（四项修改全部采纳，按修订后规格立卡；DoD 修订版原文由审批方在本轮重述，「以此为准」）。操作者由我执行。纯 docs 立卡，**立卡 ≠ 开工**，不改产品代码。两卡同一份 docs PR。顺序锁定：**P0-1 先行、独立审查验收；P0-2 待 P0-1 完成后实施**。P0-3（容器强制）与 P0-4（独立验收）**本轮不立卡**，挂账见 [`../ledger/README.md`](../ledger/README.md) 开放项，待两卡落地后重新评估。
+>
+> **卡号说明**：审批称 `TASK-P0-1` / `TASK-P0-2`。docs 门禁卡号正则为 `^TASK-[A-Z0-9]+(\.[0-9a-z-]+)*$`（`scripts/docs-check/checks.ts:31`），不接受 `-1` 后缀（`P0-1` 会被 `card-schema` 判 error）；卡头落为 **`TASK-P0.1`** / **`TASK-P0.2`**，与审批的 P0-1 / P0-2 一一对应、语义同一。未改门禁脚本。
+>
+> **审批边界（两卡共用，逐字写入）**：本审批**不是代码合并批准**，也**不是 P0 风险解除声明**。施工完成后仍需：独立审查实现与测试、负向测试实跑、全量回归、新增绕过路径检查、Evidence 与 Merge 实际裁决行为确认。施工 PR 全绿报授权，Windows 存量失败按先例报 `UNSTABLE`；范围外文件要动就停工修卡。
+
+<a id="task-p0.1"></a>
+
+#### 【Task P0.1】Evidence / Merge Fail-Closed（控制模式 + 合同版本双重封锁）`[NEW_TASK · 立卡 P-324 · 未开工]`
+
+> **断点（main `a2fa9497df70785f6e4c9d939b74695181e19c44` 直读，审批方确认属实）**：
+> 1. `deriveCanMerge()` 无控制模式入参（`src/lib/evidence.schema.ts:264-300`），只看 `status` / `scopePassed` / `budgetExhausted` / `forbiddenViolationCount` / 人工确认；
+> 2. merger 只校验 `verdict.status` 与 `verdict.can_merge`（`daemon/pipeline/merger.ts:509-514`），不重核控制模式与 Evidence 合同版本；
+> 3. `orchestrator.ts:2400-2403` 写入 `worker_control_mode` 后，`orchestrator.ts:2432` 调 `deriveCanMerge` 时未传控制模式。
+>
+> **补充事实（直读，供施工参考，不扩卡）**：Evidence Schema 中 `contract_revision`（`evidence.schema.ts:173`）与 `worker_control_mode`（`evidence.schema.ts:184-186`）均为可选；`orchestrator.ts` 证据构造段（2392 起）**未写** `contract_revision`（全文件该字段只出现在 556 / 563 / 1261 / 1999 / 2008 行，均非证据写入），即现有证据普遍缺合同版本，落地后须由 orchestrator 写入、旧证据重验后方可合并。`deriveCanMerge` 另有调用点 `daemon/guard/baseline-gates.ts:327`。
+>
+> **错误契约直读结论（DoD 第 4 条）**：已直读 [`runtime-contract-and-safety.md`](./runtime-contract-and-safety.md) §2.3（拒绝码闭集与 Daemon 专属码表）与 §8.1（L3 执行期码闭集），并核对 `src/lib/error-codes.ts` 的 `ERROR_CODES`：**`E_EVIDENCE_REVISION_MISMATCH` 均未登记**（全仓仅有 `E_SCHEME_REVISION_MISMATCH` 与已删除的 `E_APPROVAL_REVISION_MISMATCH`，语义不同，不复用）。结论：**本卡新增该码，不是复用**；登记位置为 §8.1（与 `E_GATE_SCAN_FAILED` 同属合并前失败关闭码），§8.1 新增码须同步测试。merger 现有 `E_EVIDENCE_MISSING` / `E_EVIDENCE_MISMATCH` / `E_EVIDENCE_STALE` / `E_CANNOT_MERGE` 为 `MergeGateError` 字面量（`merger.ts:489-511`），亦未入 §8.1 表。**字段缺失（`contract_revision` 缺）是否复用 `E_EVIDENCE_REVISION_MISMATCH`、控制模式拒绝用哪个码，由施工 PR 在 §8.1 同一处写明，作为审查项；本卡不预判。**
+>
+> **候选提交绑定（DoD 第 6 条 · 卡内核实项）**：复用 `worktree_snapshot.head_sha`（`evidence.schema.ts:96`）/ `git_info.task_commit_sha` / `git_info.patch_fingerprint`（`evidence.schema.ts:132-137`），不重复造字段。施工中核实「Merge 候选提交与 Evidence 绑定提交是否一致、证据生成后分支是否再变、现有指纹是否覆盖」：已覆盖 → 施工记录写明并以测试证明；未覆盖 → 在本卡 `writable_paths` 内补重核，超出则记录具体缺口停工报审，不擅自扩大实现。
+>
+> **DoD（九条 · 审批方 2026-11-26 重述原文，逐字）**：
+> 1. `deriveCanMerge()` 对 `worker_control_mode === "UNCONTROLLED_EXTERNAL"` 一律 `can_merge=false`；对字段缺失同样 `can_merge=false`（fail-closed，缺失不视为受控）。
+> 2. `GATEWAY_ENFORCED`/`SANDBOX_ENFORCED` 进入正常验收逻辑；卡面注明该字符串不构成执行受控的真实性证明，SandboxWitness 深层验证列入 P0-3 不在本卡。
+> 3. `contract_revision` 采 merger 缺失即拒（不改 Schema 必填）：旧证据可读、可展示、不可合并；新证据必填合同版本；Merge 时重新比对，不依赖生成时判断。
+> 4. `E_EVIDENCE_REVISION_MISMATCH` 可用于版本不符；字段缺失是否复用该码在错误契约文档中写明（先直读 `runtime-contract-and-safety.md` 再定，不预判）。
+> 5. 双重封锁：`deriveCanMerge`（生成时）与 merger（合并时）两处独立校验控制模式与合同版本，任一缺失即拒。
+> 6. 候选提交绑定列为卡内核实项：`head_sha`/`task_commit_sha`/`patch_fingerprint` 是否覆盖「证据生成后分支再变」的场景，核实结论写进施工记录，若缺则在卡面范围内补重核。
+> 7. 负向测试：`UNCONTROLLED_EXTERNAL` 证据不可合并；缺失 `worker_control_mode` 不可合并；缺失/不符 `contract_revision` 不可合并。
+> 8. 既有受控证据（`GATEWAY_ENFORCED` + 版本齐全）合并路径零回归。
+> 9. 合同 revision 递增语义不变；不改 Schema 兼容面；不接容器、不动 Gateway。
+>
+> **审批时一并采纳的修订要点（上一轮审批原话归纳，与 DoD 并列生效）**：验收测试须证明**构造 `PASSED + can_merge=true` 的异常 Evidence 也不能绕过 Merger**；合同 revision 缺失或不可确认走明确异常路径，不得默认放行；Sandbox 放行不被误认为容器级合同权限审计已完成。
+
+```yaml task-card
+id: TASK-P0.1
+status: NEW_TASK
+contract:
+  intent:
+    title: Evidence / Merge Fail-Closed（控制模式 + 合同版本双重封锁）
+    description: >-
+      做完后，不受控（UNCONTROLLED_EXTERNAL）或缺控制模式的证据、缺合同版本或版本不符的证据都不能合并：
+      生成证据时 deriveCanMerge 拒绝，合并时 merger 读真实 Evidence Snapshot 再独立重核一次，任一缺失即拒；
+      构造的 PASSED + can_merge=true 异常证据也绕不过 merger。旧证据可读、可展示、不可合并。
+      既有受控证据（GATEWAY_ENFORCED + 版本齐全）合并路径零回归。不改 Schema 兼容面，不接容器，不动 Gateway。
+    risk_level: HIGH
+  acceptance:
+    - id: P01-P1
+      check: auto
+      text: >-
+        deriveCanMerge() 对 worker_control_mode === "UNCONTROLLED_EXTERNAL" 一律 can_merge=false；
+        对字段缺失同样 can_merge=false（fail-closed，缺失不视为受控）。
+    - id: P01-P2
+      check: auto
+      text: >-
+        GATEWAY_ENFORCED/SANDBOX_ENFORCED 进入正常验收逻辑；卡面注明该字符串不构成执行受控的真实性证明，
+        SandboxWitness 深层验证列入 P0-3 不在本卡。
+    - id: P01-P3
+      check: auto
+      text: >-
+        contract_revision 采 merger 缺失即拒（不改 Schema 必填）：旧证据可读、可展示、不可合并；新证据必填合同版本；
+        Merge 时重新比对，不依赖生成时判断。
+    - id: P01-P4
+      check: auto
+      text: >-
+        E_EVIDENCE_REVISION_MISMATCH 可用于版本不符；字段缺失是否复用该码在错误契约文档中写明
+        （先直读 runtime-contract-and-safety.md 再定，不预判）。
+    - id: P01-P5
+      check: auto
+      text: >-
+        双重封锁：deriveCanMerge（生成时）与 merger（合并时）两处独立校验控制模式与合同版本，任一缺失即拒。
+    - id: P01-P6
+      check: auto
+      text: >-
+        候选提交绑定列为卡内核实项：head_sha/task_commit_sha/patch_fingerprint 是否覆盖「证据生成后分支再变」的场景，
+        核实结论写进施工记录，若缺则在卡面范围内补重核。
+    - id: P01-P7
+      check: auto
+      text: >-
+        负向测试：UNCONTROLLED_EXTERNAL 证据不可合并；缺失 worker_control_mode 不可合并；缺失/不符 contract_revision 不可合并。
+    - id: P01-P8
+      check: auto
+      text: >-
+        既有受控证据（GATEWAY_ENFORCED + 版本齐全）合并路径零回归。
+    - id: P01-P9
+      check: auto
+      text: >-
+        合同 revision 递增语义不变；不改 Schema 兼容面；不接容器、不动 Gateway。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/lib/evidence.schema.ts
+      - daemon/pipeline/orchestrator.ts
+      - daemon/pipeline/merger.ts
+      - daemon/guard/baseline-gates.ts
+      - src/lib/error-codes.ts
+      - docs/specs/runtime-contract-and-safety.md
+      - tests/daemon/p0-1-evidence-merge-fail-closed.test.ts
+      - tests/unit/evidence-schema-v11.test.ts
+      - tests/unit/baseline-gates.test.ts
+      - tests/unit/error-codes-mapping.test.ts
+      - tests/daemon/merger.test.ts
+      - tests/daemon/merger-d2b-gates.test.ts
+      - docs/ledger/p0-1-evidence-merge-fail-closed.md
+    readonly_paths:
+      - src/lib/contract.schema.ts
+      - daemon/worker/worker-adapter.interface.ts
+      - daemon/guard/evidence-integrity.ts
+      - daemon/mcp/gateway.ts
+      - docs/specs/evidence-and-acceptance-criteria.md
+  verification:
+    commands:
+      - { alias: p01-unit, executable: npx, args: [vitest, run, tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, tests/unit/evidence-schema-v11.test.ts, tests/unit/baseline-gates.test.ts, tests/unit/error-codes-mapping.test.ts, tests/daemon/merger.test.ts, tests/daemon/merger-d2b-gates.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) deriveCanMerge 增控制模式与合同版本入参：UNCONTROLLED_EXTERNAL 或缺失 → false；GATEWAY_ENFORCED/SANDBOX_ENFORCED 进正常逻辑（字符串不构成受控证明）。
+    2) orchestrator 写证据时写入 contract_revision 并把控制模式传给 deriveCanMerge；baseline-gates 调用点同步。
+    3) merger 在 E_CANNOT_MERGE 判定前后读真实 Evidence Snapshot，独立重核控制模式与 contract_revision（缺失即拒、与当前合同 revision 比对），不信任快照里的 can_merge。
+    4) 在 runtime-contract-and-safety.md §8.1 登记 E_EVIDENCE_REVISION_MISMATCH，并写明字段缺失与控制模式拒绝用码。
+    5) 候选提交绑定核实写入 docs/ledger/p0-1-evidence-merge-fail-closed.md；已覆盖以测试证明，未覆盖在卡内补重核，超卡停工报审。
+    6) 负向测试含构造 PASSED + can_merge=true 的异常证据被 merger 拒绝。Schema 字段可选性不变。
+  touches:
+    - { path: src/lib/evidence.schema.ts, change: modify, why: deriveCanMerge 增控制模式与合同版本入参并失败关闭；Schema 字段可选性不变, symbols: [deriveCanMerge] }
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: 证据写入 contract_revision；deriveCanMerge 调用传控制模式与合同版本, symbols: [] }
+    - { path: daemon/pipeline/merger.ts, change: modify, why: 合并时读真实 Evidence Snapshot 独立重核控制模式与合同版本（第二道封锁）, symbols: [] }
+    - { path: daemon/guard/baseline-gates.ts, change: modify, why: deriveCanMerge 第二调用点随签名同步, symbols: [] }
+    - { path: src/lib/error-codes.ts, change: modify, why: 新增码如需入目录则登记；不入目录则零 diff 并在施工记录说明, symbols: [] }
+    - { path: docs/specs/runtime-contract-and-safety.md, change: modify, why: §8.1 登记 E_EVIDENCE_REVISION_MISMATCH，写明字段缺失与控制模式拒绝用码, symbols: [] }
+    - { path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, change: create, why: 负向测试与双重封锁绕过测试, symbols: [] }
+    - { path: tests/unit/evidence-schema-v11.test.ts, change: modify, why: deriveCanMerge 新入参用例与 Schema 兼容面不变, symbols: [] }
+    - { path: tests/unit/baseline-gates.test.ts, change: modify, why: 调用点签名同步后回归, symbols: [] }
+    - { path: tests/unit/error-codes-mapping.test.ts, change: modify, why: 新增码入目录时同步映射断言, symbols: [] }
+    - { path: tests/daemon/merger.test.ts, change: modify, why: 既有受控证据合并路径零回归（夹具补 contract_revision 与控制模式）, symbols: [] }
+    - { path: tests/daemon/merger-d2b-gates.test.ts, change: modify, why: 夹具随新门禁同步，语义不变, symbols: [] }
+    - { path: docs/ledger/p0-1-evidence-merge-fail-closed.md, change: create, why: 施工记录：候选提交绑定核实结论、用码结论、负向测试实跑记录, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: P01-P1, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: unit }
+    - { acceptance_id: P01-P1, test_path: tests/unit/evidence-schema-v11.test.ts, level: unit }
+    - { acceptance_id: P01-P2, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: unit }
+    - { acceptance_id: P01-P3, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: unit }
+    - { acceptance_id: P01-P4, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: unit }
+    - { acceptance_id: P01-P5, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: unit }
+    - { acceptance_id: P01-P6, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: unit }
+    - { acceptance_id: P01-P7, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: unit }
+    - { acceptance_id: P01-P8, test_path: tests/daemon/merger.test.ts, level: unit }
+    - { acceptance_id: P01-P9, test_path: tests/unit/evidence-schema-v11.test.ts, level: unit }
+governance:
+  spec_refs:
+    - docs/specs/runtime-contract-and-safety.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+  depends_on: []
+  code_facts:
+    - { ref: "src/lib/evidence.schema.ts:264-300", note: "deriveCanMerge 入参无控制模式与合同版本" }
+    - { ref: "src/lib/evidence.schema.ts:173", note: "Evidence contract_revision 为可选字段" }
+    - { ref: "src/lib/evidence.schema.ts:184-186", note: "Evidence worker_control_mode 为可选三值枚举" }
+    - { ref: "src/lib/evidence.schema.ts:132-137", note: "git_info：base_commit_sha / task_commit_sha / patch_fingerprint（候选提交绑定复用）" }
+    - { ref: "src/lib/evidence.schema.ts:96", note: "worktree_snapshot.head_sha" }
+    - { ref: "daemon/pipeline/merger.ts:509-514", note: "merger 只校验 verdict.status 与 can_merge，不重核控制模式与合同版本" }
+    - { ref: "daemon/pipeline/orchestrator.ts:2400-2403", note: "证据写入 worker_control_mode（resolveEvidenceControlMode 降记）" }
+    - { ref: "daemon/pipeline/orchestrator.ts:2432-2440", note: "deriveCanMerge 调用未传控制模式；证据构造段未写 contract_revision" }
+    - { ref: "daemon/guard/baseline-gates.ts:327-332", note: "deriveCanMerge 第二调用点" }
+    - { ref: "docs/specs/runtime-contract-and-safety.md:249-270", note: "§8.1 L3 闭集未登记 E_EVIDENCE_REVISION_MISMATCH" }
+    - { ref: "src/lib/error-codes.ts:20-50", note: "ERROR_CODES 未含 E_EVIDENCE_REVISION_MISMATCH" }
+  non_goals:
+    - 不改 Evidence Schema 必填与兼容面（contract_revision / worker_control_mode 仍为可选，缺失由门禁拒绝）
+    - 不做 SandboxWitness 深层验证、不接容器（P0-3，本轮不立卡）
+    - 不动 Gateway 逐文件校验
+    - 不做全量候选 Scope 审计（TASK-P0.2）
+    - 不做独立验收（P0-4，本轮不立卡）
+    - 不改合同 revision 递增语义
+    - 候选提交绑定未覆盖时不擅自扩大实现到卡外
+  fail:
+    - 控制模式缺失或合同版本缺失时默认放行
+    - 只改生成时一道门、merger 仍只信快照里的 can_merge
+    - 构造 PASSED + can_merge=true 的异常证据能绕过 merger
+    - 把 GATEWAY_ENFORCED / SANDBOX_ENFORCED 字符串当作执行受控已证明，或把 Sandbox 放行说成容器级合同权限审计已完成
+    - 改 Schema 必填或兼容面
+    - 既有受控证据合并路径回归
+    - 未登记即使用新错误码，或未写明字段缺失用码
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+<a id="task-p0.2"></a>
+
+#### 【Task P0.2】Full Git Candidate Scope Audit（全量候选变更 Scope 审计）`[NEW_TASK · 立卡 P-324 · 未开工 · P0-1 完成后实施]`
+
+> **断点（main `a2fa9497df70785f6e4c9d939b74695181e19c44` 直读）**：现有 Scope 守卫只审未跟踪文件：`parseUntrackedPaths` 只取 `git status --porcelain` 的 `??` 行（`daemon/pipeline/untracked-scope-guard.ts:144`）；三检测点 `PRE_EXECUTION` / `POST_VERIFICATION` / `PRE_MERGE` 的 phase 类型已在（`untracked-scope-guard.ts:33-38`），但 `PRE_MERGE` 的 `assertWorktreeUntrackedScope`（`daemon/pipeline/merger.ts:382-400`）同样只看未跟踪；已跟踪文件的修改、删除、重命名与已提交进分支的越权改动不在审计内。白名单 `node_modules/`、`.stagent/`（`untracked-scope-guard.ts:63-66`）。`daemon/diff/diff-files.ts:133-150` 已有 `git diff --name-status` + porcelain 读取（只读参考，非审计）。
+>
+> **审计基线核实项（施工前必做）**：合同 Schema 只有 `authorization.git.base_branch`（`src/lib/contract.schema.ts:416`），**未见独立 Base SHA 字段**；Evidence 有 `git_info.base_commit_sha`（`evidence.schema.ts:133`）。审批要求「用合同绑定的 Base SHA，不用动态 `HEAD`，审计中不可替换；合同已有字段/机制则复用不重复建模」。施工前须核实现有机制（如 Worktree 创建时的基点、证据 `base_commit_sha` 的取值时机）能否稳定代表合同绑定基线：能 → 复用并在施工记录写明；**须新增合同字段或改合同 Schema → 停工修卡报审，不擅自建模**。
+>
+> **三检测点职责（审批原文归纳）**：`PRE_EXECUTION`（施工环境初始状态 / 合同基线 / 前置条件）、`POST_VERIFICATION`（执行后 Worktree 变更集 vs 合同 Scope）、`PRE_MERGE`（候选提交 vs 合同 Base SHA 的完整差异为最终审计对象 + 必要工作区检查）——**branch diff 复核必须保留**。Git 状态解析器须正确处理带空格与特殊字符文件名及 rename 双路径语义，**禁止普通空格拆分 `git status --porcelain`**；审计结果规范化为内部变更对象（原路径 / 新路径 / 变更类型 / 特殊类型标记 / Scope 判定）；Delete 审原路径。用码优先复用 §8.1 既有码，新增须同步 [`runtime-contract-and-safety.md`](./runtime-contract-and-safety.md) §8.1。
+>
+> **DoD（十条 · 审批方 2026-11-26 重述原文，逐字）**：
+> 1. 审计基线为合同 Base SHA 起的全量候选变更，覆盖已跟踪文件的修改、删除、重命名，不只 `??` 未跟踪文件。
+> 2. 重命名按「目标路径」判定 Scope；rename 出 Scope 即拒。
+> 3. symlink、submodule 等特殊条目单独标记并纳入审计。
+> 4. 三检测点 `PRE_EXECUTION`/`POST_VERIFICATION`/`PRE_MERGE` 使用同一审计函数、同一判定规则。
+> 5. `PRE_MERGE` 必须保留分支 diff 复核（`git diff --name-status base...HEAD`），覆盖已提交进分支的越权改动——Worktree 审计不能替代已提交分支审计。
+> 6. `node_modules/`、`.stagent/` 白名单保持既有语义不变。
+> 7. 审计失败时不能继续 Merge（负向测试证明）。
+> 8. 既有 `??` 未跟踪文件守卫行为零回归。
+> 9. 不改 Scope 语义、不动 Gateway 逐文件校验、不接容器。
+> 10. 审计结果（越权路径清单）写入 Evidence 或 graph issue，白话可读。
+>
+> **注**：DoD 第 2 条写「重命名按目标路径判定 Scope」；上一轮审批另有「Rename 新旧路径均审」。两者如在施工中出现取舍冲突（例如源路径在 Scope 外、目标在 Scope 内），停工报审，不自行择一。
+
+```yaml task-card
+id: TASK-P0.2
+status: NEW_TASK
+contract:
+  intent:
+    title: Full Git Candidate Scope Audit（全量候选变更 Scope 审计）
+    description: >-
+      做完后，Scope 审计从「只看 ?? 未跟踪文件」扩为合同 Base SHA 起的全量候选变更：已跟踪文件的修改、删除、重命名，
+      symlink 与 submodule 单独标记；三检测点用同一审计函数、同一判定规则；PRE_MERGE 保留分支 diff 复核，
+      已提交进分支的越权改动也拦得住。审计失败不能继续 Merge；越权路径清单白话写进 Evidence 或 graph issue。
+      白名单与既有 ?? 守卫行为不变；不改 Scope 语义、不动 Gateway、不接容器。
+    risk_level: HIGH
+  acceptance:
+    - id: P02-P1
+      check: auto
+      text: >-
+        审计基线为合同 Base SHA 起的全量候选变更，覆盖已跟踪文件的修改、删除、重命名，不只 ?? 未跟踪文件。
+    - id: P02-P2
+      check: auto
+      text: >-
+        重命名按「目标路径」判定 Scope；rename 出 Scope 即拒。
+    - id: P02-P3
+      check: auto
+      text: >-
+        symlink、submodule 等特殊条目单独标记并纳入审计。
+    - id: P02-P4
+      check: auto
+      text: >-
+        三检测点 PRE_EXECUTION/POST_VERIFICATION/PRE_MERGE 使用同一审计函数、同一判定规则。
+    - id: P02-P5
+      check: auto
+      text: >-
+        PRE_MERGE 必须保留分支 diff 复核（git diff --name-status base...HEAD），覆盖已提交进分支的越权改动——
+        Worktree 审计不能替代已提交分支审计。
+    - id: P02-P6
+      check: auto
+      text: >-
+        node_modules/、.stagent/ 白名单保持既有语义不变。
+    - id: P02-P7
+      check: auto
+      text: >-
+        审计失败时不能继续 Merge（负向测试证明）。
+    - id: P02-P8
+      check: auto
+      text: >-
+        既有 ?? 未跟踪文件守卫行为零回归。
+    - id: P02-P9
+      check: auto
+      text: >-
+        不改 Scope 语义、不动 Gateway 逐文件校验、不接容器。
+    - id: P02-P10
+      check: auto
+      text: >-
+        审计结果（越权路径清单）写入 Evidence 或 graph issue，白话可读。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/pipeline/candidate-scope-audit.ts
+      - daemon/pipeline/untracked-scope-guard.ts
+      - daemon/pipeline/orchestrator.ts
+      - daemon/pipeline/merger.ts
+      - docs/specs/runtime-contract-and-safety.md
+      - tests/unit/candidate-scope-audit.test.ts
+      - tests/daemon/p0-2-pre-merge-branch-audit.test.ts
+      - docs/ledger/p0-2-candidate-scope-audit.md
+    readonly_paths:
+      - tests/unit/untracked-scope-guard.test.ts
+      - src/lib/contract.schema.ts
+      - src/lib/evidence.schema.ts
+      - daemon/diff/diff-files.ts
+      - daemon/mcp/gateway.ts
+      - daemon/guard/evidence-integrity.ts
+  verification:
+    commands:
+      - { alias: p02-unit, executable: npx, args: [vitest, run, tests/unit/candidate-scope-audit.test.ts, tests/daemon/p0-2-pre-merge-branch-audit.test.ts, tests/unit/untracked-scope-guard.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) 新建 candidate-scope-audit.ts：以合同绑定基线（施工前核实来源，须新增合同字段则停工修卡）起读全量变更，
+    解析器按 NUL 分隔 / rename 双路径处理特殊字符文件名，禁止普通空格拆分 porcelain；规范化为内部变更对象（原路径 / 新路径 / 类型 / 特殊标记 / Scope 判定）。
+    2) rename 按目标路径判 Scope、出 Scope 即拒；Delete 审原路径；symlink / submodule 单独标记纳入审计。
+    3) 三检测点接同一函数；既有 untracked-scope-guard 的 ?? 行为与白名单语义保持，tests/unit/untracked-scope-guard.test.ts 只读且必须仍绿。
+    4) PRE_MERGE 保留 git diff --name-status base...HEAD 分支复核，审计失败即抛 MergeGateError 不进合并。
+    5) 越权路径清单白话写入 Evidence（复用 scope_audit 既有字段，不改 Schema）或 graph issue；用码优先复用 §8.1，新增须登记。
+  touches:
+    - { path: daemon/pipeline/candidate-scope-audit.ts, change: create, why: 全量候选变更审计函数（三检测点共用）与 Git 状态解析器, symbols: [] }
+    - { path: daemon/pipeline/untracked-scope-guard.ts, change: modify, why: 接入同一审计函数，?? 行为与白名单语义零回归, symbols: [] }
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: PRE_EXECUTION / POST_VERIFICATION 接入全量审计并把越权清单写入证据, symbols: [] }
+    - { path: daemon/pipeline/merger.ts, change: modify, why: PRE_MERGE 全量审计 + 分支 diff 复核，失败不进合并, symbols: [] }
+    - { path: docs/specs/runtime-contract-and-safety.md, change: modify, why: 如新增码则在 §8.1 登记；复用既有码则写明, symbols: [] }
+    - { path: tests/unit/candidate-scope-audit.test.ts, change: create, why: 变更类型、rename、特殊条目、特殊字符文件名、白名单用例, symbols: [] }
+    - { path: tests/daemon/p0-2-pre-merge-branch-audit.test.ts, change: create, why: 已提交进分支的越权改动被 PRE_MERGE 拦截；审计失败不能 Merge 的负向测试, symbols: [] }
+    - { path: docs/ledger/p0-2-candidate-scope-audit.md, change: create, why: 施工记录：审计基线来源核实结论、用码结论、负向测试实跑记录, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: P02-P1, test_path: tests/unit/candidate-scope-audit.test.ts, level: unit }
+    - { acceptance_id: P02-P2, test_path: tests/unit/candidate-scope-audit.test.ts, level: unit }
+    - { acceptance_id: P02-P3, test_path: tests/unit/candidate-scope-audit.test.ts, level: unit }
+    - { acceptance_id: P02-P4, test_path: tests/unit/candidate-scope-audit.test.ts, level: unit }
+    - { acceptance_id: P02-P5, test_path: tests/daemon/p0-2-pre-merge-branch-audit.test.ts, level: integration }
+    - { acceptance_id: P02-P6, test_path: tests/unit/candidate-scope-audit.test.ts, level: unit }
+    - { acceptance_id: P02-P7, test_path: tests/daemon/p0-2-pre-merge-branch-audit.test.ts, level: integration }
+    - { acceptance_id: P02-P8, test_path: tests/unit/untracked-scope-guard.test.ts, level: unit }
+    - { acceptance_id: P02-P9, test_path: tests/unit/candidate-scope-audit.test.ts, level: unit }
+    - { acceptance_id: P02-P10, test_path: tests/daemon/p0-2-pre-merge-branch-audit.test.ts, level: integration }
+governance:
+  spec_refs:
+    - docs/specs/runtime-contract-and-safety.md
+  depends_on:
+    - { id: TASK-P0.1, kind: hard }
+  code_facts:
+    - { ref: "daemon/pipeline/untracked-scope-guard.ts:144", note: "parseUntrackedPaths 只解析 porcelain 的 ?? 行" }
+    - { ref: "daemon/pipeline/untracked-scope-guard.ts:33-38", note: "三检测点 phase 类型已存在" }
+    - { ref: "daemon/pipeline/untracked-scope-guard.ts:63-66", note: "白名单 node_modules/、.stagent/" }
+    - { ref: "daemon/pipeline/merger.ts:382-400", note: "PRE_MERGE assertWorktreeUntrackedScope 只审未跟踪文件" }
+    - { ref: "daemon/pipeline/orchestrator.ts:2090-2100", note: "POST_VERIFICATION 越界处置顺序（先写 BLOCKED 证据、回退 EXECUTING、再抛错）" }
+    - { ref: "daemon/diff/diff-files.ts:133-150", note: "已有 git diff --name-status + porcelain 读取（只读参考）" }
+    - { ref: "src/lib/contract.schema.ts:416", note: "合同只有 base_branch，未见独立 Base SHA 字段" }
+    - { ref: "src/lib/evidence.schema.ts:133", note: "Evidence git_info.base_commit_sha" }
+  non_goals:
+    - 不改 Scope 语义（writable_paths / 通配符分级不变）
+    - 不动 Gateway 逐文件校验
+    - 不接容器（P0-3，本轮不立卡）
+    - 不改 node_modules/、.stagent/ 白名单语义
+    - 不擅自新增合同字段或改合同 Schema（基线来源须新建模则停工修卡）
+    - 不改 Evidence Schema（越权清单复用既有字段或写 graph issue）
+  fail:
+    - 用动态 HEAD 作审计基线，或审计中途替换基线
+    - 用普通空格拆分 git status --porcelain，特殊字符文件名或 rename 双路径解析错误
+    - PRE_MERGE 只做 Worktree 审计、去掉分支 diff 复核
+    - 审计失败仍能继续 Merge
+    - 既有 ?? 未跟踪文件守卫行为回归，或修改其只读测试让其变绿
+    - 三检测点使用不同函数或不同判定规则
+    - 越权清单不可读或未落 Evidence / graph issue
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
