@@ -13139,3 +13139,163 @@ governance:
 - **P03A-P7（零回归）**：既有 `GATEWAY_ENFORCED` 路径零回归（Evidence 不带 witness，正常放行合并）。
 - **旧测试对齐**：对齐 P0.3a fail-closed 规则更新了 P0.1 两处旧夹具（`evidence-schema-v11.test.ts` 与 `p0-1-evidence-merge-fail-closed.test.ts`），断言方向均对齐为「SANDBOX_ENFORCED 需合法见证才放行」，未削弱拦截断言。
 - **诚实口径**：**生产 Daemon 容器装配与 SandboxWitness 落盘/深层断言已交付（双重校验 fail-closed、逃生门如实记档）；P0 风险未宣称解除**。
+
+### 3.4cf 独立验收与测试完整性防护（P0.4 · 完工回写 P-330）
+
+> 两卡共用立卡说明与审批边界保留在 [`development-tasks-active.md`](./development-tasks-active.md#task-p0.3a) §3.4cc。
+
+<a id="task-p0.4"></a>
+
+#### 【Task P0.4】独立验收与测试完整性防护 `[COMPLETED]`
+
+```yaml task-card
+id: TASK-P0.4
+status: COMPLETED
+contract:
+  intent:
+    title: 独立验收与测试完整性防护
+    description: >-
+      做完后，防范 Worker 篡改或删除既有测试文件以产生 False Green：
+      复用并扩展既有 daemon/guard/test-integrity.ts 与 Evidence tests_modified 字段，
+      在 POST_VERIFICATION 检测到既有测试被修改或删除且合同未显式豁免时，触发受影响测试的基线隔离重跑；
+      重跑仅还原被修改/删除的既有测试文件（新增测试文件不参与基线重跑），重跑失败抛 E_TEST_BASELINE_REGRESSION，
+      重跑环境不可用抛 E_TEST_BASELINE_UNAVAILABLE 并 fail-closed 阻断合并；
+      合同 Schema 新增可选显式豁免字段 allow_baseline_test_mutation，豁免时在 Evidence test_integrity 留痕可审计；
+      merger 在 PRE_MERGE 阶段独立核验证据中的测试完整性。
+    risk_level: HIGH
+  acceptance:
+    - id: P04-P1
+      check: auto
+      text: >-
+        复用并扩展 daemon/guard/test-integrity.ts（既有 isTestPath / detectTestWeakening），
+        能够准确识别 Worker 修改与删除既有测试文件的行为。
+    - id: P04-P2
+      check: auto
+      text: >-
+        POST_VERIFICATION 阶段，当既有测试文件被修改或删除且合同未显式豁免时，
+        触发基线隔离重跑：仅将受影响的被修改/被删除既有测试文件还原至 base 版本（Worker 新增的测试文件不参与基线重跑）。
+    - id: P04-P3
+      check: auto
+      text: >-
+        Worker 删除既有测试文件时，还原至 base 版本的测试重跑必须包含该被删除文件。
+    - id: P04-P4
+      check: auto
+      text: >-
+        基线重跑环境故障（命令超时、node_modules 缺失等无法执行）时，fail-closed 抛出 E_TEST_BASELINE_UNAVAILABLE 阻断合并。
+    - id: P04-P5
+      check: auto
+      text: >-
+        基线重跑执行失败（改码破坏了基线测试）时，fail-closed 抛出 E_TEST_BASELINE_REGRESSION 阻断合并。
+    - id: P04-P6
+      check: auto
+      text: >-
+        合同 Schema（contract.schema.ts）新增可选显式豁免字段 allow_baseline_test_mutation: boolean；
+        声明豁免时跳过基线重跑阻断，但必须在 Evidence test_integrity 中明确记录 exemption: true 留痕。
+    - id: P04-P7
+      check: auto
+      text: >-
+        EvidenceBundle 扩展既有 tests_modified 字段，新增 test_integrity 对象记录修改/删除路径、
+        基线重跑结果与豁免状态；merger 在 PRE_MERGE 阶段从磁盘快照独立核验，未授权修改且重跑未通过拒绝生成 squash 提交。
+    - id: P04-P8
+      check: auto
+      text: >-
+        负向测试覆盖：篡改既有测试删断言/加 skip、删除既有测试、基线执行故障、显式豁免留痕等全部场景；常规无修改测试用例零回归。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/lib/evidence.schema.ts
+      - src/lib/contract.schema.ts
+      - src/lib/error-codes.ts
+      - docs/specs/runtime-contract-and-safety.md
+      - daemon/guard/test-integrity.ts
+      - daemon/pipeline/orchestrator.ts
+      - daemon/pipeline/merger.ts
+      - tests/unit/test-integrity-guard.test.ts
+      - tests/daemon/p0-4-test-integrity-fail-closed.test.ts
+    readonly_paths:
+      - daemon/worker/sandbox/container-host.ts
+      - daemon/worker/worker-adapter.interface.ts
+      - daemon/guard/evidence-integrity.ts
+      - docs/specs/evidence-and-acceptance-criteria.md
+      - daemon/mcp/gateway.ts
+  verification:
+    commands:
+      - { alias: p04-unit, executable: npx, args: [vitest, run, tests/unit/test-integrity-guard.test.ts, tests/daemon/p0-4-test-integrity-fail-closed.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) 扩展 daemon/guard/test-integrity.ts，实现基线测试比对与重跑准备逻辑，
+    精确区分新增测试（不参与基线重跑）与被修改/被删除的既有测试（从 base 还原重跑）。
+    2) contract.schema.ts 新增 allow_baseline_test_mutation?: boolean 可选豁免字段；
+    error-codes.ts 与 runtime-contract-and-safety.md 登记 E_TEST_BASELINE_REGRESSION 与 E_TEST_BASELINE_UNAVAILABLE。
+    3) orchestrator 在 POST_VERIFICATION 阶段，检测到 tests_modified 时若未获合同豁免，
+    执行隔离重跑；执行异常抛 E_TEST_BASELINE_UNAVAILABLE，测试失败抛 E_TEST_BASELINE_REGRESSION。
+    4) EvidenceBundle 扩展 tests_modified 并补充 test_integrity 结构体，记录路径列表、重跑状态与豁免留痕；
+    deriveCanMerge 要求在既有测试被动过且未豁免时 baseline_rerun_passed === true。
+    5) merger 在 PRE_MERGE 阶段读 Evidence Snapshot 独立重核 test_integrity，不满足直接拒绝合并。
+    6) 编写单元与集成负向测试，验证断言弱化拦截、删除拦截、超时/环境异常 fail-closed 及豁免审计。
+  touches:
+    - { path: src/lib/evidence.schema.ts, change: modify, why: 扩展 tests_modified 与新增 test_integrity schema，支持基线重跑结果与豁免记录, symbols: [deriveCanMerge] }
+    - { path: src/lib/contract.schema.ts, change: modify, why: 合同 Schema 新增 allow_baseline_test_mutation 显式豁免字段, symbols: [] }
+    - { path: src/lib/error-codes.ts, change: modify, why: 登记 E_TEST_BASELINE_REGRESSION 与 E_TEST_BASELINE_UNAVAILABLE, symbols: [] }
+    - { path: docs/specs/runtime-contract-and-safety.md, change: modify, why: §8.1 登记两项基线测试回归拒绝码与语义说明, symbols: [] }
+    - { path: daemon/guard/test-integrity.ts, change: modify, why: 复用已有函数，增加既有测试修改/删除识别与基线还原重跑逻辑, symbols: [isTestPath, detectTestWeakening] }
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: POST_VERIFICATION 触发基线隔离重跑并注入 test_integrity 到 Evidence, symbols: [] }
+    - { path: daemon/pipeline/merger.ts, change: modify, why: PRE_MERGE 阶段独立校验 test_integrity 快照, symbols: [] }
+    - { path: tests/unit/test-integrity-guard.test.ts, change: modify, why: 测试文件分类、既有/新增区分、基线还原判定单元测试, symbols: [] }
+    - { path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, change: modify, why: 弱化断言拦截、删除拦截、不可用阻断、豁免留痕与合并门禁端到端测试, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: P04-P1, test_path: tests/unit/test-integrity-guard.test.ts, level: unit, case: "P04-U4: classifyTouchedTestPaths identifies modified, deleted, and added tests" }
+    - { acceptance_id: P04-P2, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, case: "P04-I1: Worker 修改既有测试掩盖回归 -> 基线还原重跑捕获回归 -> fail-closed E_TEST_BASELINE_REGRESSION" }
+    - { acceptance_id: P04-P3, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, case: "P04-I2: Worker 删除既有测试 -> 还原被删除测试参与基线重跑 -> fail-closed 阻断" }
+    - { acceptance_id: P04-P4, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, case: "P04-I3: 基线重跑环境故障（命令超时或缺失） -> fail-closed E_TEST_BASELINE_UNAVAILABLE" }
+    - { acceptance_id: P04-P5, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, case: "P04-I1: Worker 修改既有测试掩盖回归 -> 基线还原重跑捕获回归 -> fail-closed E_TEST_BASELINE_REGRESSION" }
+    - { acceptance_id: P04-P6, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, case: "P04-I4: 合同显式声明 allow_baseline_test_mutation -> 豁免基线重跑阻断并留痕" }
+    - { acceptance_id: P04-P7, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, case: "P04-I5: merger PRE_MERGE 阶段独立核验证据快照与合同豁免" }
+    - { acceptance_id: P04-P8, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, case: "P04-I6: Worker 仅新增测试与修改源码，未改动既有测试 -> 零阻断零回归放行" }
+governance:
+  delivered: { pr: 426, commit: 191779e06e47097bf644a22f376042066197ae97 }
+  spec_refs:
+    - docs/specs/runtime-contract-and-safety.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+  depends_on: []
+  code_facts:
+    - { ref: "daemon/guard/test-integrity.ts:26-40", note: "isTestPath 测试路径判定" }
+    - { ref: "daemon/guard/test-integrity.ts:128-155", note: "detectTestWeakening 测试断言弱化与 skip 检测" }
+    - { ref: "src/lib/evidence.schema.ts:196-205", note: "tests_modified 可选布尔字段已存在" }
+    - { ref: "daemon/pipeline/orchestrator.ts:1235-1236", note: "POST_VERIFICATION 阶段 testsModified 判定" }
+    - { ref: "daemon/pipeline/merger.ts:310-312", note: "merger.ts 仅写 Stagent-Tests-Modified trailer 不阻断合并" }
+    - { ref: "src/lib/contract.schema.ts:320-350", note: "execution_permissions 现有字段集合，尚无 allow_baseline_test_mutation" }
+  non_goals:
+    - 不引入复杂的 Red-Green 双阶段状态机
+    - 不修改非测试文件的既有验证命令执行流程
+    - 不把新增测试文件纳入 base 还原重跑范围
+    - 不默认允许篡改测试且不静默放行
+  fail:
+    - 修改既有测试被篡改通过却未跑基线重跑直接合并（False Green 逃逸）
+    - 基线重跑环境故障（超时、依赖缺失）时静默放行
+    - 将 Worker 新增的测试当成既有测试在基线还原中报错或误删
+    - 显式豁免未在 Evidence test_integrity 留痕
+    - merger 未独立校验磁盘 Evidence Snapshot 中的 test_integrity
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+
+#### 归档注记（P-330 · 2026-11-26）
+
+- **交付 PR**：[#426](https://github.com/he18718143986-design/IDE/pull/426)（head `cde432706623b7b900f8dac138ff50faa50c371b`，squash `191779e06e47097bf644a22f376042066197ae97`，操作者由我执行）。
+- **范围与检查**：仅 9 个授权 `writable_paths`（+1491/−28），5 个 `readonly_paths` 保持零 diff。相关单元与集成测试（15 tests in `test-integrity-guard.test.ts`、6 tests in `p0-4-test-integrity-fail-closed.test.ts`）全部通过。必需 CI 全绿（三平台 Lint/Typecheck + ubuntu/macOS Unit + Docs/Knowledge/Perf/Detect；无 CANCELLED），Windows Unit 失败为既有环境存量（与 #424/#420 逐条一致），Cursor Bugbot neutral。
+- **P04-P1（既有测试改/删识别）**：`daemon/guard/test-integrity.ts` 实现 `classifyTouchedTestPaths` 与 `classifySingleTestPath`，准确将工作树中的测试文件划分为 `modifiedExistingTests`、`deletedExistingTests` 与 `workerAddedTests`；纯函数化设计，依赖注入 `GitRunner`（`execGit` 窄封装）。
+- **P04-P2～P3（基线隔离重跑三边界）**：(a) `restoreBaselineTestFiles` 仅将被修改与被删除的既有测试文件从 base 检出还原，`hideWorkerAddedTests` 临时隔离（重命名为 `.stagent-p04-added.bak`）Worker 新增的测试文件，确保新增测试不参与基线重跑；(b) Worker 删除既有测试文件时，还原至 base 版本的测试重跑必包含该被删除文件；(c) 重跑结束后在 `finally` 块中严格恢复工作树修改态并复原新增测试文件。
+- **P04-P4～P5（Fail-Closed 双错误码）**：基线重跑命令执行故障（超时、依赖缺失、执行器不可用等）时，fail-closed 抛出 `E_TEST_BASELINE_UNAVAILABLE`；基线重跑失败（Worker 改码导致既有测试红）时，fail-closed 抛出 `E_TEST_BASELINE_REGRESSION`；两错误码均在 `src/lib/error-codes.ts` 与 `docs/specs/runtime-contract-and-safety.md` §8.1 完整登记。
+- **P04-P6（合同豁免留痕）**：`src/lib/contract.schema.ts` 在 `execution_permissions` 新增可选 `allow_baseline_test_mutation: boolean` 豁免字段；当合同显式声明豁免时放行基线修改，但 `orchestrator.ts` 必须在 Evidence 的 `test_integrity` 中明确记录 `exemption: true` 及受影响路径与参数留痕可审计。
+- **P04-P7（Merger 独立核验）**：`daemon/pipeline/merger.ts` 在 `PRE_MERGE` 阶段增加 `assertEvidenceTestIntegrity`，直接从磁盘快照独立核验 `test_integrity` 与合同授权：未经合同豁免修改既有测试且重跑未通过时拒绝合并（抛出 `MergeGateError(E_CANNOT_MERGE)`）。
+- **P04-P8（负向测试覆盖与零回归）**：新建 `tests/unit/test-integrity-guard.test.ts`（15 例）与 `tests/daemon/p0-4-test-integrity-fail-closed.test.ts`（6 组全链路端到端场景），覆盖弱化断言拦截、删除测试还原重跑拦截、超时与环境故障 fail-closed、合同显式豁免审计放行、merger PRE_MERGE 独立拦截及仅新增测试不阻断放行等场景；既有验证流水线零回归。
+- **诚实口径**：**测试篡改拦截与基线独立重跑已交付（默认 fail-closed、三边界、豁免留痕、merger 独立核验）；P0 风险未宣称解除**。
+
