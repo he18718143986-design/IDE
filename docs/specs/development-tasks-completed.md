@@ -13519,12 +13519,12 @@ design:
     - { path: tests/daemon/p0-3b-container-scope-fail-closed.test.ts, change: create, why: 容器内文件系统 Scope 负向阻断、.git 保护与合法写入集成测试, symbols: [] }
   interfaces: []
   test_plan:
-    - { acceptance_id: P03B2-P1, test_path: tests/unit/docker-container-host-mounts.test.ts, level: unit, case: "正确构建 scoped 与 readonly_enforced 模式下的 docker 参数" }
-    - { acceptance_id: P03B2-P2, test_path: tests/daemon/p0-3b-container-scope-fail-closed.test.ts, level: integration, case: "真实 Docker 环境下 Scope 外写 EACCES、.git 写被拒、授权写放行" }
-    - { acceptance_id: P03B2-P3, test_path: tests/unit/docker-container-host-mounts.test.ts, level: unit, case: "SandboxWitness 准确回写 mount_mode 与 mount_count" }
-    - { acceptance_id: P03B2-P4, test_path: tests/unit/docker-container-host-mounts.test.ts, level: unit, case: "verifySandboxWitness 严格校验 mount_mode 与 mount_count 合法性" }
-    - { acceptance_id: P03B2-P5, test_path: tests/daemon/p0-3b-container-scope-fail-closed.test.ts, level: integration, case: "逃生门 UNCONTROLLED_EXTERNAL 语义不变" }
-    - { acceptance_id: P03B2-P6, test_path: tests/daemon/p0-3b-container-scope-fail-closed.test.ts, level: integration, case: "全套门禁双重拦截非法状态，既有功能零回归" }
+    - { acceptance_id: P03B2-P1, test_path: tests/unit/docker-container-host-mounts.test.ts, level: unit, case: "buildArgs 在 scoped 模式生成根 :ro、.git tmpfs 遮蔽与独立 :rw 挂载" }
+    - { acceptance_id: P03B2-P2, test_path: tests/daemon/p0-3b-container-scope-fail-closed.test.ts, level: integration, case: "Scope 外文件写入被内核只读文件系统拦截 (EACCES / Read-only file system)" }
+    - { acceptance_id: P03B2-P3, test_path: tests/unit/docker-container-host-mounts.test.ts, level: unit, case: "sandboxWitness 如实记录 mount_mode 与 mount_count" }
+    - { acceptance_id: P03B2-P4, test_path: tests/unit/docker-container-host-mounts.test.ts, level: unit, case: "verifySandboxWitness 模式与数量有效性断言" }
+    - { acceptance_id: P03B2-P5, test_path: tests/unit/docker-container-host-mounts.test.ts, level: unit, case: "OpenHandsSandboxAdapter 从 contract 读取 writable_paths 透传 scope" }
+    - { acceptance_id: P03B2-P6, test_path: tests/unit/docker-container-host-mounts.test.ts, level: unit, case: "ContractOrchestrator resolveContainerMountMode 区分验收与施工" }
 governance:
   delivered: { pr: 434, commit: 0a92eb773962f5d60189463883be589bd187b8be }
   spec_refs:
