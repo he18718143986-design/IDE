@@ -1920,6 +1920,8 @@ contract:
       - daemon/pipeline/merger.ts
       - tests/unit/container-witness-verify.test.ts
       - tests/daemon/p0-3a-container-wiring-and-witness.test.ts
+      - tests/unit/evidence-schema-v11.test.ts
+      - tests/daemon/p0-1-evidence-merge-fail-closed.test.ts
     readonly_paths:
       - src/lib/contract.schema.ts
       - daemon/guard/evidence-integrity.ts
@@ -1951,6 +1953,8 @@ design:
     - { path: daemon/pipeline/merger.ts, change: modify, why: PRE_MERGE 阶段对 SANDBOX_ENFORCED 独立核验证据内的 sandbox_witness, symbols: [] }
     - { path: tests/unit/container-witness-verify.test.ts, change: create, why: verifySandboxWitness 纯函数断言与边界单元测试, symbols: [] }
     - { path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, change: create, why: 生产装配、逃生门日志、负向拦截与合并阻断端到端测试, symbols: [] }
+    - { path: tests/unit/evidence-schema-v11.test.ts, change: modify, why: 对齐 P0.3a fail-closed 见证强制校验，更新 SANDBOX_ENFORCED 验收逻辑测试夹具, symbols: [] }
+    - { path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, change: modify, why: 对齐 P0.3a fail-closed 见证强制校验，更新 SANDBOX_ENFORCED 见证校验与合并断言夹具, symbols: [] }
   interfaces: []
   test_plan:
     - { acceptance_id: P03A-P1, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, case: "P03A-P1: server 构造注入 containerHost 与逃生门 WARNING 日志" }
