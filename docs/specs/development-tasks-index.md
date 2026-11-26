@@ -231,8 +231,8 @@
 | `TASK-J.60` | `COMPLETED` | 计划节点目标与 Worker 实际产出对齐（立卡 P-314；施工 #403 `5173e8e`；完工回写 P-315；估算 S；提案按验收命令能力过滤脚手架目标；核销侧零改动；既有图不回溯） | [正文](./development-tasks-completed.md#task-j.60) · [诊断简报](../ledger/j60-plan-output-mismatch-brief.md) · [n3 复测](../ledger/j60-n3-retest-after-merge.md) |
 | `TASK-J.61` | `COMPLETED` | 既有任务图目标迁移：重新派生 + 空目标节点退役 + 依赖重接（立卡 P-317；施工 #407 `cd28cc0`；完工回写 P-318；估算 S；已点亮状态保留；真机迁移 `revision` 13→16、`n10` 点亮；端到端闭环未宣称） | [正文](./development-tasks-completed.md#task-j.61) · [施工方案](../ledger/j61-graph-targets-migration-plan.md) · [迁移实测](../ledger/j61-graph-targets-migration.md) |
 | `TASK-J.62` | `COMPLETED` | execute 命令路径解析产品 CLI（立卡 P-321；施工 #412 `a05b5bf`；完工回写 P-322；估算 S；白名单前置 + 威胁守卫后解析；复用 J.59 错误码；零漂移；真钥匙复测不在本卡） | [正文](./development-tasks-completed.md#task-j.62) · [施工方案](../ledger/j62-execute-resolve-plan.md) · [施工记录](../ledger/j62-execute-resolve.md) |
-| `TASK-P0.1` | `NEW_TASK` | Evidence / Merge Fail-Closed：控制模式与合同版本双重封锁（立卡 P-324；估算 S；未开工） | [正文](./development-tasks-active.md#task-p0.1) |
-| `TASK-P0.2` | `NEW_TASK` | Full Git Candidate Scope Audit：全量候选变更 Scope 审计（立卡 P-324；估算 M；硬依赖 P0.1；未开工） | [正文](./development-tasks-active.md#task-p0.2) |
+| `TASK-P0.1` | `COMPLETED` | Evidence / Merge Fail-Closed：控制模式与合同版本双重封锁已交付（立卡 P-324；施工 #418 `dc225a0`；完工回写 P-325；估算 S；候选提交绑定重核；负向测试实跑含反证；独立审查验收已完成，P0 风险未宣称解除） | [正文](./development-tasks-completed.md#task-p0.1) · [施工记录](../ledger/p0-1-evidence-merge-fail-closed.md) |
+| `TASK-P0.2` | `NEW_TASK` | Full Git Candidate Scope Audit：全量候选变更 Scope 审计（立卡 P-324；估算 M；硬依赖 P0.1（已满足，P-325）；未开工） | [正文](./development-tasks-active.md#task-p0.2) |
 
 ---
 
