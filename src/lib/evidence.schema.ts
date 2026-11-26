@@ -156,12 +156,23 @@ export type Verdict = z.infer<typeof verdictSchema>;
 /** 外部写入证据时使用的 verdict 类型：剥离派生字段 */
 export type DraftVerdict = Omit<Verdict, "can_merge">;
 
+export const sandboxMountModeSchema = z.enum([
+  "scoped",
+  "readonly_enforced",
+  "legacy_full_rw",
+]);
+export type SandboxMountMode = z.infer<typeof sandboxMountModeSchema>;
+
 export const sandboxWitnessSchema = z.object({
   host_kind: z.string().min(1),
   via: z.enum(["exit", "timeout", "SIGKILL", "rejected"]),
   exit_code: z.number().int().nullable(),
   duration_ms: z.number().nonnegative(),
   worktree_root: z.string().min(1),
+  /** TASK-P0.3b-2: 容器挂载模式 */
+  mount_mode: sandboxMountModeSchema.optional(),
+  /** TASK-P0.3b-2: 容器生效挂载项总数 */
+  mount_count: z.number().int().nonnegative().optional(),
 });
 export type SandboxWitness = z.infer<typeof sandboxWitnessSchema>;
 
@@ -304,6 +315,24 @@ export const evidenceBundleSchema = z
           blocking.push(
             `sandbox_witness.host_kind(${bundle.sandbox_witness.host_kind})`,
           );
+        } else if (
+          bundle.sandbox_witness.mount_mode &&
+          !["scoped", "readonly_enforced", "legacy_full_rw"].includes(
+            bundle.sandbox_witness.mount_mode,
+          )
+        ) {
+          blocking.push(
+            `sandbox_witness.mount_mode(${bundle.sandbox_witness.mount_mode})`,
+          );
+        } else if (
+          bundle.sandbox_witness.mount_count !== undefined &&
+          (typeof bundle.sandbox_witness.mount_count !== "number" ||
+            !Number.isInteger(bundle.sandbox_witness.mount_count) ||
+            bundle.sandbox_witness.mount_count < 0)
+        ) {
+          blocking.push(
+            `sandbox_witness.mount_count(${bundle.sandbox_witness.mount_count})`,
+          );
         }
       }
       if (blocking.length > 0) {
@@ -404,6 +433,22 @@ export function deriveCanMerge(input: {
       hk.trim() === "" ||
       hk === "unknown" ||
       hk.toLowerCase().includes("unavailable")
+    ) {
+      return false;
+    }
+    if (
+      sw.mount_mode !== undefined &&
+      sw.mount_mode !== "scoped" &&
+      sw.mount_mode !== "readonly_enforced" &&
+      sw.mount_mode !== "legacy_full_rw"
+    ) {
+      return false;
+    }
+    if (
+      sw.mount_count !== undefined &&
+      (typeof sw.mount_count !== "number" ||
+        !Number.isInteger(sw.mount_count) ||
+        sw.mount_count < 0)
     ) {
       return false;
     }

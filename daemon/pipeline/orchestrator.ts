@@ -93,6 +93,7 @@ import { createDefaultWorkerRegistry } from "../worker/default-worker-registry";
 import { resolveEvidenceControlMode } from "../worker/worker-adapter.interface";
 import type {
   ContainerHostPort,
+  SandboxMountMode,
   SandboxWitness,
 } from "../worker/sandbox/container-host";
 import {
@@ -347,6 +348,20 @@ export class ContractOrchestrator {
     this.designNoteGenerator = options.designNoteGenerator;
     this.workerRegistry = options.registry ?? createDefaultWorkerRegistry();
     this.containerHost = options.containerHost;
+  }
+
+  /**
+   * TASK-P0.3b-2: 验收执行挂载模式解析。
+   * 验收阶段（T / verification）执行严格全量只读挂载 readonly_enforced，
+   * 施工阶段（I / construction）执行授权路径 scoped 读写挂载。
+   */
+  resolveContainerMountMode(
+    phase: "construction" | "acceptance" | "t" | "i",
+  ): SandboxMountMode {
+    if (phase === "acceptance" || phase === "t") {
+      return "readonly_enforced";
+    }
+    return "scoped";
   }
 
   /** TASK-W.6：诊断 / 设置面可读取当前已注册适配器 id 列表 */
@@ -1552,6 +1567,10 @@ export class ContractOrchestrator {
        * 未传则用构造器上的 `containerHost`；`SANDBOX_ENFORCED` 未注入宿主即拒绝派工。
        */
       containerHost?: ContainerHostPort;
+      /**
+       * TASK-P0.3b-2: 容器挂载模式覆盖（例如验收阶段只读 readonly_enforced）
+       */
+      mountMode?: SandboxMountMode | undefined;
     } = {},
   ): Promise<
     WorkerRunResult & { two_phase?: TwoPhaseResult; design?: DesignRunInfo }
@@ -1704,6 +1723,10 @@ export class ContractOrchestrator {
        * 未传则用构造器上的 `containerHost`；未注入宿主即拒绝派工。
        */
       containerHost?: ContainerHostPort;
+      /**
+       * TASK-P0.3b-2: 容器挂载模式覆盖（例如验收阶段只读 readonly_enforced）
+       */
+      mountMode?: SandboxMountMode | undefined;
     } = {},
   ): Promise<
     WorkerRunResult & { two_phase?: TwoPhaseResult; design?: DesignRunInfo }
@@ -1799,8 +1822,22 @@ export class ContractOrchestrator {
       // ----- 全部豁免 / 无义务：保持旧单段路径 -----
       if (!shouldRunTwoPhase(derived.obligations)) {
         const { gateway, costMonitor } = this.buildRuntime(current, signal);
+        const effectiveMountMode = options.mountMode;
+        const phaseContract =
+          effectiveMountMode === "readonly_enforced"
+            ? {
+                ...current,
+                authorization: {
+                  ...current.authorization,
+                  file_system_scope: {
+                    ...current.authorization.file_system_scope,
+                    writable_paths: [],
+                  },
+                },
+              }
+            : current;
         const context: WorkerDispatchContext = {
-          contract: current,
+          contract: phaseContract,
           gateway,
           costMonitor,
           modelClient,
@@ -1914,6 +1951,7 @@ export class ContractOrchestrator {
       const runPhaseWorker = async (
         gateway: ScopedWorktreeGateway,
         extras: string[],
+        phase?: "t" | "i",
       ): Promise<void> => {
         const costMonitor = gateway.getCostMonitor();
         if (!costMonitor) {
@@ -1921,8 +1959,24 @@ export class ContractOrchestrator {
             "ScopedWorktreeGateway missing costMonitor in two-phase run",
           );
         }
+        const effectiveMountMode =
+          options.mountMode ??
+          (phase === "t" ? "readonly_enforced" : undefined);
+        const phaseContract =
+          effectiveMountMode === "readonly_enforced"
+            ? {
+                ...current,
+                authorization: {
+                  ...current.authorization,
+                  file_system_scope: {
+                    ...current.authorization.file_system_scope,
+                    writable_paths: [],
+                  },
+                },
+              }
+            : current;
         const context: WorkerDispatchContext = {
-          contract: current,
+          contract: phaseContract,
           gateway,
           costMonitor,
           modelClient,
@@ -1950,7 +2004,7 @@ export class ContractOrchestrator {
         runT:
           userHooks.runT ??
           (async (gateway, extras) => {
-            await runPhaseWorker(gateway, extras);
+            await runPhaseWorker(gateway, extras, "t");
             if (userHooks.readObligationReport === undefined) {
               await this.materializeObligationReport(
                 current,
@@ -1963,7 +2017,7 @@ export class ContractOrchestrator {
         runI:
           userHooks.runI ??
           (async (gateway, extras) => {
-            await runPhaseWorker(gateway, extras);
+            await runPhaseWorker(gateway, extras, "i");
             if (userHooks.readObligationReport === undefined) {
               await this.materializeObligationReport(
                 current,

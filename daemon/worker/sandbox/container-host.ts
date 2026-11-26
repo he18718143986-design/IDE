@@ -126,6 +126,14 @@ export interface SandboxRunInput {
    * 密钥改走 `secretFiles`。
    */
   env?: Record<string, string>;
+  /** TASK-P0.3b-2: 细粒度挂载范围 */
+  scope?:
+    | {
+        writable_paths?: readonly string[] | undefined;
+      }
+    | undefined;
+  /** TASK-P0.3b-2: 容器挂载模式 */
+  mountMode?: SandboxMountMode | undefined;
 }
 
 export interface SandboxRunOutcome {
@@ -137,6 +145,10 @@ export interface SandboxRunOutcome {
   /** `via === "rejected"` 时的拒绝原因码 */
   rejection?: SandboxRejectionCode;
   durationMs: number;
+  /** TASK-P0.3b-2: 实际生效挂载模式 */
+  mountMode?: SandboxMountMode | undefined;
+  /** TASK-P0.3b-2: 实际生效挂载项总数 */
+  mountCount?: number | undefined;
 }
 
 /**
@@ -175,6 +187,10 @@ export interface SandboxWitness {
   readonly duration_ms: number;
   /** 实际挂载进容器的唯一宿主根 */
   readonly worktree_root: string;
+  /** TASK-P0.3b-2: 实际生效挂载模式 */
+  readonly mount_mode?: SandboxMountMode | undefined;
+  /** TASK-P0.3b-2: 实际生效挂载项总数 */
+  readonly mount_count?: number | undefined;
 }
 
 /** 依据宿主实际执行结果产出见证（唯一产出点） */
@@ -183,12 +199,16 @@ export function sandboxWitness(
   input: SandboxRunInput,
   outcome: SandboxRunOutcome,
 ): SandboxWitness {
+  const mountMode = outcome.mountMode ?? input.mountMode;
+  const mountCount = outcome.mountCount;
   return {
     host_kind: host.kind ?? "unknown",
     via: outcome.via,
     exit_code: outcome.exitCode,
     duration_ms: outcome.durationMs,
     worktree_root: input.worktreeRoot,
+    ...(mountMode !== undefined ? { mount_mode: mountMode } : {}),
+    ...(mountCount !== undefined ? { mount_count: mountCount } : {}),
   };
 }
 
@@ -267,6 +287,34 @@ export function verifySandboxWitness(
       throw new SandboxWitnessValidationError(
         "WITNESS_WORKTREE_MISMATCH",
         `沙箱见证工作树不匹配: 见证挂载=${normWitness}, 预期=${normExpected}`,
+      );
+    }
+  }
+
+  // TASK-P0.3b-2: 挂载模式有效性校验
+  if (witness.mount_mode !== undefined) {
+    if (
+      witness.mount_mode !== "scoped" &&
+      witness.mount_mode !== "readonly_enforced" &&
+      witness.mount_mode !== "legacy_full_rw"
+    ) {
+      throw new SandboxWitnessValidationError(
+        "WITNESS_MOUNT_MODE_INVALID",
+        `沙箱见证挂载模式非法: ${String(witness.mount_mode)}，仅允许 scoped / readonly_enforced / legacy_full_rw`,
+      );
+    }
+  }
+
+  // TASK-P0.3b-2: 挂载点数量有效性校验
+  if (witness.mount_count !== undefined) {
+    if (
+      typeof witness.mount_count !== "number" ||
+      !Number.isInteger(witness.mount_count) ||
+      witness.mount_count < 0
+    ) {
+      throw new SandboxWitnessValidationError(
+        "WITNESS_MOUNT_COUNT_INVALID",
+        `沙箱见证挂载点数量非法: ${String(witness.mount_count)}`,
       );
     }
   }
@@ -463,6 +511,11 @@ export async function runInSandbox(
  * - `readonly_enforced`: 全量只读挂载，严禁任何 :rw 挂载（验收阶段）。
  */
 export type MountMode = "scoped" | "readonly_enforced";
+
+/**
+ * TASK-P0.3b-2: 容器实际生效的挂载模式枚举（包含向后兼容的全卷读写）。
+ */
+export type SandboxMountMode = MountMode | "legacy_full_rw";
 
 /**
  * 挂载项条目规格。

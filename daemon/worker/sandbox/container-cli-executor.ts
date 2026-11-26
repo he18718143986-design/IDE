@@ -108,6 +108,10 @@ export interface ContainerCliExecutionInput {
   signal?: AbortSignal;
   maxArtifactBytes?: number;
   runSandbox?: typeof runInSandbox;
+  /** TASK-P0.3b-2: 细粒度挂载范围 */
+  scope?: SandboxRunInput["scope"] | undefined;
+  /** TASK-P0.3b-2: 容器挂载模式 */
+  mountMode?: SandboxRunInput["mountMode"] | undefined;
 }
 
 export interface ContainerCliExecutionResult extends AdapterRunOutcome {
@@ -233,6 +237,8 @@ export async function executeContainerCli(
     ...(input.allowedTargets === undefined
       ? {}
       : { allowedTargets: input.allowedTargets }),
+    ...(input.scope === undefined ? {} : { scope: input.scope }),
+    ...(input.mountMode === undefined ? {} : { mountMode: input.mountMode }),
   };
   const declaredMode = input.declaredControlMode;
   if (declaredMode !== "SANDBOX_ENFORCED") {

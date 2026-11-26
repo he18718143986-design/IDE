@@ -6,12 +6,16 @@ import path from "node:path";
 import {
   CONTAINER_SECRET_ENV_KEYS,
   SandboxRejectedError,
+  prepareHostPlaceholders,
+  resolveScopedMounts,
   validateSandboxInput,
   type ContainerHostPort,
   type SandboxMount,
+  type SandboxMountMode,
   type SandboxRunInput,
   type SandboxRunOutcome,
   type SandboxSecretFile,
+  type ScopedMountSpec,
 } from "../sandbox/container-host";
 import { spawnManaged, type ManagedProcess } from "./process-host";
 
@@ -256,6 +260,7 @@ export class DockerContainerHost implements ContainerHostPort {
     input: SandboxRunInput,
     name: string,
     secrets: readonly MaterializedSecretMount[] = [],
+    mountSpec?: ScopedMountSpec,
   ): string[] {
     const hostRoot = path.resolve(input.worktreeRoot);
     const cwd = input.cwd;
@@ -303,11 +308,29 @@ export class DockerContainerHost implements ContainerHostPort {
       this.opts.memoryLimit ?? "2g",
       "--cpus",
       this.opts.cpus ?? "2",
-      "-v",
-      `${hostRoot}:${this.containerWorkRoot}`,
-      "-w",
-      containerCwd,
     ];
+
+    // TASK-P0.3b-2: 挂载配置接入
+    const spec =
+      mountSpec ??
+      (input.mountMode !== undefined || input.scope !== undefined
+        ? resolveScopedMounts(hostRoot, input.scope?.writable_paths ?? [], {
+            containerWorkRoot: this.containerWorkRoot,
+            mode:
+              input.mountMode === "readonly_enforced"
+                ? "readonly_enforced"
+                : "scoped",
+          })
+        : undefined);
+
+    if (spec) {
+      args.push(...spec.dockerArgs);
+    } else {
+      // 既有全量读写单挂载（向后兼容未指定 scope/mountMode 的测试）
+      args.push("-v", `${hostRoot}:${this.containerWorkRoot}`);
+    }
+
+    args.push("-w", containerCwd);
 
     for (const mount of input.mounts ?? []) {
       args.push("-v", this.mountArg(mount));
@@ -378,6 +401,7 @@ export class DockerContainerHost implements ContainerHostPort {
     let safe: SandboxRunInput;
     let args: string[];
     let materialized: MaterializedSecretMount[] = [];
+    let mountSpec: ScopedMountSpec | undefined;
     try {
       // 宿主侧再校验一次（纵深防御）：即便有人绕过 `runInSandbox()` 直接调本类，
       // 也拿不到「挂载宿主根 / cwd 越界」的容器。
@@ -386,7 +410,31 @@ export class DockerContainerHost implements ContainerHostPort {
         safe.secretFiles,
         this.containerWorkRoot,
       );
-      args = this.buildArgs(safe, name, materialized);
+
+      const hostRoot = path.resolve(safe.worktreeRoot);
+      const isScopedOrReadonly =
+        safe.mountMode !== undefined || safe.scope !== undefined;
+
+      if (isScopedOrReadonly) {
+        const mode =
+          safe.mountMode === "readonly_enforced"
+            ? "readonly_enforced"
+            : "scoped";
+        mountSpec = resolveScopedMounts(
+          hostRoot,
+          safe.scope?.writable_paths ?? [],
+          {
+            containerWorkRoot: this.containerWorkRoot,
+            mode,
+          },
+        );
+
+        if (mountSpec.placeholderPaths.length > 0) {
+          prepareHostPlaceholders(hostRoot, mountSpec.placeholderPaths);
+        }
+      }
+
+      args = this.buildArgs(safe, name, materialized, mountSpec);
     } catch (err) {
       cleanupMaterializedSecrets(materialized);
       if (err instanceof SandboxRejectedError) {
@@ -441,12 +489,19 @@ export class DockerContainerHost implements ContainerHostPort {
         this.cleanupContainer(name);
       }
 
+      const outcomeMountMode: SandboxMountMode = mountSpec
+        ? mountSpec.mode
+        : "legacy_full_rw";
+      const outcomeMountCount = mountSpec ? mountSpec.entries.length : 1;
+
       return {
         exitCode: code,
         stdout: stdout.join("\n"),
         stderr: proc.stderr(),
         via,
         durationMs: Date.now() - started,
+        mountMode: outcomeMountMode,
+        mountCount: outcomeMountCount,
       };
     } finally {
       cleanupMaterializedSecrets(materialized);

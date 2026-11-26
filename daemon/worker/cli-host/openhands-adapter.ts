@@ -4,6 +4,7 @@ import {
   runInSandbox,
   sandboxWitness,
   type ContainerHostPort,
+  type SandboxMountMode,
   type SandboxRunInput,
   type SandboxRunOutcome,
 } from "../sandbox/container-host";
@@ -132,6 +133,8 @@ export interface OpenHandsAdapterOptions {
   verifiedOn?: { cli_version: string; verified_at: string } | undefined;
   /** 测试可替换 runInSandbox（默认真实围栏 + 宿主） */
   runSandbox?: typeof runInSandbox;
+  /** TASK-P0.3b-2: 挂载模式覆盖（如验收期 readonly_enforced） */
+  mountMode?: SandboxMountMode | undefined;
 }
 
 /** 允许从 Daemon 环境透传进容器的模型侧变量（不含其他密钥） */
@@ -144,7 +147,8 @@ function redact(text: string, secret: string | undefined): string {
 }
 
 /** 粗估 token（1 token ≈ 4 字符），与 `ai-worker` 同口径 */
-const estimateTokens = (text: string): number => Math.ceil(text.length / 4);
+const estimateTokens = (text: string | undefined): number =>
+  Math.ceil((text ?? "").length / 4);
 
 export class OpenHandsSandboxAdapter implements CodingWorkerAdapter {
   readonly declaration = OPENHANDS_CAPABILITY;
@@ -212,6 +216,13 @@ export class OpenHandsSandboxAdapter implements CodingWorkerAdapter {
     const argv = this.buildArgv(input);
     const runSandbox = this.opts.runSandbox ?? runInSandbox;
     const secretFiles = this.secretFilesForKey(key);
+    const writablePaths =
+      input.contract?.authorization?.file_system_scope?.writable_paths;
+    const mountMode: SandboxMountMode | undefined =
+      this.opts.mountMode ??
+      (writablePaths !== undefined && writablePaths.length > 0
+        ? "scoped"
+        : undefined);
     const sandboxInput: SandboxRunInput = {
       worktreeRoot: input.worktree_root,
       argv,
@@ -224,6 +235,10 @@ export class OpenHandsSandboxAdapter implements CodingWorkerAdapter {
         : { timeoutMs: this.opts.timeoutMs }),
       env: this.containerEnv(),
       ...(secretFiles.length === 0 ? {} : { secretFiles }),
+      ...(writablePaths !== undefined && writablePaths.length > 0
+        ? { scope: { writable_paths: writablePaths } }
+        : {}),
+      ...(mountMode !== undefined ? { mountMode } : {}),
     };
 
     // 唯一执行路径：进入容器围栏。此处没有 if/else 的本地分支。
