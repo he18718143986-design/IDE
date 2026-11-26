@@ -88,9 +88,28 @@ describe("TASK-P0.3b-2: Container Scope Fail-Closed 负向集成测试", () => {
     }
   });
 
-  // 真实 Docker 负向集成测试：仅在宿主具备可用 Docker daemon 时执行
-  const liveHost = new DockerContainerHost();
-  const describeLive = liveHost.isAvailable() ? describe : describe.skip;
+  // 真实 Docker 负向集成测试：仅在宿主具备可用 Docker daemon 且已拉取测试镜像时执行
+  // 若未预拉取测试镜像（如 CI 无镜像环境），如实跳过，避免长时间拉取巨型镜像超时
+  function isDockerImageReady(image: string): boolean {
+    try {
+      execFileSync("docker", ["image", "inspect", image], {
+        stdio: "ignore",
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  const testImage =
+    process.env.STAGENT_TEST_CONTAINER_IMAGE ??
+    "ghcr.io/all-hands-ai/openhands:latest";
+  const liveHost = new DockerContainerHost({ image: testImage });
+  const isLiveReady =
+    liveHost.isAvailable() &&
+    (process.env.STAGENT_LIVE_DOCKER_TEST === "1" ||
+      isDockerImageReady(testImage));
+  const describeLive = isLiveReady ? describe : describe.skip;
 
   describeLive(
     "真实 Docker 容器环境挂载作用域隔离验证（需 Docker daemon）",
