@@ -1827,7 +1827,7 @@ governance:
 
 > 本卡已 **COMPLETED**（施工 [#412](https://github.com/he18718143986-design/IDE/pull/412) squash `a05b5bf6b96b53e77325ea07e8cd9b17cb967881`；立卡 P-321；完工回写 P-322）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-j.62) §3.4ca。诚实口径：**execute 命令路径解析产品 CLI 已交付（白名单前置 + 威胁守卫后解析、复用 J.59 错误码、零漂移）；真钥匙复测不在本卡，端到端闭环未宣称**。
 
-### 3.4cb Evidence / Merge 失败关闭与全量候选 Scope 审计（P0-1 / P0-2 · 立卡 P-324 · P0-1 完工回写 P-325 正文已迁 · P0-2 未开工）
+### 3.4cb Evidence / Merge 失败关闭与全量候选 Scope 审计（P0-1 / P0-2 · 立卡 P-324 · P0-1 完工回写 P-325 · P0-2 完工回写 P-326 · 正文均已迁出）
 
 > **立卡说明（2026-11-26 · P-324）**：授权来源为 Tina 本轮审批（四项修改全部采纳，按修订后规格立卡；DoD 修订版原文由审批方在本轮重述，「以此为准」）。操作者由我执行。纯 docs 立卡，**立卡 ≠ 开工**，不改产品代码。两卡同一份 docs PR。顺序锁定：**P0-1 先行、独立审查验收；P0-2 待 P0-1 完成后实施**。P0-3（容器强制）与 P0-4（独立验收）**本轮不立卡**，挂账见 [`../ledger/README.md`](../ledger/README.md) 开放项，待两卡落地后重新评估。
 >
@@ -1842,3 +1842,292 @@ governance:
 <a id="task-p0.2"></a>
 
 > `TASK-P0.2` 已由 PR [#420](https://github.com/he18718143986-design/IDE/pull/420) squash `bf8d3b9ca1fd1247fe861953e14618b3c969de2c` 交付并完工回写（P-326）；正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-p0.2) §3.4cd。全量候选变更 Scope 审计已交付；P0 风险未宣称解除。此处保留立卡说明与审批边界。
+
+
+---
+
+### 3.4cc 生产 Daemon 容器装配与测试完整性防护（P0-3a / P0-4 · 立卡 P-327 · 未开工）
+
+> **立卡说明（2026-11-26 · P-327）**：授权来源为 Tina 本轮审批（四项修正全部采纳：P0-3a 装配落点 `server.ts:639` 传 `containerHost`；`STAGENT_DISABLE_CONTAINER=1` 运维逃生门落 WARNING 且如实记档不得冒认；`verifySandboxWitness` 断言 `via === "exit"`/`worktree_root`/`host_kind`，`exit_code` 只记不断言；P0-4 复用已有 `test-integrity.ts` 与 `tests_modified`；基线重跑三边界定死且环境不可用记 `E_TEST_BASELINE_UNAVAILABLE`；`allow_baseline_test_mutation` 显式豁免进 Evidence 留痕可审计；授权立卡）。操作者由我执行。纯 docs 立卡，**立卡 ≠ 开工**，不改产品代码。两卡同一份 docs PR。
+>
+> **施工顺序锁定**：P0-3a 与 P0-4 无硬依赖可并行，但建议 **P0-3a 先行**（改动面更集中）。P0-3b（容器文件系统 Scope 强制挂载，L）**继续挂账**，待 P0-3a 落地后再评。
+>
+> **审批边界（两卡共用，逐字写入）**：本审批**不是代码合并批准**，也**不是 P0 风险解除声明**。施工完成后仍需：独立审查实现与测试、负向测试实跑、全量回归、新增绕过路径检查、Evidence 与 Merge 实际裁决行为确认。施工 PR 全绿报授权，Windows 存量失败按先例报 `UNSTABLE`；范围外文件要动就停工修卡。
+
+<a id="task-p0.3a"></a>
+
+#### 【Task P0.3a】生产 Daemon 装配接线 + SandboxWitness 落盘与深层断言 `[NEW_TASK]`
+
+```yaml task-card
+id: TASK-P0.3a
+status: NEW_TASK
+contract:
+  intent:
+    title: 生产 Daemon 装配接线 + SandboxWitness 落盘与深层断言
+    description: >-
+      做完后，生产 Daemon 在 server.ts 构造 ContractOrchestrator 时显式注入 DockerContainerHost，
+      解开 SANDBOX_ENFORCED 派工被 E_ADAPTER_SANDBOX_LOCKED 拒绝的死结；提供 STAGENT_DISABLE_CONTAINER=1 显式运维逃生门，
+      设置时在 daemon.jsonl 记 WARNING 并在 Evidence 如实记档、不得冒认 SANDBOX_ENFORCED；
+      EvidenceBundle 新增可选 sandbox_witness 字段并原子落盘；verifySandboxWitness 严格断言 via === "exit"、
+      worktree_root 规范化后与合同工作树严格相等、host_kind 为有效已知类型，exit_code 只记录不断言；
+      SANDBOX_ENFORCED 证据在生成与合并阶段双重强制校验 witness，缺失或不合规一律 fail-closed 阻断合并。
+    risk_level: HIGH
+  acceptance:
+    - id: P03A-P1
+      check: auto
+      text: >-
+        DaemonServerOptions 与装配接线支持注入 containerHost；server.ts 构造 ContractOrchestrator 时
+        默认注入 DockerContainerHost（环境可用时）；支持 STAGENT_DISABLE_CONTAINER=1 显式运维逃生门，
+        启用时在 daemon.jsonl 记录 WARNING 级别日志（含来源）。
+    - id: P03A-P2
+      check: auto
+      text: >-
+        运维逃生门启用或容器宿主不可用时，SANDBOX_ENFORCED 派工 fail-closed 抛 E_ADAPTER_SANDBOX_LOCKED；
+        Evidence 的 worker_control_mode 如实记录（如 UNCONTROLLED_EXTERNAL），严禁冒认 SANDBOX_ENFORCED。
+    - id: P03A-P3
+      check: auto
+      text: >-
+        EvidenceBundle 新增可选 sandbox_witness 字段（向后兼容旧证据），记录 host_kind、via、exit_code、
+        duration_ms、worktree_root；orchestrator 在任务执行完毕后从 containerHost 采集并落盘进证据。
+    - id: P03A-P4
+      check: auto
+      text: >-
+        verifySandboxWitness 严格断言：via === "exit"（排除 rejected/timeout/SIGKILL 冒认受控）、
+        worktree_root 规范化后等于合同工作树、host_kind 非 unknown/unavailable；exit_code 只记录不断言
+        （见证证明确实在沙箱运行过，Worker 执行失败由 verdict 阻断，不否定见证真实性）。
+    - id: P03A-P5
+      check: auto
+      text: >-
+        worker_control_mode === "SANDBOX_ENFORCED" 时，deriveCanMerge（生成时）与
+        merger.assertEvidenceControlAndRevision（合并时）双重校验 sandbox_witness，缺失或断言失败一律 fail-closed 阻断合并。
+    - id: P03A-P6
+      check: auto
+      text: >-
+        负向测试覆盖：witness 缺失、via 非 "exit"（timeout/rejected/SIGKILL）、worktree_root 不匹配、
+        host_kind 非法等场景均被拦截并阻断合并；合规 witness 正常放行。
+    - id: P03A-P7
+      check: auto
+      text: >-
+        既有 GATEWAY_ENFORCED 合并与派工路径零回归，不受 sandbox_witness 校验影响。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/server.ts
+      - src/lib/evidence.schema.ts
+      - daemon/worker/sandbox/container-host.ts
+      - daemon/worker/worker-adapter.interface.ts
+      - daemon/pipeline/orchestrator.ts
+      - daemon/pipeline/merger.ts
+      - tests/unit/container-witness-verify.test.ts
+      - tests/daemon/p0-3a-container-wiring-and-witness.test.ts
+    readonly_paths:
+      - src/lib/contract.schema.ts
+      - daemon/guard/evidence-integrity.ts
+      - daemon/worker/cli-host/docker-container-host.ts
+      - docs/specs/runtime-contract-and-safety.md
+      - daemon/mcp/gateway.ts
+  verification:
+    commands:
+      - { alias: p03a-unit, executable: npx, args: [vitest, run, tests/unit/container-witness-verify.test.ts, tests/daemon/p0-3a-container-wiring-and-witness.test.ts, tests/unit/container-host.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) DaemonServerOptions 增加 containerHost?: ContainerHostPort | null 可选配置；server.ts 在构造 ContractOrchestrator 时，
+    根据 STAGENT_DISABLE_CONTAINER 环境变量与 options.containerHost 决定是否注入 DockerContainerHost；
+    若设置 STAGENT_DISABLE_CONTAINER=1，在 daemon.jsonl 输出 WARNING 日志记录设置来源。
+    2) 扩展 EvidenceBundle schema，加入可选 sandbox_witness 字段；定义 verifySandboxWitness 纯函数，
+    断言 via === "exit"、worktree_root 与合同工作树一致、host_kind 非 unknown/unavailable，exit_code 只记录不断言。
+    3) orchestrator 在任务执行完毕写 Evidence 时，若执行模式为 SANDBOX_ENFORCED 则从 containerHost 获取见证写入证据，
+    并在 deriveCanMerge 中校验 witness 合规性。
+    4) merger 在 assertEvidenceControlAndRevision 阶段，若 worker_control_mode === "SANDBOX_ENFORCED"，
+    从磁盘快照读取 sandbox_witness 执行 verifySandboxWitness，缺失或非法抛出 E_CANNOT_MERGE。
+    5) 编写单元测试与集成负向测试，验证断言覆盖及 GATEWAY_ENFORCED 零回归。
+  touches:
+    - { path: daemon/server.ts, change: modify, why: DaemonServerOptions 扩充 containerHost 注入；支持 STAGENT_DISABLE_CONTAINER=1 逃生门与 WARNING 日志, symbols: [DaemonServerOptions] }
+    - { path: src/lib/evidence.schema.ts, change: modify, why: 扩展 EvidenceBundle 新增可选 sandbox_witness 字段；deriveCanMerge 接入沙箱见证校验, symbols: [deriveCanMerge] }
+    - { path: daemon/worker/sandbox/container-host.ts, change: modify, why: 导出 verifySandboxWitness 校验函数，实现深层见证判定, symbols: [] }
+    - { path: daemon/worker/worker-adapter.interface.ts, change: modify, why: resolveEvidenceControlMode 对接见证有效性判定, symbols: [resolveEvidenceControlMode] }
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: 证据写入采集 sandbox_witness 并调用深层校验, symbols: [] }
+    - { path: daemon/pipeline/merger.ts, change: modify, why: PRE_MERGE 阶段对 SANDBOX_ENFORCED 独立核验证据内的 sandbox_witness, symbols: [] }
+    - { path: tests/unit/container-witness-verify.test.ts, change: create, why: verifySandboxWitness 纯函数断言与边界单元测试, symbols: [] }
+    - { path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, change: create, why: 生产装配、逃生门日志、负向拦截与合并阻断端到端测试, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: P03A-P1, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, case: "P03A-P1: server 构造注入 containerHost 与逃生门 WARNING 日志" }
+    - { acceptance_id: P03A-P2, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, case: "P03A-P2: 宿主禁用时派工被拒且 Evidence 如实记档不冒认" }
+    - { acceptance_id: P03A-P3, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, case: "P03A-P3: EvidenceBundle 落盘 sandbox_witness 字段" }
+    - { acceptance_id: P03A-P4, test_path: tests/unit/container-witness-verify.test.ts, level: unit, case: "P03A-P4: verifySandboxWitness 严格断言 via/worktree/host_kind 且 exit_code 只记不断言" }
+    - { acceptance_id: P03A-P5, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, case: "P03A-P5: SANDBOX_ENFORCED 缺 witness 或断言失败阻断合并" }
+    - { acceptance_id: P03A-P6, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, case: "P03A-P6: 负向测试拦截各类异常 witness" }
+    - { acceptance_id: P03A-P7, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, case: "P03A-P7: GATEWAY_ENFORCED 路径零回归" }
+governance:
+  spec_refs:
+    - docs/specs/runtime-contract-and-safety.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+  depends_on: []
+  code_facts:
+    - { ref: "daemon/server.ts:639-665", note: "构造 ContractOrchestrator 时未注入 containerHost" }
+    - { ref: "daemon/pipeline/orchestrator.ts:335-344", note: "OrchestratorOptions 已支持接收 containerHost" }
+    - { ref: "daemon/worker/sandbox/container-host.ts:164-172", note: "SandboxWitness 仅包含 5 字段且仅在内存 Map 驻留未落盘" }
+    - { ref: "daemon/worker/worker-adapter.interface.ts:168-185", note: "resolveEvidenceControlMode 仅检查 witness 是否存在" }
+    - { ref: "daemon/pipeline/merger.ts:580-605", note: "assertEvidenceControlAndRevision 仅校验 worker_control_mode 枚举值" }
+    - { ref: "daemon/worker/cli-host/docker-container-host.ts:290-310", note: "DockerContainerHost 实现类与挂载参数" }
+  non_goals:
+    - 不做容器文件系统细粒度 Scope 强制挂载（P0-3b，保持挂账）
+    - 不改动既有 GATEWAY_ENFORCED 的网络与写范围校验
+    - 不改动旧证据 schema 的向后兼容性（sandbox_witness 仍为可选）
+    - 不在此卡实现独立验收与基线重跑（TASK-P0.4）
+  fail:
+    - STAGENT_DISABLE_CONTAINER=1 启用时在 Evidence 冒认 SANDBOX_ENFORCED 或未记录 WARNING 日志
+    - verifySandboxWitness 错误断言 exit_code === 0 导致有效但失败的 Worker 见证被判定为假见证
+    - 允许 via 为 timeout/rejected/SIGKILL 的见证通过 SANDBOX_ENFORCED 合并校验
+    - 缺少 sandbox_witness 的 SANDBOX_ENFORCED 证据成功合并
+    - 破坏既有 GATEWAY_ENFORCED 任务的派工与合并
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+<a id="task-p0.4"></a>
+
+#### 【Task P0.4】独立验收与测试完整性防护 `[NEW_TASK]`
+
+```yaml task-card
+id: TASK-P0.4
+status: NEW_TASK
+contract:
+  intent:
+    title: 独立验收与测试完整性防护
+    description: >-
+      做完后，防范 Worker 篡改或删除既有测试文件以产生 False Green：
+      复用并扩展既有 daemon/guard/test-integrity.ts 与 Evidence tests_modified 字段，
+      在 POST_VERIFICATION 检测到既有测试被修改或删除且合同未显式豁免时，触发受影响测试的基线隔离重跑；
+      重跑仅还原被修改/删除的既有测试文件（新增测试文件不参与基线重跑），重跑失败抛 E_TEST_BASELINE_REGRESSION，
+      重跑环境不可用抛 E_TEST_BASELINE_UNAVAILABLE 并 fail-closed 阻断合并；
+      合同 Schema 新增可选显式豁免字段 allow_baseline_test_mutation，豁免时在 Evidence test_integrity 留痕可审计；
+      merger 在 PRE_MERGE 阶段独立核验证据中的测试完整性。
+    risk_level: HIGH
+  acceptance:
+    - id: P04-P1
+      check: auto
+      text: >-
+        复用并扩展 daemon/guard/test-integrity.ts（既有 isTestPath / detectTestWeakening），
+        能够准确识别 Worker 修改与删除既有测试文件的行为。
+    - id: P04-P2
+      check: auto
+      text: >-
+        POST_VERIFICATION 阶段，当既有测试文件被修改或删除且合同未显式豁免时，
+        触发基线隔离重跑：仅将受影响的被修改/被删除既有测试文件还原至 base 版本（Worker 新增的测试文件不参与基线重跑）。
+    - id: P04-P3
+      check: auto
+      text: >-
+        Worker 删除既有测试文件时，还原至 base 版本的测试重跑必须包含该被删除文件。
+    - id: P04-P4
+      check: auto
+      text: >-
+        基线重跑环境故障（命令超时、node_modules 缺失等无法执行）时，fail-closed 抛出 E_TEST_BASELINE_UNAVAILABLE 阻断合并。
+    - id: P04-P5
+      check: auto
+      text: >-
+        基线重跑执行失败（改码破坏了基线测试）时，fail-closed 抛出 E_TEST_BASELINE_REGRESSION 阻断合并。
+    - id: P04-P6
+      check: auto
+      text: >-
+        合同 Schema（contract.schema.ts）新增可选显式豁免字段 allow_baseline_test_mutation: boolean；
+        声明豁免时跳过基线重跑阻断，但必须在 Evidence test_integrity 中明确记录 exemption: true 留痕。
+    - id: P04-P7
+      check: auto
+      text: >-
+        EvidenceBundle 扩展既有 tests_modified 字段，新增 test_integrity 对象记录修改/删除路径、
+        基线重跑结果与豁免状态；merger 在 PRE_MERGE 阶段从磁盘快照独立核验，未授权修改且重跑未通过拒绝生成 squash 提交。
+    - id: P04-P8
+      check: auto
+      text: >-
+        负向测试覆盖：篡改既有测试删断言/加 skip、删除既有测试、基线执行故障、显式豁免留痕等全部场景；常规无修改测试用例零回归。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - src/lib/evidence.schema.ts
+      - src/lib/contract.schema.ts
+      - src/lib/error-codes.ts
+      - docs/specs/runtime-contract-and-safety.md
+      - daemon/guard/test-integrity.ts
+      - daemon/pipeline/orchestrator.ts
+      - daemon/pipeline/merger.ts
+      - tests/unit/test-integrity-guard.test.ts
+      - tests/daemon/p0-4-test-integrity-fail-closed.test.ts
+    readonly_paths:
+      - daemon/worker/sandbox/container-host.ts
+      - daemon/worker/worker-adapter.interface.ts
+      - daemon/guard/evidence-integrity.ts
+      - docs/specs/evidence-and-acceptance-criteria.md
+      - daemon/mcp/gateway.ts
+  verification:
+    commands:
+      - { alias: p04-unit, executable: npx, args: [vitest, run, tests/unit/test-integrity-guard.test.ts, tests/daemon/p0-4-test-integrity-fail-closed.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) 扩展 daemon/guard/test-integrity.ts，实现基线测试比对与重跑准备逻辑，
+    精确区分新增测试（不参与基线重跑）与被修改/被删除的既有测试（从 base 还原重跑）。
+    2) contract.schema.ts 新增 allow_baseline_test_mutation?: boolean 可选豁免字段；
+    error-codes.ts 与 runtime-contract-and-safety.md 登记 E_TEST_BASELINE_REGRESSION 与 E_TEST_BASELINE_UNAVAILABLE。
+    3) orchestrator 在 POST_VERIFICATION 阶段，检测到 tests_modified 时若未获合同豁免，
+    执行隔离重跑；执行异常抛 E_TEST_BASELINE_UNAVAILABLE，测试失败抛 E_TEST_BASELINE_REGRESSION。
+    4) EvidenceBundle 扩展 tests_modified 并补充 test_integrity 结构体，记录路径列表、重跑状态与豁免留痕；
+    deriveCanMerge 要求在既有测试被动过且未豁免时 baseline_rerun_passed === true。
+    5) merger 在 PRE_MERGE 阶段读 Evidence Snapshot 独立重核 test_integrity，不满足直接拒绝合并。
+    6) 编写单元与集成负向测试，验证断言弱化拦截、删除拦截、超时/环境异常 fail-closed 及豁免审计。
+  touches:
+    - { path: src/lib/evidence.schema.ts, change: modify, why: 扩展 tests_modified 与新增 test_integrity schema，支持基线重跑结果与豁免记录, symbols: [deriveCanMerge] }
+    - { path: src/lib/contract.schema.ts, change: modify, why: 合同 Schema 新增 allow_baseline_test_mutation 显式豁免字段, symbols: [] }
+    - { path: src/lib/error-codes.ts, change: modify, why: 登记 E_TEST_BASELINE_REGRESSION 与 E_TEST_BASELINE_UNAVAILABLE, symbols: [] }
+    - { path: docs/specs/runtime-contract-and-safety.md, change: modify, why: §8.1 登记两项基线测试回归拒绝码与语义说明, symbols: [] }
+    - { path: daemon/guard/test-integrity.ts, change: modify, why: 复用已有函数，增加既有测试修改/删除识别与基线还原重跑逻辑, symbols: [isTestPath, detectTestWeakening] }
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: POST_VERIFICATION 触发基线隔离重跑并注入 test_integrity 到 Evidence, symbols: [] }
+    - { path: daemon/pipeline/merger.ts, change: modify, why: PRE_MERGE 阶段独立校验 test_integrity 快照, symbols: [] }
+    - { path: tests/unit/test-integrity-guard.test.ts, change: create, why: 测试文件分类、既有/新增区分、基线还原判定单元测试, symbols: [] }
+    - { path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, change: create, why: 弱化断言拦截、删除拦截、不可用阻断、豁免留痕与合并门禁端到端测试, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: P04-P1, test_path: tests/unit/test-integrity-guard.test.ts, level: unit, case: "P04-P1: 准确识别既有测试修改与删除" }
+    - { acceptance_id: P04-P2, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, case: "P04-P2: 仅还原修改的既有测试且新增测试不参与基线重跑" }
+    - { acceptance_id: P04-P3, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, case: "P04-P3: 删除既有测试时还原后重跑必含该测试" }
+    - { acceptance_id: P04-P4, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, case: "P04-P4: 基线重跑环境故障 fail-closed 抛 E_TEST_BASELINE_UNAVAILABLE" }
+    - { acceptance_id: P04-P5, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, case: "P04-P5: 基线重跑失败 fail-closed 抛 E_TEST_BASELINE_REGRESSION" }
+    - { acceptance_id: P04-P6, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, case: "P04-P6: allow_baseline_test_mutation 豁免留痕且可审计" }
+    - { acceptance_id: P04-P7, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, case: "P04-P7: merger 在 PRE_MERGE 阶段独立核验 test_integrity" }
+    - { acceptance_id: P04-P8, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, case: "P04-P8: 负向用例全拦截与常规交付零回归" }
+governance:
+  spec_refs:
+    - docs/specs/runtime-contract-and-safety.md
+    - docs/specs/evidence-and-acceptance-criteria.md
+  depends_on: []
+  code_facts:
+    - { ref: "daemon/guard/test-integrity.ts:26-40", note: "isTestPath 测试路径判定" }
+    - { ref: "daemon/guard/test-integrity.ts:128-155", note: "detectTestWeakening 测试断言弱化与 skip 检测" }
+    - { ref: "src/lib/evidence.schema.ts:196-205", note: "tests_modified 可选布尔字段已存在" }
+    - { ref: "daemon/pipeline/orchestrator.ts:1235-1236", note: "POST_VERIFICATION 阶段 testsModified 判定" }
+    - { ref: "daemon/pipeline/merger.ts:310-312", note: "merger.ts 仅写 Stagent-Tests-Modified trailer 不阻断合并" }
+    - { ref: "src/lib/contract.schema.ts:320-350", note: "execution_permissions 现有字段集合，尚无 allow_baseline_test_mutation" }
+  non_goals:
+    - 不引入复杂的 Red-Green 双阶段状态机
+    - 不修改非测试文件的既有验证命令执行流程
+    - 不把新增测试文件纳入 base 还原重跑范围
+    - 不默认允许篡改测试且不静默放行
+  fail:
+    - 修改既有测试被篡改通过却未跑基线重跑直接合并（False Green 逃逸）
+    - 基线重跑环境故障（超时、依赖缺失）时静默放行
+    - 将 Worker 新增的测试当成既有测试在基线还原中报错或误删
+    - 显式豁免未在 Evidence test_integrity 留痕
+    - merger 未独立校验磁盘 Evidence Snapshot 中的 test_integrity
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
