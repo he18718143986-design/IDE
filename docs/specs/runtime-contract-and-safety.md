@@ -255,7 +255,7 @@
 | `E_UNSAFE_EXECUTION` | runtime-interceptor | 短路、降级 | 「Worker 失联 / 不受控」 | ✓ | `UNSAFE_EXECUTION` |
 | `PATH_TRAVERSAL_DETECTED` | Gateway 路径解析 | 短路 | 同上 | ✓ | `SCOPE_VIOLATION` |
 | `E_FORBIDDEN_PATH` | Gateway `checkWriteAccess` | §5.2 | 超出范围（保护） | ✓ | `SCOPE_VIOLATION` |
-| `E_OUT_OF_SCOPE` | Gateway / AiWorker / 检查点 | §5.2 | §15.6 扩权卡 | ✓ | `SCOPE_VIOLATION` |
+| `E_OUT_OF_SCOPE` | Gateway / AiWorker / 候选变更审计检查点（PRE_EXECUTION / POST_VERIFICATION / PRE_MERGE） | §5.2 | §15.6 扩权卡 | ✓ | `SCOPE_VIOLATION` |
 | `E_OUT_OF_SCOPE_UNTRACKED` | 未跟踪文件检查点 | §5.2 | §15.6 扩权卡 | ✓ | `SCOPE_VIOLATION` |
 | `E_TEST_FILE_WRITE_BLOCKED` | Gateway 测试文件守卫 | 拒绝当次写 | 检查反复失败类 | 待登记 | `SCOPE_VIOLATION`（提案） |
 | `E_BUDGET_EXCEEDED` | 成本监视 | 熔断 | 接近 / 超出预算 | ✓ | `BUDGET_EXHAUSTED` |
@@ -272,6 +272,12 @@
 - **`contract_revision` 字段缺失复用 `E_EVIDENCE_REVISION_MISMATCH`**（缺失即「无法确认与当前合同一致」，与版本不符同一处理）；不另立码。
 - **控制模式拒绝（`worker_control_mode` 缺失、`UNCONTROLLED_EXTERNAL` 或未知值）用 `E_CANNOT_MERGE`**——沿用 merger 既有「证据不可合并」字面量（与 `E_EVIDENCE_MISSING` / `E_EVIDENCE_MISMATCH` 同属 `MergeGateError` 字面量，不入 `ERROR_CODES`），不新增码。`GATEWAY_ENFORCED` / `SANDBOX_ENFORCED` 字符串只是证据记档，**不构成执行受控的真实性证明**；SandboxWitness 深层验证属 P0-3。
 - **候选提交绑定不一致（任务分支 tip ≠ 证据 `worktree_snapshot.head_sha` / `git_info.task_commit_sha`，或读不到分支 tip）用 `E_EVIDENCE_STALE`**（既有码）。
+
+**全量候选变更审计用码（TASK-P0.2，审批方 2026-11-26 拍板 · 选 A 新旧路径均审）**：
+- **未跟踪文件越界**：沿用既有 **`E_OUT_OF_SCOPE_UNTRACKED`** 码（§8.1 + `ERROR_CODES`），保留 `tests/unit/untracked-scope-guard.test.ts` 零回归。
+- **已跟踪文件变更 / 重命名 / 删除越界**：使用既有 **`E_OUT_OF_SCOPE`** 码（已登记，不新增码）。
+- **重命名双向判定（裁决选 A）**：源路径与目标路径均必须在 `writable_paths` 范围内；任一侧越界即判越权阻断，防范通过 rename 窃取 Scope 外受保护文件或逃避写权限校验。
+- **PRE_MERGE 分支复核**：在 Worktree 状态审计基础上，附加 `git diff --name-status base...HEAD` 分支差异复核，拦截即便已提前提交进任务分支的越权改动。
 
 **移出 L3**：`E_CHECKPOINT_FAILED`（开一轮前打检查点失败）——不是执行期码。
 

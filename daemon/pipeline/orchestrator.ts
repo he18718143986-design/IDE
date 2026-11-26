@@ -150,6 +150,14 @@ import {
   type UntrackedScopeReport,
 } from "./untracked-scope-guard";
 import {
+  E_OUT_OF_SCOPE,
+  CandidateScopeViolationError,
+  describeCandidateViolations,
+  enforceCandidateScope,
+  type CandidateAuditPhase,
+  type CandidateScopeReport,
+} from "./candidate-scope-audit";
+import {
   appendSilentContractRecord,
   intersectWithProtection,
   loadRoundState,
@@ -1072,10 +1080,10 @@ export class ContractOrchestrator {
       worktreePath,
     );
 
-    // TASK-W.2b：执行前未跟踪文件守卫。
+    // TASK-W.2b / TASK-P0.2：执行前全量候选变更守卫。
     // 必须早于 commitWorktree——`git add -A` 一旦把越界文件做进提交，
     // 它们就变成已跟踪文件，`git diff --name-only` 再也区分不出来。
-    await this.assertUntrackedScope({
+    await this.assertCandidateScope({
       contract: current,
       worktreePath,
       phase: "PRE_EXECUTION",
@@ -1198,10 +1206,10 @@ export class ContractOrchestrator {
       worktreePath,
     );
 
-    // TASK-W.2b：验收前再查一次未跟踪文件。
+    // TASK-W.2b / TASK-P0.2：验收前全量候选变更守卫。
     // 验证命令（测试脚本、构建脚本）会绕过网关直接落盘，这是网关拦不到的
     // 第二条通道；命中越界同样阻断，绝不产出 PASSED 证据。
-    const postVerifyScope = await this.assertUntrackedScope({
+    const postVerifyScope = await this.assertCandidateScope({
       contract: current,
       worktreePath,
       phase: "POST_VERIFICATION",
@@ -2199,29 +2207,39 @@ export class ContractOrchestrator {
     void scan.warnings;
   }
 
-  private async assertUntrackedScope(options: {
+  private async assertCandidateScope(options: {
     contract: SoftwareContract;
     worktreePath: string;
-    phase: UntrackedScopePhase;
+    phase: CandidateAuditPhase;
     costMonitor?: CostMonitor | undefined;
     verificationResults?: VerificationResultInput[] | undefined;
-  }): Promise<UntrackedScopeReport> {
-    const report = await enforceUntrackedScope({
+  }): Promise<CandidateScopeReport> {
+    const report = await enforceCandidateScope({
       worktreePath: options.worktreePath,
       scope: options.contract.authorization.file_system_scope,
       phase: options.phase,
+      baseBranch: options.contract.authorization.git.base_branch,
     });
     if (report.passed) return report;
 
+    const isOnlyUntracked =
+      report.violations.length > 0 &&
+      report.violations.every((v) => v.changeType === "UNTRACKED");
+    const code = isOnlyUntracked ? E_OUT_OF_SCOPE_UNTRACKED : E_OUT_OF_SCOPE;
+
     // 复用 forbidden_violations 通道承载违规清单：它是证据包里唯一
     // 既能让 deriveCanMerge 归零、又能逐条追溯的字符串数组。
-    const violations = report.violations.map((v) => `untracked:${v.path}`);
+    const violations = report.violations.map((v) =>
+      v.changeType === "UNTRACKED"
+        ? `untracked:${v.path}`
+        : `candidate:${v.changeType.toLowerCase()}:${v.path}`,
+    );
     await this.writeEvidence(
       options.contract,
       {
         status: "BLOCKED",
         reasonCode: "SCOPE_VIOLATION",
-        summary: `[${E_OUT_OF_SCOPE_UNTRACKED}] ${describeUntrackedViolations(report)}`,
+        summary: `[${code}] ${describeCandidateViolations(report)}`,
         verificationResults: options.verificationResults ?? [],
         scopePassed: false,
         forbiddenViolations: violations,
@@ -2236,7 +2254,42 @@ export class ContractOrchestrator {
       lifecycleState: "EXECUTING",
     });
 
-    throw new UntrackedScopeViolationError(report);
+    if (isOnlyUntracked) {
+      throw new UntrackedScopeViolationError({
+        phase: report.phase,
+        inspected: report.inspected,
+        skipped: report.skipped,
+        violations: report.violations.map((v) => ({
+          path: v.path,
+          reason: v.reason,
+          message: v.message,
+        })),
+        passed: report.passed,
+      });
+    }
+
+    throw new CandidateScopeViolationError(report);
+  }
+
+  private async assertUntrackedScope(options: {
+    contract: SoftwareContract;
+    worktreePath: string;
+    phase: UntrackedScopePhase;
+    costMonitor?: CostMonitor | undefined;
+    verificationResults?: VerificationResultInput[] | undefined;
+  }): Promise<UntrackedScopeReport> {
+    const report = await this.assertCandidateScope(options);
+    return {
+      phase: report.phase,
+      inspected: report.inspected,
+      skipped: report.skipped,
+      violations: report.violations.map((v) => ({
+        path: v.path,
+        reason: v.reason,
+        message: v.message,
+      })),
+      passed: report.passed,
+    };
   }
 
   /**
