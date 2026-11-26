@@ -237,6 +237,7 @@
 | `TASK-P0.4` | `COMPLETED` | 独立验收与测试完整性防护（立卡 P-327；完工 P-330；[#426](https://github.com/he18718143986-design/IDE/pull/426)/`191779e0`） | [正文](./development-tasks-completed.md#task-p0.4) |
 | `TASK-P0.3b-1` | `COMPLETED` | 容器文件系统 Scope 挂载规格生成纯函数、合法性校验与宿主占位（立卡 P-333；施工 #432 `dec17e1`；完工回写 P-334；估算 M；Worktree 根只读、`writable_paths` 独立 rw 挂载、tmpfs 遮蔽 `.git`、宿主侧占位文件、`MOUNT_SCOPE_INVALID` 错误码；17 个纯函数单测覆盖；执行接入属 P0.3b-2 未做，P0 风险未宣称解除） | [正文](./development-tasks-completed.md#task-p0.3b-1) · [方案讨论稿](../ledger/p0-3b-container-filesystem-scope-proposal.md) |
 | `TASK-P0.3b-2` | `COMPLETED` | DockerContainerHost 接入 Scope 挂载规格、集成负向测试与见证增强（立卡 P-333；施工 #434 `0a92eb7`；完工回写 P-335；估算 M；DockerContainerHost 接入挂载执行、两阶段挂载、真实容器负向测试写被拒 EACCES、见证记录 `mount_mode`/`mount_count` 与有效性断言；11 个无 Docker 单测覆盖；P0-3b 已交付核销，P0 风险未宣称解除） | [正文](./development-tasks-completed.md#task-p0.3b-2) · [方案讨论稿](../ledger/p0-3b-container-filesystem-scope-proposal.md) |
+| `TASK-P1.1` | `NEW_TASK` | P0 独立验收与 Evidence 可信链专项复核（专项评估 · TASK-P1-EVAL · 立卡 P-336；估算 M；纯文档评估型非施工型，不改代码；交付物六项：可信链威胁模型与选型报告、P0 独立动态验收测试矩阵、跨平台验收范围及判据、信任边界契约草案、后续施工卡建议及优先级、更新后的风险台账；代码交付 ≠ 安全验证通过，P0 风险未宣称解除） | [正文](./development-tasks-active.md#task-p1.1) · [总账报告](../ledger/p0-line-comprehensive-review.md) |
 
 ---
 
