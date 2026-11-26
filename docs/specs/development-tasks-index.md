@@ -235,7 +235,7 @@
 | `TASK-P0.2` | `COMPLETED` | Full Git Candidate Scope Audit：全量候选变更 Scope 审计（立卡 P-324；施工 P-326 · #420 `bf8d3b9`） | [正文](./development-tasks-completed.md#task-p0.2) |
 | `TASK-P0.3a` | `COMPLETED` | 生产 Daemon 装配接线 + SandboxWitness 落盘与深层断言（立卡 P-327；修订 P-328；施工 #424 `5de16ebe`；完工回写 P-329；估算 M；生产 Daemon 容器装配与 SandboxWitness 落盘/深层断言已交付，双重校验 fail-closed、逃生门如实记档；P0 风险未宣称解除） | [正文](./development-tasks-completed.md#task-p0.3a) |
 | `TASK-P0.4` | `COMPLETED` | 独立验收与测试完整性防护（立卡 P-327；完工 P-330；[#426](https://github.com/he18718143986-design/IDE/pull/426)/`191779e0`） | [正文](./development-tasks-completed.md#task-p0.4) |
-| `TASK-P0.3b-1` | `NEW_TASK` | 容器文件系统 Scope 挂载规格生成纯函数、合法性校验与宿主占位（立卡 P-333；估算 M；Worktree 根只读、`writable_paths` 独立 rw 挂载、tmpfs 遮蔽 `.git`、宿主侧占位文件、`MOUNT_SCOPE_INVALID` 错误码；纯函数单测覆盖；立卡 ≠ 开工，P0 风险未宣称解除） | [正文](./development-tasks-active.md#task-p0.3b-1) · [方案讨论稿](../ledger/p0-3b-container-filesystem-scope-proposal.md) |
+| `TASK-P0.3b-1` | `COMPLETED` | 容器文件系统 Scope 挂载规格生成纯函数、合法性校验与宿主占位（立卡 P-333；施工 #432 `dec17e1`；完工回写 P-334；估算 M；Worktree 根只读、`writable_paths` 独立 rw 挂载、tmpfs 遮蔽 `.git`、宿主侧占位文件、`MOUNT_SCOPE_INVALID` 错误码；17 个纯函数单测覆盖；执行接入属 P0.3b-2 未做，P0 风险未宣称解除） | [正文](./development-tasks-completed.md#task-p0.3b-1) · [方案讨论稿](../ledger/p0-3b-container-filesystem-scope-proposal.md) |
 | `TASK-P0.3b-2` | `NEW_TASK` | DockerContainerHost 接入 Scope 挂载规格、集成负向测试与见证增强（立卡 P-333；估算 M；硬依赖 P0.3b-1；DockerContainerHost 接入挂载执行、施工期 scoped 与验收期 readonly 两阶段挂载、真实容器负向测试物理被拒、见证记录 `mount_mode`/`mount_count`、运维逃生门如实记档；立卡 ≠ 开工，P0 风险未宣称解除） | [正文](./development-tasks-active.md#task-p0.3b-2) · [方案讨论稿](../ledger/p0-3b-container-filesystem-scope-proposal.md) |
 
 ---
