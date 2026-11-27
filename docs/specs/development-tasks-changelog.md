@@ -1,5 +1,7 @@
 # 研发任务规范 · 修订流水
 
+- **P-344（立卡 TASK-P1.4 · Gateway 凭据脱敏与 SandboxWitness Nonce 绑定 · 2026-11-27）**：授权来源为 Tina 本轮「授权合并 #447 后立 TASK-P1.4」。操作者由我执行。基线 main `f13654cd3ca5bb0a4935a5da4495ba45251f0ad4`（#447 squash）。纯 docs 施工立卡，不改产品代码，**立卡 ≠ 开工**。现场核对最新流水 P-343、版本头第 327 条，顺延为 P-344 / 第 328 条；P-285 未占用、不改号。新增 `TASK-P1.4`（M · P2-Medium · `NEW_TASK`），依据评估报告承接 Gateway 凭据脱敏与 SandboxWitness Nonce 绑定：凭据不得进入 stdout/stderr、MCP 回包、audit/error、Evidence 或见证明文；SANDBOX_ENFORCED 每次派工生成可信随机 Nonce，并绑定 contract_id、contract_revision、执行/session 标识与规范化 worktree_root，缺失、错配、跨执行嫁接、重复消费或重放均 fail-closed，字段由 Evidence schema 与现有签名覆盖。明确 daemon 重启后跨进程防重放若未实现须标注限制。硬依赖 TASK-P1.2/P1.3/P1.3a 均已满足。writable/readonly 范围、DoD、负向测试与审批边界已入卡。**审批边界**：本审批不是代码施工授权、不是代码合并批准、不是 P0 风险解除声明；后续施工需 Tina 单卡点名授权。同步版本头、矩阵、索引、active 卡、Sprint、ledger、本 changelog；不新增 OP 号、不改产品代码。P0 风险未宣称解除；CI.2 Hold（P-245）；其余既定状态维持不变。
+
 > DOC-1：自原 `development-tasks.md` §6 整节迁出。枢纽指针见 [`development-tasks.md`](./development-tasks.md)。
 
 ## v1.6.2 修订记录与一致性核对
