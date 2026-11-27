@@ -1972,121 +1972,21 @@ governance:
 > `TASK-P1.4` 已 **COMPLETED**（施工 [#449](https://github.com/he18718143986-design/IDE/pull/449) squash `5901714f4652bd4f3cdc116c8b7aa337881ce82b`；立卡 P-344；完工回写 P-345）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-p1.4) §3.4cm。诚实口径：**Gateway 凭据脱敏与见证 Nonce 绑定已交付（值级脱敏、CSPRNG Nonce、重放阻断、签名覆盖）；Nonce 为内存型存储、Daemon 重启后无跨进程防重放持久性，P0 风险未宣称解除**。此处保留立卡说明与审批边界。
 
 
-### 3.4cn 验收依据不可篡改专项（TASK-P0.2a · 审批称 TASK-P0-2A · 立卡 P-346 · NEW_TASK）
+### 3.4cn 验收依据不可篡改专项（TASK-P0.2a · 审批称 TASK-P0-2A · 立卡 P-346 · 完工 P-347 · 正文已迁出）
 
 > **卡号说明**：审批称 `TASK-P0-2A`。docs 门禁卡号正则为 `^TASK-[A-Z0-9]+(\.[0-9a-z-]+)*$`（`scripts/docs-check/checks.ts:31`），不接受连字符大写后缀；卡头规范落为 **`TASK-P0.2a`**，与审批的 `TASK-P0-2A` 一一对应、语义同一。未改门禁脚本。
 
 <a id="task-p0.2a"></a>
 <a id="task-p0-2a"></a>
 
-```yaml task-card
-id: TASK-P0.2a
-status: NEW_TASK
-contract:
-  intent:
-    title: 验收依据不可篡改专项
-    description: >-
-      核实并加固验收依据不可篡改性与测试完整性链条：封堵当前 Evidence 可选 test_integrity 导致的放行缺口，
-      强制要求当前受控 Evidence 必须包含完整 test_integrity 记录（schema 必填化与 merger fail-closed 拦截）；
-      全面审计测试基线与合同/版本绑定证明、基线不可恢复 fail-closed 复核、测试修改授权链路、合并阶段独立重核及验收环境与施工权限隔离。
-    risk_level: HIGH
-  acceptance:
-    - id: P02A-P1
-      check: auto
-      text: >-
-        当前版本受控 Evidence 必须含完整 test_integrity 记录，缺失 fail-closed：evidence.schema.ts 中 test_integrity
-        设为必填字段；merger.ts 中 assertEvidenceTestIntegrity 封堵 if (!ti) return 放行缺口，缺失即拒并抛出 E_CANNOT_MERGE；
-        负向集成与单元测试覆盖无 test_integrity 或字段残缺的 Evidence 必须被阻断。
-    - id: P02A-P2
-      check: auto
-      text: >-
-        测试基线与合同版本绑定证明审计：验证 BaselineFingerprint / test_baseline_ref 强绑定至当前 contract_id 与
-        contract_revision；测试基线文件缺失、损坏或无法由 Git 树恢复时，执行 fail-closed 拒绝准入，不降级放行。
-    - id: P02A-P3
-      check: auto
-      text: >-
-        既有测试修改授权链路复核：验证仅当合同显式声明 allow_baseline_test_mutation: true 时才允许测试文件变更或豁免；
-        伪造 exemption 或未授权测试变更直接触发 E_CANNOT_MERGE / E_TEST_BASELINE_REGRESSION 拦截。
-    - id: P02A-P4
-      check: auto
-      text: >-
-        合并阶段独立重核与隔离证明：验证 PRE_MERGE 阶段针对 test_integrity、Ed25519 签名及沙箱见证的独立校验完全基于磁盘快照，
-        不受 Worker 内存状态干扰；Worker 施工与验收环境权限完全隔离，审计报告产出落盘 docs/ledger/。
-  scheme_item_ids: []
-  scope:
-    writable_paths:
-      - src/lib/evidence.schema.ts
-      - daemon/pipeline/merger.ts
-      - daemon/pipeline/orchestrator.ts
-      - tests/daemon/p0-1-evidence-merge-fail-closed.test.ts
-      - tests/daemon/p0-4-test-integrity-wiring.test.ts
-      - tests/unit/evidence-signer.test.ts
-      - tests/integration/p1-evidence-signature-gate.test.ts
-      - docs/ledger/p0-2a-test-integrity-audit-and-tamper-proof.md
-    readonly_paths:
-      - daemon/pipeline/evidence-signer.ts
-      - daemon/pipeline/sandbox-witness-nonce.ts
-      - daemon/worker/sandbox/container-host.ts
-      - scripts/verify-p0-independent-suite.ts
-      - docs/ledger/p1-eval-evidence-trust-chain-and-p0-acceptance.md
-      - docs/ledger/p1-line-comprehensive-review.md
-      - docs/specs/development-tasks-completed.md
-  verification:
-    commands:
-      - { alias: focused-p02a, executable: npx, args: [vitest, run, tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, tests/daemon/p0-4-test-integrity-wiring.test.ts, tests/unit/evidence-signer.test.ts, tests/integration/p1-evidence-signature-gate.test.ts] }
-      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
-design:
-  approach: >-
-    修证部分：在 evidence.schema.ts 中将受控版本的 test_integrity 字段由 optional 升级为必填，
-    在 merger.ts 的 assertEvidenceTestIntegrity 入口删除 if (!ti) return 宽松放行分支，改为无 test_integrity 立即抛出
-    MergeGateError(E_CANNOT_MERGE)；并在单元与集成测试中注入缺失 test_integrity 的 Evidence 断言拦截。
-    审计部分：系统核验基线指纹绑定、不可恢复阻断、授权链路、快照独立重核与隔离证明，产出专项审计报告。
-  touches:
-    - { path: src/lib/evidence.schema.ts, change: modify, why: test_integrity 必填化与结构校验约束, symbols: [evidenceBundleSchema] }
-    - { path: daemon/pipeline/merger.ts, change: modify, why: assertEvidenceTestIntegrity 缺项 fail-closed 拦截, symbols: [assertEvidenceTestIntegrity] }
-    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: 生成与写入 Evidence 时确保完整填报 test_integrity, symbols: [writeEvidence] }
-    - { path: docs/ledger/p0-2a-test-integrity-audit-and-tamper-proof.md, change: create, why: 验收依据不可篡改与五项审计证明报告, symbols: [] }
-  interfaces: []
-  test_plan:
-    - { acceptance_id: P02A-P1, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: integration, debt: "覆盖 test_integrity 缺失时 fail-closed 拦截拒绝合并" }
-    - { acceptance_id: P02A-P1, test_path: tests/daemon/p0-4-test-integrity-wiring.test.ts, level: integration, debt: "覆盖 schema 校验与完整性记录合法放行" }
-    - { acceptance_id: P02A-P2, test_path: tests/daemon/p0-4-test-integrity-wiring.test.ts, level: integration, debt: "覆盖基线绑定与基线缺失不可恢复时 fail-closed 阻断" }
-    - { acceptance_id: P02A-P3, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: integration, debt: "覆盖未授权修改既有测试与伪造豁免拦截" }
-    - { acceptance_id: P02A-P4, test_path: tests/integration/p1-evidence-signature-gate.test.ts, level: integration, debt: "覆盖磁盘快照独立校验与权限隔离验证" }
-governance:
-  spec_refs:
-    - docs/ledger/p0-line-comprehensive-review.md
-    - docs/ledger/p1-line-comprehensive-review.md
-    - docs/specs/development-tasks-completed.md#task-p0.4
-    - docs/specs/development-tasks-completed.md#task-p1.2
-  depends_on:
-    - { id: TASK-P0.4, kind: hard }
-    - { id: TASK-P1.2, kind: hard }
-  code_facts:
-    - { ref: "daemon/pipeline/merger.ts::assertEvidenceTestIntegrity", note: "当前实现 if (ti) 存在放行缺口，当 ti 缺失时直接返回，需改为缺失立即抛出 E_CANNOT_MERGE" }
-    - { ref: "src/lib/evidence.schema.ts::evidenceBundleSchema", note: "当前 test_integrity 为 optional，需按当前受控版本改为必填" }
-    - { ref: "daemon/pipeline/orchestrator.ts::writeEvidence", note: "落盘时从 baselineDetector 收集测试完整性快照并填入 Evidence" }
-  non_goals:
-    - 不由 merger 重跑全量测试（架构边界保留）
-    - 不引入外部云端或硬件级 Attestation 机制
-    - 不在未授权情况下开启基线测试变更
-    - 不宣布 P0 风险解除
-  fail:
-    - 缺失 test_integrity 的 Evidence 未被 merger 拦截或绕过门禁
-    - 伪造豁免或未授权修改既有测试通过合并
-    - 修改 writable_paths 外文件或 readonly_paths 产生 diff
-  estimate: M
-  invariants:
-    auth: unchanged
-    demo_origin: unchanged
-    illumination: unchanged
-    gateway_write_scope: unchanged
-```
-
-> **前置条件与硬依赖**：`TASK-P0.4`（基线重跑与测试完整性防护）与 `TASK-P1.2`（Evidence Ed25519 签名门禁）已交付合入，前置依赖链满足。
+> **立卡与归档说明（2026-11-28 · P-346 / P-347）**：授权来源为 Tina 本轮指令「按先例授权合并 #452，执行 TASK-P0.2a 完工回写」。操作者由我执行。对应 P0 验收依据与测试完整性专项，封堵 Evidence 可选 `test_integrity` 放行缺口并完成五项审计证明报告。本卡为施工型任务卡（估算 M，优先级 P1-High），已按授权完成施工与完工回写。
 >
-> **范围与红线**：只允许修改 `writable_paths`；`readonly_paths` 零 diff。严禁放宽既有门禁；严禁把缺项默认为合法。发现需改范围外路径时停工修卡。
+> **目标**：封堵当前受控 Evidence 缺失 `test_integrity` 放行缺口，实现 schema 必填化与 merger fail-closed 强拦截；全面审计测试基线绑定、基线不可恢复阻断、测试修改授权链路、合并阶段独立重核及验收环境隔离，产出专项审计报告。
 >
-> **审批边界（逐字写入）**：本审批**不是代码施工授权**，也**不是代码合并批准**，更**不是 P0 风险解除声明**。本卡为施工立卡，立卡 ≠ 开工；后续施工须由 Tina 单卡点名授权，施工 PR 全绿且 CLEAN 后另行报授权合入。
+> **前置条件与硬依赖**：`TASK-P0.4`、`TASK-P1.2` 施工及完工回写已正式交付合入。
 >
-> **诚实口径**：本卡目标是验收依据不可篡改性加固（缺失 test_integrity 严禁放行）与五项审计证明；完成代码与测试不等于 P0 风险解除，也不代表 Merger 自身重跑全量测试或硬件级 Attestation 已实现。各项边界按实际审计结果如实记录。
+> **审批边界（逐字写入）**：本审批**不是代码合并批准**，也**不是 P0 风险解除声明**。
+>
+> **诚实口径**：**硬件级 Attestation 未做、Merger 不重跑全量测试、容器内无 OS 级只读隔离三条边界保留；不得宣称 P0 风险解除；代码交付 ≠ 安全验证通过**。
+>
+> `TASK-P0.2a` 已 **COMPLETED**（施工 [#452](https://github.com/he18718143986-design/IDE/pull/452) squash `b257c22c42019b0089aefb9ed0e71c0b93513b46`；立卡 P-346；完工回写 P-347）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-p0.2a) §3.4cn。诚实口径：**`test_integrity` 必填化与缺失 fail-closed 已交付、五项审计证明落盘；P0 风险未宣称解除**。此处保留立卡说明与审批边界。
