@@ -242,6 +242,7 @@
 | `TASK-P1.3` | `COMPLETED` | P0 独立动态渗透与跨平台验收套件（立卡 P-340；施工 #443 `ba9325f7`；完工回写 P-341；估算 L · P1-High；硬依赖 P1.2 已满足；覆盖 TC-P0-1A～TC-P0-4B 十大负向场景（7 项实跑通过、3 项因无 Docker 标记 SKIPPED_NO_DOCKER）；三平台判据自动化断言与 Digest 防嫁接已交付，但真实容器及三平台运行时验收尚未完成，P0 风险未宣称解除；P1.4 挂账待立硬依赖 P1.3） | [正文](./development-tasks-completed.md#task-p1.3) · [评估报告](../ledger/p1-eval-evidence-trust-chain-and-p0-acceptance.md) |
 | `TASK-P1.3a` | `COMPLETED` | P0 验收矩阵生成器裁决聚合与平台判据状态修证（交付 [#446](https://github.com/he18718143986-design/IDE/pull/446)/`1340494a`；立卡 P-342；完工 P-343；估算 XS · P1-High；针对 TASK-P1.3 交付物 scripts/verify-p0-independent-suite.ts 裁决聚合缺陷引入 PARTIAL 三态判定、无 Docker 平台判据标记 SKIPPED_NO_DOCKER 杜绝通过数虚增、单测 9/9 通过并重算矩阵与 Digest；三平台真实容器验收未完成，P0 风险未解除；P1.4 挂账待立硬依赖已满足） | [正文](./development-tasks-completed.md#task-p1.3a) · [验收矩阵](../ledger/p0-independent-verification-matrix.md) |
 | `TASK-P0.2a` | `COMPLETED` | 验收依据不可篡改专项（#452/`b257c22c`；P-347；M · P1-High；不宣称 P0 风险解除） | [正文](./development-tasks-completed.md#task-p0.2a) · [审计报告](../ledger/p0-2a-test-integrity-audit-and-tamper-proof.md) |
+| `TASK-P0.1a` | `NEW_TASK` | 执行链受控证明专项（审批称 TASK-P0-1A；P-348；M · P1-High；立卡待施工授权；不宣称 P0 风险解除） | [正文](./development-tasks-active.md#task-p0.1a) · [P1 总账复核](../ledger/p1-line-comprehensive-review.md) |
 | `TASK-P1.4` | `COMPLETED` | Gateway 凭据脱敏与 SandboxWitness Nonce 绑定（#449/`5901714f`；P-345；M · P2-Medium；不宣称 P0 风险解除） | [正文](./development-tasks-completed.md#task-p1.4) · [评估报告](../ledger/p1-eval-evidence-trust-chain-and-p0-acceptance.md) |
 
 ---
