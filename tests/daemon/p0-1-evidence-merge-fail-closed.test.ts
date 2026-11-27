@@ -1,3 +1,5 @@
+import { signEvidencePayload } from "../../daemon/pipeline/evidence-signer";
+import { getDefaultWitnessNonceStore } from "../../daemon/pipeline/sandbox-witness-nonce";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
@@ -403,6 +405,73 @@ describe("TASK-P0.1 端到端：真实证据快照 + squashMerge", () => {
       "E_EVIDENCE_STALE",
     );
     expect(fs.existsSync(path.join(repo, "src", "sneaky.ts"))).toBe(false);
+  });
+
+  it("P14-P3: SANDBOX_ENFORCED 证据 Nonce 绑定与重放防御 fail-closed", async () => {
+    const { contract, evidence } = await audited("sandbox nonce test");
+    const worktree = worktreeOf(contract.contract_id);
+    const store = getDefaultWitnessNonceStore();
+    const { nonce } = store.generateNonce({
+      contract_id: contract.contract_id,
+      contract_revision: contract.contract_revision,
+      session_id: "test-session",
+      worktree_root: worktree,
+    });
+
+    const sandboxEvidence: EvidenceBundle = {
+      ...evidence,
+      worker_control_mode: "SANDBOX_ENFORCED",
+      sandbox_witness: {
+        host_kind: "docker/29.6.1",
+        via: "exit",
+        exit_code: 0,
+        duration_ms: 100,
+        worktree_root: worktree,
+        nonce,
+        contract_id: contract.contract_id,
+        contract_revision: contract.contract_revision,
+        session_id: "test-session",
+      },
+    };
+
+    // 重新签署以符合 Ed25519 签名门禁
+    const sig = signEvidencePayload(sandboxEvidence, { repoRoot: repo });
+    const signedSandboxEvidence: EvidenceBundle = {
+      ...sandboxEvidence,
+      signature: sig,
+    };
+
+    // 1. 落盘带见证的证据快照与其独立 .sig 文件，首次合并校验通过并消费 Nonce
+    const evPath = evidencePathOf(contract.contract_id, evidence.evidence_id);
+    fs.writeFileSync(evPath, JSON.stringify(signedSandboxEvidence, null, 2));
+    const baseName = path.basename(evPath, ".json");
+    for (const sp of [
+      path.join(repo, ".stagent", "signatures", `${baseName}.sig`),
+      path.join(repo, ".stagent", "evidence", "signatures", `${baseName}.sig`),
+      path.join(path.dirname(evPath), "signatures", `${baseName}.sig`),
+      evPath.replace(/\.json$/, ".sig"),
+    ]) {
+      if (fs.existsSync(sp)) {
+        fs.writeFileSync(sp, JSON.stringify(sig, null, 2));
+      }
+    }
+    const result = await squashMerge({
+      repoRoot: repo,
+      contractId: contract.contract_id,
+      evidence: signedSandboxEvidence,
+      reviewer: "tina",
+    });
+    expect(result.contract.lifecycle_state).toBe("MERGED");
+
+    // 2. 尝试用已消费的 Nonce 再次重放合并，必被拒绝
+    expect(() =>
+      assertEvidenceControlAndRevision(
+        signedSandboxEvidence,
+        contract.contract_revision,
+        worktree,
+        { consumeNonce: true },
+      ),
+    ).toThrowError(/已消费|E_CANNOT_MERGE/);
   });
 
   it("P01-P8：受控证据（GATEWAY_ENFORCED + 版本齐全）合并路径零回归", async () => {

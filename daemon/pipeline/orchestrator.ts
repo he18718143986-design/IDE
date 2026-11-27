@@ -2,7 +2,14 @@ import { signEvidencePayload } from "./evidence-signer";
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync, spawn } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import {
+  getDefaultWitnessNonceStore,
+  type WitnessNonceBinding,
+} from "./sandbox-witness-nonce";
+import { collectAllContractSecrets } from "../worker/policy-guard";
+import { redactSensitiveText } from "../runner/env-filter";
+import { getActiveVault } from "../vault";
 import type {
   LifecycleState,
   SoftwareContract,
@@ -1847,13 +1854,35 @@ export class ContractOrchestrator {
           ...(containerHost === undefined ? {} : { containerHost }),
           ...(activeDesignNote ? { designNote: activeDesignNote } : {}),
         };
+        // TASK-P1.4：SANDBOX_ENFORCED 派工前生成安全 CSPRNG Nonce
+        let activeNonceBinding: WitnessNonceBinding | undefined;
+        if (current.worker_spec.control_mode === "SANDBOX_ENFORCED") {
+          activeNonceBinding = getDefaultWitnessNonceStore().generateNonce({
+            contract_id: contractId,
+            contract_revision: current.contract_revision,
+            session_id: randomUUID(),
+            worktree_root: worktreeRoot,
+          });
+        }
+
         // TASK-W.6：执行器由 Registry 解析出的工厂产出，编排器不 new 具体适配器
         const worker = dispatchFactory(context);
 
         try {
           const result = await worker.run(signal);
-          // TASK-W.5c-iii：记下本轮沙箱见证（无见证 = 没走 runInSandbox，证据面据此降级）
-          this.recordSandboxWitness(contractId, result.sandbox);
+          // TASK-W.5c-iii & TASK-P1.4：记下本轮沙箱见证（附带 Nonce 绑定）
+          const rawWitness = result.sandbox;
+          const boundWitness =
+            rawWitness !== undefined && activeNonceBinding !== undefined
+              ? {
+                  ...rawWitness,
+                  nonce: activeNonceBinding.nonce,
+                  contract_id: activeNonceBinding.contract_id,
+                  contract_revision: activeNonceBinding.contract_revision,
+                  session_id: activeNonceBinding.session_id,
+                }
+              : rawWitness;
+          this.recordSandboxWitness(contractId, boundWitness);
           return {
             ...result,
             two_phase: {
@@ -1987,11 +2016,33 @@ export class ContractOrchestrator {
           ...(containerHost === undefined ? {} : { containerHost }),
           ...(activeDesignNote ? { designNote: activeDesignNote } : {}),
         };
+        // TASK-P1.4：两段式派工前生成安全 CSPRNG Nonce
+        let phaseNonceBinding: WitnessNonceBinding | undefined;
+        if (current.worker_spec.control_mode === "SANDBOX_ENFORCED") {
+          phaseNonceBinding = getDefaultWitnessNonceStore().generateNonce({
+            contract_id: contractId,
+            contract_revision: current.contract_revision,
+            session_id: randomUUID(),
+            worktree_root: worktreeRoot,
+          });
+        }
+
         // TASK-W.6：两段式 T/I 段同样经 Registry 解析出的工厂派工
         const worker = dispatchFactory(context);
         const result = await worker.run(signal);
-        // TASK-W.5c-iii：两段式每段都记（两段都在容器里跑，取最近一次为如实实况）
-        this.recordSandboxWitness(contractId, result.sandbox);
+        // TASK-W.5c-iii & TASK-P1.4：两段式每段都记（附带 Nonce 绑定）
+        const rawWitness = result.sandbox;
+        const boundWitness =
+          rawWitness !== undefined && phaseNonceBinding !== undefined
+            ? {
+                ...rawWitness,
+                nonce: phaseNonceBinding.nonce,
+                contract_id: phaseNonceBinding.contract_id,
+                contract_revision: phaseNonceBinding.contract_revision,
+                session_id: phaseNonceBinding.session_id,
+              }
+            : rawWitness;
+        this.recordSandboxWitness(contractId, boundWitness);
         bag.changes.push(...result.changes);
         bag.log.push(...result.log);
         bag.usage.inputTokens += result.usage.inputTokens;
@@ -2619,6 +2670,21 @@ export class ContractOrchestrator {
       rawWitness,
     );
 
+    // TASK-P1.4: 收集合同全部凭据并对 Evidence 文本内容脱敏
+    const allEvidenceSecrets = Array.from(
+      new Set([
+        ...collectAllContractSecrets({
+          permissions: contract.authorization.execution_permissions,
+          worktreeRoot: worktreePath ?? this.repoRoot,
+        }),
+        ...(getActiveVault()?.currentValues() ?? []),
+      ]),
+    );
+
+    const safeSummary = input.summary
+      ? redactSensitiveText(input.summary, allEvidenceSecrets).text
+      : input.summary;
+
     const bundle: EvidenceBundle = {
       evidence_id: evidenceId,
       contract_id: contract.contract_id,
@@ -2626,8 +2692,11 @@ export class ContractOrchestrator {
       contract_revision: contract.contract_revision,
       generated_at: new Date().toISOString(),
       worker_control_mode: evidenceControlMode,
-      // TASK-P0.3a：采集沙箱见证原子落盘进 Evidence
+      // TASK-P0.3a & TASK-P1.4：采集沙箱见证原子落盘进 Evidence
       ...(rawWitness !== undefined ? { sandbox_witness: rawWitness } : {}),
+      ...(rawWitness?.session_id !== undefined
+        ? { worker_session_id: rawWitness.session_id }
+        : {}),
       usage:
         totals && totals.totalTokens > 0
           ? {
@@ -2667,13 +2736,14 @@ export class ContractOrchestrator {
           // TASK-P0.1：控制模式与合同版本进入派生门（缺失 / 不受控即 false）
           workerControlMode: evidenceControlMode,
           contractRevision: contract.contract_revision,
+          contractId: contract.contract_id,
           // TASK-P0.3a：沙箱见证与工作树路径进入派生门（SANDBOX_ENFORCED 必须有效）
           sandboxWitness: rawWitness,
           worktreeRoot: worktreePath,
           // TASK-P0.4: 测试完整性快照
           testIntegrity: input.testIntegrity,
         }),
-        summary: input.summary,
+        summary: safeSummary,
         ...(input.reasonCode === undefined
           ? {}
           : { reason_code: input.reasonCode }),
@@ -2697,14 +2767,24 @@ export class ContractOrchestrator {
       },
       verification_results: input.verificationResults
         .slice(-MAX_EVIDENCE_VERIFICATION_RESULTS)
-        .map((r) => ({
-          command_alias: r.alias,
-          exit_code: r.exitCode,
-          stdout_tail: r.stdout.slice(-MAX_EVIDENCE_TAIL_CHARS),
-          stderr_tail: r.stderr.slice(-MAX_EVIDENCE_TAIL_CHARS),
-          duration_ms: r.durationMs,
-          passed: r.passed,
-        })),
+        .map((r) => {
+          const safeStdout = redactSensitiveText(
+            r.stdout,
+            allEvidenceSecrets,
+          ).text;
+          const safeStderr = redactSensitiveText(
+            r.stderr,
+            allEvidenceSecrets,
+          ).text;
+          return {
+            command_alias: r.alias,
+            exit_code: r.exitCode,
+            stdout_tail: safeStdout.slice(-MAX_EVIDENCE_TAIL_CHARS),
+            stderr_tail: safeStderr.slice(-MAX_EVIDENCE_TAIL_CHARS),
+            duration_ms: r.durationMs,
+            passed: r.passed,
+          };
+        }),
       tests_modified: input.testsModified ?? false,
       ...(input.testIntegrity !== undefined
         ? { test_integrity: input.testIntegrity }

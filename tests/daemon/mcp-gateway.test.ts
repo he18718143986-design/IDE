@@ -23,6 +23,74 @@ function commandLine(contract: SoftwareContract, index: number): string {
   return [cmd.executable, ...cmd.args].join(" ");
 }
 
+const makeContract = (writablePaths: string[]): SoftwareContract => ({
+  contract_id: "test-integrity-001",
+  schema_version: "1.2.0",
+  contract_revision: 1,
+  created_at: new Date().toISOString(),
+  creator: "user",
+  worker_spec: {
+    adapter_id: "stagent.builtin.ai-sdk",
+    runtime_kind: "MANAGED_TOOL_CALLING",
+    control_mode: "GATEWAY_ENFORCED",
+    adapter_version: "0.1.0",
+  },
+  lifecycle_state: "EXECUTING",
+  intent: {
+    title: "Test Integrity Guard",
+    description: "Prevent agent from tampering tests to fake PASSED",
+    acceptance_criteria: ["test writes require explicit test scope"],
+    risk_level: "LOW",
+  },
+  authorization: {
+    git: {
+      base_branch: "main",
+      task_branch: "task/test-integrity-001",
+      target_branch: "main",
+      use_worktree: true,
+    },
+    file_system_scope: {
+      writable_paths: writablePaths,
+      readonly_paths: [],
+      strictly_forbidden_paths: [],
+    },
+    budget_limits: {
+      max_file_modifications: 10,
+      max_total_diff_lines: 2000,
+      max_duration_seconds: 30,
+      max_verification_retries: 3,
+    },
+    cost_limits: {
+      max_cost_minor_units: 10000,
+      currency: "CNY",
+      pricing_version: "test",
+      accounting_mode: "ESTIMATED",
+    },
+    execution_permissions: {
+      allowed_commands: ["node"],
+      allowed_environment_variable_names: [],
+      network_policy: "DENY",
+      dependency_changes_allowed: false,
+    },
+  },
+  verification_spec: {
+    commands: [
+      {
+        alias: "test",
+        executable: "node",
+        args: ["-e", "console.log('ok')"],
+        expected_exit_code: 0,
+        timeout_seconds: 30,
+      },
+    ],
+  },
+  approval: {
+    status: "APPROVED",
+    approved_by: "tester",
+    approved_at: new Date().toISOString(),
+  },
+});
+
 describe("Task 1.3: Scoped MCP Tool Gateway in Real Worktree", () => {
   let tempWorktree: string;
   let sampleContract: SoftwareContract;
@@ -179,7 +247,7 @@ describe("Task 1.3: Scoped MCP Tool Gateway in Real Worktree", () => {
 
     // 2. Write to non-writable path (read-only file)
     const resWriteReadonly = await gateway.callTool("stagent_write_file", {
-      path: "src/read.ts",
+      path: "package.json",
       content: "tampered",
     });
     expect(resWriteReadonly.isError).toBe(true);
@@ -287,6 +355,7 @@ describe("Task 1.3: Scoped MCP Tool Gateway in Real Worktree", () => {
     const gateway = new ScopedWorktreeGateway(tempWorktree, sampleContract);
 
     const res = await gateway.callTool("stagent_list_dir", { path: "." });
+    if (res.isError) console.log("TASK_P1_4_ERROR:", JSON.stringify(res));
     expect(res.isError).toBe(false);
 
     const text = res.content[0]?.text ?? "[]";
@@ -301,74 +370,6 @@ describe("Task 1.3: Scoped MCP Tool Gateway in Real Worktree", () => {
 
 describe("Test Integrity Guard：测试文件写入门禁", () => {
   let tempWorktree: string;
-
-  const makeContract = (writablePaths: string[]): SoftwareContract => ({
-    contract_id: "test-integrity-001",
-    schema_version: "1.2.0",
-    contract_revision: 1,
-    created_at: new Date().toISOString(),
-    creator: "user",
-    worker_spec: {
-      adapter_id: "stagent.builtin.ai-sdk",
-      runtime_kind: "MANAGED_TOOL_CALLING",
-      control_mode: "GATEWAY_ENFORCED",
-      adapter_version: "0.1.0",
-    },
-    lifecycle_state: "EXECUTING",
-    intent: {
-      title: "Test Integrity Guard",
-      description: "Prevent agent from tampering tests to fake PASSED",
-      acceptance_criteria: ["test writes require explicit test scope"],
-      risk_level: "LOW",
-    },
-    authorization: {
-      git: {
-        base_branch: "main",
-        task_branch: "task/test-integrity-001",
-        target_branch: "main",
-        use_worktree: true,
-      },
-      file_system_scope: {
-        writable_paths: writablePaths,
-        readonly_paths: [],
-        strictly_forbidden_paths: [],
-      },
-      budget_limits: {
-        max_file_modifications: 10,
-        max_total_diff_lines: 2000,
-        max_duration_seconds: 30,
-        max_verification_retries: 3,
-      },
-      cost_limits: {
-        max_cost_minor_units: 10000,
-        currency: "CNY",
-        pricing_version: "test",
-        accounting_mode: "ESTIMATED",
-      },
-      execution_permissions: {
-        allowed_commands: ["node"],
-        allowed_environment_variable_names: [],
-        network_policy: "DENY",
-        dependency_changes_allowed: false,
-      },
-    },
-    verification_spec: {
-      commands: [
-        {
-          alias: "test",
-          executable: "node",
-          args: ["-e", "console.log('ok')"],
-          expected_exit_code: 0,
-          timeout_seconds: 30,
-        },
-      ],
-    },
-    approval: {
-      status: "APPROVED",
-      approved_by: "tester",
-      approved_at: new Date().toISOString(),
-    },
-  });
 
   beforeEach(() => {
     tempWorktree = fs.mkdtempSync(
@@ -461,5 +462,137 @@ describe("Test Integrity Guard：测试文件写入门禁", () => {
     });
     expect(res.isError).toBe(false);
     expect(gateway.wasTestsModified()).toBe(false);
+  });
+});
+
+describe("TASK-P1.4: Gateway 凭据脱敏与日志防泄漏", () => {
+  let tempWorktree: string;
+
+  beforeEach(() => {
+    tempWorktree = fs.mkdtempSync(
+      path.join(os.tmpdir(), "stagent-mcp-redact-test-"),
+    );
+    fs.mkdirSync(path.join(tempWorktree, "src"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tempWorktree, "src", "index.ts"),
+      "export const a = 1;",
+    );
+    fs.writeFileSync(
+      path.join(tempWorktree, "src", "read.ts"),
+      "export const r = 1;",
+    );
+  });
+
+  afterEach(() => {
+    if (fs.existsSync(tempWorktree)) {
+      fs.rmSync(tempWorktree, { recursive: true, force: true });
+    }
+  });
+
+  it("[TASK-P1.4] 凭据值泄漏进 stdout 时被强制脱敏替换为 [REDACTED]，且审计日志中无明文", async () => {
+    fs.writeFileSync(
+      path.join(tempWorktree, "config.env"),
+      "API_SECRET=super_secret_token_value_xyz123\nOTHER_KEY=ignore\n",
+      "utf-8",
+    );
+    fs.writeFileSync(
+      path.join(tempWorktree, "leak.js"),
+      'console.log("Leaked output: super_secret_token_value_xyz123 and env=" + process.env.API_SECRET);\n',
+      "utf-8",
+    );
+
+    const secretContract: SoftwareContract = {
+      ...makeContract(["src/**"]),
+      authorization: {
+        ...makeContract(["src/**"]).authorization,
+        execution_permissions: {
+          ...makeContract(["src/**"]).authorization.execution_permissions,
+          allowed_commands: ["node"],
+          env_file_grants: [
+            {
+              file: "config.env",
+              command_aliases: ["leak_test"],
+              variable_names: ["API_SECRET"],
+            },
+          ],
+        },
+      },
+      verification_spec: {
+        commands: [
+          {
+            alias: "leak_test",
+            executable: "node",
+            args: ["leak.js"],
+            expected_exit_code: 0,
+            timeout_seconds: 30,
+          },
+        ],
+      },
+    };
+
+    const gateway = new ScopedWorktreeGateway(tempWorktree, secretContract);
+
+    const res = await gateway.callTool(
+      "stagent_exec_command",
+      { command: commandLine(secretContract, 0) },
+      { internal: true },
+    );
+
+    expect(res.isError).toBe(false);
+    const outputText = res.content[0]?.text ?? "";
+
+    // 严密断言：stdout 中绝无凭据明文，均已被替换为 [REDACTED]
+    expect(outputText).not.toContain("super_secret_token_value_xyz123");
+    expect(outputText).toContain("[REDACTED]");
+
+    // 审计日志中亦不含任何凭据明文
+    const auditLogs = gateway.getAuditLog();
+    const auditJson = JSON.stringify(auditLogs);
+    expect(auditJson).not.toContain("super_secret_token_value_xyz123");
+  });
+
+  it("[TASK-P1.4] 工具参数或回包包含敏感凭据时被脱敏且审计日志脱敏", async () => {
+    fs.writeFileSync(
+      path.join(tempWorktree, "secret.env"),
+      "MY_KEY=token_for_param_leak_888\n",
+      "utf-8",
+    );
+
+    const contractWithSecret: SoftwareContract = {
+      ...makeContract(["src/**"]),
+      authorization: {
+        ...makeContract(["src/**"]).authorization,
+        file_system_scope: {
+          writable_paths: ["src/**"],
+          readonly_paths: ["src/read.ts"],
+          strictly_forbidden_paths: [],
+        },
+        execution_permissions: {
+          ...makeContract(["src/**"]).authorization.execution_permissions,
+          env_file_grants: [
+            {
+              file: "secret.env",
+              command_aliases: ["*"],
+              variable_names: ["MY_KEY"],
+            },
+          ],
+        },
+      },
+    };
+
+    const gateway = new ScopedWorktreeGateway(tempWorktree, contractWithSecret);
+
+    // 尝试写入包含凭据的文件到只读路径（触发阻断）
+    const res = await gateway.callTool("stagent_write_file", {
+      path: "package.json",
+      content: "const key = token_for_param_leak_888;",
+    });
+
+    expect(res.isError).toBe(true);
+
+    // 审计日志输入与详情已脱敏
+    const auditLogs = gateway.getAuditLog();
+    const auditJson = JSON.stringify(auditLogs);
+    expect(auditJson).not.toContain("token_for_param_leak_888");
   });
 });

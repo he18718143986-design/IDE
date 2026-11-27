@@ -325,6 +325,12 @@ describe("TASK-P0.3a: container-wiring-and-witness 生产接线与端到端见�
     expect(evidence.sandbox_witness).toBeDefined();
     expect(evidence.sandbox_witness?.host_kind).toBe("docker/29.6.1");
     expect(evidence.sandbox_witness?.via).toBe("exit");
+    expect(evidence.sandbox_witness?.nonce).toBeDefined();
+    expect(evidence.sandbox_witness?.contract_id).toBe(contract.contract_id);
+    expect(evidence.sandbox_witness?.contract_revision).toBe(1);
+    expect(evidence.sandbox_witness?.worktree_root).toBe(
+      worktreeOf(contract.contract_id),
+    );
     expect(evidence.verdict.can_merge).toBe(true);
 
     // P03A-P3: 磁盘快照原子落盘 sandbox_witness
@@ -413,6 +419,60 @@ describe("TASK-P0.3a: container-wiring-and-witness 生产接线与端到端见�
         worktree,
       ),
     ).toThrowError(/沙箱见证工作树不匹配/);
+
+    // 5. [TASK-P1.4] Nonce 与合同标识绑定防嫁接
+    expect(() =>
+      assertEvidenceControlAndRevision(
+        {
+          worker_control_mode: "SANDBOX_ENFORCED",
+          contract_revision: 1,
+          contract_id: "contract-1",
+          sandbox_witness: {
+            ...baseWitness,
+            nonce: "test-nonce",
+            contract_id: "contract-other",
+          },
+        },
+        1,
+        worktree,
+      ),
+    ).toThrowError(/沙箱见证合同绑定不匹配/);
+
+    expect(() =>
+      assertEvidenceControlAndRevision(
+        {
+          worker_control_mode: "SANDBOX_ENFORCED",
+          contract_revision: 1,
+          contract_id: "contract-1",
+          sandbox_witness: {
+            ...baseWitness,
+            nonce: "test-nonce",
+            contract_id: "contract-1",
+            contract_revision: 2,
+          },
+        },
+        1,
+        worktree,
+      ),
+    ).toThrowError(/沙箱见证合同版本绑定错配/);
+
+    expect(() =>
+      assertEvidenceControlAndRevision(
+        {
+          worker_control_mode: "SANDBOX_ENFORCED",
+          contract_revision: 1,
+          contract_id: "contract-1",
+          sandbox_witness: {
+            ...baseWitness,
+            nonce: "   ",
+            contract_id: "contract-1",
+            contract_revision: 1,
+          },
+        },
+        1,
+        worktree,
+      ),
+    ).toThrowError(/沙箱见证 Nonce 格式非法/);
   });
 
   it("P03A-P7: GATEWAY_ENFORCED 路径零回归", async () => {

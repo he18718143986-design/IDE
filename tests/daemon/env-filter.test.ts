@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { sanitizeEnvironment } from "../../daemon/runner/env-filter";
+import {
+  sanitizeEnvironment,
+  redactSensitiveText,
+  redactSensitiveObject,
+} from "../../daemon/runner/env-filter";
 
 describe("Task 1.3: Subprocess Environment Sanitizer", () => {
   it("should strip sensitive credentials and cloud tokens", () => {
@@ -62,5 +66,49 @@ describe("Task 1.3: Subprocess Environment Sanitizer", () => {
     expect(sanitized["CUSTOM_FLAG"]).toBe("flag-value");
     expect(sanitized["TEST_RUN_ID"]).toBe("run-999");
     expect(sanitized["CI"]).toBe("true");
+  });
+});
+
+describe("TASK-P1.4: redactSecrets 与 redactSensitiveObject 凭据脱敏", () => {
+  it("对出现在输出文本中的凭据值进行全局脱敏替换，长凭据优先匹配", () => {
+    const secrets = ["secret_pass", "secret_password_super_long", "my_token"];
+    const input =
+      "Connecting with my_token and secret_password_super_long or secret_pass done.";
+    const result = redactSensitiveText(input, secrets);
+
+    expect(result.redacted).toBe(true);
+    expect(result.text).toBe(
+      "Connecting with [REDACTED] and [REDACTED] or [REDACTED] done.",
+    );
+    expect(result.text).not.toContain("secret_pass");
+    expect(result.text).not.toContain("secret_password_super_long");
+    expect(result.text).not.toContain("my_token");
+  });
+
+  it("递归对对象、数组、嵌套结构中的敏感凭据值进行脱敏", () => {
+    const secrets = ["leak_12345"];
+    const obj = {
+      cmd: 'curl -H "Authorization: Bearer leak_12345" https://api.com',
+      nested: {
+        items: ["leak_12345", 42, true, null],
+        error: "failed with leak_12345 in stack trace",
+      },
+    };
+
+    const redactedObj = redactSensitiveObject(obj, secrets) as typeof obj;
+    expect(redactedObj.cmd).toBe(
+      'curl -H "Authorization: Bearer [REDACTED]" https://api.com',
+    );
+    expect(redactedObj.nested.items[0]).toBe("[REDACTED]");
+    expect(redactedObj.nested.items[1]).toBe(42);
+    expect(redactedObj.nested.error).toBe(
+      "failed with [REDACTED] in stack trace",
+    );
+  });
+
+  it("空值与空凭据安全处理", () => {
+    expect(redactSensitiveText("", ["sec"]).text).toBe("");
+    expect(redactSensitiveText("hello", []).text).toBe("hello");
+    expect(redactSensitiveObject(null, ["sec"])).toBe(null);
   });
 });

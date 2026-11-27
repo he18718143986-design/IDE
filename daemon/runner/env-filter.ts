@@ -132,3 +132,57 @@ export function parseEnvFile(content: string): Record<string, string> {
   }
   return parsed;
 }
+
+/**
+ * TASK-P1.4: 敏感凭据脱敏函数。
+ * 覆盖「凭据值出现在输出中即替换」而非仅按变量名过滤。
+ * 只要秘密值非空且长度达到阈值（或已登记），凡在字符串中出现，均替换为 [REDACTED]。
+ */
+export function redactSensitiveText(
+  text: string,
+  secretValues: readonly string[],
+): { text: string; redacted: boolean } {
+  if (!text || !secretValues || secretValues.length === 0) {
+    return { text: text ?? "", redacted: false };
+  }
+  let out = text;
+  let redacted = false;
+  // 过滤空串，并按长度降序排列（避免短前缀提前截断长字符串）
+  const validSecrets = secretValues
+    .filter((s) => typeof s === "string" && s.trim().length > 0)
+    .sort((a, b) => b.length - a.length);
+
+  for (const secret of validSecrets) {
+    if (out.includes(secret)) {
+      out = out.split(secret).join("[REDACTED]");
+      redacted = true;
+    }
+  }
+  return { text: out, redacted };
+}
+
+/**
+ * 递归对象深度脱敏，用于 audit entry、error details、MCP 回包等复杂对象
+ */
+export function redactSensitiveObject<T>(
+  target: T,
+  secretValues: readonly string[],
+): T {
+  if (target === null || target === undefined) return target;
+  if (typeof target === "string") {
+    return redactSensitiveText(target, secretValues).text as unknown as T;
+  }
+  if (Array.isArray(target)) {
+    return target.map((item) =>
+      redactSensitiveObject(item, secretValues),
+    ) as unknown as T;
+  }
+  if (typeof target === "object") {
+    const res: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(target as Record<string, unknown>)) {
+      res[k] = redactSensitiveObject(v, secretValues);
+    }
+    return res as T;
+  }
+  return target;
+}

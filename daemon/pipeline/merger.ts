@@ -23,6 +23,10 @@ import {
 import { assertEvidenceIntegrity } from "../guard/evidence-integrity";
 import { verifySandboxWitness } from "../worker/sandbox/container-host";
 import {
+  getDefaultWitnessNonceStore,
+  WitnessNonceError,
+} from "./sandbox-witness-nonce";
+import {
   E_OUT_OF_SCOPE,
   E_OUT_OF_SCOPE_UNTRACKED,
   describeCandidateViolations,
@@ -231,12 +235,20 @@ export function assertEvidenceTestIntegrity(
 }
 
 export function assertEvidenceControlAndRevision(
-  snapshot: Pick<
-    EvidenceBundle,
-    "worker_control_mode" | "contract_revision" | "sandbox_witness"
-  >,
+  snapshot: {
+    worker_control_mode?: EvidenceBundle["worker_control_mode"] | undefined;
+    contract_revision?: number | undefined;
+    sandbox_witness?: EvidenceBundle["sandbox_witness"] | undefined;
+    contract_id?: string | undefined;
+    worker_session_id?: string | undefined;
+  },
   currentContractRevision: number,
   expectedWorktreeRoot?: string,
+  options?: {
+    contractId?: string;
+    requireNonce?: boolean;
+    consumeNonce?: boolean;
+  },
 ): void {
   const mode = snapshot.worker_control_mode;
   if (mode === undefined || !MERGEABLE_CONTROL_MODES.has(mode)) {
@@ -269,8 +281,82 @@ export function assertEvidenceControlAndRevision(
         "这份验收证据记录的控制模式是 SANDBOX_ENFORCED，但缺少沙箱执行见证（sandbox_witness），无法确认真实入箱，不能合并",
       );
     }
+
+    // TASK-P1.4：见证 Nonce 与绑定核验
+    if (options?.requireNonce === true) {
+      if (
+        !snapshot.sandbox_witness.nonce ||
+        typeof snapshot.sandbox_witness.nonce !== "string" ||
+        snapshot.sandbox_witness.nonce.trim() === ""
+      ) {
+        throw new MergeGateError(
+          "E_CANNOT_MERGE",
+          "这份验收证据记录的控制模式是 SANDBOX_ENFORCED，但缺少沙箱见证 Nonce 绑定，无法确认见证新鲜度与防重放，不能合并",
+        );
+      }
+    }
+
+    if (snapshot.sandbox_witness.nonce !== undefined) {
+      if (
+        typeof snapshot.sandbox_witness.nonce !== "string" ||
+        snapshot.sandbox_witness.nonce.trim() === ""
+      ) {
+        throw new MergeGateError(
+          "E_CANNOT_MERGE",
+          "这份验收证据中的沙箱见证 Nonce 格式非法，不能合并",
+        );
+      }
+      if (
+        options?.contractId !== undefined &&
+        snapshot.sandbox_witness.contract_id !== undefined &&
+        snapshot.sandbox_witness.contract_id !== options.contractId
+      ) {
+        throw new MergeGateError(
+          "E_CANNOT_MERGE",
+          `沙箱见证合同绑定错配: 见证 contract_id=${snapshot.sandbox_witness.contract_id}, 当前合同=${options.contractId}，不能合并`,
+        );
+      }
+      if (
+        snapshot.sandbox_witness.contract_revision !== undefined &&
+        snapshot.sandbox_witness.contract_revision !== currentContractRevision
+      ) {
+        throw new MergeGateError(
+          "E_CANNOT_MERGE",
+          `沙箱见证合同版本绑定错配: 见证 contract_revision=${snapshot.sandbox_witness.contract_revision}, 当前合同版本=${currentContractRevision}，不能合并`,
+        );
+      }
+
+      if (options?.consumeNonce === true) {
+        try {
+          const store = getDefaultWitnessNonceStore();
+          store.verifyAndConsume({
+            nonce: snapshot.sandbox_witness.nonce,
+            contract_id:
+              options?.contractId ??
+              snapshot.sandbox_witness.contract_id ??
+              snapshot.contract_id ??
+              "",
+            contract_revision: currentContractRevision,
+            worktree_root:
+              expectedWorktreeRoot ?? snapshot.sandbox_witness.worktree_root,
+            session_id: snapshot.sandbox_witness.session_id,
+          });
+        } catch (err) {
+          throw new MergeGateError(
+            "E_CANNOT_MERGE",
+            `沙箱见证 Nonce 校验/消费失败（${err instanceof Error ? err.message : String(err)}），不能合并`,
+          );
+        }
+      }
+    }
+
     try {
-      verifySandboxWitness(snapshot.sandbox_witness, expectedWorktreeRoot);
+      verifySandboxWitness(snapshot.sandbox_witness, {
+        expectedWorktreeRoot,
+        expectedContractId: options?.contractId ?? snapshot.contract_id,
+        expectedContractRevision: currentContractRevision,
+        requireNonce: options?.requireNonce,
+      });
     } catch (err) {
       throw new MergeGateError(
         "E_CANNOT_MERGE",
@@ -769,6 +855,10 @@ async function mergeInternal(
     snapshot,
     contract.contract_revision,
     worktreePath,
+    {
+      contractId: contract.contract_id,
+      consumeNonce: Boolean(snapshot.sandbox_witness?.nonce),
+    },
   );
 
   // 2c. TASK-P0.4 第二道封锁（合并时）：独立核验证据快照中的测试完整性（test_integrity）

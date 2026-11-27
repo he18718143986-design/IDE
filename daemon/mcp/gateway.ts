@@ -38,8 +38,15 @@ import {
   assertAliasExtraArgsAllowed,
   CommandPolicyError,
 } from "../runner/command-policy";
-import { type EnvSanitizerOptions } from "../runner/env-filter";
-import { buildCommandEnvironment } from "../worker/policy-guard";
+import {
+  type EnvSanitizerOptions,
+  redactSensitiveText,
+  redactSensitiveObject,
+} from "../runner/env-filter";
+import {
+  buildCommandEnvironment,
+  collectAllContractSecrets,
+} from "../worker/policy-guard";
 import type { RuntimeInterceptor } from "../worker/runtime-interceptor";
 import { assessCommandThreat, isRepoTrusted } from "../worker/threat-guard";
 import {
@@ -604,6 +611,23 @@ export class ScopedWorktreeGateway {
    * - `env_file_grants` 仅在 alias 命中 `command_aliases` 时读取，
    *   且只取 `variable_names` 声明的键；值登记为秘密值供输出脱敏。
    */
+  public getAllKnownSecrets(): string[] {
+    const vaultValues = getActiveVault()?.currentValues() ?? [];
+    const allContractSecrets = collectAllContractSecrets({
+      permissions: this.contract.authorization.execution_permissions,
+      worktreeRoot: this.worktreeRoot,
+    });
+    return Array.from(new Set([...vaultValues, ...allContractSecrets]));
+  }
+
+  /**
+   * 构建子进程环境（TASK-W.3 目标 2）：
+   * - 基础白名单由 `sanitizeEnvironment` 兜底；
+   * - 合同 `allowed_environment_variable_names` 允许透传同名宿主变量；
+   * - `env_file_grants` 仅在 alias 命中 `command_aliases` 时读取，
+   *   且只取 `variable_names` 声明的键；值登记为秘密值供输出脱敏。
+   * - TASK-P1.4：全量收集合同授权的所有凭据与保险库凭据，供全局脱敏使用。
+   */
   private buildCommandEnv(alias: string | undefined): {
     envOptions: EnvSanitizerOptions;
     secretValues: string[];
@@ -615,9 +639,11 @@ export class ScopedWorktreeGateway {
       worktreeRoot: this.worktreeRoot,
       alias,
     });
-    // TASK-L.14：保险库值并入脱敏清单；**不**注入子进程环境（仅 L.15/L.17 注入）
-    const vaultValues = getActiveVault()?.currentValues() ?? [];
-    const secretValues = [...base.secretValues, ...vaultValues];
+    // TASK-L.14 & TASK-P1.4：保险库值与全合同授权值并入脱敏清单；**不**注入子进程环境（仅 L.15/L.17 注入）
+    const allKnown = this.getAllKnownSecrets();
+    const secretValues = Array.from(
+      new Set([...base.secretValues, ...allKnown]),
+    );
     return { ...base, secretValues };
   }
 
@@ -628,17 +654,23 @@ export class ScopedWorktreeGateway {
     violationCode?: string | undefined;
     details?: string | undefined;
   }): void {
+    const secrets = this.getAllKnownSecrets();
+    const safeInput = redactSensitiveObject(entry.input, secrets);
+    const safeDetails =
+      entry.details !== undefined
+        ? redactSensitiveText(entry.details, secrets).text
+        : undefined;
     const record: AuditLogEntry = {
       timestamp: new Date().toISOString(),
       tool: entry.tool,
-      input: entry.input,
+      input: safeInput,
       outcome: entry.outcome,
     };
     if (entry.violationCode !== undefined) {
       record.violationCode = entry.violationCode;
     }
-    if (entry.details !== undefined) {
-      record.details = entry.details;
+    if (safeDetails !== undefined) {
+      record.details = safeDetails;
     }
     this.auditLog.push(record);
   }
@@ -771,6 +803,21 @@ export class ScopedWorktreeGateway {
    * Main dispatch entry point for MCP tool invocations.
    */
   public async callTool(
+    name: string,
+    rawInput: unknown,
+    options: { internal?: boolean } = {},
+  ): Promise<MCPToolCallResult> {
+    const rawResult = await this.dispatchTool(name, rawInput, options);
+    return this.redactToolResult(rawResult);
+  }
+
+  private redactToolResult(result: MCPToolCallResult): MCPToolCallResult {
+    const secrets = this.getAllKnownSecrets();
+    if (!secrets || secrets.length === 0) return result;
+    return redactSensitiveObject(result, secrets);
+  }
+
+  private async dispatchTool(
     name: string,
     rawInput: unknown,
     options: { internal?: boolean } = {},
@@ -1990,7 +2037,13 @@ export class ScopedWorktreeGateway {
           ...(this.signal === undefined ? {} : { signal: this.signal }),
           ...(this.onTerminalLine === undefined
             ? {}
-            : { onLine: this.onTerminalLine }),
+            : {
+                onLine: (stream, line) =>
+                  this.onTerminalLine?.(
+                    stream,
+                    redactSensitiveText(line, commandEnv.secretValues).text,
+                  ),
+              }),
           ...(trackedCommand === undefined
             ? {}
             : {
@@ -2033,6 +2086,22 @@ export class ScopedWorktreeGateway {
             : result.exitCode === 0
               ? undefined
               : "E_VERIFICATION_FAILED";
+
+      const redactedStdout = redactSensitiveText(
+        result.stdout,
+        commandEnv.secretValues,
+      );
+      const redactedStderr = redactSensitiveText(
+        result.stderr,
+        commandEnv.secretValues,
+      );
+      const wasRedacted =
+        result.secretRedacted ||
+        redactedStdout.redacted ||
+        redactedStderr.redacted;
+      result.stdout = redactedStdout.text;
+      result.stderr = redactedStderr.text;
+      result.secretRedacted = wasRedacted;
 
       this.logAudit({
         tool: "stagent_exec_command",
@@ -2084,21 +2153,23 @@ export class ScopedWorktreeGateway {
           : isSpawnFailure
             ? E_COMMAND_SPAWN_FAILED
             : "EXEC_ERROR";
+      const safeMessage = redactSensitiveText(
+        (err as Error).message,
+        commandEnv.secretValues,
+      ).text;
       this.logAudit({
         tool: "stagent_exec_command",
         input: { command },
         outcome: "BLOCKED",
         violationCode: code,
-        details: (err as Error).message,
+        details: safeMessage,
       });
       return {
         isError: true,
-        content: [
-          { type: "text", text: `[${code}] ${(err as Error).message}` },
-        ],
+        content: [{ type: "text", text: `[${code}] ${safeMessage}` }],
         error: {
           code,
-          message: (err as Error).message,
+          message: safeMessage,
           ...(isSpawnFailure
             ? { details: { spawn_code: String(spawnCode) } }
             : {}),
