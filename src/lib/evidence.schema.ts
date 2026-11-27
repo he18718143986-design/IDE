@@ -186,6 +186,20 @@ export type ManualConfirmationRecord = z.infer<
 >;
 
 /**
+ * TASK-P1.2: Evidence Ed25519 签名凭据 Schema。
+ * 基于 RFC 8785 规范化序列化与 Node.js 原生 crypto 生成的非对称签名记录。
+ */
+export const evidenceSignatureSchema = z.object({
+  algorithm: z.literal("Ed25519"),
+  signature: z.string().min(1),
+  canonical_hash: z.string().length(64),
+  key_id: z.string().optional(),
+  public_key: z.string().optional(),
+  signed_at: z.string().min(1),
+});
+export type EvidenceSignature = z.infer<typeof evidenceSignatureSchema>;
+
+/**
  * TASK-P0.4：测试完整性防护与基线重跑留痕（Test Integrity）。
  * 记录修改/删除的既有测试路径、Worker 新增测试路径、基线隔离重跑结果与合同显式豁免留痕。
  */
@@ -262,6 +276,11 @@ export const evidenceBundleSchema = z
      * 零命令合同在完成人工确认记录（actor / confirmed_at / reason 齐全）后方可放行。
      */
     manual_confirmation: manualConfirmationRecordSchema.optional(),
+    /**
+     * TASK-P1.2：Evidence Ed25519 签名凭据（防篡改与来源真实性证明）。
+     * 记录 RFC 8785 规范化摘要、签名、公钥元数据与时间戳。
+     */
+    signature: evidenceSignatureSchema.optional(),
     /**
      * TASK-L.3 / verification-strategy §3.4：测试义务红绿证据（可选，向后兼容）。
      * 每条对应一份 acceptance_id；red.exit_code 必须 ≠ 0，green.exit_code 必须 = 0。
