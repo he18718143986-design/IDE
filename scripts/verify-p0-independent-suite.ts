@@ -27,6 +27,8 @@ interface EnvFingerprint {
   git_branch: string;
   docker_available: boolean;
   docker_version: string;
+  /** TASK-P1.5：daemon 不可达时的归因（docker_client_only / docker_not_installed） */
+  docker_probe_reason?: DockerProbeReason;
   timestamp: string;
 }
 
@@ -112,15 +114,65 @@ function getGitBranch(cwd: string): string {
   }
 }
 
-function probeDocker(): { available: boolean; version: string } {
+/**
+ * TASK-P1.5：Docker 可用性判定必须以 **daemon 可达** 为准。
+ *
+ * 旧实现只跑 `docker --version`（客户端二进制），于是「装了 Docker CLI 但
+ * daemon 没起来」会被误记为 `docker_available: true`，让「无容器环境跳过」
+ * 与「容器环境存在但场景失败」在报告里长得一样，跳过归因失真。
+ *
+ * 三态归因：
+ * - `available: true`  → daemon 可达（`docker info` 成功），跑真实容器用例
+ * - `available: false` + `reason: "docker_client_only"` → 客户端在、daemon 不在
+ * - `available: false` + `reason: "docker_not_installed"` → 连客户端都没有
+ */
+export type DockerProbeReason = "docker_client_only" | "docker_not_installed";
+
+export interface DockerProbeResult {
+  available: boolean;
+  version: string;
+  reason?: DockerProbeReason;
+}
+
+export function probeDocker(): DockerProbeResult {
+  let clientVersion: string;
   try {
-    const out = execFileSync("docker", ["--version"], {
+    clientVersion = execFileSync("docker", ["--version"], {
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
-    return { available: true, version: out };
   } catch {
-    return { available: false, version: "NOT_AVAILABLE" };
+    return {
+      available: false,
+      version: "NOT_AVAILABLE",
+      reason: "docker_not_installed",
+    };
+  }
+
+  try {
+    // `docker info --format` 需要 daemon 应答；客户端在但 daemon 未起会失败。
+    const serverVersion = execFileSync(
+      "docker",
+      ["info", "--format", "{{.ServerVersion}}"],
+      { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] },
+    ).trim();
+    if (serverVersion === "" || /unknown/i.test(serverVersion)) {
+      return {
+        available: false,
+        version: `${clientVersion} (server: ${serverVersion || "unknown"})`,
+        reason: "docker_client_only",
+      };
+    }
+    return {
+      available: true,
+      version: `${clientVersion} (server: ${serverVersion})`,
+    };
+  } catch {
+    return {
+      available: false,
+      version: clientVersion,
+      reason: "docker_client_only",
+    };
   }
 }
 
@@ -135,6 +187,9 @@ function collectFingerprint(cwd: string): EnvFingerprint {
     git_branch: getGitBranch(cwd),
     docker_available: dockerInfo.available,
     docker_version: dockerInfo.version,
+    ...(dockerInfo.reason === undefined
+      ? {}
+      : { docker_probe_reason: dockerInfo.reason }),
     timestamp: new Date().toISOString(),
   };
 }
@@ -433,6 +488,20 @@ export function formatMarkdownMatrix(
   const fp = report.fingerprint;
   const sm = report.summary;
 
+  // TASK-P1.5：统计数字一律由实跑结果派生，禁止硬编码（旧文本会与环境不符）
+  const countBy = (
+    list: readonly { status: "PASSED" | "SKIPPED_NO_DOCKER" | "FAILED" }[],
+    status: "PASSED" | "SKIPPED_NO_DOCKER" | "FAILED",
+  ): number => list.filter((item) => item.status === status).length;
+  const core = report.scenarios;
+  const platform = report.platform_criteria;
+  const corePassed = countBy(core, "PASSED");
+  const coreSkipped = countBy(core, "SKIPPED_NO_DOCKER");
+  const coreFailed = countBy(core, "FAILED");
+  const platformPassed = countBy(platform, "PASSED");
+  const platformSkipped = countBy(platform, "SKIPPED_NO_DOCKER");
+  const platformFailed = countBy(platform, "FAILED");
+
   const scenarioRows = report.scenarios
     .map(
       (s) =>
@@ -471,6 +540,7 @@ export function formatMarkdownMatrix(
 | **工作分支** | \`git_branch\` | \`${fp.git_branch}\` |
 | **Docker 状态** | \`docker_available\` | \`${fp.docker_available ? "YES" : "NO"}\` |
 | **Docker 版本** | \`docker_version\` | \`${fp.docker_version}\` |
+| **Docker 判定归因** | \`docker_probe_reason\` | \`${fp.docker_probe_reason ?? "daemon_reachable"}\` |
 | **执行时间戳** | \`timestamp\` | \`${fp.timestamp}\` |
 
 ---
@@ -478,8 +548,8 @@ export function formatMarkdownMatrix(
 ## 2. 验收汇总结论 (Executive Summary)
 
 - **总用例数**: ${sm.total_tests} 项（十大负向场景 10 项 + 跨平台判据 4 项）
-- **核心场景动态渗透统计**: 7 项实跑通过 / 3 项无 Docker 跳过 / 0 失败（「7 实跑/3 跳过」）
-- **跨平台判据统计**: 1 项实跑通过 / 3 项无真实 Docker 容器环境跳过
+- **核心场景动态渗透统计**: ${corePassed} 项实跑通过 / ${coreSkipped} 项无 Docker 跳过 / ${coreFailed} 项失败
+- **跨平台判据统计**: ${platformPassed} 项实跑通过 / ${platformSkipped} 项无真实 Docker 容器环境跳过 / ${platformFailed} 项失败
 - **总计实跑通过 (\`PASSED\`)**: ${sm.passed} 项
 - **总计无 Docker 环境豁免跳过 (\`SKIPPED_NO_DOCKER\`)**: ${sm.skipped_no_docker} 项
 - **总计执行失败 (\`FAILED\`)**: ${sm.failed} 项
@@ -487,8 +557,9 @@ export function formatMarkdownMatrix(
 
 > **诚实口径遵循说明**：
 > 1. 本矩阵严格区分「实跑通过 (\`PASSED\`)」、「环境豁免跳过 (\`SKIPPED_NO_DOCKER\`)」与「失败 (\`FAILED\`)」三态，绝无静默假 pass。
-> 2. 无 Docker 守护进程的裸机/轻量 CI 环境下，针对真实容器读写拦截场景（TC-P0-3A~C）及跨平台容器运行判据（P13-P2~P4）如实记录为 \`SKIPPED_NO_DOCKER\`，杜绝通过计数从 8 虚增至 11；在含跳过项时矩阵裁决如实降级为 \`PARTIAL\`。
-> 3. 十大核心负向渗透场景中真实执行 7 项实跑通过、3 项因无真实 Docker 环境跳过；跨平台判据中纯逻辑/Git Trailer 绑定（P13-P5）实跑通过。
+> 2. 无 Docker 守护进程的裸机/轻量 CI 环境下，针对真实容器读写拦截场景（TC-P0-3A~C）及跨平台容器运行判据（P13-P2~P4）如实记录为 \`SKIPPED_NO_DOCKER\`，杜绝通过计数虚增；在含跳过项时矩阵裁决如实降级为 \`PARTIAL\`。
+> 3. **TASK-P1.5 起**，统计数字全部由本次实跑结果派生（不再硬编码）；\`docker_probe_reason\` 区分「daemon 可达」与「仅客户端存在（\`docker_client_only\`）」，避免把「没有 daemon」误读成「没有 Docker」。
+> 4. \`P13-P2\` / \`P13-P3\` / \`P13-P4\` 的 \`PASSED\` 是**规格断言**（\`resolveScopedMounts\` 等纯函数）通过，**不等于**在 Linux / macOS / Windows 宿主上真实跑过容器；跨平台容器运行验收仍未完成。
 
 ---
 
@@ -520,6 +591,16 @@ ${platformRows}
    - 合并门禁仅对测试文件被修改（\`tests_modified=true\`）且可能被削弱的场景触发隔离基线重跑（Baseline Rerun），不替代全量 CI/CD 流水线。
 3. **P0 安全风险口径保持**：
    - 本矩阵为 TASK-P1.3 独立动态渗透验收之可信度量证据，**不等于宣称 P0 安全风险已完全解除**。剩余三项架构边界（Mount Scope ≠ 内核隔离、无硬件 Attestation、Merger 不重跑全量用例）继续挂账并受独立门禁监控。
+
+---
+
+## 6. 历史基线留档 (Historical Baselines)
+
+> 本矩阵由生成器覆盖式重写；为免丢证，历史实跑基线在此留档。**当前生效数字只看上方 §1–§2。**
+
+| 采样时间 | 宿主 | 基线 Commit | Docker | 实跑通过 / 跳过 / 失败 | 裁决 | Digest |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| \`2026-11-27T11:35:58.467Z\` | \`linux 4.19.0-gvisor\` / \`x64\` | \`5def6bb3\` (\`fix/task-p1.3a-matrix-verdict-partial\`) | 无（\`NOT_AVAILABLE\`） | 8 / 6 / 0 | \`PARTIAL\` | \`78b199b70a64932839f61c7ffdf13a52e4a042e319350fd06ebda264de61d7ff\` |
 
 ---
 
