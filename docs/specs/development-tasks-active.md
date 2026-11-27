@@ -1941,113 +1941,16 @@ governance:
 > `TASK-P1.3` 已 **COMPLETED**（施工 [#443](https://github.com/he18718143986-design/IDE/pull/443) squash `ba9325f77574decbc4816b90d0022c5a23159123`；立卡 P-340；完工回写 P-341）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-p1.3) §3.4ck。诚实口径：**P0 独立动态渗透与跨平台验收套件已交付（十大负向场景覆盖（7 项实跑通过、3 项因无 Docker 标记 SKIPPED_NO_DOCKER）、三平台判据自动化断言、三态证据输出与验收矩阵；真实容器及三平台运行时验收尚未完成）；无 Docker 环境用例如实跳过未宣称通过，P0 风险未宣称解除**。此处保留立卡说明与审批边界。
 
 
-### 3.4cl P0 验收矩阵生成器裁决聚合与平台判据状态修证（TASK-P1.3a · 立卡 P-342）
+### 3.4cl P0 验收矩阵生成器裁决聚合与平台判据状态修证（TASK-P1.3a · 立卡 P-342 · 完工 P-343 · 正文已迁出）
 
-> **立卡说明（2026-11-27 · P-342）**：Tina 拍板立微型修复卡。操作者由我执行。对应 TASK-P1.3 交付物 `scripts/verify-p0-independent-suite.ts` 暴露的证据生成器裁决聚合缺陷（当存在 `SKIPPED_NO_DOCKER` 跳过项时，`verdict` 仍因无失败而误判为 `PASSED`；且跨平台判据 `platformCriteria` 默认赋 `PASSED` 导致无真实容器运行时通过数虚增）。本卡为微型修复卡（估算 XS，优先级 P1-High），独立修证证据生成器，杜绝失真证据链。**施工型卡，立卡 ≠ 开工**。
+> **立卡与归档说明（2026-11-27 · P-342 / P-343）**：授权来源为 Tina 授权立卡并合入施工 PR「按先例授权合并 #446，执行 TASK-P1.3a 完工回写」。操作者由我执行。对应 TASK-P1.3 交付物 `scripts/verify-p0-independent-suite.ts` 暴露的证据生成器裁决聚合缺陷（当存在 `SKIPPED_NO_DOCKER` 跳过项时，`verdict` 仍因无失败而误判为 `PASSED`；且跨平台判据 `platformCriteria` 默认赋 `PASSED` 导致无真实容器运行时通过数虚增）。本卡为微型修复卡（估算 XS，优先级 P1-High），已独立修证证据生成器。
 >
 > **目标**：修证 `scripts/verify-p0-independent-suite.ts` 裁决聚合逻辑，在存在跳过项时准确降级为 `PARTIAL` 状态；校正跨平台判据在无真实容器运行时标记为 `SKIPPED_NO_DOCKER` 而非默认 `PASSED`；提供纯函数单测并重跑脚本重算 Evidence Digest 与验收矩阵文档。
 >
-> **前置条件与硬依赖**：`TASK-P1.3` 施工及完工回写（#443 squash `ba9325f7` / #444 squash `2af3e485`）已正式交付合入。`TASK-P1.4` 继续挂账待立，硬依赖 `TASK-P1.3a` 修证合入。
+> **前置条件与硬依赖**：`TASK-P1.3` 施工及完工回写（#443 squash `ba9325f7` / #444 squash `2af3e485`）已正式交付合入。`TASK-P1.4` 继续挂账待立，硬依赖 `TASK-P1.3a` 完工合入满足。
 >
-> **审批边界（逐字写入）**：本审批**不是代码合并批准**，也**不是 P0 风险解除声明**。本卡为施工立卡，立卡 ≠ 开工；实施须遵循立卡限制与 DoD，PR 全绿且 CLEAN 报授权方可合入。
+> **审批边界（逐字写入）**：本审批**不是代码合并批准**，也**不是 P0 风险解除声明**。实施遵循立卡限制与 DoD，PR 全绿且 UNSTABLE 按先例报授权合入。
 >
 > **诚实口径**：**硬件级 Attestation 未做、Merger 不重跑全量测试、容器内无 OS 级只读隔离三条边界保留；不得宣称 P0 风险解除；代码交付 ≠ 安全验证通过**。
-
-<a id="task-p1.3a"></a>
-
-#### 【Task P1.3a】P0 验收矩阵生成器裁决聚合与平台判据状态修证 `[NEW_TASK]`
-
-```yaml task-card
-id: TASK-P1.3a
-status: NEW_TASK
-contract:
-  intent:
-    title: P0 验收矩阵生成器裁决聚合与平台判据状态修证
-    description: >-
-      做完后，修复 scripts/verify-p0-independent-suite.ts 的裁决聚合与平台判据映射缺陷；
-      在存在 SKIPPED_NO_DOCKER 跳过项时，裁决准确降级为 PARTIAL 而非误报 PASSED；
-      校正跨平台判据 platformCriteria 在未连接真实 Docker 容器环境下的默认状态为 SKIPPED_NO_DOCKER，杜绝通过数虚增；
-      提供纯函数裁决与映射单测，重新生成 docs/ledger/p0-independent-verification-matrix.md 并重算 Evidence Digest。
-    risk_level: MEDIUM
-  acceptance:
-    - id: P13a-P1
-      check: auto
-      text: >-
-        裁决聚合逻辑引入 PARTIAL 状态与正确降级：scripts/verify-p0-independent-suite.ts 中 verdict 联合类型增加 PARTIAL；实现 failed > 0 为 FAILED、failed == 0 且存在跳过项（skippedNoDocker > 0）降级为 PARTIAL、仅在零失败且无跳过（全实跑）时才判定为 PASSED。
-    - id: P13a-P2
-      check: auto
-      text: >-
-        平台判据无 Docker 环境状态校正：platformCriteria 在无真实容器执行/无 Docker 守护进程时，准确标记为 SKIPPED_NO_DOCKER 而非默认 PASSED，真实反映「自动化断言通过但真实容器运行时未执行」，杜绝通过计数从 8 虚增至 11。
-    - id: P13a-P3
-      check: auto
-      text: >-
-        裁决聚合与判据映射纯单测覆盖：新增 tests/unit/verify-p0-independent-suite-verdict.test.ts，测试全实跑通过 (PASSED)、无失败含跳过降级 (PARTIAL)、存在失败阻断 (FAILED) 以及无 Docker 平台判据状态映射。
-    - id: P13a-P4
-      check: auto
-      text: >-
-        验收矩阵文档与摘要同步重算：执行修复后的验证脚本，重新生成 docs/ledger/p0-independent-verification-matrix.md，反映真实实跑数、跳过数与 PARTIAL 裁决，并重新计算输出匹配的 Evidence Digest。
-  scheme_item_ids: []
-  scope:
-    writable_paths:
-      - scripts/verify-p0-independent-suite.ts
-      - docs/ledger/p0-independent-verification-matrix.md
-      - tests/unit/verify-p0-independent-suite-verdict.test.ts
-    readonly_paths:
-      - daemon/pipeline/orchestrator.ts
-      - daemon/pipeline/merger.ts
-      - daemon/pipeline/evidence-signer.ts
-      - daemon/worker/sandbox/container-host.ts
-      - daemon/worker/cli-host/docker-container-host.ts
-  verification:
-    commands:
-      - { alias: verdict-unit, executable: npx, args: [vitest, run, tests/unit/verify-p0-independent-suite-verdict.test.ts] }
-      - { alias: docs, executable: npm, args: [run, check:docs] }
-      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
-design:
-  approach: >-
-    1) 在 scripts/verify-p0-independent-suite.ts 中扩充 IndependentVerificationReport.summary.verdict 联合类型为 PASSED | PARTIAL | BLOCKED | FAILED。
-    2) 修改裁决聚合计算：failed > 0 ? "FAILED" : (skippedNoDocker > 0 ? "PARTIAL" : "PASSED")。
-    3) 修改 platformCriteria 映射：根据 docker_available 状态，若无 Docker 支持，将需真实容器环境的判据置为 SKIPPED_NO_DOCKER，防止通过数被静态断言虚增。
-    4) 在 tests/unit/verify-p0-independent-suite-verdict.test.ts 针对裁决算法与判据映射编写针对性单元测试。
-    5) 运行脚本带 --update-doc 更新 docs/ledger/p0-independent-verification-matrix.md 并重签 Evidence Digest。
-  touches:
-    - { path: scripts/verify-p0-independent-suite.ts, change: modify, why: 裁决聚合逻辑引入 PARTIAL 与平台判据状态修正, symbols: [] }
-    - { path: docs/ledger/p0-independent-verification-matrix.md, change: modify, why: 验收矩阵文档与摘要同步更新, symbols: [] }
-    - { path: tests/unit/verify-p0-independent-suite-verdict.test.ts, change: create, why: 裁决算法与判据映射纯单测, symbols: [] }
-  interfaces: []
-  data_changes: []
-  dependencies: []
-  decisions: []
-  test_plan:
-    - { acceptance_id: P13a-P1, test_path: tests/unit/verify-p0-independent-suite-verdict.test.ts, level: unit, debt: "立卡阶段测试文件尚未创建，待 TASK-P1.3a 开工施工时落地" }
-    - { acceptance_id: P13a-P2, test_path: tests/unit/verify-p0-independent-suite-verdict.test.ts, level: unit, debt: "立卡阶段测试文件尚未创建，待 TASK-P1.3a 开工施工时落地" }
-    - { acceptance_id: P13a-P3, test_path: tests/unit/verify-p0-independent-suite-verdict.test.ts, level: unit, debt: "立卡阶段测试文件尚未创建，待 TASK-P1.3a 开工施工时落地" }
-    - { acceptance_id: P13a-P4, test_path: tests/unit/verify-p0-independent-suite-verdict.test.ts, level: unit, debt: "立卡阶段测试文件尚未创建，待 TASK-P1.3a 开工施工时落地" }
-  knowledge_delta:
-    modules_upsert: []
-    decisions_add: []
-    overview_changed: false
-governance:
-  spec_refs:
-    - docs/ledger/p0-independent-verification-matrix.md
-    - docs/ledger/p1-eval-evidence-trust-chain-and-p0-acceptance.md
-  depends_on:
-    - { id: TASK-P1.3, kind: hard }
-  code_facts:
-    - { ref: "scripts/verify-p0-independent-suite.ts:509", note: "verdict 聚合计算：failed > 0 ? FAILED : PASSED 遗漏 skipped 降级" }
-    - { ref: "scripts/verify-p0-independent-suite.ts:343", note: "platformCriteria 默认赋 PASSED 导致无容器通过数虚增" }
-  non_goals:
-    - 不修改生产核心代码（orchestrator/merger/evidence-signer/container-host 等严格只读）
-    - 不在本卡处理 Gateway 脱敏与 Nonce 绑定（由 TASK-P1.4 承接）
-    - 不宣称 P0 风险解除或三平台真实容器验收已通过
-  fail:
-    - 跳过场景依然输出 PASSED 裁决
-    - 未连接真实 Docker 容器环境依然把平台判据计入实跑通过
-    - 动用授权范围外的生产代码文件
-  estimate: S
-  invariants:
-    auth: unchanged
-    demo_origin: unchanged
-    illumination: unchanged
-    gateway_write_scope: unchanged
-```
+>
+> `TASK-P1.3a` 已 **COMPLETED**（施工 [#446](https://github.com/he18718143986-design/IDE/pull/446) squash `1340494a5d9e750efd775f70c019677cf53c1c87`；立卡 P-342；完工回写 P-343）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-p1.3a) §3.4cl。诚实口径：**验收矩阵裁决聚合与平台判据状态修证已交付（PARTIAL 三态、SKIPPED_NO_DOCKER 标记、矩阵如实反映 7 实跑/3 跳过）；三平台真实容器验收仍未完成，P0 风险未宣称解除**。此处保留立卡说明与审批边界。
