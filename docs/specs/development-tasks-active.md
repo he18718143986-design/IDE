@@ -1991,134 +1991,21 @@ governance:
 >
 > `TASK-P0.2a` 已 **COMPLETED**（施工 [#452](https://github.com/he18718143986-design/IDE/pull/452) squash `b257c22c42019b0089aefb9ed0e71c0b93513b46`；立卡 P-346；完工回写 P-347）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-p0.2a) §3.4cn。诚实口径：**`test_integrity` 必填化与缺失 fail-closed 已交付、五项审计证明落盘；P0 风险未宣称解除**。此处保留立卡说明与审批边界。
 
-### 3.4co 执行链受控证明专项（TASK-P0.1a · 审批称 TASK-P0-1A · 立卡 P-348 · NEW_TASK）
+### 3.4co 执行链受控证明专项（TASK-P0.1a · 审批称 TASK-P0-1A · 立卡 P-348 · 完工 P-349 · 正文已迁出）
 
 > **卡号说明**：审批称 `TASK-P0-1A`。docs 门禁卡号正则为 `^TASK-[A-Z0-9]+(\.[0-9a-z-]+)*$`（`scripts/docs-check/checks.ts:31`），不接受连字符大写后缀；卡头规范落为 **`TASK-P0.1a`**，与审批的 `TASK-P0-1A` 一一对应、语义同一。未改门禁脚本。
 
 <a id="task-p0.1a"></a>
 <a id="task-p0-1a"></a>
 
-```yaml task-card
-id: TASK-P0.1a
-status: NEW_TASK
-contract:
-  intent:
-    title: 执行链受控证明专项
-    description: >-
-      核实并证明派工至真实进程的全链路执行链受控状态：
-      追踪 openhands-adapter / container-cli-executor -> runInSandbox -> DockerContainerHost.run 派工链条；
-      系统枚举并复核所有 SANDBOX_ENFORCED 入口与降级/重试/异常路径，确认 HOST_UNAVAILABLE 与逃生门触发时的 fail-closed 阻断行为；
-      核查 SandboxWitness 是否严格源自实际执行结果而非伪造；
-      对 os-sandbox.ts probeDeniedFromOutput 网络探测逻辑进行三态修证（api.anthropic.com 不可达时增加交叉校验或降级 UNKNOWN 不计入 denied）；
-      审计 orchestrator.ts 自动补齐 test_integrity 占位记录与真实重跑记录在 schema 与下游核验中的区分性，防止占位记录被误认为真实验收凭据；
-      产出专项审计报告落盘 docs/ledger/p0-1a-execution-chain-controlled-audit.md。
-    risk_level: HIGH
-  acceptance:
-    - id: P01A-P1
-      check: auto
-      text: >-
-        派工→真实进程全链路追踪审计：核查并证明从 openhands-adapter / container-cli-executor 到 runInSandbox 再到 DockerContainerHost.run 的调用栈链路，
-        确认在 SANDBOX_ENFORCED 模式下进程真实受限在容器内执行，禁止非受控本地直接派工逃逸。
-    - id: P01A-P2
-      check: auto
-      text: >-
-        SANDBOX_ENFORCED 入口与异常路径枚举：完整枚举并审计所有受控沙箱派工入口，核实重试、降级与异常捕获路径；
-        确认宿主不可用（HOST_UNAVAILABLE）或逃生门启用时严格 fail-closed 抛出 E_ADAPTER_SANDBOX_LOCKED 阻断，严禁静默回退至无受控环境执行。
-    - id: P01A-P3
-      check: auto
-      text: >-
-        见证真实性审计：证明落盘的 SandboxWitness 字段（host_kind, via, exit_code, worktree_root, nonce 等）直接源自真实进程执行与容器退出状态，
-        非静态 mock 或伪造，且与合同/版本/会话及工作树规范化路径强绑定。
-    - id: P01A-P4
-      check: auto
-      text: >-
-        os-sandbox.ts 网络探测三态修证：修复 probeDeniedFromOutput 判定逻辑，针对网络探测（如 api.anthropic.com）因外部网络不可达而非沙箱规则拦截导致的错误引入三态判据（DENIED / UNKNOWN / ALLOWED），
-        在网络不可达或超时情况下降级为 UNKNOWN 并不计入 denied，补充交叉校验与单元测试。
-    - id: P01A-P5
-      check: auto
-      text: >-
-        test_integrity 区分性审计：复核 orchestrator.ts 自动补齐的默认 test_integrity 结构（baseline_fingerprint: "none" 等占位记录）与基线真实重跑记录在 downstream（merger, 独立验收）的区分性，
-        确保占位记录不会被误当作真实测试验证通过的依据，必要时增加显式标识或断言。
-    - id: P01A-P6
-      check: auto
-      text: >-
-        执行链受控证明报告落盘：产出专项审计报告 docs/ledger/p0-1a-execution-chain-controlled-audit.md，
-        完整记录执行链追踪证明、异常路径枚举、见证真实性复核、网络探测三态修证方案及占位记录审计结论。
-  scheme_item_ids: []
-  scope:
-    writable_paths:
-      - daemon/baseline/os-sandbox.ts
-      - daemon/pipeline/orchestrator.ts
-      - tests/daemon/baseline-c14e.test.ts
-      - tests/daemon/p0-3a-container-wiring-and-witness.test.ts
-      - docs/ledger/p0-1a-execution-chain-controlled-audit.md
-    readonly_paths:
-      - daemon/worker/cli-host/openhands-adapter.ts
-      - daemon/worker/sandbox/container-cli-executor.ts
-      - daemon/worker/sandbox/container-host.ts
-      - daemon/pipeline/merger.ts
-      - daemon/pipeline/sandbox-witness-nonce.ts
-      - src/lib/evidence.schema.ts
-      - docs/specs/development-tasks-completed.md
-  verification:
-    commands:
-      - { alias: focused-p01a, executable: npx, args: [vitest, run, tests/daemon/baseline-c14e.test.ts, tests/daemon/p0-3a-container-wiring-and-witness.test.ts] }
-      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
-design:
-  approach: >-
-    审计部分：静态分析结合动态断言，追踪从 openhands-adapter / container-cli-executor 经 runInSandbox 至 DockerContainerHost.run 的调用全流程；
-    扫描所有 SANDBOX_ENFORCED 派工点与 catch / fallback 分支，证实 HOST_UNAVAILABLE 与逃生门触发时 fail-closed 拦截并抛出 E_ADAPTER_SANDBOX_LOCKED；
-    核查 SandboxWitness 数据链路，确保字段绑定真实容器退出码与会话 Nonce；复核 orchestrator 自动补齐的 test_integrity 占位记录是否具备区分性，避免被 merger 或独立验收误判。
-    修证部分：在 daemon/baseline/os-sandbox.ts 中重构 probeDeniedFromOutput，对网络连通性探测异常进行三态化分流（DENIED / UNKNOWN / ALLOWED），
-    当 api.anthropic.com DNS 失败、超时或外部网络不可达时判定为 UNKNOWN，严禁误判为沙箱规则生效（denied: true）。
-  touches:
-    - { path: daemon/baseline/os-sandbox.ts, change: modify, why: probeDeniedFromOutput 网络探测三态修证, symbols: [probeDeniedFromOutput] }
-    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: test_integrity 占位记录与真实重跑记录区分性加固, symbols: [writeEvidence] }
-    - { path: docs/ledger/p0-1a-execution-chain-controlled-audit.md, change: create, why: 执行链受控证明与全链路审计报告, symbols: [] }
-  interfaces: []
-  test_plan:
-    - { acceptance_id: P01A-P1, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, debt: "追踪派工至真实进程并验证容器执行入箱" }
-    - { acceptance_id: P01A-P2, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, debt: "验证宿主不可用时派工被拒 fail-closed" }
-    - { acceptance_id: P01A-P3, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, debt: "验证真实入箱执行见证落盘与防伪" }
-    - { acceptance_id: P01A-P4, test_path: tests/daemon/baseline-c14e.test.ts, level: unit, debt: "覆盖网络探测三态修证与 UNKNOWN 降级" }
-    - { acceptance_id: P01A-P5, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, debt: "验证 test_integrity 占位记录与真实重跑的区分性" }
-    - { acceptance_id: P01A-P6, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, debt: "核验执行链受控证明专项审计报告落盘" }
-governance:
-  spec_refs:
-    - docs/ledger/p0-line-comprehensive-review.md
-    - docs/ledger/p1-line-comprehensive-review.md
-    - docs/ledger/p0-2a-test-integrity-audit-and-tamper-proof.md
-    - docs/specs/development-tasks-completed.md#task-p0.2a
-    - docs/specs/development-tasks-completed.md#task-p0.3a
-  depends_on:
-    - { id: TASK-P0.2a, kind: hard }
-    - { id: TASK-P0.3a, kind: hard }
-  code_facts:
-    - { ref: "daemon/baseline/os-sandbox.ts::probeDeniedFromOutput", note: "当前实现对非成功输出一律认定为 denied，当网络不可达时易把环境故障误当成规则生效" }
-    - { ref: "daemon/pipeline/orchestrator.ts::writeEvidence", note: "受控模式未传 test_integrity 时自动生成 baseline_fingerprint 为 none 的默认占位结构" }
-    - { ref: "daemon/worker/sandbox/container-cli-executor.ts::executeContainerCli", note: "派工入箱主要执行器" }
-  non_goals:
-    - 不引入外部云端或硬件级 Attestation 机制
-    - 不宣布 P0 风险解除
-    - 不重做容器底层驱动
-    - 不修改既有只读路径
-  fail:
-    - 存在非受控逃逸或降级静默执行路径
-    - 宿主不可用时未阻断派工
-    - 网络探测将外部不可达误判为受控安全生效
-    - 修改 writable_paths 外文件或 readonly_paths 产生 diff
-  estimate: M
-  invariants:
-    auth: unchanged
-    demo_origin: unchanged
-    illumination: unchanged
-    gateway_write_scope: unchanged
-```
-
-> **前置条件与硬依赖**：`TASK-P0.2a`（验收依据不可篡改专项）与 `TASK-P0.3a`（生产 Daemon 容器装配与见证强校验）已交付合入，硬依赖满足。
+> **立卡与归档说明（2026-11-28 · P-348 / P-349）**：授权来源为 Tina 本轮指令「按先例授权合并 #455，执行 TASK-P0.1a 完工回写」。操作者由我执行。对应 P0 执行链受控证明专项，完成派工至真实进程全链路追踪、异常路径枚举、见证真实性核查、网络探测三态修证、占位记录区分性审计及专项报告落盘。本卡为施工型任务卡（估算 M，优先级 P1-High），已按授权完成施工与完工回写。
 >
-> **范围与红线**：只允许修改 `writable_paths`；`readonly_paths` 零 diff。严禁放宽既有门禁；严禁把缺项默认为合法。发现需改范围外路径时停工修卡。
+> **目标**：证明派工至真实容器进程全链路受控，枚举受控派工入口与异常分支，修复网络探测假阳性断网证明，加固占位记录与真实重跑区分性，产出专项审计报告。
 >
-> **审批边界（逐字写入）**：本审批**不是代码施工授权**，也**不是代码合并批准**，更**不是 P0 风险解除声明**。本卡为施工立卡，立卡 ≠ 开工；后续施工须由 Tina 单卡点名授权，施工 PR 全绿且 CLEAN 后另行报授权合入。
+> **前置条件与硬依赖**：`TASK-P0.2a`、`TASK-P0.3a` 施工及完工回写已正式交付合入。
 >
-> **诚实口径**：**硬件级 Attestation 未做、Merger 不重跑全量测试、容器内无 OS 级只读隔离三条边界保留；不得宣称 P0/P1 风险解除；代码交付 ≠ 安全验证通过**。
+> **审批边界（逐字写入）**：本审批**不是代码合并批准**，也**不是 P0 风险解除声明**。
+>
+> **诚实口径**：**执行链受控证明专项已交付（全链路追踪、入口枚举、见证真实性核查、网络探测三态修证、占位记录区分性审计、专项报告落盘）；硬件 Attestation 未做、Merger 不重跑全量测试、容器内无 OS 级二次沙盒，P0 风险未宣称解除**。
+>
+> `TASK-P0.1a` 已 **COMPLETED**（施工 [#455](https://github.com/he18718143986-design/IDE/pull/455) squash `670860eb36bf829d4e703433549a7f77853ea1f3`；立卡 P-348；完工回写 P-349）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-p0.1a) §3.4co。诚实口径：**执行链受控证明专项已交付（全链路追踪、入口枚举、见证真实性核查、网络探测三态修证、占位记录区分性审计、专项报告落盘）；硬件 Attestation 未做、Merger 不重跑全量测试、容器内无 OS 级二次沙盒，P0 风险未宣称解除**。此处保留立卡说明与审批边界。
