@@ -1,3 +1,9 @@
+- **P-350（P0 复审专项总账复核落盘与收敛裁定 · 2026-11-28）**：授权来源为 Tina 本轮指令「裁定方案 A，执行 P0 复审专项总账复核落盘与 docs PR」。操作者由我执行。纯 docs 落盘，不改产品代码。基线 main `e28d6110b4f58e86452b18e8516d07669963951f`（#456 squash）。现场核对最新流水 P-349、版本头第 333 条，顺延为 P-350 / 第 334 条；P-285 未占用、不改号。
+  - P0 复审专项两卡（P0.1a 执行链受控证明、P0.2a 验收依据不可篡改）已全部交付核销；总账复核报告落盘 [`docs/ledger/p0-review-comprehensive-audit.md`](../ledger/p0-review-comprehensive-audit.md)；
+  - Tina 裁定宣称「P0 复审专项收敛（剩余项挂账）」，统一口径为：P0 复审专项两卡（P0.1a 执行链受控证明、P0.2a 验收依据不可篡改）已交付核销；五项架构事实边界继续挂账，不构成当前默认可达路径上的活跃利用链；
+  - 五条红线边界逐字保留：硬件级 Attestation 缺失（见证与签名建立在宿主 Node.js 进程及 Docker daemon 未被攻破的可信根假设下）、Merger 不重跑全量测试（PRE_MERGE 仅证据结构审计与基线增量重跑校验）、容器内无 OS 级二次沙盒（无 seccomp/apparmor 严格二次限制或只读根文件系统）、跨进程 Nonce 持久化未做（内存单例、Daemon 重启重置）、真实容器运行时 3/10 跳过项（无 Docker 环境降级 mock 验证）；
+  - **诚实口径**：严禁表述为「P0 风险完全解除」或「具备完整合同级权限强制和独立验收能力」；
+  - 同步：版本头第 334 条、`docs/ledger/README.md` 清单与开放项、本 changelog；第 333 条 / P-349 及更早条目原文逐字未改。合同 `MERGED`、端到端闭环走通一次口径不变。P0/P1 收敛口径维持（专项收敛、剩余项挂账、不宣称风险完全解除）。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。R23 暂缓。Console 拆分与第二批未立卡。`multi-worktree-cross-talk` 挂账未动。J.53–J.62 保持关闭。J.16 仍 `NEW_TASK`。J.22 未开工。#344 遗留分支不动。本线无 active 施工卡。本条仅文档落盘，不改产品代码。
 - **P-349（TASK-P0.1a 施工合入与完工回写 · 执行链受控证明专项 · 2026-11-28）**：授权来源为 Tina 本轮指令「按先例授权合并 #455，执行 TASK-P0.1a 完工回写」。操作者由我执行。施工 PR [#455](https://github.com/he18718143986-design/IDE/pull/455)（head `67eaa0ab4d462b3cd4e802a126c46ffb1c18c0e4`）squash **`670860eb36bf829d4e703433549a7f77853ea1f3`** 于 2026-11-28 合入（父提交 `a751b8cdb236d08fb6a836d0269bdf0d767c07ab`，线性历史）。仅 5 个授权 `writable_paths` +1016/−39，readonly 路径零 diff。归档注记逐条记录 P01A-P1～P6：
   - P01A-P1（派工→真实进程全链路追踪）：核查并证明从 `openhands-adapter` / `container-cli-executor` 经 `runInSandbox` 至 `DockerContainerHost.run` 调用链，在 `SANDBOX_ENFORCED` 模式下受限在真实隔离容器内执行，禁止非受控本地直接派工逃逸；专用集成测试验证调用栈与见证落盘；
   - P01A-P2（SANDBOX_ENFORCED 入口与异常路径枚举）：系统枚举并复核所有受控沙箱派工入口；核实重试、降级与异常捕获路径，确认 `HOST_UNAVAILABLE` 或逃生门启用时严格 fail-closed 抛出 `E_ADAPTER_SANDBOX_LOCKED` 阻断，严禁静默回退至无受控环境执行；
