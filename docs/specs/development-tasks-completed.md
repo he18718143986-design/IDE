@@ -14457,3 +14457,142 @@ governance:
     illumination: unchanged
     gateway_write_scope: unchanged
 ```
+
+
+### 3.4cp 基线验收独立性与恢复加固（TASK-P0.13 · 交付 #459 / 6122e347 · 完工回写 P-352）
+
+<a id="task-p0.13"></a>
+
+> **归档注记（2026-11-28 · P-352）**：施工 PR [#459](https://github.com/he18718143986-design/IDE/pull/459)（head `f8751be9f95d39d1c55c885ad2852056e8e1f7c5`）squash **`6122e347abc6d360e4f15c1238fdd6ec9f8f92c7`** 合入 main。操作者由我执行。8 个授权 `writable_paths` +1114/−139，readonly 六文件零 diff。
+>
+> 验收逐条记录（P013-P1～P6）：
+> - **P013-P1（Scope A 审批冻结与 revision 约束全链路审计）**：核查 `verification_spec.commands` 从 Contract、审批快照、revision 到 `executeBaselineRerun` 全链路；证实既有机制已严格满足审批快照锁定、变更强制重审、执行已批准版本与 Evidence 计划绑定，未破坏既有断言，记录审计证据无需改动产品代码；
+> - **P013-P2（Scope B 测试资产基线登记方案设计先行）**：交付测试资产基线登记架构设计报告（含资产范围、配置/helper/fixture 识别、Base Commit 绑定机制、未登记资产检测、豁免审计记录、与 `test-integrity.ts` 兼容性及渐进演进方案），不扩大当前分类器职责，本阶段不进行代码施工；
+> - **P013-P3（Scope C 执行环境共享风险评估与最小修补）**：交付 `executeBaselineRerun` 与候选执行环境共享风险分析与独立执行器架构评估报告，梳理 Worktree、依赖、环境变量与工具链共享边界与威胁模型；仅对可直接确认且明确影响合并安全的漏洞做最小修补；
+> - **P013-P4（Scope D 恢复失败 fail-closed 强拦截）**：`daemon/guard/test-integrity.ts` 引入 `RecoveryOperationFailure` 与 `TestBaselineRecoveryError` 结构化异常；`hideWorkerAddedTests` 与 `restoreBaselineTestFiles` 显式检查每个恢复与重命名操作结果，单个失败不静默吞并保留可诊断失败记录；`executeBaselineRerun` `finally` 清理阶段若出现恢复错误，将结果覆盖为 `passed: false` / `E_TEST_BASELINE_UNAVAILABLE`；`daemon/pipeline/orchestrator.ts` 异常全捕获并降级为 `UNSAFE_EXECUTION` + `BLOCKED`；`daemon/pipeline/merger.ts` 新增状态一致性（通过但携带失败码即拒）与完整性强校验断言；
+> - **P013-P5（专项报告与去重对照落盘）**：交付物完整落盘 [`docs/ledger/p0-13-baseline-acceptance-independence-and-recovery.md`](../ledger/p0-13-baseline-acceptance-independence-and-recovery.md) 及 [`docs/ledger/p0-deduplication-and-p0-13-mapping.md`](../ledger/p0-deduplication-and-p0-13-mapping.md)；去重对照表明确 P0.5–P0.8 不重复立卡、P0.9–P0.12 纳入本卡；
+> - **P013-P6（测试验证与边界收敛）**：三套测试（`p0-4-test-integrity-wiring.test.ts` 10/10 含 P013-W1~W4、`p0-4-test-integrity-fail-closed.test.ts` 6/6 含 P013-I1/I2、`test-integrity-guard.test.ts` 14/14 含 P013-U1~U7）全绿通过；
+> - 必需 CI 全绿，Windows Unit 存量失败按先例 `UNSTABLE` 不挡（10 项既有环境差异，本卡测试 100% 通过），Cursor Bugbot neutral。
+>
+> **诚实口径**：**基线验收独立性、环境共享风险评估与现场恢复加固已交付（恢复失败 fail-closed、审批冻结审计、共享风险最小修补、测试资产登记设计）；五项事实边界保留，P0 风险未宣称解除**。
+
+```yaml task-card
+id: TASK-P0.13
+status: COMPLETED
+contract:
+  intent:
+    title: 基线验收独立性与恢复加固
+    description: >-
+      核实基线独立验收关键控制链路并加固恢复机制：
+      Scope A（审计+条件修证）：verification_spec.commands 从 Contract/审批快照/revision 到 executeBaselineRerun 全链路核实（是否含在审批快照、revision 是否覆盖变更、审批后变更是否强制重审、Baseline Rerun 是否严格执行已批准版本、Evidence 是否绑定实际执行计划；已满足则记录证据不改，断链则修证）；
+      Scope B（设计先行，不施工）：制定测试资产基线登记方案（测试文件/配置/helper/fixture/动态加载入口识别、Base Commit 绑定、未登记资产检测、增删改豁免审计记录、与 test-integrity.ts 兼容性；交付设计与实施建议，不扩大现有分类器职责）；
+      Scope C（评估+最小修证）：评估 executeBaselineRerun 与候选执行环境共享风险（runCommand 执行器与配置依赖、候选 Worktree 对执行环境影响、依赖/环境变量/工具链可控性、独立验收执行器可行架构；交付风险分析与隔离边界，仅对可直接确认且影响合并安全的漏洞做最小修补）；
+      Scope D（明确修证项）：加固 hideWorkerAddedTests / restoreBaselineTestFiles 恢复失败 fail-closed（每个恢复操作显式检查结果、单个失败不静默吞、部分失败保留可诊断记录、恢复失败产生明确错误状态且不得视为 Rerun 成功、必须阻断 Merge、验证失败/异常/部分成功均 fail-closed；最小改动不扩大重构）；
+      卡面原则：不重复实施已交付的容器执行闭环（P0.3b-2 #434）、Sandbox Witness 强绑定（P1.4 #449）、OS Sandbox 三态门禁与全路径派工审计（P0.1a #455）。
+    risk_level: HIGH
+  acceptance:
+    - id: P013-P1
+      check: auto
+      text: >-
+        Scope A（审批冻结与 revision 约束）：核查 verification_spec.commands 从 Contract、审批快照、revision 到 executeBaselineRerun 的全链路；
+        证明已满足审批快照锁定、变更强制重审、执行已批准版本与 Evidence 计划绑定；缺口则按最小侵入修补并提供测试证明。
+    - id: P013-P2
+      check: auto
+      text: >-
+        Scope B（测试资产基线登记方案）：交付测试资产基线登记架构设计报告（含资产范围、配置/helper/fixture 识别、Base Commit 绑定机制、未登记资产检测、豁免审计记录、与 test-integrity.ts 兼容性及渐进演进方案），
+        不扩大当前分类器职责，本阶段不进行代码施工。
+    - id: P013-P3
+      check: auto
+      text: >-
+        Scope C（执行环境共享风险评估与最小修证）：交付 executeBaselineRerun 与候选执行环境共享风险分析与独立执行器架构评估报告，
+        梳理 Worktree、依赖、环境变量与工具链共享边界与威胁模型；仅对可直接确认且明确影响合并安全的漏洞做最小修补。
+    - id: P013-P4
+      check: auto
+      text: >-
+        Scope D（恢复失败 fail-closed 强拦截）：hideWorkerAddedTests 与 restoreBaselineTestFiles 显式检查每个恢复与重命名操作结果；
+        单个失败不静默吞并保留可诊断失败记录；恢复失败产生明确错误状态（不得视为 Rerun 成功），在 Evidence 与 Merge Gate 显式阻断 Merge；覆盖部分失败、异常与合并拦截。
+    - id: P013-P5
+      check: auto
+      text: >-
+        专项报告与去重对照落盘：交付物落盘 docs/ledger/p0-13-baseline-acceptance-independence-and-recovery.md 及 docs/ledger/p0-deduplication-and-p0-13-mapping.md；
+        去重对照表明确 P0.5–P0.8 不重复立卡、P0.9–P0.12 纳入本卡。
+    - id: P013-P6
+      check: auto
+      text: >-
+        测试覆盖与边界收敛：新增修证项均有针对性单元/集成测试覆盖，范围外问题单独提后续卡不擅自扩大；
+        严格遵守卡面原则，不重复实施已交付的容器执行闭环、Sandbox Witness 绑定与 OS 沙箱三态门禁。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/guard/test-integrity.ts
+      - daemon/pipeline/orchestrator.ts
+      - daemon/pipeline/merger.ts
+      - tests/unit/test-integrity-guard.test.ts
+      - tests/daemon/p0-4-test-integrity-wiring.test.ts
+      - tests/daemon/p0-4-test-integrity-fail-closed.test.ts
+      - docs/ledger/p0-13-baseline-acceptance-independence-and-recovery.md
+      - docs/ledger/p0-deduplication-and-p0-13-mapping.md
+    readonly_paths:
+      - src/lib/evidence.schema.ts
+      - src/lib/contract.schema.ts
+      - daemon/baseline/os-sandbox.ts
+      - daemon/worker/sandbox/container-host.ts
+      - docs/ledger/p0-review-comprehensive-audit.md
+      - docs/specs/development-tasks-completed.md
+  verification:
+    commands:
+      - { alias: focused-p013, executable: npx, args: [vitest, run, tests/unit/test-integrity-guard.test.ts, tests/daemon/p0-4-test-integrity-wiring.test.ts, tests/daemon/p0-4-test-integrity-fail-closed.test.ts] }
+      - { alias: check-docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    审计与设计：系统核验 verification_spec.commands 在审批快照、合同 revision 与 executeBaselineRerun 之间的传递链条，验证审批后篡改命令是否触发重审或拦截；
+    制定测试资产基线登记方案，研究测试辅助文件（配置、fixture、helper）的 Base 绑定与篡改检测；评估 executeBaselineRerun 与候选工作树的环境共享风险与独立执行器架构。
+    代码修证：在 daemon/guard/test-integrity.ts 中加固 hideWorkerAddedTests 与 restoreBaselineTestFiles，对每个文件的检出还原与重命名结果进行显式检查；
+    当任一文件恢复失败时，捕获异常并保留失败明细，返回明确的失败状态或抛出 E_TEST_BASELINE_RECOVERY_FAILED，杜绝由于恢复失败残留错误文件却误判为基线重跑成功（false green）；
+    编排器与合并阶段捕获该状态，写入 Evidence 并触发 Merge Gate 拦截阻断合流。
+  touches:
+    - { path: daemon/guard/test-integrity.ts, change: modify, why: "hideWorkerAddedTests/restoreBaselineTestFiles 恢复失败显式检查与 fail-closed 加固", symbols: [hideWorkerAddedTests, restoreBaselineTestFiles, executeBaselineRerun] }
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: "基线重跑恢复失败错误状态穿透与 Evidence 绑定", symbols: [writeEvidence] }
+    - { path: daemon/pipeline/merger.ts, change: modify, why: "基线重跑恢复失败阻断合并", symbols: [assertEvidenceTestIntegrity] }
+    - { path: docs/ledger/p0-13-baseline-acceptance-independence-and-recovery.md, change: create, why: "Scope A~D 审计核实、资产登记设计方案与共享风险评估专项报告", symbols: [] }
+    - { path: docs/ledger/p0-deduplication-and-p0-13-mapping.md, change: modify, why: "P0.5–P0.12 去重对照表与 TASK-P0.13 架构映射报告", symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: P013-P1, test_path: tests/daemon/p0-4-test-integrity-wiring.test.ts, level: integration, debt: "核验 verification_spec.commands 审批冻结与 revision 绑定链路" }
+    - { acceptance_id: P013-P2, test_path: tests/unit/test-integrity-guard.test.ts, level: unit, debt: "核验测试资产基线登记方案设计文档落盘与边界" }
+    - { acceptance_id: P013-P3, test_path: tests/daemon/p0-4-test-integrity-wiring.test.ts, level: integration, debt: "核验执行环境共享风险评估报告落盘与最小修补验证" }
+    - { acceptance_id: P013-P4, test_path: tests/unit/test-integrity-guard.test.ts, level: unit, debt: "单元用例覆盖 hide/restore 恢复失败显式检查与 fail-closed" }
+    - { acceptance_id: P013-P5, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, debt: "集成用例覆盖恢复失败导致基线重跑异常并被 merger 拦截" }
+    - { acceptance_id: P013-P6, test_path: tests/daemon/p0-4-test-integrity-wiring.test.ts, level: integration, debt: "核验专项报告与去重对照表落盘且无未决回归" }
+governance:
+  delivered: { pr: 459, commit: 6122e347abc6d360e4f15c1238fdd6ec9f8f92c7 }
+  spec_refs:
+    - docs/ledger/p0-deduplication-and-p0-13-mapping.md
+    - docs/ledger/p0-review-comprehensive-audit.md
+    - docs/ledger/p0-line-comprehensive-review.md
+    - docs/ledger/p0-2a-test-integrity-audit-and-tamper-proof.md
+    - docs/specs/development-tasks-completed.md#task-p0.4
+  depends_on:
+    - { id: TASK-P0.4, kind: hard }
+    - { id: TASK-P0.2a, kind: hard }
+    - { id: TASK-P0.1a, kind: hard }
+  code_facts:
+    - { ref: "daemon/guard/test-integrity.ts::restoreBaselineTestFiles", note: "当前实现检出 base 文件时若异常未逐项详细记录失败上下文" }
+    - { ref: "daemon/guard/test-integrity.ts::hideWorkerAddedTests", note: "当前实现重命名隔离新增测试时若异常未显式穿透至重跑失败状态" }
+    - { ref: "daemon/guard/test-integrity.ts::executeBaselineRerun", note: "基线重跑执行器，需确保恢复失败时绝对不能被判定为 Rerun 成功" }
+  non_goals:
+    - 不重复实施已交付的容器执行闭环（P0.3b-2 #434）、Sandbox Witness 强绑定（P1.4 #449）、OS Sandbox 三态门禁与全路径派工审计（P0.1a #455）
+    - 不宣称 P0 风险完全解除
+    - 不在 Scope B 阶段开展代码施工（测试资产基线登记本卡仅设计先行）
+    - 不擅自扩大修补范围到已划定边界之外
+  fail:
+    - verification_spec.commands 未在审批快照冻结或 revision 未覆盖变更时放行
+    - hideWorkerAddedTests 或 restoreBaselineTestFiles 恢复失败时吞掉异常判定重跑成功
+    - 恢复失败未在 Evidence 或 Merger 门禁中 fail-closed 阻断合并
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```

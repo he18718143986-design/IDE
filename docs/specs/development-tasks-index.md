@@ -243,7 +243,7 @@
 | `TASK-P1.3a` | `COMPLETED` | P0 验收矩阵生成器裁决聚合与平台判据状态修证（交付 [#446](https://github.com/he18718143986-design/IDE/pull/446)/`1340494a`；立卡 P-342；完工 P-343；估算 XS · P1-High；针对 TASK-P1.3 交付物 scripts/verify-p0-independent-suite.ts 裁决聚合缺陷引入 PARTIAL 三态判定、无 Docker 平台判据标记 SKIPPED_NO_DOCKER 杜绝通过数虚增、单测 9/9 通过并重算矩阵与 Digest；三平台真实容器验收未完成，P0 风险未解除；P1.4 挂账待立硬依赖已满足） | [正文](./development-tasks-completed.md#task-p1.3a) · [验收矩阵](../ledger/p0-independent-verification-matrix.md) |
 | `TASK-P0.2a` | `COMPLETED` | 验收依据不可篡改专项（#452/`b257c22c`；P-347；M · P1-High；不宣称 P0 风险解除） | [正文](./development-tasks-completed.md#task-p0.2a) · [审计报告](../ledger/p0-2a-test-integrity-audit-and-tamper-proof.md) |
 | `TASK-P0.1a` | `COMPLETED` | 执行链受控证明专项（#455/`670860eb`；P-349；M · P1-High；不宣称 P0 风险解除） | [正文](./development-tasks-completed.md#task-p0.1a) · [审计报告](../ledger/p0-1a-execution-chain-controlled-audit.md) |
-| `TASK-P0.13` | `NEW_TASK` | 基线验收独立性与恢复加固（Baseline Acceptance Independence & Recovery Hardening；估算 M · P0；Audit + Conditional Fix 型；立卡 P-351；待施工授权；不宣称 P0 风险解除） | [正文](./development-tasks-active.md#task-p0.13) · [去重对照表](../ledger/p0-deduplication-and-p0-13-mapping.md) |
+| `TASK-P0.13` | `COMPLETED` | 基线验收独立性与恢复加固（Baseline Acceptance Independence & Recovery Hardening；估算 M · P0；交付 #459 / `6122e347`；完工回写 P-352；五项事实边界保留，不宣称 P0 风险解除） | [正文](./development-tasks-completed.md#task-p0.13) · [去重对照表](../ledger/p0-deduplication-and-p0-13-mapping.md) |
 | `TASK-P1.4` | `COMPLETED` | Gateway 凭据脱敏与 SandboxWitness Nonce 绑定（#449/`5901714f`；P-345；M · P2-Medium；不宣称 P0 风险解除） | [正文](./development-tasks-completed.md#task-p1.4) · [评估报告](../ledger/p1-eval-evidence-trust-chain-and-p0-acceptance.md) |
 
 ---
