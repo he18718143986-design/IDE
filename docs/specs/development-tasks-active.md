@@ -2019,3 +2019,145 @@ governance:
 <a id="task-p1.5"></a>
 
 > 本卡已 **COMPLETED**（施工 [#463](https://github.com/he18718143986-design/IDE/pull/463) squash `583c580df6bf73a9cb6c85661786852748d255d7`；立卡 P-354；完工回写 P-355）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-p1.5) §3.4cr。诚实口径：**Docker 在场补验已交付（三项容器隔离实跑、网络 `DENY`/`EXPLICIT_TARGETS` 判据、证据链字段核对、`probeDocker` 三态修证）；alpine ≠ OpenHands 实测、`P13-P2/P3/P4` 仍为规格断言、`SANDBOX_ENFORCED` + OpenHands 派工未做，P0 风险未宣称解除**。
+
+### 3.4cr 测试资产基线登记施工（TASK-P0.14 · 立卡 P-356 · 未开工）
+
+<a id="task-p0.14"></a>
+
+> **立卡说明（2026-11-28 · P-356）**：授权来源为 Tina 本轮指令「点名立卡 TASK-P0.14（测试资产基线登记施工，估算 M，P1-High）」。操作者由我执行。卡面基于 TASK-P0.13 Scope B 已落盘设计方案（见 [`docs/ledger/p0-13-baseline-acceptance-independence-and-recovery.md`](../ledger/p0-13-baseline-acceptance-independence-and-recovery.md) 第三章《测试资产基线登记方案与扩展架构设计》）。本卡为施工型任务卡（估算 M，优先级 P1-High），**立卡 ≠ 开工**，后续代码施工须由 Tina 单卡点名授权。
+>
+> **目标**：落实测试资产识别机制（测试文件/配置/helper/fixture/动态加载入口）、Base Commit 绑定机制（基于 baseRef 生成不可变 TestAssetManifest）、未登记资产检测与 fail-closed 拦截或豁免审计留痕、与 `test-integrity.ts` 现有分类（`tests_modified`/`added_tests`/`deleted_existing_tests`）及 Evidence 结构的兼容衔接，并补齐负向测试覆盖。
+>
+> **前置条件与硬依赖**：`TASK-P0.13` 施工及完工回写已正式交付合入（`6122e347` / P-352）。
+>
+> **审批边界（逐字写入）**：本审批**不是代码施工授权**，**不是代码合并批准**，也**不是 P0 风险解除声明**；本卡为施工立卡，**立卡 ≠ 开工**，后续施工须由 Tina 单卡点名授权，施工 PR 全绿且 CLEAN 后另行报授权合入。
+>
+> **诚实口径**：**本卡补的是「非标准测试资产可能绕过基线分类」的已知缺口，不宣称补完后验收链完全无盲区；硬件级 Attestation 缺失、Merger 不重跑全量测试、容器内无 OS 级二次沙盒、跨进程 Nonce 持久化未做、真实容器运行时 3/10 跳过项等五项事实边界继续保留；严禁宣称「P0 风险完全解除」**。
+
+```yaml task-card
+id: TASK-P0.14
+status: NEW_TASK
+contract:
+  intent:
+    title: 测试资产基线登记施工
+    description: >-
+      基于 TASK-P0.13 Scope B 已落盘设计方案（《测试资产基线登记方案与扩展架构设计》），落实生产级测试资产基线登记与防篡改机制，消除非标准测试资产绕过基线分类之安全盲区：
+      1. 测试资产识别与分类机制：系统识别测试文件（test suites）、测试配置文件（vitest.config.ts, tsconfig.json 等）、测试夹具与 Mock 数据（fixtures/**, mocks/**）、共享测试工具库（helpers/utils）及动态加载入口；
+      2. Base Commit 绑定机制：基于基准提交（baseRef / base_commit_sha）扫描并哈希化所有测试资产，生成强绑定的不可变基线清单（TestAssetManifest）；
+      3. 未登记测试资产检测与处理：Worker 执行产生未登记或动态新增的测试资产时，实施 fail-closed 拦截，或按合同明确豁免审计记录；
+      4. 分级处置与现有分类器兼容衔接：
+         - 配置文件篡改：若未经合同显式声明豁免（allow_test_config_mutation 或类似契约配置），触发 fail-closed 拒绝（抛 E_TEST_CONFIG_MUTATED 阻断合并）；
+         - fixture / helper 篡改：自动纳入基线隔离重跑的还原路径集（pathsToRestore），在 executeBaselineRerun 期间连同测试用例一并还原至 Base 版本重跑；
+         - 与 test-integrity.ts 现有 tests_modified / added_tests / deleted_existing_tests 分类及 Evidence test_integrity 结构无缝兼容与扩展；
+      5. 负向测试覆盖：覆盖未登记测试资产被检出阻断、测试配置文件篡改无豁免被拒、fixture/helper 篡改被还原并参与基线重跑全链路。
+      卡面原则：紧扣测试资产基线登记与防篡改执行闭环，不扩大重构无关模块。
+    risk_level: HIGH
+  acceptance:
+    - id: P014-P1
+      check: auto
+      text: >-
+        测试资产识别与分类：实现测试资产识别纯函数与分类器，准确提取测试套件、配置文件（vitest.config.ts、tsconfig.json 等）、
+        测试夹具（fixtures/**）、共享 helper 及动态加载入口的相对路径与资产类型（assetKind）。
+    - id: P014-P2
+      check: auto
+      text: >-
+        Base Commit 绑定与 TestAssetManifest 生成：基于 baseRef / base_commit_sha 扫描工作区测试资产并计算 SHA256，
+        生成与基准提交强绑定的不可变测试资产清单（TestAssetManifest），记录资产路径、类型、哈希与判定级别（criticality）。
+    - id: P014-P3
+      check: auto
+      text: >-
+        未登记测试资产检测与 fail-closed 拦截：在 Worker 变更比对中检测不在基线清单内的新增或伪造测试资产；
+        未获合同显式豁免时确定性 fail-closed 抛异常阻断合并，并在 Evidence 留存审计明细。
+    - id: P014-P4
+      check: auto
+      text: >-
+        分级处置与基线重跑集成：测试配置文件发生未豁免篡改时抛出 E_TEST_CONFIG_MUTATED 并阻断合并；
+        fixture 与 helper 篡改自动纳入 restoreBaselineTestFiles 还原路径集参与基线重跑；与 test-integrity.ts 现有三类测试分类无缝兼容。
+    - id: P014-P5
+      check: auto
+      text: >-
+        合同与 Evidence 契约扩展及门禁拦截：支持合同 execution_permissions / allow_test_config_mutation 豁免配置；
+        Evidence test_integrity 结构扩展资产登记与篡改审计留痕；merger PRE_MERGE 阶段独立校验资产基线一致性与签名覆盖。
+    - id: P014-P6
+      check: auto
+      text: >-
+        负向测试覆盖与专项报告：单元与集成用例全面覆盖未登记测试资产被拒、配置文件篡改被拒、fixture/helper 篡改被还原重跑及豁免放行场景；
+        交付报告落盘 docs/ledger/p0-14-test-asset-manifest-and-baseline-registration.md。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/guard/test-integrity.ts
+      - src/lib/test-asset-manifest.ts
+      - src/lib/contract.schema.ts
+      - src/lib/evidence.schema.ts
+      - daemon/pipeline/orchestrator.ts
+      - daemon/pipeline/merger.ts
+      - tests/unit/test-asset-manifest.test.ts
+      - tests/unit/test-integrity-guard.test.ts
+      - tests/daemon/p0-4-test-integrity-wiring.test.ts
+      - tests/daemon/p0-4-test-integrity-fail-closed.test.ts
+      - docs/ledger/p0-14-test-asset-manifest-and-baseline-registration.md
+    readonly_paths:
+      - daemon/baseline/os-sandbox.ts
+      - daemon/worker/sandbox/container-host.ts
+      - scripts/verify-p0-independent-suite.ts
+      - docs/ledger/p0-13-baseline-acceptance-independence-and-recovery.md
+      - docs/specs/development-tasks-completed.md
+  verification:
+    commands:
+      - { alias: focused-p014, executable: npx, args: [vitest, run, tests/unit/test-integrity-guard.test.ts, tests/daemon/p0-4-test-integrity-wiring.test.ts, tests/daemon/p0-4-test-integrity-fail-closed.test.ts] }
+      - { alias: check-docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    基于 P0.13 Scope B 已落盘设计方案（《测试资产基线登记方案与扩展架构设计》）：
+    1. 在 src/lib/test-asset-manifest.ts 中定义 TestAssetItem 与 TestAssetManifest 结构，实现基于 Git 树与路径正则的纯函数分类与哈希生成器；
+    2. 在 daemon/guard/test-integrity.ts 中扩展差异审计与资产比对逻辑，与现行 isTestPath / tests_modified / added_tests / deleted_existing_tests 分类机制兼容衔接；
+    3. 分级处置：测试配置修改检查 allow_test_config_mutation 豁免，未声明则阻断；测试夹具与 helper 修改自动扩充 pathsToRestore 集合，由既有 restoreBaselineTestFiles 保证在基线重跑时还原至 Base 版本；
+    4. 编排器 orchestrator 与合并阶段 merger 接线核验，Evidence test_integrity 字段扩展记录资产基线校验明细并由现有 Ed25519 签名全覆盖；
+    5. 编写单元与集成负向测试，验证未登记资产与篡改拦截。
+  touches:
+    - { path: daemon/guard/test-integrity.ts, change: modify, why: "扩展测试资产比对、未登记资产与配置文件篡改检测，衔接基线重跑还原集", symbols: [classifyTouchedTestPaths, executeBaselineRerun] }
+    - { path: src/lib/test-asset-manifest.ts, change: create, why: "新建测试资产基线清单接口定义、资产分类与 SHA256 清单生成纯函数", symbols: [TestAssetItem, TestAssetManifest, buildTestAssetManifest, verifyTestAssetManifest] }
+    - { path: src/lib/contract.schema.ts, change: modify, why: "合同执行权限中增加 allow_test_config_mutation 豁免声明配置", symbols: [SoftwareContract] }
+    - { path: src/lib/evidence.schema.ts, change: modify, why: "受控 Evidence test_integrity 结构扩展资产登记与篡改审计记录字段", symbols: [ControlledTestIntegrityRecord] }
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: "生成并传递基线测试资产清单，驱动重跑与审计记录填充", symbols: [writeEvidence] }
+    - { path: daemon/pipeline/merger.ts, change: modify, why: "PRE_MERGE 门禁独立核验测试资产基线完整性与未豁免篡改拦截", symbols: [assertEvidenceTestIntegrity] }
+    - { path: tests/unit/test-asset-manifest.test.ts, change: create, why: "测试资产识别、清单生成、哈希比对与未登记资产检测单测", symbols: [] }
+    - { path: tests/unit/test-integrity-guard.test.ts, change: modify, why: "单测补充资产登记分类与分级处置纯函数逻辑", symbols: [] }
+    - { path: tests/daemon/p0-4-test-integrity-wiring.test.ts, change: modify, why: "集成接线覆盖编排器资产清单构建与传递", symbols: [] }
+    - { path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, change: modify, why: "负向测试覆盖配置文件篡改与未登记资产拦截", symbols: [] }
+    - { path: docs/ledger/p0-14-test-asset-manifest-and-baseline-registration.md, change: create, why: "测试资产基线登记机制与执行验证专项交付报告", symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: P014-P1, test_path: tests/unit/test-integrity-guard.test.ts, level: unit, debt: "立卡未开工；施工阶段落实测试资产识别纯函数与分类器单测" }
+    - { acceptance_id: P014-P2, test_path: tests/unit/test-integrity-guard.test.ts, level: unit, debt: "立卡未开工；施工阶段新建 test-asset-manifest.test.ts 覆盖清单生成与哈希绑定" }
+    - { acceptance_id: P014-P3, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, debt: "立卡未开工；施工阶段落实未登记资产检出与 fail-closed 负向拦截测试" }
+    - { acceptance_id: P014-P4, test_path: tests/daemon/p0-4-test-integrity-wiring.test.ts, level: integration, debt: "立卡未开工；施工阶段落实配置篡改阻断与 fixture/helper 还原重跑集成测试" }
+    - { acceptance_id: P014-P5, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, debt: "立卡未开工；施工阶段落实合同豁免与 merger PRE_MERGE 门禁断言测试" }
+    - { acceptance_id: P014-P6, test_path: tests/daemon/p0-4-test-integrity-wiring.test.ts, level: integration, debt: "立卡未开工；施工阶段核验专项报告落盘与全链路无回归" }
+governance:
+  spec_refs:
+    - docs/ledger/p0-13-baseline-acceptance-independence-and-recovery.md
+  depends_on:
+    - { id: TASK-P0.13, kind: hard }
+  code_facts:
+    - { ref: "daemon/guard/test-integrity.ts::isTestPath", note: "现行测试路径正则分类器，需扩展测试配置文件与辅助资产识别" }
+    - { ref: "daemon/guard/test-integrity.ts::classifyTouchedTestPaths", note: "测试变更差异比对纯函数，需接入测试资产基线清单核验" }
+    - { ref: "daemon/guard/test-integrity.ts::executeBaselineRerun", note: "基线隔离重跑执行器，需接入测试配置篡改阻断与 fixture 还原" }
+  non_goals:
+    - 不重构与测试资产无关的容器挂载与沙箱执行策略
+    - 不推翻现有 test-integrity.ts 的三类核心测试判定逻辑
+    - 不在未授权情况下开启代码施工
+  fail:
+    - 测试配置文件被篡改却被当做普通文件静默放行
+    - 测试夹具或 helper 被篡改但在基线重跑时未还原至基准提交
+    - 新增未登记测试资产未获豁免却通过合并门禁
+    - 破坏现有 isTestPath 的正反向判定行为
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
