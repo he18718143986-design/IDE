@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   verifyEvidenceSignature,
   type EvidenceSignatureRecord,
@@ -203,33 +204,55 @@ export function assertEvidenceTestIntegrity(
   snapshot: EvidenceBundle,
   contract: SoftwareContract,
 ): void {
+  const ti = snapshot.test_integrity;
+
+  // TASK-P0.2a (P02A-P1): 封堵 if (!ti) return 放行缺口，缺失即拒并抛出 E_CANNOT_MERGE
+  if (!ti) {
+    throw new MergeGateError(
+      "E_CANNOT_MERGE",
+      "Evidence missing required test_integrity record",
+    );
+  }
+
+  // 结构完整性校验：若字段残缺，也必须 fail-closed 拒绝
+  if (
+    typeof ti.tests_modified !== "boolean" ||
+    !Array.isArray(ti.modified_existing_tests) ||
+    !Array.isArray(ti.deleted_existing_tests) ||
+    !Array.isArray(ti.added_tests) ||
+    typeof ti.exemption !== "boolean" ||
+    typeof ti.baseline_rerun_triggered !== "boolean" ||
+    typeof ti.baseline_rerun_passed !== "boolean" ||
+    !Array.isArray(ti.restored_paths) ||
+    !Array.isArray(ti.weakened_tests)
+  ) {
+    throw new MergeGateError(
+      "E_CANNOT_MERGE",
+      "Evidence test_integrity record is corrupted or incomplete",
+    );
+  }
+
   const allowMutation =
     contract.authorization.execution_permissions
       ?.allow_baseline_test_mutation === true;
-  const ti = snapshot.test_integrity;
 
-  if (ti) {
-    const hasExistingMutation =
-      (ti.modified_existing_tests && ti.modified_existing_tests.length > 0) ||
-      (ti.deleted_existing_tests && ti.deleted_existing_tests.length > 0);
+  const hasExistingMutation =
+    (ti.modified_existing_tests && ti.modified_existing_tests.length > 0) ||
+    (ti.deleted_existing_tests && ti.deleted_existing_tests.length > 0);
 
-    if (ti.exemption && !allowMutation) {
-      throw new MergeGateError(
-        "E_CANNOT_MERGE",
-        "Evidence claims test integrity exemption but contract does not allow baseline test mutation",
-      );
-    }
+  if (ti.exemption && !allowMutation) {
+    throw new MergeGateError(
+      "E_CANNOT_MERGE",
+      "Evidence claims test integrity exemption but contract does not allow baseline test mutation",
+    );
+  }
 
-    if (hasExistingMutation && !allowMutation) {
-      if (!ti.baseline_rerun_passed) {
-        const code = ti.failure_code ?? "E_TEST_BASELINE_REGRESSION";
-        const reason =
-          ti.failure_reason ?? "Baseline test rerun failed or unavailable";
-        throw new MergeGateError(
-          code,
-          `Test integrity check failed: ${reason}`,
-        );
-      }
+  if (hasExistingMutation && !allowMutation) {
+    if (!ti.baseline_rerun_passed) {
+      const code = ti.failure_code ?? "E_TEST_BASELINE_REGRESSION";
+      const reason =
+        ti.failure_reason ?? "Baseline test rerun failed or unavailable";
+      throw new MergeGateError(code, `Test integrity check failed: ${reason}`);
     }
   }
 }
@@ -824,9 +847,20 @@ async function mergeInternal(
       `Evidence snapshot not found: ${evidencePath}`,
     );
   }
-  const snapshot = evidenceBundleSchema.parse(
-    JSON.parse(fs.readFileSync(evidencePath, "utf-8")),
-  );
+  let snapshot: EvidenceBundle;
+  try {
+    snapshot = evidenceBundleSchema.parse(
+      JSON.parse(fs.readFileSync(evidencePath, "utf-8")),
+    );
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      throw new MergeGateError(
+        "E_CANNOT_MERGE",
+        `Evidence snapshot schema validation failed: ${err.message}`,
+      );
+    }
+    throw err;
+  }
   if (snapshot.contract_id !== contract.contract_id) {
     throw new MergeGateError(
       "E_EVIDENCE_MISMATCH",
