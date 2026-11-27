@@ -12,6 +12,16 @@ import {
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import {
+  assertEvidenceTestIntegrity,
+  assertEvidenceControlAndRevision,
+  MergeGateError,
+} from "../../daemon/pipeline/merger";
+import {
+  createContractDraft,
+  bumpContractRevision,
+  type SoftwareContract,
+} from "../../src/lib/contract.schema";
 
 function createValidBaseEvidence(
   overrides: Partial<EvidenceBundle> = {},
@@ -307,5 +317,139 @@ describe("TASK-P0.2a (P02A-P2): 测试基线与合同版本绑定证明审计与
 
     expect(rerunRes.triggered).toBe(false);
     expect(rerunRes.passed).toBe(true);
+  });
+});
+
+describe("TASK-P0.13: 基线验收独立性与恢复加固 (Scope A, Scope C & Scope D wiring)", () => {
+  function createSampleContract(
+    overrides: Partial<SoftwareContract> = {},
+  ): SoftwareContract {
+    const draft = createContractDraft({
+      title: "Sample Contract",
+      description: "Test Contract",
+      writablePaths: ["src/**"],
+      acceptanceCriteria: ["AC-1: tests must pass"],
+      commands: [
+        {
+          alias: "unit",
+          executable: "npm",
+          args: ["test"],
+          expected_exit_code: 0,
+          timeout_seconds: 30,
+        },
+      ],
+    });
+    return {
+      ...draft,
+      lifecycle_state: "EXECUTING",
+      approval: {
+        status: "APPROVED",
+        approved_by: "reviewer_1",
+        approved_at: new Date().toISOString(),
+        approved_revision: draft.contract_revision,
+      },
+      ...overrides,
+    };
+  }
+
+  it("P013-W1 (Scope D): merger 拒绝 baseline_rerun_passed 为 true 但携带 failure_code 的自相矛盾伪造证据", () => {
+    const contract = createSampleContract();
+    const evidence = createValidBaseEvidence({
+      test_integrity: {
+        tests_modified: true,
+        modified_existing_tests: ["tests/a.test.ts"],
+        deleted_existing_tests: [],
+        added_tests: [],
+        exemption: false,
+        baseline_rerun_triggered: true,
+        baseline_rerun_passed: true,
+        failure_code: "E_TEST_BASELINE_REGRESSION",
+        restored_paths: ["tests/a.test.ts"],
+        weakened_tests: [],
+      },
+    });
+
+    expect(() => assertEvidenceTestIntegrity(evidence, contract)).toThrow(
+      MergeGateError,
+    );
+    expect(() => assertEvidenceTestIntegrity(evidence, contract)).toThrow(
+      /inconsistent/,
+    );
+  });
+
+  it("P013-W2 (Scope D): merger 拒绝修改了既有测试且未获豁免但未触发基线重跑的证据", () => {
+    const contract = createSampleContract();
+    const evidence = createValidBaseEvidence({
+      test_integrity: {
+        tests_modified: true,
+        modified_existing_tests: ["tests/a.test.ts"],
+        deleted_existing_tests: [],
+        added_tests: [],
+        exemption: false,
+        baseline_rerun_triggered: false,
+        baseline_rerun_passed: true,
+        restored_paths: [],
+        weakened_tests: [],
+      },
+    });
+
+    expect(() => assertEvidenceTestIntegrity(evidence, contract)).toThrow(
+      MergeGateError,
+    );
+    expect(() => assertEvidenceTestIntegrity(evidence, contract)).toThrow(
+      /Baseline rerun was not triggered/,
+    );
+  });
+
+  it("P013-W3 (Scope D): merger 拦截因恢复失败导致的 E_TEST_BASELINE_UNAVAILABLE", () => {
+    const contract = createSampleContract();
+    const evidence = createValidBaseEvidence({
+      test_integrity: {
+        tests_modified: true,
+        modified_existing_tests: ["tests/a.test.ts"],
+        deleted_existing_tests: [],
+        added_tests: [],
+        exemption: false,
+        baseline_rerun_triggered: true,
+        baseline_rerun_passed: false,
+        failure_code: "E_TEST_BASELINE_UNAVAILABLE",
+        failure_reason: "Recovery cleanup failed: tests/a.test.ts (EPERM)",
+        restored_paths: ["tests/a.test.ts"],
+        weakened_tests: [],
+      },
+    });
+
+    expect(() => assertEvidenceTestIntegrity(evidence, contract)).toThrow(
+      MergeGateError,
+    );
+    try {
+      assertEvidenceTestIntegrity(evidence, contract);
+    } catch (err: unknown) {
+      const e = err as MergeGateError;
+      expect(e.code).toBe("E_TEST_BASELINE_UNAVAILABLE");
+      expect(e.message).toContain("Recovery cleanup failed");
+    }
+  });
+
+  it("P013-W4 (Scope A): verification_spec 与 revision 变更强制使旧审批失效，并在合并前由 revision 门禁拦截", () => {
+    const contract = createSampleContract();
+    expect(contract.contract_revision).toBe(1);
+    expect(contract.approval.approved_revision).toBe(1);
+
+    // 当合同规范发生变更导致版本递增时
+    const bumped = bumpContractRevision(contract);
+    expect(bumped.contract_revision).toBe(2);
+    // 旧审批状态必须重置，不可直接使用
+    expect(bumped.approval.status).toBe("PENDING_REVIEW");
+    expect(bumped.approval.approved_revision).toBeUndefined();
+
+    // 针对旧 revision 签发的 Evidence 在新 revision 合同时无法通过合并独立核验
+    const oldEvidence = createValidBaseEvidence({
+      contract_revision: 1,
+    });
+
+    expect(() =>
+      assertEvidenceControlAndRevision(oldEvidence, bumped.contract_revision),
+    ).toThrow(/E_EVIDENCE_REVISION_MISMATCH/);
   });
 });

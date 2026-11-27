@@ -351,4 +351,111 @@ if (!content.includes('exports.a = 2')) {
     expect(ti?.baseline_rerun_triggered).toBe(false);
     expect(ti?.baseline_rerun_passed).toBe(true);
   });
+
+  it("P013-I1 (Scope D): 基线重跑执行期间恢复异常 -> orchestrator fail-closed BLOCKED + E_TEST_BASELINE_UNAVAILABLE -> merger 拦截阻断合流", async () => {
+    // 验证命令在执行期间破坏新增测试备份，模拟重跑恢复现场故障
+    const contract = makeContract({
+      title: "recovery-failure-test",
+      verificationScript: `
+        const fs = require('fs');
+        const path = require('path');
+        // 破坏备份文件导致现场无法恢复
+        const bak = path.resolve(process.cwd(), 'tests/unit/worker-added.test.js.stagent-p04-added.bak');
+        if (fs.existsSync(bak)) {
+          fs.unlinkSync(bak);
+        }
+      `,
+    });
+    store.save(contract);
+
+    const orchestrator = new ContractOrchestrator({ repoRoot: repo });
+    await orchestrator.admit(contract.contract_id);
+    const wt = worktreeOf(contract.contract_id);
+
+    // 修改既有测试以触发基线重跑，同时新增测试
+    fs.writeFileSync(
+      path.join(wt, "tests", "unit", "a.test.js"),
+      "// tampered test\n",
+    );
+    fs.writeFileSync(
+      path.join(wt, "tests", "unit", "worker-added.test.js"),
+      "// added test\n",
+    );
+
+    const outcome = await orchestrator.execute(contract.contract_id);
+
+    expect(outcome.evidence.verdict.status).toBe("BLOCKED");
+    expect(outcome.evidence.verdict.reason_code).toBe("UNSAFE_EXECUTION");
+    expect(outcome.evidence.verdict.can_merge).toBe(false);
+
+    const ti = outcome.evidence.test_integrity;
+    expect(ti?.baseline_rerun_triggered).toBe(true);
+    expect(ti?.baseline_rerun_passed).toBe(false);
+    expect(ti?.failure_code).toBe("E_TEST_BASELINE_UNAVAILABLE");
+    expect(ti?.failure_reason).toContain("Recovery cleanup failed");
+
+    // merger 独立门禁必须拦截
+    expect(() =>
+      assertEvidenceTestIntegrity(outcome.evidence, contract),
+    ).toThrow(MergeGateError);
+    try {
+      assertEvidenceTestIntegrity(outcome.evidence, contract);
+    } catch (err: unknown) {
+      const e = err as MergeGateError;
+      expect(e.code).toBe("E_TEST_BASELINE_UNAVAILABLE");
+      expect(e.message).toContain("Recovery cleanup failed");
+    }
+  });
+
+  it("P013-I2 (Scope C): 修改既有测试但无任何可用测试命令 -> orchestrator fail-closed BLOCKED + E_TEST_BASELINE_UNAVAILABLE -> merger 拦截阻断合流", async () => {
+    // 构造零测试命令但修改了既有测试的场景
+    const draft = createContractDraft({
+      title: "zero-commands-mutation-test",
+      description: "p0.13 zero commands test",
+      acceptanceCriteria: ["verify baseline test integrity"],
+      writablePaths: ["src/**", "tests/**"],
+      commands: [], // 零命令（配置 manualConfirmation 以通过合同校验）
+      manualConfirmation: {
+        reason_required: true,
+        capture_evidence: ["actor", "confirmed_at", "reason"],
+      },
+    });
+    const contract = softwareContractSchema.parse({
+      ...draft,
+      lifecycle_state: "PENDING_APPROVAL",
+      approval: { status: "PENDING_REVIEW" },
+    });
+    store.save(contract);
+
+    const orchestrator = new ContractOrchestrator({ repoRoot: repo });
+    await orchestrator.admit(contract.contract_id);
+    const wt = worktreeOf(contract.contract_id);
+
+    fs.writeFileSync(
+      path.join(wt, "tests", "unit", "a.test.js"),
+      "// tampered test\n",
+    );
+
+    const outcome = await orchestrator.execute(contract.contract_id);
+
+    expect(outcome.evidence.verdict.status).toBe("BLOCKED");
+    expect(outcome.evidence.verdict.can_merge).toBe(false);
+
+    const ti = outcome.evidence.test_integrity;
+    expect(ti?.baseline_rerun_triggered).toBe(true);
+    expect(ti?.baseline_rerun_passed).toBe(false);
+    expect(ti?.failure_code).toBe("E_TEST_BASELINE_UNAVAILABLE");
+    expect(ti?.failure_reason).toContain("No verification commands available");
+
+    expect(() =>
+      assertEvidenceTestIntegrity(outcome.evidence, contract),
+    ).toThrow(MergeGateError);
+    try {
+      assertEvidenceTestIntegrity(outcome.evidence, contract);
+    } catch (err: unknown) {
+      const e = err as MergeGateError;
+      expect(e.code).toBe("E_TEST_BASELINE_UNAVAILABLE");
+      expect(e.message).toContain("No verification commands available");
+    }
+  });
 });

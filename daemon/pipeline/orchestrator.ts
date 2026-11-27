@@ -1301,56 +1301,68 @@ export class ContractOrchestrator {
     let testBaselineFailureReason: string | undefined;
 
     if (testClassification.hasExistingTestMutation && !allowTestMutation) {
-      const rerunRes = await executeBaselineRerun({
-        worktreePath,
-        baseRef,
-        classification: testClassification,
-        verificationCommands: current.verification_spec.commands,
-        gitRunner,
-        runCommand: async (cmd) => {
-          try {
-            const res = await runCommand(cmd.executable, {
-              cwd: worktreePath,
-              argv: { executable: cmd.executable, args: cmd.args },
-              timeoutMs: (cmd.timeoutSeconds ?? 30) * 1000,
-            });
-            return {
-              exitCode: res.exitCode,
-              stdout: res.stdout,
-              stderr: res.stderr,
-              timedOut: res.timedOut,
-            };
-          } catch (err: unknown) {
-            const errorObj = err as {
-              code?: number | string;
-              message?: string;
-              stdout?: string;
-              stderr?: string;
-            };
-            const isEnoent = errorObj.code === "ENOENT";
-            return {
-              exitCode:
-                typeof errorObj.code === "number"
-                  ? errorObj.code
-                  : isEnoent
-                    ? 127
-                    : 1,
-              stdout: errorObj.stdout ?? "",
-              stderr: errorObj.stderr ?? errorObj.message ?? String(err),
-              timedOut: false,
-            };
-          }
-        },
-      });
+      try {
+        const rerunRes = await executeBaselineRerun({
+          worktreePath,
+          baseRef,
+          classification: testClassification,
+          verificationCommands: current.verification_spec.commands,
+          gitRunner,
+          runCommand: async (cmd) => {
+            try {
+              const res = await runCommand(cmd.executable, {
+                cwd: worktreePath,
+                argv: { executable: cmd.executable, args: cmd.args },
+                timeoutMs: (cmd.timeoutSeconds ?? 30) * 1000,
+              });
+              return {
+                exitCode: res.exitCode,
+                stdout: res.stdout,
+                stderr: res.stderr,
+                timedOut: res.timedOut,
+              };
+            } catch (err: unknown) {
+              const errorObj = err as {
+                code?: number | string;
+                message?: string;
+                stdout?: string;
+                stderr?: string;
+              };
+              const isEnoent = errorObj.code === "ENOENT";
+              return {
+                exitCode:
+                  typeof errorObj.code === "number"
+                    ? errorObj.code
+                    : isEnoent
+                      ? 127
+                      : 1,
+                stdout: errorObj.stdout ?? "",
+                stderr: errorObj.stderr ?? errorObj.message ?? String(err),
+                timedOut: false,
+              };
+            }
+          },
+        });
 
-      testIntegrityEvidence.baseline_rerun_triggered = rerunRes.triggered;
-      testIntegrityEvidence.baseline_rerun_passed = rerunRes.passed;
-      testIntegrityEvidence.restored_paths = rerunRes.restored_paths;
-      if (!rerunRes.passed) {
-        testIntegrityEvidence.failure_code = rerunRes.failure_code;
-        testIntegrityEvidence.failure_reason = rerunRes.failure_reason;
-        testBaselineFailureCode = rerunRes.failure_code;
-        testBaselineFailureReason = rerunRes.failure_reason;
+        testIntegrityEvidence.baseline_rerun_triggered = rerunRes.triggered;
+        testIntegrityEvidence.baseline_rerun_passed = rerunRes.passed;
+        testIntegrityEvidence.restored_paths = rerunRes.restored_paths;
+        if (!rerunRes.passed) {
+          testIntegrityEvidence.failure_code = rerunRes.failure_code;
+          testIntegrityEvidence.failure_reason = rerunRes.failure_reason;
+          testBaselineFailureCode = rerunRes.failure_code;
+          testBaselineFailureReason = rerunRes.failure_reason;
+        }
+      } catch (rerunErr: unknown) {
+        // TASK-P0.13 (Scope D): 异常全捕获 fail-closed，阻断合并并记录可诊断原因
+        const msg =
+          rerunErr instanceof Error ? rerunErr.message : String(rerunErr);
+        testIntegrityEvidence.baseline_rerun_triggered = true;
+        testIntegrityEvidence.baseline_rerun_passed = false;
+        testIntegrityEvidence.failure_code = "E_TEST_BASELINE_UNAVAILABLE";
+        testIntegrityEvidence.failure_reason = `Baseline test rerun encountered unexpected error: ${msg}`;
+        testBaselineFailureCode = "E_TEST_BASELINE_UNAVAILABLE";
+        testBaselineFailureReason = testIntegrityEvidence.failure_reason;
       }
     }
     const zeroCommands = verificationResults.length === 0;
