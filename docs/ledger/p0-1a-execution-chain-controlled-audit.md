@@ -138,7 +138,11 @@ export function probeDeniedFromOutput(stdout: string, successToken: string): boo
    - 外部网络不可达、DNS 解析超时或失败（`TIMEOUT`, `ETIMEDOUT`, `ENOTFOUND`, `EAI_AGAIN`, `ENETUNREACH`, `EHOSTUNREACH`, `ENETDOWN`, `ECONNRESET` 等）；
    - 宿主基线不可达（`opts.hostReachable === false`）；
    - 任何非明确沙箱拒绝的输出，一律降级判定为 `UNKNOWN`，`probeDeniedFromOutput` 返回 `false`，绝不计入 `network_denied`。
-3. **成功连通（`ALLOWED`）**：
+3. **宿主连通性交叉校验（Cross-Check）**：
+   - 在沙箱执行前通过 `checkHostNetworkConnectivity` 校验宿主自身对目标主机（如 `example.com:80` 或 `api.anthropic.com`）的网络可达性；
+   - 若宿主自身连通成功（`hostReachable === true`），而在沙箱内由于 Seatbelt `(deny network*)` 规则导致套接字创建/解析失败，可确认为沙箱阻断（`DENIED`）；
+   - 若宿主自身断网（`hostReachable === false`）或探测超时（`TIMEOUT`），则一律判定为 `UNKNOWN`，`probeDeniedFromOutput` 严格返回 `false`，绝不计入 `network_denied`。
+4. **成功连通（`ALLOWED`）**：
    - 输出精确匹配 `CONNECTED`（网络连通）或 `WROTE`（写入成功），证明沙箱未拦截。
 
 ---

@@ -87,7 +87,7 @@ export type ProbeVerdict = "DENIED" | "UNKNOWN" | "ALLOWED";
 
 export interface ProbeVerdictOptions {
   /** 外部宿主基线是否连通；若为 false 则表明宿主自身网络不可达，任何网络探测失败均降级为 UNKNOWN */
-  hostReachable?: boolean;
+  hostReachable?: boolean | undefined;
 }
 
 /**
@@ -108,41 +108,33 @@ export function probeVerdictFromOutput(
     return "ALLOWED";
   }
 
-  // 若宿主环境自身已被标记为网络不可达，任何网络探测失败均不得作为沙箱阻断证据
+  // 超时型输出在任何情况下均判定为 UNKNOWN，不能证明是规则拦截
+  if (out === "TIMEOUT" || out === "ETIMEDOUT") {
+    return "UNKNOWN";
+  }
+
+  // 若宿主环境已被标记为网络不可达，任何网络探测失败均降级为 UNKNOWN，严禁记入 denied
   if (opts?.hostReachable === false && successToken === "CONNECTED") {
     return "UNKNOWN";
   }
 
   if (successToken === "CONNECTED") {
-    // 明确的沙箱拦截码（如 Darwin Seatbelt deny network* 返回 EPERM / EACCES）
+    // 明确的内核沙箱拦截码（如 EPERM, EACCES, ERR_ACCESS_DENIED）
     if (out === "EPERM" || out === "EACCES" || out === "ERR_ACCESS_DENIED") {
       return "DENIED";
     }
 
-    // 环境型失败 / 不可达错误：DNS 失败、超时、路由不可达、主机关闭等
-    // 这类错误在外网断开或目标不可达时均会出现，不得误当成沙箱拦截
-    const ambiguousErrors = new Set([
-      "TIMEOUT",
-      "ETIMEDOUT",
-      "ENOTFOUND",
-      "EAI_AGAIN",
-      "ENETUNREACH",
-      "EHOSTUNREACH",
-      "ENETDOWN",
-      "EHOSTDOWN",
-      "ECONNRESET",
-    ]);
-
-    if (ambiguousErrors.has(out)) {
-      return "UNKNOWN";
+    // 若进行了交叉校验并证实宿主环境可连通（hostReachable === true），
+    // 则沙箱内出现的任何网络失败（如 ENOTFOUND/ECONNREFUSED/ERR）均确由沙箱规则阻断所致
+    if (opts?.hostReachable === true) {
+      return "DENIED";
     }
 
-    // 其它未知错误码在网络探测中一律保守降级为 UNKNOWN（fail-closed 对证据真实性）
+    // 既非明确拦截码、又无宿主连通证明时，对未知网络错误保守判定为 UNKNOWN
     return "UNKNOWN";
   }
 
   if (successToken === "WROTE") {
-    // 文件系统写入探针：被沙箱只读拦截通常返回 EPERM (Darwin Seatbelt) 或 EROFS (Linux) 或 EACCES
     if (out === "EPERM" || out === "EROFS" || out === "EACCES") {
       return "DENIED";
     }
@@ -151,14 +143,6 @@ export function probeVerdictFromOutput(
 
   return "UNKNOWN";
 }
-
-/**
- * 从探测子进程的 stdout 判定「是否真的被拒绝」。
- *
- * 判据：严格要求 probeVerdictFromOutput 返回 "DENIED"。
- * 出现 UNKNOWN（如 TIMEOUT、ENOTFOUND 等环境故障）或 ALLOWED 时一律返回 false，
- * 绝不把环境不可达误算为沙箱拒绝（TASK-P0.1a 修证）。
- */
 export function probeDeniedFromOutput(
   stdout: string,
   successToken: string,
@@ -337,12 +321,41 @@ try {
 }
 
 /** 在 OS 沙盒内尝试出站；期望失败 */
+/**
+ * 宿主网络连通性快速交叉校验（用于排除外部断网导致的假阳性拦截证明）。
+ */
+export function checkHostNetworkConnectivity(
+  host: string,
+  port: number,
+  timeoutMs = 1500,
+): boolean {
+  try {
+    const testScript = `
+const net = require("node:net");
+const s = net.connect({ host: ${JSON.stringify(host)}, port: ${port} }, () => {
+  process.stdout.write("OK");
+  s.end();
+  process.exit(0);
+});
+s.on("error", () => process.exit(1));
+setTimeout(() => process.exit(2), ${timeoutMs});
+`;
+    const r = spawnSync(process.execPath, ["-e", testScript], {
+      timeout: timeoutMs + 1000,
+      encoding: "utf8",
+    });
+    return r.status === 0 && (r.stdout || "").trim() === "OK";
+  } catch {
+    return false;
+  }
+}
+
 export function proveScanNetworkDenied(
   repoRoot: string,
   opts?: {
     targetHost?: string;
     targetPort?: number;
-    hostReachable?: boolean;
+    hostReachable?: boolean | undefined;
   },
 ): {
   denied: boolean;
@@ -355,6 +368,11 @@ export function proveScanNetworkDenied(
   const mode = detectPreferredOsSandboxMode();
   const targetHost = opts?.targetHost ?? "example.com";
   const targetPort = opts?.targetPort ?? 80;
+
+  let hostReachable = opts?.hostReachable;
+  if (hostReachable === undefined && mode === "sandbox-exec") {
+    hostReachable = checkHostNetworkConnectivity(targetHost, targetPort);
+  }
   const script = `
 const net = require("node:net");
 const s = net.connect({ host: ${JSON.stringify(targetHost)}, port: ${targetPort} }, () => {
@@ -374,7 +392,10 @@ setTimeout(() => { process.stdout.write("TIMEOUT"); process.exit(3); }, 2500);
       timeoutMs: 8_000,
     });
     const code = (r.stdout || "").trim() || null;
-    const verdict = probeVerdictFromOutput(r.stdout, "CONNECTED", opts);
+    const verdict = probeVerdictFromOutput(r.stdout, "CONNECTED", {
+      ...opts,
+      hostReachable,
+    });
     const denied = verdict === "DENIED";
     return {
       denied,
@@ -392,7 +413,10 @@ setTimeout(() => { process.stdout.write("TIMEOUT"); process.exit(3); }, 2500);
       { encoding: "utf8", timeout: 8_000 },
     );
     const code = (r.stdout || "").trim() || null;
-    const verdict = probeVerdictFromOutput(r.stdout, "CONNECTED", opts);
+    const verdict = probeVerdictFromOutput(r.stdout, "CONNECTED", {
+      ...opts,
+      hostReachable,
+    });
     const denied = verdict === "DENIED";
     return {
       denied,
