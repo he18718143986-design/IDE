@@ -1,3 +1,11 @@
+- **P-351（立卡 TASK-P0.13 · 基线验收独立性与恢复加固 · 2026-11-28）**：授权来源为 Tina 本轮指令「按此口径点名立卡 TASK-P0.13，出立卡 docs PR，对照落盘随卡交付」。操作者由我执行。纯 docs 立卡与对照落盘，不改产品代码，**施工型卡，立卡 ≠ 开工**。基线 main `0d72029e9a0932969906d5193e7c52c3f9ab2a8c`（#457 squash）。现场核对最新流水 P-350、版本头第 334 条，顺延为 P-351 / 第 335 条；P-285 未占用、不改号。
+  - 新增 `[NEW_TASK]` 任务卡 **`TASK-P0.13`**（Baseline Acceptance Independence & Recovery Hardening，估算 M，优先级 P0，Audit + Conditional Fix 型）；
+  - **卡面原则（逐字写入）**：不重复实施已交付的容器执行闭环（P0.3b-2 #434）、Sandbox Witness 强绑定（P1.4 #449）、OS Sandbox 三态门禁与全路径派工审计（P0.1a #455）；
+  - **四大 Scope 与 DoD**：Scope A（审计+条件修证 · verification_spec.commands 审批冻结与 revision 约束全链路核实）、Scope B（设计先行，不施工 · 测试资产基线登记方案，不扩大分类器职责）、Scope C（评估+最小修证 · executeBaselineRerun 与候选执行环境共享风险评估及最小修补）、Scope D（明确修证项 · hideWorkerAddedTests/restoreBaselineTestFiles 恢复失败 fail-closed 强拦截）；
+  - 对照落盘随卡交付：在卡面交付物与 `docs/ledger/p0-deduplication-and-p0-13-mapping.md` 中登记 P0.5–P0.12 去重对照表（P0.5→P0.3b-2 #434+P0.1a #455 不重复立卡、P0.6→P1.4 #449 不重复立卡、P0.7→P0.1a #455 不重复立卡、P0.8→P0.1a #455+ledger audit 不重复立卡、P0.9–P0.12 纳入本卡）；
+  - **审批边界（逐字写入）**：非代码施工授权、非代码合并批准、非 P0 风险解除声明；立卡 ≠ 开工，实际代码施工须等待 Tina 单卡点名授权；
+  - **诚实口径**：硬件级 Attestation 缺失、Merger 不重跑全量测试、容器内无 OS 级二次沙盒、跨进程 Nonce 持久化未做、真实容器运行时 3/10 跳过项等五项事实边界继续保留；严禁表述为「P0 风险完全解除」或「具备完整合同级权限强制和独立验收能力」；
+  - 同步：版本头第 335 条、§1.1 矩阵、索引、active §3.4cp、ledger 清单与开放项、Sprint 首要、本 changelog；第 334 条 / P-350 及更早条目原文逐字未改。合同 `MERGED`、端到端闭环走通一次口径不变。P0/P1 收敛口径维持（专项收敛、剩余项挂账、不宣称风险完全解除）。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。R23 暂缓。Console 拆分与第二批未立卡。`multi-worktree-cross-talk` 挂账未动。J.53–J.62 保持关闭。J.16 仍 `NEW_TASK`。J.22 未开工。#344 遗留分支不动。本条仅文档立卡，不改产品代码。
 - **P-350（P0 复审专项总账复核落盘与收敛裁定 · 2026-11-28）**：授权来源为 Tina 本轮指令「裁定方案 A，执行 P0 复审专项总账复核落盘与 docs PR」。操作者由我执行。纯 docs 落盘，不改产品代码。基线 main `e28d6110b4f58e86452b18e8516d07669963951f`（#456 squash）。现场核对最新流水 P-349、版本头第 333 条，顺延为 P-350 / 第 334 条；P-285 未占用、不改号。
   - P0 复审专项两卡（P0.1a 执行链受控证明、P0.2a 验收依据不可篡改）已全部交付核销；总账复核报告落盘 [`docs/ledger/p0-review-comprehensive-audit.md`](../ledger/p0-review-comprehensive-audit.md)；
   - Tina 裁定宣称「P0 复审专项收敛（剩余项挂账）」，统一口径为：P0 复审专项两卡（P0.1a 执行链受控证明、P0.2a 验收依据不可篡改）已交付核销；五项架构事实边界继续挂账，不构成当前默认可达路径上的活跃利用链；
