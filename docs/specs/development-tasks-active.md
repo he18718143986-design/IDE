@@ -1955,129 +1955,18 @@ governance:
 >
 > `TASK-P1.3a` 已 **COMPLETED**（施工 [#446](https://github.com/he18718143986-design/IDE/pull/446) squash `1340494a5d9e750efd775f70c019677cf53c1c87`；立卡 P-342；完工回写 P-343）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-p1.3a) §3.4cl。诚实口径：**验收矩阵裁决聚合与平台判据状态修证已交付（PARTIAL 三态、SKIPPED_NO_DOCKER 标记、矩阵如实反映 7 实跑/3 跳过）；三平台真实容器验收仍未完成，P0 风险未宣称解除**。此处保留立卡说明与审批边界。
 
-### 3.4cm Gateway 凭据脱敏与 SandboxWitness Nonce 绑定（TASK-P1.4 · P-344 · NEW_TASK）
+### 3.4cm Gateway 凭据脱敏与 SandboxWitness Nonce 绑定（TASK-P1.4 · 立卡 P-344 · 完工 P-345 · 正文已迁出）
 
 <a id="task-p1.4"></a>
 
-```yaml task-card
-id: TASK-P1.4
-status: NEW_TASK
-contract:
-  intent:
-    title: Gateway 凭据脱敏与 SandboxWitness Nonce 绑定
-    description: >-
-      阻断 Gateway 授权注入的敏感环境变量明文进入 Worker 可见日志、工具回包或 Evidence；
-      为每次受控沙箱执行建立随机、单次、会话级 SandboxWitness Nonce 绑定，防止缺失、错配或重放的见证被接受。
-    risk_level: HIGH
-  acceptance:
-    - id: P14-P1
-      check: auto
-      text: >-
-        使用测试凭据覆盖成功、失败、超时与截断路径；明文不得出现在 stdout/stderr、MCP 工具回包、
-        audit/log 详情、错误消息、Evidence 或 SandboxWitness 中；secretRedacted 等状态仍如实可观察。
-    - id: P14-P2
-      check: auto
-      text: >-
-        每次 SANDBOX_ENFORCED 派工生成不可预测的新鲜随机 Nonce，并绑定 contract_id、contract_revision、
-        execution/session 标识及规范化 worktree_root；Worker 不得控制或改写待核验 Nonce。有效新见证可通过，
-        缺 Nonce、错配、跨执行嫁接、重复消费或重放一律 fail-closed；消费状态原子且有确定的生命周期。
-    - id: P14-P3
-      check: auto
-      text: >-
-        Nonce/绑定字段按 Evidence schema 明确校验，并由现有 Evidence 签名覆盖；merger 对缺失或绑定不一致的
-        SANDBOX_ENFORCED 见证拒绝合并，不得因 legacy/unknown 字段降级放行。
-    - id: P14-P4
-      check: auto
-      text: >-
-        新增脱敏与 Nonce 正负向测试：敏感值不泄露；新鲜 Nonce 通过；缺失、错配、跨合同/版本/工作树、
-        重用/重放及篡改均拒绝。已有 Gateway 授权、普通本地进程与 Evidence 签名语义不回退。
-  scheme_item_ids: []
-  scope:
-    writable_paths:
-      - daemon/mcp/gateway.ts
-      - daemon/runner/env-filter.ts
-      - daemon/worker/policy-guard.ts
-      - daemon/worker/sandbox/container-host.ts
-      - daemon/pipeline/orchestrator.ts
-      - daemon/pipeline/merger.ts
-      - daemon/pipeline/sandbox-witness-nonce.ts
-      - src/lib/evidence.schema.ts
-      - tests/daemon/mcp-gateway.test.ts
-      - tests/daemon/env-filter.test.ts
-      - tests/daemon/p0-3a-container-wiring-and-witness.test.ts
-      - tests/daemon/p0-1-evidence-merge-fail-closed.test.ts
-      - tests/unit/container-witness-verify.test.ts
-      - tests/unit/sandbox-witness-nonce.test.ts
-    readonly_paths:
-      - daemon/pipeline/evidence-signer.ts
-      - daemon/worker/cli-host/process-host.ts
-      - daemon/worker/cli-host/docker-container-host.ts
-      - scripts/verify-p0-independent-suite.ts
-      - docs/ledger/p1-eval-evidence-trust-chain-and-p0-acceptance.md
-      - docs/ledger/p0-independent-verification-matrix.md
-      - docs/specs/development-tasks-completed.md
-  verification:
-    commands:
-      - { alias: focused-p14, executable: npx, args: [vitest, run, tests/daemon/mcp-gateway.test.ts, tests/daemon/env-filter.test.ts, tests/daemon/p0-3a-container-wiring-and-witness.test.ts, tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, tests/unit/container-witness-verify.test.ts, tests/unit/sandbox-witness-nonce.test.ts] }
-      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
-design:
-  approach: >-
-    环境凭据沿现有 Gateway 授权与 secretValues 脱敏通道流转，不扩大授权、不把凭据复制进 Evidence；
-    随机 Nonce 由可信 Daemon 执行面创建并在 worker 不可写的控制状态中绑定一次执行，见证核验与消费 fail-closed，
-    Evidence 使用现有签名覆盖 Nonce 及其绑定字段。实施时必须明确 Nonce 的创建、传递、校验、消费与清理边界；
-    若 daemon 重启后的跨进程重放保护未实现，必须作为限制明示，不得声称已覆盖该边界。
-  touches:
-    - { path: daemon/mcp/gateway.ts, change: modify, why: Gateway 授权环境与 MCP 工具回包 / audit 边界, symbols: [buildCommandEnv, logAudit] }
-    - { path: daemon/runner/env-filter.ts, change: modify, why: 命令输出凭据脱敏的执行接缝, symbols: [] }
-    - { path: daemon/worker/sandbox/container-host.ts, change: modify, why: SandboxWitness 生成与验证, symbols: [sandboxWitness, verifySandboxWitness] }
-    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: 每次执行绑定见证并在 Evidence 落盘前核验, symbols: [writeEvidence] }
-    - { path: daemon/pipeline/merger.ts, change: modify, why: PRE_MERGE 对 SANDBOX_ENFORCED 见证绑定 fail-closed 核验, symbols: [verifySandboxWitness] }
-    - { path: src/lib/evidence.schema.ts, change: modify, why: Evidence sandbox_witness 结构化字段约束, symbols: [sandboxWitnessSchema] }
-  interfaces: []
-  test_plan:
-    - { acceptance_id: P14-P1, test_path: tests/daemon/mcp-gateway.test.ts, level: unit, debt: "覆盖工具成功/失败/超时/截断及 audit/error 回包不泄露测试凭据" }
-    - { acceptance_id: P14-P1, test_path: tests/daemon/env-filter.test.ts, level: unit, debt: "覆盖 stdout/stderr 脱敏与状态标记" }
-    - { acceptance_id: P14-P2, test_path: tests/unit/sandbox-witness-nonce.test.ts, level: unit, debt: "覆盖随机新鲜度、绑定、原子单次消费、重复/重放拒绝及清理" }
-    - { acceptance_id: P14-P3, test_path: tests/daemon/p0-1-evidence-merge-fail-closed.test.ts, level: integration, debt: "覆盖签名 Evidence 的 witness nonce/schema 校验与 fail-closed 合并拒绝" }
-    - { acceptance_id: P14-P4, test_path: tests/daemon/p0-3a-container-wiring-and-witness.test.ts, level: integration, debt: "覆盖真实执行结果到见证与 Evidence 的绑定接线；不以 mock 字段自证" }
-governance:
-  spec_refs:
-    - docs/ledger/p1-eval-evidence-trust-chain-and-p0-acceptance.md
-    - docs/specs/development-tasks-completed.md#task-p1.2
-    - docs/specs/development-tasks-completed.md#task-p1.3
-    - docs/specs/development-tasks-completed.md#task-p1.3a
-  depends_on:
-    - { id: TASK-P1.2, kind: hard }
-    - { id: TASK-P1.3, kind: hard }
-    - { id: TASK-P1.3a, kind: hard }
-  code_facts:
-    - { ref: "daemon/mcp/gateway.ts::buildCommandEnv", note: "现有 Gateway 以 secretValues 汇总凭据脱敏值，并把 resolvedEnv / secretValues 传给 runCommand；需验证所有回包与日志出口" }
-    - { ref: "daemon/worker/sandbox/container-host.ts::sandboxWitness", note: "现有见证含 host_kind/via/exit_code/duration_ms/worktree_root 与可选挂载字段，尚无 Nonce 绑定" }
-    - { ref: "daemon/worker/sandbox/container-host.ts::verifySandboxWitness", note: "当前核验 via、host_kind、worktree_root 与挂载字段；无 contract/session/Nonce 校验" }
-    - { ref: "daemon/pipeline/orchestrator.ts::writeEvidence", note: "Evidence 从 sandboxWitnesses 按 contract_id 读取见证并写入 sandbox_witness；此处需接入执行级绑定" }
-    - { ref: "daemon/pipeline/merger.ts::verifySandboxWitness", note: "SANDBOX_ENFORCED 在 PRE_MERGE 校验见证存在与 worktree_root；需要扩展至 Nonce 绑定 fail-closed" }
-  non_goals:
-    - 不扩大 Gateway 环境变量授权，不新增秘密暴露给 Worker 的通道
-    - 不重做 Evidence Ed25519 签名体系，不修改签名密钥管理
-    - 不实现硬件级 Attestation 或宣称 P0 风险解除
-    - daemon 重启后的跨进程防重放若未交付，必须如实标注，不得声称已覆盖
-  fail:
-    - 任一测试凭据明文出现在 stdout/stderr、MCP 回包、audit/error、Evidence 或 SandboxWitness
-    - SANDBOX_ENFORCED 下缺失、错配、跨执行嫁接、重复消费或重放的 Nonce 被接受或未 fail-closed
-    - Evidence schema 与 PRE_MERGE 对 Nonce 绑定口径不一致，或现有签名不覆盖绑定字段
-    - 修改 writable_paths 外文件，或 readonly_paths 出现任何 diff
-  estimate: M
-  invariants:
-    auth: unchanged
-    demo_origin: unchanged
-    illumination: unchanged
-    gateway_write_scope: unchanged
-```
-
-> **前置条件与硬依赖**：评估报告建议的 `TASK-P1.2`（Evidence 签名门禁）已完成；`TASK-P1.3` 与 `TASK-P1.3a` 也已完成，当前任务卡序的前置链满足。签名门禁与 `PARTIAL` 验收矩阵现状不因此被重新声明为 P0 风险解除。
+> **立卡与归档说明（2026-11-27 · P-344 / P-345）**：授权来源为 Tina 授权立卡并合入施工 PR「按先例授权合并 #449，执行 TASK-P1.4 完工回写与 P1 线总账复核」。操作者由我执行。对应 P1 评估报告建议第 3 项与 P0 深审遗留，承接 Gateway 凭据脱敏与 SandboxWitness Nonce 绑定。本卡为施工型任务卡（估算 M，优先级 P2-Medium），已按授权完成施工与完工回写。
 >
-> **范围与红线**：只允许修改 `writable_paths`；`readonly_paths` 零 diff。不得扩大 Gateway 环境变量授权，不得把敏感值写入日志、工具回包、Evidence、Nonce 或见证；Nonce 必须由可信 Daemon 生成且一次执行只消费一次。发现需改范围外路径时停工修卡。
+> **目标**：阻断 Gateway 授权注入的敏感环境变量明文进入 Worker 可见日志、工具回包或 Evidence；为每次受控沙箱执行建立随机、单次、会话级 SandboxWitness Nonce 绑定，防止缺失、错配或重放的见证被接受。
 >
-> **审批边界（逐字写入）**：本审批**不是代码施工授权**，也**不是代码合并批准**，更**不是 P0 风险解除声明**。本卡为施工立卡，立卡 ≠ 开工；后续施工须由 Tina 单卡点名授权，施工 PR 全绿且 CLEAN 后另行报授权合入。
+> **前置条件与硬依赖**：`TASK-P1.2`、`TASK-P1.3`、`TASK-P1.3a` 施工及完工回写已正式交付合入。
 >
-> **诚实口径**：本卡目标是凭据脱敏与见证 Nonce 的会话级绑定；完成代码与测试不等于 P0 风险解除，也不代表硬件级 Attestation、容器内 OS 级只读隔离或 daemon 重启后的跨进程防重放已实现。各项边界按实际验收结果如实记录。
+> **审批边界（逐字写入）**：本审批**不是代码合并批准**，也**不是 P0 风险解除声明**。实施遵循立卡限制与 DoD，PR 全绿且 UNSTABLE 按先例报授权合入。
+>
+> **诚实口径**：**硬件级 Attestation 未做、Merger 不重跑全量测试、容器内无 OS 级只读隔离三条边界保留；不得宣称 P0 风险解除；代码交付 ≠ 安全验证通过**。
+>
+> `TASK-P1.4` 已 **COMPLETED**（施工 [#449](https://github.com/he18718143986-design/IDE/pull/449) squash `5901714f4652bd4f3cdc116c8b7aa337881ce82b`；立卡 P-344；完工回写 P-345）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-p1.4) §3.4cm。诚实口径：**Gateway 凭据脱敏与见证 Nonce 绑定已交付（值级脱敏、CSPRNG Nonce、重放阻断、签名覆盖）；Nonce 为内存型存储、Daemon 重启后无跨进程防重放持久性，P0 风险未宣称解除**。此处保留立卡说明与审批边界。
