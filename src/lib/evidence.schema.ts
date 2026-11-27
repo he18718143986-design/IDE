@@ -391,8 +391,9 @@ export const evidenceBundleSchema = z
       }
       // TASK-P0.2a: 当前版本受控 Evidence 必须包含完整 test_integrity 记录，缺失 fail-closed
       if (
-        bundle.worker_control_mode === "GATEWAY_ENFORCED" ||
-        bundle.worker_control_mode === "SANDBOX_ENFORCED"
+        bundle.contract_revision !== undefined &&
+        (bundle.worker_control_mode === "GATEWAY_ENFORCED" ||
+          bundle.worker_control_mode === "SANDBOX_ENFORCED")
       ) {
         if (!bundle.test_integrity) {
           ctx.addIssue({
