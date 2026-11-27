@@ -1938,4 +1938,4 @@ governance:
 
 <a id="task-p1.3"></a>
 
-> `TASK-P1.3` 已 **COMPLETED**（施工 [#443](https://github.com/he18718143986-design/IDE/pull/443) squash `ba9325f77574decbc4816b90d0022c5a23159123`；立卡 P-340；完工回写 P-341）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-p1.3) §3.4ck。诚实口径：**P0 独立动态渗透与跨平台验收套件已交付（十大负向场景实跑、三平台判据、三态证据输出、验收矩阵）；无 Docker 环境用例如实跳过未宣称通过，P0 风险未宣称解除**。此处保留立卡说明与审批边界。
+> `TASK-P1.3` 已 **COMPLETED**（施工 [#443](https://github.com/he18718143986-design/IDE/pull/443) squash `ba9325f77574decbc4816b90d0022c5a23159123`；立卡 P-340；完工回写 P-341）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-p1.3) §3.4ck。诚实口径：**P0 独立动态渗透与跨平台验收套件已交付（十大负向场景覆盖（7 项实跑通过、3 项因无 Docker 标记 SKIPPED_NO_DOCKER）、三平台判据自动化断言、三态证据输出与验收矩阵；真实容器及三平台运行时验收尚未完成）；无 Docker 环境用例如实跳过未宣称通过，P0 风险未宣称解除**。此处保留立卡说明与审批边界。
