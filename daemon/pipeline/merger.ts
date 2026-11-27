@@ -272,8 +272,8 @@ export function assertEvidenceTestIntegrity(
 
   // TASK-P0.14: 测试配置文件篡改独立门禁断言
   const allowConfigMutation =
-    contract.authorization.execution_permissions
-      ?.allow_test_config_mutation === true;
+    contract.authorization.execution_permissions?.allow_test_config_mutation ===
+    true;
 
   if (ti.allow_test_config_mutation && !allowConfigMutation) {
     throw new MergeGateError(

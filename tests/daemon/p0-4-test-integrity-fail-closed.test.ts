@@ -475,8 +475,16 @@ if (!content.includes('exports.a = 2')) {
         contract_revision: contract.contract_revision,
         worker_control_mode: "GATEWAY_ENFORCED",
         generated_at: new Date().toISOString(),
-        usage: { total_input_tokens: 10, total_output_tokens: 10, duration_ms: 100 },
-        verdict: { status: "PASSED", reason_code: "ALL_CONDITIONS_MET", note: "ok" },
+        usage: {
+          total_input_tokens: 10,
+          total_output_tokens: 10,
+          duration_ms: 100,
+        },
+        verdict: {
+          status: "PASSED",
+          reason_code: "ALL_CONDITIONS_MET",
+          note: "ok",
+        },
         test_integrity: {
           tests_modified: true,
           modified_existing_tests: [],
@@ -486,7 +494,8 @@ if (!content.includes('exports.a = 2')) {
           baseline_rerun_triggered: false,
           baseline_rerun_passed: false,
           failure_code: "E_TEST_CONFIG_MUTATED",
-          failure_reason: "Test configuration mutated without exemption: vitest.config.ts",
+          failure_reason:
+            "Test configuration mutated without exemption: vitest.config.ts",
           restored_paths: [],
           weakened_tests: [],
           modified_test_configs: ["vitest.config.ts"],
@@ -515,8 +524,16 @@ if (!content.includes('exports.a = 2')) {
         contract_revision: contract.contract_revision,
         worker_control_mode: "GATEWAY_ENFORCED",
         generated_at: new Date().toISOString(),
-        usage: { total_input_tokens: 10, total_output_tokens: 10, duration_ms: 100 },
-        verdict: { status: "PASSED", reason_code: "ALL_CONDITIONS_MET", note: "ok" },
+        usage: {
+          total_input_tokens: 10,
+          total_output_tokens: 10,
+          duration_ms: 100,
+        },
+        verdict: {
+          status: "PASSED",
+          reason_code: "ALL_CONDITIONS_MET",
+          note: "ok",
+        },
         test_integrity: {
           tests_modified: true,
           modified_existing_tests: [],

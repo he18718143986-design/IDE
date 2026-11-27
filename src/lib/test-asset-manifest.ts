@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
-import { isTestPath, normalizeTestRelPath } from "../../daemon/guard/test-integrity";
+import {
+  isTestPath,
+  normalizeTestRelPath,
+} from "../../daemon/guard/test-integrity";
 
 /**
  * 测试资产类型：
@@ -10,11 +13,7 @@ import { isTestPath, normalizeTestRelPath } from "../../daemon/guard/test-integr
  * - script: 测试验证脚本 (scripts/verify-*.ts, scripts/check-*.ts)
  */
 export type TestAssetKind =
-  | "test_suite"
-  | "config"
-  | "fixture"
-  | "helper"
-  | "script";
+  "test_suite" | "config" | "fixture" | "helper" | "script";
 
 /**
  * 判定级别：
@@ -45,8 +44,19 @@ const CONFIG_FILE_PATTERNS = [
   /^\.mocharc\.(json|yaml|yml|js)$/i,
 ];
 
-const FIXTURE_SEGMENTS = new Set(["fixtures", "__fixtures__", "mocks", "__mocks__"]);
-const HELPER_SEGMENTS = new Set(["helpers", "helper", "utils", "util", "support"]);
+const FIXTURE_SEGMENTS = new Set([
+  "fixtures",
+  "__fixtures__",
+  "mocks",
+  "__mocks__",
+]);
+const HELPER_SEGMENTS = new Set([
+  "helpers",
+  "helper",
+  "utils",
+  "util",
+  "support",
+]);
 
 export function normalizeAssetRelPath(relPath: string): string {
   return normalizeTestRelPath(relPath);
@@ -67,7 +77,10 @@ export function classifyTestAssetKind(relPath: string): TestAssetKind | null {
   const basename = segments[segments.length - 1] ?? "";
 
   // 1. 配置文件识别
-  if (segments.length === 1 && CONFIG_FILE_PATTERNS.some((p) => p.test(basename))) {
+  if (
+    segments.length === 1 &&
+    CONFIG_FILE_PATTERNS.some((p) => p.test(basename))
+  ) {
     return "config";
   }
   // 子目录下的 tsconfig 等配置（如 configs/tsconfig.base.json）
@@ -247,7 +260,9 @@ export function auditTestAssetsAgainstManifest(options: {
         case "config":
           modifiedConfigs.push(relPath);
           if (!allowTestConfigMutation) {
-            violations.push(`Test configuration mutated without exemption: ${relPath}`);
+            violations.push(
+              `Test configuration mutated without exemption: ${relPath}`,
+            );
           }
           break;
         case "fixture":

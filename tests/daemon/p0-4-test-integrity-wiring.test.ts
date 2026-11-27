@@ -474,8 +474,12 @@ describe("TASK-P0.13: 基线验收独立性与恢复加固 (Scope A, Scope C & S
       });
 
       const parsed = evidenceBundleSchema.parse(evidence);
-      expect(parsed.test_integrity?.test_asset_manifest_digest).toBe("a".repeat(64));
-      expect(parsed.test_integrity?.modified_test_configs).toContain("vitest.config.ts");
+      expect(parsed.test_integrity?.test_asset_manifest_digest).toBe(
+        "a".repeat(64),
+      );
+      expect(parsed.test_integrity?.modified_test_configs).toContain(
+        "vitest.config.ts",
+      );
       expect(parsed.test_integrity?.restored_fixtures_and_helpers).toContain(
         "tests/fixtures/data.json",
       );
@@ -540,7 +544,9 @@ describe("TASK-P0.13: 基线验收独立性与恢复加固 (Scope A, Scope C & S
         },
       });
 
-      expect(() => assertEvidenceTestIntegrity(evidence, contract)).not.toThrow();
+      expect(() =>
+        assertEvidenceTestIntegrity(evidence, contract),
+      ).not.toThrow();
     });
   });
 });

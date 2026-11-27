@@ -661,13 +661,17 @@ describe("TASK-P0.4: test-integrity-guard unit tests", () => {
           "export default {};",
           "utf-8",
         );
-        fs.mkdirSync(path.join(repoDir, "tests", "fixtures"), { recursive: true });
+        fs.mkdirSync(path.join(repoDir, "tests", "fixtures"), {
+          recursive: true,
+        });
         fs.writeFileSync(
           path.join(repoDir, "tests", "fixtures", "mock.json"),
           '{"foo": 1}',
           "utf-8",
         );
-        fs.mkdirSync(path.join(repoDir, "tests", "helpers"), { recursive: true });
+        fs.mkdirSync(path.join(repoDir, "tests", "helpers"), {
+          recursive: true,
+        });
         fs.writeFileSync(
           path.join(repoDir, "tests", "helpers", "util.ts"),
           "export const util = () => 1;",
@@ -694,7 +698,9 @@ describe("TASK-P0.4: test-integrity-guard unit tests", () => {
           gitRunner: testGitRunner,
         });
 
-        expect(classification.modifiedTestConfigs).toContain("vitest.config.ts");
+        expect(classification.modifiedTestConfigs).toContain(
+          "vitest.config.ts",
+        );
         expect(classification.modifiedFixturesAndHelpers).toContain(
           "tests/fixtures/mock.json",
         );
@@ -742,8 +748,15 @@ describe("TASK-P0.4: test-integrity-guard unit tests", () => {
     it("P014-U3: executeBaselineRerun 自动将 modifiedFixturesAndHelpers 纳入还原路径集", async () => {
       const { repoDir, baseBranch, cleanup } = setupGitRepo();
       try {
-        fs.mkdirSync(path.join(repoDir, "tests", "fixtures"), { recursive: true });
-        const fixturePath = path.join(repoDir, "tests", "fixtures", "mock.json");
+        fs.mkdirSync(path.join(repoDir, "tests", "fixtures"), {
+          recursive: true,
+        });
+        const fixturePath = path.join(
+          repoDir,
+          "tests",
+          "fixtures",
+          "mock.json",
+        );
         fs.writeFileSync(fixturePath, "original_content", "utf-8");
         git(repoDir, ["add", "."]);
         git(repoDir, ["commit", "-m", "add fixture"]);

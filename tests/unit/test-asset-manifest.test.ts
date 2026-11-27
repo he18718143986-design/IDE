@@ -9,34 +9,54 @@ import {
 describe("TestAssetManifest & Classification (P014-P1 ~ P014-P4)", () => {
   describe("P014-P1: 识别机制与分类", () => {
     it("识别各类测试套件", () => {
-      expect(classifyTestAssetKind("tests/unit/example.test.ts")).toBe("test_suite");
-      expect(classifyTestAssetKind("src/components/button.spec.tsx")).toBe("test_suite");
+      expect(classifyTestAssetKind("tests/unit/example.test.ts")).toBe(
+        "test_suite",
+      );
+      expect(classifyTestAssetKind("src/components/button.spec.tsx")).toBe(
+        "test_suite",
+      );
       expect(classifyTestAssetKind("__tests__/foo.test.js")).toBe("test_suite");
     });
 
     it("识别测试与构建配置文件", () => {
       expect(classifyTestAssetKind("vitest.config.ts")).toBe("config");
       expect(classifyTestAssetKind("tsconfig.json")).toBe("config");
-      expect(classifyTestAssetKind("configs/tsconfig.base.json")).toBe("config");
+      expect(classifyTestAssetKind("configs/tsconfig.base.json")).toBe(
+        "config",
+      );
       expect(classifyTestAssetKind("playwright.config.ts")).toBe("config");
       expect(classifyTestAssetKind("jest.config.js")).toBe("config");
       expect(classifyTestAssetKind("pytest.ini")).toBe("config");
     });
 
     it("识别测试夹具与 Mock 文件", () => {
-      expect(classifyTestAssetKind("tests/fixtures/contract.sample.json")).toBe("fixture");
-      expect(classifyTestAssetKind("tests/mocks/agent-gateway.ts")).toBe("fixture");
-      expect(classifyTestAssetKind("__fixtures__/payload.json")).toBe("fixture");
+      expect(classifyTestAssetKind("tests/fixtures/contract.sample.json")).toBe(
+        "fixture",
+      );
+      expect(classifyTestAssetKind("tests/mocks/agent-gateway.ts")).toBe(
+        "fixture",
+      );
+      expect(classifyTestAssetKind("__fixtures__/payload.json")).toBe(
+        "fixture",
+      );
     });
 
     it("识别测试共享 Helper 与 Utils", () => {
-      expect(classifyTestAssetKind("tests/helpers/test-runner.ts")).toBe("helper");
-      expect(classifyTestAssetKind("tests/utils/crypto-stub.ts")).toBe("helper");
-      expect(classifyTestAssetKind("tests/unit/support/mock-ipc.ts")).toBe("helper");
+      expect(classifyTestAssetKind("tests/helpers/test-runner.ts")).toBe(
+        "helper",
+      );
+      expect(classifyTestAssetKind("tests/utils/crypto-stub.ts")).toBe(
+        "helper",
+      );
+      expect(classifyTestAssetKind("tests/unit/support/mock-ipc.ts")).toBe(
+        "helper",
+      );
     });
 
     it("识别测试校验脚本", () => {
-      expect(classifyTestAssetKind("scripts/verify-p0-independent-suite.ts")).toBe("script");
+      expect(
+        classifyTestAssetKind("scripts/verify-p0-independent-suite.ts"),
+      ).toBe("script");
       expect(classifyTestAssetKind("scripts/check-docs.ts")).toBe("script");
     });
 
@@ -53,8 +73,14 @@ describe("TestAssetManifest & Classification (P014-P1 ~ P014-P4)", () => {
       const files = [
         { relPath: "vitest.config.ts", content: "export default {};" },
         { relPath: "tests/fixtures/data.json", content: '{"sample": 1}' },
-        { relPath: "tests/helpers/runner.ts", content: "export const run = () => {};" },
-        { relPath: "tests/unit/core.test.ts", content: "test('ok', () => {});" },
+        {
+          relPath: "tests/helpers/runner.ts",
+          content: "export const run = () => {};",
+        },
+        {
+          relPath: "tests/unit/core.test.ts",
+          content: "test('ok', () => {});",
+        },
         { relPath: "src/index.ts", content: "console.log('ignored');" },
       ];
 
@@ -63,9 +89,15 @@ describe("TestAssetManifest & Classification (P014-P1 ~ P014-P4)", () => {
       expect(manifest.baseCommit).toBe(baseCommit);
       expect(Object.keys(manifest.assets)).toHaveLength(4);
       expect(manifest.assets["vitest.config.ts"]?.criticality).toBe("BLOCKING");
-      expect(manifest.assets["tests/fixtures/data.json"]?.criticality).toBe("BLOCKING");
-      expect(manifest.assets["tests/helpers/runner.ts"]?.criticality).toBe("BLOCKING");
-      expect(manifest.assets["tests/unit/core.test.ts"]?.criticality).toBe("BLOCKING");
+      expect(manifest.assets["tests/fixtures/data.json"]?.criticality).toBe(
+        "BLOCKING",
+      );
+      expect(manifest.assets["tests/helpers/runner.ts"]?.criticality).toBe(
+        "BLOCKING",
+      );
+      expect(manifest.assets["tests/unit/core.test.ts"]?.criticality).toBe(
+        "BLOCKING",
+      );
 
       const digest = computeManifestDigest(manifest);
       expect(digest).toBeDefined();
@@ -101,7 +133,8 @@ describe("TestAssetManifest & Classification (P014-P1 ~ P014-P4)", () => {
 
     it("未豁免篡改测试配置文件时确定性 fail-closed", () => {
       const current = {
-        "vitest.config.ts": "export default { test: { passWithNoTests: true } };",
+        "vitest.config.ts":
+          "export default { test: { passWithNoTests: true } };",
       };
       const res = auditTestAssetsAgainstManifest({
         manifest,
@@ -110,12 +143,15 @@ describe("TestAssetManifest & Classification (P014-P1 ~ P014-P4)", () => {
       });
       expect(res.passed).toBe(false);
       expect(res.modifiedConfigs).toEqual(["vitest.config.ts"]);
-      expect(res.violations[0]).toContain("Test configuration mutated without exemption");
+      expect(res.violations[0]).toContain(
+        "Test configuration mutated without exemption",
+      );
     });
 
     it("合同显式豁免时允许配置修改并记录明细", () => {
       const current = {
-        "vitest.config.ts": "export default { test: { passWithNoTests: true } };",
+        "vitest.config.ts":
+          "export default { test: { passWithNoTests: true } };",
       };
       const res = auditTestAssetsAgainstManifest({
         manifest,
