@@ -19,9 +19,10 @@ import {
   evidenceBundleSchema,
   type EvidenceBundle,
 } from "../../src/lib/evidence.schema";
-import type {
-  ContainerHostPort,
-  SandboxWitness,
+import {
+  type ContainerHostPort,
+  type SandboxWitness,
+  verifySandboxWitness,
 } from "../../daemon/worker/sandbox/container-host";
 import { DockerContainerHost } from "../../daemon/worker/cli-host/docker-container-host";
 import { AdapterRegistry } from "../../daemon/worker/adapter-registry";
@@ -503,5 +504,369 @@ describe("TASK-P0.3a: container-wiring-and-witness 生产接线与端到端见�
       }),
     ).resolves.toBeDefined();
     expect(store.get(contract.contract_id)?.lifecycle_state).toBe("MERGED");
+  });
+
+  // ── TASK-P0.1a 专项测试（P01A-P1 ~ P6）──────────────────────────────
+
+  it("P01A-P1: 追踪派工至真实进程并验证容器执行入箱", async () => {
+    let capturedWorktree: string | null = null;
+    let runnerCalled = false;
+
+    const mockHost: ContainerHostPort = {
+      kind: "docker/29.6.1",
+      isAvailable: () => true,
+      run: async (input: { worktreeRoot: string }) => {
+        capturedWorktree = input.worktreeRoot;
+        runnerCalled = true;
+        fs.mkdirSync(path.join(input.worktreeRoot, "src"), { recursive: true });
+        fs.writeFileSync(
+          path.join(input.worktreeRoot, "src", "p01a.ts"),
+          "export const p = 1;\n",
+        );
+        return {
+          exitCode: 0,
+          via: "exit",
+          durationMs: 42,
+          stdout: "done",
+          stderr: "",
+          sessionId: "sess-p01a-1",
+        };
+      },
+    };
+
+    let targetContractId = "";
+    const factory: WorkerDispatchFactory = () => ({
+      run: async () => {
+        const wt = worktreeOf(targetContractId);
+        fs.mkdirSync(path.join(wt, "src"), { recursive: true });
+        fs.writeFileSync(
+          path.join(wt, "src", "p01a.ts"),
+          "export const p = 1;\n",
+        );
+        return {
+          applied: true,
+          changes: [],
+          log: ["container executed"],
+          usage: { inputTokens: 0, outputTokens: 0 },
+          blockers: [],
+          sandbox: {
+            host_kind: "docker/29.6.1",
+            via: "exit" as const,
+            exit_code: 0,
+            duration_ms: 42,
+            worktree_root: wt,
+            session_id: "sess-p01a-1",
+          },
+        };
+      },
+    });
+
+    const registry = registryWith(factory);
+    const orchestrator = new ContractOrchestrator({
+      repoRoot: repo,
+      registry,
+      containerHost: mockHost,
+    });
+
+    const contract = makeContract({
+      title: "trace dispatch to container",
+      controlMode: "SANDBOX_ENFORCED",
+      adapterId: SANDBOX_ADAPTER_ID,
+    });
+    targetContractId = contract.contract_id;
+    store.save(contract);
+    await orchestrator.approve(contract.contract_id, "tina");
+
+    await orchestrator.runWorker(contract.contract_id, {
+      modelClient: {
+        generateChanges: async () => ({
+          changes: [],
+          log: [],
+          rawResponse: "stub",
+          usage: { inputTokens: 0, outputTokens: 0 },
+        }),
+      },
+      skipDesignStep: true,
+      twoPhase: { obligations: [], waived: [] },
+      containerHost: mockHost,
+    });
+
+    const outcome = await orchestrator.execute(contract.contract_id);
+    expect(outcome.contract.lifecycle_state).toBe("AUDITED");
+    expect(outcome.evidence.worker_control_mode).toBe("SANDBOX_ENFORCED");
+    expect(outcome.evidence.sandbox_witness).toBeDefined();
+
+    // 验证调用链确经 containerHost 与沙箱见证传递
+    expect(outcome.evidence.sandbox_witness?.host_kind).toBe("docker/29.6.1");
+    expect(outcome.evidence.sandbox_witness?.via).toBe("exit");
+    expect(outcome.evidence.sandbox_witness?.session_id).toBeDefined();
+    expect(outcome.evidence.sandbox_witness?.worktree_root).toBe(
+      worktreeOf(contract.contract_id),
+    );
+  });
+
+  it("P01A-P2: 验证宿主不可用时派工被拒 fail-closed", async () => {
+    // 1. 宿主不可用时，isAdapterDispatchable 为 false 且派工抛出 E_ADAPTER_SANDBOX_LOCKED
+    const unavailableHost: ContainerHostPort = {
+      kind: "docker/unavailable",
+      isAvailable: () => false,
+      run: async () => {
+        throw new Error("should not be called");
+      },
+    };
+
+    const emptyFactory: WorkerDispatchFactory = () => ({
+      run: async () => ({
+        applied: true,
+        changes: [],
+        log: [],
+        usage: { inputTokens: 0, outputTokens: 0 },
+        blockers: [],
+      }),
+    });
+
+    const registry = registryWith(emptyFactory);
+    const orchLocked = new ContractOrchestrator({
+      repoRoot: repo,
+      registry,
+      containerHost: unavailableHost,
+    });
+
+    expect(orchLocked.isAdapterDispatchable(SANDBOX_ADAPTER_ID)).toBe(false);
+
+    const contract = makeContract({
+      title: "fail closed when unavailable",
+      controlMode: "SANDBOX_ENFORCED",
+      adapterId: SANDBOX_ADAPTER_ID,
+    });
+    store.save(contract);
+    await orchLocked.approve(contract.contract_id, "tina");
+
+    await expect(
+      orchLocked.runWorker(contract.contract_id, {
+        modelClient: {
+          generateChanges: async () => ({
+            changes: [],
+            log: [],
+            rawResponse: "stub",
+            usage: { inputTokens: 0, outputTokens: 0 },
+          }),
+        },
+      }),
+    ).rejects.toMatchObject({
+      name: "WorkerDispatchError",
+      code: "E_ADAPTER_SANDBOX_LOCKED",
+    });
+
+    // 2. 运行时返回 HOST_UNAVAILABLE 时，严禁降级本机会话，严禁产生 witness
+    const runtimeFailHost: ContainerHostPort = {
+      kind: "docker/29.6.1",
+      isAvailable: () => true,
+      run: async () => ({
+        exitCode: 1,
+        via: "rejected",
+        rejectionCode: "HOST_UNAVAILABLE",
+        durationMs: 5,
+        stdout: "",
+        stderr: "docker daemon unresponsive",
+      }),
+    };
+
+    const runtimeFailFactory: WorkerDispatchFactory = () => ({
+      run: async () => {
+        throw new Error("HOST_UNAVAILABLE: docker daemon died");
+      },
+    });
+
+    const orchRuntime = new ContractOrchestrator({
+      repoRoot: repo,
+      registry: registryWith(runtimeFailFactory),
+      containerHost: runtimeFailHost,
+    });
+
+    const contract2 = makeContract({
+      title: "runtime host unavailable",
+      controlMode: "SANDBOX_ENFORCED",
+      adapterId: SANDBOX_ADAPTER_ID,
+    });
+    store.save(contract2);
+    await orchRuntime.approve(contract2.contract_id, "tina");
+
+    await expect(
+      orchRuntime.runWorker(contract2.contract_id, {
+        modelClient: {
+          generateChanges: async () => ({
+            changes: [],
+            log: [],
+            rawResponse: "stub",
+            usage: { inputTokens: 0, outputTokens: 0 },
+          }),
+        },
+      }),
+    ).rejects.toThrowError(/HOST_UNAVAILABLE/);
+  });
+
+  it("P01A-P3: 验证真实入箱执行见证落盘与防伪", async () => {
+    const validWitness: SandboxWitness = {
+      contract_id: "c-p01a-3",
+      contract_revision: 1,
+      nonce: "a".repeat(32),
+      worktree_root: path.resolve(repo),
+      host_kind: "docker",
+      exit_code: 0,
+      via: "exit",
+      duration_ms: 100,
+    };
+
+    // 合法 witness 校验通过
+    expect(() => verifySandboxWitness(validWitness, repo)).not.toThrow();
+
+    // via 非 exit 被拒
+    expect(() =>
+      verifySandboxWitness({ ...validWitness, via: "timeout" }, repo),
+    ).toThrowError(/沙箱见证终止方式非法/);
+
+    // 工作树路径不一致被拒
+    expect(() =>
+      verifySandboxWitness(
+        { ...validWitness, worktree_root: "/different/path" },
+        repo,
+      ),
+    ).toThrowError(/沙箱见证工作树不匹配/);
+
+    // 伪造/非法 host_kind 被拒
+    expect(() =>
+      verifySandboxWitness(
+        { ...validWitness, host_kind: "unknown" as unknown as "docker" },
+        repo,
+      ),
+    ).toThrowError(/沙箱宿主类型非法/);
+  });
+
+  it("P01A-P5: 验证 test_integrity 占位记录与真实重跑的区分性", async () => {
+    const orchestrator = new ContractOrchestrator({ repoRoot: repo });
+    const c1 = makeContract({
+      title: "placeholder without test modification",
+      controlMode: "SANDBOX_ENFORCED",
+      adapterId: SANDBOX_ADAPTER_ID,
+    });
+    store.save(c1);
+    await orchestrator.approve(c1.contract_id, "tina");
+    const wt1 = worktreeOf(c1.contract_id);
+
+    const rawWitness = {
+      contract_id: c1.contract_id,
+      contract_revision: c1.contract_revision,
+      nonce: "a".repeat(32),
+      worktree_root: path.resolve(wt1),
+      host_kind: "docker/29.6.1",
+      exit_code: 0,
+      via: "exit" as const,
+      duration_ms: 10,
+    };
+    (
+      orchestrator as unknown as { sandboxWitnesses: Map<string, unknown> }
+    ).sandboxWitnesses.set(c1.contract_id, rawWitness);
+
+    // Case 1: 未修改测试文件且缺失 testIntegrity 时，自动补齐占位记录并标记 placeholder
+    const out1 = await (
+      orchestrator as unknown as {
+        writeEvidence: (
+          contract: SoftwareContract,
+          params: unknown,
+        ) => Promise<EvidenceBundle>;
+      }
+    ).writeEvidence(c1, {
+      status: "PASSED",
+      scopePassed: true,
+      modifiedFiles: ["src/code.ts"],
+      forbiddenViolations: [],
+      verificationResults: [
+        {
+          alias: "test",
+          exitCode: 0,
+          stdout: "ok",
+          stderr: "",
+          durationMs: 10,
+          passed: true,
+        },
+      ],
+      workerControlMode: "SANDBOX_ENFORCED",
+      testsModified: false,
+      summary: "unmodified tests default placeholder",
+    });
+
+    expect(out1.test_integrity).toBeDefined();
+    expect(out1.test_integrity?.baseline_rerun_triggered).toBe(false);
+    expect(out1.test_integrity?.failure_reason).toBe(
+      "placeholder:unmodified_tests_default",
+    );
+    expect(out1.verdict.can_merge).toBe(true);
+
+    // Case 2: 改动了测试文件却未做完整性审计时，自动 fail-closed 阻断合并
+    const out2 = await (
+      orchestrator as unknown as {
+        writeEvidence: (
+          contract: SoftwareContract,
+          params: unknown,
+        ) => Promise<EvidenceBundle>;
+      }
+    ).writeEvidence(c1, {
+      status: "PASSED",
+      scopePassed: true,
+      modifiedFiles: ["tests/some.test.ts"],
+      forbiddenViolations: [],
+      verificationResults: [
+        {
+          alias: "test",
+          exitCode: 0,
+          stdout: "ok",
+          stderr: "",
+          durationMs: 10,
+          passed: true,
+        },
+      ],
+      workerControlMode: "SANDBOX_ENFORCED",
+      testsModified: true, // 标记改动了测试文件，但故意未传入 testIntegrity 证据
+      summary: "tampered tests without integrity rerun",
+    });
+
+    expect(out2.test_integrity).toBeDefined();
+    expect(out2.test_integrity?.baseline_rerun_passed).toBe(false);
+    expect(out2.test_integrity?.failure_code).toBe(
+      "E_TEST_BASELINE_REGRESSION",
+    );
+    expect(out2.test_integrity?.failure_reason).toBe(
+      "tests_modified_without_test_integrity_evaluation",
+    );
+    // can_merge 必须被阻断
+    expect(out2.verdict.can_merge).toBe(false);
+  });
+
+  it("P01A-P6: 核验执行链受控证明专项审计报告落盘", () => {
+    const reportPath = path.resolve(
+      __dirname,
+      "../../docs/ledger/p0-1a-execution-chain-controlled-audit.md",
+    );
+    expect(fs.existsSync(reportPath)).toBe(true);
+    const content = fs.readFileSync(reportPath, "utf-8");
+
+    expect(content).toContain("TASK-P0.1a 执行链受控证明专项审计报告");
+    expect(content).toContain("1. 派工→真实进程全链路追踪（P01A-P1）");
+    expect(content).toContain(
+      "2. SANDBOX_ENFORCED 所有入口与异常路径枚举（P01A-P2）",
+    );
+    expect(content).toContain(
+      "3. SandboxWitness 来源真实性与防伪核查（P01A-P3）",
+    );
+    expect(content).toContain("4. 网络探测三态修证与 UNKNOWN 降级（P01A-P4）");
+    expect(content).toContain(
+      "5. test_integrity 占位记录与真实重跑区分性审计（P01A-P5）",
+    );
+    expect(content).toContain("6. 诚实口径与边界声明（P01A-P6）");
+    expect(content).toContain("硬件级 Attestation 未实施");
+    expect(content).toContain("Merger 阶段不重跑全量测试");
+    expect(content).toContain("容器内未叠加 OS 级二次沙盒");
+    expect(content).toContain("严禁宣称 P0/P1 安全风险完全解除");
   });
 });

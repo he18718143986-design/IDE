@@ -25,6 +25,7 @@ import {
   isOsSandboxApplicable,
   isSandboxLaunchFailure,
   probeDeniedFromOutput,
+  probeVerdictFromOutput,
 } from "../../daemon/baseline/index";
 
 function mkRepo(): string {
@@ -167,11 +168,41 @@ describe("TASK-C.14e OS sandbox", () => {
     expect(isSandboxLaunchFailure("")).toBe(false);
   });
 
-  it("沙箱内真实报错仍算拒绝，连上了则不算", () => {
-    expect(probeDeniedFromOutput("ENOTFOUND", "CONNECTED")).toBe(true);
-    expect(probeDeniedFromOutput("TIMEOUT", "CONNECTED")).toBe(true);
-    expect(probeDeniedFromOutput("EPERM", "WROTE")).toBe(true);
+  it("沙箱网络探测三态修证与 UNKNOWN 降级（P01A-P4）", () => {
+    // 外部不可达 / DNS 失败 / 超时 降级为 UNKNOWN，不计入 denied
+    expect(probeVerdictFromOutput("ENOTFOUND", "CONNECTED")).toBe("UNKNOWN");
+    expect(probeDeniedFromOutput("ENOTFOUND", "CONNECTED")).toBe(false);
+
+    expect(probeVerdictFromOutput("TIMEOUT", "CONNECTED")).toBe("UNKNOWN");
+    expect(probeDeniedFromOutput("TIMEOUT", "CONNECTED")).toBe(false);
+
+    expect(probeVerdictFromOutput("EAI_AGAIN", "CONNECTED")).toBe("UNKNOWN");
+    expect(probeDeniedFromOutput("EAI_AGAIN", "CONNECTED")).toBe(false);
+
+    // 交叉校验：宿主自身不可达时，任何网络错误一律降级为 UNKNOWN
+    expect(
+      probeVerdictFromOutput("EPERM", "CONNECTED", { hostReachable: false }),
+    ).toBe("UNKNOWN");
+    expect(
+      probeDeniedFromOutput("EPERM", "CONNECTED", { hostReachable: false }),
+    ).toBe(false);
+
+    // 沙箱内核级明确拦截（EPERM/EACCES）判定为 DENIED，计入 denied
+    expect(probeVerdictFromOutput("EPERM", "CONNECTED")).toBe("DENIED");
+    expect(probeDeniedFromOutput("EPERM", "CONNECTED")).toBe(true);
+    expect(probeVerdictFromOutput("EACCES", "CONNECTED")).toBe("DENIED");
+    expect(probeDeniedFromOutput("EACCES", "CONNECTED")).toBe(true);
+
+    // 成功连通判定为 ALLOWED，不计入 denied
+    expect(probeVerdictFromOutput("CONNECTED", "CONNECTED")).toBe("ALLOWED");
     expect(probeDeniedFromOutput("CONNECTED", "CONNECTED")).toBe(false);
+
+    // 文件系统写拦截：EPERM / EROFS / EACCES 判定为 DENIED
+    expect(probeVerdictFromOutput("EPERM", "WROTE")).toBe("DENIED");
+    expect(probeDeniedFromOutput("EPERM", "WROTE")).toBe(true);
+    expect(probeVerdictFromOutput("EROFS", "WROTE")).toBe("DENIED");
+    expect(probeDeniedFromOutput("EROFS", "WROTE")).toBe(true);
+    expect(probeVerdictFromOutput("WROTE", "WROTE")).toBe("ALLOWED");
     expect(probeDeniedFromOutput("WROTE", "WROTE")).toBe(false);
   });
 
