@@ -173,6 +173,11 @@ export const sandboxWitnessSchema = z.object({
   mount_mode: sandboxMountModeSchema.optional(),
   /** TASK-P0.3b-2: 容器生效挂载项总数 */
   mount_count: z.number().int().nonnegative().optional(),
+  /** TASK-P1.4: 见证 Nonce 与上下文绑定 */
+  nonce: z.string().min(1).optional(),
+  contract_id: z.string().min(1).optional(),
+  contract_revision: z.number().int().min(1).optional(),
+  session_id: z.string().min(1).optional(),
 });
 export type SandboxWitness = z.infer<typeof sandboxWitnessSchema>;
 
@@ -353,6 +358,33 @@ export const evidenceBundleSchema = z
             `sandbox_witness.mount_count(${bundle.sandbox_witness.mount_count})`,
           );
         }
+        if (bundle.sandbox_witness) {
+          if (
+            bundle.sandbox_witness.nonce !== undefined &&
+            (typeof bundle.sandbox_witness.nonce !== "string" ||
+              bundle.sandbox_witness.nonce.trim() === "")
+          ) {
+            blocking.push("sandbox_witness.nonce");
+          }
+          if (
+            bundle.sandbox_witness.contract_id !== undefined &&
+            bundle.sandbox_witness.contract_id !== bundle.contract_id
+          ) {
+            blocking.push(
+              `sandbox_witness.contract_id_mismatch(${bundle.sandbox_witness.contract_id}!=${bundle.contract_id})`,
+            );
+          }
+          if (
+            bundle.sandbox_witness.contract_revision !== undefined &&
+            bundle.contract_revision !== undefined &&
+            bundle.sandbox_witness.contract_revision !==
+              bundle.contract_revision
+          ) {
+            blocking.push(
+              `sandbox_witness.contract_revision_mismatch(${bundle.sandbox_witness.contract_revision}!=${bundle.contract_revision})`,
+            );
+          }
+        }
       }
       if (blocking.length > 0) {
         ctx.addIssue({
@@ -414,6 +446,10 @@ export function deriveCanMerge(input: {
   sandboxWitness?: SandboxWitness | undefined | null;
   /** TASK-P0.3a：任务工作树路径（用于校验 sandboxWitness 挂载路径） */
   worktreeRoot?: string | undefined;
+  /** TASK-P1.4: 用于校验见证合同绑定一致性 */
+  contractId?: string | undefined;
+  /** TASK-P1.4: 是否强制要求见证必须携 Nonce */
+  requireWitnessNonce?: boolean | undefined;
   /**
    * TASK-P0.4：测试完整性防护（test_integrity）。
    * 若修改或删除了既有测试文件且未获豁免，必须基线隔离重跑通过（baseline_rerun_passed === true）。
@@ -484,6 +520,32 @@ export function deriveCanMerge(input: {
         .replace(/[\\/]+/g, "/")
         .replace(/\/$/, "");
       if (normW !== normE && normW.toLowerCase() !== normE.toLowerCase()) {
+        return false;
+      }
+    }
+    // TASK-P1.4: 见证 Nonce 与上下文绑定
+    if (
+      sw.nonce !== undefined &&
+      (typeof sw.nonce !== "string" || sw.nonce.trim() === "")
+    ) {
+      return false;
+    }
+    if (
+      sw.contract_id !== undefined &&
+      input.contractId !== undefined &&
+      sw.contract_id !== input.contractId
+    ) {
+      return false;
+    }
+    if (
+      sw.contract_revision !== undefined &&
+      input.contractRevision !== undefined &&
+      sw.contract_revision !== input.contractRevision
+    ) {
+      return false;
+    }
+    if (input.requireWitnessNonce === true) {
+      if (!sw.nonce || typeof sw.nonce !== "string" || sw.nonce.trim() === "") {
         return false;
       }
     }

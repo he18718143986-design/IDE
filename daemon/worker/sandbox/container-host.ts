@@ -191,6 +191,20 @@ export interface SandboxWitness {
   readonly mount_mode?: SandboxMountMode | undefined;
   /** TASK-P0.3b-2: 实际生效挂载项总数 */
   readonly mount_count?: number | undefined;
+  /** TASK-P1.4: 见证 Nonce 与上下文绑定 */
+  readonly nonce?: string | undefined;
+  readonly contract_id?: string | undefined;
+  readonly contract_revision?: number | undefined;
+  readonly session_id?: string | undefined;
+}
+
+export interface VerifySandboxWitnessOptions {
+  expectedWorktreeRoot?: string | undefined;
+  expectedNonce?: string | undefined;
+  expectedContractId?: string | undefined;
+  expectedContractRevision?: number | undefined;
+  expectedSessionId?: string | undefined;
+  requireNonce?: boolean | undefined;
 }
 
 /** 依据宿主实际执行结果产出见证（唯一产出点） */
@@ -235,8 +249,18 @@ export class SandboxWitnessValidationError extends Error {
  */
 export function verifySandboxWitness(
   witness: SandboxWitness | undefined | null,
-  expectedWorktreeRoot?: string,
+  expectedWorktreeRootOrOptions?: string | VerifySandboxWitnessOptions,
+  optionsInput?: VerifySandboxWitnessOptions,
 ): SandboxWitness {
+  const options: VerifySandboxWitnessOptions =
+    typeof expectedWorktreeRootOrOptions === "object" &&
+    expectedWorktreeRootOrOptions !== null
+      ? expectedWorktreeRootOrOptions
+      : {
+          expectedWorktreeRoot: expectedWorktreeRootOrOptions,
+          ...optionsInput,
+        };
+  const expectedWorktreeRoot = options.expectedWorktreeRoot;
   if (!witness || typeof witness !== "object") {
     throw new SandboxWitnessValidationError(
       "WITNESS_MISSING",
@@ -319,6 +343,71 @@ export function verifySandboxWitness(
     }
   }
 
+  // TASK-P1.4: 见证 Nonce 与会话级绑定深度校验
+  if (options.requireNonce === true) {
+    if (
+      !witness.nonce ||
+      typeof witness.nonce !== "string" ||
+      witness.nonce.trim() === ""
+    ) {
+      throw new SandboxWitnessValidationError(
+        "WITNESS_NONCE_MISSING",
+        "沙箱见证缺少 Nonce 绑定（nonce 为空或未设置）",
+      );
+    }
+  }
+
+  if (witness.nonce !== undefined) {
+    if (typeof witness.nonce !== "string" || witness.nonce.trim() === "") {
+      throw new SandboxWitnessValidationError(
+        "WITNESS_NONCE_INVALID",
+        "沙箱见证 Nonce 格式非法",
+      );
+    }
+    if (
+      options.expectedNonce !== undefined &&
+      witness.nonce !== options.expectedNonce
+    ) {
+      throw new SandboxWitnessValidationError(
+        "WITNESS_NONCE_MISMATCH",
+        `沙箱见证 Nonce 不匹配: 见证=${witness.nonce}, 预期=${options.expectedNonce}`,
+      );
+    }
+  }
+
+  if (
+    options.expectedContractId !== undefined &&
+    witness.contract_id !== undefined &&
+    witness.contract_id !== options.expectedContractId
+  ) {
+    throw new SandboxWitnessValidationError(
+      "WITNESS_CONTRACT_MISMATCH",
+      `沙箱见证合同绑定不匹配: 见证=${witness.contract_id}, 预期=${options.expectedContractId}`,
+    );
+  }
+
+  if (
+    options.expectedContractRevision !== undefined &&
+    witness.contract_revision !== undefined &&
+    witness.contract_revision !== options.expectedContractRevision
+  ) {
+    throw new SandboxWitnessValidationError(
+      "WITNESS_REVISION_MISMATCH",
+      `沙箱见证合同版本绑定不匹配: 见证=${witness.contract_revision}, 预期=${options.expectedContractRevision}`,
+    );
+  }
+
+  if (
+    options.expectedSessionId !== undefined &&
+    witness.session_id !== undefined &&
+    witness.session_id !== options.expectedSessionId
+  ) {
+    throw new SandboxWitnessValidationError(
+      "WITNESS_SESSION_MISMATCH",
+      `沙箱见证会话绑定不匹配: 见证=${witness.session_id}, 预期=${options.expectedSessionId}`,
+    );
+  }
+
   return witness;
 }
 
@@ -327,10 +416,11 @@ export function verifySandboxWitness(
  */
 export function isSandboxWitnessValid(
   witness: SandboxWitness | undefined | null,
-  expectedWorktreeRoot?: string,
+  expectedWorktreeRootOrOptions?: string | VerifySandboxWitnessOptions,
+  options?: VerifySandboxWitnessOptions,
 ): boolean {
   try {
-    verifySandboxWitness(witness, expectedWorktreeRoot);
+    verifySandboxWitness(witness, expectedWorktreeRootOrOptions, options);
     return true;
   } catch {
     return false;

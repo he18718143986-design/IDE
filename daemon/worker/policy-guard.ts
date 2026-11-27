@@ -85,7 +85,7 @@ export function collectGrantedEnv(params: {
         const value = parsedFile[name];
         if (value === undefined) continue;
         extraEnv[name] = value;
-        if (value.length >= 6) secretValues.push(value);
+        if (value.trim().length > 0) secretValues.push(value);
       }
     } catch {
       // 文件缺失/越界：该命令拿不到这些变量，但不阻断执行
@@ -127,4 +127,32 @@ export function buildCommandEnvironment(
     params.permissions.network_policy,
   );
   return { env, envOptions, secretValues };
+}
+
+/**
+ * TASK-P1.4: 收集合同所有授权文件的全部凭据值（不仅限于单个别名）。
+ * 供网关全局脱敏使用，确保任何已授权凭据即使在未声明别名或其他命令输出中泄露也能被脱敏。
+ */
+export function collectAllContractSecrets(params: {
+  permissions: ExecutionPermissionsView;
+  worktreeRoot: string;
+}): string[] {
+  const secretValues: string[] = [];
+  for (const grant of params.permissions.env_file_grants ?? []) {
+    try {
+      const safe = resolveSafeWorktreePath(params.worktreeRoot, grant.file);
+      const parsedFile = parseEnvFile(
+        fs.readFileSync(safe.absolutePath, "utf-8"),
+      );
+      for (const name of grant.variable_names) {
+        const value = parsedFile[name];
+        if (value !== undefined && value.trim().length > 0) {
+          secretValues.push(value);
+        }
+      }
+    } catch {
+      // 文件缺失/越界：跳过
+    }
+  }
+  return secretValues;
 }
