@@ -395,23 +395,6 @@ export async function classifyTouchedTestPaths(options: {
     unregisteredAssets: unregisteredAssets.sort(),
   };
 }
-      }
-    } else {
-      if (existsOnDisk) {
-        addedTests.push(relPath);
-      }
-    }
-  }
-
-  return {
-    modifiedExistingTests: modifiedExistingTests.sort(),
-    deletedExistingTests: deletedExistingTests.sort(),
-    addedTests: addedTests.sort(),
-    hasExistingTestMutation:
-      modifiedExistingTests.length > 0 || deletedExistingTests.length > 0,
-    weakenedTests: weakenedTests.sort(),
-  };
-}
 
 export interface RecoveryOperationFailure {
   operation: "restore" | "revert" | "hide";
