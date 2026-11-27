@@ -332,6 +332,26 @@ export async function classifyTouchedTestPaths(options: {
   };
 }
 
+export interface RecoveryOperationFailure {
+  operation: "restore" | "revert" | "hide";
+  relPath: string;
+  reason: string;
+  error?: unknown;
+}
+
+/**
+ * TASK-P0.13 (Scope D): 基线测试恢复操作明确错误异常。
+ * 保留单个或部分文件恢复失败的明细诊断上下文，避免静默吞掉异常。
+ */
+export class TestBaselineRecoveryError extends Error {
+  readonly failures: RecoveryOperationFailure[];
+  constructor(message: string, failures: RecoveryOperationFailure[]) {
+    super(message);
+    this.name = "TestBaselineRecoveryError";
+    this.failures = failures;
+  }
+}
+
 export interface RestoredBaselineState {
   revert: () => Promise<void>;
   restoredPaths: string[];
@@ -339,6 +359,8 @@ export interface RestoredBaselineState {
 
 /**
  * 仅将受影响的被修改/被删除既有测试文件还原至 baseRef 版本。
+ * TASK-P0.13 (Scope D): 显式检查每个恢复与重命名操作结果；单个失败不静默吞；
+ * 部分失败保留可诊断记录；任一文件恢复失败均 fail-closed 阻断。
  * 返回 revert 函数用于在重跑结束后恢复候选状态。
  */
 export async function restoreBaselineTestFiles(options: {
@@ -353,34 +375,93 @@ export async function restoreBaselineTestFiles(options: {
     existed: boolean;
     content?: string;
   }> = [];
+  const restoreFailures: RecoveryOperationFailure[] = [];
 
   for (const relPath of pathsToRestore) {
     const fullPath = path.join(worktreePath, relPath);
-    const existed = fs.existsSync(fullPath);
-    originalStates.push({
-      relPath,
-      existed,
-      ...(existed ? { content: fs.readFileSync(fullPath, "utf-8") } : {}),
-    });
+    try {
+      const existed = fs.existsSync(fullPath);
+      originalStates.push({
+        relPath,
+        existed,
+        ...(existed ? { content: fs.readFileSync(fullPath, "utf-8") } : {}),
+      });
 
-    const showRes = await gitRunner(
-      ["show", `${baseRef}:${relPath}`],
-      worktreePath,
-    );
-    if (showRes.exitCode === 0) {
-      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-      fs.writeFileSync(fullPath, showRes.stdout, "utf-8");
+      const showRes = await gitRunner(
+        ["show", `${baseRef}:${relPath}`],
+        worktreePath,
+      );
+      if (showRes.exitCode === 0) {
+        fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+        fs.writeFileSync(fullPath, showRes.stdout, "utf-8");
+      } else {
+        restoreFailures.push({
+          operation: "restore",
+          relPath,
+          reason: `git show ${baseRef}:${relPath} exited with code ${showRes.exitCode}: ${showRes.stderr || "unknown error"}`,
+        });
+      }
+    } catch (err: unknown) {
+      restoreFailures.push({
+        operation: "restore",
+        relPath,
+        reason: err instanceof Error ? err.message : String(err),
+        error: err,
+      });
     }
   }
 
-  const revert = async () => {
+  // TASK-P0.13: 准备阶段任一文件还原失败，尽力回退已写文件并抛出明确异常
+  if (restoreFailures.length > 0) {
     for (const state of originalStates) {
-      const fullPath = path.join(worktreePath, state.relPath);
-      if (state.existed && state.content !== undefined) {
-        fs.writeFileSync(fullPath, state.content, "utf-8");
-      } else if (!state.existed && fs.existsSync(fullPath)) {
-        fs.unlinkSync(fullPath);
+      try {
+        const fullPath = path.join(worktreePath, state.relPath);
+        if (state.existed && state.content !== undefined) {
+          fs.writeFileSync(fullPath, state.content, "utf-8");
+        } else if (!state.existed && fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+        }
+      } catch {
+        // ignore best-effort rollback
       }
+    }
+    const details = restoreFailures
+      .map((f) => `${f.relPath} (${f.reason})`)
+      .join("; ");
+    throw new TestBaselineRecoveryError(
+      `Failed to restore baseline test files: ${details}`,
+      restoreFailures,
+    );
+  }
+
+  const revert = async () => {
+    const revertFailures: RecoveryOperationFailure[] = [];
+    for (const state of originalStates) {
+      try {
+        const fullPath = path.join(worktreePath, state.relPath);
+        if (state.existed && state.content !== undefined) {
+          fs.writeFileSync(fullPath, state.content, "utf-8");
+        } else if (!state.existed && fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+        }
+      } catch (err: unknown) {
+        revertFailures.push({
+          operation: "revert",
+          relPath: state.relPath,
+          reason: err instanceof Error ? err.message : String(err),
+          error: err,
+        });
+      }
+    }
+
+    if (revertFailures.length > 0) {
+      const details = revertFailures
+        .map((f) => `${f.relPath} (${f.reason})`)
+        .join("; ");
+      throw new TestBaselineRecoveryError(
+        `Failed to revert baseline test files: ${details}`,
+        revertFailures,
+      );
     }
   };
 
@@ -398,6 +479,7 @@ export interface HiddenAddedTestsState {
 /**
  * 临时隐藏 Worker 新增的测试文件（重命名为 .stagent-p04-added.bak），
  * 确保通用测试运行器（如 vitest run / pytest）在基线重跑时不执行新增测试。
+ * TASK-P0.13 (Scope D): 显式检查隐藏与还原重命名结果，捕获部分失败与可诊断记录。
  */
 export async function hideWorkerAddedTests(options: {
   worktreePath: string;
@@ -405,21 +487,78 @@ export async function hideWorkerAddedTests(options: {
 }): Promise<HiddenAddedTestsState> {
   const { worktreePath, addedTests } = options;
   const hiddenPairs: Array<{ original: string; hidden: string }> = [];
+  const hideFailures: RecoveryOperationFailure[] = [];
 
   for (const relPath of addedTests) {
     const fullPath = path.join(worktreePath, relPath);
-    if (fs.existsSync(fullPath)) {
-      const hiddenPath = `${fullPath}.stagent-p04-added.bak`;
-      fs.renameSync(fullPath, hiddenPath);
-      hiddenPairs.push({ original: fullPath, hidden: hiddenPath });
+    try {
+      if (fs.existsSync(fullPath)) {
+        const hiddenPath = `${fullPath}.stagent-p04-added.bak`;
+        fs.renameSync(fullPath, hiddenPath);
+        hiddenPairs.push({ original: fullPath, hidden: hiddenPath });
+      }
+    } catch (err: unknown) {
+      hideFailures.push({
+        operation: "hide",
+        relPath,
+        reason: err instanceof Error ? err.message : String(err),
+        error: err,
+      });
     }
   }
 
-  const revert = async () => {
+  if (hideFailures.length > 0) {
+    // 隐藏过程出现部分失败：回滚已重命名文件并抛出明确错误
     for (const pair of hiddenPairs) {
-      if (fs.existsSync(pair.hidden)) {
-        fs.renameSync(pair.hidden, pair.original);
+      try {
+        if (fs.existsSync(pair.hidden)) {
+          fs.renameSync(pair.hidden, pair.original);
+        }
+      } catch {
+        // ignore best-effort rollback
       }
+    }
+    const details = hideFailures
+      .map((f) => `${f.relPath} (${f.reason})`)
+      .join("; ");
+    throw new TestBaselineRecoveryError(
+      `Failed to hide worker added tests: ${details}`,
+      hideFailures,
+    );
+  }
+
+  const revert = async () => {
+    const revertFailures: RecoveryOperationFailure[] = [];
+    for (const pair of hiddenPairs) {
+      const relPath = path.relative(worktreePath, pair.original);
+      try {
+        if (fs.existsSync(pair.hidden)) {
+          fs.renameSync(pair.hidden, pair.original);
+        } else if (!fs.existsSync(pair.original)) {
+          revertFailures.push({
+            operation: "revert",
+            relPath,
+            reason: `Neither backup file (${path.basename(pair.hidden)}) nor original file exists`,
+          });
+        }
+      } catch (err: unknown) {
+        revertFailures.push({
+          operation: "revert",
+          relPath,
+          reason: err instanceof Error ? err.message : String(err),
+          error: err,
+        });
+      }
+    }
+
+    if (revertFailures.length > 0) {
+      const details = revertFailures
+        .map((f) => `${f.relPath} (${f.reason})`)
+        .join("; ");
+      throw new TestBaselineRecoveryError(
+        `Failed to revert hidden worker tests: ${details}`,
+        revertFailures,
+      );
     }
   };
 
@@ -446,7 +585,7 @@ export interface BaselineRerunResult {
  * 3. 运行验证命令；
  * 4. 出现命令执行异常/超时/找不到命令 fail-closed 返回 E_TEST_BASELINE_UNAVAILABLE；
  * 5. 退出码不符合预期 fail-closed 返回 E_TEST_BASELINE_REGRESSION；
- * 6. 最终在 finally 中还原测试文件现场。
+ * 6. 最终显式还原测试文件现场，恢复失败 fail-closed 置为不可用且阻断合并。
  */
 export async function executeBaselineRerun(options: {
   worktreePath: string;
@@ -478,17 +617,51 @@ export async function executeBaselineRerun(options: {
     };
   }
 
-  const restoredState = await restoreBaselineTestFiles({
-    worktreePath,
-    baseRef,
-    pathsToRestore: affectedPaths,
-    gitRunner,
-  });
+  let restoredState: RestoredBaselineState | undefined;
+  try {
+    restoredState = await restoreBaselineTestFiles({
+      worktreePath,
+      baseRef,
+      pathsToRestore: affectedPaths,
+      gitRunner,
+    });
+  } catch (restoreErr: unknown) {
+    const msg =
+      restoreErr instanceof Error ? restoreErr.message : String(restoreErr);
+    return {
+      triggered: true,
+      passed: false,
+      failure_code: "E_TEST_BASELINE_UNAVAILABLE",
+      failure_reason: `Baseline test workspace restore failed: ${msg}`,
+      restored_paths: affectedPaths,
+    };
+  }
 
-  const hiddenState = await hideWorkerAddedTests({
-    worktreePath,
-    addedTests: classification.addedTests,
-  });
+  let hiddenState: HiddenAddedTestsState | undefined;
+  try {
+    hiddenState = await hideWorkerAddedTests({
+      worktreePath,
+      addedTests: classification.addedTests,
+    });
+  } catch (hideErr: unknown) {
+    if (restoredState) {
+      try {
+        await restoredState.revert();
+      } catch {
+        // ignore best-effort rollback
+      }
+    }
+    const msg = hideErr instanceof Error ? hideErr.message : String(hideErr);
+    return {
+      triggered: true,
+      passed: false,
+      failure_code: "E_TEST_BASELINE_UNAVAILABLE",
+      failure_reason: `Baseline test workspace isolation failed: ${msg}`,
+      restored_paths: affectedPaths,
+    };
+  }
+
+  let runResult: BaselineRerunResult;
 
   try {
     let testCommands = verificationCommands.filter((c) => {
@@ -516,78 +689,129 @@ export async function executeBaselineRerun(options: {
       testCommands = [...verificationCommands];
     }
 
-    for (const cmd of testCommands) {
-      const filteredArgs = cmd.args.filter((arg) => {
-        const norm = normalizeTestRelPath(arg);
-        return !classification.addedTests.includes(norm);
-      });
+    // TASK-P0.13 (Scope C 最小修证): 若动了既有测试但无任何可用验证命令，绝不假绿放行，fail-closed 阻断
+    if (testCommands.length === 0) {
+      runResult = {
+        triggered: true,
+        passed: false,
+        failure_code: "E_TEST_BASELINE_UNAVAILABLE",
+        failure_reason:
+          "No verification commands available to execute baseline test rerun",
+        restored_paths: affectedPaths,
+      };
+    } else {
+      let commandPassed = true;
+      let failureCode:
+        | "E_TEST_BASELINE_REGRESSION"
+        | "E_TEST_BASELINE_UNAVAILABLE"
+        | undefined;
+      let failureReason: string | undefined;
 
-      let outcome;
-      try {
-        outcome = await runCommand({
-          executable: cmd.executable,
-          args: filteredArgs,
-          timeoutSeconds: cmd.timeout_seconds ?? 30,
+      for (const cmd of testCommands) {
+        const filteredArgs = cmd.args.filter((arg) => {
+          const norm = normalizeTestRelPath(arg);
+          return !classification.addedTests.includes(norm);
         });
-      } catch (execErr: unknown) {
-        const msg =
-          execErr instanceof Error ? execErr.message : String(execErr);
-        return {
-          triggered: true,
-          passed: false,
-          failure_code: "E_TEST_BASELINE_UNAVAILABLE",
-          failure_reason: `Baseline rerun execution error: ${msg}`,
-          restored_paths: affectedPaths,
-        };
+
+        let outcome;
+        try {
+          outcome = await runCommand({
+            executable: cmd.executable,
+            args: filteredArgs,
+            timeoutSeconds: cmd.timeout_seconds ?? 30,
+          });
+        } catch (execErr: unknown) {
+          const msg =
+            execErr instanceof Error ? execErr.message : String(execErr);
+          commandPassed = false;
+          failureCode = "E_TEST_BASELINE_UNAVAILABLE";
+          failureReason = `Baseline rerun execution error: ${msg}`;
+          break;
+        }
+
+        if (outcome.timedOut) {
+          commandPassed = false;
+          failureCode = "E_TEST_BASELINE_UNAVAILABLE";
+          failureReason = `Baseline test command '${cmd.alias}' timed out after ${cmd.timeout_seconds ?? 30}s`;
+          break;
+        }
+
+        const stderr = (outcome.stderr || "").toLowerCase();
+        if (
+          outcome.exitCode === 127 ||
+          (outcome.exitCode !== 0 &&
+            (stderr.includes("cannot find module") ||
+              stderr.includes("command not found") ||
+              stderr.includes("enoent") ||
+              stderr.includes("not found")))
+        ) {
+          commandPassed = false;
+          failureCode = "E_TEST_BASELINE_UNAVAILABLE";
+          failureReason = `Baseline test environment unavailable: ${outcome.stderr}`;
+          break;
+        }
+
+        const expectedCode = cmd.expected_exit_code ?? 0;
+        if (outcome.exitCode !== expectedCode) {
+          commandPassed = false;
+          failureCode = "E_TEST_BASELINE_REGRESSION";
+          failureReason = `Baseline test '${cmd.alias}' regression: exit code ${outcome.exitCode} (expected ${expectedCode}). stderr: ${outcome.stderr}`;
+          break;
+        }
       }
 
-      if (outcome.timedOut) {
-        return {
+      if (commandPassed) {
+        runResult = {
           triggered: true,
-          passed: false,
-          failure_code: "E_TEST_BASELINE_UNAVAILABLE",
-          failure_reason: `Baseline test command '${cmd.alias}' timed out after ${cmd.timeout_seconds ?? 30}s`,
+          passed: true,
           restored_paths: affectedPaths,
         };
-      }
-
-      const stderr = (outcome.stderr || "").toLowerCase();
-      if (
-        outcome.exitCode === 127 ||
-        (outcome.exitCode !== 0 &&
-          (stderr.includes("cannot find module") ||
-            stderr.includes("command not found") ||
-            stderr.includes("enoent") ||
-            stderr.includes("not found")))
-      ) {
-        return {
+      } else {
+        runResult = {
           triggered: true,
           passed: false,
-          failure_code: "E_TEST_BASELINE_UNAVAILABLE",
-          failure_reason: `Baseline test environment unavailable: ${outcome.stderr}`,
-          restored_paths: affectedPaths,
-        };
-      }
-
-      const expectedCode = cmd.expected_exit_code ?? 0;
-      if (outcome.exitCode !== expectedCode) {
-        return {
-          triggered: true,
-          passed: false,
-          failure_code: "E_TEST_BASELINE_REGRESSION",
-          failure_reason: `Baseline test '${cmd.alias}' regression: exit code ${outcome.exitCode} (expected ${expectedCode}). stderr: ${outcome.stderr}`,
+          failure_code: failureCode ?? "E_TEST_BASELINE_REGRESSION",
+          failure_reason: failureReason ?? "Baseline test command failed",
           restored_paths: affectedPaths,
         };
       }
     }
-
-    return {
-      triggered: true,
-      passed: true,
-      restored_paths: affectedPaths,
-    };
   } finally {
-    await hiddenState.revert();
-    await restoredState.revert();
+    // TASK-P0.13 (Scope D): 显式检查并收集现场恢复错误，单个或部分恢复失败绝不静默吞
+    const cleanupErrors: string[] = [];
+    if (hiddenState) {
+      try {
+        await hiddenState.revert();
+      } catch (err: unknown) {
+        cleanupErrors.push(err instanceof Error ? err.message : String(err));
+      }
+    }
+    if (restoredState) {
+      try {
+        await restoredState.revert();
+      } catch (err: unknown) {
+        cleanupErrors.push(err instanceof Error ? err.message : String(err));
+      }
+    }
+
+    if (cleanupErrors.length > 0) {
+      const cleanupMsg = `Recovery cleanup failed: ${cleanupErrors.join("; ")}`;
+      if (runResult!.passed) {
+        runResult = {
+          triggered: true,
+          passed: false,
+          failure_code: "E_TEST_BASELINE_UNAVAILABLE",
+          failure_reason: cleanupMsg,
+          restored_paths: affectedPaths,
+        };
+      } else {
+        runResult = {
+          ...runResult!,
+          failure_reason: `${runResult!.failure_reason}; additionally ${cleanupMsg}`,
+        };
+      }
+    }
   }
+
+  return runResult;
 }

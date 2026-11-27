@@ -65,6 +65,10 @@
   - 验证失败、操作异常与部分成功均严格 fail-closed。
 - **处置原则**：最小改动加固恢复判定与状态穿透，不进行扩大重构。
 
+### 5. 交付物与详细专项报告链接
+- 完整落地报告详见 [`docs/ledger/p0-13-baseline-acceptance-independence-and-recovery.md`](./p0-13-baseline-acceptance-independence-and-recovery.md)；
+- 包含四大 Scope 的审计证据、设计方案、风险评估与代码/测试修证记录。
+
 ---
 
 ## 三、审批边界与诚实口径

@@ -232,6 +232,14 @@ export function assertEvidenceTestIntegrity(
     );
   }
 
+  // TASK-P0.13: 状态一致性校验：若声明通过但携带失败码，属于自相矛盾伪造，fail-closed 拒绝
+  if (ti.baseline_rerun_passed && ti.failure_code !== undefined) {
+    throw new MergeGateError(
+      "E_CANNOT_MERGE",
+      `Evidence test_integrity is inconsistent: baseline_rerun_passed is true but failure_code is ${ti.failure_code}`,
+    );
+  }
+
   const allowMutation =
     contract.authorization.execution_permissions
       ?.allow_baseline_test_mutation === true;
@@ -248,6 +256,12 @@ export function assertEvidenceTestIntegrity(
   }
 
   if (hasExistingMutation && !allowMutation) {
+    if (!ti.baseline_rerun_triggered) {
+      throw new MergeGateError(
+        "E_TEST_BASELINE_UNAVAILABLE",
+        "Test integrity check failed: Baseline rerun was not triggered for mutated existing tests",
+      );
+    }
     if (!ti.baseline_rerun_passed) {
       const code = ti.failure_code ?? "E_TEST_BASELINE_REGRESSION";
       const reason =
