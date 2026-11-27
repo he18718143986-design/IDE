@@ -460,12 +460,12 @@ if (!content.includes('exports.a = 2')) {
   });
   describe("TASK-P0.14: 负向测试覆盖 (配置篡改阻断与门禁拦截)", () => {
     it("P014-I1: 篡改 vitest.config.ts 且未获豁免时 merger fail-closed 拦截", () => {
-      const contract = createContractDraft({
-        intent: { title: "P0.14 test", description: "test" },
+      const contract = makeContract({
+        title: "P0.14 test",
+        allowBaselineTestMutation: true,
       });
-      // 仅允许基线测试修改，但不允许配置篡改
       contract.authorization.execution_permissions = {
-        allow_baseline_test_mutation: true,
+        ...contract.authorization.execution_permissions,
         allow_test_config_mutation: false,
       };
 
@@ -476,14 +476,14 @@ if (!content.includes('exports.a = 2')) {
         worker_control_mode: "GATEWAY_ENFORCED",
         generated_at: new Date().toISOString(),
         usage: {
-          total_input_tokens: 10,
-          total_output_tokens: 10,
-          duration_ms: 100,
+          currency: "USD",
+          pricing_version: "1.0",
+          accounting_mode: "UNAVAILABLE",
+          limit_reached: false,
         },
-        verdict: {
-          status: "PASSED",
-          reason_code: "ALL_CONDITIONS_MET",
-          note: "ok",
+        worker_report: {
+          summary: "test",
+          tests_modified: true,
         },
         test_integrity: {
           tests_modified: true,
@@ -511,10 +511,11 @@ if (!content.includes('exports.a = 2')) {
     });
 
     it("P014-I2: Evidence 自称配置豁免但合同未授权时抛出 E_CANNOT_MERGE", () => {
-      const contract = createContractDraft({
-        intent: { title: "P0.14 test", description: "test" },
+      const contract = makeContract({
+        title: "P0.14 test unauth",
       });
       contract.authorization.execution_permissions = {
+        ...contract.authorization.execution_permissions,
         allow_test_config_mutation: false,
       };
 
@@ -525,14 +526,14 @@ if (!content.includes('exports.a = 2')) {
         worker_control_mode: "GATEWAY_ENFORCED",
         generated_at: new Date().toISOString(),
         usage: {
-          total_input_tokens: 10,
-          total_output_tokens: 10,
-          duration_ms: 100,
+          currency: "USD",
+          pricing_version: "1.0",
+          accounting_mode: "UNAVAILABLE",
+          limit_reached: false,
         },
-        verdict: {
-          status: "PASSED",
-          reason_code: "ALL_CONDITIONS_MET",
-          note: "ok",
+        worker_report: {
+          summary: "test",
+          tests_modified: true,
         },
         test_integrity: {
           tests_modified: true,

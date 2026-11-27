@@ -487,7 +487,18 @@ describe("TASK-P0.13: 基线验收独立性与恢复加固 (Scope A, Scope C & S
 
     it("P014-W2: assertEvidenceTestIntegrity 拦截未豁免配置篡改抛出 E_TEST_CONFIG_MUTATED", () => {
       const contract = createContractDraft({
-        intent: { title: "test", description: "test" },
+        title: "test",
+        description: "test",
+        writablePaths: ["src/**"],
+        acceptanceCriteria: ["AC-1"],
+        commands: [
+          {
+            alias: "unit",
+            executable: "npx",
+            args: ["vitest"],
+            timeoutSeconds: 30,
+          },
+        ],
       });
       contract.authorization.execution_permissions = {
         allow_baseline_test_mutation: true,
@@ -519,7 +530,18 @@ describe("TASK-P0.13: 基线验收独立性与恢复加固 (Scope A, Scope C & S
 
     it("P014-W3: 合同显式豁免配置篡改时允许通过", () => {
       const contract = createContractDraft({
-        intent: { title: "test", description: "test" },
+        title: "test",
+        description: "test",
+        writablePaths: ["src/**"],
+        acceptanceCriteria: ["AC-1"],
+        commands: [
+          {
+            alias: "unit",
+            executable: "npx",
+            args: ["vitest"],
+            timeoutSeconds: 30,
+          },
+        ],
       });
       contract.authorization.execution_permissions = {
         allow_baseline_test_mutation: true,

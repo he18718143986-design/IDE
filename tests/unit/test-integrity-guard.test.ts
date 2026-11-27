@@ -653,48 +653,48 @@ describe("TASK-P0.4: test-integrity-guard unit tests", () => {
   });
   describe("TASK-P0.14: 测试资产基线识别、配置篡改拦截与还原集", () => {
     it("P014-U1: classifyTouchedTestPaths 识别测试配置文件与夹具/helper 变动", async () => {
-      const { repoDir, baseBranch, cleanup } = setupGitRepo();
+      const { dir, cleanup } = initTempGitRepo();
       try {
-        // 在 baseBranch 上建立配置文件和 fixture 文件
+        // 在 main 上建立配置文件和 fixture 文件
         fs.writeFileSync(
-          path.join(repoDir, "vitest.config.ts"),
+          path.join(dir, "vitest.config.ts"),
           "export default {};",
           "utf-8",
         );
-        fs.mkdirSync(path.join(repoDir, "tests", "fixtures"), {
+        fs.mkdirSync(path.join(dir, "tests", "fixtures"), {
           recursive: true,
         });
         fs.writeFileSync(
-          path.join(repoDir, "tests", "fixtures", "mock.json"),
+          path.join(dir, "tests", "fixtures", "mock.json"),
           '{"foo": 1}',
           "utf-8",
         );
-        fs.mkdirSync(path.join(repoDir, "tests", "helpers"), {
+        fs.mkdirSync(path.join(dir, "tests", "helpers"), {
           recursive: true,
         });
         fs.writeFileSync(
-          path.join(repoDir, "tests", "helpers", "util.ts"),
+          path.join(dir, "tests", "helpers", "util.ts"),
           "export const util = () => 1;",
           "utf-8",
         );
-        git(repoDir, ["add", "."]);
-        git(repoDir, ["commit", "-m", "add test assets in base"]);
+        git(dir, ["add", "."]);
+        git(dir, ["commit", "-m", "add test assets in base"]);
 
         // 在工作区修改配置与 fixture
         fs.writeFileSync(
-          path.join(repoDir, "vitest.config.ts"),
+          path.join(dir, "vitest.config.ts"),
           "export default { test: { passWithNoTests: true } };",
           "utf-8",
         );
         fs.writeFileSync(
-          path.join(repoDir, "tests", "fixtures", "mock.json"),
+          path.join(dir, "tests", "fixtures", "mock.json"),
           '{"foo": 2}',
           "utf-8",
         );
 
         const classification = await classifyTouchedTestPaths({
-          worktreePath: repoDir,
-          baseRef: baseBranch,
+          worktreePath: dir,
+          baseRef: "main",
           gitRunner: testGitRunner,
         });
 
@@ -711,7 +711,7 @@ describe("TASK-P0.4: test-integrity-guard unit tests", () => {
     });
 
     it("P014-U2: executeBaselineRerun 拦截未豁免的测试配置篡改并抛 E_TEST_CONFIG_MUTATED", async () => {
-      const { repoDir, baseBranch, cleanup } = setupGitRepo();
+      const { dir, cleanup } = initTempGitRepo();
       try {
         const classification = {
           modifiedExistingTests: [],
@@ -725,11 +725,16 @@ describe("TASK-P0.4: test-integrity-guard unit tests", () => {
         };
 
         const res = await executeBaselineRerun({
-          worktreePath: repoDir,
-          baseRef: baseBranch,
+          worktreePath: dir,
+          baseRef: "main",
           classification,
           verificationCommands: [
-            { alias: "test", executable: "npx", args: ["vitest"] },
+            {
+              alias: "test",
+              executable: "npx",
+              args: ["vitest"],
+              timeoutSeconds: 30,
+            },
           ],
           gitRunner: testGitRunner,
           runCommand: testCommandRunner,
@@ -746,20 +751,15 @@ describe("TASK-P0.4: test-integrity-guard unit tests", () => {
     });
 
     it("P014-U3: executeBaselineRerun 自动将 modifiedFixturesAndHelpers 纳入还原路径集", async () => {
-      const { repoDir, baseBranch, cleanup } = setupGitRepo();
+      const { dir, cleanup } = initTempGitRepo();
       try {
-        fs.mkdirSync(path.join(repoDir, "tests", "fixtures"), {
+        fs.mkdirSync(path.join(dir, "tests", "fixtures"), {
           recursive: true,
         });
-        const fixturePath = path.join(
-          repoDir,
-          "tests",
-          "fixtures",
-          "mock.json",
-        );
+        const fixturePath = path.join(dir, "tests", "fixtures", "mock.json");
         fs.writeFileSync(fixturePath, "original_content", "utf-8");
-        git(repoDir, ["add", "."]);
-        git(repoDir, ["commit", "-m", "add fixture"]);
+        git(dir, ["add", "."]);
+        git(dir, ["commit", "-m", "add fixture"]);
 
         // 篡改 fixture
         fs.writeFileSync(fixturePath, "tampered_content", "utf-8");
@@ -777,11 +777,16 @@ describe("TASK-P0.4: test-integrity-guard unit tests", () => {
 
         let observedContentDuringRun = "";
         const res = await executeBaselineRerun({
-          worktreePath: repoDir,
-          baseRef: baseBranch,
+          worktreePath: dir,
+          baseRef: "main",
           classification,
           verificationCommands: [
-            { alias: "test", executable: "npx", args: ["vitest"] },
+            {
+              alias: "test",
+              executable: "npx",
+              args: ["vitest"],
+              timeoutSeconds: 30,
+            },
           ],
           gitRunner: testGitRunner,
           runCommand: async () => {

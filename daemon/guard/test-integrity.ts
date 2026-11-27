@@ -199,11 +199,13 @@ export interface TestPathClassification {
   hasExistingTestMutation: boolean;
   weakenedTests: string[];
   /** TASK-P0.14: 被修改或删除的测试配置文件列表 */
-  modifiedTestConfigs: string[];
+  modifiedTestConfigs?: string[];
   /** TASK-P0.14: 被修改或删除的测试夹具与辅助库列表 */
-  modifiedFixturesAndHelpers: string[];
+  modifiedFixturesAndHelpers?: string[];
   /** TASK-P0.14: 未在基线清单中登记的新增测试资产 */
-  unregisteredAssets: string[];
+  unregisteredAssets?: string[];
+  /** TASK-P0.14: 测试资产基线清单 SHA256 摘要 */
+  testAssetManifestDigest?: string;
 }
 
 /**

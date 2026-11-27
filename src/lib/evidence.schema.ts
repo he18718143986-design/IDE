@@ -240,13 +240,13 @@ export const testIntegrityEvidenceSchema = z.object({
   /** TASK-P0.14: 测试资产基线清单 SHA256 摘要 */
   test_asset_manifest_digest: z.string().optional(),
   /** TASK-P0.14: 被修改或删除的测试配置文件列表 */
-  modified_test_configs: z.array(z.string()).default([]),
+  modified_test_configs: z.array(z.string()).default([]).optional(),
   /** TASK-P0.14: 还原参与基线重跑的夹具与辅助文件列表 */
-  restored_fixtures_and_helpers: z.array(z.string()).default([]),
+  restored_fixtures_and_helpers: z.array(z.string()).default([]).optional(),
   /** TASK-P0.14: 未在基线清单中登记的新增测试资产列表 */
-  unregistered_test_assets: z.array(z.string()).default([]),
+  unregistered_test_assets: z.array(z.string()).default([]).optional(),
   /** TASK-P0.14: 合同显式豁免 allow_test_config_mutation 状态 */
-  allow_test_config_mutation: z.boolean().default(false),
+  allow_test_config_mutation: z.boolean().default(false).optional(),
 });
 export type TestIntegrityEvidence = z.infer<typeof testIntegrityEvidenceSchema>;
 

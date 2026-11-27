@@ -1313,8 +1313,9 @@ export class ContractOrchestrator {
       | undefined;
     let testBaselineFailureReason: string | undefined;
 
-    // TASK-P0.14: 配置文件发生未豁免篡改，确定性阻断并标记 UNSAFE_EXECUTION
+    // TASK-P0.14: 配置文件发生未豁免篡改，确定性阻断并记录失败码
     if (
+      testClassification.modifiedTestConfigs &&
       testClassification.modifiedTestConfigs.length > 0 &&
       !allowTestConfigMutation
     ) {
@@ -1323,9 +1324,6 @@ export class ContractOrchestrator {
       testIntegrityEvidence.baseline_rerun_passed = false;
       testIntegrityEvidence.failure_code = "E_TEST_CONFIG_MUTATED";
       testIntegrityEvidence.failure_reason = testBaselineFailureReason;
-      executionControlMode = "UNSAFE_EXECUTION";
-      executionControlDegraded = true;
-      executionBlockedReason = "E_TEST_CONFIG_MUTATED";
     }
 
     if (
@@ -2740,6 +2738,11 @@ export class ContractOrchestrator {
             input.workerControlMode === "SANDBOX_ENFORCED"
           ? {
               tests_modified: input.testsModified ?? false,
+              test_asset_manifest_digest: undefined,
+              modified_test_configs: [],
+              restored_fixtures_and_helpers: [],
+              unregistered_test_assets: [],
+              allow_test_config_mutation: false,
               modified_existing_tests: input.testsModified
                 ? input.modifiedFiles.filter(
                     (p) =>

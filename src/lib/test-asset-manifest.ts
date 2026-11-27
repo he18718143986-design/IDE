@@ -235,7 +235,7 @@ export function auditTestAssetsAgainstManifest(options: {
     }
 
     const currentContent = currentFiles[relPath];
-    if (currentContent === null) {
+    if (currentContent === null || currentContent === undefined) {
       // 资产被删除
       if (baseAsset.assetKind === "test_suite") {
         deletedSuites.push(relPath);
