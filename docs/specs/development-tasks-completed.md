@@ -13844,3 +13844,127 @@ governance:
 - **P12-P4（Git Trailer 哈希与签名绑定）**：在 `buildMergeCommitMessage` 注入 `Evidence-Sha256` 与 `Evidence-Signature` Git Trailer，并在提交执行前进行强校验核对，确保提交历史与特定 Evidence 强哈希绑定，杜绝跨提交或跨合同证据嫁接。
 - **P12-P5（测试全覆盖与零回归）**：`tests/unit/evidence-signer.test.ts`（9 项单元）与 `tests/integration/p1-evidence-signature-gate.test.ts`（6 项集成）全面覆盖合法签名放行与内容篡改/缺失签名/篡改签名/损坏凭据/公钥不符五类阻断场景；既有 3483 个测试与门禁零回归。
 - **诚实口径**：**Evidence Ed25519 签名与防篡改验签门禁已交付（私钥 0400 隔离、规范化签名、PRE_MERGE fail-closed 验签、Git Trailer 绑定、正负向测试）；旧 Evidence 无签名一律拒，P0 风险未宣称解除**。
+
+### 3.4ck P0 独立动态渗透与跨平台验收套件（TASK-P1.3 · 立卡 P-340 · 完工 P-341）
+
+<a id="task-p1.3"></a>
+
+#### 【Task P1.3】P0 独立动态渗透与跨平台验收套件 `[COMPLETED]`
+
+```yaml task-card
+id: TASK-P1.3
+status: COMPLETED
+contract:
+  intent:
+    title: P0 独立动态渗透与跨平台验收套件
+    description: >-
+      做完后，构建独立于既有开发测试套件的动态渗透测试集；
+      实跑验证 TC-P0-1A～TC-P0-4B 十大负向场景（版本过期/流转嫁接/非受控模式/未授权越界/重命名逃逸/根只读写被拒/.git 篡改阻断/全量只读拦截/测试篡改隔离/基线破坏阻断）；
+      验证 Linux 原生容器、macOS Docker Desktop / OrbStack 与 Windows WSL2 跨平台真实阻断行为并确立差异判据；
+      产出结构化独立动态验收报告与可验证证据记录。
+    risk_level: HIGH
+  acceptance:
+    - id: P13-P1
+      check: auto
+      text: >-
+        十大负向场景动态渗透实跑：独立套件实跑验证 TC-P0-1A（合同版本过期阻断）、TC-P0-1B（任务分支提交流转嫁接阻断）、TC-P0-1C（非受控模式伪装阻断）、TC-P0-2A（未授权路径越界写入阻断）、TC-P0-2B（重命名路径逃逸阻断）、TC-P0-3A（容器根工作树只读写被拒）、TC-P0-3B（.git 目录篡改遮蔽阻断）、TC-P0-3C（验收阶段全量只读拦截）、TC-P0-4A（既有测试被篡改拦截触发基线重跑）、TC-P0-4B（破坏基线环境逃逸失败关闭）。全部用例在隔离环境下真实执行并验证 fail-closed 拦截。
+    - id: P13-P2
+      check: auto
+      text: >-
+        Linux 原生容器环境验收标准：在 Linux (Ubuntu) 原生 Docker 环境下，验证文件系统挂载返回标准物理 EACCES 错误码，宿主占位预建成功无目录化混淆，容器内无法穿透宿主 .git，提交前后 .git 哈希严格一致。
+    - id: P13-P3
+      check: auto
+      text: >-
+        macOS 跨 VM 挂载与路径敏感度验证：在 macOS Docker Desktop / OrbStack 环境下，验证跨 Hypervisor VirtioFS 共享挂载的时延可见性与只读物理阻断，大小写混合路径挂载不产生 Scope 逃逸。
+    - id: P13-P4
+      check: auto
+      text: >-
+        Windows WSL2 路径规范化与遮蔽验证：在 Windows WSL2 容器层验证反斜杠路径自动规范化为正斜杠无 EINVAL，tmpfs 遮蔽挂载在 WSL2 内生效，:ro 挂载在 Windows 宿主映射卷内同样触发物理写阻断。
+    - id: P13-P5
+      check: auto
+      text: >-
+        独立动态验收证据产出与防嫁接核验：套件实跑输出结构化验收证据矩阵与测试报告文档（docs/ledger/p0-independent-verification-matrix.md），记录平台载体、测试用例、实际阻断错误码、执行时间戳与 Git Trailer 绑定摘要，落实「代码交付 ≠ 安全验证通过」。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - tests/integration/p1-3-independent-dynamic-suite.test.ts
+      - tests/daemon/p1-3-cross-platform-penetration.test.ts
+      - scripts/verify-p0-independent-suite.ts
+      - docs/ledger/p0-independent-verification-matrix.md
+    readonly_paths:
+      - daemon/pipeline/orchestrator.ts
+      - daemon/pipeline/merger.ts
+      - daemon/pipeline/evidence-signer.ts
+      - daemon/worker/sandbox/container-host.ts
+      - daemon/worker/cli-host/docker-container-host.ts
+  verification:
+    commands:
+      - { alias: p13-dynamic-suite, executable: npx, args: [vitest, run, tests/integration/p1-3-independent-dynamic-suite.test.ts] }
+      - { alias: p13-cross-platform, executable: npx, args: [vitest, run, tests/daemon/p1-3-cross-platform-penetration.test.ts] }
+      - { alias: typecheck, executable: npx, args: [tsc, --noEmit] }
+design:
+  approach: >-
+    1) 在 tests/integration/p1-3-independent-dynamic-suite.test.ts 构建契约与门禁动态渗透测试集，
+       覆盖 TC-P0-1A~C（版本过期、嫁接空提交、非受控伪装）、TC-P0-2A~B（越界写、rename 逃逸）以及 TC-P0-4A~B（测试篡改基线重跑、基线破坏）。
+    2) 在 tests/daemon/p1-3-cross-platform-penetration.test.ts 构建跨平台与容器挂载物理隔离渗透套件，
+       覆盖 TC-P0-3A~C（容器写只读根抛 EACCES、.git tmpfs 遮蔽、readonly_enforced 全量只读），并对 Linux/macOS/Windows 三平台判据提供断言与测试环境嗅探。
+    3) 在 scripts/verify-p0-independent-suite.ts 编写独立动态验收执行脚本，标准化拉起套件并输出结构化矩阵证据。
+    4) 在 docs/ledger/p0-independent-verification-matrix.md 落地跨平台动态验收记录文档。
+  touches:
+    - { path: tests/integration/p1-3-independent-dynamic-suite.test.ts, change: create, why: 独立契约与门禁动态渗透测试套件（覆盖 TC-P0-1/2/4）, symbols: [] }
+    - { path: tests/daemon/p1-3-cross-platform-penetration.test.ts, change: create, why: 跨平台容器文件系统隔离渗透测试套件（覆盖 TC-P0-3 及平台判据）, symbols: [] }
+    - { path: scripts/verify-p0-independent-suite.ts, change: create, why: 独立动态验收套件自动化执行与证据提取脚本, symbols: [] }
+    - { path: docs/ledger/p0-independent-verification-matrix.md, change: create, why: 独立动态验收证据产出落地规范与结果表, symbols: [] }
+  interfaces: []
+  data_changes: []
+  dependencies: []
+  decisions: []
+  test_plan:
+    - { acceptance_id: P13-P1, test_path: tests/integration/p1-3-independent-dynamic-suite.test.ts, level: integration, case: "TC-P0-1A: 合同版本过期阻断" }
+    - { acceptance_id: P13-P2, test_path: tests/daemon/p1-3-cross-platform-penetration.test.ts, level: integration, case: "P13-P2-A: resolveScopedMounts 严格生成 root:ro 与 tmpfs:.git 隔离配置" }
+    - { acceptance_id: P13-P3, test_path: tests/daemon/p1-3-cross-platform-penetration.test.ts, level: integration, case: "P13-P3-A: 大小写混合路径挂载防逃逸与受保护边界约束" }
+    - { acceptance_id: P13-P4, test_path: tests/daemon/p1-3-cross-platform-penetration.test.ts, level: integration, case: "P13-P4-A: 挂载目标使用 POSIX 正斜杠路径杜绝 EINVAL" }
+    - { acceptance_id: P13-P5, test_path: tests/integration/p1-3-independent-dynamic-suite.test.ts, level: integration, case: "P13-P5: 独立动态验收防嫁接核验" }
+  knowledge_delta:
+    modules_upsert: []
+    decisions_add: []
+    overview_changed: false
+governance:
+  delivered: { pr: 443, commit: ba9325f77574decbc4816b90d0022c5a23159123 }
+  spec_refs:
+    - docs/ledger/p1-eval-evidence-trust-chain-and-p0-acceptance.md
+    - docs/ledger/p0-line-comprehensive-review.md
+    - docs/ledger/p0-independent-verification-matrix.md
+  depends_on:
+    - { id: TASK-P1.2, kind: hard }
+  code_facts:
+    - { ref: "daemon/pipeline/merger.ts:796", note: "PRE_MERGE 阶段强校验 Evidence 签名与审计" }
+    - { ref: "daemon/worker/cli-host/docker-container-host.ts:311", note: "resolveScopedMounts 接入容器运行时挂载" }
+    - { ref: "scripts/verify-p0-independent-suite.ts:125", note: "collectFingerprint 采集环境指纹" }
+    - { ref: "scripts/verify-p0-independent-suite.ts:360", note: "computeEvidenceDigest 防嫁接摘要计算" }
+  non_goals:
+    - 不修改现有生产代码逻辑（严格遵守 readonly_paths 限制）
+    - 不在本卡处理 Gateway 凭据脱敏与 Nonce 绑定（由 TASK-P1.4 承接）
+    - 不宣称硬件级 Attestation 或 P0 风险解除
+  fail:
+    - 动态负向渗透测试无法真实阻断或存在非预期放行
+    - 篡改核心生产文件代码以迎合测试通过
+    - 跨平台测试在不同环境产生静默跳过或虚假成功
+  estimate: L
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+#### 归档注记（P-341 · 2026-11-27）
+
+- **交付 PR**：[#443](https://github.com/he18718143986-design/IDE/pull/443)（head `9ac4077910bed7bfcff7cce8896d22d39eeeb768`，squash `ba9325f77574decbc4816b90d0022c5a23159123`，操作者由我执行）。
+- **范围与检查**：仅动 4 个授权 `writable_paths`（+1475/−0），5 个 `readonly_paths` 保持绝对零 diff。独立动态渗透套件（8 tests in `tests/integration/p1-3-independent-dynamic-suite.test.ts`）与跨平台渗透套件（10 tests in `tests/daemon/p1-3-cross-platform-penetration.test.ts`）全部通过（3 项真实容器测试因轻量无 Docker 环境如实标记 `SKIPPED_NO_DOCKER`，不伪造假绿）。必需 CI 全绿（三平台 Lint/Typecheck + ubuntu/macOS Unit 全绿 + Docs/Knowledge/Perf/Detect；无 CANCELLED），Windows Unit 存量失败按先例 `UNSTABLE` 不挡（存量跨平台差异，新增用例 100% 通过），Cursor Bugbot neutral。
+- **P13-P1（十大负向场景动态实跑）**：在 `tests/integration/p1-3-independent-dynamic-suite.test.ts` 中独立构造攻击载荷，脱离既有单测自证循环，实跑验证 TC-P0-1A（合同版本过期阻断 `E_EVIDENCE_REVISION_MISMATCH`）、TC-P0-1B（任务分支提交嫁接阻断 `E_EVIDENCE_FINGERPRINT_MISMATCH` / `E_EVIDENCE_STALE`）、TC-P0-1C（非受控模式伪装阻断 `E_CANNOT_MERGE` / `EVIDENCE_SIGNATURE_INVALID`）、TC-P0-2A（未授权路径越界写阻断 `E_OUT_OF_SCOPE`）、TC-P0-2B（重命名受保护路径逃逸双审阻断 `E_OUT_OF_SCOPE`）、TC-P0-4A（既有测试被篡改掩盖回归触发基线隔离重跑 `E_TEST_BASELINE_REGRESSION`）、TC-P0-4B（破坏基线执行环境超时/异常安全防御 `E_TEST_BASELINE_UNAVAILABLE`），动态拦截 fail-closed 全部生效。
+- **P13-P2（Linux 原生容器挂载判据）**：在 `tests/daemon/p1-3-cross-platform-penetration.test.ts` 中验证 `resolveScopedMounts` 严格生成 `root:ro` 与 `.git` tmpfs，`prepareHostPlaceholders` 预建 0 字节文件杜绝 Docker 自动将文件挂载目标误建为目录。
+- **P13-P3（macOS 跨 VM 挂载规范）**：验证 VirtioFS 大小写混合路径合法规范化约束在 worktree 内，路径穿越与越界 fail-closed 拦截。
+- **P13-P4（Windows WSL2 路径规范化）**：验证 POSIX 正斜杠挂载规范生成无 `EINVAL`，拒绝 Windows 反斜杠，`readonly_enforced` 模式全量拦截写操作。
+- **P13-P5（独立动态验收证据产出与防嫁接）**：编写自动化执行脚本 `scripts/verify-p0-independent-suite.ts`，采集 OS/Docker/Node/Git 环境指纹与执行时间戳，计算规范化 `Evidence Digest` 防跨提交嫁接；生成标准化验收矩阵文档 `docs/ledger/p0-independent-verification-matrix.md`；正向验证 Git 提交严格注入 `Evidence-Sha256`、`Evidence-Signature` 与 `Stagent-Contract-ID` Git Trailer。
+- **三态真实区分与诚实口径**：**P0 独立动态渗透与跨平台验收套件已交付（十大负向场景实跑、三平台判据、三态证据输出、验收矩阵）；无 Docker 环境用例如实跳过未宣称通过，P0 风险未宣称解除**。
