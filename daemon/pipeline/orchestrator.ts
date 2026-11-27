@@ -1280,12 +1280,16 @@ export class ContractOrchestrator {
     const allowTestMutation =
       current.authorization.execution_permissions
         ?.allow_baseline_test_mutation === true;
+    const allowTestConfigMutation =
+      current.authorization.execution_permissions
+        ?.allow_test_config_mutation === true;
 
     const testIntegrityEvidence: TestIntegrityEvidence = {
       tests_modified:
         testsModified ||
         testClassification.hasExistingTestMutation ||
-        testClassification.addedTests.length > 0,
+        testClassification.addedTests.length > 0 ||
+        testClassification.modifiedTestConfigs.length > 0,
       modified_existing_tests: testClassification.modifiedExistingTests,
       deleted_existing_tests: testClassification.deletedExistingTests,
       added_tests: testClassification.addedTests,
@@ -1294,13 +1298,41 @@ export class ContractOrchestrator {
       baseline_rerun_passed: true,
       restored_paths: [],
       weakened_tests: testClassification.weakenedTests,
+      test_asset_manifest_digest: testClassification.testAssetManifestDigest,
+      modified_test_configs: testClassification.modifiedTestConfigs,
+      restored_fixtures_and_helpers:
+        testClassification.modifiedFixturesAndHelpers,
+      unregistered_test_assets: testClassification.unregisteredAssets,
+      allow_test_config_mutation: allowTestConfigMutation,
     };
 
     let testBaselineFailureCode:
-      "E_TEST_BASELINE_REGRESSION" | "E_TEST_BASELINE_UNAVAILABLE" | undefined;
+      | "E_TEST_BASELINE_REGRESSION"
+      | "E_TEST_BASELINE_UNAVAILABLE"
+      | "E_TEST_CONFIG_MUTATED"
+      | undefined;
     let testBaselineFailureReason: string | undefined;
 
-    if (testClassification.hasExistingTestMutation && !allowTestMutation) {
+    // TASK-P0.14: 配置文件发生未豁免篡改，确定性阻断并标记 UNSAFE_EXECUTION
+    if (
+      testClassification.modifiedTestConfigs.length > 0 &&
+      !allowTestConfigMutation
+    ) {
+      testBaselineFailureCode = "E_TEST_CONFIG_MUTATED";
+      testBaselineFailureReason = `Test configuration mutated without exemption: ${testClassification.modifiedTestConfigs.join(", ")}`;
+      testIntegrityEvidence.baseline_rerun_passed = false;
+      testIntegrityEvidence.failure_code = "E_TEST_CONFIG_MUTATED";
+      testIntegrityEvidence.failure_reason = testBaselineFailureReason;
+      executionControlMode = "UNSAFE_EXECUTION";
+      executionControlDegraded = true;
+      executionBlockedReason = "E_TEST_CONFIG_MUTATED";
+    }
+
+    if (
+      !testBaselineFailureCode &&
+      testClassification.hasExistingTestMutation &&
+      !allowTestMutation
+    ) {
       try {
         const rerunRes = await executeBaselineRerun({
           worktreePath,
@@ -1308,6 +1340,7 @@ export class ContractOrchestrator {
           classification: testClassification,
           verificationCommands: current.verification_spec.commands,
           gitRunner,
+          allowTestConfigMutation,
           runCommand: async (cmd) => {
             try {
               const res = await runCommand(cmd.executable, {

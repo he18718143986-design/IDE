@@ -452,4 +452,95 @@ describe("TASK-P0.13: 基线验收独立性与恢复加固 (Scope A, Scope C & S
       assertEvidenceControlAndRevision(oldEvidence, bumped.contract_revision),
     ).toThrow(/E_EVIDENCE_REVISION_MISMATCH/);
   });
+  describe("TASK-P0.14: 契约与 Evidence 扩展及 merger 门禁校验", () => {
+    it("P014-W1: evidenceBundleSchema 校验 test_integrity 新字段", () => {
+      const evidence = createValidBaseEvidence({
+        test_integrity: {
+          tests_modified: true,
+          modified_existing_tests: [],
+          deleted_existing_tests: [],
+          added_tests: [],
+          exemption: false,
+          baseline_rerun_triggered: true,
+          baseline_rerun_passed: true,
+          restored_paths: ["tests/fixtures/data.json"],
+          weakened_tests: [],
+          test_asset_manifest_digest: "a".repeat(64),
+          modified_test_configs: ["vitest.config.ts"],
+          restored_fixtures_and_helpers: ["tests/fixtures/data.json"],
+          unregistered_test_assets: ["tsconfig.temp.json"],
+          allow_test_config_mutation: false,
+        },
+      });
+
+      const parsed = evidenceBundleSchema.parse(evidence);
+      expect(parsed.test_integrity?.test_asset_manifest_digest).toBe("a".repeat(64));
+      expect(parsed.test_integrity?.modified_test_configs).toContain("vitest.config.ts");
+      expect(parsed.test_integrity?.restored_fixtures_and_helpers).toContain(
+        "tests/fixtures/data.json",
+      );
+    });
+
+    it("P014-W2: assertEvidenceTestIntegrity 拦截未豁免配置篡改抛出 E_TEST_CONFIG_MUTATED", () => {
+      const contract = createContractDraft({
+        intent: { title: "test", description: "test" },
+      });
+      contract.authorization.execution_permissions = {
+        allow_baseline_test_mutation: true,
+        allow_test_config_mutation: false, // 未豁免配置篡改
+      };
+
+      const evidence = createValidBaseEvidence({
+        test_integrity: {
+          tests_modified: true,
+          modified_existing_tests: [],
+          deleted_existing_tests: [],
+          added_tests: [],
+          exemption: true,
+          baseline_rerun_triggered: false,
+          baseline_rerun_passed: true,
+          restored_paths: [],
+          weakened_tests: [],
+          modified_test_configs: ["vitest.config.ts"],
+          restored_fixtures_and_helpers: [],
+          unregistered_test_assets: [],
+          allow_test_config_mutation: false,
+        },
+      });
+
+      expect(() => assertEvidenceTestIntegrity(evidence, contract)).toThrow(
+        /E_TEST_CONFIG_MUTATED/,
+      );
+    });
+
+    it("P014-W3: 合同显式豁免配置篡改时允许通过", () => {
+      const contract = createContractDraft({
+        intent: { title: "test", description: "test" },
+      });
+      contract.authorization.execution_permissions = {
+        allow_baseline_test_mutation: true,
+        allow_test_config_mutation: true, // 显式豁免
+      };
+
+      const evidence = createValidBaseEvidence({
+        test_integrity: {
+          tests_modified: true,
+          modified_existing_tests: [],
+          deleted_existing_tests: [],
+          added_tests: [],
+          exemption: true,
+          baseline_rerun_triggered: false,
+          baseline_rerun_passed: true,
+          restored_paths: [],
+          weakened_tests: [],
+          modified_test_configs: ["vitest.config.ts"],
+          restored_fixtures_and_helpers: [],
+          unregistered_test_assets: [],
+          allow_test_config_mutation: true,
+        },
+      });
+
+      expect(() => assertEvidenceTestIntegrity(evidence, contract)).not.toThrow();
+    });
+  });
 });

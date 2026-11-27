@@ -458,4 +458,85 @@ if (!content.includes('exports.a = 2')) {
       expect(e.message).toContain("No verification commands available");
     }
   });
+  describe("TASK-P0.14: 负向测试覆盖 (配置篡改阻断与门禁拦截)", () => {
+    it("P014-I1: 篡改 vitest.config.ts 且未获豁免时 merger fail-closed 拦截", () => {
+      const contract = createContractDraft({
+        intent: { title: "P0.14 test", description: "test" },
+      });
+      // 仅允许基线测试修改，但不允许配置篡改
+      contract.authorization.execution_permissions = {
+        allow_baseline_test_mutation: true,
+        allow_test_config_mutation: false,
+      };
+
+      const evidence: EvidenceBundle = {
+        evidence_id: "evi_p014_config",
+        contract_id: contract.contract_id,
+        contract_revision: contract.contract_revision,
+        worker_control_mode: "GATEWAY_ENFORCED",
+        generated_at: new Date().toISOString(),
+        usage: { total_input_tokens: 10, total_output_tokens: 10, duration_ms: 100 },
+        verdict: { status: "PASSED", reason_code: "ALL_CONDITIONS_MET", note: "ok" },
+        test_integrity: {
+          tests_modified: true,
+          modified_existing_tests: [],
+          deleted_existing_tests: [],
+          added_tests: [],
+          exemption: true,
+          baseline_rerun_triggered: false,
+          baseline_rerun_passed: false,
+          failure_code: "E_TEST_CONFIG_MUTATED",
+          failure_reason: "Test configuration mutated without exemption: vitest.config.ts",
+          restored_paths: [],
+          weakened_tests: [],
+          modified_test_configs: ["vitest.config.ts"],
+          restored_fixtures_and_helpers: [],
+          unregistered_test_assets: [],
+          allow_test_config_mutation: false,
+        },
+      };
+
+      expect(() => assertEvidenceTestIntegrity(evidence, contract)).toThrow(
+        /E_TEST_CONFIG_MUTATED/,
+      );
+    });
+
+    it("P014-I2: Evidence 自称配置豁免但合同未授权时抛出 E_CANNOT_MERGE", () => {
+      const contract = createContractDraft({
+        intent: { title: "P0.14 test", description: "test" },
+      });
+      contract.authorization.execution_permissions = {
+        allow_test_config_mutation: false,
+      };
+
+      const evidence: EvidenceBundle = {
+        evidence_id: "evi_p014_unauth",
+        contract_id: contract.contract_id,
+        contract_revision: contract.contract_revision,
+        worker_control_mode: "GATEWAY_ENFORCED",
+        generated_at: new Date().toISOString(),
+        usage: { total_input_tokens: 10, total_output_tokens: 10, duration_ms: 100 },
+        verdict: { status: "PASSED", reason_code: "ALL_CONDITIONS_MET", note: "ok" },
+        test_integrity: {
+          tests_modified: true,
+          modified_existing_tests: [],
+          deleted_existing_tests: [],
+          added_tests: [],
+          exemption: false,
+          baseline_rerun_triggered: true,
+          baseline_rerun_passed: true,
+          restored_paths: [],
+          weakened_tests: [],
+          modified_test_configs: ["vitest.config.ts"],
+          restored_fixtures_and_helpers: [],
+          unregistered_test_assets: [],
+          allow_test_config_mutation: true, // 伪造声明
+        },
+      };
+
+      expect(() => assertEvidenceTestIntegrity(evidence, contract)).toThrow(
+        /E_CANNOT_MERGE/,
+      );
+    });
+  });
 });

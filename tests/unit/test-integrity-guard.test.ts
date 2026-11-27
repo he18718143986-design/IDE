@@ -651,4 +651,142 @@ describe("TASK-P0.4: test-integrity-guard unit tests", () => {
       cleanup();
     }
   });
+  describe("TASK-P0.14: 测试资产基线识别、配置篡改拦截与还原集", () => {
+    it("P014-U1: classifyTouchedTestPaths 识别测试配置文件与夹具/helper 变动", async () => {
+      const { repoDir, baseBranch, cleanup } = setupGitRepo();
+      try {
+        // 在 baseBranch 上建立配置文件和 fixture 文件
+        fs.writeFileSync(
+          path.join(repoDir, "vitest.config.ts"),
+          "export default {};",
+          "utf-8",
+        );
+        fs.mkdirSync(path.join(repoDir, "tests", "fixtures"), { recursive: true });
+        fs.writeFileSync(
+          path.join(repoDir, "tests", "fixtures", "mock.json"),
+          '{"foo": 1}',
+          "utf-8",
+        );
+        fs.mkdirSync(path.join(repoDir, "tests", "helpers"), { recursive: true });
+        fs.writeFileSync(
+          path.join(repoDir, "tests", "helpers", "util.ts"),
+          "export const util = () => 1;",
+          "utf-8",
+        );
+        git(repoDir, ["add", "."]);
+        git(repoDir, ["commit", "-m", "add test assets in base"]);
+
+        // 在工作区修改配置与 fixture
+        fs.writeFileSync(
+          path.join(repoDir, "vitest.config.ts"),
+          "export default { test: { passWithNoTests: true } };",
+          "utf-8",
+        );
+        fs.writeFileSync(
+          path.join(repoDir, "tests", "fixtures", "mock.json"),
+          '{"foo": 2}',
+          "utf-8",
+        );
+
+        const classification = await classifyTouchedTestPaths({
+          worktreePath: repoDir,
+          baseRef: baseBranch,
+          gitRunner: testGitRunner,
+        });
+
+        expect(classification.modifiedTestConfigs).toContain("vitest.config.ts");
+        expect(classification.modifiedFixturesAndHelpers).toContain(
+          "tests/fixtures/mock.json",
+        );
+        expect(classification.hasExistingTestMutation).toBe(true);
+      } finally {
+        cleanup();
+      }
+    });
+
+    it("P014-U2: executeBaselineRerun 拦截未豁免的测试配置篡改并抛 E_TEST_CONFIG_MUTATED", async () => {
+      const { repoDir, baseBranch, cleanup } = setupGitRepo();
+      try {
+        const classification = {
+          modifiedExistingTests: [],
+          deletedExistingTests: [],
+          addedTests: [],
+          hasExistingTestMutation: true,
+          weakenedTests: [],
+          modifiedTestConfigs: ["vitest.config.ts"],
+          modifiedFixturesAndHelpers: [],
+          unregisteredAssets: [],
+        };
+
+        const res = await executeBaselineRerun({
+          worktreePath: repoDir,
+          baseRef: baseBranch,
+          classification,
+          verificationCommands: [
+            { alias: "test", executable: "npx", args: ["vitest"] },
+          ],
+          gitRunner: testGitRunner,
+          runCommand: testCommandRunner,
+          allowTestConfigMutation: false,
+        });
+
+        expect(res.triggered).toBe(false);
+        expect(res.passed).toBe(false);
+        expect(res.failure_code).toBe("E_TEST_CONFIG_MUTATED");
+        expect(res.failure_reason).toContain("vitest.config.ts");
+      } finally {
+        cleanup();
+      }
+    });
+
+    it("P014-U3: executeBaselineRerun 自动将 modifiedFixturesAndHelpers 纳入还原路径集", async () => {
+      const { repoDir, baseBranch, cleanup } = setupGitRepo();
+      try {
+        fs.mkdirSync(path.join(repoDir, "tests", "fixtures"), { recursive: true });
+        const fixturePath = path.join(repoDir, "tests", "fixtures", "mock.json");
+        fs.writeFileSync(fixturePath, "original_content", "utf-8");
+        git(repoDir, ["add", "."]);
+        git(repoDir, ["commit", "-m", "add fixture"]);
+
+        // 篡改 fixture
+        fs.writeFileSync(fixturePath, "tampered_content", "utf-8");
+
+        const classification = {
+          modifiedExistingTests: [],
+          deletedExistingTests: [],
+          addedTests: [],
+          hasExistingTestMutation: true,
+          weakenedTests: [],
+          modifiedTestConfigs: [],
+          modifiedFixturesAndHelpers: ["tests/fixtures/mock.json"],
+          unregisteredAssets: [],
+        };
+
+        let observedContentDuringRun = "";
+        const res = await executeBaselineRerun({
+          worktreePath: repoDir,
+          baseRef: baseBranch,
+          classification,
+          verificationCommands: [
+            { alias: "test", executable: "npx", args: ["vitest"] },
+          ],
+          gitRunner: testGitRunner,
+          runCommand: async () => {
+            observedContentDuringRun = fs.readFileSync(fixturePath, "utf-8");
+            return { exitCode: 0, stdout: "ok", stderr: "", timedOut: false };
+          },
+        });
+
+        expect(res.triggered).toBe(true);
+        expect(res.passed).toBe(true);
+        expect(res.restored_paths).toContain("tests/fixtures/mock.json");
+        // 关键断言：重跑执行时，文件已还原为 base 版本
+        expect(observedContentDuringRun).toBe("original_content");
+        // 重跑完成后，恢复为工作区当前篡改内容
+        expect(fs.readFileSync(fixturePath, "utf-8")).toBe("tampered_content");
+      } finally {
+        cleanup();
+      }
+    });
+  });
 });
