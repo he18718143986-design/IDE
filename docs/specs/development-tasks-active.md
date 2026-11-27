@@ -2013,3 +2013,140 @@ governance:
 <a id="task-p0.13"></a>
 
 > `TASK-P0.13` 已 **COMPLETED**（施工 [#459](https://github.com/he18718143986-design/IDE/pull/459) squash `6122e347abc6d360e4f15c1238fdd6ec9f8f92c7`；立卡 P-351；完工回写 P-352）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-p0.13) §3.4cp。诚实口径：**基线验收独立性、环境共享风险评估与现场恢复加固已交付（恢复失败 fail-closed、审批冻结审计、共享风险最小修补、测试资产登记设计）；五项事实边界保留，P0 风险未宣称解除**。此处保留立卡说明与审批边界。
+
+### 3.4cq Docker 在场补验：容器隔离策略与证据链字段核销（2026-11-28 · 立卡 P-354）
+
+<a id="task-p1.5"></a>
+
+#### 【Task P1.5】Docker 在场补验：容器隔离策略与证据链字段核销 `[NEW_TASK]`
+
+```yaml task-card
+id: TASK-P1.5
+status: NEW_TASK
+contract:
+  intent:
+    title: Docker 在场补验：容器隔离策略与证据链字段核销
+    description: >-
+      本地具备可用 Docker daemon 后，把 TASK-P1.3 遗留的 TC-P0-3A/3B/3C 三项
+      从 SKIPPED_NO_DOCKER 变为真实容器实跑，并逐项核对证据链字段与代码是否一致；
+      顺带修掉 probeDocker() 只探客户端导致 docker_available 误报的缺陷。
+      不含 SANDBOX_ENFORCED + OpenHands 真实派工（另案）。
+    risk_level: LOW
+  acceptance:
+    - id: P13D-P1
+      check: auto
+      text: >-
+        probeDocker() 以 daemon 可达性（docker info）判定可用性：daemon 不可达但
+        客户端存在时返回 available=false 且 reason=docker_client_only；daemon 可达
+        时返回 true。正反两向均可由注入命令/桩验证。
+    - id: P13D-P2
+      check: auto
+      text: >-
+        Docker 在场且测试镜像可用时，TC-P0-3A（根只读写阻断）、TC-P0-3B（.git
+        tmpfs 遮蔽且宿主哈希不变）、TC-P0-3C（readonly_enforced 全量只读）三项
+        真实执行而非 skip；容器内写只读路径 exit != 0 且 stderr 含
+        Read-only file system 或 Permission denied；宿主对应文件内容未变。
+    - id: P13D-P3
+      check: auto
+      text: >-
+        网络 DENY 下容器无出网（不可达）；非 DENY 策略返回 via=rejected 且
+        rejection=NETWORK_TARGET_NOT_ALLOWED，且不产生容器子进程。
+    - id: P13D-P4
+      check: auto
+      text: >-
+        证据链字段核对报告与代码逐条一致：.stagent/signatures/<contract>-<evidence>.sig
+        独立凭据、Git Trailer 四键（Stagent-Evidence-ID / Evidence-Sha256 /
+        Evidence-Signature / Stagent-Evidence-Hash）、test_integrity 现字段名、
+        SandboxWitness 字段名；三处「文档 vs 代码」漂移如实列出。
+    - id: P13D-P5
+      check: auto
+      text: >-
+        readonly 五文件（docker-container-host.ts / evidence.schema.ts / merger.ts /
+        evidence-signer.ts / orchestrator.ts）相对父提交零 diff；核对报告含诚实
+        口径：alpine 不等于 OpenHands 实测、P13-P2/P3/P4 仍为规格断言、不宣称
+        P0 风险解除。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - docs/ledger/p13-docker-live-verification.md
+      - scripts/verify-p0-independent-suite.ts
+      - tests/daemon/p1-3-cross-platform-penetration.test.ts
+      - docs/ledger/p0-independent-verification-matrix.md
+    readonly_paths:
+      - daemon/worker/cli-host/docker-container-host.ts
+      - src/lib/evidence.schema.ts
+      - daemon/pipeline/merger.ts
+      - daemon/pipeline/evidence-signer.ts
+      - daemon/pipeline/orchestrator.ts
+  verification:
+    commands:
+      - { alias: docker-suite, executable: npx, args: [tsx, scripts/verify-p0-independent-suite.ts, --json] }
+      - { alias: penetration, executable: npx, args: [vitest, run, tests/daemon/p1-3-cross-platform-penetration.test.ts] }
+      - { alias: docs-check, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    本机已具备 Docker daemon（Docker Desktop 29.6.1 / linuxkit 6.12.76 / aarch64 /
+    overlayfs / 18 CPU / 7.9GiB），镜像用 alpine:3.20（仅需 sh）。范围只做两件事：
+    (1) 修 scripts/verify-p0-independent-suite.ts 的 probeDocker()——现在用
+    docker --version 判可用性，daemon 不可达也会记 docker_available=true，须改探
+    docker info，并把「客户端在、daemon 不在」记为 docker_client_only；
+    (2) 落核对报告 docs/ledger/p13-docker-live-verification.md，把 TC-P0-3A/3B/3C
+    实跑证据、网络 DENY 与 fail-closed 拒绝、越界写/.git tmpfs/readonly_enforced
+    五条实测、证据链字段逐条核对、三处文档与代码漂移写清。矩阵 Docker 在场一节
+    同卡同 PR 更新。不含 SANDBOX_ENFORCED + OpenHands 真实派工（需 GB 级固定摘要
+    镜像 + 容器内模型凭据 + 真实模型花费，另案等 Tina 明确同意）。
+  touches:
+    - { path: docs/ledger/p13-docker-live-verification.md, change: create, why: 核对报告主体, symbols: [] }
+    - { path: scripts/verify-p0-independent-suite.ts, change: modify, why: probeDocker 改探 daemon + docker_client_only 归因, symbols: [probeDocker, collectFingerprint] }
+    - { path: tests/daemon/p1-3-cross-platform-penetration.test.ts, change: modify, why: 仅当必须时补 daemon 不在仍归 SKIPPED_NO_DOCKER 的用例, symbols: [] }
+    - { path: docs/ledger/p0-independent-verification-matrix.md, change: modify, why: 追加 Docker 在场一节, symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: P13D-P1, test_path: tests/daemon/p1-3-cross-platform-penetration.test.ts, level: unit, case: "probeDocker daemon 不可达时归 docker_client_only 而非可用" }
+    - { acceptance_id: P13D-P2, test_path: tests/daemon/p1-3-cross-platform-penetration.test.ts, level: unit, case: "Docker 容器环境动态渗透实跑 TC-P0-3A" }
+    - { acceptance_id: P13D-P3, test_path: tests/daemon/p1-3-cross-platform-penetration.test.ts, level: unit, debt: "网络 DENY 与 EXPLICIT_TARGETS fail-closed 以核对报告 §3 的实测输出留证（该路径在 docker-container-host 内，本卡 readonly），不另写 it()" }
+    - { acceptance_id: P13D-P4, test_path: tests/daemon/p1-3-cross-platform-penetration.test.ts, level: unit, debt: "证据链字段与代码一致性以核对报告逐条摘录 + readonly 五文件零 diff 自证，不写成产品行为 it()" }
+    - { acceptance_id: P13D-P5, test_path: tests/daemon/p1-3-cross-platform-penetration.test.ts, level: unit, debt: "readonly 五文件零 diff 与诚实口径以施工 diff + 报告正文核对，不另写 it()" }
+governance:
+  spec_refs:
+    - docs/ledger/p0-independent-verification-matrix.md
+    - docs/ledger/p1-line-comprehensive-review.md
+  depends_on:
+    - { id: TASK-P1.3, kind: soft }
+    - { id: TASK-P1.2, kind: soft }
+  code_facts:
+    - { ref: "scripts/verify-p0-independent-suite.ts:115-124", note: "probeDocker 用 docker --version 判可用，daemon 不可达仍记 available=true" }
+    - { ref: "tests/daemon/p1-3-cross-platform-penetration.test.ts:226-238", note: "isLiveReady = isDockerAvailable() && (STAGENT_LIVE_DOCKER_TEST=1 || isDockerImageReady)" }
+    - { ref: "daemon/worker/cli-host/docker-container-host.ts:367-374", note: "networkMode: DENY→none；其余策略返回 NETWORK_TARGET_NOT_ALLOWED 拒绝" }
+    - { ref: "src/lib/evidence.schema.ts:211-237", note: "test_integrity 现字段；不存在 baseline_fingerprint" }
+    - { ref: "daemon/pipeline/merger.ts:564-572", note: "Git Trailer 四键注入点" }
+  non_goals:
+    - 不做 SANDBOX_ENFORCED + OpenHands 真实派工（另案，须 Tina 明确同意消耗模型额度）
+    - 不改 docker-container-host.ts / evidence.schema.ts / merger.ts / evidence-signer.ts / orchestrator.ts
+    - 不宣称 P0 风险解除，不宣称 OpenHands 适配器已实测
+    - 不把 P13-P2/P3/P4 的规格断言写成跨平台容器运行验收
+    - 不改门禁阈值、标题兜底、右栏、ADR-0015
+    - 不动 #344 遗留分支与 TASK-J.22
+  fail:
+    - probeDocker 仍以客户端存在判定可用，或 daemon 不可达被记成 docker_available=true 却不标注归因
+    - TC-P0-3A/3B/3C 在 Docker 在场时仍被 skip（除非镜像不可用且报告如实标注）
+    - 把 alpine 容器结果写成 OpenHands 适配器实测
+    - 把 P13-P2/P3/P4 规格断言写成跨平台容器运行验收
+    - 改 readonly 五文件任一
+    - 宣称 P0 风险解除
+  adr_revisions: []
+  defaults:
+    - 测试镜像默认用 alpine:3.20 并由 STAGENT_TEST_CONTAINER_IMAGE 覆盖
+    - 矩阵更新与核对报告同卡同 PR
+  open_questions: []
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+* **背景**：TASK-P1.3 交付时 3 项容器场景因无 Docker 记 `SKIPPED_NO_DOCKER`，矩阵裁决为 `PARTIAL`。本机现具备 Docker daemon（29.6.1 / linuxkit 6.12.76 / aarch64 / overlayfs），用 `alpine:3.20` 已实测三项真实通过、套件裁决从 `PARTIAL` 升为 `PASSED`（`total=14 / passed=14 / skipped=0`，digest `5b30fab8…`）。本轮把该实测固化进核对报告与生成器修证。
+* **取舍**：只核销「容器隔离策略 + 证据链字段」，不碰 `SANDBOX_ENFORCED` + OpenHands 重路径（GB 级固定摘要镜像 + 容器内模型凭据 + 真实模型花费，另案）。修 `probeDocker()` 是为了让「无 daemon」与「无 Docker」在报告里可区分——否则跳过归因失真。
+* **立卡说明（2026-11-28 · P-354）**：Tina 拍板认可 A 案范围与 `writable_paths`、明确 OpenHands 派工不进本卡。本卡交付四件同 PR：核对报告（新建）、生成器 `probeDocker()` 修证、（仅当必须）穿透用例补一条、矩阵 Docker 在场一节。**立卡 ≠ 开工**；合入后另点名开工。
