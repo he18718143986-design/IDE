@@ -18,10 +18,10 @@
 | **P0.6** | Gateway 凭据脱敏与 SandboxWitness 强绑定 | **已闭合交付**，不重复立卡 | • [`TASK-P1.4`](../specs/development-tasks-completed.md#task-p1.4)（[#449](https://github.com/he18718143986-design/IDE/pull/449)/`5901714f`）：递归值级敏感凭据脱敏、256-bit CSPRNG Nonce 绑定会话与工作树、merger 单次原子消费防重放、Ed25519 签名全覆盖。 | **去重核销**：不重复立卡。 |
 | **P0.7** | OS Sandbox 三态门禁与假阳性探测修证 | **已闭合交付**，不重复立卡 | • [`TASK-P0.1a`](../specs/development-tasks-completed.md#task-p0.1a)（[#455](https://github.com/he18718143986-design/IDE/pull/455)/`670860eb`）：`daemon/baseline/os-sandbox.ts` 引入 `ProbeVerdict`（`DENIED`/`UNKNOWN`/`ALLOWED`）三态判定，探测前引入宿主连通性交叉校验，超时/不可达降级 `UNKNOWN`，`probeDeniedFromOutput` 严格返回 `false`。 | **去重核销**：不重复立卡。 |
 | **P0.8** | 受控派工全链路追踪审计与异常路径覆盖 | **已闭合交付**，不重复立卡 | • [`TASK-P0.1a`](../specs/development-tasks-completed.md#task-p0.1a)（[#455](https://github.com/he18718143986-design/IDE/pull/455)/`670860eb`）：系统枚举所有 `SANDBOX_ENFORCED` 入口，确认 `HOST_UNAVAILABLE` fail-closed 拦截，产出专项报告 [`docs/ledger/p0-1a-execution-chain-controlled-audit.md`](./p0-1a-execution-chain-controlled-audit.md)。 | **去重核销**：不重复立卡。 |
-| **P0.9** | 验收命令审批冻结与 revision 全链路约束 | **未闭合，纳入本卡** | 纳入 [`TASK-P0.13`](../specs/development-tasks-active.md#task-p0.13) **Scope A**。 | **纳入 TASK-P0.13 Scope A** |
-| **P0.10** | 测试资产基线登记方案（配置/helper/fixture/入口识别） | **未闭合，纳入本卡** | 纳入 [`TASK-P0.13`](../specs/development-tasks-active.md#task-p0.13) **Scope B（设计先行）**。 | **纳入 TASK-P0.13 Scope B** |
-| **P0.11** | executeBaselineRerun 与候选执行环境共享风险评估 | **未闭合，纳入本卡** | 纳入 [`TASK-P0.13`](../specs/development-tasks-active.md#task-p0.13) **Scope C（评估+最小修证）**。 | **纳入 TASK-P0.13 Scope C** |
-| **P0.12** | hideWorkerAddedTests / restoreBaselineTestFiles 恢复失败 fail-closed | **未闭合，纳入本卡** | 纳入 [`TASK-P0.13`](../specs/development-tasks-active.md#task-p0.13) **Scope D（明确修证项）**。 | **纳入 TASK-P0.13 Scope D** |
+| **P0.9** | 验收命令审批冻结与 revision 全链路约束 | **未闭合，纳入本卡** | 纳入 [`TASK-P0.13`](../specs/development-tasks-completed.md#task-p0.13) **Scope A**。 | **纳入 TASK-P0.13 Scope A** |
+| **P0.10** | 测试资产基线登记方案（配置/helper/fixture/入口识别） | **未闭合，纳入本卡** | 纳入 [`TASK-P0.13`](../specs/development-tasks-completed.md#task-p0.13) **Scope B（设计先行）**。 | **纳入 TASK-P0.13 Scope B** |
+| **P0.11** | executeBaselineRerun 与候选执行环境共享风险评估 | **未闭合，纳入本卡** | 纳入 [`TASK-P0.13`](../specs/development-tasks-completed.md#task-p0.13) **Scope C（评估+最小修证）**。 | **纳入 TASK-P0.13 Scope C** |
+| **P0.12** | hideWorkerAddedTests / restoreBaselineTestFiles 恢复失败 fail-closed | **未闭合，纳入本卡** | 纳入 [`TASK-P0.13`](../specs/development-tasks-completed.md#task-p0.13) **Scope D（明确修证项）**。 | **纳入 TASK-P0.13 Scope D** |
 
 ---
 
