@@ -274,7 +274,10 @@ export const evidenceBundleSchema = z
      * 属已登记的规格外扩展（待 A 文档回写后转正）。
      */
     tests_modified: z.boolean().optional(),
-    /** TASK-P0.4: 测试完整性快照与基线重跑证据 */
+    /**
+     * TASK-P0.4: 测试完整性快照与基线重跑证据。
+     * TASK-P0.2a: 当前版本受控 Evidence 必须包含完整 test_integrity 记录（schema 与 merger 双重 fail-closed）。
+     */
     test_integrity: testIntegrityEvidenceSchema.optional(),
     /**
      * 【非 §9.2 字段】人工确认留痕记录（G2 守卫条款 / 兜底语义）：
@@ -386,6 +389,22 @@ export const evidenceBundleSchema = z
           }
         }
       }
+      // TASK-P0.2a: 当前版本受控 Evidence 必须包含完整 test_integrity 记录，缺失 fail-closed
+      if (
+        bundle.contract_revision !== undefined &&
+        (bundle.worker_control_mode === "GATEWAY_ENFORCED" ||
+          bundle.worker_control_mode === "SANDBOX_ENFORCED")
+      ) {
+        if (!bundle.test_integrity) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["test_integrity"],
+            message:
+              "受控 Evidence 必须包含完整 test_integrity 记录 (TASK-P0.2a fail-closed)",
+          });
+        }
+      }
+
       if (blocking.length > 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -399,6 +418,26 @@ export const evidenceBundleSchema = z
 export type EvidenceBundleV11 = z.infer<typeof evidenceBundleSchema>;
 /** 兼容别名：全仓既有代码使用 `EvidenceBundle` */
 export type EvidenceBundle = EvidenceBundleV11;
+
+/**
+ * TASK-P0.2a: 当前受控版本 EvidenceBundle Schema。
+ * 强制要求 test_integrity 必须存在且完整，用于在受控派工与合流验证中进行强模式约束。
+ */
+export const controlledEvidenceBundleSchema = evidenceBundleSchema.superRefine(
+  (bundle, ctx) => {
+    if (!bundle.test_integrity) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["test_integrity"],
+        message:
+          "受控 Evidence 必须包含完整 test_integrity 记录 (TASK-P0.2a fail-closed)",
+      });
+    }
+  },
+);
+export type ControlledEvidenceBundle = EvidenceBundle & {
+  test_integrity: TestIntegrityEvidence;
+};
 
 /**
  * 合并门禁的唯一派生函数（§9.2：`can_merge` 必须等于完整合并门禁的派生结果）。

@@ -2786,9 +2786,25 @@ export class ContractOrchestrator {
           };
         }),
       tests_modified: input.testsModified ?? false,
+      // TASK-P0.2a: 受控执行落盘必须含完整 test_integrity 记录
       ...(input.testIntegrity !== undefined
         ? { test_integrity: input.testIntegrity }
-        : {}),
+        : input.workerControlMode === "GATEWAY_ENFORCED" ||
+            input.workerControlMode === "SANDBOX_ENFORCED"
+          ? {
+              test_integrity: {
+                tests_modified: input.testsModified ?? false,
+                modified_existing_tests: [],
+                deleted_existing_tests: [],
+                added_tests: [],
+                exemption: false,
+                baseline_rerun_triggered: false,
+                baseline_rerun_passed: true,
+                restored_paths: [],
+                weakened_tests: [],
+              },
+            }
+          : {}),
       ...(input.manualConfirmationRecord === undefined
         ? {}
         : { manual_confirmation: input.manualConfirmationRecord }),

@@ -14,6 +14,7 @@ import {
   E_EVIDENCE_REVISION_MISMATCH,
   MergeGateError,
   assertEvidenceControlAndRevision,
+  assertEvidenceTestIntegrity,
   squashMerge,
 } from "../../daemon/pipeline/merger";
 import {
@@ -485,5 +486,128 @@ describe("TASK-P0.1 端到端：真实证据快照 + squashMerge", () => {
     expect(result.commitSha).toMatch(/^[a-f0-9]{40}$/);
     expect(result.contract.lifecycle_state).toBe("MERGED");
     expect(fs.existsSync(path.join(repo, "src", "b.ts"))).toBe(true);
+  });
+
+  // === TASK-P0.2a (P02A-P1 / P02A-P3) 测试集 ===
+  it("P02A-P1: assertEvidenceTestIntegrity 在缺失 test_integrity 时抛出 E_CANNOT_MERGE", () => {
+    const dummyContract = makeContract("dummy");
+    expect(() =>
+      assertEvidenceTestIntegrity(
+        {} as unknown as EvidenceBundle,
+        dummyContract,
+      ),
+    ).toThrowError(MergeGateError);
+    try {
+      assertEvidenceTestIntegrity(
+        {} as unknown as EvidenceBundle,
+        dummyContract,
+      );
+    } catch (err: unknown) {
+      const gateErr = err as MergeGateError;
+      expect(gateErr.name).toBe("MergeGateError");
+      expect(gateErr.code).toBe("E_CANNOT_MERGE");
+      expect(gateErr.message).toContain(
+        "missing required test_integrity record",
+      );
+    }
+  });
+
+  it("P02A-P1: assertEvidenceTestIntegrity 在 test_integrity 字段残缺时抛出 E_CANNOT_MERGE", () => {
+    const dummyContract = makeContract("dummy");
+    const incompleteTi = {
+      test_integrity: {
+        tests_modified: true,
+        // 缺少 modified_existing_tests 等必填字段
+      },
+    } as unknown as EvidenceBundle;
+    expect(() =>
+      assertEvidenceTestIntegrity(incompleteTi, dummyContract),
+    ).toThrowError(MergeGateError);
+    try {
+      assertEvidenceTestIntegrity(incompleteTi, dummyContract);
+    } catch (err: unknown) {
+      const gateErr = err as MergeGateError;
+      expect(gateErr.name).toBe("MergeGateError");
+      expect(gateErr.code).toBe("E_CANNOT_MERGE");
+      expect(gateErr.message).toContain("corrupted or incomplete");
+    }
+  });
+
+  it("P02A-P1 端到端：磁盘证据快照缺失 test_integrity 时被 squashMerge 拦截拒绝", async () => {
+    const { contract, evidence } = await audited("missing test integrity");
+    const p = evidencePathOf(contract.contract_id, evidence.evidence_id);
+    const raw = JSON.parse(fs.readFileSync(p, "utf-8")) as Record<
+      string,
+      unknown
+    >;
+    delete raw["test_integrity"];
+    raw["verdict"] = {
+      ...(raw["verdict"] as Record<string, unknown>),
+      status: "PASSED",
+      can_merge: true,
+    };
+    fs.writeFileSync(p, JSON.stringify(raw, null, 2));
+
+    await expectMergeRejected(
+      contract.contract_id,
+      raw as unknown as EvidenceBundle,
+      "E_CANNOT_MERGE",
+    );
+  });
+
+  it("P02A-P3 端到端：伪造 exemption: true 但合同未授权时被 squashMerge 拦截拒绝", async () => {
+    const { contract, evidence } = await audited("forged exemption");
+    const p = evidencePathOf(contract.contract_id, evidence.evidence_id);
+    const raw = JSON.parse(fs.readFileSync(p, "utf-8")) as Record<
+      string,
+      unknown
+    >;
+    raw["test_integrity"] = {
+      tests_modified: true,
+      modified_existing_tests: ["tests/unit/a.test.ts"],
+      deleted_existing_tests: [],
+      added_tests: [],
+      exemption: true, // 伪造豁免
+      baseline_rerun_triggered: false,
+      baseline_rerun_passed: true,
+      restored_paths: [],
+      weakened_tests: [],
+    };
+    fs.writeFileSync(p, JSON.stringify(raw, null, 2));
+
+    await expectMergeRejected(
+      contract.contract_id,
+      raw as unknown as EvidenceBundle,
+      "E_CANNOT_MERGE",
+    );
+  });
+
+  it("P02A-P3 端到端：未授权修改既有测试且基线重跑失败时被 squashMerge 拦截拒绝", async () => {
+    const { contract, evidence } = await audited("regression test mutation");
+    const p = evidencePathOf(contract.contract_id, evidence.evidence_id);
+    const raw = JSON.parse(fs.readFileSync(p, "utf-8")) as Record<
+      string,
+      unknown
+    >;
+    raw["test_integrity"] = {
+      tests_modified: true,
+      modified_existing_tests: ["tests/unit/a.test.ts"],
+      deleted_existing_tests: [],
+      added_tests: [],
+      exemption: false,
+      baseline_rerun_triggered: true,
+      baseline_rerun_passed: false,
+      failure_code: "E_TEST_BASELINE_REGRESSION",
+      failure_reason: "Assertion failed in baseline test",
+      restored_paths: ["tests/unit/a.test.ts"],
+      weakened_tests: [],
+    };
+    fs.writeFileSync(p, JSON.stringify(raw, null, 2));
+
+    await expectMergeRejected(
+      contract.contract_id,
+      raw as unknown as EvidenceBundle,
+      "E_TEST_BASELINE_REGRESSION",
+    );
   });
 });
