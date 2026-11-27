@@ -3,9 +3,9 @@
 > **任务标识**: `TASK-P1.3` (P0 独立动态渗透与跨平台验收套件)  
 > **依赖基线**: `TASK-P1.2` (Evidence Ed25519 签名与防篡改门禁) 已合流交付  
 > **报告类型**: 独立动态验收实跑证据矩阵 (Independent Dynamic Penetration Matrix)  
-> **生成时间**: `2026-11-27T09:28:49.632Z`  
-> **基线 Commit**: `812199408d7aef2da8335d2119b3b9e93c5e65a2` (`feat/task-p1.3-independent-dynamic-suite`)  
-> **证据摘要 (Digest)**: `a6138ddf19e91c3db486a99874a9160f54c381116755fd22d289b480f68ce9ee`  
+> **生成时间**: `2026-11-27T11:35:58.467Z`  
+> **基线 Commit**: `5def6bb3edea6d0d059907403dc02fdb4df9c9ce` (`fix/task-p1.3a-matrix-verdict-partial`)  
+> **证据摘要 (Digest)**: `78b199b70a64932839f61c7ffdf13a52e4a042e319350fd06ebda264de61d7ff`  
 
 ---
 
@@ -18,26 +18,28 @@
 | **操作系统** | `os_platform` / `os_release` | `linux` (`4.19.0-gvisor`) |
 | **CPU 架构** | `os_arch` | `x64` |
 | **运行时** | `node_version` | `v22.23.5` |
-| **代码基线** | `git_commit` | `812199408d7aef2da8335d2119b3b9e93c5e65a2` |
-| **工作分支** | `git_branch` | `feat/task-p1.3-independent-dynamic-suite` |
+| **代码基线** | `git_commit` | `5def6bb3edea6d0d059907403dc02fdb4df9c9ce` |
+| **工作分支** | `git_branch` | `fix/task-p1.3a-matrix-verdict-partial` |
 | **Docker 状态** | `docker_available` | `NO` |
 | **Docker 版本** | `docker_version` | `NOT_AVAILABLE` |
-| **执行时间戳** | `timestamp` | `2026-11-27T09:28:49.632Z` |
+| **执行时间戳** | `timestamp` | `2026-11-27T11:35:58.467Z` |
 
 ---
 
 ## 2. 验收汇总结论 (Executive Summary)
 
-- **总用例数**: 14 项
-- **实跑通过 (`PASSED`)**: 11 项
-- **无 Docker 环境豁免跳过 (`SKIPPED_NO_DOCKER`)**: 3 项
-- **执行失败 (`FAILED`)**: 0 项
-- **矩阵裁决 (`verdict`)**: **`PASSED`**
+- **总用例数**: 14 项（十大负向场景 10 项 + 跨平台判据 4 项）
+- **核心场景动态渗透统计**: 7 项实跑通过 / 3 项无 Docker 跳过 / 0 失败（「7 实跑/3 跳过」）
+- **跨平台判据统计**: 1 项实跑通过 / 3 项无真实 Docker 容器环境跳过
+- **总计实跑通过 (`PASSED`)**: 8 项
+- **总计无 Docker 环境豁免跳过 (`SKIPPED_NO_DOCKER`)**: 6 项
+- **总计执行失败 (`FAILED`)**: 0 项
+- **矩阵裁决 (`verdict`)**: **`PARTIAL`**
 
 > **诚实口径遵循说明**：
 > 1. 本矩阵严格区分「实跑通过 (`PASSED`)」、「环境豁免跳过 (`SKIPPED_NO_DOCKER`)」与「失败 (`FAILED`)」三态，绝无静默假 pass。
-> 2. 无 Docker 守护进程的裸机/轻量 CI 环境下，针对真实容器读写拦截场景（TC-P0-3A~C）如实记录为 `SKIPPED_NO_DOCKER`。
-> 3. 跨平台静态与规范判据（Linux 挂载结构、macOS 大小写敏感度约束、Windows WSL2 正斜杠规范化）全部 100% 实跑通过。
+> 2. 无 Docker 守护进程的裸机/轻量 CI 环境下，针对真实容器读写拦截场景（TC-P0-3A~C）及跨平台容器运行判据（P13-P2~P4）如实记录为 `SKIPPED_NO_DOCKER`，杜绝通过计数从 8 虚增至 11；在含跳过项时矩阵裁决如实降级为 `PARTIAL`。
+> 3. 十大核心负向渗透场景中真实执行 7 项实跑通过、3 项因无真实 Docker 环境跳过；跨平台判据中纯逻辑/Git Trailer 绑定（P13-P5）实跑通过。
 
 ---
 
@@ -47,16 +49,16 @@
 
 | 场景编号 | 场景名称 | 攻防门禁层级 | 动态实跑状态 | 执行耗时 | 实际拦截凭据 / 错误码 |
 | :--- | :--- | :--- | :---: | :---: | :--- |
-| **TC-P0-1A** | 合同版本过期阻断 | Merger PRE_MERGE 审批与版本一致性门禁 | `PASSED` | 470ms | `E_EVIDENCE_REVISION_MISMATCH` |
-| **TC-P0-1B** | 任务分支提交流转嫁接阻断 | Merger PRE_MERGE 指纹比对与提交绑定 | `PASSED` | 509ms | `E_EVIDENCE_FINGERPRINT_MISMATCH / E_EVIDENCE_STALE` |
-| **TC-P0-1C** | 非受控模式伪装阻断 | Merger PRE_MERGE 控制模式白名单门禁 | `PASSED` | 403ms | `E_CANNOT_MERGE / EVIDENCE_SIGNATURE_INVALID` |
-| **TC-P0-2A** | 未授权路径越界写入阻断 | Merger PRE_MERGE 变更范围与快照差异审计 | `PASSED` | 428ms | `E_OUT_OF_SCOPE` |
-| **TC-P0-2B** | 重命名路径逃逸阻断 | Merger PRE_MERGE 文件重命名双审拦截 | `PASSED` | 417ms | `E_OUT_OF_SCOPE` |
+| **TC-P0-1A** | 合同版本过期阻断 | Merger PRE_MERGE 审批与版本一致性门禁 | `PASSED` | 612ms | `E_EVIDENCE_REVISION_MISMATCH` |
+| **TC-P0-1B** | 任务分支提交流转嫁接阻断 | Merger PRE_MERGE 指纹比对与提交绑定 | `PASSED` | 697ms | `E_EVIDENCE_FINGERPRINT_MISMATCH / E_EVIDENCE_STALE` |
+| **TC-P0-1C** | 非受控模式伪装阻断 | Merger PRE_MERGE 控制模式白名单门禁 | `PASSED` | 543ms | `E_CANNOT_MERGE / EVIDENCE_SIGNATURE_INVALID` |
+| **TC-P0-2A** | 未授权路径越界写入阻断 | Merger PRE_MERGE 变更范围与快照差异审计 | `PASSED` | 594ms | `E_OUT_OF_SCOPE` |
+| **TC-P0-2B** | 重命名路径逃逸阻断 | Merger PRE_MERGE 文件重命名双审拦截 | `PASSED` | 585ms | `E_OUT_OF_SCOPE` |
 | **TC-P0-3A** | 根工作树只读写阻断 | Sandbox 容器运行时隔离（宿主内核级只读绑定） | `SKIPPED_NO_DOCKER` | 0ms | `EACCES / Read-only file system` |
 | **TC-P0-3B** | .git 目录篡改遮蔽阻断 | Sandbox tmpfs 隔离遮蔽 | `SKIPPED_NO_DOCKER` | 0ms | `宿主 .git HEAD sha256 严格一致` |
 | **TC-P0-3C** | 验收阶段全量只读拦截 | Sandbox readonly_enforced 模式 | `SKIPPED_NO_DOCKER` | 0ms | `EACCES / Read-only file system` |
-| **TC-P0-4A** | 既有测试被篡改拦截 | Orchestrator 测试完整性防护与基线隔离重跑 | `PASSED` | 461ms | `E_TEST_BASELINE_REGRESSION (can_merge=false)` |
-| **TC-P0-4B** | 破坏基线环境逃逸阻断 | Orchestrator 基线执行环境超时与异常安全防御 | `PASSED` | 2523ms | `E_TEST_BASELINE_UNAVAILABLE (can_merge=false)` |
+| **TC-P0-4A** | 既有测试被篡改拦截 | Orchestrator 测试完整性防护与基线隔离重跑 | `PASSED` | 711ms | `E_TEST_BASELINE_REGRESSION (can_merge=false)` |
+| **TC-P0-4B** | 破坏基线环境逃逸阻断 | Orchestrator 基线执行环境超时与异常安全防御 | `PASSED` | 2751ms | `E_TEST_BASELINE_UNAVAILABLE (can_merge=false)` |
 
 ---
 
@@ -64,9 +66,9 @@
 
 | 判据编号 | 适用平台 / 架构 | 核心环境规范与判据要求 | 验收状态 | 验证细节与防护机制 |
 | :--- | :--- | :--- | :---: | :--- |
-| **P13-P2** | Linux (Ubuntu) | Linux 原生容器挂载与隔离规范（EACCES / 0 字节占位预建 / .git 隔离） | `PASSED` | resolveScopedMounts 严格生成 root:ro 与 tmpfs，prepareHostPlaceholders 杜绝目录化混淆 |
-| **P13-P3** | macOS (Desktop/OrbStack) | VirtioFS 跨 VM 挂载规范与大小写混合路径防逃逸 | `PASSED` | 大小写混合路径合法映射约束在 worktreeRoot 内，路径穿越与越界 fail-closed 拦截 |
-| **P13-P4** | Windows (WSL2) | POSIX 正斜杠挂载规范与 readonly_enforced 全量只读拦截 | `PASSED` | 正斜杠生成无 EINVAL，非法反斜杠阻断，readonly_enforced 模式零 :rw 挂载 |
+| **P13-P2** | Linux (Ubuntu) | Linux 原生容器挂载与隔离规范（EACCES / 0 字节占位预建 / .git 隔离） | `SKIPPED_NO_DOCKER` | resolveScopedMounts 严格生成 root:ro 与 tmpfs，prepareHostPlaceholders 杜绝目录化混淆 |
+| **P13-P3** | macOS (Desktop/OrbStack) | VirtioFS 跨 VM 挂载规范与大小写混合路径防逃逸 | `SKIPPED_NO_DOCKER` | 大小写混合路径合法映射约束在 worktreeRoot 内，路径穿越与越界 fail-closed 拦截 |
+| **P13-P4** | Windows (WSL2) | POSIX 正斜杠挂载规范与 readonly_enforced 全量只读拦截 | `SKIPPED_NO_DOCKER` | 正斜杠生成无 EINVAL，非法反斜杠阻断，readonly_enforced 模式零 :rw 挂载 |
 | **P13-P5** | Cross-Platform | 独立动态验收防跨提交嫁接与 Git Trailer 绑定核验 | `PASSED` | 合流提交严格绑定 Evidence-Sha256、Evidence-Signature 与 Stagent-Contract-ID |
 
 ---
@@ -84,5 +86,5 @@
 
 ---
 
-_Matrix Digest: `a6138ddf19e91c3db486a99874a9160f54c381116755fd22d289b480f68ce9ee`_  
+_Matrix Digest: `78b199b70a64932839f61c7ffdf13a52e4a042e319350fd06ebda264de61d7ff`_  
 _Generated by `scripts/verify-p0-independent-suite.ts`_
