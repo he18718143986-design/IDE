@@ -245,6 +245,7 @@
 | `TASK-P0.1a` | `COMPLETED` | 执行链受控证明专项（#455/`670860eb`；P-349；M · P1-High；不宣称 P0 风险解除） | [正文](./development-tasks-completed.md#task-p0.1a) · [审计报告](../ledger/p0-1a-execution-chain-controlled-audit.md) |
 | `TASK-P0.13` | `COMPLETED` | 基线验收独立性与恢复加固（Baseline Acceptance Independence & Recovery Hardening；估算 M · P0；交付 #459 / `6122e347`；完工回写 P-352；五项事实边界保留，不宣称 P0 风险解除） | [正文](./development-tasks-completed.md#task-p0.13) · [去重对照表](../ledger/p0-deduplication-and-p0-13-mapping.md) |
 | `TASK-P1.4` | `COMPLETED` | Gateway 凭据脱敏与 SandboxWitness Nonce 绑定（#449/`5901714f`；P-345；M · P2-Medium；不宣称 P0 风险解除） | [正文](./development-tasks-completed.md#task-p1.4) · [评估报告](../ledger/p1-eval-evidence-trust-chain-and-p0-acceptance.md) |
+| `TASK-P1.5` | `NEW_TASK` | Docker 在场补验：容器隔离策略与证据链字段核销（立卡 P-354；估算 S；未开工） | [正文](./development-tasks-active.md#task-p1.5) · [P1.3 矩阵](../ledger/p0-independent-verification-matrix.md) |
 
 ---
 
