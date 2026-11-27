@@ -78,19 +78,93 @@ export function isSandboxLaunchFailure(stderr: string): boolean {
 }
 
 /**
+ * 探测结果三态判据（TASK-P0.1a P01A-P4）：
+ * - ALLOWED: 成功连通/写入（输出匹配 successToken）
+ * - DENIED: 确被沙箱规则拦截（返回明确的沙箱拦截错误码，如 EPERM, EROFS, EACCES）
+ * - UNKNOWN: 无法证明是被沙箱拦截还是外部环境故障（如空输出、TIMEOUT、ENOTFOUND、EAI_AGAIN、网络不可达等）
+ */
+export type ProbeVerdict = "DENIED" | "UNKNOWN" | "ALLOWED";
+
+export interface ProbeVerdictOptions {
+  /** 外部宿主基线是否连通；若为 false 则表明宿主自身网络不可达，任何网络探测失败均降级为 UNKNOWN */
+  hostReachable?: boolean;
+}
+
+/**
+ * 依据探测输出与成功标识判定三态裁决。
+ * 针对网络探测（如 api.anthropic.com 或 example.com），因外部网络不可达、DNS 失败或超时
+ * 导致的报错，判定为 UNKNOWN，严禁误判为沙箱规则生效。
+ */
+export function probeVerdictFromOutput(
+  stdout: string,
+  successToken: string,
+  opts?: ProbeVerdictOptions,
+): ProbeVerdict {
+  const out = (stdout ?? "").trim();
+  if (out.length === 0) {
+    return "UNKNOWN";
+  }
+  if (out === successToken) {
+    return "ALLOWED";
+  }
+
+  // 若宿主环境自身已被标记为网络不可达，任何网络探测失败均不得作为沙箱阻断证据
+  if (opts?.hostReachable === false && successToken === "CONNECTED") {
+    return "UNKNOWN";
+  }
+
+  if (successToken === "CONNECTED") {
+    // 明确的沙箱拦截码（如 Darwin Seatbelt deny network* 返回 EPERM / EACCES）
+    if (out === "EPERM" || out === "EACCES" || out === "ERR_ACCESS_DENIED") {
+      return "DENIED";
+    }
+
+    // 环境型失败 / 不可达错误：DNS 失败、超时、路由不可达、主机关闭等
+    // 这类错误在外网断开或目标不可达时均会出现，不得误当成沙箱拦截
+    const ambiguousErrors = new Set([
+      "TIMEOUT",
+      "ETIMEDOUT",
+      "ENOTFOUND",
+      "EAI_AGAIN",
+      "ENETUNREACH",
+      "EHOSTUNREACH",
+      "ENETDOWN",
+      "EHOSTDOWN",
+      "ECONNRESET",
+    ]);
+
+    if (ambiguousErrors.has(out)) {
+      return "UNKNOWN";
+    }
+
+    // 其它未知错误码在网络探测中一律保守降级为 UNKNOWN（fail-closed 对证据真实性）
+    return "UNKNOWN";
+  }
+
+  if (successToken === "WROTE") {
+    // 文件系统写入探针：被沙箱只读拦截通常返回 EPERM (Darwin Seatbelt) 或 EROFS (Linux) 或 EACCES
+    if (out === "EPERM" || out === "EROFS" || out === "EACCES") {
+      return "DENIED";
+    }
+    return "UNKNOWN";
+  }
+
+  return "UNKNOWN";
+}
+
+/**
  * 从探测子进程的 stdout 判定「是否真的被拒绝」。
  *
- * 判据只有一条：**必须有输出**。沙箱应用失败时 stdout 为空，若沿用
- * 「不等于 CONNECTED 就算拒绝」的写法，就会在读不到任何证据的情况下
- * 凭空生成一条断网证明——归档里的 `os_sandbox` 也就跟着失真。
+ * 判据：严格要求 probeVerdictFromOutput 返回 "DENIED"。
+ * 出现 UNKNOWN（如 TIMEOUT、ENOTFOUND 等环境故障）或 ALLOWED 时一律返回 false，
+ * 绝不把环境不可达误算为沙箱拒绝（TASK-P0.1a 修证）。
  */
 export function probeDeniedFromOutput(
   stdout: string,
   successToken: string,
+  opts?: ProbeVerdictOptions,
 ): boolean {
-  const out = (stdout ?? "").trim();
-  if (out.length === 0) return false;
-  return out !== successToken;
+  return probeVerdictFromOutput(stdout, successToken, opts) === "DENIED";
 }
 
 /** 生成 Darwin Seatbelt：默拒绝；允许读；仅允许 /tmp 写入；禁网；禁写 repoRoot */
@@ -263,17 +337,27 @@ try {
 }
 
 /** 在 OS 沙盒内尝试出站；期望失败 */
-export function proveScanNetworkDenied(repoRoot: string): {
+export function proveScanNetworkDenied(
+  repoRoot: string,
+  opts?: {
+    targetHost?: string;
+    targetPort?: number;
+    hostReachable?: boolean;
+  },
+): {
   denied: boolean;
+  verdict: ProbeVerdict;
   code: string | null;
   mode: OsSandboxMode;
   detail: string;
 } {
   const root = path.resolve(repoRoot);
   const mode = detectPreferredOsSandboxMode();
+  const targetHost = opts?.targetHost ?? "example.com";
+  const targetPort = opts?.targetPort ?? 80;
   const script = `
 const net = require("node:net");
-const s = net.connect({ host: "example.com", port: 80 }, () => {
+const s = net.connect({ host: ${JSON.stringify(targetHost)}, port: ${targetPort} }, () => {
   process.stdout.write("CONNECTED");
   s.end();
   process.exit(0);
@@ -290,9 +374,11 @@ setTimeout(() => { process.stdout.write("TIMEOUT"); process.exit(3); }, 2500);
       timeoutMs: 8_000,
     });
     const code = (r.stdout || "").trim() || null;
-    const denied = probeDeniedFromOutput(r.stdout, "CONNECTED");
+    const verdict = probeVerdictFromOutput(r.stdout, "CONNECTED", opts);
+    const denied = verdict === "DENIED";
     return {
       denied,
+      verdict,
       code: denied ? code : null,
       mode,
       detail: r.stderr || "",
@@ -306,9 +392,11 @@ setTimeout(() => { process.stdout.write("TIMEOUT"); process.exit(3); }, 2500);
       { encoding: "utf8", timeout: 8_000 },
     );
     const code = (r.stdout || "").trim() || null;
-    const denied = probeDeniedFromOutput(r.stdout, "CONNECTED");
+    const verdict = probeVerdictFromOutput(r.stdout, "CONNECTED", opts);
+    const denied = verdict === "DENIED";
     return {
       denied,
+      verdict,
       code: denied ? code : null,
       mode,
       detail: r.stderr || "",
@@ -317,6 +405,7 @@ setTimeout(() => { process.stdout.write("TIMEOUT"); process.exit(3); }, 2500);
 
   return {
     denied: false,
+    verdict: "UNKNOWN",
     code: null,
     mode: "logical_fallback",
     detail: "无 OS 网络隔离能力",

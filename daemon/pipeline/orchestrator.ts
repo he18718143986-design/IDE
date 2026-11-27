@@ -2685,6 +2685,50 @@ export class ContractOrchestrator {
       ? redactSensitiveText(input.summary, allEvidenceSecrets).text
       : input.summary;
 
+    // TASK-P0.1a P01A-P5: 自动补齐 test_integrity 与基线真实重跑记录区分性加固
+    // 当未显式提供 testIntegrity 且属于受控模式时，生成显式带占位标识的默认结构；
+    // 若 testsModified 为 true 却未提供 testIntegrity 证据，说明测试被改动但未做完整性审计，拒绝判定通过（fail-closed 拦截）
+    const effectiveTestIntegrity: TestIntegrityEvidence | undefined =
+      input.testIntegrity !== undefined
+        ? input.testIntegrity
+        : input.workerControlMode === "GATEWAY_ENFORCED" ||
+            input.workerControlMode === "SANDBOX_ENFORCED"
+          ? {
+              tests_modified: input.testsModified ?? false,
+              modified_existing_tests: input.testsModified
+                ? input.modifiedFiles.filter(
+                    (p) =>
+                      p.includes("test") ||
+                      p.includes("spec") ||
+                      p.startsWith("tests/"),
+                  ).length > 0
+                  ? input.modifiedFiles.filter(
+                      (p) =>
+                        p.includes("test") ||
+                        p.includes("spec") ||
+                        p.startsWith("tests/"),
+                    )
+                  : ["tests/modified_without_evidence"]
+                : [],
+              deleted_existing_tests: [],
+              added_tests: [],
+              exemption: false,
+              baseline_rerun_triggered: false,
+              baseline_rerun_passed: !(input.testsModified ?? false),
+              ...(input.testsModified
+                ? {
+                    failure_code: "E_TEST_BASELINE_REGRESSION" as const,
+                    failure_reason:
+                      "tests_modified_without_test_integrity_evaluation",
+                  }
+                : {
+                    failure_reason: "placeholder:unmodified_tests_default",
+                  }),
+              restored_paths: [],
+              weakened_tests: [],
+            }
+          : undefined;
+
     const bundle: EvidenceBundle = {
       evidence_id: evidenceId,
       contract_id: contract.contract_id,
@@ -2741,7 +2785,8 @@ export class ContractOrchestrator {
           sandboxWitness: rawWitness,
           worktreeRoot: worktreePath,
           // TASK-P0.4: 测试完整性快照
-          testIntegrity: input.testIntegrity,
+          // TASK-P0.4 & TASK-P0.1a: 测试完整性快照（受控模式下区分占位与真实重跑）
+          testIntegrity: effectiveTestIntegrity,
         }),
         summary: safeSummary,
         ...(input.reasonCode === undefined
@@ -2786,25 +2831,10 @@ export class ContractOrchestrator {
           };
         }),
       tests_modified: input.testsModified ?? false,
-      // TASK-P0.2a: 受控执行落盘必须含完整 test_integrity 记录
-      ...(input.testIntegrity !== undefined
-        ? { test_integrity: input.testIntegrity }
-        : input.workerControlMode === "GATEWAY_ENFORCED" ||
-            input.workerControlMode === "SANDBOX_ENFORCED"
-          ? {
-              test_integrity: {
-                tests_modified: input.testsModified ?? false,
-                modified_existing_tests: [],
-                deleted_existing_tests: [],
-                added_tests: [],
-                exemption: false,
-                baseline_rerun_triggered: false,
-                baseline_rerun_passed: true,
-                restored_paths: [],
-                weakened_tests: [],
-              },
-            }
-          : {}),
+      // TASK-P0.2a & TASK-P0.1a: 受控执行落盘必须含完整 test_integrity 记录（区分占位与真实重跑）
+      ...(effectiveTestIntegrity !== undefined
+        ? { test_integrity: effectiveTestIntegrity }
+        : {}),
       ...(input.manualConfirmationRecord === undefined
         ? {}
         : { manual_confirmation: input.manualConfirmationRecord }),
