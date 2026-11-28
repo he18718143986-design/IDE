@@ -8,8 +8,15 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { ContractStore } from "./contract-store";
-import { archiveContractRecords } from "./records-archive";
-import { publicDeliveryCopy } from "../../src/lib/state/terminal-delivery-closure";
+import {
+  archiveContractRecords,
+  compensateContractRecordsArchive,
+  type RecordsArchiveCompensationResult,
+} from "./records-archive";
+import {
+  publicDeliveryCopy,
+  H2_TERMINAL_SCHEME,
+} from "../../src/lib/state/terminal-delivery-closure";
 import { readStateFile } from "../guard/state-store";
 import type { SoftwareContract } from "../../src/lib/contract.schema";
 import { assertApprovalBinding } from "../../src/lib/state-machine";
@@ -82,6 +89,8 @@ export interface MergeResult {
     ok: boolean;
     records_dir: string;
     copied: string[];
+    skipped?: string[];
+    repaired?: string[];
     error?: string;
   };
   /**
@@ -1309,7 +1318,7 @@ async function mergeInternal(
     lifecycleState: "MERGED",
   });
 
-  // 8. TASK-C.12d/e：MERGED 后轻量 records 归档 + audit-manifest（失败不标 DELIVERED）
+  // 8. TASK-C.12d/e / TASK-P0.16：MERGED 后轻量 records 归档 + audit-manifest（失败不标 DELIVERED）
   const archive = archiveContractRecords({
     repoRoot,
     contract_id: contract.contract_id,
@@ -1336,10 +1345,12 @@ async function mergeInternal(
       ok: archive.ok,
       records_dir: archive.records_dir,
       copied: archive.copied,
+      ...(archive.skipped ? { skipped: archive.skipped } : {}),
+      ...(archive.repaired ? { repaired: archive.repaired } : {}),
       ...(archive.error ? { error: archive.error } : {}),
     },
     deliveryTerminal: {
-      scheme: "B_MERGED_IS_TERMINAL",
+      scheme: H2_TERMINAL_SCHEME,
       lifecycle_state: "MERGED",
       label: delivery.label,
       delivery_complete: delivery.delivery_complete,
@@ -1416,3 +1427,83 @@ export function loadEvidenceSnapshot(
 
 /** TASK-P1.2 卡面设计符号对齐：executeMerge 导出别名 */
 export const executeMerge = squashMerge;
+
+/**
+ * TASK-P0.16 显式补偿重试入参。
+ */
+export interface CompensateMergeRecordsArchiveInput {
+  repoRoot: string;
+  contract_id: string;
+  prototype_id?: string | null | undefined;
+  commit_sha?: string | null | undefined;
+  assertion_ids?: readonly string[] | undefined;
+}
+
+/**
+ * TASK-P0.16 显式补偿重试返回结构。
+ */
+export interface CompensateMergeRecordsArchiveResult {
+  ok: boolean;
+  contract_id: string;
+  recordsArchive: RecordsArchiveCompensationResult;
+  deliveryTerminal: {
+    scheme: typeof H2_TERMINAL_SCHEME;
+    lifecycle_state: "MERGED";
+    label: string;
+    delivery_complete: boolean;
+    compensated?: boolean;
+  };
+}
+
+/**
+ * TASK-P0.16：显式补偿重试入口。
+ * 针对 Git 合并落地后辅助性归档失败场景（recordsArchive.ok === false），
+ * 允许上层调用方显式触发幂等补偿流程；
+ * 补偿成功后，deliveryTerminal 状态无缝收敛为 delivery_complete: true，文案收敛为「已交付归档」。
+ */
+export function compensateMergeRecordsArchive(
+  input: CompensateMergeRecordsArchiveInput,
+): CompensateMergeRecordsArchiveResult {
+  const archiveResult = compensateContractRecordsArchive({
+    repoRoot: input.repoRoot,
+    contract_id: input.contract_id,
+    prototype_id: input.prototype_id,
+    commit_sha: input.commit_sha,
+    snapshot: {
+      contract_id: input.contract_id,
+      commit_sha: input.commit_sha ?? null,
+      lifecycle_state: "MERGED",
+      compensated: true,
+    },
+    ...(input.assertion_ids ? { assertion_ids: input.assertion_ids } : {}),
+    events: [
+      {
+        type: "RECORDS_ARCHIVE_COMPENSATED",
+        contract_id: input.contract_id,
+        commit_sha: input.commit_sha ?? null,
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  });
+
+  const delivery = publicDeliveryCopy({
+    lifecycle_state: "MERGED",
+    archive_ok: archiveResult.ok,
+    compensated: archiveResult.compensated,
+  });
+
+  return {
+    ok: archiveResult.ok,
+    contract_id: input.contract_id,
+    recordsArchive: archiveResult,
+    deliveryTerminal: {
+      scheme: H2_TERMINAL_SCHEME,
+      lifecycle_state: "MERGED",
+      label: delivery.label,
+      delivery_complete: delivery.delivery_complete,
+      ...(delivery.compensated !== undefined
+        ? { compensated: delivery.compensated }
+        : {}),
+    },
+  };
+}
