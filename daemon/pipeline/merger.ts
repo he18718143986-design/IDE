@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   verifyEvidenceSignature,
+  getDefaultPublicKeyPath,
   type EvidenceSignatureRecord,
 } from "./evidence-signer";
 import fs from "node:fs";
@@ -60,6 +61,9 @@ export interface MergeOptions {
   contractId: string;
   evidence: EvidenceBundle;
   reviewer: string;
+  /** TASK-P0.15 Scope A: 预期的受信公钥 PEM，或受信公钥策略 */
+  expectedPublicKey?: string | undefined;
+  trustPolicy?: EvidenceTrustPolicy | undefined;
 }
 
 export interface MergeResult {
@@ -114,6 +118,30 @@ export const E_EVIDENCE_REVISION_MISMATCH = "E_EVIDENCE_REVISION_MISMATCH";
  */
 export const EVIDENCE_SIGNATURE_MISSING = "EVIDENCE_SIGNATURE_MISSING";
 export const EVIDENCE_SIGNATURE_INVALID = "EVIDENCE_SIGNATURE_INVALID";
+/** TASK-P0.15 Scope A: 缺少受信任根或尝试以自带公钥单方授权受控合并 */
+export const E_EVIDENCE_UNTRUSTED_KEY = "E_EVIDENCE_UNTRUSTED_KEY";
+
+export interface EvidenceTrustPolicy {
+  /** 显式指定的受信任公钥 PEM 字符串 */
+  expectedPublicKey?: string | undefined;
+  /** 显式指定的受信任公钥 PEM 列表 */
+  trustedPublicKeys?: string[] | undefined;
+  /** 显式指定的受信任公钥文件路径 */
+  trustedPublicKeyPath?: string | undefined;
+  /** 是否允许降级为仅完整性校验（integrity-only）；受控合并默认强制要求可信根，降级模式严禁授权受控合并 */
+  allowIntegrityOnly?: boolean | undefined;
+  /** 是否强制执行受控合并信任检查（默认为 true） */
+  enforceMergeControlledTrust?: boolean | undefined;
+  /** 是否跳过本地默认公钥扫描（用于无根/隔离测试场景） */
+  ignoreDefaultKey?: boolean | undefined;
+}
+
+export interface EvidenceSignatureGateResult {
+  signatureRecord: EvidenceSignatureRecord;
+  canonicalHash: string;
+  trustMode: "trusted" | "integrity_only";
+  trustedKeyId?: string | undefined;
+}
 
 /** TASK-P0.1：合并时承认的受控档位（字符串不构成执行受控的真实性证明，见 P0-3） */
 const MERGEABLE_CONTROL_MODES: ReadonlySet<string> = new Set([
@@ -141,8 +169,8 @@ const MERGEABLE_CONTROL_MODES: ReadonlySet<string> = new Set([
 export function assertEvidenceSignatureGate(
   evidencePath: string,
   snapshot: EvidenceBundle,
-  expectedPublicKey?: string | undefined,
-): { signatureRecord: EvidenceSignatureRecord; canonicalHash: string } {
+  expectedPublicKeyOrPolicy?: string | EvidenceTrustPolicy | undefined,
+): EvidenceSignatureGateResult {
   const baseName = path.basename(evidencePath, ".json");
   const parentStagent = path.dirname(path.dirname(evidencePath));
   const stagentSigPath = path.join(
@@ -183,20 +211,135 @@ export function assertEvidenceSignatureGate(
     );
   }
 
-  const result = verifyEvidenceSignature(snapshot, sigRecord, {
-    expectedPublicKeyPem: expectedPublicKey,
-  });
+  // 规范化信任策略配置
+  const policy: EvidenceTrustPolicy =
+    typeof expectedPublicKeyOrPolicy === "string"
+      ? {
+          expectedPublicKey: expectedPublicKeyOrPolicy,
+          enforceMergeControlledTrust: true,
+        }
+      : {
+          enforceMergeControlledTrust: true,
+          ...(expectedPublicKeyOrPolicy ?? {}),
+        };
 
-  if (!result.valid) {
+  // 汇总所有系统可信公钥来源（不可信的自带公钥严禁混入此集合）
+  const trustedPublicKeys: string[] = [];
+  if (policy.expectedPublicKey && policy.expectedPublicKey.trim()) {
+    trustedPublicKeys.push(policy.expectedPublicKey.trim());
+  }
+  if (Array.isArray(policy.trustedPublicKeys)) {
+    for (const key of policy.trustedPublicKeys) {
+      if (typeof key === "string" && key.trim()) {
+        trustedPublicKeys.push(key.trim());
+      }
+    }
+  }
+  if (
+    policy.trustedPublicKeyPath &&
+    fs.existsSync(policy.trustedPublicKeyPath)
+  ) {
+    try {
+      const pKey = fs.readFileSync(policy.trustedPublicKeyPath, "utf8").trim();
+      if (pKey) trustedPublicKeys.push(pKey);
+    } catch {
+      // ignore read error
+    }
+  }
+  if (process.env["STAGENT_EVIDENCE_PUBLIC_KEY_PEM"]) {
+    const envPem = process.env["STAGENT_EVIDENCE_PUBLIC_KEY_PEM"].trim();
+    if (envPem) trustedPublicKeys.push(envPem);
+  }
+  if (process.env["STAGENT_EVIDENCE_PUBLIC_KEY_PATH"]) {
+    const envPath = process.env["STAGENT_EVIDENCE_PUBLIC_KEY_PATH"].trim();
+    if (fs.existsSync(envPath)) {
+      try {
+        const envKey = fs.readFileSync(envPath, "utf8").trim();
+        if (envKey) trustedPublicKeys.push(envKey);
+      } catch {
+        // ignore read error
+      }
+    }
+  }
+  // 系统默认公钥路径（若已落盘并且存在，作为本机受信任根之一）
+  if (!policy.ignoreDefaultKey) {
+    try {
+      const defaultPubPath = getDefaultPublicKeyPath();
+      if (fs.existsSync(defaultPubPath)) {
+        const defKey = fs.readFileSync(defaultPubPath, "utf8").trim();
+        if (defKey) trustedPublicKeys.push(defKey);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // TASK-P0.15 Scope A: 凭据信任根强制判定
+  // 当系统完全没有配置任何受信任公钥，而凭据仅提供自带 public_key 时：
+  if (trustedPublicKeys.length === 0) {
+    if (policy.enforceMergeControlledTrust !== false) {
+      throw new MergeGateError(
+        E_EVIDENCE_UNTRUSTED_KEY,
+        `Evidence signature trust-root missing: merge-controlled authorization requires a configured trusted public key or explicit trust policy, but none was found. Evidence-supplied public key cannot be used as the sole trust basis for merge authorization.`,
+      );
+    }
+
+    // 非受控合并下的降级分支（必须显式允许 allowIntegrityOnly）
+    if (!policy.allowIntegrityOnly) {
+      throw new MergeGateError(
+        E_EVIDENCE_UNTRUSTED_KEY,
+        `Evidence signature lacks trusted root and allowIntegrityOnly is not permitted.`,
+      );
+    }
+
+    // 仅执行载荷完整性验签（integrity-only）
+    const integrityResult = verifyEvidenceSignature(snapshot, sigRecord);
+    if (!integrityResult.valid) {
+      throw new MergeGateError(
+        EVIDENCE_SIGNATURE_INVALID,
+        `Evidence signature integrity check failed: ${integrityResult.reason}`,
+      );
+    }
+
+    return {
+      signatureRecord: sigRecord,
+      canonicalHash: integrityResult.canonical_hash || sigRecord.canonical_hash,
+      trustMode: "integrity_only",
+      trustedKeyId: sigRecord.key_id,
+    };
+  }
+
+  // 存在可信公钥时：逐一匹配尝试验签，必须通过任一可信公钥的密码学验证
+  let lastFailureReason = "Public key mismatch against trusted public key";
+  let passedResult: ReturnType<typeof verifyEvidenceSignature> | undefined;
+  let matchingTrustedKey: string | undefined;
+
+  for (const trustedKey of trustedPublicKeys) {
+    const res = verifyEvidenceSignature(snapshot, sigRecord, {
+      expectedPublicKeyPem: trustedKey,
+      publicKeyPem: trustedKey,
+    });
+    if (res.valid) {
+      passedResult = res;
+      matchingTrustedKey = trustedKey;
+      break;
+    } else {
+      lastFailureReason = res.reason || lastFailureReason;
+    }
+  }
+
+  if (!passedResult || !passedResult.valid) {
     throw new MergeGateError(
       EVIDENCE_SIGNATURE_INVALID,
-      `Evidence signature invalid: ${result.reason}`,
+      `Evidence signature invalid against configured trust root: ${lastFailureReason}`,
     );
   }
 
   return {
     signatureRecord: sigRecord,
-    canonicalHash: result.canonical_hash || sigRecord.canonical_hash,
+    canonicalHash: passedResult.canonical_hash || sigRecord.canonical_hash,
+    trustMode: "trusted",
+    trustedKeyId: sigRecord.key_id,
   };
 }
 
@@ -960,10 +1103,11 @@ async function mergeInternal(
     }
   }
 
-  // 2d. TASK-P1.2: Evidence Ed25519 签名与防篡改门禁（fail-closed 强校验）
+  // 2d. TASK-P1.2 & TASK-P0.15: Evidence Ed25519 签名与信任根门禁（fail-closed 强校验）
   const { signatureRecord, canonicalHash } = assertEvidenceSignatureGate(
     evidencePath,
     snapshot,
+    options.trustPolicy ?? options.expectedPublicKey,
   );
 
   if (!fs.existsSync(worktreePath)) {
