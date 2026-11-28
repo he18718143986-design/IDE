@@ -1,3 +1,12 @@
+- **P-361（TASK-P0.16 施工合入与完工回写 · 归档与交付副本幂等补偿修证 · 2026-11-28）**：授权来源为 Tina 本轮指令「按先例授权合并 #474，执行 TASK-P0.16 完工回写」。操作者由我执行。施工 PR [#474](https://github.com/he18718143986-design/IDE/pull/474)（head `f8012f09b5aeb6fb6cdef9b07d43aae178e46ab4`）squash **`abf25163f4c1abd0cd506e21355baab199e5ae78`** 于 2026-11-28 合入 main（父提交 `728b5060920eeb28b2659119875b1e7d1ab2e365`，线性历史）。仅 6 个授权 `writable_paths`（+808/−11），readonly 路径零 diff。归档注记逐条记录 P016-P1～P5：
+  - P016-P1：`daemon/pipeline/merger.ts:1312–1348` 辅助拷贝失败语义确认（`archiveContractRecords` 隔离捕获返回 `{ok:false}`、`publicDeliveryCopy` 保持 `delivery_complete:false` 且 `assertRecordsReadyForDelivered` 拦截）；
+  - P016-P2：`daemon/pipeline/records-archive.ts` `compensateContractRecordsArchive`——`contract_id` 幂等键、SHA-256 比对完整文件 `skipped`、损坏/半写原子覆写 `repaired`、缺失补拷 `copied`、`.tmp-*`+`rename` 原子提交；
+  - P016-P3：`merger.ts` `compensateMergeRecordsArchive` 显式重试入口 + `deliveryTerminal` 收敛 `delivery_complete: true`（文案「已交付归档」）；
+  - P016-P4：新建 `tests/daemon/p0-16-records-archive-compensation.test.ts` 7 用例全过（拷贝失败→重试→成功、重复触发不重复写入、部分失败恢复一致性）；
+  - P016-P5：专项报告落盘 [`docs/ledger/p0-16-records-archive-idempotent-compensation.md`](../ledger/p0-16-records-archive-idempotent-compensation.md)；
+  - 必需 CI 全绿（12/12 成功），Windows Unit 存量失败按先例 `UNSTABLE` 不挡，Cursor Bugbot neutral。
+  - `TASK-P0.16` 由 `[NEW_TASK]` → **`[COMPLETED]`**，`delivered: { pr: 474, commit: abf25163f4c1abd0cd506e21355baab199e5ae78 }`，正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-p0.16) §3.4cu；索引同步更新。
+  - **诚实口径：归档/交付副本幂等补偿已交付（`contract_id` 幂等键、原子覆写与断点续拷、显式重试入口、交付状态收敛）；跨进程持久化队列挂账，五项事实边界保留，P0 风险未宣称解除**。现场核对 changelog 最新原为 P-360、版本头最新原为第 344 条，按流水取下一号 **P-361**（版本头第 345 条）；**P-285 未占用、不改号**。同步：版本头第 345 条、§1.1 矩阵、索引、active §3.4cs 迁出、completed §3.4cu 迁入、ledger 开放项、Sprint 首要、本 changelog。第 344 条 / P-360 及更早条目原文逐字未改。合同 `MERGED`、端到端闭环走通一次口径不变。P0/P1 收敛口径维持（专项收敛、剩余项挂账、不宣称风险完全解除）。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。R23 暂缓。Console 拆分与第二批未立卡。`multi-worktree-cross-talk` 挂账未动。J.53–J.62 保持关闭。J.22 未开工。#344 遗留分支不动。本条仅文档回写，不改产品代码。
 - **P-360（立卡 TASK-P0.16 · 归档/交付副本幂等补偿修证 · 2026-11-28）**：授权来源为 Tina 本轮指令「点名立卡 TASK-P0.16，出立卡 docs PR」。操作者由我执行。纯 docs 立卡，不改产品代码，**施工型卡，立卡 ≠ 开工**。基线 main `12ac2ba0a379d2a27618e7ec18714f6cc86fdea9`（#472 squash）。现场核对最新流水 P-359、版本头第 343 条，顺延为 **P-360**（版本头第 344 条）；**P-285 未占用、不改号**。
   - 新增 `[NEW_TASK]` 任务卡 **`TASK-P0.16`**（Records Archive & Public Delivery Idempotent Compensation，估算 S~M，优先级 P1）；
   - **来源**：P0.15 Scope B 审计挂账项（`docs/ledger/p0-15-merge-transaction-and-trust-audit.md` 结论与 `docs/ledger/README.md` 挂账项）；
