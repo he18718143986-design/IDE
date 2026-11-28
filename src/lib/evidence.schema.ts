@@ -223,9 +223,13 @@ export const testIntegrityEvidenceSchema = z.object({
   baseline_rerun_triggered: z.boolean().default(false),
   /** 基线重跑是否通过（若无需重跑或重跑成功为 true；测试破坏或环境不可用为 false） */
   baseline_rerun_passed: z.boolean(),
-  /** 失败拒绝码（E_TEST_BASELINE_REGRESSION 或 E_TEST_BASELINE_UNAVAILABLE） */
+  /** 失败拒绝码（E_TEST_BASELINE_REGRESSION, E_TEST_BASELINE_UNAVAILABLE, E_TEST_CONFIG_MUTATED） */
   failure_code: z
-    .enum(["E_TEST_BASELINE_REGRESSION", "E_TEST_BASELINE_UNAVAILABLE"])
+    .enum([
+      "E_TEST_BASELINE_REGRESSION",
+      "E_TEST_BASELINE_UNAVAILABLE",
+      "E_TEST_CONFIG_MUTATED",
+    ])
     .optional(),
   /** 失败或不可用原因说明 */
   failure_reason: z.string().optional(),
@@ -233,6 +237,16 @@ export const testIntegrityEvidenceSchema = z.object({
   restored_paths: z.array(z.string()).default([]),
   /** 检测到被弱化的测试列表（断言减少或增加 skip） */
   weakened_tests: z.array(z.string()).default([]),
+  /** TASK-P0.14: 测试资产基线清单 SHA256 摘要 */
+  test_asset_manifest_digest: z.string().optional(),
+  /** TASK-P0.14: 被修改或删除的测试配置文件列表 */
+  modified_test_configs: z.array(z.string()).default([]).optional(),
+  /** TASK-P0.14: 还原参与基线重跑的夹具与辅助文件列表 */
+  restored_fixtures_and_helpers: z.array(z.string()).default([]).optional(),
+  /** TASK-P0.14: 未在基线清单中登记的新增测试资产列表 */
+  unregistered_test_assets: z.array(z.string()).default([]).optional(),
+  /** TASK-P0.14: 合同显式豁免 allow_test_config_mutation 状态 */
+  allow_test_config_mutation: z.boolean().default(false).optional(),
 });
 export type TestIntegrityEvidence = z.infer<typeof testIntegrityEvidenceSchema>;
 

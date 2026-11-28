@@ -458,4 +458,143 @@ if (!content.includes('exports.a = 2')) {
       expect(e.message).toContain("No verification commands available");
     }
   });
+  describe("TASK-P0.14: 负向测试覆盖 (配置篡改阻断与门禁拦截)", () => {
+    it("P014-I1: 篡改 vitest.config.ts 且未获豁免时 merger fail-closed 拦截", () => {
+      const contract = makeContract({
+        title: "P0.14 test",
+        allowBaselineTestMutation: true,
+      });
+      contract.authorization.execution_permissions = {
+        ...contract.authorization.execution_permissions,
+        allow_test_config_mutation: false,
+      };
+
+      const evidence: EvidenceBundle = {
+        evidence_id: "evi_p014_config",
+        contract_id: contract.contract_id,
+        contract_revision: contract.contract_revision,
+        worker_control_mode: "GATEWAY_ENFORCED",
+        generated_at: new Date().toISOString(),
+        usage: {
+          currency: "USD",
+          pricing_version: "1.0",
+          accounting_mode: "UNAVAILABLE",
+          limit_reached: false,
+        },
+        worktree_snapshot: {
+          head_sha: "abc",
+          snapshot_fingerprint: "fp",
+          captured_at: new Date().toISOString(),
+        },
+        verdict: {
+          status: "PASSED",
+          can_merge: true,
+          summary: "fake pass",
+          verification_retry_count: 0,
+        },
+        scope_audit: {
+          passed: true,
+          files_changed: [],
+          forbidden_violations: [],
+          budget_exhausted: false,
+        },
+        verification_results: [],
+        git_info: {
+          base_commit_sha: "base_sha",
+          task_commit_sha: "task_sha",
+          diff_stat: "1 file changed",
+          patch_fingerprint: "pfp",
+        },
+        test_integrity: {
+          tests_modified: true,
+          modified_existing_tests: [],
+          deleted_existing_tests: [],
+          added_tests: [],
+          exemption: true,
+          baseline_rerun_triggered: false,
+          baseline_rerun_passed: false,
+          failure_code: "E_TEST_CONFIG_MUTATED",
+          failure_reason:
+            "Test configuration mutated without exemption: vitest.config.ts",
+          restored_paths: [],
+          weakened_tests: [],
+          modified_test_configs: ["vitest.config.ts"],
+          restored_fixtures_and_helpers: [],
+          unregistered_test_assets: [],
+          allow_test_config_mutation: false,
+        },
+      };
+
+      expect(() => assertEvidenceTestIntegrity(evidence, contract)).toThrow(
+        /E_TEST_CONFIG_MUTATED/,
+      );
+    });
+
+    it("P014-I2: Evidence 自称配置豁免但合同未授权时抛出 E_CANNOT_MERGE", () => {
+      const contract = makeContract({
+        title: "P0.14 test unauth",
+      });
+      contract.authorization.execution_permissions = {
+        ...contract.authorization.execution_permissions,
+        allow_test_config_mutation: false,
+      };
+
+      const evidence: EvidenceBundle = {
+        evidence_id: "evi_p014_unauth",
+        contract_id: contract.contract_id,
+        contract_revision: contract.contract_revision,
+        worker_control_mode: "GATEWAY_ENFORCED",
+        generated_at: new Date().toISOString(),
+        usage: {
+          currency: "USD",
+          pricing_version: "1.0",
+          accounting_mode: "UNAVAILABLE",
+          limit_reached: false,
+        },
+        worktree_snapshot: {
+          head_sha: "abc",
+          snapshot_fingerprint: "fp",
+          captured_at: new Date().toISOString(),
+        },
+        verdict: {
+          status: "PASSED",
+          can_merge: true,
+          summary: "fake pass",
+          verification_retry_count: 0,
+        },
+        scope_audit: {
+          passed: true,
+          files_changed: [],
+          forbidden_violations: [],
+          budget_exhausted: false,
+        },
+        verification_results: [],
+        git_info: {
+          base_commit_sha: "base_sha",
+          task_commit_sha: "task_sha",
+          diff_stat: "1 file changed",
+          patch_fingerprint: "pfp",
+        },
+        test_integrity: {
+          tests_modified: true,
+          modified_existing_tests: [],
+          deleted_existing_tests: [],
+          added_tests: [],
+          exemption: false,
+          baseline_rerun_triggered: true,
+          baseline_rerun_passed: true,
+          restored_paths: [],
+          weakened_tests: [],
+          modified_test_configs: ["vitest.config.ts"],
+          restored_fixtures_and_helpers: [],
+          unregistered_test_assets: [],
+          allow_test_config_mutation: true, // 伪造声明
+        },
+      };
+
+      expect(() => assertEvidenceTestIntegrity(evidence, contract)).toThrow(
+        /E_CANNOT_MERGE/,
+      );
+    });
+  });
 });

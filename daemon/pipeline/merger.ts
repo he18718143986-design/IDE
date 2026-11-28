@@ -269,6 +269,35 @@ export function assertEvidenceTestIntegrity(
       throw new MergeGateError(code, `Test integrity check failed: ${reason}`);
     }
   }
+
+  // TASK-P0.14: 测试配置文件篡改独立门禁断言
+  const allowConfigMutation =
+    contract.authorization.execution_permissions?.allow_test_config_mutation ===
+    true;
+
+  if (ti.allow_test_config_mutation && !allowConfigMutation) {
+    throw new MergeGateError(
+      "E_CANNOT_MERGE",
+      "Evidence claims test config mutation exemption but contract does not allow it",
+    );
+  }
+
+  const hasConfigMutation =
+    ti.modified_test_configs && ti.modified_test_configs.length > 0;
+
+  if (hasConfigMutation && !allowConfigMutation) {
+    throw new MergeGateError(
+      "E_TEST_CONFIG_MUTATED",
+      `Test integrity check failed: Test configuration mutated without contract exemption: ${(ti.modified_test_configs ?? []).join(", ")}`,
+    );
+  }
+
+  if (ti.failure_code === "E_TEST_CONFIG_MUTATED") {
+    throw new MergeGateError(
+      "E_TEST_CONFIG_MUTATED",
+      `Test integrity check failed: ${ti.failure_reason ?? "Test configuration mutated without exemption"}`,
+    );
+  }
 }
 
 export function assertEvidenceControlAndRevision(

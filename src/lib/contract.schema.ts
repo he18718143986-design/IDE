@@ -193,6 +193,8 @@ export const executionPermissionsSchema = z.object({
   port_policy: portPolicySchema.optional(),
   // TASK-P0.4: 显式豁免允许修改/删除基线测试文件
   allow_baseline_test_mutation: z.boolean().optional(),
+  // TASK-P0.14: 显式豁免允许修改测试与类型配置文件
+  allow_test_config_mutation: z.boolean().optional(),
 });
 export type ExecutionPermissions = z.infer<typeof executionPermissionsSchema>;
 

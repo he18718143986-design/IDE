@@ -1,6 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { VerificationCommand } from "../../src/lib/contract.schema";
+import {
+  classifyTestAssetKind,
+  isTestAsset,
+  normalizeAssetRelPath,
+  type TestAssetKind,
+} from "../../src/lib/test-asset-manifest";
 
 /**
  * 测试文件防篡改（Test Integrity Guard）。
@@ -192,6 +198,14 @@ export interface TestPathClassification {
   addedTests: string[];
   hasExistingTestMutation: boolean;
   weakenedTests: string[];
+  /** TASK-P0.14: 被修改或删除的测试配置文件列表 */
+  modifiedTestConfigs?: string[];
+  /** TASK-P0.14: 被修改或删除的测试夹具与辅助库列表 */
+  modifiedFixturesAndHelpers?: string[];
+  /** TASK-P0.14: 未在基线清单中登记的新增测试资产 */
+  unregisteredAssets?: string[];
+  /** TASK-P0.14: 测试资产基线清单 SHA256 摘要 */
+  testAssetManifestDigest?: string;
 }
 
 /**
@@ -214,8 +228,8 @@ export async function classifyTouchedTestPaths(options: {
   // 若传入了 candidatePaths，先过滤
   if (options.candidatePaths) {
     for (const p of options.candidatePaths) {
-      if (isTestPath(p)) {
-        pathsSet.add(normalizeTestRelPath(p));
+      if (isTestAsset(p) || isTestPath(p)) {
+        pathsSet.add(normalizeAssetRelPath(p));
       }
     }
   }
@@ -232,12 +246,12 @@ export async function classifyTouchedTestPaths(options: {
       const p = line.slice(3).trim();
       if (p.includes("->")) {
         const parts = p.split("->").map((s) => s.trim());
-        if (parts[0] && isTestPath(parts[0]))
-          pathsSet.add(normalizeTestRelPath(parts[0]));
-        if (parts[1] && isTestPath(parts[1]))
-          pathsSet.add(normalizeTestRelPath(parts[1]));
-      } else if (p && isTestPath(p)) {
-        pathsSet.add(normalizeTestRelPath(p));
+        if (parts[0] && (isTestAsset(parts[0]) || isTestPath(parts[0])))
+          pathsSet.add(normalizeAssetRelPath(parts[0]));
+        if (parts[1] && (isTestAsset(parts[1]) || isTestPath(parts[1])))
+          pathsSet.add(normalizeAssetRelPath(parts[1]));
+      } else if (p && (isTestAsset(p) || isTestPath(p))) {
+        pathsSet.add(normalizeAssetRelPath(p));
       }
     }
   }
@@ -257,10 +271,10 @@ export async function classifyTouchedTestPaths(options: {
     for (const line of diffRes.stdout.split("\n")) {
       const parts = line.trim().split(/\t+/);
       if (parts.length >= 2) {
-        if (parts[1] && isTestPath(parts[1]))
-          pathsSet.add(normalizeTestRelPath(parts[1]));
-        if (parts[2] && isTestPath(parts[2]))
-          pathsSet.add(normalizeTestRelPath(parts[2]));
+        if (parts[1] && (isTestAsset(parts[1]) || isTestPath(parts[1])))
+          pathsSet.add(normalizeAssetRelPath(parts[1]));
+        if (parts[2] && (isTestAsset(parts[2]) || isTestPath(parts[2])))
+          pathsSet.add(normalizeAssetRelPath(parts[2]));
       }
     }
   }
@@ -269,8 +283,13 @@ export async function classifyTouchedTestPaths(options: {
   const deletedExistingTests: string[] = [];
   const addedTests: string[] = [];
   const weakenedTests: string[] = [];
+  const modifiedTestConfigs: string[] = [];
+  const modifiedFixturesAndHelpers: string[] = [];
+  const unregisteredAssets: string[] = [];
 
   for (const relPath of pathsSet) {
+    const assetKind = classifyTestAssetKind(relPath);
+
     // 检查文件在 baseRef 是否存在
     const catRes = await gitRunner(
       ["cat-file", "-e", `${baseRef}:${relPath}`],
@@ -281,6 +300,48 @@ export async function classifyTouchedTestPaths(options: {
     const fullPath = path.join(worktreePath, relPath);
     const existsOnDisk = fs.existsSync(fullPath);
 
+    if (assetKind === "config") {
+      if (existedInBase) {
+        if (!existsOnDisk) {
+          modifiedTestConfigs.push(relPath);
+        } else {
+          const baseContentRes = await gitRunner(
+            ["show", `${baseRef}:${relPath}`],
+            worktreePath,
+          );
+          const currentContent = fs.readFileSync(fullPath, "utf-8");
+          if (baseContentRes.stdout !== currentContent) {
+            modifiedTestConfigs.push(relPath);
+          }
+        }
+      } else if (existsOnDisk) {
+        modifiedTestConfigs.push(relPath);
+        unregisteredAssets.push(relPath);
+      }
+      continue;
+    }
+
+    if (assetKind === "fixture" || assetKind === "helper") {
+      if (existedInBase) {
+        if (!existsOnDisk) {
+          modifiedFixturesAndHelpers.push(relPath);
+        } else {
+          const baseContentRes = await gitRunner(
+            ["show", `${baseRef}:${relPath}`],
+            worktreePath,
+          );
+          const currentContent = fs.readFileSync(fullPath, "utf-8");
+          if (baseContentRes.stdout !== currentContent) {
+            modifiedFixturesAndHelpers.push(relPath);
+          }
+        }
+      } else if (existsOnDisk) {
+        unregisteredAssets.push(relPath);
+      }
+      continue;
+    }
+
+    // 测试套件（test_suite）与通用测试文件
     if (existedInBase) {
       if (!existsOnDisk) {
         deletedExistingTests.push(relPath);
@@ -327,8 +388,13 @@ export async function classifyTouchedTestPaths(options: {
     deletedExistingTests: deletedExistingTests.sort(),
     addedTests: addedTests.sort(),
     hasExistingTestMutation:
-      modifiedExistingTests.length > 0 || deletedExistingTests.length > 0,
+      modifiedExistingTests.length > 0 ||
+      deletedExistingTests.length > 0 ||
+      modifiedFixturesAndHelpers.length > 0,
     weakenedTests: weakenedTests.sort(),
+    modifiedTestConfigs: modifiedTestConfigs.sort(),
+    modifiedFixturesAndHelpers: modifiedFixturesAndHelpers.sort(),
+    unregisteredAssets: unregisteredAssets.sort(),
   };
 }
 
@@ -573,7 +639,10 @@ export async function hideWorkerAddedTests(options: {
 export interface BaselineRerunResult {
   triggered: boolean;
   passed: boolean;
-  failure_code?: "E_TEST_BASELINE_REGRESSION" | "E_TEST_BASELINE_UNAVAILABLE";
+  failure_code?:
+    | "E_TEST_BASELINE_REGRESSION"
+    | "E_TEST_BASELINE_UNAVAILABLE"
+    | "E_TEST_CONFIG_MUTATED";
   failure_reason?: string;
   restored_paths: string[];
 }
@@ -594,6 +663,7 @@ export async function executeBaselineRerun(options: {
   verificationCommands: VerificationCommand[];
   gitRunner: GitRunner;
   runCommand: BaselineCommandRunner;
+  allowTestConfigMutation?: boolean;
 }): Promise<BaselineRerunResult> {
   const {
     worktreePath,
@@ -604,10 +674,29 @@ export async function executeBaselineRerun(options: {
     runCommand,
   } = options;
 
-  const affectedPaths = [
-    ...classification.modifiedExistingTests,
-    ...classification.deletedExistingTests,
-  ];
+  // TASK-P0.14: 若存在未获豁免的测试配置文件篡改，确定性 fail-closed 抛异常/阻断
+  if (
+    classification.modifiedTestConfigs &&
+    classification.modifiedTestConfigs.length > 0 &&
+    !options.allowTestConfigMutation
+  ) {
+    return {
+      triggered: false,
+      passed: false,
+      failure_code: "E_TEST_CONFIG_MUTATED",
+      failure_reason: `Test configuration mutated without exemption: ${classification.modifiedTestConfigs.join(", ")}`,
+      restored_paths: [],
+    };
+  }
+
+  // TASK-P0.14: 还原路径集自动纳入被改动/删除的测试夹具与 helper
+  const affectedPaths = Array.from(
+    new Set([
+      ...classification.modifiedExistingTests,
+      ...classification.deletedExistingTests,
+      ...(classification.modifiedFixturesAndHelpers || []),
+    ]),
+  ).sort();
 
   if (affectedPaths.length === 0) {
     return {
