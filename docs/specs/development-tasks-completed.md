@@ -14737,3 +14737,155 @@ governance:
 * **取舍**：只核销「容器隔离策略 + 证据链字段」，不碰 `SANDBOX_ENFORCED` + OpenHands 重路径（GB 级固定摘要镜像 + 容器内模型凭据 + 真实模型花费，另案）。修 `probeDocker()` 是为了让「无 daemon」与「无 Docker」在报告里可区分——否则跳过归因失真。
 * **立卡说明（2026-11-28 · P-354）**：Tina 拍板认可 A 案范围与 `writable_paths`、明确 OpenHands 派工不进本卡。本卡交付四件同 PR：核对报告（新建）、生成器 `probeDocker()` 修证、（仅当必须）穿透用例补一条、矩阵 Docker 在场一节。**立卡 ≠ 开工**；合入后另点名开工。
 * **完工说明（2026-11-28 · P-355）**：Tina 授权开工并按先例合并 [#463](https://github.com/he18718143986-design/IDE/pull/463)（由我执行）。施工 squash `583c580df6bf73a9cb6c85661786852748d255d7`。**Docker 在场补验已交付**：(1) **三项容器隔离实跑**——`TC-P0-3A`（容器内写只读根 → `Read-only file system`，宿主未污染）、`TC-P0-3B`（`.git` tmpfs 遮蔽，宿主 `.git` 哈希不变）、`TC-P0-3C`（`readonly_enforced` 写授权路径亦只读）全部 `PASSED`；穿透文件 `10 passed` / 0 skip；套件裁决由 `PARTIAL`（`passed=11`/`skipped=3`）升为 **`PASSED`**（`passed=14`/`skipped=0`/`failed=0`）。(2) **网络判据**——`DENY` 下容器无出网（`Network unreachable`）；`EXPLICIT_TARGETS` 返回 `via=rejected` / `rejection=NETWORK_TARGET_NOT_ALLOWED` / `exitCode=null`（拒绝而非静默放行/静默断网，且未产生容器）。(3) **证据链字段核对**——签名记录 6 键（`algorithm`/`signature`/`canonical_hash`/`key_id`/`public_key`/`signed_at`），`canonical_hash` 长度 64、`signature` 长度 88；私钥 `~/.stagent/keys/evidence-ed25519.pem` 权限 **0400** 且不在仓库内；独立凭据 `.stagent/signatures/<contract_id>-<evidence_id>.sig`；篡改载荷验签拒绝，合并级 `TC-P0-1C` 返回 `E_CANNOT_MERGE / EVIDENCE_SIGNATURE_INVALID`；Git Trailer **四键**（`Stagent-Evidence-ID` / `Evidence-Sha256` / `Evidence-Signature` / `Stagent-Evidence-Hash`）；`test_integrity` 11 字段、`SandboxWitness` 11 字段。(4) **`probeDocker` 三态修证**——daemon 在场 `available=true` + `(server: 29.6.1)`；仅客户端 `docker_client_only`；无客户端 `docker_not_installed`；daemon 不在时三项如实归 `SKIPPED_NO_DOCKER` 而非 `FAILED`（实测 `passed=8`/`skipped=6`/`failed=0`/`verdict=PARTIAL`）。(5) **顺手修生成器两处失真**——矩阵 §2 三行统计原为硬编码（`7 实跑/3 跳过`，与环境不符），改为由本次结果派生；新增 §6「历史基线留档」保留旧 linux 采样（`5def6bb3` / 8-6-0 / `PARTIAL` / digest `78b199b7…`），避免覆盖式重写丢证。(6) **三处「文档 vs 代码」漂移如实列出**——`baseline_fingerprint` 字段不存在（实为 `failure_reason: "placeholder:unmodified_tests_default"`）；`SandboxWitness` 无 `mount_scope`（实为 `mount_mode` + `mount_count`）；Trailer 为四键。相对父提交 3 文件 +385/−40；**readonly 五文件零 diff**；`tests/daemon/p1-3-cross-platform-penetration.test.ts` 未改动（现有用例已覆盖）。CI 必需面全绿（Docs 56s / Knowledge 57s / Perf 46s / 三平台 Lint·Typecheck / ubuntu 2m5s、macOS 3m24s Unit），Windows Unit 为存量 16 文件 / 28 例（`continue-on-error`；本卡相关 `p1-3-cross-platform-penetration` 10 tests、`evidence-signer` 9 tests、`verify-p0-independent-suite-verdict` 9 tests 在 Windows 全绿），`mergeable=MERGEABLE`、`mergeStateStatus=UNSTABLE` 按先例不挡；Bugbot skipping。**诚实口径**：`alpine:3.20` 证明挂载/只读/网络策略隔离，**不等于 OpenHands 适配器实测**；`P13-P2/P3/P4` 的 `PASSED` 是**规格断言**（`resolveScopedMounts` 等纯函数），`P13-P3/P4` 跨平台容器运行**未在本机验证**；**`SANDBOX_ENFORCED` + OpenHands 派工未做**（另案）；**P0 风险未宣称解除**。旧试玩证据缺 `signature`/`test_integrity`/`sandbox_witness`，属前置缺口（产生于 P1.2/P0.2a/P0.3a 合流之前），**未补写未冒充**，报告 §4.5 写明原因。
+
+
+### 3.4cs 测试资产基线登记施工（TASK-P0.14 · 完工回写 P-357）
+
+<a id="task-p0.14"></a>
+
+#### 【Task P0.14】测试资产基线登记施工 `[COMPLETED]`
+
+> **归档注记（2026-11-28 · P-357）**：施工 PR [#466](https://github.com/he18718143986-design/IDE/pull/466) squash `ee43d64e587f89e9c783322191ed6a68752b8920` 已于 2026-11-28 合入 main（由我执行）。
+> 测试资产识别机制（套件/配置/fixture/helper/动态入口五类分类器）、不可变清单 TestAssetManifest 与 baseRef 强绑定、未登记资产检测与 fail-closed 拦截、配置篡改 E_TEST_CONFIG_MUTATED 确定性阻断、被篡改 fixture/helper 自动纳入还原集重跑、merger PRE_MERGE 独立断言与豁免防伪核验已全部落地。
+> 专项施工与验证报告落盘 [`docs/ledger/p0-14-test-asset-manifest-and-baseline-registration.md`](../ledger/p0-14-test-asset-manifest-and-baseline-registration.md)。
+> 四套测试套件（unit 12 用例 + guard P014-U1~U3 + wiring P014-W1~W3 + fail-closed P014-I1~I2）56/56 全过，静态红线 59/59 全过。
+>
+> **诚实口径**：**测试资产基线登记已交付（五类资产识别、Base Commit 绑定清单、未登记资产 fail-closed、配置篡改阻断、fixture/helper 还原、豁免审计）；补非标准测试资产绕过基线分类之已知缺口，不宣称验收链完全无盲区；硬件级 Attestation 缺失、Merger 不重跑全量测试、容器内无 OS 级二次沙盒、跨进程 Nonce 持久化未做、真实容器运行时 3/10 跳过项等五项事实边界继续保留；严禁宣称「P0 风险完全解除」**。
+>
+> **立卡说明（2026-11-28 · P-356）**：授权来源为 Tina 本轮指令「点名立卡 TASK-P0.14（测试资产基线登记施工，估算 M，P1-High）」。操作者由我执行。卡面基于 TASK-P0.13 Scope B 已落盘设计方案（见 [`docs/ledger/p0-13-baseline-acceptance-independence-and-recovery.md`](../ledger/p0-13-baseline-acceptance-independence-and-recovery.md) 第三章《测试资产基线登记方案与扩展架构设计》）。本卡为施工型任务卡（估算 M，优先级 P1-High），**立卡 ≠ 开工**，后续代码施工须由 Tina 单卡点名授权。
+>
+> **目标**：落实测试资产识别机制（测试文件/配置/helper/fixture/动态加载入口）、Base Commit 绑定机制（基于 baseRef 生成不可变 TestAssetManifest）、未登记资产检测与 fail-closed 拦截或豁免审计留痕、与 `test-integrity.ts` 现有分类（`tests_modified`/`added_tests`/`deleted_existing_tests`）及 Evidence 结构的兼容衔接，并补齐负向测试覆盖。
+>
+> **前置条件与硬依赖**：`TASK-P0.13` 施工及完工回写已正式交付合入（`6122e347` / P-352）。
+>
+> **审批边界（逐字写入）**：本审批**不是代码施工授权**，**不是代码合并批准**，也**不是 P0 风险解除声明**；本卡为施工立卡，**立卡 ≠ 开工**，后续施工须由 Tina 单卡点名授权，施工 PR 全绿且 CLEAN 后另行报授权合入。
+>
+> **诚实口径**：**本卡补的是「非标准测试资产可能绕过基线分类」的已知缺口，不宣称补完后验收链完全无盲区；硬件级 Attestation 缺失、Merger 不重跑全量测试、容器内无 OS 级二次沙盒、跨进程 Nonce 持久化未做、真实容器运行时 3/10 跳过项等五项事实边界继续保留；严禁宣称「P0 风险完全解除」**。
+
+```yaml task-card
+id: TASK-P0.14
+status: COMPLETED
+contract:
+  intent:
+    title: 测试资产基线登记施工
+    description: >-
+      基于 TASK-P0.13 Scope B 已落盘设计方案（《测试资产基线登记方案与扩展架构设计》），落实生产级测试资产基线登记与防篡改机制，消除非标准测试资产绕过基线分类之安全盲区：
+      1. 测试资产识别与分类机制：系统识别测试文件（test suites）、测试配置文件（vitest.config.ts, tsconfig.json 等）、测试夹具与 Mock 数据（fixtures/**, mocks/**）、共享测试工具库（helpers/utils）及动态加载入口；
+      2. Base Commit 绑定机制：基于基准提交（baseRef / base_commit_sha）扫描并哈希化所有测试资产，生成强绑定的不可变基线清单（TestAssetManifest）；
+      3. 未登记测试资产检测与处理：Worker 执行产生未登记或动态新增的测试资产时，实施 fail-closed 拦截，或按合同明确豁免审计记录；
+      4. 分级处置与现有分类器兼容衔接：
+         - 配置文件篡改：若未经合同显式声明豁免（allow_test_config_mutation 或类似契约配置），触发 fail-closed 拒绝（抛 E_TEST_CONFIG_MUTATED 阻断合并）；
+         - fixture / helper 篡改：自动纳入基线隔离重跑的还原路径集（pathsToRestore），在 executeBaselineRerun 期间连同测试用例一并还原至 Base 版本重跑；
+         - 与 test-integrity.ts 现有 tests_modified / added_tests / deleted_existing_tests 分类及 Evidence test_integrity 结构无缝兼容与扩展；
+      5. 负向测试覆盖：覆盖未登记测试资产被检出阻断、测试配置文件篡改无豁免被拒、fixture/helper 篡改被还原并参与基线重跑全链路。
+      卡面原则：紧扣测试资产基线登记与防篡改执行闭环，不扩大重构无关模块。
+    risk_level: HIGH
+  acceptance:
+    - id: P014-P1
+      check: auto
+      text: >-
+        测试资产识别与分类：实现测试资产识别纯函数与分类器，准确提取测试套件、配置文件（vitest.config.ts、tsconfig.json 等）、
+        测试夹具（fixtures/**）、共享 helper 及动态加载入口的相对路径与资产类型（assetKind）。
+    - id: P014-P2
+      check: auto
+      text: >-
+        Base Commit 绑定与 TestAssetManifest 生成：基于 baseRef / base_commit_sha 扫描工作区测试资产并计算 SHA256，
+        生成与基准提交强绑定的不可变测试资产清单（TestAssetManifest），记录资产路径、类型、哈希与判定级别（criticality）。
+    - id: P014-P3
+      check: auto
+      text: >-
+        未登记测试资产检测与 fail-closed 拦截：在 Worker 变更比对中检测不在基线清单内的新增或伪造测试资产；
+        未获合同显式豁免时确定性 fail-closed 抛异常阻断合并，并在 Evidence 留存审计明细。
+    - id: P014-P4
+      check: auto
+      text: >-
+        分级处置与基线重跑集成：测试配置文件发生未豁免篡改时抛出 E_TEST_CONFIG_MUTATED 并阻断合并；
+        fixture 与 helper 篡改自动纳入 restoreBaselineTestFiles 还原路径集参与基线重跑；与 test-integrity.ts 现有三类测试分类无缝兼容。
+    - id: P014-P5
+      check: auto
+      text: >-
+        合同与 Evidence 契约扩展及门禁拦截：支持合同 execution_permissions / allow_test_config_mutation 豁免配置；
+        Evidence test_integrity 结构扩展资产登记与篡改审计留痕；merger PRE_MERGE 阶段独立校验资产基线一致性与签名覆盖。
+    - id: P014-P6
+      check: auto
+      text: >-
+        负向测试覆盖与专项报告：单元与集成用例全面覆盖未登记测试资产被拒、配置文件篡改被拒、fixture/helper 篡改被还原重跑及豁免放行场景；
+        交付报告落盘 docs/ledger/p0-14-test-asset-manifest-and-baseline-registration.md。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/guard/test-integrity.ts
+      - src/lib/test-asset-manifest.ts
+      - src/lib/contract.schema.ts
+      - src/lib/evidence.schema.ts
+      - daemon/pipeline/orchestrator.ts
+      - daemon/pipeline/merger.ts
+      - tests/unit/test-asset-manifest.test.ts
+      - tests/unit/test-integrity-guard.test.ts
+      - tests/daemon/p0-4-test-integrity-wiring.test.ts
+      - tests/daemon/p0-4-test-integrity-fail-closed.test.ts
+      - docs/ledger/p0-14-test-asset-manifest-and-baseline-registration.md
+    readonly_paths:
+      - daemon/baseline/os-sandbox.ts
+      - daemon/worker/sandbox/container-host.ts
+      - scripts/verify-p0-independent-suite.ts
+      - docs/ledger/p0-13-baseline-acceptance-independence-and-recovery.md
+      - docs/specs/development-tasks-completed.md
+  verification:
+    commands:
+      - { alias: focused-p014, executable: npx, args: [vitest, run, tests/unit/test-integrity-guard.test.ts, tests/daemon/p0-4-test-integrity-wiring.test.ts, tests/daemon/p0-4-test-integrity-fail-closed.test.ts] }
+      - { alias: check-docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    基于 P0.13 Scope B 已落盘设计方案（《测试资产基线登记方案与扩展架构设计》）：
+    1. 在 src/lib/test-asset-manifest.ts 中定义 TestAssetItem 与 TestAssetManifest 结构，实现基于 Git 树与路径正则的纯函数分类与哈希生成器；
+    2. 在 daemon/guard/test-integrity.ts 中扩展差异审计与资产比对逻辑，与现行 isTestPath / tests_modified / added_tests / deleted_existing_tests 分类机制兼容衔接；
+    3. 分级处置：测试配置修改检查 allow_test_config_mutation 豁免，未声明则阻断；测试夹具与 helper 修改自动扩充 pathsToRestore 集合，由既有 restoreBaselineTestFiles 保证在基线重跑时还原至 Base 版本；
+    4. 编排器 orchestrator 与合并阶段 merger 接线核验，Evidence test_integrity 字段扩展记录资产基线校验明细并由现有 Ed25519 签名全覆盖；
+    5. 编写单元与集成负向测试，验证未登记资产与篡改拦截。
+  touches:
+    - { path: daemon/guard/test-integrity.ts, change: modify, why: "扩展测试资产比对、未登记资产与配置文件篡改检测，衔接基线重跑还原集", symbols: [classifyTouchedTestPaths, executeBaselineRerun] }
+    - { path: src/lib/test-asset-manifest.ts, change: create, why: "新建测试资产基线清单接口定义、资产分类与 SHA256 清单生成纯函数", symbols: [TestAssetItem, TestAssetManifest, buildTestAssetManifest, auditTestAssetsAgainstManifest] }
+    - { path: src/lib/contract.schema.ts, change: modify, why: "合同执行权限中增加 allow_test_config_mutation 豁免声明配置", symbols: [SoftwareContract] }
+    - { path: src/lib/evidence.schema.ts, change: modify, why: "受控 Evidence test_integrity 结构扩展资产登记与篡改审计记录字段", symbols: [TestIntegrityEvidence] }
+    - { path: daemon/pipeline/orchestrator.ts, change: modify, why: "生成并传递基线测试资产清单，驱动重跑与审计记录填充", symbols: [writeEvidence] }
+    - { path: daemon/pipeline/merger.ts, change: modify, why: "PRE_MERGE 门禁独立核验测试资产基线完整性与未豁免篡改拦截", symbols: [assertEvidenceTestIntegrity] }
+    - { path: tests/unit/test-asset-manifest.test.ts, change: create, why: "测试资产识别、清单生成、哈希比对与未登记资产检测单测", symbols: [] }
+    - { path: tests/unit/test-integrity-guard.test.ts, change: modify, why: "单测补充资产登记分类与分级处置纯函数逻辑", symbols: [] }
+    - { path: tests/daemon/p0-4-test-integrity-wiring.test.ts, change: modify, why: "集成接线覆盖编排器资产清单构建与传递", symbols: [] }
+    - { path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, change: modify, why: "负向测试覆盖配置文件篡改与未登记资产拦截", symbols: [] }
+    - { path: docs/ledger/p0-14-test-asset-manifest-and-baseline-registration.md, change: create, why: "测试资产基线登记机制与执行验证专项交付报告", symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: P014-P1, test_path: tests/unit/test-integrity-guard.test.ts, level: unit, debt: "立卡未开工；施工阶段落实测试资产识别纯函数与分类器单测" }
+    - { acceptance_id: P014-P2, test_path: tests/unit/test-integrity-guard.test.ts, level: unit, debt: "立卡未开工；施工阶段新建 test-asset-manifest.test.ts 覆盖清单生成与哈希绑定" }
+    - { acceptance_id: P014-P3, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, debt: "立卡未开工；施工阶段落实未登记资产检出与 fail-closed 负向拦截测试" }
+    - { acceptance_id: P014-P4, test_path: tests/daemon/p0-4-test-integrity-wiring.test.ts, level: integration, debt: "立卡未开工；施工阶段落实配置篡改阻断与 fixture/helper 还原重跑集成测试" }
+    - { acceptance_id: P014-P5, test_path: tests/daemon/p0-4-test-integrity-fail-closed.test.ts, level: integration, debt: "立卡未开工；施工阶段落实合同豁免与 merger PRE_MERGE 门禁断言测试" }
+    - { acceptance_id: P014-P6, test_path: tests/daemon/p0-4-test-integrity-wiring.test.ts, level: integration, debt: "立卡未开工；施工阶段核验专项报告落盘与全链路无回归" }
+governance:
+  spec_refs:
+    - docs/ledger/p0-13-baseline-acceptance-independence-and-recovery.md
+  depends_on:
+    - { id: TASK-P0.13, kind: hard }
+  code_facts:
+    - { ref: "daemon/guard/test-integrity.ts::isTestPath", note: "现行测试路径正则分类器，需扩展测试配置文件与辅助资产识别" }
+    - { ref: "daemon/guard/test-integrity.ts::classifyTouchedTestPaths", note: "测试变更差异比对纯函数，需接入测试资产基线清单核验" }
+    - { ref: "daemon/guard/test-integrity.ts::executeBaselineRerun", note: "基线隔离重跑执行器，需接入测试配置篡改阻断与 fixture 还原" }
+  non_goals:
+    - 不重构与测试资产无关的容器挂载与沙箱执行策略
+    - 不推翻现有 test-integrity.ts 的三类核心测试判定逻辑
+    - 不在未授权情况下开启代码施工
+  fail:
+    - 测试配置文件被篡改却被当做普通文件静默放行
+    - 测试夹具或 helper 被篡改但在基线重跑时未还原至基准提交
+    - 新增未登记测试资产未获豁免却通过合并门禁
+    - 破坏现有 isTestPath 的正反向判定行为
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 466, commit: ee43d64e587f89e9c783322191ed6a68752b8920 }
+```
