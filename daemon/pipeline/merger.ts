@@ -288,7 +288,7 @@ export function assertEvidenceTestIntegrity(
   if (hasConfigMutation && !allowConfigMutation) {
     throw new MergeGateError(
       "E_TEST_CONFIG_MUTATED",
-      `Test integrity check failed: Test configuration mutated without contract exemption: ${ti.modified_test_configs.join(", ")}`,
+      `Test integrity check failed: Test configuration mutated without contract exemption: ${(ti.modified_test_configs ?? []).join(", ")}`,
     );
   }
 

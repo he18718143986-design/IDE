@@ -496,11 +496,13 @@ describe("TASK-P0.13: 基线验收独立性与恢复加固 (Scope A, Scope C & S
             alias: "unit",
             executable: "npx",
             args: ["vitest"],
-            timeoutSeconds: 30,
+            timeout_seconds: 30,
+            expected_exit_code: 0,
           },
         ],
       });
       contract.authorization.execution_permissions = {
+        ...contract.authorization.execution_permissions,
         allow_baseline_test_mutation: true,
         allow_test_config_mutation: false, // 未豁免配置篡改
       };
@@ -539,11 +541,13 @@ describe("TASK-P0.13: 基线验收独立性与恢复加固 (Scope A, Scope C & S
             alias: "unit",
             executable: "npx",
             args: ["vitest"],
-            timeoutSeconds: 30,
+            timeout_seconds: 30,
+            expected_exit_code: 0,
           },
         ],
       });
       contract.authorization.execution_permissions = {
+        ...contract.authorization.execution_permissions,
         allow_baseline_test_mutation: true,
         allow_test_config_mutation: true, // 显式豁免
       };

@@ -1289,7 +1289,7 @@ export class ContractOrchestrator {
         testsModified ||
         testClassification.hasExistingTestMutation ||
         testClassification.addedTests.length > 0 ||
-        testClassification.modifiedTestConfigs.length > 0,
+        (testClassification.modifiedTestConfigs?.length ?? 0) > 0,
       modified_existing_tests: testClassification.modifiedExistingTests,
       deleted_existing_tests: testClassification.deletedExistingTests,
       added_tests: testClassification.addedTests,
@@ -1314,13 +1314,10 @@ export class ContractOrchestrator {
     let testBaselineFailureReason: string | undefined;
 
     // TASK-P0.14: 配置文件发生未豁免篡改，确定性阻断并记录失败码
-    if (
-      testClassification.modifiedTestConfigs &&
-      testClassification.modifiedTestConfigs.length > 0 &&
-      !allowTestConfigMutation
-    ) {
+    const modifiedConfigsList = testClassification.modifiedTestConfigs ?? [];
+    if (modifiedConfigsList.length > 0 && !allowTestConfigMutation) {
       testBaselineFailureCode = "E_TEST_CONFIG_MUTATED";
-      testBaselineFailureReason = `Test configuration mutated without exemption: ${testClassification.modifiedTestConfigs.join(", ")}`;
+      testBaselineFailureReason = `Test configuration mutated without exemption: ${modifiedConfigsList.join(", ")}`;
       testIntegrityEvidence.baseline_rerun_passed = false;
       testIntegrityEvidence.failure_code = "E_TEST_CONFIG_MUTATED";
       testIntegrityEvidence.failure_reason = testBaselineFailureReason;

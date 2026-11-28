@@ -481,9 +481,29 @@ if (!content.includes('exports.a = 2')) {
           accounting_mode: "UNAVAILABLE",
           limit_reached: false,
         },
-        worker_report: {
-          summary: "test",
-          tests_modified: true,
+        worktree_snapshot: {
+          head_sha: "abc",
+          snapshot_fingerprint: "fp",
+          captured_at: new Date().toISOString(),
+        },
+        verdict: {
+          status: "PASSED",
+          can_merge: true,
+          summary: "fake pass",
+          verification_retry_count: 0,
+        },
+        scope_audit: {
+          passed: true,
+          files_changed: [],
+          forbidden_violations: [],
+          budget_exhausted: false,
+        },
+        verification_results: [],
+        git_info: {
+          base_commit_sha: "base_sha",
+          task_commit_sha: "task_sha",
+          diff_stat: "1 file changed",
+          patch_fingerprint: "pfp",
         },
         test_integrity: {
           tests_modified: true,
@@ -531,9 +551,29 @@ if (!content.includes('exports.a = 2')) {
           accounting_mode: "UNAVAILABLE",
           limit_reached: false,
         },
-        worker_report: {
-          summary: "test",
-          tests_modified: true,
+        worktree_snapshot: {
+          head_sha: "abc",
+          snapshot_fingerprint: "fp",
+          captured_at: new Date().toISOString(),
+        },
+        verdict: {
+          status: "PASSED",
+          can_merge: true,
+          summary: "fake pass",
+          verification_retry_count: 0,
+        },
+        scope_audit: {
+          passed: true,
+          files_changed: [],
+          forbidden_violations: [],
+          budget_exhausted: false,
+        },
+        verification_results: [],
+        git_info: {
+          base_commit_sha: "base_sha",
+          task_commit_sha: "task_sha",
+          diff_stat: "1 file changed",
+          patch_fingerprint: "pfp",
         },
         test_integrity: {
           tests_modified: true,
