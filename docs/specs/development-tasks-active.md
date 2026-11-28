@@ -2029,3 +2029,212 @@ governance:
 <a id="task-p0.15"></a>
 
 > 本卡已 **COMPLETED**（施工 [#471](https://github.com/he18718143986-design/IDE/pull/471) squash `ccaf6f1902b2919e6146909a102ebdd0e850a43e`；立卡 P-358；完工回写 P-359）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-p0.15) §3.4ct。诚实口径：**Evidence 信任根强制与合并事务一致性审计已交付（自带公钥不得单独授权受控合并、缺可信根 fail-closed、四入口审计落盘）；归档/交付副本幂等补偿建议挂账，五项事实边界保留，P0 风险未宣称解除**。
+
+
+### 3.4cs 归档与交付副本幂等补偿修证（TASK-P0.16 · NEW_TASK）
+
+<a id="task-p0.16"></a>
+
+> **立卡说明（2026-11-28 · P-360）**：授权来源为 Tina 本轮指令「点名立卡 TASK-P0.16，出立卡 docs PR」。操作者由我执行。本卡为施工型任务卡（估算 S~M，优先级 P1），承接 P0.15 Scope B 审计挂账项（[`docs/ledger/p0-15-merge-transaction-and-trust-audit.md`](../ledger/p0-15-merge-transaction-and-trust-audit.md)）。**施工型卡，立卡 ≠ 开工**，开工需 Tina 明确点名授权。
+>
+> **审批边界（逐字写入）**：本审批**不是代码合并批准**，也**不是 P0 风险解除声明**。
+>
+> **诚实口径**：**归档与交付副本幂等补偿修证立卡已就绪；不改 Git 提交主路径语义、不动 merge gate 门禁断言、不引入外部依赖服务、不做跨进程持久化队列；硬件级 Attestation 缺失、Merger 不重跑全量测试等五项事实边界保留，P0 风险未宣称解除**。
+
+```yaml task-card
+id: TASK-P0.16
+status: NEW_TASK
+contract:
+  intent:
+    title: Records Archive & Public Delivery Idempotent Compensation
+    description: >-
+      基于 P0.15 Scope B 审计挂账项（docs/ledger/p0-15-merge-transaction-and-trust-audit.md），
+      修证 Git 合并后辅助性 records 归档与公开交付副本拷贝的幂等补偿与显式重试机制，
+      确保失败副本可安全重试，不产生半写或重复脏状态。
+    risk_level: HIGH
+  acceptance:
+    - id: P016-P1
+      check: auto
+      text: >-
+        辅助拷贝失败路径枚举与现状行为确认：系统枚举 merger.ts:1312–1348 代码行号与提交后辅助拷贝全部失败路径，
+        确认当前隔离捕获语义（不破坏 Git squash commit 提交一致性），完成现状行为审计。
+    - id: P016-P2
+      check: auto
+      text: >-
+        幂等补偿机制设计与实现：在 daemon/pipeline/records-archive.ts 中实现幂等安全重试逻辑，
+        基于 contract_id 幂等键、文件存在性与指纹比对、跳过完整文件、断点续拷未完整文件与原子 manifest 写入。
+    - id: P016-P3
+      check: auto
+      text: >-
+        显式补偿重试入口与交付状态收敛：暴露显式补偿重试接口，支持在 archive.ok === false 状态下重新触发补偿流程；
+        归档补偿成功后，deliveryTerminal 状态无缝收敛为 delivery_complete: true。
+    - id: P016-P4
+      check: auto
+      text: >-
+        负向防重与中断恢复专项测试：新建 tests/daemon/p0-16-records-archive-compensation.test.ts 专项测试，
+        覆盖初次失败重试成功、重复多次触发幂等防重、部分拷贝中断后断点续写与未合流防误触。
+    - id: P016-P5
+      check: auto
+      text: >-
+        专项交付报告落盘与诚实口径：专项交付报告落盘 docs/ledger/p0-16-records-archive-idempotent-compensation.md；
+        明确排除改 Git 提交主语义、动门禁、引入外部服务与跨进程队列；五项事实边界保留，P0 风险未宣称解除。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/pipeline/records-archive.ts
+      - daemon/pipeline/merger.ts
+      - src/lib/state/terminal-delivery-closure.ts
+      - tests/daemon/p0-16-records-archive-compensation.test.ts
+      - docs/ledger/p0-16-records-archive-idempotent-compensation.md
+      - docs/ledger/README.md
+    readonly_paths:
+      - daemon/guard/evidence-integrity.ts
+      - daemon/pipeline/contract-store.ts
+      - src/lib/contract.schema.ts
+      - docs/specs/task-card-standard.md
+  verification:
+    commands:
+      - { alias: focused-p016, executable: npx, args: [vitest, run, tests/daemon/p0-16-records-archive-compensation.test.ts] }
+      - { alias: check-docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    基于 P0.15 Scope B 审计挂账项：
+    1. 在 records-archive.ts 中实现 compensateContractRecordsArchive，基于存在性检查与原子 manifest 覆写提供幂等重试；
+    2. 在 merger.ts 或对应模块暴露显式补偿调用链路，并在补偿成功后由 terminal-delivery-closure.ts 将 deliveryTerminal 收敛为已交付完成；
+    3. 新建 tests/daemon/p0-16-records-archive-compensation.test.ts 专项用例，并产出专项审计交付报告。
+  touches:
+    - { path: daemon/pipeline/records-archive.ts, change: modify, why: "新增 compensateContractRecordsArchive 幂等补偿函数与原子 manifest 写入", symbols: [compensateContractRecordsArchive] }
+    - { path: daemon/pipeline/merger.ts, change: modify, why: "接入显式补偿链路并校正行号注释", symbols: [] }
+    - { path: src/lib/state/terminal-delivery-closure.ts, change: modify, why: "支持补偿成功后的文案与状态无缝收敛", symbols: [publicDeliveryCopy] }
+    - { path: tests/daemon/p0-16-records-archive-compensation.test.ts, change: create, why: "新建幂等补偿与负向中断恢复专项测试", symbols: [] }
+    - { path: docs/ledger/p0-16-records-archive-idempotent-compensation.md, change: create, why: "落盘归档与交付副本幂等补偿专项交付报告", symbols: [] }
+    - { path: docs/ledger/README.md, change: modify, why: "更新台账开放项与核销状态", symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: P016-P1, test_path: tests/daemon/p0-16-records-archive-compensation.test.ts, level: unit, debt: "立卡未开工；施工阶段落实辅助拷贝失败枚举与现状隔离验证" }
+    - { acceptance_id: P016-P2, test_path: tests/daemon/p0-16-records-archive-compensation.test.ts, level: unit, debt: "立卡未开工；施工阶段落实幂等比对、断点续拷与 manifest 原子写入测试" }
+    - { acceptance_id: P016-P3, test_path: tests/daemon/p0-16-records-archive-compensation.test.ts, level: integration, debt: "立卡未开工；施工阶段落实显式补偿接口接线与 delivery_complete 状态收敛测试" }
+    - { acceptance_id: P016-P4, test_path: tests/daemon/p0-16-records-archive-compensation.test.ts, level: integration, debt: "立卡未开工；施工阶段落实异常注入重试成功、重复防重与中断续写负向测试" }
+    - { acceptance_id: P016-P5, test_path: tests/daemon/p0-16-records-archive-compensation.test.ts, level: unit, debt: "立卡未开工；施工阶段核验专项报告落盘" }
+governance:
+  spec_refs:
+    - docs/ledger/p0-15-merge-transaction-and-trust-audit.md
+  depends_on:
+    - { id: TASK-P0.15, kind: hard }
+  code_facts:
+    - { ref: "daemon/pipeline/merger.ts:1312-1348", note: "提交后辅助归档调用处于独立 try/catch，失败未提供幂等补偿" }
+    - { ref: "daemon/pipeline/records-archive.ts::archiveContractRecords", note: "同步拷贝记录文件与生成 manifest，遇错误直接中断且无断点续拷" }
+  non_goals:
+    - 不改动 Git 提交主路径与回滚语义
+    - 不动 merge gate 门禁断言与信任根规则
+    - 不引入外部依赖服务与独立后台守护进程
+    - 不做跨进程持久化队列（挂账）
+  fail:
+    - 修改 Git 提交主逻辑导致合并语义改变
+    - 破坏既有 PRE_MERGE 门禁断言顺序
+    - 重复触发补偿产生重复追加或脏数据
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+#### 【Task P0.16】Records Archive & Public Delivery Idempotent Compensation
+
+##### R-1 背景与动机
+在 `TASK-P0.15` Scope B 事务一致性审计（[`docs/ledger/p0-15-merge-transaction-and-trust-audit.md`](../ledger/p0-15-merge-transaction-and-trust-audit.md) §3.3）中明确确认：
+1. `merger.ts` 在 Git squash commit 提交落地并将生命周期迁移至 `MERGED` 后，会触发辅助性的 records 归档（`archiveContractRecords`）与公开交付文案装配（`publicDeliveryCopy`）；
+2. 现状代码采用务实的隔离捕获设计：若辅助拷贝出现 IO 异常，系统捕获异常并返回 `{ ok: false, error: ... }`，文案标注为 `已合入（归档未完成，尚未标交付完成）`（`delivery_complete: false`），从而保证已合流的 Git 提交绝对不会因非核心辅助文件拷贝失败而处于未定或回滚状态；
+3. 但系统缺少后台异步重试队列与显式幂等补偿机制，若归档因临时文件系统繁忙或偶发异常失败，该合同的 records 目录将永久缺失或残留半写状态，且无法通过安全重试恢复为正常的 `已交付归档`（`delivery_complete: true`）；
+4. 因此立本卡实施幂等补偿机制修证。
+
+##### R-2 目标与明确排除（Non-Goals）
+- **目标**：
+  1. 系统枚举辅助拷贝的全部失败路径，并核对修正代码实际所在行号；
+  2. 实现幂等安全的重试补偿函数，支持基于 `contract_id` 幂等续拷与原子 manifest 覆写；
+  3. 暴露显式的补偿重试接口，使得未完成归档的合同可按需重试并收敛交付状态；
+  4. 健全负向测试套件与覆盖；
+  5. 产出专项报告落盘。
+- **明确排除（逐字写入）**：
+  - **不改 Git 提交主路径语义**：严格保持 Git squash commit 优先落地、不可逆、无害隔离设计；
+  - **不动 merge gate 门禁断言**：PRE_MERGE 8 道只读门禁检查保持原封不动；
+  - **不引入外部依赖服务**：不引入 Redis、RabbitMQ、Kafka 等外部服务；
+  - **不做跨进程持久化队列**：若采用进程内轻量重试或显式重试入口，如实标注跨进程持久化队列为后续挂账。
+
+##### R-3 架构映射与现有模块分析
+- **`daemon/pipeline/merger.ts:1312–1348`**：
+  - 核心合流链路末端，在 `store.transition({ contractId, lifecycleState: 'MERGED' })` 后调用 `archiveContractRecords`；
+  - 审计报告 L48/L60 原记录行号为 1151/1164，经代码核验实际位于 1313/1324，施工阶段在卡面与报告中如实校正；
+- **`daemon/pipeline/records-archive.ts`**：
+  - 负责 Demo 快照、确认元数据与 audit-manifest 拷贝写入；当前仅有单次执行逻辑，缺少断点存在性比对与单文件增量续写；
+- **`src/lib/state/terminal-delivery-closure.ts`**：
+  - `publicDeliveryCopy` 根据 `archive_ok` 决定 `delivery_complete` 及对外展示文案；补偿成功后需支持状态无缝同步。
+
+##### R-4 代码锚点与现状校正
+1. **行号校正**：`merger.ts:1313` 调用 `archiveContractRecords(...)`，`1324` 调用 `publicDeliveryCopy(...)`；
+2. **错误模型**：`RecordsArchiveResult`（`ok: boolean; records_dir: string; copied: string[]; error?: string; manifest?: AuditManifest;`）；
+3. **交付文案**：`publicDeliveryCopy` 当 `archive_ok === false` 时返回 `已合入（归档未完成，尚未标交付完成）`。
+
+##### R-5 接口与数据结构设计
+在 `daemon/pipeline/records-archive.ts` 中新增导出：
+```ts
+export interface CompensateArchiveOptions {
+  repoRoot: string;
+  contract_id: string;
+  forceOverwrite?: boolean;
+}
+
+export function compensateContractRecordsArchive(
+  options: CompensateArchiveOptions,
+): RecordsArchiveResult;
+```
+并在 `merger.ts` 或对应对外接口按需提供补偿调用链路。
+
+##### R-6 失败路径枚举与恢复设计
+1. **目标目录只读/无写权限**：补偿入口捕获 `EACCES` 并返回结构化错误，不崩溃进程；
+2. **源 Demo/Snapshot 文件不存在或已被清理**：跳过缺失可选文件，记录 warnings，在 manifest 中注明缺项；
+3. **Manifest 写入中途崩溃**：采用原子写入策略（写入临时文件后 `fs.renameSync` 替换），杜绝半写损坏；
+4. **并发重复补偿**：基于合同锁或目录锁保护，重复触发幂等跳过相同哈希的文件。
+
+##### R-7 幂等防重与断点续拷算法设计
+1. 检查目标目录 `.stagent/records/{contract_id}/`；
+2. 遍历应拷贝文件清单（`demo-confirm.json`、`demo-index.html`、`demo-meta.json` 等）：
+   - 若目标文件已存在且大小/mtime/内容一致，直接跳过并计入 `copied` 列表；
+   - 若目标文件不存在或损坏，执行拷贝；
+3. 重新聚合生成 `AuditManifest` 并以临时文件原子重命名落盘；
+4. 返回 `RecordsArchiveResult`（`ok: true`）。
+
+##### R-8 测试用例设计（`tests/daemon/p0-16-records-archive-compensation.test.ts`）
+1. **TC-P016-1 失败枚举与现状隔离**：模拟 `fs.mkdirSync` 抛出异常，断言 `archiveContractRecords` 返回 `ok: false` 且不阻断 `merger.ts` 主返回值；
+2. **TC-P016-2 补偿成功收敛**：首次归档失败的合同，调用 `compensateContractRecordsArchive` 成功完成拷贝，且调用 `publicDeliveryCopy({ archive_ok: true })` 转换为 `delivery_complete: true`；
+3. **TC-P016-3 幂等防重**：连续调用 3 次补偿函数，目标文件内容保持一致，不产生临时垃圾文件；
+4. **TC-P016-4 中断断点恢复**：模拟先拷贝部分文件后中断，再次补偿能补齐缺失文件并正确生成 manifest；
+5. **TC-P016-5 非法状态防护**：对未达 `MERGED` 状态或不存在的合同拒绝非法补偿，抛出或返回预期错误码。
+
+##### R-9 交付物清单
+1. `daemon/pipeline/records-archive.ts`：幂等补偿函数与原子写入；
+2. `daemon/pipeline/merger.ts`：辅助拷贝代码段对接与行号校正；
+3. `src/lib/state/terminal-delivery-closure.ts`：文案与状态收敛适配；
+4. `tests/daemon/p0-16-records-archive-compensation.test.ts`：专项测试用例；
+5. `docs/ledger/p0-16-records-archive-idempotent-compensation.md`：专项交付报告；
+6. `docs/ledger/README.md`：台账状态核销。
+
+##### R-10 依赖与排程
+- **硬依赖**：`TASK-P0.15`（COMPLETED · 施工 #471 / 完工回写 P-359）；
+- **排程**：本卡为 P1 优先级卡，立卡后处于 `NEW_TASK`，待 Tina 明确授权开工。
+
+##### R-11 风险与诚实口径
+- **非 P0 风险解除声明**：本卡仅处理辅助性文件拷贝与交付文案的一致性与可恢复性，不影响核心 Git Squash 提交与门禁安全；
+- **五项事实边界保留**：
+  1. 硬件级 Attestation 缺失；
+  2. Merger PRE_MERGE 阶段不重跑全量测试；
+  3. 容器内无 OS 级二次沙盒隔离；
+  4. 跨进程 Nonce 存储仍为内存型；
+  5. 真实容器运行时 3/10 测试跳过项；
+  严禁因本卡立卡或交付宣称「P0 风险完全解除」。
+
+##### R-12 审批边界声明
+- 本审批**不是代码合并批准**，也**不是 P0 风险解除声明**；
+- **施工型卡，立卡 ≠ 开工**，开工需 Tina 明确点名授权。
