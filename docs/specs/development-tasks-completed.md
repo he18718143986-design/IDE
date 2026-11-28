@@ -14889,3 +14889,125 @@ governance:
     gateway_write_scope: unchanged
   delivered: { pr: 466, commit: ee43d64e587f89e9c783322191ed6a68752b8920 }
 ```
+
+### 3.4ct 凭据信任根强制与合并事务审计（TASK-P0.15 · COMPLETED）
+
+<a id="task-p0.15"></a>
+
+#### 【Task P0.15】Evidence Trust-root Enforcement + Merge Transaction Audit `[COMPLETED]`
+
+> **完工回写说明（2026-11-28 · P-359）**：授权来源为 Tina 本轮指令「按先例授权合并 #471，执行 TASK-P0.15 完工回写」。操作者由我执行。施工 PR [#471](https://github.com/he18718143986-design/IDE/pull/471)（head `a9cf16903f4d3aaaa4f41b36ff3f849b2ff38794`）squash **`ccaf6f1902b2919e6146909a102ebdd0e850a43e`** 于 2026-11-28 合入 main。纯 docs 完工回写，不改产品代码。基线 main `ccaf6f1902b2919e6146909a102ebdd0e850a43e`。顺延为 **P-359**（版本头第 343 条）；**P-285 未占用、不改号**。`TASK-P0.15` 由 `[NEW_TASK]` → **`[COMPLETED]`**，正文迁入 `development-tasks-completed.md` §3.4ct。
+>
+> **诚实口径**：**Evidence 信任根强制与合并事务一致性审计已交付（自带公钥不得单独授权受控合并、缺可信根 fail-closed、四入口审计落盘）；归档/交付副本幂等补偿建议挂账，五项事实边界保留，P0 风险未宣称解除**。
+
+```yaml task-card
+id: TASK-P0.15
+status: COMPLETED
+contract:
+  intent:
+    title: Evidence Trust-root Enforcement + Merge Transaction Audit
+    description: >-
+      基于 PR #468 去重对照落盘方案（《PR #468 Deduplication Crosswalk and Incremental Disposition》），聚焦高风险安全增量与合并事务边界审计：
+      1. Scope A（明确修证 - 凭据信任根强制）：
+         - 修正 merger.ts 验签逻辑：受控合并强制要求配置可信公钥或显式信任策略；
+         - Evidence 自带 public_key 不得单独获得受控合并授权；无 expectedPublicKey 时完整性校验模式须显式降级为 integrity-only 并阻断受控合并；
+         - 负向测试覆盖未知密钥、伪造信任来源、载荷变更、签名不匹配、Contract/Candidate 绑定错误；正向测试验证可信密钥路径；
+      2. Scope B（审计型 - 合并事务与恢复一致性审计）：
+         - 枚举所有 Merge/Delivery 入口及完整调用链；
+         - 审计门禁检查与 Git 操作临界边界（TOCTOU/竞态风险与防御假设）；
+         - 审计锁获取与释放范围、并发一致性假设、失败/重试/取消/部分交付恢复行为；
+         - 审计归档与 Closure 失败恢复机制；
+         - 所有新增发现映射至现有卡，禁止重复施工；产出落盘 docs/ledger/p0-15-merge-transaction-and-trust-audit.md；
+      3. 明确排除逐字约束：已交付沙箱探测/Container Fence/Baseline Recovery 重写、硬件 Attestation、无增量证据的跨层大规模改造。
+    risk_level: HIGH
+  acceptance:
+    - id: P015-P1
+      check: auto
+      text: >-
+        Scope A 信任根强制与降级阻断：修证 merger.ts assertEvidenceSignatureGate，受控合并强制要求可信密钥或显式信任策略；
+        Evidence 自带公钥不得单独获得受控合并授权，无 expectedPublicKey 时完整性校验模式显式降级为 integrity-only 并阻断受控合并。
+    - id: P015-P2
+      check: auto
+      text: >-
+        Scope A 负向拦截与防伪测试：负向测试覆盖未知密钥、伪造信任来源、载荷变更、签名不匹配、Contract/Candidate 绑定错误；
+        验证非可信签名无法突破受控合并门禁。
+    - id: P015-P3
+      check: auto
+      text: >-
+        Scope A 正向可信路径验证与留痕：正向测试验证合法配置的可信公钥路径顺利通过受控合并；
+        门禁决策与 Evidence 留存信任验证模式及 keyId 审计信息。
+    - id: P015-P4
+      check: auto
+      text: >-
+        Scope B 合并与交付入口及临界边界审计：系统枚举所有 Merge/Delivery 入口及完整调用链，
+        审查门禁检查与 Git 操作临界边界，分析并记录状态竞态与 TOCTOU 假设。
+    - id: P015-P5
+      check: auto
+      text: >-
+        Scope B 锁范围与并发/失败恢复一致性审计：系统审查锁范围、并发一致性、失败/重试/取消/部分交付恢复，
+        以及归档与 Closure 失败恢复机制；映射所有发现至现有卡，严禁重复施工。
+    - id: P015-P6
+      check: auto
+      text: >-
+        专项审计报告落盘与去重闭环：专项交付报告落盘 docs/ledger/p0-15-merge-transaction-and-trust-audit.md；
+        对齐 pr468-dedup-crosswalk 去重结论，记录信任根修证、事务审计发现与诚实口径。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - daemon/pipeline/merger.ts
+      - tests/daemon/p0-15-evidence-trust-root.test.ts
+      - docs/ledger/p0-15-merge-transaction-and-trust-audit.md
+    readonly_paths:
+      - daemon/pipeline/orchestrator.ts
+      - daemon/pipeline/evidence-signer.ts
+      - daemon/guard/test-integrity.ts
+      - src/lib/contract.schema.ts
+      - src/lib/evidence.schema.ts
+  verification:
+    commands:
+      - { alias: focused-p015, executable: npx, args: [vitest, run, tests/daemon/p0-15-evidence-trust-root.test.ts] }
+      - { alias: check-docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    基于 PR #468 去重对照落盘结论：
+    1. 在 merger.ts assertEvidenceSignatureGate 中引入信任模式判断，仅当 expectedPublicKey 显式匹配或显式信任策略允许时才授权受控合并，自带公钥回退仅作为 integrity-only 校验且拒绝受控合并（抛 E_EVIDENCE_UNTRUSTED_KEY）；
+    2. 新建 tests/daemon/p0-15-evidence-trust-root.test.ts，构造自带公钥、未知公钥、篡改载荷等负向场景与可信公钥正向场景；
+    3. 审计合并链路各入口与事务临界区，产出专项报告 docs/ledger/p0-15-merge-transaction-and-trust-audit.md。
+  touches:
+    - { path: daemon/pipeline/merger.ts, change: modify, why: "修证 assertEvidenceSignatureGate 强制可信密钥并阻断自带公钥单独受控合并", symbols: [assertEvidenceSignatureGate] }
+    - { path: tests/daemon/p0-15-evidence-trust-root.test.ts, change: create, why: "新建 Evidence 信任根强制与负向防伪测试套件", symbols: [] }
+    - { path: docs/ledger/p0-15-merge-transaction-and-trust-audit.md, change: create, why: "落盘合并事务边界与信任根加固专项审计报告", symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: P015-P1, test_path: tests/daemon/p0-15-evidence-trust-root.test.ts, level: integration, debt: "立卡未开工；施工阶段落实 merger 信任根强制与降级阻断单测" }
+    - { acceptance_id: P015-P2, test_path: tests/daemon/p0-15-evidence-trust-root.test.ts, level: integration, debt: "立卡未开工；施工阶段落实伪造公钥与载荷篡改负向拦截用例" }
+    - { acceptance_id: P015-P3, test_path: tests/daemon/p0-15-evidence-trust-root.test.ts, level: integration, debt: "立卡未开工；施工阶段落实可信公钥正常合并正向用例" }
+    - { acceptance_id: P015-P4, test_path: tests/daemon/p0-15-evidence-trust-root.test.ts, level: integration, debt: "立卡未开工；施工阶段核验合并入口与临界边界审计报告落盘" }
+    - { acceptance_id: P015-P5, test_path: tests/daemon/p0-15-evidence-trust-root.test.ts, level: integration, debt: "立卡未开工；施工阶段核验并发锁与失败恢复审计报告落盘" }
+    - { acceptance_id: P015-P6, test_path: tests/daemon/p0-15-evidence-trust-root.test.ts, level: integration, debt: "立卡未开工；施工阶段核验专项报告完整性与诚实口径" }
+governance:
+  spec_refs:
+    - docs/ledger/pr468-dedup-crosswalk-task-p0-15.md
+  depends_on:
+    - { id: TASK-P0.14, kind: hard }
+  code_facts:
+    - { ref: "daemon/pipeline/merger.ts::assertEvidenceSignatureGate", note: "现行合并验签门禁，需修证自带公钥回退逻辑并强制可信策略" }
+    - { ref: "daemon/pipeline/evidence-signer.ts::verifyEvidenceSignature", note: "底层签名验签纯函数，提供载荷完整性与公钥匹配校验" }
+  non_goals:
+    - 不重复重写已交付的容器沙箱探测与容器隔离栅栏（P0.1a/P0.3b/P1.5）
+    - 不重复重写已交付的基线恢复机制与测试资产登记（P0.4/P0.13/P0.14）
+    - 不实施硬件 Attestation 或未定性的全层大幅改动
+    - 不在未授权情况下开启代码施工
+  fail:
+    - Evidence 自带公钥在缺少信任策略时仍能通过受控合并授权
+    - 未知公钥签名的 Evidence 能够通过合并门禁
+    - 合并与交付入口未完成全面审计或存在未登记的旁路合并
+    - 破坏既有通过配置密钥签名的合法合并行为
+  estimate: M
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+  delivered: { pr: 471, commit: ccaf6f1902b2919e6146909a102ebdd0e850a43e }
+```
