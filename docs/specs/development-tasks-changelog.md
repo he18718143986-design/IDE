@@ -1,3 +1,17 @@
+- **P-362（去重对照落盘与立卡 TASK-P1.6 · 跨层状态一致性盘点评估 · 2026-11-29）**：授权来源为 Tina 本轮指令「按此口径执行：去重对照落盘 docs PR 与立卡 TASK-P1.6」。操作者由我执行。纯 docs 变更，不改产品代码，**审计型卡，立卡 ≠ 开工**。基线 main `dd0ef3f057c8ad806de0236624517dc82a4cd652`（#475 squash 后）。现场核对最新流水 P-361、版本头第 345 条，顺延为 **P-362**（版本头第 346 条）；**P-285 未占用、不改号**。
+  - **去重对照落盘**：对 `docs/stagent-p0-p1-hardening-spec` 分支（commit `4aa68449`）规格文件 `docs/specs/v0.1-p0-p1-hardening-remediation.md` 逐条对照，产出报告 [`docs/ledger/p0-p1-hardening-spec-dedup-crosswalk.md`](../ledger/p0-p1-hardening-spec-dedup-crosswalk.md)：
+    - P0-A Execution Assurance → P0.3b-2 #434 + P0.1a #455 + P1.5 #463 已交付，不重复施工；
+    - P0-B Independent Acceptance → P0.2a #452 + P0.13 #459 + P0.14 #466 已交付，不重复施工；
+    - P1-A Evidence Trust Root → P0.15 #471 已交付（自带公钥不得单独授权受控合并、9 用例覆盖伪造签名者），规格基于旧快照；
+    - P1-B Merge Transaction → P0.15 Scope B 已审计落盘 + P0.16 #474 幂等补偿已交付；
+    - P1-C Cross-layer Invariants → **唯一真实增量**，转立卡 `TASK-P1.6`；
+    - 规格执行纪律部分（Worker 不得自改验收标准、环境不可用不得转 PASS、验收绑定候选指纹等）注明「与现行卡面纪律一致，非新发现」；
+    - 该分支保留作审计参考不删、不合入原文；
+  - **立卡 TASK-P1.6**：新增 `[NEW_TASK]` 审计型任务卡 **`TASK-P1.6`**（跨层状态一致性盘点评估，估算 S，审计型）；
+    - **DoD 预估**：(a) Lifecycle/Delivery/Presentation 三层状态投影点枚举（合同状态机、`deliveryTerminal`、UI 展示层各自的状态来源与转换入口）；(b) 非法转换面识别（哪些跨层状态组合在代码上可达但语义上不应出现，如 UI 显示 DELIVERED 但 merge gate 未过）；(c) 现有测试覆盖缺口盘点（哪些不变量已有断言、哪些无）；(d) 盘点报告落盘 `docs/ledger/p1-6-cross-layer-invariants-audit.md`，含「需修证项/可接受项/待设计项」三分类；
+    - **明确排除逐字写入**：本卡只盘点不修证——发现的缺口如实记录挂账，施工另立卡；严禁修改任何产品代码；
+    - **审批边界逐字写入**：本审批**不是代码合并批准**，也**不是 P0 风险解除声明**；**审计型卡，立卡 ≠ 开工**，开工需 Tina 明确点名授权；
+  - 同步：版本头第 346 条、§1.1 矩阵新增行、索引、active 新增 §3.4ct、ledger 清单与开放项更新、Sprint 首要、本流水。合同 `MERGED`、端到端闭环走通一次口径不变。P0/P1 收敛口径维持（专项收敛、剩余项挂账、不宣称风险完全解除）。CI.2 继续 Hold（P-245）。活发送、§3.3、D.1e、S.3 维持 Hold / DEFERRED。R23 暂缓。Console 拆分与第二批未立卡。`multi-worktree-cross-talk` 挂账未动。J.53–J.62 保持关闭。J.22 未开工。#344 遗留分支不动。本条仅文档立卡与去重对照，不改产品代码。
 - **P-361（TASK-P0.16 施工合入与完工回写 · 归档与交付副本幂等补偿修证 · 2026-11-28）**：授权来源为 Tina 本轮指令「按先例授权合并 #474，执行 TASK-P0.16 完工回写」。操作者由我执行。施工 PR [#474](https://github.com/he18718143986-design/IDE/pull/474)（head `f8012f09b5aeb6fb6cdef9b07d43aae178e46ab4`）squash **`abf25163f4c1abd0cd506e21355baab199e5ae78`** 于 2026-11-28 合入 main（父提交 `728b5060920eeb28b2659119875b1e7d1ab2e365`，线性历史）。仅 6 个授权 `writable_paths`（+808/−11），readonly 路径零 diff。归档注记逐条记录 P016-P1～P5：
   - P016-P1：`daemon/pipeline/merger.ts:1312–1348` 辅助拷贝失败语义确认（`archiveContractRecords` 隔离捕获返回 `{ok:false}`、`publicDeliveryCopy` 保持 `delivery_complete:false` 且 `assertRecordsReadyForDelivered` 拦截）；
   - P016-P2：`daemon/pipeline/records-archive.ts` `compensateContractRecordsArchive`——`contract_id` 幂等键、SHA-256 比对完整文件 `skipped`、损坏/半写原子覆写 `repaired`、缺失补拷 `copied`、`.tmp-*`+`rename` 原子提交；

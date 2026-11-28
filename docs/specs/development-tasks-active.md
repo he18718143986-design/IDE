@@ -2036,3 +2036,149 @@ governance:
 <a id="task-p0.16"></a>
 
 > 本卡已 **COMPLETED**（施工 [#474](https://github.com/he18718143986-design/IDE/pull/474) squash `abf25163f4c1abd0cd506e21355baab199e5ae78`；立卡 P-360；完工回写 P-361）。正文迁入 [`development-tasks-completed.md`](./development-tasks-completed.md#task-p0.16) §3.4cu。诚实口径：**归档/交付副本幂等补偿已交付（`contract_id` 幂等键、原子覆写与断点续拷、显式重试入口、交付状态收敛）；跨进程持久化队列挂账，五项事实边界保留，P0 风险未宣称解除**。
+
+### 3.4ct 跨层状态一致性盘点评估（TASK-P1.6 · NEW_TASK）
+
+<a id="task-p1.6"></a>
+
+> **立卡说明（2026-11-29 · P-362）**：授权来源为 Tina 本轮指令「按此口径执行：去重对照落盘 docs PR 与立卡 TASK-P1.6」。操作者由我执行。本卡为**纯审计型任务卡**（估算 S，优先级 P2-Medium），承接 `docs/stagent-p0-p1-hardening-spec` 分支规格（commit `4aa68449`）中唯一真实增量 P1-C（跨层不变量与状态投影）。**纯审计型卡，只盘点不修证，立卡 ≠ 开工**，开工需 Tina 明确点名授权。
+>
+> **审批边界（逐字写入）**：本审批**不是代码合并批准**，也**不是 P0 风险解除声明**。
+>
+> **诚实口径**：**跨层状态一致性盘点评估立卡已就绪；本卡只盘点不修证，发现的缺口如实记录挂账，严禁修改任何产品代码；硬件级 Attestation 缺失、Merger 不重跑全量测试等五项事实边界保留，P0 风险未宣称解除**。
+
+```yaml task-card
+id: TASK-P1.6
+status: NEW_TASK
+contract:
+  intent:
+    title: Cross-layer Invariants and State Projection Audit
+    description: >-
+      承接硬化补救规格（docs/ledger/p0-p1-hardening-spec-dedup-crosswalk.md）中 P1-C 增量项，
+      系统盘点 Lifecycle / Delivery / Presentation 三层状态投影点、识别非法跨层转换面与测试覆盖缺口，
+      产出分类盘点评估报告。本卡纯审计只盘点不修证，不改动任何产品代码。
+    risk_level: MEDIUM
+  acceptance:
+    - id: P16-P1
+      check: auto
+      text: >-
+        三层状态投影点全量枚举：系统梳理并枚举 (1) 合同生命周期状态机（ContractStore/ContractLifecycleState）、
+        (2) 交付端点（merger.ts deliveryTerminal / terminal-delivery-closure.ts）、
+        (3) UI 展示层（src/routes/index.tsx / Console / 各类 Tab 投影）各自的状态字段来源与驱动入口。
+    - id: P16-P2
+      check: auto
+      text: >-
+        非法转换面识别与矛盾组合分析：排查哪些跨层状态组合在代码逻辑上理论可达但在业务语义上不应出现
+        （如 UI 显示 DELIVERED 但 merger 门禁未过、或合同仍处于 EXECUTING 时公开文案提前展示已交付），识别潜在风险面。
+    - id: P16-P3
+      check: auto
+      text: >-
+        测试覆盖缺口盘点：系统对照三层状态投影与不变量定义，盘点现有测试套件（单元、集成、端到端）
+        对状态一致性断言的覆盖情况，明确哪些不变量已有测试防护、哪些存在验证盲区。
+    - id: P16-P4
+      check: auto
+      text: >-
+        专项盘点报告落盘与三分类归拢：形成专项盘点报告落盘 docs/ledger/p1-6-cross-layer-invariants-audit.md，
+        对发现项明确标注「需修证项 / 可接受项 / 待设计项」三分类；发现缺口如实挂账，施工另行立卡。
+  scheme_item_ids: []
+  scope:
+    writable_paths:
+      - docs/ledger/p1-6-cross-layer-invariants-audit.md
+      - docs/ledger/README.md
+    readonly_paths:
+      - src/lib/contract.schema.ts
+      - daemon/pipeline/contract-store.ts
+      - daemon/pipeline/merger.ts
+      - src/lib/state/terminal-delivery-closure.ts
+      - src/routes/index.tsx
+      - tests/lib/contract.schema.test.ts
+      - docs/specs/task-card-standard.md
+  verification:
+    commands:
+      - { alias: check-docs, executable: npm, args: [run, check:docs] }
+design:
+  approach: >-
+    纯审计型任务卡设计：
+    1. 静态代码走查与架构映射：跟踪合同状态在 ContractStore、Merger 与前端组件（如 IndexRoute、Console）间的流转与投影映射；
+    2. 状态组合矩阵构建：穷举 LifecycleState × DeliveryTerminal × PresentationView 状态空间，标注合法性与单向依赖规则；
+    3. 缺口审查与归类：对比现有测试用例断言，将未覆盖的非法状态组合分类为需修证、可接受或待设计项，产出专项报告。
+  touches:
+    - { path: docs/ledger/p1-6-cross-layer-invariants-audit.md, change: create, why: "落盘跨层状态一致性盘点评估专项报告", symbols: [] }
+    - { path: docs/ledger/README.md, change: modify, why: "更新台账开放项与盘点结论登记", symbols: [] }
+  interfaces: []
+  test_plan:
+    - { acceptance_id: P16-P1, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "立卡未开工；纯审计型任务卡，施工阶段落实三层状态投影点全量枚举与现状梳理" }
+    - { acceptance_id: P16-P2, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "立卡未开工；纯审计型任务卡，施工阶段落实非法转换面识别与矛盾组合分析" }
+    - { acceptance_id: P16-P3, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "立卡未开工；纯审计型任务卡，施工阶段落实测试覆盖缺口盘点与不变量断言核对" }
+    - { acceptance_id: P16-P4, test_path: tests/unit/docs-check.test.ts, level: unit, debt: "立卡未开工；纯审计型任务卡，施工阶段落实分类报告落盘 docs/ledger/p1-6-cross-layer-invariants-audit.md" }
+governance:
+  spec_refs:
+    - docs/ledger/p0-p1-hardening-spec-dedup-crosswalk.md
+  depends_on:
+    - { id: TASK-P0.16, kind: hard }
+  code_facts:
+    - { ref: "src/lib/contract.schema.ts::LifecycleState", note: "合同生命周期权威状态定义（DRAFT/PREPARING/EXECUTING/AUDITED/MERGED 等）" }
+    - { ref: "src/lib/state/terminal-delivery-closure.ts::publicDeliveryCopy", note: "交付完成文案与状态投影，根据 archive_ok 派生 delivery_complete" }
+    - { ref: "daemon/pipeline/merger.ts::assertEvidenceSignatureGate", note: "受控合流门禁，控制进入 MERGED 的严格前置条件" }
+  non_goals:
+    - 本卡只盘点不修证，严禁修改任何产品代码
+    - 发现的缺口如实记录挂账，施工另行立卡
+    - 不改动现有合同 Schema 与生命周期转换规则
+    - 不宣称 P0 风险解除
+  fail:
+    - 擅自修改生产代码或测试代码
+    - 未能全面识别三层状态投影点
+    - 将缺口遗漏或未进行明确三分类标注
+  estimate: S
+  invariants:
+    auth: unchanged
+    demo_origin: unchanged
+    illumination: unchanged
+    gateway_write_scope: unchanged
+```
+
+#### 【Task P1.6】Cross-layer Invariants and State Projection Audit
+
+##### R-1 背景与动机
+在《Stagent v0.1 P0/P1 Hardening Remediation Specification》（`docs/stagent-p0-p1-hardening-spec` 分支 commit `4aa68449`）中，P0-A、P0-B、P1-A、P1-B 经去重对照核验（[`docs/ledger/p0-p1-hardening-spec-dedup-crosswalk.md`](../ledger/p0-p1-hardening-spec-dedup-crosswalk.md)），均已在 `main` 主线通过专项施工或总账审计完整闭环。唯有 **P1-C（Cross-layer Invariants and State Projection）** 提出了对系统内多层状态投影与不变量关系的系统性梳理诉求。
+目前系统中，合同生命周期（`ContractStore` / `ContractLifecycleState`）、交付终端闭包（`merger.ts` / `terminal-delivery-closure.ts`）以及前端 UI 呈现层（`index.tsx` / `Console`）存在多处派生与映射点，虽然核心合流受严格门禁（PRE_MERGE 8 道检查）保护，但缺乏统一的状态投影与矛盾组合排查报告。因此立本卡进行专项盘点评估。
+
+##### R-2 目标与明确排除（Non-Goals）
+- **目标**：
+  1. 系统枚举 Lifecycle / Delivery / Presentation 三层状态投影点与数据流向；
+  2. 识别代码中理论可达但语义矛盾的非法转换面与危险状态组合；
+  3. 盘点当前单元、集成与端到端测试对跨层不变量的断言覆盖缺口；
+  4. 产出专项报告落盘 `docs/ledger/p1-6-cross-layer-invariants-audit.md`，按「需修证项 / 可接受项 / 待设计项」进行三分类归拢。
+- **明确排除（逐字写入）**：
+  - **本卡只盘点不修证**：发现的缺口如实记录挂账，施工另行立卡；
+  - **严禁修改任何产品代码**：纯审计型任务卡，生产代码零 diff；
+  - **不变更现有状态机行为**：不修改 `contract.schema.ts`、`contract-store.ts` 与 `merger.ts` 任何执行逻辑。
+
+##### R-3 架构映射与审计对象
+- **Lifecycle 层**：`src/lib/contract.schema.ts` 中的 `ContractLifecycleState`、`daemon/pipeline/contract-store.ts` 中的状态持久化与状态迁移驱动；
+- **Delivery 层**：`daemon/pipeline/merger.ts` 中的合流门禁裁决、`src/lib/state/terminal-delivery-closure.ts` 中的交付状态与公开文案组装；
+- **Presentation 层**：`src/routes/index.tsx`、`src/components/TaskGraphPanel.tsx`、`src/components/Console.tsx` 中的状态消费与展示逻辑。
+
+##### R-4 预期交付物清单
+1. `docs/ledger/p1-6-cross-layer-invariants-audit.md`：跨层状态一致性盘点评估专项报告；
+2. `docs/ledger/README.md`：台账状态与开放项同步；
+3. docs 规范枢纽文件（index、active、completed、changelog、development-tasks.md）按阶段回写。
+
+##### R-5 依赖与排程
+- **硬依赖**：`TASK-P0.16`（COMPLETED）；
+- **排程**：估算 S，优先级 P2-Medium，立卡后状态为 `NEW_TASK`，待 Tina 明确点名授权。
+
+##### R-6 风险与诚实口径
+- **非 P0 风险解除声明**：本卡仅为架构状态一致性的静态盘点评估，不宣称消除底层安全风险；
+- **五项事实边界保留**：
+  1. 硬件级 Attestation 缺失；
+  2. Merger PRE_MERGE 阶段不重跑全量测试；
+  3. 容器内无 OS 级二次沙盒隔离；
+  4. 跨进程 Nonce 存储仍为内存型；
+  5. 真实容器运行时 3/10 测试跳过项；
+  严禁因本卡立卡或交付宣称「P0 风险完全解除」。
+
+##### R-7 审批边界声明
+- 本审批**不是代码合并批准**，也**不是 P0 风险解除声明**；
+- **纯审计型卡，立卡 ≠ 开工**，开工需 Tina 明确点名授权。
+
